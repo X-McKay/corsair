@@ -4,7 +4,7 @@ kind: plan
 title: Local platform qualification
 status: blocked
 updated: 2026-10-10
-related: [SPEC-0001, ISSUE-0001, IDEA-0001, HANDOFF-0001]
+related: [SPEC-0001, ISSUE-0001, IDEA-0001, HANDOFF-0001, HANDOFF-0003]
 ---
 
 # Local platform qualification
@@ -30,3 +30,5 @@ Baseline implementation commit: `047e0bf5dac888f0bbe64c03e24a3e9e09b66397`. Orig
 ## Decisions and next action
 
 No fake kernel device, policy weakening or undocumented patch stack is admitted. Next: use a compatible Linux Docker host and the existing commands, preserving every attempt. Review an explicitly supported alternative profile separately if needed; do not treat it as an automatic fallback.
+
+[HANDOFF-0003](../handoffs/HANDOFF-0003-openshell-continuation.md) records recommended host capacity, upstream kernel/runtime requirements, read-only preflight and the two-clean-cluster procedure. This documentation does not resolve the live blocker. `make test-config` passes all ten offline guards for the handoff update; live Docker qualification was not rerun for this documentation-only change.

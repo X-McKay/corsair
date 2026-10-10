@@ -2,7 +2,7 @@
 
 Corsair is a planned system for validating a reported security issue against an exact repository revision and, when available, a proposed fix. It produces reproducible tests and evidence for InfoSec review. Implementation proceeds through independently qualified components before the complete agent graph is connected.
 
-Status: the first local platform qualification slice is implemented. Six offline guard checks pass; live Kubernetes/CNI qualification is blocked by this development host's nested Docker prerequisites. OpenShell and agents are not yet implemented or qualified. See the [qualification record](docs/qualification/network-platform.md).
+Status: the first local platform qualification slice is implemented. Ten offline guard checks pass; live Kubernetes/CNI qualification is blocked by this development host's nested Docker prerequisites. OpenShell and agents are not yet implemented or qualified. See the [qualification record](docs/qualification/network-platform.md).
 
 The next implementation milestone is [OpenShell qualification in kind](docs/implementation-plan.md#milestone-1-openshell-in-kind), using trusted fixtures to establish execution, policy enforcement, diagnostics, and cleanup before agent integration.
 

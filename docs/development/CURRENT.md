@@ -9,6 +9,6 @@ Updated: 2026-10-10. This is a navigation index; linked plans, issues and qualif
 | Milestone 1A platform subset | Implemented; live qualification blocked on nested host prerequisites | [SPEC-0001](specs/SPEC-0001-local-platform-qualification.md), [PLAN-0001](plans/PLAN-0001-local-platform-qualification.md), [ISSUE-0001](issues/ISSUE-0001-nested-container-runtime.md) |
 | Alternate local runtime profiles | Deferred idea; no automatic repair or fallback | [IDEA-0001](ideas/IDEA-0001-local-runtime-profiles.md) |
 
-Latest handoff: [HANDOFF-0002](handoffs/HANDOFF-0002-ci-cache-and-continuation.md).
+Latest handoff: [HANDOFF-0003](handoffs/HANDOFF-0003-openshell-continuation.md), including a copyable OpenShell continuation prompt, recommended hardware, required host capabilities and preflight.
 
 Current runtime gate: all three live ordinary-pod platform/CNI checks on a compatible host, confirmed cleanup, and a second clean cluster creation/run. See the [qualification record](../qualification/network-platform.md). Actual OpenShell kernel/storage admission, gateway and later components remain pending. Do not integrate unqualified runtime components; independent planning/research and offline fixes can continue.

@@ -16,7 +16,7 @@ make qualify-network CORSAIR_QUAL_RUN=.runs/network-001
 make kind-down
 ```
 
-`make tools` explicitly downloads the locked native binaries. Python dependencies come from `uv.lock`; subsequent commands use `uv run --locked`. `make test-config` runs six offline checks. Native fixture and Calico rendering can also be inspected with the installed kubectl Kustomize support; rendering does not prove runtime compatibility.
+`make tools` explicitly downloads the locked native binaries. Python dependencies come from `uv.lock`; subsequent commands use `uv run --locked`. `make test-config` runs ten offline checks. Native fixture and Calico rendering can also be inspected with the installed kubectl Kustomize support; rendering does not prove runtime compatibility.
 
 `make kind-up` creates one control-plane node, disables kind's default CNI, installs Calico's official digest-verified manifest, loads pinned images, and waits for readiness. It refuses an existing `corsair` cluster, a conflicting container name, or a stale ownership receipt. A partial bootstrap stays available for inspection and explicit cleanup; it is never silently adopted or repaired.
 

@@ -4,7 +4,7 @@ kind: issue
 title: Nested container runtime blocks kind qualification
 status: open
 updated: 2026-10-10
-related: [SPEC-0001, PLAN-0001, IDEA-0001, HANDOFF-0001]
+related: [SPEC-0001, PLAN-0001, IDEA-0001, HANDOFF-0001, HANDOFF-0003]
 ---
 
 # Nested container runtime blocks kind qualification
@@ -24,3 +24,5 @@ The real 1:11 character-device entry was restored only inside the diagnostic nod
 ## Resolution criteria and next action
 
 Use a compatible Linux Docker host or separately reviewed supported profile. Require all three live checks, confirmed fixture cleanup, then a second clean cluster/run and reviewed evidence. Preserve the failed attempt and qualify the selected runtime rather than counting a patched/reused node as fresh acceptance. Resolve this issue only when that evidence exists. No external issue has been created.
+
+The next-session [hardware/preflight handoff](../handoffs/HANDOFF-0003-openshell-continuation.md) separates capacity recommendations from actual host/kernel/runtime acceptance. New hardware alone is not resolution evidence.
