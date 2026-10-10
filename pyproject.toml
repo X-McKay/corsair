@@ -1,0 +1,16 @@
+[project]
+name = "corsair"
+version = "0.0.0"
+description = "Sandboxed security issue validation; initial platform qualification"
+requires-python = ">=3.12,<3.13"
+
+[dependency-groups]
+dev = ["pytest==9.0.2", "PyYAML==6.0.3"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+markers = ["platform: live kind and CNI qualification; requires explicit kubeconfig"]

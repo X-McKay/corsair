@@ -65,7 +65,7 @@ The trusted worker owns model access and sandbox lifecycle. Repository workloads
 ## Organization
 
 ```text
-src/validator/
+src/corsair/
   core/                 contracts, evidence rules, verdict gates
   ports/                narrow external capability interfaces
   adapters/             SDK-backed implementations
@@ -87,6 +87,8 @@ docs/                   contracts, qualification evidence, runbooks
 ```
 
 Each agent owns its factory, contracts, instructions, tools, and evaluation cases. Share a capability only when there is a demonstrated second consumer. Ports describe external capabilities; avoid interfaces for every internal function.
+
+The [OpenShell milestone](openshell-milestone.md) starts with native runtime qualification under deployment, policies, images, and pytest checks. Application ports/adapters are implemented after that boundary passes; later package folders are created only when needed.
 
 ## Complexity rules
 

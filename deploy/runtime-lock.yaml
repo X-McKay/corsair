@@ -1,0 +1,29 @@
+schema_version: 1
+scope: single-node Linux amd64 network qualification; OpenShell not yet admitted
+platform: linux-amd64
+kind:
+  version: v0.33.0
+  url: https://github.com/kubernetes-sigs/kind/releases/download/v0.33.0/kind-linux-amd64
+  sha256: aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d
+kubernetes:
+  version: v1.35.8
+  node_image: kindest/node:v1.35.8@sha256:07b2536e30b803ed61d1677a79df6115f798ce64c80f9e22f6ed45afd09323c0
+kubectl:
+  version: v1.35.8
+  url: https://dl.k8s.io/release/v1.35.8/bin/linux/amd64/kubectl
+  sha256: 874d5e72dbb819f43cff16bcd1e4f8bac5b7f2361fe1e55049b0a6c676fb0cbf
+calico:
+  version: v3.33.0
+  url: https://raw.githubusercontent.com/projectcalico/calico/v3.33.0/manifests/calico.yaml
+  sha256: 2de8f47595fb9c41b3f47d7b767a1f8e72ecf84057af834738ff12689a234da5
+  images:
+    quay.io/calico/calico: sha256:4ebc20730127bc9e8bf1db5f5a2d8b58cf37fe0e891b3c7b5471992221d213e5
+    quay.io/calico/node: sha256:565d8db3200e443955557f8f28ff44ab8a4a456754bc74a19c4f2f3444af9b1c
+    quay.io/calico/third-party-cni-plugins: sha256:0f32f48279484c0d6f0e0d0e767b2d0e1a6c6ca34cb3421a61b989d992f3df41
+fixtures:
+  qualification-echo:
+    image: docker.io/hashicorp/http-echo
+    digest: sha256:fcb75f691c8b0414d670ae570240cbf95502cc18a9ba57e982ecac589760a186
+  qualification-probe:
+    image: docker.io/curlimages/curl
+    digest: sha256:9a1ed35addb45476afa911696297f8e115993df459278ed036182dd2cd22b67b

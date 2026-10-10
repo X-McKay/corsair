@@ -2,9 +2,23 @@
 
 Corsair is a planned system for validating a reported security issue against an exact repository revision and, when available, a proposed fix. It produces reproducible tests and evidence for InfoSec review. Implementation proceeds through independently qualified components before the complete agent graph is connected.
 
-Status: design baseline for implementation planning. No runtime or agent has been implemented or qualified by this bundle.
+Status: the first local platform qualification slice is implemented. Six offline guard checks pass; live Kubernetes/CNI qualification is blocked by this development host's nested Docker prerequisites. OpenShell and agents are not yet implemented or qualified. See the [qualification record](docs/qualification/network-platform.md).
 
 The next implementation milestone is [OpenShell qualification in kind](docs/implementation-plan.md#milestone-1-openshell-in-kind), using trusted fixtures to establish execution, policy enforcement, diagnostics, and cleanup before agent integration.
+
+## Run the first slice
+
+Requirements: Linux amd64, Python 3.12, `uv`, and a local Docker daemon capable of running privileged kind nodes and nested containerd workloads. These commands create a dedicated `corsair` cluster; they do not install into an existing cluster.
+
+```shell
+make tools
+make test-config
+make kind-up
+make qualify-network
+make kind-down
+```
+
+Setup and qualification are separate commands. Failed prerequisites produce errors, and evidence is retained under `.runs/`. Local ownership and kubeconfig state live separately under `.state/`. Both directories are excluded from Git. The [local platform runbook](docs/runbooks/local-platform.md) explains setup, failure diagnosis, and safe cleanup.
 
 ## Agreed decisions
 
@@ -30,6 +44,7 @@ These incorporate improvement items 1, 2, 3, 4, 6, 7, 8, and 9. Item 10 is captu
 5. [Implementation plan](docs/implementation-plan.md): progressive milestones and required evidence.
 6. [Analyst pilot plan](docs/analyst-pilot-plan.md): proposed measurement of practical InfoSec value.
 7. [Benchmark datasets](docs/benchmark-datasets.md): researched sources, 50 candidate issue pairs, licensing, and progressive qualification across Java/Maven, Python, JavaScript, Perl, and Ruby.
+8. [OpenShell milestone](docs/openshell-milestone.md): proposed directory structure, native runtime qualification slices, diagnostics, testing, and acceptance gates.
 
 ## Initial support envelope
 
