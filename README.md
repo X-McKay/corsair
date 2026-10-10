@@ -6,6 +6,10 @@ Status: the first local platform qualification slice is implemented. Six offline
 
 The next implementation milestone is [OpenShell qualification in kind](docs/implementation-plan.md#milestone-1-openshell-in-kind), using trusted fixtures to establish execution, policy enforcement, diagnostics, and cleanup before agent integration.
 
+## Development across sessions
+
+Start with [AGENTS.md](AGENTS.md) and [current work](docs/development/CURRENT.md). The [development workflow](docs/development/README.md) defines shared Codex/Claude skills, principles, record templates, reviews, and handoff prompts. Ideas, specs, plans, development issues and handoffs have stable IDs under `docs/development/`; existing system design docs remain authoritative. Offline workflow guards run with `make test-config` and in GitHub Actions.
+
 ## Run the first slice
 
 Requirements: Linux amd64, Python 3.12, `uv`, and a local Docker daemon capable of running privileged kind nodes and nested containerd workloads. These commands create a dedicated `corsair` cluster; they do not install into an existing cluster.

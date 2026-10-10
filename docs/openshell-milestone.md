@@ -181,7 +181,7 @@ uv run pytest tests/qualification -m recovery --junitxml="$CORSAIR_QUAL_RUN/reco
 make kind-down
 ```
 
-The run directory is operator-selected and created explicitly. The full qualification target runs the admitted groups in dependency order and preserves failing results. It does not skip failed prerequisite checks into an apparent pass. CI executes the same commands on a runner that has passed actual kernel/container qualification; a standard hosted runner is not assumed compatible. Add CI only when the first live slice passes locally.
+The run directory is operator-selected and created explicitly. The full qualification target runs the admitted groups in dependency order and preserves failing results. It does not skip failed prerequisite checks into an apparent pass. Live qualification CI executes the same commands on a runner that has passed actual kernel/container qualification; a standard hosted runner is not assumed compatible. Add live qualification CI only when the first live slice passes locally. Offline development/record guards run independently in the development workflow and do not qualify the runtime.
 
 The later `corsair doctor sandbox` entry point can call admitted checks through a small diagnostic seam. It should not spawn pytest as part of an investigation, import pytest into the production worker, or become another scheduler. Production health checks are a deliberately limited subset; destructive qualification fixtures stay operator tests.
 

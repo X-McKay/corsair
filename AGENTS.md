@@ -1,0 +1,26 @@
+# Corsair development instructions
+
+These instructions apply throughout this repository. Follow the user's current scope and existing authorization; this workflow does not introduce an extra approval gate.
+
+## Start and finish a session
+
+1. Read [README.md](README.md), [current work](docs/development/CURRENT.md), and the linked plan, issue, and latest handoff. Check `git status` and the branch before editing; preserve unrelated work.
+2. Use the [development skill](.claude/skills/corsair-development/SKILL.md). Read only the architecture/contracts and records relevant to the change. Verify recorded state against source and evidence; a handoff is context, not proof.
+3. Work on one bounded component at a time. Keep its implementation plan current, including blockers, decisions, commands and actual results. Continue independent authorized work when a dependency is blocked.
+4. Review using the [review skill](.claude/skills/corsair-review/SKILL.md). Run checks appropriate to the changed boundary; report failed or unrun checks explicitly.
+5. Before ending substantial work, use the [handoff skill](.claude/skills/corsair-handoff/SKILL.md), update `CURRENT.md`, and leave a self-contained result for the user.
+
+The [development guide](docs/development/README.md) defines locations, templates, status meanings and validation. Existing architecture, investigation, recovery and evaluation documents remain authoritative; work records reference them rather than copying them.
+
+## Development principles
+
+- **Keep components small.** Each agent has one objective, typed inputs/outputs, restricted tools, and isolated evaluation. Introduce shared code only for a demonstrated second consumer. Create directories when their component is needed.
+- **Use native capabilities first.** Prefer PydanticAI, Temporal, OpenShell, Pydantic Evals, supported providers and native SDKs. Do not build another scheduler, graph engine, tracing system, provider protocol, credential broker or generic repair framework. Record the upstream gap and concrete need before adding meaningful bespoke functionality.
+- **Keep ports narrow.** Domain contracts do not import vendor SDK objects. Configuration selects explicit adapters/providers; no silent fallback. Reuse the same agent factory/contracts in direct and durable modes and support isolated fixture/local/OpenShell execution as those modes are admitted.
+- **Qualify dependencies progressively.** Do not connect an unqualified component or count mocks, rendered YAML, installed resources or version strings as live qualification. A blocked host/CNI gate stays blocked until actual evidence resolves it. Planning and other independent work may continue.
+- **Preserve security scope.** Keep exactly two native issue-validation tests: benign control and security safety regression. Failed control, skipped discovery, unknown execution, or sandbox denial cannot prove an application fix. Keep labels/oracles outside agent-visible inputs.
+- **Retain attributable evidence.** Distinguish host/admission, gateway/transport, policy, dependency, build, test discovery, assertion, agent/provider and cleanup failures. Preserve upstream detail and uncertain command delivery; do not blindly retry possible side effects.
+- **Keep boundaries explicit.** Operator-owned policies, pins and budgets are not agent-editable. No workload credentials, arbitrary host access, TLS bypass or policy weakening to obtain a pass. Confirm cleanup against immutable identity; record unconfirmed cleanup.
+- **Measure changes.** Use native receipts, traces, usage and evaluation reports. Track observable latency, tool/model calls, tokens, retries and failures per agent and mode. Missing telemetry is unknown, not zero. Relevant evaluations include correctness, contract, trajectory, consistency, grounding, robustness, security, durability, efficiency and composition.
+- **Test proportionately.** Use the smallest meaningful checks for the changed behavior, then affected consumers. Shared contract/policy/runtime changes need broader checks. Do not add tests that merely mirror code or invent coverage claims. Preserve failed attempts and compare against frozen baselines.
+- **Keep durable context honest.** Separate proposed, accepted, implemented and qualified states. Update affected docs and records with the code. Never commit `.runs/`, `.state/`, credentials, unredacted secrets or raw private diagnostic exports. Publication follows user authorization; these instructions do not authorize deployments, issue closure or messaging others.
