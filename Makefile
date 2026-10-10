@@ -1,5 +1,5 @@
 .PHONY: tools kind-up kind-down test-config qualify-network
-export UV_CACHE_DIR := $(CURDIR)/.cache/uv
+export UV_CACHE_DIR ?= $(CURDIR)/.cache/uv
 ifndef CORSAIR_QUAL_RUN
 CORSAIR_QUAL_RUN := .runs/network-$(shell date -u +%Y%m%dT%H%M%S)
 endif
