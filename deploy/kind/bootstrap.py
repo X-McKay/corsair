@@ -130,12 +130,9 @@ def main():
     download(LOCK["calico"], calico / "calico.yaml")
     images = [{"name": name, "newName": name, "digest": digest} for name, digest in LOCK["calico"]["images"].items()]
     (calico / "kustomization.yaml").write_text(yaml.safe_dump({"apiVersion": "kustomize.config.k8s.io/v1beta1", "kind": "Kustomization", "resources": ["calico.yaml"], "images": images}))
-    # Native Docker pulls use configured registry trust; loading avoids node pull setup.
-    refs = [f"{name}@{digest}" for name, digest in LOCK["calico"]["images"].items()]
-    refs += [f"{spec['image']}@{spec['digest']}" for spec in LOCK["fixtures"].values()]
-    for ref in refs:
-        run(docker + ["pull", ref], timeout=600)
-        run([kind, "load", "docker-image", "--name", CLUSTER, ref], timeout=300)
+    # Let the node's CRI pull the exact digest-pinned references from the pod
+    # specs. Loading a digest-only Docker archive through kind can give it a
+    # synthetic import-<date> name that containerd cannot resolve later.
     kube = [kubectl, "--kubeconfig", KUBECONFIG, "--context", "kind-corsair"]
     run(kube + ["apply", "--server-side", "--field-manager=corsair-bootstrap", "-k", calico])
     run(kube + ["rollout", "status", "daemonset/calico-node", "-n", "kube-system", "--timeout=180s"])

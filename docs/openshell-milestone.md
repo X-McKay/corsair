@@ -1,6 +1,6 @@
 # OpenShell qualification in kind
 
-Status: the initial kind/Calico bootstrap and independent network tests are implemented. Offline guard checks pass; live CNI qualification is blocked by the current host's nested Docker prerequisites. See the [platform qualification record](qualification/network-platform.md) and [runbook](runbooks/local-platform.md). The remaining slices below are planned. Source review uses OpenShell v0.1.2 documentation; its exact release artifacts must be selected and pinned before that installation.
+Status: the initial kind/Calico bootstrap and independent network tests are implemented and passed on two clean clusters with confirmed cleanup. See the [platform qualification record](qualification/network-platform.md) and [runbook](runbooks/local-platform.md). Actual storage and OpenShell kernel/runtime admission remain within 1A; later slices below are planned. Source review uses OpenShell v0.1.2 documentation, but compatible immutable release artifacts must be selected and pinned before installation.
 
 ## Objective and scope
 

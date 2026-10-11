@@ -2,16 +2,16 @@
 id: ISSUE-0001
 kind: issue
 title: Nested container runtime blocks kind qualification
-status: open
-updated: 2026-10-10
-related: [SPEC-0001, PLAN-0001, IDEA-0001, HANDOFF-0001, HANDOFF-0003]
+status: resolved
+updated: 2026-10-11
+related: [SPEC-0001, PLAN-0001, IDEA-0001, HANDOFF-0001, HANDOFF-0003, HANDOFF-0004]
 ---
 
 # Nested container runtime blocks kind qualification
 
 ## Observed and expected behavior
 
-Failure layer: host/kubelet/containerd, before Calico or OpenShell. Kubelet cannot open missing `/dev/kmsg`; after diagnostic restoration of the real device entry inside the owned privileged node, containerd cannot mount its nested overlay rootfs. Expected: Kubernetes static pods start and the native platform/CNI tests can run. [PLAN-0001](../plans/PLAN-0001-local-platform-qualification.md) remains blocked.
+Original failure layer: host/kubelet/containerd, before Calico or OpenShell. Kubelet could not open missing `/dev/kmsg`; after diagnostic restoration of the real device entry inside the owned privileged node, containerd could not mount its nested overlay rootfs. Expected: Kubernetes static pods start and the native platform/CNI tests can run. This remains an unsupported-host result, but [PLAN-0001](../plans/PLAN-0001-local-platform-qualification.md) is complete on a separately qualified tuple.
 
 ## Reproduction and evidence
 
@@ -23,6 +23,6 @@ The real 1:11 character-device entry was restored only inside the diagnostic nod
 
 ## Resolution criteria and next action
 
-Use a compatible Linux Docker host or separately reviewed supported profile. Require all three live checks, confirmed fixture cleanup, then a second clean cluster/run and reviewed evidence. Preserve the failed attempt and qualify the selected runtime rather than counting a patched/reused node as fresh acceptance. Resolve this issue only when that evidence exists. No external issue has been created.
+Resolution evidence exists on Ubuntu 24.04.5 LTS, Linux `6.14.0-37-generic`, Docker `29.8.2`, `overlay2`, cgroup v2, with a real `/dev/kmsg`. After correcting digest-only image delivery to use the node's native CRI pull path, all three live checks passed on two fresh clusters in 156.07 and 155.98 seconds. The runs used distinct node UIDs; all four fixture namespace cleanups and both immutable-identity cluster cleanups were confirmed. No external Corsair issue was created.
 
-The next-session [hardware/preflight handoff](../handoffs/HANDOFF-0003-openshell-continuation.md) separates capacity recommendations from actual host/kernel/runtime acceptance. New hardware alone is not resolution evidence.
+The reviewed [qualification report](../../qualification/network-platform.md) preserves both failed-host history and the successful evidence identifiers. This resolves the ordinary-pod kind/Calico blocker only. Actual OpenShell Landlock, seccomp notification, task-memory, storage and gateway admission remain unqualified.

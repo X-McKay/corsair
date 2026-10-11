@@ -3,8 +3,8 @@ id: PLAN-0002
 kind: plan
 title: Shared development workflow
 status: complete
-updated: 2026-10-10
-related: [SPEC-0002, HANDOFF-0001, HANDOFF-0002, PLAN-0001, ISSUE-0002]
+updated: 2026-10-11
+related: [SPEC-0002, HANDOFF-0001, HANDOFF-0002, HANDOFF-0004, PLAN-0001, ISSUE-0002]
 ---
 
 # Shared development workflow
@@ -32,4 +32,4 @@ The first [hosted run](https://github.com/X-McKay/corsair/actions/runs/380827897
 
 ## Decisions and next action
 
-Use the already-present pytest/PyYAML stack for a small set of offline guardrails. These detect structural drift; they are not an agent compliance evaluator or runtime admission. The scoped workflow deliverables are complete; native client smoke coverage remains open and the platform plan remains blocked. Resume runtime qualification only on a compatible host.
+Use the already-present pytest/PyYAML stack for a small set of offline guardrails. These detect structural drift; they are not an agent compliance evaluator or runtime admission. The scoped workflow deliverables are complete; native client smoke coverage remains open. [PLAN-0001](PLAN-0001-local-platform-qualification.md) is now complete on the qualified host tuple; actual OpenShell installation, storage and kernel/runtime admission remain the next live gate.

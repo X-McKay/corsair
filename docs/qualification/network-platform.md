@@ -1,67 +1,84 @@
 # Initial platform qualification record
 
-Date: 2026-10-10. Outcome: **blocked at host/container-runtime prerequisites; no live CNI or OpenShell qualification**.
+Date: 2026-10-11. Outcome: **qualified for the bounded single-node ordinary-pod kind/Calico boundary on the recorded host tuple after two clean runs with confirmed cleanup**.
 
-The bootstrap, trusted ordinary-pod fixtures, and independent ingress/egress tests are implemented. This record distinguishes completed offline checks from a failed live attempt. No benchmark candidate is promoted to runtime-qualified by this work.
+The bootstrap, trusted ordinary-pod fixtures, and independent ingress/egress tests are implemented and live-qualified. This result does not qualify OpenShell, Agent Sandbox, storage, gateway identity, production tenancy or benchmark workloads. No benchmark candidate is promoted by this work.
 
-## Selected tuple
+## Qualified tuple
 
 | Component | Selection/observation |
 | --- | --- |
-| Python | 3.12.14 observed; project requires Python 3.12 |
-| uv / pytest / PyYAML | uv 0.12.23 observed; pytest 9.0.2 and PyYAML 6.0.3 locked |
-| Host | Linux amd64; Docker 28.4.0, kernel 6.18.44, Docker storage driver `vfs` observed |
+| Host capacity | Ubuntu 24.04.5 LTS; Linux amd64; 32 CPUs; 59 GiB RAM; 589 GiB free storage |
+| Kernel/runtime hints | Kernel `6.14.0-37-generic`; real `/dev/kmsg`; cgroup v2; `landlock` in the visible LSM list |
+| Docker | Engine `29.8.2`; `overlay2`; local `/var/run/docker.sock` |
+| Python | Host `python3.12` reported 3.12.4; uv selected CPython 3.12.13 for the project |
+| uv / pytest / PyYAML | uv 0.11.12 observed; pytest 9.0.2 and PyYAML 6.0.3 locked |
 | kind / Kubernetes / kubectl | v0.33.0 / v1.35.8 / v1.35.8 selected; tool checksums verified |
-| Calico | v3.33.0 official manifest checksum verified; images pinned; not installed in the live attempt |
+| Node runtime | Debian 13 kind node; kernel `6.14.0-37-generic`; containerd 2.3.4 |
+| Calico | v3.33.0 official manifest checksum verified; all deployed images digest-pinned |
 | Fixtures | HashiCorp http-echo 1.0.0 and curlimages/curl 8.14.1 selected by immutable digest |
 | Topology | One local control-plane node; no multi-node claim |
-| OpenShell / Agent Sandbox | Not yet selected, installed or admitted |
+| OpenShell / Agent Sandbox | Not selected, installed or admitted |
 
-Exact tool URLs, SHA-256 checksums and OCI digests live in [runtime-lock.yaml](../../deploy/runtime-lock.yaml). This is a selected tuple with incomplete runtime qualification, not a support declaration.
+Exact tool URLs, SHA-256 checksums and OCI digests live in [runtime-lock.yaml](../../deploy/runtime-lock.yaml). The capacity and kernel hints above are observations, not evidence that later OpenShell Landlock/seccomp/task-memory checks will pass.
 
 ## Completed checks
 
-- Six offline pytest checks pass: local/CNI configuration, immutable pins, workload identity/host-access restrictions, scoped network rules, unknown timeout receipt preservation, and refusal to delete a replacement namespace.
-- Native kubectl Kustomize rendering succeeds: four fixture resources with three pinned container references; 38 official Calico resources with six pinned container references. The downloaded Calico manifest matches its locked SHA-256.
-- kind and kubectl native version commands pass using checksum-verified binaries. The pinned kind node image is available and node creation begins.
-- The live qualification command reports three prerequisite errors, zero passing live checks and zero skips. It does not turn missing bootstrap state into an apparent qualification.
-- Explicit native kind cleanup succeeds and confirms the owned node container is absent. The diagnostic changes described below are discarded with that container.
+- Ten offline pytest checks pass: local/CNI configuration, immutable pins, workload identity/host-access restrictions, scoped network rules, unknown timeout receipt preservation, replacement-namespace cleanup refusal, and development workflow/record guards.
+- Checksum-verified kind and kubectl native version commands pass. Native kubectl Kustomize rendering uses the pinned Calico and fixture image digests.
+- Two clusters were created only after native kind and Docker inspection reported no existing `corsair` cluster or control-plane container. Their Kubernetes node UIDs differ.
+- On each cluster, the pinned Kubernetes version/architecture, Ready node, Ready Calico daemonset/controller and deployed Calico image digests passed the platform check.
+- On each cluster, ingress and egress checks exercised direct PodIP and Service ClusterIP paths with GET and POST. Every permitted control reached the server and appeared in its logs. Each denied route/method completed three fresh curl trials with exit 28/status 000, and denied markers were absent from covered server logs. Policy removal or narrow additive allow restored reachability.
+- Run 1 passed three tests in 156.07 seconds; run 2 passed three tests in 155.98 seconds. There were no failures, errors or skips.
+- All four fixture namespaces were deleted only after UID comparison; every cleanup receipt says `confirmed: true`, and live post-run inventories contained no `corsair-net-*` namespace.
+- Both clusters were deleted only after container-ID comparison. Native Docker inspection confirmed the owned node absent before local owner/kubeconfig state was removed; both cleanup receipts say `confirmed: true`.
 
-## Live bootstrap failure and diagnosis
+This establishes the bounded single-node ordinary-pod NetworkPolicy calibration described by [SPEC-0001](../development/specs/SPEC-0001-local-platform-qualification.md). It is not a general proof of network isolation or sandbox escape resistance.
 
-`make kind-up` fails during control-plane initialization, before CNI installation, image loading, or network fixtures. The failing native kind command takes approximately 81.6 seconds. Kubeadm's visible symptom is inability to create its admin ClusterRoleBinding; native kubelet diagnostics identify the earlier cause:
+## Retained image-delivery failure and correction
+
+The first cluster created on this host reached the Kubernetes API and applied Calico, but `calico-node` remained in `Init:CreateContainerError`. The bootstrap had passed digest-only external references to `kind load docker-image`. The resulting containerd metadata included synthetic `docker.io/library/import-2026-10-11@...` repo digests. Kubelet's checkpoint-image check selected one of those names and failed because containerd could not resolve it:
 
 ```text
-failed to run Kubelet: ... open /dev/kmsg: no such file or directory
+failed to check if this is a checkpoint image: failed to get image from containerd
+... image "docker.io/library/import-2026-10-11@sha256:...": not found
 ```
 
-For diagnosis only, the real character-device entry with major/minor 1:11 was created inside the already privileged, owned kind node. It was not substituted with `/dev/null` or a synthetic log source. Kubelet then started, exposing another underlying runtime failure:
+The underlying Calico content and original pinned repo digest were present. This matches upstream kind issue [#4184](https://github.com/kubernetes-sigs/kind/issues/4184), which records the same synthetic archive name and checkpoint-image failure. The owned failed cluster was deleted with confirmed identity/absence.
 
-```text
-failed to create containerd task: ... failed to mount rootfs component:
-... fstype: overlay ... err: invalid argument
-```
+The bounded repository correction removes archive loading for these published digest-only images. Kubernetes now gives the node's native CRI the exact digest-pinned pod references, and containerd pulls them through its supported CRI path. No tag, mirror, registry, TLS check, policy or image digest was loosened. Both subsequent clean clusters passed without synthetic imported Calico images.
 
-The nested containerd overlay filesystem cannot start Kubernetes static-pod sandboxes on this host configuration. The API server remains unavailable. Neither failure is an OpenShell policy boundary, a repository dependency error, a Java build failure, or agent behavior: those components have not run. Automatic bootstrap performs no device repair, snapshotter substitution, or policy weakening.
+## Evidence identifiers
 
-Local retained evidence identifiers:
+Raw evidence remains ignored and local. The checked-in record preserves the reviewed outcomes and identifiers:
 
-- Bootstrap receipts: `.runs/bootstrap/266e792cceb448eda4a120fda17715db/`.
-- Manually collected native kind logs: that directory's `native-kind-logs/corsair-control-plane/`, including kubelet/containerd journals. Full vendor diagnostic metadata is private local material, not a publication artifact.
-- Blocked qualification JUnit: `.runs/network-blocked-20261010/junit.xml`; final-source prerequisite check: `.runs/network-blocked-final-20261010/junit.xml` (three errors, zero passes/skips).
-- Confirmed cleanup receipt: `.runs/bootstrap/9376da560683484c95328edcfb94830b/cleanup.json`.
+| Attempt | Evidence | Result |
+| --- | --- | --- |
+| Digest-archive failure | `.runs/bootstrap/d252aa9bd03b4f22a83a971c0d0223c5/` | Calico rollout timed out after 180 seconds; scoped pod/event/CRI diagnostics retained |
+| Failed-attempt cleanup | `.runs/bootstrap/c8875408e6ae4b35864e0646e35798a8/cleanup.json` | Confirmed |
+| Clean run 1 bootstrap | `.runs/bootstrap/737b0d52667c4ed8b7706b88d43d4e2c/` | Ready |
+| Clean run 1 qualification | `.runs/network-host-001/` | 3 passed in 156.07s; node UID `4966d7bf-eba5-44cd-9972-95ee0bf434bc`; both fixture cleanups confirmed |
+| Clean run 1 cleanup | `.runs/bootstrap/f7d4716ed3474669b31825e0c488b8ff/cleanup.json` | Container ID `810856456ba9ab229fb94079f8b4371097efbbf6ef1e1485c318fbbd5cb84368`; confirmed |
+| Clean run 2 bootstrap | `.runs/bootstrap/0872c5a96488407fbba2ca4d32761778/` | Ready |
+| Clean run 2 qualification | `.runs/network-host-002/` | 3 passed in 155.98s; node UID `419ddd9e-0f0e-4c6f-b60e-e38db2bd420a`; both fixture cleanups confirmed |
+| Clean run 2 cleanup | `.runs/bootstrap/9c97eff6b7894799afc06ab94aebe079/cleanup.json` | Container ID `a34995046b3fc32bded713d78ea59adeae2d3751ff8fd40d5a47240192bec29d`; confirmed |
 
-Evidence remains outside Git; the checked-in report preserves the result and references. Private kubeconfig/ownership state is separate from run evidence.
+Kubeconfigs, ownership state and raw private logs are not publication artifacts.
+
+## Preserved unsupported-host history
+
+The earlier managed environment remains unsupported: Docker 28.4.0, kernel 6.18.44 and outer `vfs` storage. Kind failed before Calico because kubelet lacked `/dev/kmsg`; diagnostic-only restoration of the real device entry exposed nested overlay mount `invalid argument` failures. No fake device, alternate snapshotter, host repair or policy weakening was retained. The owned node was deleted and its absence confirmed. Success on the qualified `overlay2` host does not retroactively qualify that environment.
 
 ## Next acceptance gate
 
-Run the existing commands on a Linux Docker host that supports the required nested kind devices, cgroups and containerd mounts. Require all three live checks to pass, confirmed fixture cleanup, then a second clean cluster creation and run. Keep every failed attempt in evidence. A supported alternate local runtime profile may be reviewed separately; it must preserve the same acceptance tests.
+Select mutually compatible immutable Agent Sandbox, OpenShell, Helm and workload artifacts from primary sources. Then implement the remaining bounded 1A slice: supported installation prerequisites, storage/PVC behavior, and actual production-topology kernel/runtime admission for Landlock, seccomp notification/addfd, task-memory access and listener mode. A version string, chart render or installed resource cannot pass that gate.
 
-Then extend 1A to actual OpenShell kernel/storage admission and move into gateway/identity qualification. Select compatible upstream Agent Sandbox, OpenShell CLI/SDK/chart/runtime artifacts before that work. The remaining lifecycle, filesystem/request policy, toolchain and recovery slices are still planned in the [OpenShell milestone](../openshell-milestone.md).
+Only after mandatory 1A admission succeeds should work proceed to gateway/identity, lifecycle, policy, toolchain and recovery slices in the [OpenShell milestone](../openshell-milestone.md). Do not start application adapters, agents or Temporal integration first.
 
 ## Primary sources
 
 - [kind v0.33.0 release and node image digests](https://github.com/kubernetes-sigs/kind/releases/tag/v0.33.0).
+- [kind issue #4184: synthetic import image name and checkpoint failure](https://github.com/kubernetes-sigs/kind/issues/4184).
 - [Calico on kind](https://docs.tigera.io/calico/latest/getting-started/kubernetes/kind) and [selected official manifest](https://github.com/projectcalico/calico/blob/v3.33.0/manifests/calico.yaml).
 - [Kubernetes NetworkPolicy semantics](https://kubernetes.io/docs/concepts/services-networking/network-policies/), including additive allows and CNI implementation requirements.
 - [http-echo request logging implementation](https://github.com/hashicorp/http-echo/blob/v1.0.0/handlers.go).

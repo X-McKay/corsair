@@ -6,7 +6,7 @@ This first slice tests Kubernetes NetworkPolicy using ordinary, trusted pods. It
 
 Use Linux amd64, Python 3.12, `uv`, and a local Docker daemon at `/var/run/docker.sock`. The Docker host must support privileged kind nodes, kubelet's real kernel-device prerequisites, cgroups, and nested containerd mounts. Docker Desktop/VM/containerized environments need their own qualification; a workstation kernel version alone is insufficient.
 
-The runtime lock pins kind, kubectl, Kubernetes/node image, the official Calico manifest, and every fixture/CNI image. Tool and manifest downloads are checksum verified. Native Kustomize pins upstream image references. Docker pulls and `kind load docker-image` supply images without adding a custom image registry or disabling TLS checks. Existing proxy, CA trust, and Docker registry configuration are preserved; remote Docker context selectors are cleared deliberately because this target owns a local cluster.
+The runtime lock pins kind, kubectl, Kubernetes/node image, the official Calico manifest, and every fixture/CNI image. Tool and manifest downloads are checksum verified. Native Kustomize pins upstream image references, and the kind node's native CRI pulls those exact digests using its configured network and trust without adding a custom image registry or disabling TLS checks. Pull or trust failures remain node/runtime prerequisites. Remote host Docker context selectors are cleared deliberately because this target owns a local cluster.
 
 ```shell
 make tools
