@@ -51,7 +51,7 @@ def wait_pair(kube):
         time.sleep(2)
 
 
-def inspect_identity(kube, actual, summary):
+def inspect_identity(kube, actual, summary, expected_image=None):
     pair = wait_pair(kube)
     crs = kube.get('sandboxes', '-n', 'openshell')['items']
     assert len(crs) == 1
@@ -79,14 +79,14 @@ def inspect_identity(kube, actual, summary):
             assert container['securityContext']['capabilities'] == {'drop': ['ALL']}
         summary[role + '_pod_uid'] = pod['metadata']['uid']
     workload, supervisor = pair['workload']['spec'], pair['supervisor']['spec']
-    assert workload['containers'][0]['image'] == LOCK['openshell']['images']['workload']
+    assert workload['containers'][0]['image'] == (expected_image or LOCK['openshell']['images']['workload'])
     assert supervisor['containers'][0]['image'] == LOCK['openshell']['images']['supervisor']
     tokens = [s['serviceAccountToken'] for v in supervisor['volumes'] for s in v.get('projected', {}).get('sources', []) if 'serviceAccountToken' in s]
     assert len(tokens) == 1 and tokens[0]['audience'] == 'openshell-gateway'
     assert not any('serviceAccountToken' in s for v in workload['volumes'] for s in v.get('projected', {}).get('sources', []))
     workload_volumes = {v['name']: v for v in workload['volumes']}
     assert workload['securityContext']['supplementalGroupsPolicy'] == 'Strict'
-    assert all(c['image'] in (LOCK['openshell']['images']['runtime'], LOCK['openshell']['images']['workload']) for c in workload['initContainers'])
+    assert all(c['image'] in (LOCK['openshell']['images']['runtime'], expected_image or LOCK['openshell']['images']['workload']) for c in workload['initContainers'])
     assert workload_volumes['openshell-runtime']['emptyDir']['medium'] == 'Memory'
     assert workload_volumes['openshell-runtime-state']['emptyDir']['medium'] == 'Memory'
     assert all('secret' not in workload_volumes[m['name']] for c in workload['containers'] for m in c.get('volumeMounts', [])), 'Workload container has Secret mount'
