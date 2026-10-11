@@ -22,7 +22,7 @@ Deliver a minimal repeatable setup and qualification command, evidence report, v
 
 ## Milestone 2 Sandbox and artifact adapters
 
-Status: the first [create/readiness/delete and host receipt slice](qualification/openshell-adapter-lifecycle.md) is qualified on two fresh admitted nodes. The full milestone is incomplete; execution/transfers/output/failure contracts, immutable artifact storage and worker-loss cases remain. Native deletion lacks an atomic expected-ID condition, so the current slice requires an operator-exclusive workspace and nonreused names.
+Status: the first [create/readiness/delete and host receipt slice](qualification/openshell-adapter-lifecycle.md) is qualified on two fresh admitted nodes. The [bounded execution/output/failure slice](qualification/openshell-adapter-execution.md) also passed three cycles on each of two new admitted nodes with complete cleanup and 123 offline checks. Its supported SDK worker requires the qualified Linux/glibc 2.39 single-CPU/two-arena profile under unchanged hard limits. The full milestone is incomplete; transfers/path/digest contracts, immutable artifact/source storage and live worker/controller/storage/transport fault cases remain. Native deletion lacks an atomic expected-ID condition, so the current slice requires an operator-exclusive workspace and nonreused names.
 
 Implement only the required port methods using SDKs/standard storage operations. Exercise create, transfers, exec, event collection, destroy, output bounds, timeout, interrupted transport, and unknown delivery. Capture immutable source snapshots without running hooks; validate file types, path confinement, and digest identity.
 
