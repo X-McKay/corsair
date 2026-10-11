@@ -133,6 +133,7 @@ def gateway(kube):
     summary = {'gateway': 'blocked', 'tls': 'unrun', 'caller_auth': 'unrun', 'identity': 'unrun', 'access_isolation': 'unrun'}
     cleanup = {'namespace_uid': owner['namespace_uid'], 'confirmed': False, 'pv_confirmed': False}
     port_forward = None
+    port_forwards = []
     sandbox_id = None
     name = 'identity-' + uuid.uuid4().hex[:10]
     private = STATE / name
@@ -155,6 +156,7 @@ def gateway(kube):
             port = listener.getsockname()[1]
         forward_log = (kube.evidence / 'port-forward.log').open('w')
         port_forward = subprocess.Popen(kube.argv + ['port-forward', '-n', 'openshell', 'svc/openshell', '--address=127.0.0.1', f'{port}:8080'], stdout=forward_log, stderr=subprocess.STDOUT)
+        port_forwards.append((port_forward, forward_log))
         deadline = time.monotonic() + 15
         while True:
             assert port_forward.poll() is None, 'Port-forward exited'
@@ -230,7 +232,7 @@ def gateway(kube):
         for resource, identity in summary['workspace_storage'].items():
             wait_resource_absent(kube, resource, identity['name'], identity['uid'], namespace=None if resource == 'pv' else 'openshell')
         sandbox_id = None
-        yield {'endpoint': f'127.0.0.1:{port}', 'mtls': mtls, 'cli': cli}
+        yield {'endpoint': f'127.0.0.1:{port}', 'mtls': mtls, 'cli': cli, 'port_forwards': port_forwards}
     finally:
         (kube.evidence / 'gateway.json').write_text(json.dumps(summary, indent=2))
         try:
@@ -267,11 +269,14 @@ def gateway(kube):
         finally:
             try:
                 if port_forward is not None:
-                    port_forward.terminate()
-                    port_forward.wait(timeout=10)
-                    forward_log.close()
+                    for process, log in port_forwards:
+                        if process.poll() is None:
+                            process.terminate()
+                        process.wait(timeout=10)
+                        log.close()
                     cleanup['port_forward_exit'] = port_forward.returncode
-                    cleanup['port_forward_confirmed'] = True
+                    cleanup['port_forwards'] = [{'pid': p.pid, 'exit': p.returncode} for p, _ in port_forwards]
+                    cleanup['port_forward_confirmed'] = all(p.poll() is not None for p, _ in port_forwards)
             finally:
                 (kube.evidence / 'cleanup.json').write_text(json.dumps(cleanup, indent=2))
                 summary['outcome'] = 'passed' if all(summary[key] == 'passed' for key in ('gateway', 'tls', 'caller_auth', 'identity', 'access_isolation')) and all(cleanup.get(key) is True for key in ('confirmed', 'pv_confirmed', 'private_state_absent', 'port_forward_confirmed')) else 'failed'

@@ -10,6 +10,8 @@ Deliverables are an example input, environment recipe, two-test specification, e
 
 ## Milestone 1 OpenShell in kind
 
+Status: bounded native 1A–1F qualified on the selected single-node Linux amd64 tuple; [the closure report](qualification/openshell-recovery.md) records the two final recovery matrices, failures and immutable cleanup. Intermittent admission-readiness [ISSUE-0004](development/issues/ISSUE-0004-native-admission-readiness.md) remains open. Production reliability and subsequent milestones remain unqualified; each fresh runtime must pass its mandatory native gates.
+
 The [detailed OpenShell milestone](openshell-milestone.md) specifies the proposed files, topology, progressive test slices, native SDK/CLI paths, evidence, and handoff to the application adapter.
 
 Pin kind, Kubernetes, Agent Sandbox, OpenShell, image digests, and node/kernel assumptions. Provision the supported local topology and use native CLI/SDK commands to verify readiness, permitted scratch access, forbidden filesystem access, approved/denied network access, limits, transfer, and confirmed deletion. Use a network-denial test that distinguishes policy enforcement from an unavailable endpoint.
