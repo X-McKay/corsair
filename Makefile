@@ -100,3 +100,10 @@ qualify-artifacts:
 	test ! -e "$(CORSAIR_QUAL_RUN)"
 	mkdir -m 700 -p "$(CORSAIR_QUAL_RUN)"
 	PYTHONPATH="$(CURDIR)/src:$(CURDIR)" uv run --locked python -m tests.qualification.qualify_artifacts --evidence-dir "$(CORSAIR_QUAL_RUN)" --configuration "$(CORSAIR_ARTIFACT_CONFIG)" --source-manifest "$(CORSAIR_SOURCE_MANIFEST)"
+
+# One documented native upload; no download or application transfer admission.
+.PHONY: qualify-native-upload
+qualify-native-upload:
+	test ! -e "$(CORSAIR_QUAL_RUN)"
+	mkdir -p "$(CORSAIR_QUAL_RUN)"
+	uv run --locked python -m pytest tests/qualification -m native_upload --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"

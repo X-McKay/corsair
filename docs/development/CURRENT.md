@@ -2,15 +2,15 @@
 
 Updated: 2026-10-11. This is a navigation index; linked plans, issues and qualification reports carry the details. Verify git/source state when resuming.
 
-Current focus: resume transfer admission through the smallest documented native operation. The premature Docker staging experiment is withdrawn; its failed attempts are retained in PLAN-0013. Native application transfers remain blocked; independent local source/artifact qualification does not admit sandbox storage integration. No live cluster or OpenShell installation remains; private evidence is retained separately.
+Current focus: the documented trusted single-file native upload passed on two fresh admitted nodes with confirmed cleanup. Native application transfers and untrusted download admission remain blocked; next is a focused documented-download admission review. The premature Docker staging experiment remains withdrawn, with failures retained in PLAN-0013. No live cluster or OpenShell installation remains; private evidence is retained separately.
 
 | Active or latest work | State | Records |
 | --- | --- | --- |
-| Milestone 2 native transfers | Blocked before application/live dispatch: supported retry and bounded extraction admission unresolved | [SPEC-0011](specs/SPEC-0011-native-transfer-admission.md), [PLAN-0013](plans/PLAN-0013-native-transfer-admission.md), [ISSUE-0006](issues/ISSUE-0006-native-transfer-retry-admission.md) |
+| Milestone 2 native transfers | Controlled native upload qualified; application retry and untrusted bounded extraction admission blocked | [SPEC-0011](specs/SPEC-0011-native-transfer-admission.md), [PLAN-0013](plans/PLAN-0013-native-transfer-admission.md), [ISSUE-0006](issues/ISSUE-0006-native-transfer-retry-admission.md), [upload report](../qualification/openshell-native-upload.md) |
 | Milestone 2 local source/artifacts | Qualified for one exclusive local root and complete offline bare Git repository; principles review recorded | [SPEC-0012](specs/SPEC-0012-immutable-source-artifacts.md), [PLAN-0014](plans/PLAN-0014-immutable-source-artifacts.md), [report](../qualification/local-source-artifacts.md) |
 | Native client discovery | Layout checks pass; actual client smoke checks remain limited | [ISSUE-0002](issues/ISSUE-0002-native-client-discovery.md) |
 
-Latest handoff: [HANDOFF-0017](handoffs/HANDOFF-0017-native-transfer-course-correction.md). [HANDOFF-0015](handoffs/HANDOFF-0015-source-artifacts-qualified-transfer-blocked.md) preserves the local source qualification and transfer investigation.
+Latest handoff: [HANDOFF-0018](handoffs/HANDOFF-0018-native-upload-qualified.md). [HANDOFF-0017](handoffs/HANDOFF-0017-native-transfer-course-correction.md) preserves the staging course correction; [HANDOFF-0015](handoffs/HANDOFF-0015-source-artifacts-qualified-transfer-blocked.md) preserves local source qualification.
 
 | Qualified foundation | Evidence and limits |
 | --- | --- |
