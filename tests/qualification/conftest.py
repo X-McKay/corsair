@@ -1,9 +1,10 @@
 import json
+import hashlib
 from pathlib import Path
 
 import pytest
 
-from tests.qualification.support import Kubectl, NetworkFixture, ROOT, require_platform
+from tests.qualification.support import Kubectl, NetworkFixture, ROOT, LOCK, require_platform, require_owned_cluster
 
 
 def pytest_addoption(parser):
@@ -25,6 +26,9 @@ def kube(request):
         pytest.fail("This gate only mutates the explicitly owned local kind cluster")
     if not kubeconfig.is_file() or not (ROOT / ".state/kind/owner.json").is_file():
         pytest.fail("Owned kind state is missing; bootstrap did not finish. Inspect .runs/bootstrap before retrying")
+    binary = ROOT / ".tools" / LOCK["platform"] / "kubectl"
+    if not binary.is_file() or hashlib.sha256(binary.read_bytes()).hexdigest() != LOCK["kubectl"]["sha256"]:
+        pytest.fail("Run make tools for the checksum-verified native kubectl")
     evidence = Path(evidence_arg).resolve()
     evidence.mkdir(parents=True, exist_ok=True)
     evidence.chmod(0o700)
@@ -32,13 +36,8 @@ def kube(request):
         pytest.fail("Evidence directory must be empty; prior results cannot be overwritten")
     (evidence / "runtime-lock.yaml").write_text((ROOT / "deploy/runtime-lock.yaml").read_text())
     client = Kubectl(kubeconfig, context, evidence)
-    server = client.run("config", "view", "--minify", "-o", "jsonpath={.clusters[0].cluster.server}").stdout
-    if not server.startswith("https://127.0.0.1:"):
-        pytest.fail("Qualification requires a localhost-bound kind API")
-    nodes = client.get("nodes")["items"]
-    if len(nodes) != 1 or nodes[0]["metadata"]["name"] != "corsair-control-plane":
-        pytest.fail("Unexpected cluster topology; refusing mutations")
-    (evidence / "scope.json").write_text(json.dumps({"scope": "single-node local kind network qualification", "openshell_admitted": False, "node_uid": nodes[0]["metadata"]["uid"]}, indent=2))
+    node = require_owned_cluster(client)
+    (evidence / "scope.json").write_text(json.dumps({"scope": "single-node local kind platform qualification", "openshell_gateway_admitted": False, "node_uid": node["metadata"]["uid"]}, indent=2))
     yield client
 
 

@@ -1,4 +1,4 @@
-.PHONY: tools kind-up kind-down test-config qualify-network
+.PHONY: tools kind-up kind-down test-config qualify-network admission-artifacts admission-install qualify-admission
 export UV_CACHE_DIR ?= $(CURDIR)/.cache/uv
 ifndef CORSAIR_QUAL_RUN
 CORSAIR_QUAL_RUN := .runs/network-$(shell date -u +%Y%m%dT%H%M%S)
@@ -19,3 +19,14 @@ test-config:
 qualify-network:
 	mkdir -p "$(CORSAIR_QUAL_RUN)"
 	uv run --locked python -m pytest tests/qualification -m platform --kubeconfig .state/kind/kubeconfig --context kind-corsair --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
+
+# Explicit preparation and installation. Neither target installs a gateway.
+admission-artifacts:
+	uv run --locked python -m deploy.openshell.artifacts
+
+admission-install:
+	uv run --locked python -m tests.qualification.install_admission
+
+qualify-admission:
+	mkdir -p "$(CORSAIR_QUAL_RUN)"
+	uv run --locked python -m pytest tests/qualification -m admission --kubeconfig .state/kind/kubeconfig --context kind-corsair --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"

@@ -37,3 +37,29 @@ def test_cleanup_cannot_delete_a_replacement_namespace(tmp_path):
     assert not any(args[0] == "delete" for args in calls)
     receipt = json.loads((fixture.evidence / "cleanup.json").read_text())
     assert receipt["uid"] == "original" and receipt["confirmed"] is False
+
+
+def test_admission_refuses_a_replaced_cluster_before_kubernetes_access(tmp_path, monkeypatch):
+    from tests.qualification import support
+    (tmp_path / '.state/kind').mkdir(parents=True)
+    (tmp_path / '.state/kind/owner.json').write_text(json.dumps({'container_id': 'original'}))
+    monkeypatch.setattr(support, 'ROOT', tmp_path)
+    calls = []
+    def native(argv):
+        calls.append(argv)
+        return SimpleNamespace(stdout='replacement\n')
+    client = SimpleNamespace(native=native)
+    with pytest.raises(RuntimeError, match='identity changed'):
+        support.require_owned_cluster(client)
+    assert len(calls) == 1 and calls[0][2] == 'inspect'
+
+
+def test_offline_chart_evidence_never_contains_secret_values():
+    from deploy.openshell.artifacts import reviewed_render
+    import yaml
+    source = 'kind: Secret\ndata: {key: private-value}\nstringData: {other: private-text}\n---\nkind: ConfigMap\ndata: {config: harmless}\n'
+    rendered = reviewed_render(source)
+    assert 'private-value' not in rendered and 'private-text' not in rendered
+    documents = list(yaml.safe_load_all(rendered))
+    assert documents[0]['data']['key'] == '<redacted>'
+    assert documents[1]['data']['config'] == 'harmless'

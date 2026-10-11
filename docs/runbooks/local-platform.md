@@ -16,11 +16,11 @@ make qualify-network CORSAIR_QUAL_RUN=.runs/network-001
 make kind-down
 ```
 
-`make tools` explicitly downloads the locked native binaries. Python dependencies come from `uv.lock`; subsequent commands use `uv run --locked`. `make test-config` runs ten offline checks. Native fixture and Calico rendering can also be inspected with the installed kubectl Kustomize support; rendering does not prove runtime compatibility.
+`make tools` explicitly downloads the locked native binaries. Python dependencies come from `uv.lock`; subsequent commands use `uv run --locked`. `make test-config` runs fourteen offline checks, including the admission artifact/profile and identity/evidence guards. Native fixture and Calico rendering can also be inspected with the installed kubectl Kustomize support; rendering does not prove runtime compatibility.
 
-`make kind-up` creates one control-plane node, disables kind's default CNI, installs Calico's official digest-verified manifest, loads pinned images, and waits for readiness. It refuses an existing `corsair` cluster, a conflicting container name, or a stale ownership receipt. A partial bootstrap stays available for inspection and explicit cleanup; it is never silently adopted or repaired.
+`make kind-up` creates one control-plane node, disables kind's default CNI, installs Calico's official digest-verified manifest, leaves pinned image pulls to the native CRI, and waits for readiness. It refuses an existing `corsair` cluster, a conflicting container name, or a stale ownership receipt. A partial bootstrap stays available for inspection and explicit cleanup; it is never silently adopted or repaired.
 
-`make qualify-network` requires the explicit owned kubeconfig/context and an empty evidence directory. It checks the local API and expected topology before any mutation. Readiness and pinned Calico images are prerequisites for fixture creation. Each network scenario owns a fresh namespace and records its UID; cleanup refuses a replacement namespace.
+`make qualify-network` requires the explicit owned kubeconfig/context and an empty evidence directory. It verifies the local node container ID against the ownership receipt, the checksum-pinned kubectl, the local API and expected topology before any mutation. Readiness and pinned Calico images are prerequisites for fixture creation. Each network scenario owns a fresh namespace and records its UID; cleanup refuses a replacement namespace.
 
 ## What the tests establish
 
@@ -65,4 +65,4 @@ Qualification receipts, runtime-lock snapshot, scope, native resource facts/logs
 
 `make kind-down` compares the owned node's container ID, uses native kind deletion, and confirms container absence before removing local ownership/kubeconfig state. It refuses an unknown owner or replacement container. Run it after a partial bootstrap if ownership was recorded. Evidence survives cleanup; cached images and downloads are intentionally retained. If cleanup fails, preserve state and inspect that failure before another attempt.
 
-The current [qualification record](../qualification/network-platform.md) documents the host blocker. After this suite passes on a fresh compatible cluster and a second clean creation, proceed to selecting and qualifying Agent Sandbox and OpenShell artifacts. Actual kernel admission, gateway identity, lifecycle, policy, toolchain and recovery gates remain outstanding.
+The [ordinary-pod qualification record](../qualification/network-platform.md) preserves the original host failure and the two successful clusters on the qualified host. The remaining 1A prerequisite/storage/kernel slice uses a separate [runbook](openshell-admission.md) and report. Gateway identity, lifecycle, policy, toolchain and recovery require their own later qualification.
