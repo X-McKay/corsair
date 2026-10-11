@@ -22,6 +22,8 @@ Implement and qualify [SPEC-0008](../specs/SPEC-0008-openshell-recovery.md), the
 
 ## Validation and progress
 
+The chronology below preserves the original 1F work and its then-current interpretation. The later readiness-budget correction section supersedes the mandatory120-second interpretation without rewriting original attempts.
+
 Baseline UV_OFFLINE=true make test-config:84 passed/0.11s. Actual prior audit output is retained in .runs/recovery-resume/prior-1e-audit.txt; primary release and publication API receipts remain ignored. Initial read-only SDK path guesses were wrong; rg --files located python/openshell/sandbox.py. No source mutation resulted. Native primary documentation consulted via Context7 and primary upstream source; current docs are navigation context, immutable release code determines acceptance.
 
 ## Decisions and next action
@@ -58,3 +60,18 @@ Final-source recovery-host-011 passed 1/222.096s on independently created node 2
 Final review accepts bounded native 1A–1F functional closure within the report's explicit supported limits. It rejects general reliability, arbitrary-output SDK memory and CPU-throttling claims. There are no unresolved mandatory findings within the accepted matrices. Shared forward ownership was exercised with full native gateway controls on both nodes; full 1C–1E matrices were not repeated here. All live installations/private state/clusters are removed. The final offline record/source checks and staged diff are checked before publication; raw evidence/caches/credentials remain ignored. This is a prepublication work-record snapshot: authorized draft publication above still-open PR 7 and exact-head CI verification occur after this snapshot is committed, without inventing a future SHA/PR/CI result. See HANDOFF-0011 and resolve the committed source using git.
 
 Final checks: UV_OFFLINE=true make test-config passed 94/0.13s; native recovery collection selected one of nine without dispatch (0.05s); compileall and git diff --check passed. Final aggregate raw audit passed after all immutable cluster removal. Publication and exact-head CI are verified after committing this prepublication snapshot.
+
+
+## Readiness-budget attribution correction
+
+User review established that 120 seconds was a qualification-harness choice, first introduced in 1C commit cc97b88 and carried into 1D/1F. The upstream SDK example and higher-level Sandbox wrapper use 120, but SandboxClient.wait_ready (our actual API) defaults to 300 seconds. Neither the user nor a recorded startup SLO supplied a mandatory 120-second criterion. Base 4aacc8a75e85f42531bdb03791a3f2e0fc1aff4d matches published open draft PR8 and successful exact-head CI38171748213; baseline94 guards pass. The user authorized correcting this distinction and discussing next steps.
+
+- [x] Remove only the four explicit native sandbox-readiness overrides; use the pinned API default. Preserve security checks and all other command/output/resource/cleanup budgets.
+- [x] Correct living records and issue attribution; retain every historical source/result and append HANDOFF-0012. Separate the historically qualified source from the corrected harness and unrun 300-second live baseline.
+- [x] Run proportionate offline/collection/compile checks, review the diff and prepare the authorized draft update. Discuss fresh native confirmation and the narrow Milestone 2 component without starting either.
+
+No cluster is created for this correction. A new 300-second live baseline is unrun and must not be claimed from old receipts. Runs 002/009 remain failed under their original 120-second test budget, with their separate cleanup facts unchanged; no evidence establishes an OpenShell readiness guarantee at 120 or 300 seconds. Actual Ready identity, kernel/storage/CNI/TLS/policy and immutable cleanup remain mandatory. ISSUE-0004 becomes a latency observation with cause unknown, not an inferred runtime defect or requirement for a speculative repair before planning the next component.
+
+Correction check history: the first offline run retained 93 passed/one failed because the rewritten issue omitted required template headings. Restored the existing issue headings and handoff validation heading; no runtime/source or prior evidence changed. All nine live tests collect without dispatch (0.04s), compilation and whitespace pass. No live baseline was run.
+
+Final correction review: the code diff contains exactly four removed readiness arguments across three qualification files. Native installed-source hash57b9450b6b514a90f994d03fdb8a2b52d3d23d35560f66e7e2100d09ec7814cb matches immutable cached e1f3c82 source; signature inspection confirms wait_ready default300 without executing an RPC. All94 offline guards pass after the retained record-heading failure; nine qualification tests collect without dispatch, compilation and diff checks pass. Live validation remains unrun. Only tracked correction files and the new handoff are prepared for publication on PR8; raw proof/private state remain ignored. Exact-head CI is verified after committing this snapshot.

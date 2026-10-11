@@ -1,26 +1,30 @@
 ---
 id: ISSUE-0004
 kind: issue
-title: Native sandbox admission can exceed the readiness deadline
+title: Native sandbox startup latency is uncharacterized
 status: open
 updated: 2026-10-11
 related: [SPEC-0008, PLAN-0009, ISSUE-0003]
 ---
 
-# Native sandbox admission can exceed the readiness deadline
+# Native sandbox startup latency is uncharacterized
 
 ## Observed and expected behavior
 
-OpenShell 0.1.3 can acknowledge a native create while its supervisor remains unready past the fixed 120-second SDK wait. This blocks that attempt before recovery workloads. The ordinary-pod Service prerequisite is a separate resolved boundary; no causal identity with ISSUE-0003 is established. A healthy gateway, Ready workload or loaded resources cannot replace native sandbox readiness.
+Recovery-host-002/009 failed to observe native sandbox readiness within our local 120-second test budget. That observation remains valid; it does not establish an OpenShell defect or breach of an upstream readiness guarantee. The cause and eventual readiness of those specific attempts are unknown because original-identity cleanup followed the timeout. Actual Ready state and security admission are still required before workload use. The ordinary-pod Service prerequisite is a separate resolved boundary; no causal identity with ISSUE-0003 is established.
+
+The 120-second override first appeared in Corsair's 1C test at commit cc97b88 and was carried into 1D/1F. An [upstream SDK example](https://github.com/NVIDIA/OpenShell/blob/e1f3c82caa3ed3b65de22889ae7ef32a774878ef/docs/sdk/python.mdx#L87) uses 120, and the higher-level Sandbox wrapper defaults to 120. Our actual SandboxClient.wait_ready API has a [300-second default](https://github.com/NVIDIA/OpenShell/blob/e1f3c82caa3ed3b65de22889ae7ef32a774878ef/python/openshell/sandbox.py#L1111). No user requirement, recorded startup SLO or measured rationale established 120 as mandatory. The user authorized correcting this attribution and using the pinned API default for future native readiness waits. This is a test-budget correction; neither 120 nor 300 is an upstream readiness guarantee.
 
 ## Reproduction and evidence
 
-The selected immutable Linux amd64 runtime passed real storage/kernel admission and all three CNI controls. During `make qualify-recovery`, recovery-host-002 and final-source recovery-host-009 exceeded 120s. Their original native IDs, SDK errors, partial-admission CR/pod/PVC/PV/container identities and supervisor logs remain under ignored .runs/recovery-resume/ and the native run directories. [The reviewed report](../../qualification/openshell-recovery.md) carries attribution and cleanup. Earlier policy creates near140–142s used a different unchanged180-second native CLI budget; that does not authorize extending this SDK deadline.
+The selected Linux amd64 tuple passed actual storage/kernel/CNI controls. Runs 002/009, their SDK errors, source revisions, partial original CR/pod/PVC/PV/container identities, supervisor logs and confirmed cleanup remain ignored under .runs/recovery-resume/ and their original run directories. [The report](../../qualification/openshell-recovery.md) preserves their failed results and the two accepted original-source 1F matrices. Earlier successful policy creates took approximately 140–142s within their separate 180-second CLI budget. These observations demonstrate variable startup timing; they do not identify its cause.
 
 ## Attempts and diagnosis
 
-Native logs for run 009 show supervision starting but no gateway policy-fetch message before the deadline. Immutable upstream source performs boundary image-policy discovery before gateway policy fetch. The pinned backend gives DiscoverPolicy/Attach a separate five-minute native request budget; this is not authority to extend the local120-second qualification wait. This narrows a possible startup stage; it does not establish the cause, network failure, retry count or a repair. Supported original-ID delete/wait and native resource/container-task cleanup are retained. No unknown workload operation is replayed. Fixture naming, resource serialization, TLS-path and forwarding fixes address separate harness defects and cannot resolve this native issue.
+Run 009 logs show supervision starting without an observed gateway policy-fetch message before teardown. Immutable upstream source performs boundary image-policy discovery before that fetch; DiscoverPolicy/Attach has a separate five-minute backend request budget. This suggests a possible startup stage but does not establish actual cause, retry count or a network failure. The backend budget is distinct from the SDK readiness default. No unknown workload was replayed, runtime patched or security requirement relaxed.
 
 ## Resolution criteria and next action
 
-Establish the actual failing startup boundary and a supported bounded remedy, then verify it with attributable native observations and repeated fresh-cluster admission without relaxing policy, TLS, pins, kernel or deadlines. Two successful bounded matrices alone do not prove an admission-reliability repair. Keep this issue open until those criteria pass. PLAN-0009 completed two full final-source matrices on fresh nodes, with confirmed cleanup; this establishes bounded functional behavior without resolving this issue. Failed admission prevents acceptance of its attempt and dependent integration on that runtime. Next separately bounded work is attributable primary-source/native diagnosis; do not apply speculative host/CNI patches or automatic restart workarounds.
+The earlier resolution criteria treated the harness deadline as a mandatory runtime criterion and demanded a supported repair. That interpretation is withdrawn. The four explicit 120-second SandboxClient.wait_ready overrides now use the pinned API's 300-second default. Original run results are never relabeled, and there is no claim that the failed attempts would have passed at 300 seconds. The corrected harness has not been live requalified. The known functional qualification remains attributable to source 4aacc8a and its original 120-second budget.
+
+This record stays open as a startup-latency observation, rather than a demonstrated upstream defect or an automatic Milestone 2 blocker. Next: collect a bounded fresh-native readiness sample using the actual API default, retaining timings, native state and original-ID cleanup for every attempt. Define an operational startup SLO only if a product requirement needs one. Close the observation when its characterization and operational decision are documented; do not infer fleet reliability from a small sample. If actual native Ready is not reached within the supported bounded wait, keep that attempt failed and investigate before using that runtime. Planning the next component can proceed; speculative host/CNI patches, automatic repair and unknown-command replay remain excluded.

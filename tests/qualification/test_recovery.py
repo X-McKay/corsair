@@ -93,7 +93,7 @@ def owned(kube, native, sdk, record, memory):
     try:
         sandbox = sdk.call('create', workspace='default', name=name, spec=spec)
         record['sandbox_id'] = sandbox.id
-        assert sdk.call('wait_ready', name, workspace='default', timeout_seconds=120).id == sandbox.id
+        assert sdk.call('wait_ready', name, workspace='default').id == sandbox.id
         actual = json.loads(native['cli']('sandbox', 'get', name, '-o', 'json').stdout)
         assert actual['id'] == sandbox.id
         pair = inspect_identity(kube, actual, record, expected_image=image['image'])
@@ -283,7 +283,7 @@ def test_native_interruptions_limits_and_cleanup(kube, recovery_gateway):
                                 recovered = sdk.call('get',name,workspace='default')
                                 assert recovered.id==record['sandbox_id']
                                 record['gateway_recovered_phase'] = recovered.status.phase
-                                assert sdk.call('wait_ready',name,workspace='default',timeout_seconds=120).id==record['sandbox_id']
+                                assert sdk.call('wait_ready',name,workspace='default').id==record['sandbox_id']
                                 for role,pod in pair.items():
                                     current = kube.get('pod',pod['metadata']['name'],'-n','openshell')
                                     assert current['metadata']['uid']==pod['metadata']['uid']

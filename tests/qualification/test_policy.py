@@ -105,7 +105,7 @@ def owned_sandbox(kube, cli, sdk, image, policy, record):
         sandbox_id = record['sandbox_id'] = json.loads(result.stdout)['id']
         actual = json.loads(cli('sandbox', 'get', name, '-o', 'json').stdout)
         assert actual['id'] == sandbox_id, 'Original native create identity changed'
-        ready = sdk.call('wait_ready', name, workspace='default', timeout_seconds=120)
+        ready = sdk.call('wait_ready', name, workspace='default')
         assert ready.id == sandbox_id and ready.phase == openshell_pb2.SANDBOX_PHASE_READY
         pair = inspect_identity(kube, actual, record, expected_image=image['image'])
         cr = kube.get('sandboxes', '-n', 'openshell')['items'][0]
