@@ -1,0 +1,55 @@
+# OpenShell gateway and generated identity qualification
+
+Status: bounded Milestone 1B passed on two separately created clean clusters, with confirmed native sandbox, namespace/PV, private-state, port-forward and cluster cleanup. Full lifecycle, application policy, toolchains, recovery, production tenancy/authentication, adapters, PydanticAI and Temporal remain unqualified. See [SPEC-0004](../development/specs/SPEC-0004-openshell-gateway-identity.md), [PLAN-0004](../development/plans/PLAN-0004-openshell-gateway-identity.md) and the [runbook](../runbooks/openshell-gateway.md).
+
+## Selected source and prerequisites
+
+Base/source 153ed1ee58a3a17b6ee941c12c14da74dfa7276e, branch codex/openshell-1b-gateway-identity. The published 1A branch matched that SHA and draft [PR #2](https://github.com/X-McKay/corsair/pull/2). Both retained `.runs/admission-host-001/` and `002/` native reports, separate immutable identities and namespace/PV cleanup receipts were re-read. Historical ordinary-pod raw runs are absent; their published report/source were verified previously, without a raw-log re-audit claim.
+
+Primary release APIs on 2026-10-11 still selected OpenShell v0.1.3, Agent Sandbox v1.0.6, compatible Helm 3.22.0 (latest 4.3.0 is unadmitted). The platform/chart/image/storage tuple matches the [1A report](openshell-admission.md) and [runtime lock](../../deploy/runtime-lock.yaml). This slice adds the matching official linux-amd64 CLI archive SHA-256 ed08ea7874c47f22d6e5dcc4b27d9ef1ef5d2060f83035b35ff725d5160830a3 and binary SHA-256 557f8e2af1d91221211bb29cc7152d975084d2a8c9ab8c549d46c4370ccf492e. Native artifact/render evidence: `.runs/artifacts/c88b385d9ed645d6aaa952f636d6c547/`. Chart Secret fields are redacted before persistence.
+
+The chart uses native preflight, PKI jobs, StatefulSet/PVC, shared namespace and driver-generated runtime resources. No copied chart or custom driver/protocol/credential broker. Default native mTLS remains enabled and unauthenticated users disabled; the setup prose conflicts with the release's access-control documentation, so source and actual authenticated/unauthenticated results decide this local claim. Production OIDC/tenancy is unrun.
+
+## Observations and retained failures
+
+Fresh prerequisite admission `.runs/gateway-prerequisite-001/` passed in 93.84s on node UID b25abfca-dc4c-4541-95f9-26d8cdbca4d4. Native storage persistence and all kernel controls passed again, with fixture/PV cleanup. Bootstrap `.runs/bootstrap/7b133755479b44468eca0b64fbb332dd/`; prerequisite install `.runs/admission-install/b555684e33dc48e2a9d0462b05f1c6ef/`.
+
+Every gateway attempt has separate native installation, qualification and cleanup receipts. Three failed attempts remain:
+
+| Evidence | Result/layer | Correction and cleanup |
+| --- | --- | --- |
+| `.runs/gateway-host-001/`, install eaa787461646478b9441df1b8c5cba60 | 11.15s; harness expected HTTP health JSON on the gRPC port; native mTLS CLI status already connected | Use the protected native API rejection surface and native CLI health; namespace/PV/forward cleanup confirmed |
+| `.runs/gateway-host-002/`, install 3a532c828c9e41d9a34604c2e90070b0 | 11.29s; native create rejected the 21-character fixture name before provisioning | Use a name within native maximum 19; TLS/auth had passed; namespace/PV cleanup confirmed |
+| `.runs/gateway-host-003/`, install 510885c4440a429c9402dbb70658d348 | 21.84s; harness required supervisor UID at pod scope | Source/actual supervisor has UID/GID/nonroot at container scope; workload at both scopes. Check effective Kubernetes identity, still exactly 10001. Native Ready/configuration acceptance and sandbox/namespace/two-PV cleanup confirmed |
+
+No runtime, authentication, TLS, policy, artifact or kernel requirement was relaxed for these corrections. The third attempt had native sandbox ID 8a1bb15c-83a9-4237-b2e6-9768995dbd7a, Sandbox UID e3280e96-aca7-4367-9e84-38077fce1aba and actual supervisor/workload UIDs in retained metadata. Failed assertions do not qualify their uncompleted boundary.
+
+An initial compileall command used the host's read-only UV cache; rerunning with the repository cache passed. One automatic permission review timed out before the fourth install launched; the tool-permitted single retry launched successfully. A verbose failed pytest traceback included the ambient host environment in its private JUnit output; that environment was withheld from retained XML, and CLI subprocesses now receive a narrow noncredential environment with short pytest tracebacks. Failed results/native errors remain retained. No generated transport key/Secret payload is persisted in `.runs/` or tracked files.
+
+## Successful bounded results
+
+`.runs/gateway-host-004/` passed in 74.44s and `.runs/gateway-host-005/` passed in 75.58s on the second clean cluster. Each contains 59 native command receipts plus three credential-output-withheld export receipts. Native installs bc65c0969fe84691bd854a6abe5c6bdb and 9952d33ff37a44b2a4fe1c974eadbdd4. All following observations passed:
+
+- Official pinned gateway Ready and native CLI connected/version 0.1.3/authenticated mTLS. Server trust verifies over the loopback-only forward; public-root trust and wrong hostname each fail with curl 60. Authenticated native sandbox list succeeds; no-identity user API returns gRPC Unauthenticated 16.
+- One inert native sandbox reaches Ready with accepted hard-requirement policy, no providers/network grants and policy hash cd1ac5ef950b1bbbd14d425876038074bd09b58c86de0bb2fc52d25b0c4c8d1f. Native runtime identity URI binds the namespace, actual immutable Sandbox UID and supervisor Pod UID.
+- Actual workload/supervisor UID/GID 10001, no privilege escalation, all capabilities dropped, RuntimeDefault, no host namespaces/mounts; workload supplemental groups Strict. Matching pinned images pulled; workload runtime/state are memory volumes. Workload has no projected Kubernetes identity, Secret mount in its running container, secret environment source or provider. Protected bootstrap input exists only for native init and is absent from the running container. Supervisor keeps the audience openshell-gateway token and client Secret projection containing only ca.crt.
+- Three trials per gateway Service/Pod route: trusted pinned in-cluster curl receives the expected user authentication response through verified TLS, while the direct operator workload process times out (exit 124). These controls establish the outer CNI gateway boundary, not a general escape or application-policy proof.
+- Native sandbox identity comparison/deletion/list absence, namespace UID comparison/deletion/absence, both PV identities/disappearance, private-state removal and known port-forward termination/reap all confirmed.
+
+The affected ordinary-pod CNI regression also passed: `.runs/network-gateway-regression-001/`, three tests in 155.19s, both namespace cleanups confirmed. First cluster cleanup `.runs/bootstrap/0ee3c187175f48efab41773932de2771/cleanup.json` confirms container 9d16ba4a91e4290b956e34d2bbd169f6fde9b0a8323b25b5290de27d569ac549 absent. `.runs/gateway-lock-equivalence.json` verifies that the only runtime-lock change after first success was scope wording, with identical artifact inputs. Final offline render `.runs/artifacts/3de9bd1921214b6c92409e502fbcae9b/` passed.
+
+Second prerequisites: bootstrap `.runs/bootstrap/4024779f924a49fa9e0268ee5d90355f/`, install `.runs/admission-install/8e723470fb0a442884c07ce9db053f59/`, native admission `.runs/gateway-prerequisite-002/` passed in 93.77s on node 233fcc62-76e0-4809-af32-b6150073d1a1 with fixture/PV cleanup. Second native sandbox 7a73897e-0294-4432-8d42-71239e335d72; Sandbox UID c09efecc-2d9a-4a01-a9f7-8cee948774d3; workload Pod 3631fc49-2eef-452b-bc9b-6f83594eed2d; supervisor Pod 095188bc-42ba-47cb-bc18-e86e13e09557; namespace c11edc06-c0a0-4dc1-a03c-95b2dda7ec91; PV UIDs 42606aad-7e43-4a67-94ca-048e136eac40 and 777d9bff-0918-4f65-9188-47d67b4bf817. Both runs admitted the same policy hash/config revision and separate immutable resource identities.
+
+Second cluster cleanup `.runs/bootstrap/f256bfbf8d7f4fc1b8c86f64fbd15587/cleanup.json` confirms container d1a4b7c2e1814071edc41d2537a2e10d5deaa790166d3421f6e47e9febfcdc51 absent. `.runs/gateway-final-inventory/` observed zero owned fixture/gateway namespaces, Sandbox resources, PVCs and PVs before deletion. Private gateway state, kind owner and kubeconfig are absent. The added Make guard rejects an existing gateway evidence directory before pytest; `.runs/gateway-duplicate-guard.json` proves expected rejection with unchanged prior JUnit, without live command dispatch.
+
+First successful identities: native sandbox 578776d7-1d76-4085-b237-7b59124edb6f; Sandbox UID 6fc0072c-05f0-465a-aab3-b5379cbf5947; workload Pod 2f215772-730b-4f6c-b7c6-d54150b811fa; supervisor Pod 98679bf9-6a99-416c-970b-483941bd8bba; namespace 5398e8ae-1506-4d91-9aa9-9b742e8f7308. Gateway/workspace PV UIDs 6dcd4d43-7a6b-48ec-b1e8-42838db7669a and ed8c200c-4038-41cd-91b2-acf37c207970.
+
+Review added explicit pair-ambiguity, effective container seccomp/privileged and complete private-state/port-forward outcome guards. `.runs/gateway-host-004/review-guard-audit.json` checks the additional identity assertions against retained first-run native metadata; it is a record audit, not another live execution. The second live run also records qualification source hashes. These receipt/assertion additions do not alter deployed inputs or requirements.
+
+Sixteen offline guards, native Helm render, compilation and diff whitespace checks pass. The final qualification source hashes match the second live run. Command counts/times are native receipt observations; internal RPC, controller retries and queue times remain unknown; model calls/tokens/retries are unrun/unknown. Full execution/file-transfer/exit results and SDK deletion waits belong to 1C; only inert creation/deletion needed to observe 1B is exercised here. Production storage/tenancy and other host architectures remain unqualified.
+
+## Primary references
+
+- [OpenShell v0.1.3 release](https://github.com/NVIDIA/OpenShell/releases/tag/v0.1.3) and [immutable access-control source](https://github.com/NVIDIA/OpenShell/blob/e1f3c82caa3ed3b65de22889ae7ef32a774878ef/docs/kubernetes/access-control.mdx).
+- [Official chart](https://github.com/NVIDIA/OpenShell/tree/e1f3c82caa3ed3b65de22889ae7ef32a774878ef/deploy/helm/openshell), [native runtime identity/mount source](https://github.com/NVIDIA/OpenShell/blob/e1f3c82caa3ed3b65de22889ae7ef32a774878ef/crates/openshell-driver-kubernetes/src/sandbox_runtime.rs) and [workload fence](https://github.com/NVIDIA/OpenShell/blob/e1f3c82caa3ed3b65de22889ae7ef32a774878ef/crates/openshell-driver-kubernetes/src/isolation.rs).
+- [Agent Sandbox v1.0.6](https://github.com/kubernetes-sigs/agent-sandbox/releases/tag/v1.0.6), [Helm 3.22.0 native installation](https://helm.sh/docs/v3/helm/helm_install/) and [OpenShell native policy default/inspection](https://github.com/NVIDIA/OpenShell/blob/e1f3c82caa3ed3b65de22889ae7ef32a774878ef/docs/how-it-works/policies/default-policy.mdx).

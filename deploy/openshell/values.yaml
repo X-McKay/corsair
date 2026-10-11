@@ -1,4 +1,4 @@
-# Artifact-selection profile only. Gateway installation/identity belongs to 1B.
+# Official-chart profile for the isolated 1B local mTLS gateway.
 # Discovery preflight stays enabled in this file; offline rendering alone disables it.
 agentSandbox:
   preflight:
@@ -17,6 +17,8 @@ sandbox:
     repository: nvcr.io/nvidia/base/ubuntu
     digest: sha256:43c1682f10cdf6561e22f6da1765d491b6f0e5808f94d5fde29d7bdbe75142d5
 server:
+  auth:
+    allowUnauthenticatedUsers: false
   disableTls: false
   telemetryEnabled: false
   workspaceStorageClass: standard

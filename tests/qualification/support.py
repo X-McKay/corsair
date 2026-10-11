@@ -23,13 +23,13 @@ class Kubectl:
     def run(self, *args, check=True, timeout=120):
         return self.native(self.argv + list(map(str, args)), check=check, timeout=timeout)
 
-    def native(self, argv, check=True, timeout=120):
+    def native(self, argv, check=True, timeout=120, env=None):
         """Retain an operator native-tool receipt, including uncertain delivery."""
         self.counter += 1
         receipt = {"argv": list(map(str, argv)), "started_at": datetime.now(timezone.utc).isoformat()}
         started = time.monotonic()
         try:
-            result = subprocess.run(receipt["argv"], capture_output=True, text=True, timeout=timeout)
+            result = subprocess.run(receipt["argv"], capture_output=True, text=True, timeout=timeout, env=env)
             receipt.update(exit_code=result.returncode, stdout=result.stdout, stderr=result.stderr)
         except subprocess.TimeoutExpired as error:
             receipt.update(timed_out=True, stdout=(error.stdout or b"").decode(), stderr=(error.stderr or b"").decode())

@@ -13,4 +13,4 @@ package = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--strict-markers"
-markers = ["platform: live kind and CNI qualification; requires explicit kubeconfig", "admission: live storage and native OpenShell kernel admission; requires installed prerequisites"]
+markers = ["platform: live kind and CNI qualification; requires explicit kubeconfig", "gateway: live gateway TLS and generated identity qualification", "admission: live storage and native OpenShell kernel admission; requires installed prerequisites"]
