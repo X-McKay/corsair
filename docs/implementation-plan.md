@@ -10,7 +10,7 @@ Deliverables are an example input, environment recipe, two-test specification, e
 
 ## Milestone 1 OpenShell in kind
 
-Status: bounded native 1A–1F qualified on the selected single-node Linux amd64 tuple; [the closure report](qualification/openshell-recovery.md) records the two final recovery matrices, failures and immutable cleanup. Startup-latency [ISSUE-0004](development/issues/ISSUE-0004-native-admission-readiness.md) remains an observation; exceeding the original local 120-second wait is not proof of an upstream defect. Future sandbox-readiness calls use the pinned API default 300s; the corrected harness has no fresh live baseline. Historical qualification retains its original source/budget. Production reliability and subsequent milestones remain unqualified; each fresh runtime must pass its mandatory native gates.
+Status: bounded native 1A–1F qualified on the selected single-node Linux amd64 tuple; [the closure report](qualification/openshell-recovery.md) records the two final recovery matrices, failures and immutable cleanup. Startup-latency [ISSUE-0004](development/issues/ISSUE-0004-native-admission-readiness.md) is resolved as a bounded measured observation; exceeding the original local 120-second wait is not proof of an upstream defect. Future sandbox-readiness calls use the pinned API default 300s; a separate [six-sample native baseline](qualification/openshell-readiness.md) passed with full cleanup. The complete corrected 1F interruption matrix is not rerun. Historical qualification retains its original source/budget. Production reliability and subsequent milestones remain unqualified; each fresh runtime must pass its mandatory native gates.
 
 The [detailed OpenShell milestone](openshell-milestone.md) specifies the proposed files, topology, progressive test slices, native SDK/CLI paths, evidence, and handoff to the application adapter.
 
@@ -21,6 +21,8 @@ Acceptance: the real boundary works on the selected tuple; each required negativ
 Deliver a minimal repeatable setup and qualification command, evidence report, versions, and runbook. Do not patch the gateway or add an inspector unless a demonstrated mandatory check cannot be achieved through supported interfaces; record the SDK gap first.
 
 ## Milestone 2 Sandbox and artifact adapters
+
+Status: the first [create/readiness/delete and host receipt slice](qualification/openshell-adapter-lifecycle.md) is qualified on two fresh admitted nodes. The full milestone is incomplete; execution/transfers/output/failure contracts, immutable artifact storage and worker-loss cases remain. Native deletion lacks an atomic expected-ID condition, so the current slice requires an operator-exclusive workspace and nonreused names.
 
 Implement only the required port methods using SDKs/standard storage operations. Exercise create, transfers, exec, event collection, destroy, output bounds, timeout, interrupted transport, and unknown delivery. Capture immutable source snapshots without running hooks; validate file types, path confinement, and digest identity.
 
