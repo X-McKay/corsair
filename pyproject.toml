@@ -5,7 +5,7 @@ description = "Sandboxed security issue validation; initial platform qualificati
 requires-python = ">=3.12,<3.13"
 
 [dependency-groups]
-dev = ["pytest==9.0.2", "PyYAML==6.0.3"]
+dev = ["pytest==9.0.2", "PyYAML==6.0.3", "openshell @ https://github.com/NVIDIA/OpenShell/releases/download/v0.1.3/openshell-0.1.3-py3-none-any.whl"]
 
 [tool.uv]
 package = false
@@ -13,4 +13,4 @@ package = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--strict-markers"
-markers = ["platform: live kind and CNI qualification; requires explicit kubeconfig", "gateway: live gateway TLS and generated identity qualification", "admission: live storage and native OpenShell kernel admission; requires installed prerequisites"]
+markers = ["platform: live kind and CNI qualification; requires explicit kubeconfig", "lifecycle: live native SDK lifecycle, execution and CLI transfers; includes gateway prerequisites", "gateway: live gateway TLS and generated identity qualification", "admission: live storage and native OpenShell kernel admission; requires installed prerequisites"]

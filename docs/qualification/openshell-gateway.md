@@ -1,6 +1,6 @@
 # OpenShell gateway and generated identity qualification
 
-Status: bounded Milestone 1B passed on two separately created clean clusters, with confirmed native sandbox, namespace/PV, private-state, port-forward and cluster cleanup. Full lifecycle, application policy, toolchains, recovery, production tenancy/authentication, adapters, PydanticAI and Temporal remain unqualified. See [SPEC-0004](../development/specs/SPEC-0004-openshell-gateway-identity.md), [PLAN-0004](../development/plans/PLAN-0004-openshell-gateway-identity.md) and the [runbook](../runbooks/openshell-gateway.md).
+Status: bounded Milestone 1B passed on two separately created clean clusters, with confirmed native sandbox, namespace/PV, private-state, port-forward and cluster cleanup. Bounded native lifecycle/execution/transfers are now qualified in the [separate 1C record](openshell-lifecycle.md); application policy, toolchains, recovery, production tenancy/authentication, adapters, PydanticAI and Temporal remain unqualified. See [SPEC-0004](../development/specs/SPEC-0004-openshell-gateway-identity.md), [PLAN-0004](../development/plans/PLAN-0004-openshell-gateway-identity.md) and the [runbook](../runbooks/openshell-gateway.md).
 
 ## Selected source and prerequisites
 

@@ -23,7 +23,7 @@ def test_private_transport_export_withholds_credential_bytes(tmp_path, monkeypat
     import base64
     import json
     from types import SimpleNamespace
-    from tests.qualification.test_gateway import export_client
+    from tests.qualification.gateway import export_client
 
     evidence = tmp_path / 'evidence'
     evidence.mkdir()
