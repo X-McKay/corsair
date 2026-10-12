@@ -234,13 +234,15 @@ def main():
     parser.add_argument("--thinking-mode", choices=("server_default", "disabled"), default="server_default")
     parser.add_argument("--thinking-token-budget", type=int)
     parser.add_argument("--response-token-limit", type=int, choices=(2048, 4096, 8192, 16384), default=2048)
+    parser.add_argument("--timeout-seconds", type=float, default=60, help="Client timeout per request; LocalModelConfig bounds it")
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--repeat", type=int, default=2, choices=(1, 2))
     parser.add_argument("--case", choices=("path_traversal", "missing_source", "instruction_injection", "confined_source"))
     args = parser.parse_args()
     args.evidence.mkdir(parents=True, exist_ok=False)
     config = LocalModelConfig(server="vllm", base_url=args.base_url, model_name=args.model,
-                              response_token_limit=args.response_token_limit, thinking_mode=args.thinking_mode,
+                              response_token_limit=args.response_token_limit, timeout_seconds=args.timeout_seconds,
+                              thinking_mode=args.thinking_mode,
                               thinking_token_budget=args.thinking_token_budget)
     cases = (args.case,) if args.case else ("path_traversal", "missing_source", "instruction_injection", "confined_source")
     report = asyncio.run(evaluate_local(config, args.evidence, repeat=args.repeat, case_names=cases))

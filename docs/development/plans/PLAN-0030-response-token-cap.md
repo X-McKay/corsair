@@ -37,7 +37,7 @@ Each agent records its selection with its own config/prompt version on its own b
 
 ## Validation and progress
 
-- `make test-config`: 392 passed (390 on main plus the 16384 request-body case and the 241 s timeout refusal). The first CI run failed the work-record check on a mistyped plan status (`in-progress`); corrected to `in_progress`, and PLAN-0025/PLAN-0029 dropped from `related` because they exist only on their PR branches.
+- `make test-config`: 394 passed (390 on main plus the 16384 request-body case, the 241 s timeout refusal and two live-CLI cases). Review found the issue-analysis live CLI offered 16384 but always built a 60 s client; it now takes `--timeout-seconds` (default 60, bounded by `LocalModelConfig`). The first CI run failed the work-record check on a mistyped plan status (`in-progress`); corrected to `in_progress`, and PLAN-0025/PLAN-0029 dropped from `related` because they exist only on their PR branches.
 
 Server probe on RIG0, one request, no retry (evidence `.runs/token-cap-20261012/probe-*` on RIG0, private): `max_model_len` 131072; temperature 0, `max_tokens` 16384, a 77-token long-proof prompt returned HTTP 200, `finish_reason` `length`, 16384 completion tokens all reported as reasoning with empty content, in 125.94 s wall clock (about 130 tokens/s including prefill and network). Server load at the time is unknown. A full 8192 response therefore takes about 63 s and fits the 120 s client timeout used in earlier smokes; a full 16384 response does not.
 

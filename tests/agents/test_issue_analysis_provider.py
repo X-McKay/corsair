@@ -255,6 +255,21 @@ def test_no_unknown_tool_attempts_fails_closed():
     assert NoUnknownToolAttempts().evaluate(SimpleNamespace(attributes={"unknown_tool_attempts": 0})).value
 
 
+@pytest.mark.parametrize("extra,expected", [([], (2048, 60)), (["--response-token-limit", "16384", "--timeout-seconds", "180"], (16384, 180))])
+def test_live_cli_passes_response_cap_and_timeout(monkeypatch, tmp_path, extra, expected):
+    from evals.issue_analysis import live
+    seen = []
+    async def capture(config, evidence, **options):
+        seen.append((config.response_token_limit, config.timeout_seconds))
+        raise SystemExit(0)
+    monkeypatch.setattr(live, "evaluate_local", capture)
+    monkeypatch.setattr("sys.argv", ["live", "--base-url", "https://llm.example/v1", "--model", "explicit-model",
+                                     "--evidence", str(tmp_path / "run"), *extra])
+    with pytest.raises(SystemExit):
+        live.main()
+    assert seen == [expected]
+
+
 @pytest.mark.parametrize("first_tool", ["read_source", "run_shell"])
 def test_live_evaluation_records_config_counts_and_run_identity_offline(monkeypatch, tmp_path, first_tool):
     from evals.issue_analysis import live
