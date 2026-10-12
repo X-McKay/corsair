@@ -26,6 +26,8 @@ class IssueAnalysisBudget:
     total_tokens_limit: int
 
     def within(self, ceiling: "IssueAnalysisBudget") -> bool:
+        # Direct mode sees the caller's objects, so bool/float are refused here; the durable
+        # payload converter coerces lax JSON before admission, and the ceiling remains the guard.
         values = (self.request_limit, self.tool_calls_limit, self.total_tokens_limit)
         limits = (ceiling.request_limit, ceiling.tool_calls_limit, ceiling.total_tokens_limit)
         return (all(type(value) is int for value in values)
@@ -44,8 +46,8 @@ class IssueAnalysisRequest:
 class IssueAnalysisExecution:
     """Result plus native run accounting; token counts are None when no response reported usage.
 
-    `output_corrections` counts every native retry prompt the run sent (output validation,
-    schema or unknown-tool refusals). `elapsed_seconds` is replay-safe workflow time in durable
+    `output_corrections` counts every native retry prompt the run sent (output validation or
+    schema corrections; with a zero tool budget an invented tool ends the run instead). `elapsed_seconds` is replay-safe workflow time in durable
     mode (it advances per workflow task) and host monotonic time in direct mode.
     """
 
