@@ -201,6 +201,8 @@ def test_contracts_refuse_ambiguous_inputs_and_extra_verdicts():
     with pytest.raises(ValidationError):
         EvidenceItem(item_id='y', kind='junit', revision='baseline', run=None, sha256=digest('a'), content='a')
     with pytest.raises(ValidationError):
+        EvidenceItem(item_id='z', kind='junit', revision=None, run=None, sha256=digest('original'), content='altered')
+    with pytest.raises(ValidationError):
         ProposedDispositionDraft.model_validate(draft() | {'verdict': 'safe'})
     with pytest.raises(ValidationError):
         ProposedDispositionDraft.model_validate(draft(limitations=[]))

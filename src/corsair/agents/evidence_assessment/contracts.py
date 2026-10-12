@@ -1,5 +1,6 @@
 """Frozen evidence-assessment contracts; no model, workflow or execution SDK types."""
 
+from hashlib import sha256
 from typing import Annotated, Generic, Literal, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -34,6 +35,8 @@ class EvidenceItem(Contract):
     def run_belongs_to_revision(self) -> "EvidenceItem":
         if (self.revision is None) != (self.run is None):
             raise ValueError("a run index requires a revision and vice versa")
+        if sha256(self.content.encode("utf-8")).hexdigest() != self.sha256:
+            raise ValueError("evidence content does not match its recorded digest")
         return self
 
 
