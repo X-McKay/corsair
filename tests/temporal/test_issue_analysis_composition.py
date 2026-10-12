@@ -75,9 +75,23 @@ def test_agent_configuration_refuses_before_agent_execution(agents):
 class UnreportedUsage(WrapperModel):
     """Fixture provider that reports no usage at all."""
 
+    usage = RequestUsage()
+
     async def request(self, messages, model_settings, model_request_parameters):
         response = await super().request(messages, model_settings, model_request_parameters)
-        return replace(response, usage=RequestUsage())
+        return replace(response, usage=self.usage)
+
+
+class InputOnlyUsage(UnreportedUsage):
+    """Fixture provider that reports only the input dimension."""
+
+    usage = RequestUsage(input_tokens=7)
+
+
+class DetailsOnlyUsage(UnreportedUsage):
+    """Fixture provider whose usage carries details but no token counts."""
+
+    usage = RequestUsage(details={"reasoning_tokens": 3})
 
 
 def test_unreported_usage_is_unknown_and_output_corrections_are_counted():
@@ -89,26 +103,34 @@ def test_unreported_usage_is_unknown_and_output_corrections_are_counted():
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, output.model_dump(mode="json"))])
 
     corrected = FunctionModel(respond)
-    durability = TemporalDurability(models={"corrected": corrected, "unreported": UnreportedUsage(corrected)},
+    durability = TemporalDurability(models={"corrected": corrected, "unreported": UnreportedUsage(corrected),
+                                            "input_only": InputOnlyUsage(corrected),
+                                            "details_only": DetailsOnlyUsage(corrected)},
                                     activity_config=ACTIVITY_CONFIG)
 
     class Correcting(IssueAnalysisWorkflow):
         __pydantic_ai_agents__ = [create_issue_analysis_agent(corrected, output_retries=1, durability=durability)]
-        model_keys = ("corrected", "unreported")
+        model_keys = ("corrected", "unreported", "input_only", "details_only")
         budget_ceiling = BUDGET
 
     async def check():
         with models.override_allow_model_requests(False):
             return [await Correcting().run(IssueAnalysisRequest(inputs("missing_source"), key, BUDGET))
                     for key in Correcting.model_keys]
-    reported, unreported = asyncio.run(check())
-    for result in (reported, unreported):
+    reported, unreported, input_only, details_only = asyncio.run(check())
+    for result in (reported, unreported, input_only, details_only):
         assert result.output == expected
         assert (result.requests, result.tool_calls, result.output_corrections) == (2, 0, 1)
-    assert reported.usage_reported and reported.input_tokens > 0
+    assert reported.usage_reported and reported.input_tokens > 0 and reported.output_tokens > 0
     # A provider that reports nothing yields unknown token counts, never zero.
     assert not unreported.usage_reported
     assert (unreported.input_tokens, unreported.output_tokens) == (None, None)
+    # Partial usage keeps the reported dimension and leaves the other unknown, never zero.
+    assert not input_only.usage_reported
+    assert (input_only.input_tokens, input_only.output_tokens) == (14, None)
+    # Details-only usage has values but no token evidence for either dimension.
+    assert not details_only.usage_reported
+    assert (details_only.input_tokens, details_only.output_tokens) == (None, None)
 
 
 def test_native_direct_request_limit_remains_effective():

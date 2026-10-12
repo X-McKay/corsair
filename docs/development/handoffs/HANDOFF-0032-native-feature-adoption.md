@@ -1,5 +1,5 @@
 ---
-id: HANDOFF-0030
+id: HANDOFF-0032
 kind: handoff
 title: Native feature adoption implemented offline
 status: recorded

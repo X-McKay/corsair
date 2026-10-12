@@ -44,7 +44,7 @@ class IssueAnalysisRequest:
 
 @dataclass(frozen=True)
 class IssueAnalysisExecution:
-    """Result plus native run accounting; token counts are None when no response reported usage.
+    """Result plus native run accounting; a token dimension is None unless every response reported it.
 
     `output_corrections` counts every native retry prompt the run sent (output validation or
     schema corrections; with a zero tool budget an invented tool ends the run instead). `elapsed_seconds` is replay-safe workflow time in durable
@@ -66,6 +66,20 @@ class IssueAnalysisExecution:
 def _clock() -> float:
     # Workflow time is deterministic under replay; the host clock is only read outside workflows.
     return workflow.time() if workflow.in_workflow() else time.monotonic()
+
+
+def _reported_dimension(responses: list[ModelResponse], name: str) -> int | None:
+    """Sum one token dimension only when every response carries evidence it was reported.
+
+    The SDK keeps no per-field presence after mapping provider usage (no fields-set record,
+    and durable payloads serialize every field), so a zero cannot be told from an omitted
+    count. A nonzero value is evidence the provider reported that dimension; anything else
+    is retained as unknown rather than admitted as zero.
+    """
+    values = [getattr(response.usage, name) for response in responses]
+    if not values or any(type(value) is not int or value <= 0 for value in values):
+        return None
+    return sum(values)
 
 
 def _refusal(kind: str, message: str) -> ApplicationError:
@@ -112,13 +126,14 @@ class IssueAnalysisWorkflow(PydanticAIWorkflow):
         elapsed = _clock() - started
         messages = result.new_messages()
         responses = [message for message in messages if isinstance(message, ModelResponse)]
-        reported = bool(responses) and all(response.usage.has_values() for response in responses)
+        input_tokens = _reported_dimension(responses, "input_tokens")
+        output_tokens = _reported_dimension(responses, "output_tokens")
         usage = result.usage
         return IssueAnalysisExecution(
             output=result.output, run_id=result.run_id, mode=mode,
-            requests=usage.requests, tool_calls=usage.tool_calls, usage_reported=reported,
-            input_tokens=usage.input_tokens if reported else None,
-            output_tokens=usage.output_tokens if reported else None,
+            requests=usage.requests, tool_calls=usage.tool_calls,
+            usage_reported=input_tokens is not None and output_tokens is not None,
+            input_tokens=input_tokens, output_tokens=output_tokens,
             output_corrections=sum(isinstance(part, RetryPromptPart) for message in messages
                                    for part in message.parts),
             elapsed_seconds=elapsed,
