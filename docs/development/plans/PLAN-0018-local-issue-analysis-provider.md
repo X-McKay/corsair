@@ -175,3 +175,5 @@ Post-merge integration: full offline363/6.29s and the deterministic native fixtu
 
 
 Skill-evaluation continuation: [PLAN-0023](PLAN-0023-issue-analysis-rubric-and-skill-protocol.md) applies the SPEC-0023 protocol (coded rubric labels, judge calibration, held-out guard, baseline) before any further analyze-issue skill candidate is compared.
+
+PR22 review at exact head28feef4 adds [published comments](https://github.com/X-McKay/corsair/pull/22#pullrequestreview-5494630076) on individual-attempt calibration labels, honest unsupported planning output and pre-registered judge validation. The isolated exact-head offline suite passed367/6.44s; no live calibration/inference ran. Its dataset and specs remain unmerged/draft, and ISSUE-0007 remains blocked. See HANDOFF-0035 for review scope and continuation; current-main native/corpus state from HANDOFF-0034 is unchanged.
