@@ -22,6 +22,7 @@ Implement [SPEC-0030](../specs/SPEC-0030-evidence-assessment-agent.md), step 4 o
 - [x] First bounded live smoke on llm.almckay.io (prompt v1; below).
 - [x] Rerun the smoke with prompt v2 (below).
 - [x] Rerun case (b) with an unlabelled sandbox log (below).
+- [ ] Skill work on case (c): witness/planned safe-behavior disagreement still yields verified-fix proposals, and one case (b) attempt exhausted its budget deliberating (PR #29 / PLAN-0030 cap check at 16384).
 - [ ] Evals-based live repeats; durable stage.
 
 ## Validation and progress
