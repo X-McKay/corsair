@@ -19,7 +19,7 @@ from corsair.agents.test_authoring import (
 )
 from corsair.agents.test_authoring.skills import SKILL_TEXT
 from corsair.agents.test_authoring.static import assertion_lines, static_checks
-from tests.unit.test_pytest_runner import DISCOVER, PREFIX, ReviewedLocalExecution, ReviewedWorkspace
+from evals.fixture_e2e.reviewed import DISCOVER, PREFIX, ReviewedLocalExecution, ReviewedWorkspace
 from evals.test_authoring.evaluate import (
     FILES, EvaluationBudget, ScriptedRun, ScriptedRunner, authoring_checks, dataset, evaluate, passed,
 )

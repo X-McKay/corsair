@@ -1,12 +1,6 @@
 """Runner orchestration over fake ports plus one real pytest run of reviewed SPEC-0018 bytes."""
 from dataclasses import replace
 import json
-import os
-from pathlib import Path
-import shutil
-import subprocess
-import sys
-import time
 from uuid import uuid4, uuid5
 
 import pytest
@@ -16,13 +10,10 @@ from corsair.adapters.pytest_runner import WRAPPER, PytestRunner, PytestRunnerCo
 from corsair.ports.execution import ExecutionError, ExecutionReceipt
 from corsair.ports.sandbox import SandboxHandle
 from corsair.ports.test_runner import ApprovedPatch, PatchFile, PreparedWorkspace
+from evals.fixture_e2e.reviewed import DISCOVER, FIXTURE, PREFIX, ReviewedLocalExecution, ReviewedWorkspace
 
 IDS = ('tests/test_a.py::test_control', 'tests/test_a.py::test_security')
 PATCH = ApprovedPatch((PatchFile('tests/test_a.py', b'def test_control(): pass\n'),), ('tests/test_a.py',))
-PREFIX = ('env', 'PYTEST_DISABLE_PLUGIN_AUTOLOAD=1', 'PYTHONDONTWRITEBYTECODE=1', 'PYTHONPATH=.', 'python3.12', '-m',
-          'pytest', '-c', '/dev/null', '--rootdir', '.', '--noconftest', '--import-mode=importlib',
-          '-p', 'no:cacheprovider', '--basetemp', 'scratch')
-DISCOVER = PREFIX + ('--collect-only', '-q')
 COLLECTED = ('\n'.join(IDS) + '\n\n2 tests collected in 0.01s\n').encode()
 
 
@@ -190,44 +181,6 @@ def test_ids_must_be_distinct_plain_and_inside_the_patch(store, ids):
 def test_option_like_patch_path_is_refused(store):
     patch = ApprovedPatch((PatchFile('-p.py', b''),), ('-p.py',))
     with pytest.raises(ValueError): run(store, patch=patch, ids=('-p.py::test_a', '-p.py::test_b'))
-
-
-FIXTURE = Path(__file__).resolve().parents[2] / 'benchmarks/fixtures/path-traversal'
-
-
-class ReviewedWorkspace:
-    """Delivers only the repository-owned, reviewed SPEC-0018 bytes into a private scratch directory."""
-    def __init__(self, store, root, variant):
-        self.store, self.root, self.variant = store, root, variant
-
-    def prepare(self, patch, operation):
-        reviewed = (FIXTURE / 'test_documents.py').read_bytes()
-        assert [(f.path, f.content) for f in patch.files] == [('test_documents.py', reviewed)]
-        source = (FIXTURE / self.variant / 'documents.py').read_bytes()
-        self.root.mkdir(mode=0o700)
-        (self.root / 'documents.py').write_bytes(source)
-        (self.root / 'test_documents.py').write_bytes(reviewed)
-        handle = SandboxHandle(str(uuid4()), 'reviewed', 'local', 'tests', str(operation))
-        return PreparedWorkspace(handle, self.store.put(source), self.store.put(reviewed), patch.sha256)
-
-    def release(self, workspace, operation):
-        shutil.rmtree(self.root)
-        return 'unconfirmed' if self.root.exists() else 'confirmed'
-
-
-class ReviewedLocalExecution:
-    """Test-only host execution. Model-authored code must never run on the host; this is allowed solely
-    because ReviewedWorkspace admits nothing but the reviewed repository-owned SPEC-0018 fixture bytes."""
-    def __init__(self, root):
-        self.root = root
-
-    def execute(self, handle, command, operation):
-        argv = [sys.executable if token == 'python3.12' else token for token in command]
-        started = time.monotonic()
-        done = subprocess.run(argv, cwd=self.root, env={'PATH': os.environ['PATH']}, capture_output=True, timeout=60)
-        return ExecutionReceipt(str(operation), handle, 'local', time.monotonic()-started, 'acknowledged',
-                                'terminal_observed', 'terminal', stdout=done.stdout, stderr=done.stderr,
-                                native_exit=done.returncode, worker_cleanup='confirmed')
 
 
 @pytest.mark.parametrize('variant', ['vulnerable', 'fixed'])
