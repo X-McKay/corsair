@@ -64,6 +64,10 @@ class TestPlanningInput(Contract):
         if self.identification.scope != self.scope:
             raise ValueError("identification scope must equal the authorized planning scope")
         bounded_inventory(self.source_files)
+        # A planned test file must never replace saved source (application or existing test).
+        overlap = set(self.environment.approved_test_paths) & {source.path for source in self.source_files}
+        if overlap:
+            raise ValueError(f"approved test paths overlap saved source: {sorted(overlap)}")
         baseline = self.environment.baseline_test
         if baseline is not None and baseline.path not in {source.path for source in self.source_files}:
             raise ValueError("the baseline test file must be in the saved inventory")

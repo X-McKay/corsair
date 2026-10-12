@@ -101,6 +101,13 @@ def test_input_refuses_baseline_test_absent_from_inventory():
         TestPlanningInput.model_validate(data)
 
 
+def test_input_refuses_approved_test_path_over_saved_source():
+    data = case().inputs.model_dump()
+    data["environment"]["approved_test_paths"] = ["documents.py"]
+    with pytest.raises(ValidationError):
+        TestPlanningInput.model_validate(data)
+
+
 def edit(path, value):
     plan = reference()
     target = plan
