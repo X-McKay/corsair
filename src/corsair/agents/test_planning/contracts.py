@@ -14,6 +14,8 @@ Scope = Literal["component", "application_path"]
 Token = Annotated[str, Field(min_length=1, max_length=512)]
 Name = Annotated[str, Field(min_length=1, max_length=256)]
 Path = Annotated[str, Field(min_length=1, max_length=256)]
+# Same identifier shape the deterministic disposition gates (SPEC-0027) compare against.
+Identifier = Annotated[str, Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.:-]+$")]
 CommandTokens = Annotated[tuple[Token, ...], Field(min_length=1, max_length=32)]
 
 
@@ -87,6 +89,12 @@ class TestSpecification(Contract, Generic[Citation]):
     _path = field_validator("test_path")(confined_path)
 
 
+class SecurityExpectation(Contract):
+    """Typed expectations for the security test, so later gates never parse model prose."""
+    failure_type: Identifier = Field(description="Native exception type reported when the security assertion fails, for example AssertionError")
+    safe_behavior: Identifier = Field(description="Identity of the specific required safe behavior, for example the rejection exception type ValueError")
+
+
 def _environment(info: ValidationInfo) -> EnvironmentEvidence | None:
     context: Any = info.context
     return context.environment if isinstance(context, TestPlanningInput) else None
@@ -97,6 +105,7 @@ class _ReadyPlan(Contract, Generic[Citation]):
     scope: Scope
     control: TestSpecification[Citation] = Field(description="Benign control through the real implementation path")
     security: TestSpecification[Citation] = Field(description="Security regression for the reported concern")
+    security_expectation: SecurityExpectation
     discovery_command: CommandTokens = Field(description="Exactly the supplied native discovery command tokens")
     evidence_requirements: tuple[Fact, ...] = Field(min_length=1, max_length=8)
     citations: tuple[Citation, ...] = Field(min_length=1, max_length=16)

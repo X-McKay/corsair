@@ -91,6 +91,9 @@ cases:
           observation); a sandbox or policy denial is recorded separately and is not a rejection
         source_references:
         - *id001
+      security_expectation:
+        failure_type: AssertionError
+        safe_behavior: ValueError
       discovery_command: *id002
       evidence_requirements:
       - Native discovery finds exactly the two planned test ids
@@ -192,6 +195,9 @@ cases:
           observation); a sandbox or policy denial is recorded separately and is not a rejection
         source_references:
         - *id004
+      security_expectation:
+        failure_type: AssertionError
+        safe_behavior: ValueError
       discovery_command: *id002
       evidence_requirements:
       - Native discovery finds exactly the two planned test ids
@@ -295,6 +301,9 @@ cases:
           observation); a sandbox or policy denial is recorded separately and is not a rejection
         source_references:
         - *id005
+      security_expectation:
+        failure_type: AssertionError
+        safe_behavior: ValueError
       discovery_command: *id002
       evidence_requirements:
       - Native discovery finds exactly the two planned test ids

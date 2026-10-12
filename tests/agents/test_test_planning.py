@@ -58,6 +58,7 @@ def test_reference_plan_is_admitted_with_trusted_quotations_and_no_labels_in_pro
     plan = result.output
     assert isinstance(plan, ReadyTestPlan) and all(plan_checks(c.inputs, plan, c.metadata).values())
     assert plan.security.source_references[0].quote.startswith("def read_document")
+    assert (plan.security_expectation.failure_type, plan.security_expectation.safe_behavior) == ("AssertionError", "ValueError")
     prompt = planning_prompt(c.inputs)
     # Identification is sent without its quotation; contents arrive only through reads; oracle never sent.
     assert c.inputs.identification.target.source.quote not in prompt
@@ -120,6 +121,8 @@ def edit(path, value):
     edit(("scope",), "application_path"),                                                        # scope expansion
     reference() | {"verdict": "fixed"},                                                          # verdict field
     edit(("security", "implementation_call"), "open(tmp_path / 'outside.txt')"),                 # not the target
+    edit(("security_expectation", "safe_behavior"), "raises some error"),                        # untyped expectation
+    {k: v for k, v in reference().items() if k != "security_expectation"},                       # missing expectation
 ])
 def test_finalizer_and_contract_refuse_invalid_plans(plan):
     with pytest.raises(UnexpectedModelBehavior):
