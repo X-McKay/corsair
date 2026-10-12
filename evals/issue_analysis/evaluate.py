@@ -2,15 +2,17 @@
 
 import argparse
 import asyncio
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, field
 import json
 from importlib.metadata import version
 from pathlib import Path
+from typing import Any
 
 import logfire
 from pydantic import TypeAdapter
 from pydantic_ai import models
 from pydantic_ai.messages import ModelResponse, ToolCallPart, ToolReturnPart
+from pydantic_ai.models import Model
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import UsageLimits
 from pydantic_evals import Case, Dataset, increment_eval_metric, set_eval_attribute
@@ -19,7 +21,7 @@ from pydantic_evals.evaluators import Evaluator, EvaluatorContext, HasMatchingSp
 from corsair.agents.issue_analysis import (
     FixtureDependencies, IssueAnalysis, IssueAnalysisInput, create_issue_analysis_agent, fixture_prompt,
 )
-from corsair.agents.issue_analysis.agent import PROMPT_VERSION
+from corsair.agents.issue_analysis.agent import CONFIG_VERSION, PROMPT_VERSION, TOOL_RETRIES
 
 ROOT = Path(__file__).parent
 
@@ -32,6 +34,61 @@ def scripted_model(output: IssueAnalysis, *, path: str = "documents.py") -> Func
             return ModelResponse(parts=[ToolCallPart("read_source", {"path": path, "start_line": 1, "end_line": 4})])
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, output.model_dump(mode="json"))])
     return FunctionModel(respond)
+
+
+PROFILE_FLAGS = ("default_structured_output_mode", "supports_json_schema_output", "supports_json_object_output",
+                 "json_schema_transformer", "openai_chat_supports_multiple_system_messages",
+                 "openai_supports_strict_tool_definition")
+
+
+def describe_model(model: Model) -> dict[str, Any]:
+    """Read the request-shaping configuration from the model actually used."""
+    profile = model.profile
+    def flag(name):
+        if name not in profile:
+            return "unset"
+        value = profile[name]
+        return value.__name__ if isinstance(value, type) else value
+    client = getattr(model, "client", None)
+    return {"model_name": model.model_name, "system": model.system,
+            "profile": {name: flag(name) for name in PROFILE_FLAGS},
+            "model_settings": dict(model.settings or {}),
+            "sdk_max_retries": client.max_retries if client is not None else "not_applicable"}
+
+
+def record_count(name: str, value: int) -> None:
+    """Pydantic Evals drops zero-valued metric increments; the attribute keeps a measured zero."""
+    set_eval_attribute(name, value)
+    increment_eval_metric(name, value)
+
+
+@dataclass(frozen=True)
+class FixtureEvaluationConfig:
+    """The one source for the fixture run budget and its recorded experiment metadata."""
+    model: dict[str, Any]
+    mode: str = "direct_fixture"
+    model_kind: str = "FunctionModel scripted oracle, not live reasoning"
+    prompt_version: str = PROMPT_VERSION
+    config_version: str = CONFIG_VERSION
+    rubric_version: str = "fixture-contract-v1"
+    output_retries: int = 1
+    tool_retries: int = TOOL_RETRIES
+    retry_task: None = None  # no Pydantic Evals task retry
+    request_limit: int = 3
+    tool_calls_limit: int = 1
+    total_tokens_limit: int = 5000
+    repeat: int = 2
+    max_concurrency: int = 1
+    provider_revision: str = "not_applicable"
+    packages: dict[str, str] = field(default_factory=lambda: {
+        "pydantic_ai_slim": version("pydantic-ai-slim"), "pydantic_evals": version("pydantic-evals")})
+
+    def usage_limits(self) -> UsageLimits:
+        return UsageLimits(request_limit=self.request_limit, tool_calls_limit=self.tool_calls_limit,
+                           total_tokens_limit=self.total_tokens_limit)
+
+    def metadata(self) -> dict[str, Any]:
+        return asdict(self)
 
 
 @dataclass
@@ -48,6 +105,8 @@ def dataset() -> Dataset:
         output = IssueAnalysis.model_validate(expected)
         cases.append(Case(name=name, inputs=inputs, expected_output=output,
                           evaluators=[ToolCorrectness(expected_tools=["read_source"] if output.citations else [])]))
+    # MatchesOracle fails closed; a case without an oracle is a dataset defect, not a pass.
+    assert cases and all(case.expected_output is not None for case in cases), "every fixture case needs an oracle"
     return Dataset(name="issue-analysis-fixture-v1", cases=cases,
                    evaluators=[MatchesOracle(), MaxToolCalls(max_calls=1), MaxModelRequests(max_requests=2),
                                HasMatchingSpan(query={"has_attributes": {"gen_ai.operation.name": "chat"}},
@@ -63,32 +122,29 @@ async def evaluate_fixture() -> object:
         IssueAnalysis.model_validate(output) for name, output in oracles.items()
     }
 
+    config = FixtureEvaluationConfig(model=describe_model(scripted_model(next(iter(scripted.values())))))
+
     async def task(inputs: IssueAnalysisInput) -> IssueAnalysis:
-        agent = create_issue_analysis_agent(scripted_model(scripted[inputs.fixture_id]))
+        model = scripted_model(scripted[inputs.fixture_id])
+        if describe_model(model) != config.model:
+            raise RuntimeError("fixture model configuration differs from recorded metadata")
+        agent = create_issue_analysis_agent(model, output_retries=config.output_retries)
         with models.override_allow_model_requests(False):
             result = await agent.run(fixture_prompt(inputs), deps=FixtureDependencies(inputs),
-                                     usage_limits=UsageLimits(request_limit=3, tool_calls_limit=1, total_tokens_limit=5000))
+                                     usage_limits=config.usage_limits())
         usage = result.usage
         set_eval_attribute("input_digest", inputs.input_digest)
         set_eval_attribute("observed_native_tool_calls", usage.tool_calls)
         set_eval_attribute("usage_source", "FunctionModel estimated tokens; no provider billing")
-        increment_eval_metric("native_requests", usage.requests)
+        record_count("native_requests", usage.requests)
         increment_eval_metric("native_tool_calls", usage.tool_calls)
         # FunctionModel token counts are estimates; never provider billing observations.
         increment_eval_metric("fixture_estimated_input_tokens", usage.input_tokens)
         increment_eval_metric("fixture_estimated_output_tokens", usage.output_tokens)
         return result.output
 
-    return await dataset().evaluate(task, max_concurrency=1, repeat=2,
-                                    metadata={"mode": "direct_fixture", "prompt_version": PROMPT_VERSION,
-                                              "rubric_version": "fixture-contract-v1",
-                                              "pydantic_ai_slim": version("pydantic-ai-slim"),
-                                              "pydantic_evals": version("pydantic-evals"),
-                                              "model": "FunctionModel scripted oracle, not live reasoning",
-                                              "task_retries": 0, "output_retries": 1,
-                                              "request_limit": 3, "tool_calls_limit": 1,
-                                              "total_tokens_limit": 5000,
-                                              "provider_revision": "not_applicable"})
+    return await dataset().evaluate(task, max_concurrency=config.max_concurrency, repeat=config.repeat,
+                                    retry_task=config.retry_task, metadata=config.metadata())
 
 
 def main() -> None:
