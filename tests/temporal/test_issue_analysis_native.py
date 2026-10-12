@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from dataclasses import asdict, replace
 from pathlib import Path
 from uuid import uuid4
 
@@ -20,20 +21,48 @@ with workflow.unsafe.imports_passed_through():
     from pydantic_ai.durable_exec.temporal import LogfirePlugin, PydanticAIPlugin
     from pydantic_ai.exceptions import UnexpectedModelBehavior, UsageLimitExceeded
 
-    from corsair.workflows.issue_analysis import IssueAnalysisExecution, IssueAnalysisWorkflow
-    from corsair.agents.issue_analysis import IssueAnalysisInput
-    from tests.temporal.test_issue_analysis_support import AGENT, EXPECTED, MODELS, inputs
+    from corsair.agents.issue_analysis.agent import PROMPT_VERSION
+    from corsair.workflows.issue_analysis import (
+        IssueAnalysisExecution, IssueAnalysisRequest, IssueAnalysisWorkflow,
+    )
+    from tests.temporal.support import EXECUTION_TIMEOUT, workflow_runner
+    from tests.temporal.test_issue_analysis_support import (
+        BUDGET, EXPECTED, MODELS, admitted, fixture_agent, inputs,
+    )
 
 
-@workflow.defn
+# The workflow name and single request parameter are frozen replay contracts.
+@workflow.defn(name="corsair.test.FixtureIssueAnalysis")
+@admitted
 class FixtureIssueAnalysisWorkflow(IssueAnalysisWorkflow):
-    __pydantic_ai_agents__ = [AGENT]
+    __pydantic_ai_agents__ = [fixture_agent()]
     model_keys = tuple(MODELS)
+    budget_ceiling = BUDGET
 
     @workflow.run
-    async def run(self, inputs: IssueAnalysisInput, model_key: str,
-                  request_limit: int = 3) -> IssueAnalysisExecution:
-        return await super().run(inputs, model_key, request_limit)
+    async def run(self, request: IssueAnalysisRequest) -> IssueAnalysisExecution:
+        return await super().run(request)
+
+
+def memo(case, request):
+    return {"case": case, "mode": "durable", "input_digest": request.inputs.input_digest,
+            "prompt_version": PROMPT_VERSION, "model_key": request.model_key}
+
+
+def worker(client, queue):
+    return Worker(client, task_queue=queue, workflows=[FixtureIssueAnalysisWorkflow],
+                  workflow_runner=workflow_runner())
+
+
+def replayer(plugins):
+    return Replayer(workflows=[FixtureIssueAnalysisWorkflow], plugins=plugins, workflow_runner=workflow_runner())
+
+
+def accounting(execution):
+    return {"run_id": execution.run_id, "mode": execution.mode, "requests": execution.requests,
+            "tool_calls": execution.tool_calls, "usage_reported": execution.usage_reported,
+            "input_tokens": execution.input_tokens, "output_tokens": execution.output_tokens,
+            "output_corrections": execution.output_corrections, "elapsed_seconds": execution.elapsed_seconds}
 
 
 def configure_local_spans():
@@ -75,19 +104,24 @@ def test_issue_analysis_same_agent_direct_durable_replay_local_spans(temporal_ad
         plugins = [PydanticAIPlugin(), LogfirePlugin(metrics=False)]
         client = await Client.connect(temporal_address, plugins=plugins)
         identity = "corsair-analysis-" + str(uuid4())
+        analysis = IssueAnalysisRequest(inputs(key), key, BUDGET)
         with models.override_allow_model_requests(False):
-            direct = await FixtureIssueAnalysisWorkflow().run(inputs(key), key)
+            direct = await FixtureIssueAnalysisWorkflow().run(analysis)
             direct_spans = exporter.get_finished_spans()
             assert sum(s.attributes.get("gen_ai.operation.name") == "chat"
                        for s in direct_spans) == direct.requests
             assert sum(s.attributes.get("gen_ai.operation.name") == "execute_tool"
                        for s in direct_spans) == direct.tool_calls
-            async with Worker(client, task_queue=identity, workflows=[FixtureIssueAnalysisWorkflow]):
-                handle = await client.start_workflow(FixtureIssueAnalysisWorkflow.run,
-                                                    args=[inputs(key), key, 3], id=identity, task_queue=identity)
+            async with worker(client, identity):
+                handle = await client.start_workflow(FixtureIssueAnalysisWorkflow.run, analysis, id=identity,
+                                                    task_queue=identity, execution_timeout=EXECUTION_TIMEOUT,
+                                                    memo=memo(key, analysis))
                 durable = await asyncio.wait_for(handle.result(), 30)
+        assert await (await handle.describe()).memo() == memo(key, analysis)
         assert durable.output == direct.output == EXPECTED[key]
-        assert (durable.requests, durable.tool_calls) == (direct.requests, direct.tool_calls)
+        assert (direct.mode, durable.mode) == ("direct", "durable")
+        assert (durable.requests, durable.tool_calls, durable.output_corrections, durable.usage_reported) == (
+            direct.requests, direct.tool_calls, direct.output_corrections, direct.usage_reported)
         assert durable.requests in (1, 2) and durable.tool_calls in (0, 1)
         destination = request.config.getoption("--temporal-evidence-dir")
         history = await save_history(handle, destination)
@@ -108,20 +142,45 @@ def test_issue_analysis_same_agent_direct_durable_replay_local_spans(temporal_ad
         assert all(s.context.trace_id in workflow_traces for s in model_spans + tool_spans)
         assert any(s.name.startswith("RunWorkflow:") for s in durable_spans)
         assert sum(s.name.startswith("RunActivity:") for s in durable_spans) == len(activities)
-        await Replayer(workflows=[FixtureIssueAnalysisWorkflow], plugins=plugins).replay_workflow(history)
+        await replayer(plugins).replay_workflow(history)
         # A native history replay performs no model/tool requests or new execution spans.
         assert len(exporter.get_finished_spans()) == len(spans_before)
         write_spans(exporter, Path(destination) / f"{identity}-spans.json")
         with (Path(destination) / f"{identity}-comparison.json").open("x", encoding="utf-8") as output:
             json.dump({"case": key, "input_digest": inputs(key).input_digest,
-                       "direct": {"requests": direct.requests, "tool_calls": direct.tool_calls,
-                                  "input_tokens": direct.input_tokens, "output_tokens": direct.output_tokens},
-                       "durable": {"requests": durable.requests, "tool_calls": durable.tool_calls,
-                                   "input_tokens": durable.input_tokens, "output_tokens": durable.output_tokens},
+                       "budget": asdict(BUDGET), "prompt_version": PROMPT_VERSION,
+                       "direct": accounting(direct), "durable": accounting(durable),
                        "usage_source": "Fixture model estimates; no provider billing",
                        "native_activities": activities, "local_spans": len(spans_before),
                        "direct_spans": len(direct_spans), "durable_spans": len(durable_spans),
                        "durable_workflow_trace_ids": [f"{value:032x}" for value in workflow_traces]}, output, indent=2)
+    asyncio.run(check())
+
+
+@pytest.mark.parametrize("key,budget,failure_type", [
+    ("unadmitted-provider", BUDGET, "ModelKeyNotAdmitted"),
+    ("path_traversal", replace(BUDGET, request_limit=4), "BudgetNotAdmitted"),
+])
+def test_issue_analysis_durable_admission_refusal_fails_workflow(temporal_address, request, key, budget, failure_type):
+    async def check():
+        plugins = [PydanticAIPlugin()]
+        client = await Client.connect(temporal_address, plugins=plugins)
+        identity = "corsair-analysis-refused-" + str(uuid4())
+        analysis = IssueAnalysisRequest(inputs(), key, budget)
+        async with worker(client, identity):
+            handle = await client.start_workflow(FixtureIssueAnalysisWorkflow.run, analysis, id=identity,
+                                                task_queue=identity, execution_timeout=EXECUTION_TIMEOUT,
+                                                memo=memo("admission-refusal", analysis))
+            with pytest.raises(WorkflowFailureError) as failure:
+                await asyncio.wait_for(handle.result(), 30)
+        # The refusal fails the workflow itself, not a retried workflow task, before any activity.
+        assert isinstance(failure.value.cause, ApplicationError)
+        assert (failure.value.cause.type, failure.value.cause.non_retryable) == (failure_type, True)
+        history = await save_history(handle, request.config.getoption("--temporal-evidence-dir"))
+        assert history.events[-1].event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_FAILED
+        assert not any(e.event_type in (EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+                                        EventType.EVENT_TYPE_WORKFLOW_TASK_FAILED) for e in history.events)
+        await replayer(plugins).replay_workflow(history)
     asyncio.run(check())
 
 
@@ -137,14 +196,16 @@ def test_issue_analysis_direct_durable_failure_preserves_native_cause(
         plugins = [PydanticAIPlugin(), LogfirePlugin(metrics=False)]
         client = await Client.connect(temporal_address, plugins=plugins)
         identity = "corsair-analysis-negative-" + str(uuid4())
+        analysis = IssueAnalysisRequest(inputs(), key, replace(BUDGET, request_limit=limit))
         with models.override_allow_model_requests(False):
             with pytest.raises(exception_type):
-                await FixtureIssueAnalysisWorkflow().run(inputs(), key, limit)
+                await FixtureIssueAnalysisWorkflow().run(analysis)
             direct_spans = exporter.get_finished_spans()
             assert sum(s.attributes.get("gen_ai.operation.name") == "chat" for s in direct_spans) == 1
-            async with Worker(client, task_queue=identity, workflows=[FixtureIssueAnalysisWorkflow]):
-                handle = await client.start_workflow(FixtureIssueAnalysisWorkflow.run,
-                                                    args=[inputs(), key, limit], id=identity, task_queue=identity)
+            async with worker(client, identity):
+                handle = await client.start_workflow(FixtureIssueAnalysisWorkflow.run, analysis, id=identity,
+                                                    task_queue=identity, execution_timeout=EXECUTION_TIMEOUT,
+                                                    memo=memo(key, analysis))
                 with pytest.raises(WorkflowFailureError) as failure:
                     await asyncio.wait_for(handle.result(), 30)
         cause = failure.value.cause
@@ -163,6 +224,6 @@ def test_issue_analysis_direct_durable_failure_preserves_native_cause(
         model_spans = [s for s in durable_spans if s.attributes.get("gen_ai.operation.name") == "chat"]
         assert len(model_spans) == 1 and model_spans[0].context.trace_id in workflow_traces
         assert any(s.status.status_code.name == "ERROR" for s in durable_spans)
-        await Replayer(workflows=[FixtureIssueAnalysisWorkflow], plugins=plugins).replay_workflow(history)
+        await replayer(plugins).replay_workflow(history)
         write_spans(exporter, Path(destination) / f"{identity}-spans.json")
     asyncio.run(check())

@@ -1,4 +1,8 @@
-"""One native parent/child composition, with retry ownership per fixture operation."""
+"""One native parent/child composition, with retry ownership per fixture operation.
+
+Workflow, signal and query names are explicit and frozen replay contracts: renaming a class or
+method must not change them, and changing them invalidates retained histories.
+"""
 
 from datetime import timedelta
 
@@ -11,17 +15,17 @@ with workflow.unsafe.imports_passed_through():
     from .fixture_contracts import FixtureRequest, FixtureResult
 
 
-@workflow.defn
+@workflow.defn(name="corsair.fixture.Stage")
 class FixtureStage:
     def __init__(self) -> None:
         self._released = False
         self._waiting = False
 
-    @workflow.signal
+    @workflow.signal(name="release")
     def release(self) -> None:
         self._released = True
 
-    @workflow.query
+    @workflow.query(name="waiting")
     def waiting(self) -> bool:
         return self._waiting
 
@@ -63,7 +67,7 @@ class FixtureStage:
                                  prepared.attempts, int(cause.details[0]))
 
 
-@workflow.defn
+@workflow.defn(name="corsair.fixture.Investigation")
 class FixtureInvestigation:
     @workflow.run
     async def run(self, request: FixtureRequest) -> FixtureResult:

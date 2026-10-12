@@ -10,7 +10,7 @@ from temporalio.exceptions import CancelledError
 
 from corsair.workflows.fixture import FixtureInvestigation, FixtureStage
 from corsair.workflows.fixture_contracts import FixtureRequest
-from tests.temporal.support import save_and_replay, wait_for_child, worker
+from tests.temporal.support import EXECUTION_TIMEOUT, fixture_memo, save_and_replay, wait_for_child, worker
 
 
 @pytest.mark.parametrize("scenario,outcome,prepare_attempts,operation_attempts", [
@@ -24,11 +24,13 @@ def test_native_parent_child_failure_retry_and_replay(
         client = await Client.connect(temporal_address)
         identity = "corsair-fixture-" + str(uuid4())
         async with worker(client, identity):
+            fixture = FixtureRequest(identity, "fixture", scenario)
             handle = await client.start_workflow(
-                FixtureInvestigation.run, FixtureRequest(identity, "fixture", scenario),
-                id=identity, task_queue=identity,
+                FixtureInvestigation.run, fixture, id=identity, task_queue=identity,
+                execution_timeout=EXECUTION_TIMEOUT, memo=fixture_memo(fixture),
             )
             result = await asyncio.wait_for(handle.result(), timeout=30)
+            assert await (await handle.describe()).memo() == fixture_memo(fixture)
             assert (result.outcome, result.prepare_attempts, result.operation_attempts) == (
                 outcome, prepare_attempts, operation_attempts,
             )
@@ -41,8 +43,8 @@ def test_native_parent_child_failure_retry_and_replay(
         scheduled = [e.activity_task_scheduled_event_attributes.activity_type.name
                      for e in history.events
                      if e.event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED]
-        assert scheduled == (["prepare_fixture"] if scenario == "permanent"
-                             else ["prepare_fixture", "complete_fixture"])
+        assert scheduled == (["corsair.fixture.prepare"] if scenario == "permanent"
+                             else ["corsair.fixture.prepare", "corsair.fixture.complete"])
     asyncio.run(check())
 
 
@@ -51,9 +53,10 @@ def test_native_parent_cancels_waiting_child(temporal_address, request):
         client = await Client.connect(temporal_address)
         identity = "corsair-cancel-" + str(uuid4())
         async with worker(client, identity):
+            fixture = FixtureRequest(identity, "fixture", wait_for_release=True)
             parent = await client.start_workflow(
-                FixtureInvestigation.run, FixtureRequest(identity, "fixture", wait_for_release=True),
-                id=identity, task_queue=identity,
+                FixtureInvestigation.run, fixture, id=identity, task_queue=identity,
+                execution_timeout=EXECUTION_TIMEOUT, memo=fixture_memo(fixture),
             )
             child = await asyncio.wait_for(wait_for_child(client, identity), 30)
             await parent.cancel()
@@ -67,7 +70,7 @@ def test_native_parent_cancels_waiting_child(temporal_address, request):
         await save_and_replay(parent, destination)
         history = await save_and_replay(child, destination)
         assert not any(e.event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED
-                       and e.activity_task_scheduled_event_attributes.activity_type.name == "complete_fixture"
+                       and e.activity_task_scheduled_event_attributes.activity_type.name == "corsair.fixture.complete"
                        for e in history.events)
     asyncio.run(check())
 
@@ -77,9 +80,10 @@ def test_native_worker_replacement_reuses_completed_activity(temporal_address, r
         client = await Client.connect(temporal_address)
         identity = "corsair-replace-" + str(uuid4())
         async with worker(client, identity):
+            fixture = FixtureRequest(identity, "fixture", wait_for_release=True)
             parent = await client.start_workflow(
-                FixtureInvestigation.run, FixtureRequest(identity, "fixture", wait_for_release=True),
-                id=identity, task_queue=identity,
+                FixtureInvestigation.run, fixture, id=identity, task_queue=identity,
+                execution_timeout=EXECUTION_TIMEOUT, memo=fixture_memo(fixture),
             )
             child = await asyncio.wait_for(wait_for_child(client, identity), 30)
         # A fresh Worker has no cached workflow instance; native history restores it.
