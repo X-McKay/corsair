@@ -2,14 +2,15 @@
 
 import asyncio
 from copy import deepcopy
+from dataclasses import dataclass, field
 import json
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
-from pydantic_ai import models
-from pydantic_ai.exceptions import UnexpectedModelBehavior, UsageLimitExceeded
-from pydantic_ai.messages import ModelResponse, ToolCallPart
+from pydantic_ai import capture_run_messages, models
+from pydantic_ai.exceptions import ToolFailed, UnexpectedModelBehavior, UsageLimitExceeded
+from pydantic_ai.messages import ModelResponse, RetryPromptPart, ToolCallPart, ToolReturnPart
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.usage import UsageLimits
@@ -49,9 +50,10 @@ def test_native_function_model_reads_cited_source_and_override_restores_model():
     assert result.usage.requests == 2
     assert result.usage.tool_calls == 1
     assert agent.model is original
-    # Neither source content nor the oracle is included in the initial user prompt.
+    # Neither source content, the evaluator fixture label nor the oracle is in the initial user prompt.
     prompt = fixture_prompt(inputs)
     assert inputs.source_files[0].content not in prompt
+    assert inputs.fixture_id not in prompt
     assert expected.hypothesis.observable_effect not in prompt
 
 
@@ -121,6 +123,66 @@ def test_model_failure_is_preserved_and_explicit_model_is_required():
         create_issue_analysis_agent(None)
 
 
+def test_invented_tool_call_is_refused_not_retried():
+    inputs, output = load_case()
+    calls = []
+    async def respond(messages, info):
+        calls.append(len(messages))
+        if len(calls) == 1:
+            return ModelResponse(parts=[ToolCallPart("run_shell", {"command": "cat /etc/passwd"})])
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, output.model_dump(mode="json"))])
+    # A generous output budget must not lend retries to an authority-expansion attempt.
+    with pytest.raises(UnexpectedModelBehavior, match="run_shell"):
+        run(create_issue_analysis_agent(FunctionModel(respond), output_retries=3), inputs)
+    assert len(calls) == 1
+
+
+def test_sent_tool_schema_describes_every_parameter():
+    inputs, output = load_case("missing_source")
+    sent = []
+    async def respond(messages, info):
+        sent.extend(info.function_tools)
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, output.model_dump(mode="json"))])
+    run(create_issue_analysis_agent(FunctionModel(respond)), inputs)
+    properties = {tool.name: tool.parameters_json_schema["properties"] for tool in sent}["read_source"]
+    assert set(properties) == {"path", "start_line", "end_line"}
+    assert all(schema.get("description") for schema in properties.values())
+
+
+@dataclass(frozen=True)
+class FirstReadFails(FixtureDependencies):
+    """A source adapter that reports one terminal read failure, then serves the fixture."""
+    failures: list = field(default_factory=lambda: [ToolFailed("saved source temporarily unreadable")])
+
+    def read_source(self, path, start_line, end_line):
+        if self.failures:
+            raise self.failures.pop()
+        return super().read_source(path, start_line, end_line)
+
+
+@pytest.mark.parametrize("deps_type", [FixtureDependencies, FirstReadFails])
+def test_only_successful_reads_authorise_citations(deps_type):
+    inputs, output = load_case()
+    messages = []
+    agent = create_issue_analysis_agent(scripted_model(output), output_retries=1)
+    with capture_run_messages() as messages:
+        if deps_type is FixtureDependencies:
+            # Control: the same scripted read and citation succeed when the read succeeds.
+            assert agent.run_sync(fixture_prompt(inputs), deps=deps_type(inputs)).output == output
+        else:
+            with pytest.raises(UnexpectedModelBehavior):
+                agent.run_sync(fixture_prompt(inputs), deps=deps_type(inputs))
+    parts = [part for message in messages for part in message.parts]
+    outcomes = [part.outcome for part in parts if isinstance(part, ToolReturnPart) and part.tool_name == "read_source"]
+    corrections = [part.content for part in parts if isinstance(part, RetryPromptPart)]
+    if deps_type is FixtureDependencies:
+        assert (outcomes, corrections) == (["success"], [])
+    else:
+        # The failed read is refused with the attributable grounding reason, not a
+        # schema error that echoes the tool failure text back to the model.
+        assert (outcomes, corrections) == (["failed"], ["citation must reference source read during this run"])
+
+
 def test_native_tool_refusal_preserves_contract_failure():
     inputs, output = load_case()
     with pytest.raises(UnexpectedModelBehavior, match="read_source"):
@@ -160,6 +222,16 @@ def test_ready_hypothesis_requires_citations_and_cannot_carry_missing_facts():
             IssueAnalysis.model_validate(output.model_dump() | changed)
 
 
+def test_unsupported_needs_no_missing_fact_but_missing_information_does():
+    _, output = load_case("missing_source")
+    unsupported = output.model_dump() | {"status": "unsupported", "missing_facts": []}
+    assert IssueAnalysis.model_validate(unsupported).status == "unsupported"
+    for changed in ({"status": "missing_information"}, {"limitations": []},
+                    {"hypothesis": load_case()[1].hypothesis.model_dump()}):
+        with pytest.raises(ValidationError):
+            IssueAnalysis.model_validate(unsupported | changed)
+
+
 def test_fixture_contract_bounds_unique_source_and_read_size():
     inputs, _ = load_case()
     with pytest.raises(ValidationError):
@@ -180,8 +252,14 @@ def test_native_evals_repeat_with_local_span_coverage():
         assert case.trace_id and case.span_id
         assert case.task_duration >= 0
         assert case.metrics["native_requests"] in (1, 2)
+        assert case.attributes["native_requests"] == case.metrics["native_requests"]
         assert case.attributes["observed_native_tool_calls"] in (0, 1)
         assert case.attributes["input_digest"] == case.inputs.input_digest
+    # Experiment metadata is derived from the configuration object that ran, not hand-typed.
+    metadata = report.experiment_metadata
+    assert (metadata["tool_retries"], metadata["output_retries"]) == (0, 1)
+    assert (metadata["request_limit"], metadata["tool_calls_limit"], metadata["total_tokens_limit"]) == (3, 1, 5000)
+    assert metadata["model"]["system"] == "function" and metadata["model"]["sdk_max_retries"] == "not_applicable"
     groups = report.case_groups()
     assert len(groups) == 3
     assert all(group.runs[0].output == group.runs[1].output for group in groups)
