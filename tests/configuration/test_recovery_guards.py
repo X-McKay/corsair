@@ -30,6 +30,7 @@ def test_native_resource_request_roundtrip_uses_supported_limits_shape(memory):
     assert actual['template']['resources']=={'limits':{'cpu':'1','memory':memory}}
     assert actual['policy']['landlock']['compatibility']=='hard_requirement'
     assert actual['command']==['/bin/sleep','600']
+    assert actual['restart_policy']=='SANDBOX_RESTART_POLICY_NEVER'
 
 
 def test_json_transport_paths_support_native_sdk_file_reads(tmp_path):

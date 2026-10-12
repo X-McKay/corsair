@@ -77,7 +77,7 @@ def test_reviewer_native_wire_contains_skill_locator_tool_and_trusted_anchor():
     async def exercise():
         client = httpx2.AsyncClient(transport=httpx2.MockTransport(respond))
         async with local_model(LocalModelConfig(
-            base_url="https://llm.example/v1", model_name="explicit-model",
+            server="vllm", base_url="https://llm.example/v1", model_name="explicit-model",
         ), http_client=client) as model:
             result = await create_evidence_reviewer(model).run(
                 prompt, deps=ReviewDependencies(inputs, analysis),

@@ -96,7 +96,7 @@ Citation = TypeVar("Citation", bound=SourceReference)
 
 
 class _Analysis(Contract, Generic[Citation]):
-    status: Literal["ready", "missing_information", "unsupported"] = Field(description="ready: cited, testable behavioral prediction, not confirmation of a vulnerability. Other statuses require blocking missing facts and a null hypothesis.")
+    status: Literal["ready", "missing_information", "unsupported"] = Field(description="ready: cited, testable behavioral prediction, not confirmation of a vulnerability. Other statuses require a null hypothesis; missing_information also requires blocking missing facts.")
     scope: Literal["component", "application_path"]
     hypothesis: Hypothesis | None
     citations: tuple[Citation, ...] = Field(max_length=16)
@@ -108,8 +108,12 @@ class _Analysis(Contract, Generic[Citation]):
         if self.status == "ready":
             if self.hypothesis is None or not self.citations or self.missing_facts:
                 raise ValueError("ready requires a cited hypothesis and no missing required facts")
-        elif self.hypothesis is not None or not self.missing_facts:
-            raise ValueError("incomplete analysis requires missing facts and no ready hypothesis")
+        elif self.hypothesis is not None:
+            raise ValueError("missing_information or unsupported analysis cannot carry a hypothesis")
+        elif self.status == "missing_information" and not self.missing_facts:
+            raise ValueError("missing_information requires the missing facts")
+        # unsupported may have no missing fact: the requirement itself is out of
+        # scope, and the mandatory limitations state why.
         return self
 
 

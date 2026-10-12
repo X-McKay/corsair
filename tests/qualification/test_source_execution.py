@@ -19,6 +19,7 @@ from openshell import SandboxClient, TlsConfig
 from corsair.adapters.git_source import Executable, GitSource, SourceLimits, SourceCaptureError
 from corsair.adapters.local_artifacts import LocalArtifacts, ArtifactStorageError
 from corsair.adapters.openshell import OpenShellLifecycle
+from corsair.ports.sandbox import LifecycleLimits
 from corsair.adapters.openshell_execution import OpenShellConnection, OpenShellExecution, serialized
 from corsair.adapters.receipts import ReceiptDirectory
 from corsair.ports.execution import ExecutionError, ExecutionLimits
@@ -126,7 +127,7 @@ def test_fixed_captured_staging_source_execution_output_binding(kube, adapter_ga
         connection = OpenShellConnection(native['endpoint'], native['mtls']/'ca.crt', native['mtls']/'tls.crt', native['mtls']/'tls.key')
         with SandboxClient(native['endpoint'], tls=tls, timeout=60) as client, closing(ReceiptDirectory(composition)) as journal:
             observed = ObservedClient(SdkReceipts(client, kube.evidence))
-            with OpenShellLifecycle(observed, spec=recovery_spec(image['image'], '512Mi'), workspace='default', owner=owner, receipts=receipts) as lifecycle, OpenShellExecution(connection, workspace='default', owner=owner, workdir=remote+'/nested', limits=limits, receipts=receipts) as adapter, LocalArtifacts(output_objects, max_bytes=4096) as outputs:
+            with OpenShellLifecycle(observed, spec=recovery_spec(image['image'], '512Mi'), workspace='default', owner=owner, receipts=receipts, limits=LifecycleLimits(ready_seconds=300, delete_seconds=60)) as lifecycle, OpenShellExecution(connection, workspace='default', owner=owner, workdir=remote+'/nested', limits=limits, receipts=receipts) as adapter, LocalArtifacts(output_objects, max_bytes=4096) as outputs:
                 driver = AdapterHarness(lifecycle, observed); driver.creation = uuid4()
                 try:
                     with owned(kube, native, driver, summary['sandbox'], '512Mi', name='cs-'+driver.creation.hex[:16]) as (name, pair):

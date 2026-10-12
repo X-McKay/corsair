@@ -11,7 +11,7 @@ PYTHONPATH="$PWD/src:$PWD" .venv/bin/python -m pytest \
   tests/temporal/test_issue_analysis_composition.py -q
 ```
 
-This exercises direct capability transparency, typed result conversion, admitted model/request limits and native usage-limit enforcement. It starts no service. Use the existing [Temporal development runbook](temporal-fixture.md#prerequisites-and-ownership) for verified CLI acquisition and explicit service ownership. The selected CLI 1.9.1 binary must match SHA256 `712217694cac9f786a72d4b6c876cd15f3dcf1bf31434d9fed6af25242a327a0`; do not use an implicit SDK download or a floating service.
+This exercises direct capability transparency, typed result conversion, admitted model keys, a typed request carrying an operator budget (request, tool-call and total-token limits) under the workflow's ceiling with typed non-retryable refusals, and native usage-limit enforcement. It starts no service. Use the existing [Temporal development runbook](temporal-fixture.md#prerequisites-and-ownership) for verified CLI acquisition and explicit service ownership. The selected CLI 1.9.1 binary must match SHA256 `712217694cac9f786a72d4b6c876cd15f3dcf1bf31434d9fed6af25242a327a0`; do not use an implicit SDK download or a floating service.
 
 ## Explicit native composition
 

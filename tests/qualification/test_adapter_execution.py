@@ -8,6 +8,7 @@ import pytest
 from openshell import SandboxClient, TlsConfig
 
 from corsair.adapters.openshell import OpenShellLifecycle
+from corsair.ports.sandbox import LifecycleLimits
 from corsair.adapters.openshell_execution import OpenShellConnection, OpenShellExecution
 from corsair.ports.execution import ExecutionLimits, ExecutionError
 from tests.qualification.test_adapter_lifecycle import ObservedClient, AdapterHarness, adapter_gateway
@@ -31,7 +32,7 @@ def test_real_execution_limits_receipts_and_cleanup(kube,adapter_gateway):
     connection=OpenShellConnection(native['endpoint'],native['mtls']/'ca.crt',native['mtls']/'tls.crt',native['mtls']/'tls.key')
     with SandboxClient(native['endpoint'],tls=tls,timeout=60) as client:
         observed=ObservedClient(SdkReceipts(client,kube.evidence))
-        with OpenShellLifecycle(observed,spec=recovery_spec(image_receipt('python')['image'],'512Mi'),workspace='default',owner=owner,receipts=receipts) as lifecycle, OpenShellExecution(connection,workspace='default',owner=owner,workdir='/tmp',limits=limits,receipts=receipts) as adapter:
+        with OpenShellLifecycle(observed,spec=recovery_spec(image_receipt('python')['image'],'512Mi'),workspace='default',owner=owner,receipts=receipts,limits=LifecycleLimits(ready_seconds=300, delete_seconds=60)) as lifecycle, OpenShellExecution(connection,workspace='default',owner=owner,workdir='/tmp',limits=limits,receipts=receipts) as adapter:
             driver=AdapterHarness(lifecycle,observed)
             try:
                 for index in range(3):

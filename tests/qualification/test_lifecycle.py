@@ -30,6 +30,7 @@ def inert_spec():
         template=openshell_pb2.SandboxTemplate(image=LOCK['openshell']['images']['workload'], resources={'cpu': '1', 'memory': '512Mi'}),
         policy=sandbox_pb2.SandboxPolicy(version=policy['version'], filesystem=sandbox_pb2.FilesystemPolicy(**policy['filesystem_policy']), landlock=sandbox_pb2.LandlockPolicy(**policy['landlock'])),
         command=['/bin/sleep', '600'], tty=False,
+        restart_policy=openshell_pb2.SANDBOX_RESTART_POLICY_NEVER,
     )
 
 

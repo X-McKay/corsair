@@ -5,6 +5,7 @@ import tomllib
 from types import SimpleNamespace
 
 from openshell import SandboxClient, TlsConfig
+from openshell._proto import openshell_pb2
 import pytest
 
 from tests.qualification.support import ROOT, LOCK
@@ -23,6 +24,7 @@ def test_sdk_pin_matches_native_lock_and_spec_is_inert():
     assert not spec.providers and not spec.environment and not spec.policy.network_policies
     assert spec.policy.filesystem.include_workdir and not spec.tty
     assert list(spec.command) == ['/bin/sleep', '600']
+    assert spec.restart_policy == openshell_pb2.SANDBOX_RESTART_POLICY_NEVER
     assert 'expected_sandbox_id' in inspect.signature(SandboxClient.wait_deleted).parameters
     with pytest.raises(ValueError, match='set together'):
         TlsConfig(cert_path=ROOT / 'missing')
