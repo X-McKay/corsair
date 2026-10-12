@@ -145,6 +145,10 @@ def test_runs_requested_together_each_reserve_budget_and_identity():
                          runner({"status": "discovered"}, {"status": "discovered"}))
     operations = {r.operation for r in result.output.dev_runs}
     assert len(fake.calls) == 2 and len(operations) == 2
+    (result, fake) = run(create_test_authoring_agent(responding([write(), two])), case().inputs.inputs,
+                         runner({"status": "discovered"}), budget=AuthoringBudget(dev_runs=1))
+    assert isinstance(result.output, TestPatch) and len(fake.calls) == 1
+    assert sorted(r.status for r in result.output.dev_runs) == ["discovered", "not_run"]
 
 
 def test_skipped_security_is_shown_and_refuses_a_patch_by_default():

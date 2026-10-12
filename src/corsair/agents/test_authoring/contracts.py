@@ -122,8 +122,10 @@ class TestPatch(Contract):
             confined_path(path)
         if len(set(paths)) != len(paths) or self.control_test_id == self.security_test_id:
             raise ValueError("distinct files and test ids required")
-        if self.dev_runs[-1].patch_sha256 != self.patch_sha256:
-            raise ValueError("the final development run must cover the final patch")
+        # Budget-refused calls stay in the audit history; the patch must match the last executed run.
+        executed = [run for run in self.dev_runs if run.status != "not_run"]
+        if not executed or executed[-1].patch_sha256 != self.patch_sha256:
+            raise ValueError("the last executed development run must cover the final patch")
         return self
 
 
