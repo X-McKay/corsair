@@ -77,8 +77,8 @@ class AttemptLabel(BaseModel):
     run: str = Field(description="Retained private run identity, e.g. issue-0007-research-20261012/live010")
     attempt: str = Field(description="Attempt identity inside that run as its receipts record it")
     outcome: Literal["typed_output", "no_output"]
-    output_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$", description="SHA256 of the retained typed output JSON; required for calibration use")
-    skill_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    output_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$", description="SHA256 of the retained typed output JSON; required with skill_sha256 for calibration use")
+    skill_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$", description="SHA256 of the SKILL.md the attempt ran under; required with output_sha256 for calibration use")
     failure_layer: Literal["provider", "contract", "evaluator"] | None = Field(default=None, description="Attribution for an attempt without typed output")
     labels: tuple[FailureClass, ...] = Field(default=(), description="Semantic classes found by independent review of this output; empty means reviewed and clean")
     reviewed_by: Literal["root", "sol", "root_and_sol"]
@@ -95,7 +95,10 @@ class AttemptLabel(BaseModel):
 
     @property
     def calibration_ready(self) -> bool:
-        return self.outcome == "typed_output" and self.output_sha256 is not None
+        # Both identities are required: the output hash binds the reviewed bytes, the skill
+        # hash binds them to the frozen skill the comparison attributes them to.
+        return (self.outcome == "typed_output" and self.output_sha256 is not None
+                and self.skill_sha256 is not None)
 
 
 ATTEMPT_LABELS_PATH = ROOT / "attempt_labels.yaml"
@@ -110,7 +113,7 @@ def load_attempt_labels(path: Path = ATTEMPT_LABELS_PATH) -> tuple[AttemptLabel,
 
 
 def calibration_attempts(labels: tuple[AttemptLabel, ...]) -> tuple[AttemptLabel, ...]:
-    """Only individually identified typed outputs enter judge agreement; the rest stay attributed elsewhere."""
+    """Only typed outputs identified by both output and skill hash enter judge agreement."""
     return tuple(item for item in labels if item.calibration_ready)
 
 

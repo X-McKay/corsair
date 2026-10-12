@@ -59,23 +59,28 @@ def test_task_inputs_exclude_labels():
 
 def test_attempt_labels_identify_individual_outputs():
     # Two attempts of one case carry different reviewed labels; neither inherits the case history.
-    sha = "a" * 64
+    sha, skill = "a" * 64, "c" * 64
     clean = AttemptLabel(case="path_traversal", run="r", attempt="1", outcome="typed_output", output_sha256=sha,
-                         labels=(), reviewed_by="sol", source="review: no defect")
+                         skill_sha256=skill, labels=(), reviewed_by="sol", source="review: no defect")
     defective = AttemptLabel(case="path_traversal", run="r", attempt="2", outcome="typed_output", output_sha256="b" * 64,
-                             labels=("omitted_access_condition",), reviewed_by="root_and_sol", source="review: missing read access")
+                             skill_sha256=skill, labels=("omitted_access_condition",), reviewed_by="root_and_sol",
+                             source="review: missing read access")
     failed = AttemptLabel(case="path_traversal", run="r", attempt="3", outcome="no_output", failure_layer="provider",
                           reviewed_by="root", source="receipt: response tokens exhausted")
     unidentified = AttemptLabel(case="path_traversal", run="r", attempt="4", outcome="typed_output",
                                 labels=("imprecise_api_wording",), reviewed_by="root", source="report sentence")
+    # An output hash alone does not identify the producing skill, so the entry stays excluded.
+    skill_unknown = AttemptLabel(case="path_traversal", run="r", attempt="5", outcome="typed_output",
+                                 output_sha256="d" * 64, labels=(), reviewed_by="root", source="review")
     assert clean.labels != defective.labels
     assert RUBRICS["path_traversal"].reported_failure_history and not clean.labels
-    assert calibration_attempts((clean, defective, failed, unidentified)) == (clean, defective)
+    assert calibration_attempts((clean, defective, failed, unidentified, skill_unknown)) == (clean, defective)
+    assert not skill_unknown.calibration_ready and not unidentified.calibration_ready
     with pytest.raises(ValueError):
-        AttemptLabel(case="c", run="r", attempt="5", outcome="no_output", labels=("omitted_access_condition",),
+        AttemptLabel(case="c", run="r", attempt="6", outcome="no_output", labels=("omitted_access_condition",),
                      reviewed_by="root", source="x")
     with pytest.raises(ValueError):
-        AttemptLabel(case="c", run="r", attempt="6", outcome="typed_output", output_sha256=sha,
+        AttemptLabel(case="c", run="r", attempt="7", outcome="typed_output", output_sha256=sha, skill_sha256=skill,
                      labels=("response_truncation",), reviewed_by="root", source="x")
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory) / "labels.yaml"
@@ -89,5 +94,5 @@ def test_committed_attempt_labels_load_and_name_dataset_cases():
     labels = load_attempt_labels()
     names = {case.name for case in load_dataset().cases}
     assert labels and all(item.case in names for item in labels)
-    # Published findings lack output identity until coded from private copies: none is calibration-ready yet.
+    # Published findings lack output and skill identity until coded from private copies: none is calibration-ready yet.
     assert calibration_attempts(labels) == ()
