@@ -107,3 +107,15 @@ qualify-native-upload:
 	test ! -e "$(CORSAIR_QUAL_RUN)"
 	mkdir -p "$(CORSAIR_QUAL_RUN)"
 	uv run --locked python -m pytest tests/qualification -m native_upload --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
+
+# Independent existing-adapter qualifications; one matrix per evidence root.
+.PHONY: qualify-execution-artifacts qualify-execution-receipts
+qualify-execution-artifacts:
+	test ! -e "$(CORSAIR_QUAL_RUN)"
+	mkdir -p "$(CORSAIR_QUAL_RUN)"
+	uv run --locked python -m pytest tests/qualification -m execution_artifacts --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
+
+qualify-execution-receipts:
+	test ! -e "$(CORSAIR_QUAL_RUN)"
+	mkdir -p "$(CORSAIR_QUAL_RUN)"
+	uv run --locked python -m pytest tests/qualification -m execution_receipts --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"

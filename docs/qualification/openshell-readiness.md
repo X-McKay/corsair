@@ -34,3 +34,5 @@ Second node c40e33c1-2e70-45e7-b7b5-54403ff071dc: adapter-admission-002 passed 9
 | adapter-readiness-002/3 | bece3cf6-3a5d-4253-906a-597e9d6458aa | 0.165 | 9.017 |
 
 Independent runs-audit-001/002 and cluster-001/002 audits match raw JUnit, native observations, original IDs and frozen source. Six normal waits ranged from 8.014 to 142.237s. ISSUE-0004 is resolved as a bounded characterization and operational decision: use the pinned native default, require actual Ready/security admission for every new runtime, retain failures and investigate a future timeout, and defer a product SLO until a product requirement exists. Cause and fleet reliability remain unknown. This closes the observation without claiming an upstream repair.
+
+Subsequent [corrected full native1F qualification](openshell-recovery.md) passed on two further fresh admitted nodes with independently audited source/process/storage/OOM and original fixture/cluster cleanup. It is separate from this readiness sample and establishes no product latency SLO. Historical120-second failures and their unknown eventual outcomes are unchanged.
