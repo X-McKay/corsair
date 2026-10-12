@@ -21,8 +21,10 @@ from pydantic_evals.evaluators import EvaluationReason, Evaluator, HasMatchingSp
 
 from corsair.agents.issue_analysis import FixtureDependencies, IssueAnalysis, IssueAnalysisInput, create_issue_analysis_agent, fixture_prompt
 from corsair.agents.issue_analysis.agent import CONFIG_VERSION, PROMPT_VERSION, READ_SOURCE_TOOL, TOOL_RETRIES
+from corsair.agents.issue_analysis.contracts import IssueAnalysisDraft, SourceRead
+from corsair.agents.issue_analysis.skills import SKILL_ID, SKILL_SHA256
 from corsair.agents.issue_analysis.provider import LocalModelConfig, local_model
-from evals.issue_analysis.evaluate import describe_model, record_count
+from evals.issue_analysis.evaluate import CITATION_TEXT_OWNER, SKILL_DELIVERY, describe_model, record_count
 
 ROOT = Path(__file__).parent
 
@@ -112,10 +114,19 @@ class LiveEvaluationConfig:
     server: str
     base_url: str
     model: dict[str, Any]
+    thinking_mode: str
+    thinking_token_budget: int | None
     mode: str = "direct_local_provider_saved_source"
     weights_revision: str = "unknown"
     prompt_version: str = PROMPT_VERSION
     config_version: str = CONFIG_VERSION
+    skill_id: str = SKILL_ID
+    skill_sha256: str = SKILL_SHA256
+    skill_delivery: str = SKILL_DELIVERY
+    source_tool_contract: str = SourceRead.__name__
+    model_output_contract: str = IssueAnalysisDraft.__name__
+    final_output_contract: str = IssueAnalysis.__name__
+    citation_text_owner: str = CITATION_TEXT_OWNER
     rubric_version: str = "local-finite-semantics-v3"
     output_retries: int = 1
     tool_retries: int = TOOL_RETRIES
@@ -157,7 +168,8 @@ async def evaluate_local(config: LocalModelConfig, evidence: Path, *, repeat: in
     logfire.configure(send_to_logfire=False, console=False)
     async with local_model(config) as model:
         run_config = LiveEvaluationConfig(server=config.server, base_url=config.base_url, model=describe_model(model),
-                                          repeat=repeat)
+                                          thinking_mode=config.thinking_mode,
+                                          thinking_token_budget=config.thinking_token_budget, repeat=repeat)
         known_tools = frozenset({READ_SOURCE_TOOL}) | output_tool_names(model)
         agent = create_issue_analysis_agent(model, output_retries=run_config.output_retries)
         async def task(inputs: IssueAnalysisInput):
@@ -219,12 +231,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--model", required=True)
+    parser.add_argument("--thinking-mode", choices=("server_default", "disabled"), default="server_default")
+    parser.add_argument("--thinking-token-budget", type=int)
+    parser.add_argument("--response-token-limit", type=int, choices=(2048, 4096, 8192), default=2048)
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--repeat", type=int, default=2, choices=(1, 2))
     parser.add_argument("--case", choices=("path_traversal", "missing_source", "instruction_injection", "confined_source"))
     args = parser.parse_args()
     args.evidence.mkdir(parents=True, exist_ok=False)
-    config = LocalModelConfig(server="vllm", base_url=args.base_url, model_name=args.model)
+    config = LocalModelConfig(server="vllm", base_url=args.base_url, model_name=args.model,
+                              response_token_limit=args.response_token_limit, thinking_mode=args.thinking_mode,
+                              thinking_token_budget=args.thinking_token_budget)
     cases = (args.case,) if args.case else ("path_traversal", "missing_source", "instruction_injection", "confined_source")
     report = asyncio.run(evaluate_local(config, args.evidence, repeat=args.repeat, case_names=cases))
     with (args.evidence / "report.json").open("xb") as destination:

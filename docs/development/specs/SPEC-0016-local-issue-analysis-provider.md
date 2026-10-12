@@ -33,3 +33,12 @@ Native provider [documentation](https://pydantic.dev/docs/ai/models/openai/) and
 
 
 The frozen real-provider assessment observes the typed/source-read boundary but does not meet semantic/consistency acceptance. [ISSUE-0007](../issues/ISSUE-0007-local-issue-analysis-semantics.md) blocks dependent real-agent expansion; [qualification report](../../qualification/issue-analysis-local-provider.md) distinguishes actual failures from finite-rubric false negatives. Full raw native span exports were not retained; report trace identities and completed-case coverage assertions are retained.
+
+
+## Request-level thinking and communication candidates
+
+A user-authorized continuation adds explicit native request controls on LocalModelConfig: default server behavior, documented non-thinking template kwargs, or a positive `thinking_token_budget` no larger than2048. Disabled thinking and a cap cannot be combined. No inference default, retry, validator, model alias, deployment or overall token cap changes. Native MockTransport checks include actual live run settings and emitted schema descriptions. The selected serving pod's reasoning parser was observed read-only; per-response enforcement and semantic quality still require evidence.
+
+Promptv5 and three schema descriptions clarify the existing read-only task: inventory paths are available through read_source; ready means a cited testable behavioral prediction that may include prevention; only blocking unknowns are missing_facts. Wider-context unknowns remain limitations and environmental assumptions remain preconditions. Source behavior may predict rejection without an execution/refutation/fix-verification verdict. Ordered operations/exceptions and the difference between performing an operation and returning its result are generic analysis guidance. All validation constraints remain unchanged; the change is model-facing communication, not relaxed acceptance. Evaluation labels and independent held-out expectations stay outside model inputs.
+
+The later [SPEC-0019](SPEC-0019-issue-analysis-skills-tools.md) candidate moves general procedural detail into a required native Capability skill and the sole source tool into FunctionToolset. Pydantic input/output contracts, `output_type=IssueAnalysis`, native prompted output parsing/correction and exact current-run citation/scope validators remain the boundary. Explicit response comparisons2048/4096/8192 retain the16000 total and all other limits; no successful smaller-budget claim follows a larger-budget pass.

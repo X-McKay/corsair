@@ -22,6 +22,8 @@ from corsair.agents.issue_analysis import (
     FixtureDependencies, IssueAnalysis, IssueAnalysisInput, create_issue_analysis_agent, fixture_prompt,
 )
 from corsair.agents.issue_analysis.agent import CONFIG_VERSION, PROMPT_VERSION, TOOL_RETRIES
+from corsair.agents.issue_analysis.contracts import IssueAnalysisDraft, SourceRead
+from corsair.agents.issue_analysis.skills import SKILL_ID, SKILL_SHA256
 
 ROOT = Path(__file__).parent
 
@@ -32,7 +34,7 @@ def scripted_model(output: IssueAnalysis, *, path: str = "documents.py") -> Func
         returned = any(isinstance(part, ToolReturnPart) for message in messages for part in message.parts)
         if output.citations and not returned:
             return ModelResponse(parts=[ToolCallPart("read_source", {"path": path, "start_line": 1, "end_line": 4})])
-        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, output.model_dump(mode="json"))])
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, output.model_dump(mode="json", exclude={"citations": {"__all__": {"quote"}}}))])
     return FunctionModel(respond)
 
 
@@ -56,6 +58,12 @@ def describe_model(model: Model) -> dict[str, Any]:
             "sdk_max_retries": client.max_retries if client is not None else "not_applicable"}
 
 
+# Descriptive labels recorded with every report; skill identity and contract names
+# are read from the code actually run.
+SKILL_DELIVERY = "eager_native_capability_instructions"
+CITATION_TEXT_OWNER = "trusted_output_function"
+
+
 def record_count(name: str, value: int) -> None:
     """Pydantic Evals drops zero-valued metric increments; the attribute keeps a measured zero."""
     set_eval_attribute(name, value)
@@ -70,6 +78,13 @@ class FixtureEvaluationConfig:
     model_kind: str = "FunctionModel scripted oracle, not live reasoning"
     prompt_version: str = PROMPT_VERSION
     config_version: str = CONFIG_VERSION
+    skill_id: str = SKILL_ID
+    skill_sha256: str = SKILL_SHA256
+    skill_delivery: str = SKILL_DELIVERY
+    source_tool_contract: str = SourceRead.__name__
+    model_output_contract: str = IssueAnalysisDraft.__name__
+    final_output_contract: str = IssueAnalysis.__name__
+    citation_text_owner: str = CITATION_TEXT_OWNER
     rubric_version: str = "fixture-contract-v1"
     output_retries: int = 1
     tool_retries: int = TOOL_RETRIES

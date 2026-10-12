@@ -14,3 +14,12 @@ Private native reports, logs, metadata and the current eleven-input `source-v2.j
 ## Later prompt and provider assessments
 
 The earlier26-check/evaluation003 metrics above describe the historical promptv1 snapshot and remain unchanged. Promptv3 adds exact one-based inclusive inventory/tool metadata and the supported native durability seam; current direct scripted fixture evaluation `.runs/four-priorities-20261012/pydantic-agent/fixture-evaluation-001.json` passes6 cases/30 assertions. Scripted estimates/local spans still do not qualify model reasoning. [PLAN-0018](../development/plans/PLAN-0018-local-issue-analysis-provider.md) records separate real-provider attempts and semantic failures; [native Temporal fixture qualification](issue-analysis-temporal-fixture.md) records durable fixture evidence.
+
+## Native citation references (2026-10-12)
+
+SPEC-0019 supplies the procedural skill via native Capability and the sole reader via FunctionToolset. SPEC-0020 then gives the model a Pydantic reference-only draft and uses a native async output function to check scope/current-run read coverage and supply exact source quotes. The public final IssueAnalysis JSON schema remains identical to the pre-change schema. Final oracle equality is unchanged; deterministic model helpers project quotation-bearing expected results into draft references outside agent-visible inputs. Native deterministic evaluation remains6 cases/30 assertions; full offline270/5.82s passed with the existing event-loop deprecation warning. Actual provider semantics remain separately gated by ISSUE-0007.
+
+
+The subsequent evidence-coordinate skill/tool candidate passes full offline271/5.82s and deterministic6 cases/30 assertions. A native correction test exercises invalid local citation coordinates followed by a valid result with exactly one source read, preserving current-run validation. An initial full-suite failure on the deliberately changed inventory label is retained; its exact-label assertion was updated, without changing evidence gates.
+
+The current numbered SourceRead/SourceLine tool representation passes272 offline checks/5.82s and deterministic6/30. Native provider wire and blank-line/range-order tests verify explicit local numbering without duplicated quote text; final IssueAnalysis schema and exact quotations remain unchanged.

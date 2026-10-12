@@ -7,7 +7,7 @@ from urllib.parse import urlsplit
 
 from httpx2 import AsyncClient
 from openai import AsyncOpenAI
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic_ai import InlineDefsJsonSchemaTransformer
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.profiles.openai import OpenAIModelProfile
@@ -31,7 +31,8 @@ PROFILE_OVERRIDES = OpenAIModelProfile(
 )
 
 # Model-level settings, so direct, evaluation and durable runs send the same request.
-MODEL_SETTINGS = ModelSettings(temperature=0, max_tokens=2048, parallel_tool_calls=False)
+# The response cap (default 2048) comes from the explicit configuration below.
+MODEL_SETTINGS = ModelSettings(temperature=0, parallel_tool_calls=False)
 
 
 class LocalModelConfig(BaseModel):
@@ -42,6 +43,16 @@ class LocalModelConfig(BaseModel):
     model_name: str = Field(min_length=1, max_length=256)
     api_key_env: Literal["CORSAIR_LOCAL_MODEL_API_KEY"] | None = None
     timeout_seconds: float = Field(default=60, gt=0, le=120)
+    # Planned comparison caps only; the cap includes reasoning and answer tokens.
+    response_token_limit: Literal[2048, 4096, 8192] = 2048
+    thinking_mode: Literal["server_default", "disabled"] = "server_default"
+    thinking_token_budget: int | None = Field(default=None, ge=1, le=2048, strict=True)
+
+    @model_validator(mode="after")
+    def distinct_thinking_controls(self) -> "LocalModelConfig":
+        if self.thinking_mode == "disabled" and self.thinking_token_budget is not None:
+            raise ValueError("a thinking budget cannot be combined with disabled thinking")
+        return self
 
     @field_validator("base_url")
     @classmethod
@@ -51,6 +62,16 @@ class LocalModelConfig(BaseModel):
                 or parts.query or parts.fragment or parts.path.rstrip("/") != "/v1"):
             raise ValueError("explicit HTTPS /v1 endpoint without credentials/query is required")
         return value.rstrip("/")
+
+
+def model_settings(config: LocalModelConfig) -> ModelSettings:
+    """One model-level mapping: fixed request controls, response cap and explicit thinking control."""
+    settings = ModelSettings(**MODEL_SETTINGS, max_tokens=config.response_token_limit)
+    if config.thinking_mode == "disabled":
+        settings["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
+    if config.thinking_token_budget is not None:
+        settings["extra_body"] = {"thinking_token_budget": config.thinking_token_budget}
+    return settings
 
 
 @asynccontextmanager
@@ -65,4 +86,4 @@ async def local_model(config: LocalModelConfig, *, http_client: AsyncClient | No
                            organization="", project="", max_retries=0,
                            timeout=config.timeout_seconds, http_client=http_client) as client:
         yield OpenAIChatModel(config.model_name, provider=PROVIDERS[config.server](openai_client=client),
-                              profile=PROFILE_OVERRIDES, settings=MODEL_SETTINGS)
+                              profile=PROFILE_OVERRIDES, settings=model_settings(config))
