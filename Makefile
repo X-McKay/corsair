@@ -14,7 +14,7 @@ kind-down:
 	uv run --locked python deploy/kind/bootstrap.py down
 
 test-config:
-	uv run --locked python -m pytest tests/configuration tests/unit
+	uv run --locked python -m pytest tests/configuration tests/unit tests/agents tests/temporal/test_fixture_contracts.py
 
 qualify-network:
 	test ! -e "$(CORSAIR_QUAL_RUN)"
@@ -145,3 +145,11 @@ qualify-untrusted-file:
 	test ! -e "$(CORSAIR_QUAL_RUN)"
 	mkdir -p "$(CORSAIR_QUAL_RUN)"
 	uv run --locked python -m pytest tests/qualification -m untrusted_file --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
+
+# An independently owned native fixture service; never starts/downloads a server.
+.PHONY: qualify-temporal-fixture
+qualify-temporal-fixture:
+	test -n "$(CORSAIR_TEMPORAL_ADDRESS)"
+	test ! -e "$(CORSAIR_QUAL_RUN)"
+	mkdir -m 700 -p "$(CORSAIR_QUAL_RUN)"
+	uv run --locked python -m pytest tests/temporal/test_fixture_native.py --temporal-address "$(CORSAIR_TEMPORAL_ADDRESS)" --temporal-evidence-dir "$(CORSAIR_QUAL_RUN)/histories" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"

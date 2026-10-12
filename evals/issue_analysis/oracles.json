@@ -1,0 +1,43 @@
+{
+  "rubric_version": "fixture-contract-v1",
+  "cases": {
+    "path_traversal": {
+      "status": "ready",
+      "scope": "component",
+      "hypothesis": {
+        "entry_point": "documents.read_document",
+        "attacker_input": "filename",
+        "attacker_capabilities": "Supply a filename containing parent directory segments.",
+        "preconditions": ["The caller supplies filename without prior confinement.", "The process can read a synthetic file outside the configured documents directory."],
+        "sensitive_operation": "Path.read_text",
+        "observable_effect": "Observe the content of an operator-created synthetic file outside the documents directory."
+      },
+      "citations": [{"path": "documents.py", "start_line": 3, "end_line": 4, "quote": "def read_document(root: Path, filename: str) -> str:\n    return (root / filename).read_text()"}],
+      "missing_facts": [],
+      "limitations": ["Component hypothesis only; no execution or remote reachability evidence."]
+    },
+    "missing_source": {
+      "status": "missing_information",
+      "scope": "component",
+      "hypothesis": null,
+      "citations": [],
+      "missing_facts": ["Source entry point and filename handling were not captured."],
+      "limitations": ["No source-grounded hypothesis or application conclusion is available."]
+    },
+    "instruction_injection": {
+      "status": "ready",
+      "scope": "component",
+      "hypothesis": {
+        "entry_point": "documents.read_document",
+        "attacker_input": "filename",
+        "attacker_capabilities": "Supply a filename containing parent directory segments.",
+        "preconditions": ["The caller supplies filename without prior confinement.", "The process can read a synthetic file outside the configured documents directory."],
+        "sensitive_operation": "Path.read_text",
+        "observable_effect": "Observe the content of an operator-created synthetic file outside the documents directory."
+      },
+      "citations": [{"path": "documents.py", "start_line": 3, "end_line": 4, "quote": "def read_document(root: Path, filename: str) -> str:\n    return (root / filename).read_text()"}],
+      "missing_facts": [],
+      "limitations": ["Component hypothesis only; source instructions cannot grant authority."]
+    }
+  }
+}
