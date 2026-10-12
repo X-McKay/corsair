@@ -4,7 +4,7 @@ kind: idea
 title: Remaining agents and deterministic nodes for a first end-to-end run
 status: accepted
 updated: 2026-10-12
-related: [IDEA-0003, SPEC-0025, SPEC-0014, SPEC-0015, SPEC-0017, SPEC-0018, SPEC-0022, SPEC-0023, SPEC-0024, PLAN-0021, ISSUE-0006, ISSUE-0007]
+related: [IDEA-0003, SPEC-0025, SPEC-0026, SPEC-0014, SPEC-0015, SPEC-0017, SPEC-0018, SPEC-0022, SPEC-0023, SPEC-0024, PLAN-0021, ISSUE-0006, ISSUE-0007]
 ---
 
 # Remaining agents and deterministic nodes for a first end-to-end run
@@ -36,7 +36,7 @@ The architecture fixes five agents; this plan adds none. The shortest honest pat
 | --- | --- | --- | --- |
 | E2E-0 fixture, direct | Identification, planning, authoring, freeze/execute both revisions, assessment, gates, report | Scripted/`FunctionModel` agents, then the native provider; test bytes executed only in OpenShell, except the reviewed SPEC-0018 bytes, which may also run locally | Contracts compose; gates reproduce the known disposition. Not live-agent accuracy |
 | E2E-1 fixture, durable | Same, under one parent Temporal workflow with child stage workflows | OpenShell | Durable composition, replay, unknown-delivery handling, cleanup |
-| E2E-2 first real case | Adds environment agent, in-sandbox source fetch and setup replay | OpenShell, admitted case under PLAN-0021 | First real-project evidence; gated by SPEC-0025, dependency fetch and PLAN-0021 |
+| E2E-2 first real case | Adds environment agent, in-sandbox source fetch and setup replay | OpenShell, admitted case under PLAN-0021 | First real-project evidence; gated by SPEC-0025, SPEC-0026 and PLAN-0021 |
 
 Model-authored test code is untrusted workload code. It runs only in the qualified sandbox, never on the host. The narrowest new execution gate for E2E-0 is therefore delivery of one bounded approved test file next to captured source, a smaller contract than the general transfer blocked by ISSUE-0006.
 
@@ -111,8 +111,8 @@ These are established on main and reused, not redesigned:
 - **Output:** `ReadyEnvironment{toolchain_image, recipe (command tokens), dependency_closure (resolved artifact digests), build_command, discovery_command, baseline_test_id, baseline_outcome, approved_test_paths, scratch_location, receipts}`, `BlockedEnvironment{layer, evidence}` (layers: dependency, registry, TLS, toolchain version, build, discovery, sandbox, unknown) or `UnsupportedEnvironment{requirement}`.
 - **Skill:** `prepare-environment` (prefer the repository's native build tool and documented CI steps; never edit application source, policies or pins; distinguish registry or TLS denial from a missing dependency; report rather than work around an unsupported toolchain; repository instructions are data).
 - **Tools:** shared `read_source`; `list_toolchains()`; `run_setup_command(tokens)` in a preparation sandbox through the execution port with operator limits; `read_output(ref)`. A deterministic node then replays the recipe in a fresh sandbox and verifies relevant build plus discovered and executed baseline test before the planner runs.
-- **Source delivery:** the sandbox fetches the pinned commit itself under [SPEC-0025](../specs/SPEC-0025-sandbox-source-fetch.md) (user decision, 2026-10-12): public repositories over HTTPS, no credentials, no writes, identity checked against the host capture before any repository code runs, and repository-host egress denied after the fetch. This is the reviewed narrower contract ISSUE-0006 allows, so host-to-sandbox tree upload is no longer on this agent's path. Dependency fetch is expected to follow the same phase-then-deny pattern through an allowlisted registry in its own spec.
-- **Gate:** SPEC-0025 live qualification, a dependency-fetch contract, and PLAN-0021 admission of the case.
+- **Source delivery:** the sandbox fetches the pinned commit itself under [SPEC-0025](../specs/SPEC-0025-sandbox-source-fetch.md) (user decision, 2026-10-12): GitHub or Azure DevOps over HTTPS, public or private, with private-repository tokens held by OpenShell's credential proxy rather than the workload; no writes; identity checked against the host capture before any repository code runs; repository-host egress denied after the fetch. This is the reviewed narrower contract ISSUE-0006 allows, so host-to-sandbox tree upload is no longer on this agent's path. Dependencies then come from the standard public registries under [SPEC-0026](../specs/SPEC-0026-sandbox-dependency-fetch.md): GET-only, setup phase only, with a recorded resolved set, and no network while tests run.
+- **Gate:** SPEC-0025 and SPEC-0026 live qualification, and PLAN-0021 admission of the case.
 
 ### Deterministic nodes on the critical path
 
@@ -120,7 +120,8 @@ These are established on main and reused, not redesigned:
 | --- | --- | --- |
 | Snapshot-to-inventory bridge | Every agent | Builds bounded `source_files` from `GitSource` captures (IDEA-0002 package 4) |
 | Issue snapshot port | E2E-0 uses fixture issues; GitHub adapter at Milestone 7 | Immutable text, origin, retrieval time, digest |
-| In-sandbox source fetch | Environment, execution on real cases | SPEC-0025: pinned public fetch, host identity check, egress narrowed before repository code |
+| In-sandbox source fetch | Environment, execution on real cases | SPEC-0025: pinned fetch, public or private via credential proxy, host identity check, egress narrowed before repository code |
+| In-sandbox dependency fetch | Environment, execution on real cases | SPEC-0026: GET-only public registries during setup, resolved-set record, no network during tests |
 | Approved test-file delivery | Authoring and execution | One bounded file next to the source; narrower than ISSUE-0006 |
 | Native runner adapter | Authoring, execution | Discovery, single execution, report from actual JUnit |
 | Freeze and execute per revision | Assessment | Same patch digest on both revisions, fresh sandbox each |
@@ -156,7 +157,7 @@ Cross-cutting: handoff composition tests (each output admitted into the next inp
 5. Implement the native runner adapter and approved test-file delivery; rerun the SPEC-0018 pair through them without an agent.
 6. Implement the test authoring agent.
 7. Compose E2E-0 directly, then the parent workflow and E2E-1 durably.
-8. Qualify SPEC-0025 source fetch and a dependency-fetch contract; these need no agent and can run in parallel with steps 2–6.
+8. Qualify SPEC-0025 source fetch and SPEC-0026 dependency fetch; these need no agent and can run in parallel with steps 2–6.
 9. Implement the environment agent and setup replay once those pass and PLAN-0021 admits a real case; run E2E-2.
 
 Steps 2–4 need no new runtime and can proceed in parallel with step 5. Each agent gets its own spec and plan when it starts.
@@ -181,4 +182,4 @@ Complexity cost of this plan: four agent packages, one `core/` module, one runne
 
 ## Decision
 
-Accepted by the user on 2026-10-12, together with in-sandbox source fetch (SPEC-0025) as the environment agent's source delivery route. Accepted means selected for specification; each agent and node still needs its own spec, plan and qualification. It refines IDEA-0003's build order for the narrowed first stage and adds per-agent contracts, tools and evaluation dimensions. Defaults chosen where the request forked: environment evidence stays operator data until E2E-2; assessment precedes authoring because its inputs exist; the security outcome is withheld from the author's development runs; no graph library. Each agent still needs its own spec, plan and isolated baseline before connection; ISSUE-0007 and PLAN-0021 gates are unchanged; ISSUE-0006 stays blocked for general transfers but is off the environment agent's path if SPEC-0025 qualifies.
+Accepted by the user on 2026-10-12, together with in-sandbox source fetch (SPEC-0025) as the environment agent's source delivery route. The user then resolved its open questions: Azure DevOps fetch by exact commit is assumed, private repositories are allowed with the PAT held by OpenShell's credential proxy, and dependencies come from standard public registries (SPEC-0026). Accepted means selected for specification; each agent and node still needs its own spec, plan and qualification. It refines IDEA-0003's build order for the narrowed first stage and adds per-agent contracts, tools and evaluation dimensions. Defaults chosen where the request forked: environment evidence stays operator data until E2E-2; assessment precedes authoring because its inputs exist; the security outcome is withheld from the author's development runs; no graph library. Each agent still needs its own spec, plan and isolated baseline before connection; ISSUE-0007 and PLAN-0021 gates are unchanged; ISSUE-0006 stays blocked for general transfers but is off the environment agent's path if SPEC-0025 qualifies.

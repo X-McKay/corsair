@@ -4,7 +4,7 @@ kind: issue
 title: Native transfer retry and resource admission
 status: blocked
 updated: 2026-10-12
-related: [SPEC-0011, PLAN-0013, SPEC-0025]
+related: [SPEC-0011, PLAN-0013, SPEC-0025, SPEC-0026]
 ---
 
 # Native transfer retry and resource admission
@@ -68,4 +68,4 @@ This resolves only the reviewed small inert exclusive-file recipe. Native CLI ar
 
 ## Proposed narrower route for full source trees
 
-On 2026-10-12 the user selected in-sandbox fetch for real-project source: the sandbox fetches one pinned public commit over HTTPS itself, the host compares commit and tree identity with its own `GitSource` capture before any repository code runs, and repository-host egress is narrowed after the fetch. Draft [SPEC-0025](../specs/SPEC-0025-sandbox-source-fetch.md) defines it. No host-side extraction occurs, and a failed or unknown fetch discards the sandbox instead of retrying in place. This is proposed, not qualified. This issue's general transfer criteria, native download extraction and interrupted-transfer reconciliation remain blocked and unchanged.
+On 2026-10-12 the user selected in-sandbox fetch for real-project source: the sandbox fetches one pinned public commit over HTTPS itself, the host compares commit and tree identity with its own `GitSource` capture before any repository code runs, and repository-host egress is narrowed after the fetch. Draft [SPEC-0025](../specs/SPEC-0025-sandbox-source-fetch.md) defines it, including private repositories through OpenShell's credential proxy, and draft [SPEC-0026](../specs/SPEC-0026-sandbox-dependency-fetch.md) installs dependencies from public registries inside the sandbox, so no dependency state is transferred from the host either. No host-side extraction occurs, and a failed or unknown fetch discards the sandbox instead of retrying in place. This is proposed, not qualified. This issue's general transfer criteria, native download extraction and interrupted-transfer reconciliation remain blocked and unchanged.
