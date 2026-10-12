@@ -2,7 +2,7 @@
 id: PLAN-0023
 kind: plan
 title: Issue-analysis rubric coding and skill evaluation protocol
-status: in_progress
+status: cancelled
 updated: 2026-10-12
 related: [PLAN-0018, SPEC-0023, SPEC-0014, SPEC-0019, SPEC-0021, ISSUE-0007]
 ---
@@ -10,6 +10,8 @@ related: [PLAN-0018, SPEC-0023, SPEC-0014, SPEC-0019, SPEC-0021, ISSUE-0007]
 # Issue-analysis rubric coding and skill evaluation protocol
 
 ## Objective and dependencies
+
+Continuation decision: the user accepted the narrower identification role under SPEC-0024/PLAN-0024 and deterministic evaluation without an LLM judge. This plan is cancelled in favor of the new role; its original-contract work remains incomplete historical evidence, and its judge-calibration prerequisite does not gate the new role. Existing labels and failed outputs remain unchanged. Further old-contract work is deferred in favor of PLAN-0024.
 
 Apply [SPEC-0023](../specs/SPEC-0023-native-skill-evaluation-protocol.md) to the `analyze-issue` skill as the first bounded step toward ISSUE-0007, under the objective [PLAN-0018](PLAN-0018-local-issue-analysis-provider.md) still owns. The order is fixed by the spec: code the human findings into per-case rubric labels, calibrate the native judge against those findings, then run a baseline, and only then evaluate skill candidates. The typed precondition contract change proposed for ISSUE-0007 is a separate spec after the baseline exists, so its effect is measured rather than assumed.
 

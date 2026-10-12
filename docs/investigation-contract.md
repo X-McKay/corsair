@@ -24,7 +24,7 @@ Initial qualification targets Python 3.12/pytest and Java 17/Maven/JUnit 5, for 
 
 ## Security hypothesis
 
-The issue-analysis output identifies:
+The issue-identification stage preserves the reported concern and locates the relevant implementation with source evidence, or records a concrete blocker. It does not establish whether the issue occurs. Under [SPEC-0024](development/specs/SPEC-0024-issue-identification.md), the test-planning stage develops the conditional security hypothesis using that handoff, source reads and admitted environment evidence. The investigation must still establish:
 
 - Real entry point and source citations.
 - Attacker-controlled input and attacker capabilities.

@@ -4,12 +4,18 @@ kind: issue
 title: Local issue-analysis semantic and consistency gate
 status: blocked
 updated: 2026-10-12
-related: [SPEC-0016, PLAN-0018, PLAN-0023, SPEC-0023]
+related: [SPEC-0016, PLAN-0018, PLAN-0023, SPEC-0023, SPEC-0024, PLAN-0024]
 ---
 
 # Local issue-analysis semantic and consistency gate
 
-## Current assessment after PR22
+## Accepted narrower objective
+
+The user accepted narrowing the analyst to reported-property identification and source localization, prioritizing accurate end-to-end results over latency. SPEC-0024/PLAN-0024 implement a separate native replacement candidate with strict Pydantic output, its own procedural skill, a restricted source-window toolset over the existing reader and deterministic curated selection checks. Trusted code preserves the original report; the agent locates a source-grounded target or returns a concrete blocker; it does not generate behavioral predictions or preconditions. Test planning owns conditional setup, required safe assertions and application witnesses. Exactly-two-test and final disposition rules are unchanged.
+
+This changes the contract, not the truth of the original failures. The old hypothesis/reviewer remain unqualified history; no old attempt is rescored as a pass and no new output is silently converted into their contracts. The LLM-judge calibration prerequisite under PLAN-0023 is superseded for this role by deterministic development/fresh-case expectations. Resolution still requires evidence that the new handoff reliably supports valid planning and execution; neither structural output nor localization alone proves a security finding or fix. Final v3 passed every deterministic check on 16/16 native-provider development attempts, with 390 offline checks passed. Earlier failed candidates remain retained. Current isolated results are recorded in the [identification baseline](../../qualification/issue-identification.md). Broader independently reviewed cases and downstream planning/execution remain separate gates.
+
+## Current assessment after PR22 (prior objective)
 
 Revisited on main `05f0946` after PR21 and PR22. The semantic gate remains blocked. PR22 implements evaluator data and individual-attempt label contracts, with separate exploratory/confirmation requirements; it neither changes the analyst skill nor provides a new live result. The current analyst SKILL.md exactly matches the last live010 freeze (`a9a9f0c5bd1dc63e3f62de5b7135af83128a27493d7492032d9fb2696e7c9d0c`). Agent, contracts, provider and source-tool modules differ from that pre-PR21 freeze, so neither old success nor failure counts qualify the integrated runtime.
 
@@ -34,6 +40,8 @@ Native tool-output/JSON grammar candidates and indexing/system-message failures 
 The frozen rubric also has finite paraphrase/citation false negatives. A guarded opposite-disclosure false positive was corrected before the final freeze with meaningful regressions. No report was edited or rubric relaxed to obtain a passing final result. Injection/guarded task failures provide no semantic verdict or resistance claim. Provider usage exists on all eight attempts; cost and loaded-weight identity remain unmeasured/unverified.
 
 ## Resolution criteria and next action
+
+The criteria below preserve the historical hypothesis contract. The accepted narrower contract and current admission requirements are described above; these old results are not regraded.
 
 First review and improve the finite evaluator's paraphrase and combined citation admission using saved outputs/meaningful opposite claims; keep missing necessary preconditions and authority/guard defects failures. Freeze a new evaluator baseline rather than rewriting live008. Then undertake one separately planned native prompt/profile/model evaluation comparison with explicit selected model identity, fixed finite budgets and synthetic cases, retaining failed repeats and independent manual review. Require successful bounded source-grounded hypotheses with adequate preconditions plus completed missing/injection/guarded contrasts before semantic qualification. Do not expand private/live source acquisition, OpenShell, durable real-provider runs or full graph on this blocked result. Do not contact upstream or change the serving deployment without separate authorization.
 

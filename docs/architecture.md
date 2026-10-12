@@ -6,7 +6,7 @@ The system uses a fixed graph of five PydanticAI agents plus deterministic nodes
 
 ```mermaid
 flowchart TD
-    A[Capture immutable issue and source] --> B[Issue analysis agent]
+    A[Capture immutable issue and source] --> B[Issue identification agent]
     B --> C[Environment agent]
     C --> D[Replay setup and verify readiness]
     D --> E[Test planning agent]
@@ -24,11 +24,13 @@ Every node has explicit success, blocked, unsupported, failure, and unknown outc
 
 | Agent | Objective and output | Authority |
 | --- | --- | --- |
-| Issue analysis | Testable hypothesis, source citations, preconditions, scope | Confined source/issue reads only |
+| Issue identification | Reported security concern and relevant source target, or a concrete blocker | Confined source/issue reads only |
 | Environment | Successful setup recipe, dependency closure, environment evidence | Preparation sandbox commands and approved setup artifacts; no application changes or policy edits |
-| Test planning | Two-test specification and evidence requirements | Source and environment evidence reads only |
+| Test planning | Conditional test hypothesis, setup/preconditions, two-test specification and evidence requirements | Source and environment evidence reads only |
 | Test authoring | Exactly two native tests, test patch, run command | Approved test writes and bounded development execution in the prepared environment |
 | Evidence assessment | Interpretation, citations, limitations, proposed disposition | Frozen execution and source evidence reads only |
+
+The narrowed first-stage contract is accepted in [SPEC-0024](development/specs/SPEC-0024-issue-identification.md). Its isolated factory is a replacement candidate; the existing hypothesis analyst/reviewer and single-agent Temporal workflow retain their historical contracts until separately migrated and qualified. The preserved original report is a concern to investigate, not a source-proved vulnerability.
 
 All agents use separate contexts and receive only explicit stage inputs. No global conversation or shared mutable agent memory is required. Budgets and permissions are injected dependencies, not instructions that an agent can override.
 

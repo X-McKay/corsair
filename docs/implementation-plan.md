@@ -54,7 +54,7 @@ Acceptance: provider authentication/errors and unavailable usage are visible; di
 
 ## Milestone 6 Individual agents
 
-Add agents in order: issue analysis, environment, test planning, test authoring, evidence assessment. Each consumes saved predecessor artifacts. Build its reviewed development/held-out cases, trajectory checks, repeat comparisons, robustness tests, and performance baseline before connecting it to the graph.
+Add agents in order: issue identification (the narrowed first-stage role in SPEC-0024), environment, test planning, test authoring, evidence assessment. The legacy hypothesis analyst remains separate until explicit migration. Each consumes saved predecessor artifacts. Build its reviewed development/held-out cases, trajectory checks, repeat comparisons, robustness tests, and performance baseline before connecting it to the graph.
 
 Acceptance: each agent is independently runnable, has one objective and restricted authority, passes its mandatory negative cases, and supplies a measured quality/efficiency baseline. Prompt edits need no upstream rerun when frozen inputs remain valid.
 

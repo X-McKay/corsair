@@ -35,7 +35,7 @@ References: [agentic evaluators](https://pydantic.dev/docs/ai/evals/evaluators/a
 
 | Agent | Primary success evidence | Critical failure cases |
 | --- | --- | --- |
-| Issue analysis | Correct entry point, input, preconditions, effect, citations, scope | Invented facts, wrong module, repository instruction injection |
+| Issue identification | Exact trusted report preservation, correct source symbol/location, scope and justified abstention against frozen curated expectations | Wrong concern, decoy module, invented source, repository instruction injection |
 | Environment | Successful fresh replay, relevant build, actual test discovery/execution | Missing dependency, registry/TLS denial, wrong JDK, changes to application behavior |
 | Test planning | Two tests distinguish reviewed vulnerable/fixed behavior at stated scope | Constant assertions, mocked vulnerability, sandbox denial treated as fix |
 | Test authoring | Exactly two tests; control passes both; security assertion fails baseline and passes fixed | Skips, fake runner output, unreachable target, source modification, stale results |
@@ -73,3 +73,5 @@ Before a component is connected, all deterministic contract and required negativ
 For initial fixture qualification, require all mandatory vulnerable/fixed cases to behave as expected and zero unsupported conclusive dispositions. These are finite-suite gates, not claims of universal safety. Record achieved coverage and limits. Set live-agent success, latency, token, and retry regression thresholds after collecting a repeat baseline; freeze those thresholds before evaluating a candidate change.
 
 Change an agent locally first, run its relevant isolated suite, then affected contract consumers, then a small end-to-end regression suite. Shared contract, runtime, or policy changes require broader checks determined by artifact invalidation rules.
+
+The narrow identification contract in SPEC-0024 uses deterministic curated selection oracles rather than an LLM judge. They test known case expectations and do not prove arbitrary unseen-source semantics. Conditional setup, preconditions and application effects remain test-planning/execution responsibilities; end-to-end disposition criteria are unchanged. Historical hypothesis and auxiliary-reviewer evaluations remain bound to their original contracts.
