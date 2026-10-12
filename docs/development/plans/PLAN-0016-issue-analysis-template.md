@@ -60,3 +60,8 @@ Broader checks, current index, handoff and publication are root-owned. Root subs
 The initial contract deliberately uses saved synthetic file contents rather than a host reader, source adapter, artifact framework or new execution abstraction. Fixtures qualify contract plumbing, not real security analysis. Output citations are syntactically/source grounded; each hypothesis field still requires live/evaluator semantic assessment later.
 
 Next: root review this code/frozen report, run affected shared/offline checks and record publication. Thereafter independently admit a real configured provider or native Temporal use of this same factory/contracts, with separate configuration/evidence. Stop before OpenShell/provider/full-graph integration until those actual gates pass. Keep the existing two native issue-validation-test requirement unchanged.
+
+
+## Later prompt and provider assessments
+
+The earlier26-check/evaluation003 metrics above describe the historical promptv1 snapshot and remain unchanged. Promptv3 adds exact one-based inclusive inventory/tool metadata and the supported native durability seam; current direct scripted fixture evaluation `.runs/four-priorities-20261012/pydantic-agent/fixture-evaluation-001.json` passes6 cases/30 assertions. Scripted estimates/local spans still do not qualify model reasoning. [PLAN-0018](../plans/PLAN-0018-local-issue-analysis-provider.md) records separate real-provider attempts and semantic failures; [native Temporal fixture qualification](../../qualification/issue-analysis-temporal-fixture.md) records durable fixture evidence.

@@ -28,6 +28,7 @@ from tests.qualification.test_recovery import PYTHON, owned, recovery_spec
 from tests.qualification.prepare_toolchains import image_receipt
 from tests.qualification.support import ROOT
 from tests.qualification.gateway import gateway
+from tests.qualification.receipt_observation import file_identity, reader_command
 
 
 def process_identity(pid):
@@ -161,7 +162,8 @@ def test_actual_worker_loss_storage_refusal_and_original_cleanup(kube, adapter_g
                'tests/qualification/test_recovery.py', 'tests/qualification/gateway.py',
                'tests/qualification/test_lifecycle.py', 'tests/qualification/test_policy.py',
                'tests/qualification/support.py', 'deploy/runtime-lock.yaml',
-               'policies/openshell/identity.yaml', 'pyproject.toml', 'uv.lock']
+               'policies/openshell/identity.yaml', 'pyproject.toml', 'uv.lock',
+               'tests/qualification/receipt_observation.py']
     hashes = {p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest() for p in sources}
     hashes[str(Path(__file__).relative_to(ROOT))] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     (kube.evidence / 'execution-fault-source-hashes.json').write_text(json.dumps(hashes, indent=2))
@@ -248,6 +250,7 @@ def test_actual_worker_loss_storage_refusal_and_original_cleanup(kube, adapter_g
                                 record['remote_after_worker_loss'] = remote
                                 saved = json.loads((execution_receipts / f'{operation}.result.json').read_text())
                                 assert saved == json.loads(json.dumps(serialized(receipt)))
+                                result_identity = file_identity(execution_receipts / f'{operation}.result.json')
                             else:
                                 assert isinstance(failure.value.__cause__, PermissionError) and failure.value.__cause__.errno == 13, 'Actual EACCES result write was not observed'
                                 assert receipt.storage_error.startswith('PermissionError:')
@@ -256,10 +259,31 @@ def test_actual_worker_loss_storage_refusal_and_original_cleanup(kube, adapter_g
                                 assert receipt.stdout == start_bytes
                                 assert not (execution_receipts / f'{operation}.result.json').exists()
                                 record['restart_inference'] = 'parent observed intent present and authoritative result absent; a later reader must retain unknown delivery'
+                                result_identity = None
                             intent = execution_receipts / f'{operation}.intent.json'
                             assert json.loads(intent.read_text())['operation'] == str(operation)
                             assert stat.S_IMODE(intent.stat().st_mode) == 0o600
+                            intent_identity = file_identity(intent)
                         assert record['cleanup_confirmed'] and record['container_tasks_absent']
+                        # Only persisted host evidence is available to this new
+                        # isolated process, after original sandbox teardown.
+                        check_directory(execution_receipts, fd, identity)
+                        command = reader_command(execution_receipts, operation, asdict(handle), identity,
+                                                 intent_identity, result_identity)
+                        record['reader_selection'] = json.loads(command[-1])
+                        command_number = kube.counter + 1
+                        fresh = kube.native(command, timeout=10)
+                        assert fresh.stderr == ''
+                        reader = record['fresh_reader'] = json.loads(fresh.stdout)
+                        record['reader_command_receipt'] = f'command-{command_number:04d}.json'
+                        assert reader['operation'] == str(operation) and reader['handle'] == asdict(handle)
+                        assert reader['root_identity'] == identity and reader['delivery'] == reader['completion'] == 'unknown'
+                        assert reader['replay_permitted'] is False and reader['pid'] != controller['pid']
+                        assert not Path(f"/proc/{reader['pid']}").exists(), 'Fresh reader was not reaped'
+                        assert reader['result_present'] == (mode == 'worker-loss')
+                        assert reader['observation'] == ('persisted_worker_loss' if mode == 'worker-loss'
+                                                         else 'intent_without_authoritative_result')
+                        record['fresh_reader_reaped'] = True
                     finally:
                         check_directory(execution_receipts, fd, identity)
                         os.fchmod(fd, 0o700)
