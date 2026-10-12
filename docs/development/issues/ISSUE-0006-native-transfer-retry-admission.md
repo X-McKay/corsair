@@ -21,7 +21,9 @@ Installed CLI SHA256557f8e2af1d91221211bb29cc7152d975084d2a8c9ab8c549d46c4370ccf
 
 ## Attempts and diagnosis
 
-Read-only source/help and earlier published execution audits only; no upload/download or cluster dispatched in this session. Do not manufacture a failure by risking arbitrary extraction merely to prove a visible source capability gap. Native1C's successful transfer controls remain valid for their original scope, without unknown-delivery/fault/byte-limit admission. No supported no-retry alternative found; no speculative wrapper/SDK patch adopted.
+Initial investigation used read-only source/help and earlier published execution audits only; no upload/download or cluster was dispatched at that stage. Do not manufacture a failure by risking arbitrary extraction merely to prove a visible source capability gap. Native1C's successful transfer controls remain valid for their original scope, without unknown-delivery/fault/byte-limit admission. No supported no-retry alternative found; no speculative wrapper/SDK patch adopted.
+
+Subsequent [controlled native upload qualification](../../qualification/openshell-native-upload.md) passed on two fresh admitted nodes: trusted fixed1MiB bytes into new isolated scratch, native success plus original identity/digest admission, corruption detection and full cleanup. It permits native-owned retries only inside that exclusive disposable fixture, with zero outer retries and no authoritative artifact publication. The initial missing gateway fixture import failed before transfer dispatch and remains retained. This resolves the narrow documented-upload baseline, not this issue's broader application retry/resource criteria. Native untrusted downloads, interrupted transfer and application adapter admission remain blocked. The withdrawn Docker staging experiment is not a required prerequisite or a qualified workaround.
 
 ## Resolution criteria and next action
 

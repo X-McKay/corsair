@@ -24,3 +24,11 @@ Require compatible supported retry control or authoritative native operation rec
 ## Decisions and open questions
 
 Current user continuation authorizes transfers and subsequent immutable storage; this component stays blocked rather than weakening uncertainty/resource requirements. Independent local immutable storage/source capture can proceed under its own focused spec/plan. No agents, Temporal, merges or external issue messaging.
+
+## First native operation: trusted single-file upload
+
+Qualify the documented CLI sandbox upload --no-git-ignore with one fixed regular host file of 1 MiB, frozen SHA256 and original local file identity, into an explicit new /tmp basename of a fresh operator-owned idle sandbox. Only trusted operator fixture bytes enter this operation; no repository code or concurrent actor runs there. Preserve existing TLS/policy/kernel/pins. Reuse existing gateway/lifecycle/cleanup fixtures, not a second transfer runtime or protocol.
+
+The native CLI remains the retry owner (up to 4 whole-operation attempts). This narrow operation admits the final regular file only after native success, unchanged sandbox/parent identity and exact size/digest checks. A failed/lost CLI result remains unknown and is never resent by application code; the original sandbox is retired using existing identity-checked lifecycle cleanup. Repeating a native write to this isolated scratch file cannot publish an authoritative artifact or execute its bytes. This does not establish native exactly-once delivery, atomic replacement under concurrency or recovery of a failed transfer.
+
+Two fresh admitted nodes must exercise actual successful upload, independent regular-file/digest reread and detection of a deliberately changed destination, with immutable cleanup. The 1 MiB file cap comes from the already selected source-file envelope, not a performance SLO. No untrusted host extraction occurs. Native internal retry/RPC counts remain unknown unless observed. This is native controlled-upload qualification only; the application transfer adapter, arbitrary source materialization, untrusted downloads and transport/controller loss remain unqualified. ISSUE-0006's broader gate stays blocked.
