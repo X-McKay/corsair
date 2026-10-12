@@ -11,6 +11,7 @@ def pytest_addoption(parser):
     parser.addoption("--kubeconfig", help="Explicit owned local kind kubeconfig; no ambient fallback")
     parser.addoption("--context", help="Explicit kind-corsair context")
     parser.addoption("--evidence-dir", help="New host-owned evidence directory")
+    parser.addoption("--network-evidence", help="Successful exact-node CNI receipts required by policy qualification")
 
 
 @pytest.fixture(scope="session")

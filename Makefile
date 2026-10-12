@@ -1,4 +1,4 @@
-.PHONY: tools kind-up kind-down test-config qualify-network admission-artifacts admission-install qualify-admission openshell-install qualify-gateway qualify-lifecycle
+.PHONY: tools kind-up kind-down test-config qualify-network admission-artifacts admission-install qualify-admission openshell-install qualify-gateway qualify-lifecycle policy-image policy-image-load qualify-policy
 export UV_CACHE_DIR ?= $(CURDIR)/.cache/uv
 ifndef CORSAIR_QUAL_RUN
 CORSAIR_QUAL_RUN := .runs/network-$(shell date -u +%Y%m%dT%H%M%S)
@@ -45,3 +45,14 @@ qualify-lifecycle:
 	test ! -e "$(CORSAIR_QUAL_RUN)"
 	mkdir -p "$(CORSAIR_QUAL_RUN)"
 	uv run --locked python -m pytest tests/qualification -m lifecycle --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
+
+policy-image:
+	uv run --locked python -m tests.qualification.prepare_policy_image build
+
+policy-image-load:
+	uv run --locked python -m tests.qualification.prepare_policy_image load
+
+qualify-policy:
+	test ! -e "$(CORSAIR_QUAL_RUN)"
+	mkdir -p "$(CORSAIR_QUAL_RUN)"
+	uv run --locked python -m pytest tests/qualification -m policy --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
