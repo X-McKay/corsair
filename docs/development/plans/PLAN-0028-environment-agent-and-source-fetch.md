@@ -28,7 +28,7 @@ Implement [SPEC-0029](../specs/SPEC-0029-environment-agent.md): the isolated env
 
 ## Validation and progress
 
-2026-10-12: `make test-config` passed with the results recorded in [HANDOFF-0046](../handoffs/HANDOFF-0046-environment-agent-and-source-fetch.md) (baseline on main `83dec61` was 390 passed). Node tests: 124 (`tests/unit/test_source_fetch.py`, `test_phase_policy.py`, `test_dependency_inventory.py`); agent tests: 23 (`tests/agents/test_environment.py`). Each agent refusal case was checked to fail on its intended trusted-check message rather than incidentally.
+2026-10-12: `make test-config` passed with the results recorded in [HANDOFF-0046](../handoffs/HANDOFF-0046-environment-agent-and-source-fetch.md) (baseline on main `83dec61` was 390 passed). Node tests: 124 (`tests/unit/test_source_fetch.py`, `test_phase_policy.py`, `test_dependency_inventory.py`); agent tests: 24 (`tests/agents/test_environment.py`). Each agent refusal case was checked to fail on its intended trusted-check message rather than incidentally.
 
 The local fetch test runs with local Git 2.43: a bare repository is captured with the real `GitSource`, fetched shallowly from `file://` by the test (the production script refuses `file://`), then the fixed materialize and inventory script parts run. Files with `eol=crlf` and `ident` attributes materialize byte-identical to their blobs (a normal clone of the same repository does transform them), and a modified, added, deleted or mode-changed file, an empty directory or a symlink is refused. `FETCH_SCRIPT` itself refuses `file://`, a non-empty workdir (exit 65), and symlink or submodule tree entries before writing.
 

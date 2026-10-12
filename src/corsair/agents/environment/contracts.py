@@ -61,6 +61,7 @@ class CommandRecord(Contract):
     completion: Literal["unknown", "terminal_observed"]
     exit_code: int | None
     failure_layer: str | None
+    execution_error: str | None = Field(description="Port-level failure (journal, cleanup or transport); such a run never counts as successful")
     stdout_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     stderr_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     elapsed_seconds: float = Field(ge=0)
@@ -91,7 +92,7 @@ class _Ready(Contract, Generic[Citation]):
 class _Blocked(Contract, Generic[Citation]):
     status: Literal["blocked"]
     layer: Layer
-    evidence: Fact = Field(description="Observed failure, quoting the native error, not a guess")
+    evidence: Fact = Field(description="Exact excerpt of a cited run's output or execution error; empty run_ids only after a halt or budget exhaustion")
     run_ids: tuple[int, ...] = Field(max_length=16, description="run_setup_command run_ids showing the failure")
     citations: tuple[Citation, ...] = Field(max_length=8)
 

@@ -84,6 +84,7 @@ class SetupRun(Contract):
     completion: str
     exit_code: int | None
     failure_layer: str | None
+    execution_error: str | None
     stdout_bytes: int
     stderr_bytes: int
     stdout_tail: str
@@ -98,10 +99,10 @@ class OutputSlice(Contract):
     text: str
 
 
-def _record(run_id: int, command: tuple[str, ...], receipt: ExecutionReceipt) -> CommandRecord:
+def _record(run_id: int, command: tuple[str, ...], receipt: ExecutionReceipt, error: str | None) -> CommandRecord:
     return CommandRecord(run_id=run_id, command=command, operation=receipt.operation, delivery=receipt.delivery,
                          completion=receipt.completion, exit_code=receipt.native_exit,
-                         failure_layer=receipt.failure_layer, stdout_sha256=sha256(receipt.stdout).hexdigest(),
+                         failure_layer=receipt.failure_layer, execution_error=error, stdout_sha256=sha256(receipt.stdout).hexdigest(),
                          stderr_sha256=sha256(receipt.stderr).hexdigest(), elapsed_seconds=receipt.elapsed_seconds)
 
 
@@ -142,17 +143,20 @@ def environment_tools() -> FunctionToolset[EnvironmentDependencies]:
             raise ToolFailed("operator setup command budget exhausted")
         command = tuple(command)
         operation = deps.new_operation()
+        error = None
         try:
             receipt = deps.execution.execute(deps.handle, command, operation)
-        except ExecutionError as error:
-            receipt = error.receipt
+        except ExecutionError as failure:
+            # Journal loss or unconfirmed cleanup can accompany exit 0; the run is still failed evidence.
+            receipt, error = failure.receipt, str(failure)
         run_id = len(ledger.records) + 1
-        ledger.records.append(_record(run_id, command, receipt))
+        ledger.records.append(_record(run_id, command, receipt, error))
         ledger.outputs[run_id] = (receipt.stdout, receipt.stderr)
-        if receipt.delivery != "acknowledged" or receipt.completion != "terminal_observed":
-            ledger.halted = f"run {run_id} delivery {receipt.delivery}, completion {receipt.completion}: no further commands"
+        if error or receipt.delivery != "acknowledged" or receipt.completion != "terminal_observed":
+            ledger.halted = (f"run {run_id} delivery {receipt.delivery}, completion {receipt.completion}, "
+                             f"execution error {error}: no further commands")
         return SetupRun(run_id=run_id, delivery=receipt.delivery, completion=receipt.completion,
-                        exit_code=receipt.native_exit, failure_layer=receipt.failure_layer,
+                        exit_code=receipt.native_exit, failure_layer=receipt.failure_layer, execution_error=error,
                         stdout_bytes=len(receipt.stdout), stderr_bytes=len(receipt.stderr),
                         stdout_tail=receipt.stdout[-OUTPUT_TAIL_BYTES:].decode("utf-8", "replace"),
                         stderr_tail=receipt.stderr[-OUTPUT_TAIL_BYTES:].decode("utf-8", "replace"))

@@ -71,10 +71,10 @@ def create_environment_agent(model: Model, *, output_retries: int = 1) -> Agent[
         values = draft.model_dump() | {"receipts": [r.model_dump() for r in deps.ledger.records]}
         if draft.status == "ready":
             if deps.ledger.halted:
-                raise ModelRetry("a command had unknown delivery or completion; report blocked, not ready")
+                raise ModelRetry("a command had an unknown outcome or an execution error; report blocked, not ready")
             if draft.toolchain_id != deps.toolchain_id:
                 raise ModelRetry("ready requires the preparation sandbox's toolchain")
-            succeeded = [rid for rid in sorted(runs) if records[rid].exit_code == 0
+            succeeded = [rid for rid in sorted(runs) if records[rid].exit_code == 0 and records[rid].execution_error is None
                          and records[rid].delivery == "acknowledged" and records[rid].completion == "terminal_observed"]
             required = [s.command for s in draft.recipe] + [draft.build_command, draft.discovery_command, draft.baseline_test_command]
             positions = _subsequence([records[rid].command for rid in succeeded], required)
@@ -95,9 +95,16 @@ def create_environment_agent(model: Model, *, output_retries: int = 1) -> Agent[
             if draft.status == "blocked":
                 if set(draft.run_ids) - set(runs):
                     raise ModelRetry("blocked run_ids must name commands run in this run")
-                if draft.layer not in ("sandbox", "unknown") and not any(
-                        records[rid].exit_code != 0 or records[rid].delivery != "acknowledged" for rid in draft.run_ids):
+                failed = [rid for rid in draft.run_ids if records[rid].exit_code != 0 or records[rid].execution_error
+                          or records[rid].delivery != "acknowledged" or records[rid].completion != "terminal_observed"]
+                if draft.run_ids and not failed:
                     raise ModelRetry("blocked evidence must cite at least one failed command")
+                if not draft.run_ids and (draft.layer not in ("sandbox", "unknown") or not (
+                        deps.ledger.halted or len(deps.ledger.records) >= deps.budget.max_commands)):
+                    raise ModelRetry("blocked without cited runs requires a halt or an exhausted budget and layer sandbox or unknown")
+                quoted_from = [part for rid in failed for part in (*deps.ledger.outputs[rid], (records[rid].execution_error or "").encode())]
+                if draft.run_ids and not any(draft.evidence.encode() in part for part in quoted_from):
+                    raise ModelRetry("blocked evidence must be an exact excerpt of a failed cited run's output or execution error")
         return _RESULT.validate_python(values)
 
     return Agent[EnvironmentDependencies, EnvironmentResult](

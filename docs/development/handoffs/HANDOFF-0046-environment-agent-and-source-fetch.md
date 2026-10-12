@@ -15,7 +15,7 @@ Branch `claude/environment-agent-n93amx` from main `83dec61`. Adds draft [SPEC-0
 
 ## Validation and blockers
 
-`make test-config`: 537 passed (390 baseline, 124 node tests, 23 agent tests). No OpenShell, provider or Temporal run. Live use is blocked by the absence of a qualified quota-enforcing storage volume for the sandbox workspace (SPEC-0025), and private repositories additionally by the unconfirmed OpenShell 0.1.3 credential placeholder substitution. Script tool availability in the toolchain images and OpenShell acceptance of the upload-pack rule glob are unverified.
+`make test-config`: 538 passed (390 baseline, 124 node tests, 24 agent tests). No OpenShell, provider or Temporal run. Live use is blocked by the absence of a qualified quota-enforcing storage volume for the sandbox workspace (SPEC-0025), and private repositories additionally by the unconfirmed OpenShell 0.1.3 credential placeholder substitution. Script tool availability in the toolchain images and OpenShell acceptance of the upload-pack rule glob are unverified.
 
 ## Decisions and next steps
 

@@ -1,6 +1,6 @@
 """Environment agent contract and trajectory checks through native SDK calls and a scripted execution port."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from uuid import UUID
 
 import pytest
@@ -53,7 +53,11 @@ class ScriptedExecution:
                                    delivery="acknowledged" if kind == "terminal" else "unknown",
                                    completion="terminal_observed" if kind == "terminal" else "unknown",
                                    reason=kind, stdout=stdout, native_exit=exit_code if kind == "terminal" else None,
-                                   failure_layer=None if kind == "terminal" else "native_execution")
+                                   failure_layer=None if kind == "terminal" else "native_execution",
+                                   error_detail=None if kind == "terminal" else "native stream ended without exit status")
+        if kind == "journal":
+            raise ExecutionError(replace(receipt, delivery="acknowledged", completion="terminal_observed", native_exit=0,
+                                         storage_error="result journal write failed"))
         if kind != "terminal":
             raise ExecutionError(receipt)
         return receipt
@@ -149,13 +153,24 @@ def test_ready_refused_without_matching_current_run_evidence(calls, outcomes, dr
 
 def test_unknown_delivery_halts_commands_and_forbids_ready():
     execution = ScriptedExecution({INSTALL: (None, b"", "unknown")})
-    blocked = {"status": "blocked", "layer": "sandbox", "evidence": "install delivery unknown", "run_ids": [1], "citations": []}
+    blocked = {"status": "blocked", "layer": "sandbox", "evidence": "native stream ended without exit status", "run_ids": [1], "citations": []}
     calls = SETUP[:3] + [("run_setup_command", {"command": list(BUILD)})]
     result = run(blocked, calls, execution).output
     assert execution.calls == [INSTALL], "no command may be dispatched after an unknown delivery"
     assert result.status == "blocked" and result.receipts[0].delivery == "unknown"
     with pytest.raises(UnexpectedModelBehavior):
         run(ready(), SETUP, ScriptedExecution({INSTALL: (None, b"", "unknown")}))
+
+
+def test_execution_error_after_zero_exit_is_failed_evidence_and_halts():
+    execution = ScriptedExecution(dict(DISCOVERED) | {BASELINE: (0, b"", "journal")})
+    with pytest.raises(UnexpectedModelBehavior):
+        run(ready(), SETUP, execution)
+    blocked = {"status": "blocked", "layer": "sandbox", "evidence": "result journal write failed", "run_ids": [4], "citations": []}
+    execution = ScriptedExecution(dict(DISCOVERED) | {BUILD: (0, b"", "journal")})
+    result = run(blocked | {"run_ids": [2]}, SETUP, execution).output
+    assert execution.calls == [INSTALL, BUILD], "no command may be dispatched after an execution error"
+    assert result.receipts[1].exit_code == 0 and "journal" in result.receipts[1].execution_error
 
 
 def test_budget_is_operator_owned_and_enforced():
@@ -169,15 +184,19 @@ def test_budget_is_operator_owned_and_enforced():
 
 
 def test_blocked_must_cite_observed_failure_for_attributed_layer():
-    execution = ScriptedExecution({INSTALL: (1, b"", "terminal")})
+    denied = (1, b"Collecting pytest\nERROR: 403 Forbidden from files.pythonhosted.org\n", "terminal")
     calls = SETUP[:3]
     registry = {"status": "blocked", "layer": "registry", "evidence": "ERROR: 403 Forbidden from files.pythonhosted.org", "run_ids": [1], "citations": []}
-    assert run(registry, calls, execution).output.layer == "registry"
+    assert run(registry, calls, ScriptedExecution({INSTALL: denied})).output.layer == "registry"
     for invented in ([2], []):
         with pytest.raises(UnexpectedModelBehavior):
-            run(registry | {"run_ids": invented}, calls, ScriptedExecution({INSTALL: (1, b"", "terminal")}))
+            run(registry | {"run_ids": invented}, calls, ScriptedExecution({INSTALL: denied}))
+    with pytest.raises(UnexpectedModelBehavior):
+        run(registry, calls, ScriptedExecution({INSTALL: (1, b"", "terminal")}))  # evidence is not in the output
     with pytest.raises(UnexpectedModelBehavior):
         run(registry, calls, ScriptedExecution())  # the cited run succeeded
+    with pytest.raises(UnexpectedModelBehavior):
+        run(registry | {"layer": "sandbox", "run_ids": []}, calls, ScriptedExecution({INSTALL: denied}))  # no halt
 
 
 def test_unsupported_toolchain_is_grounded_and_runs_nothing():
