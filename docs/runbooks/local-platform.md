@@ -20,7 +20,7 @@ make kind-down
 
 `make kind-up` creates one control-plane node, disables kind's default CNI, installs Calico's official digest-verified manifest, leaves pinned image pulls to the native CRI, and waits for readiness. It refuses an existing `corsair` cluster, a conflicting container name, or a stale ownership receipt. A partial bootstrap stays available for inspection and explicit cleanup; it is never silently adopted or repaired.
 
-`make qualify-network` requires the explicit owned kubeconfig/context and an empty evidence directory. It verifies the local node container ID against the ownership receipt, the checksum-pinned kubectl, the local API and expected topology before any mutation. Readiness and pinned Calico images are prerequisites for fixture creation. Each network scenario owns a fresh namespace and records its UID; cleanup refuses a replacement namespace.
+`make qualify-network` requires the explicit owned kubeconfig/context and an empty evidence directory. It verifies the local node container ID against the ownership receipt, the checksum-pinned kubectl, the local API and expected topology before any mutation. Readiness and pinned Calico images are prerequisites for fixture creation. Each network scenario owns a fresh namespace and records its UID; cleanup refuses a replacement namespace. After Pod Ready, setup separately requires the original Service-owned EndpointSlice to identify the Ready echo Pod, then actual Service reachability from both probes within 30 seconds. Every setup attempt is retained; failed setup blocks policy work. Fresh strict PodIP/Service GET/POST controls still run afterward. See the [Service readiness diagnosis and qualification](../qualification/service-readiness.md).
 
 ## What the tests establish
 
@@ -61,7 +61,7 @@ An incomplete control plane may never produce a usable kubeconfig. In that case,
 
 ## Evidence and cleanup
 
-Qualification receipts, runtime-lock snapshot, scope, native resource facts/logs, denial markers, per-scenario cleanup and JUnit XML are retained in the selected `.runs/` directory. `.state/kind/` contains the ownership receipt and private kubeconfig, and must not be included in evidence exports. Caches and native tools live in ignored `.cache/` and `.tools/` directories. Run/state directories use private permissions; review native logs before sharing. No Secret objects, ambient environment dumps, model credentials, or real repository workloads are collected by these checks.
+Qualification receipts, runtime-lock snapshot, scope, native resource facts/logs, denial markers, per-scenario Service readiness attempts/cleanup and JUnit XML are retained in the selected `.runs/` directory. `.state/kind/` contains the ownership receipt and private kubeconfig, and must not be included in evidence exports. Caches and native tools live in ignored `.cache/` and `.tools/` directories. Run/state directories use private permissions; review native logs before sharing. No Secret objects, ambient environment dumps, model credentials, or real repository workloads are collected by these checks.
 
 `make kind-down` compares the owned node's container ID, uses native kind deletion, and confirms container absence before removing local ownership/kubeconfig state. It refuses an unknown owner or replacement container. Run it after a partial bootstrap if ownership was recorded. Evidence survives cleanup; cached images and downloads are intentionally retained. If cleanup fails, preserve state and inspect that failure before another attempt.
 

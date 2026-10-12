@@ -41,8 +41,8 @@ class Kubectl:
             raise RuntimeError(f"Native infrastructure/resource error ({result.returncode}): {result.stderr[-2000:]}")
         return result
 
-    def get(self, *args):
-        return json.loads(self.run("get", *args, "-o", "json").stdout)
+    def get(self, *args, timeout=120):
+        return json.loads(self.run("get", *args, "-o", "json", timeout=timeout).stdout)
 
 
 def require_owned_cluster(kube):
@@ -98,9 +98,62 @@ class NetworkFixture:
         (rendered / "kustomization.yaml").write_text(yaml.safe_dump({"apiVersion": "kustomize.config.k8s.io/v1beta1", "kind": "Kustomization", "resources": ["fixtures.yaml"], "images": images}))
         self.kube.run("apply", "-n", self.namespace, "-k", rendered)
         self.kube.run("wait", "-n", self.namespace, "--for=condition=Ready", "pod", "--all", "--timeout=90s")
-        pod_ip = self.kube.get("pod", "echo", "-n", self.namespace)["status"]["podIP"]
-        service_ip = self.kube.get("service", "echo", "-n", self.namespace)["spec"]["clusterIP"]
-        self.endpoints = {"pod": pod_ip, "service": service_ip}
+        pod = self.kube.get("pod", "echo", "-n", self.namespace)
+        service = self.kube.get("service", "echo", "-n", self.namespace)
+        self.endpoints = {"pod": pod["status"]["podIP"], "service": service["spec"]["clusterIP"]}
+        self.wait_service(pod["metadata"]["uid"], service["metadata"]["uid"])
+
+    def wait_service(self, pod_uid, service_uid):
+        # Pod Ready and EndpointSlice Ready do not acknowledge proxy rule sync.
+        # This pre-policy setup observation never replaces fresh strict controls.
+        started = time.monotonic()
+        deadline = started + 30
+        receipt = {"namespace": self.namespace, "namespace_uid": self.uid,
+                   "pod_uid": pod_uid, "service_uid": service_uid,
+                   "started_at": datetime.now(timezone.utc).isoformat(),
+                   "budget_seconds": 30, "ready": False, "attempts": []}
+        try:
+            assert not self.kube.get("networkpolicies", "-n", self.namespace, timeout=10)["items"], "Service setup requires no policies"
+            while time.monotonic() < deadline:
+                slices = self.kube.get("endpointslices", "-n", self.namespace, "-l", "kubernetes.io/service-name=echo", timeout=min(10, deadline - time.monotonic()))
+                attempt = {"endpoint_command": f"command-{self.kube.counter:04d}.json", "requests": []}
+                receipt["attempts"].append(attempt)
+                endpoints = []
+                for item in slices["items"]:
+                    assert any(o["uid"] == service_uid and o["kind"] == "Service" for o in item["metadata"].get("ownerReferences", [])), "EndpointSlice Service identity changed"
+                    if item.get("endpoints"):
+                        assert item["ports"] == [{"name": "", "protocol": "TCP", "port": 5678}], "Unexpected Service port"
+                    endpoints.extend(item.get("endpoints") or [])
+                endpoint_ready = bool(endpoints)
+                for endpoint in endpoints:
+                    assert endpoint.get("targetRef", {}).get("uid") == pod_uid and endpoint["addresses"] == [self.endpoints["pod"]], "EndpointSlice Pod identity changed"
+                    conditions = endpoint.get("conditions", {})
+                    endpoint_ready &= conditions.get("ready") is True and conditions.get("terminating") is not True
+                attempt["endpoint_ready"] = endpoint_ready
+                if endpoint_ready:
+                    markers = []
+                    for probe in ("probe-allowed", "probe-denied"):
+                        if time.monotonic() >= deadline:
+                            break
+                        result, marker = self.request(probe, self.endpoints["service"], "GET", timeout=min(20, deadline - time.monotonic()))
+                        attempt["requests"].append({"probe": probe, "marker": marker, "command": f"command-{self.kube.counter:04d}.json", "exit_code": result.returncode})
+                        if result.returncode == 0:
+                            assert result.stdout == "corsair-network-ok\n\nSTATUS:200", "Unexpected Service setup response"
+                            markers.append(marker)
+                        else:
+                            assert result.returncode in (7, 28) and result.stdout == "\nSTATUS:000", f"Unexpected Service setup failure: {result.stderr}"
+                            break
+                    if len(markers) == 2 and time.monotonic() < deadline:
+                        logs = self.kube.run("logs", "-n", self.namespace, "echo", "--timestamps=true", timeout=min(10, deadline - time.monotonic())).stdout
+                        assert all(marker in logs for marker in markers), "Service setup server log coverage missing"
+                        assert time.monotonic() < deadline, "Service setup exceeded 30 seconds"
+                        receipt["ready"] = True
+                        return
+                time.sleep(min(0.25, max(0, deadline - time.monotonic())))
+            raise AssertionError("Service setup did not converge within 30 seconds; fresh controls not admitted")
+        finally:
+            receipt["elapsed_seconds"] = time.monotonic() - started
+            (self.evidence / "service-readiness.json").write_text(json.dumps(receipt, indent=2))
 
     def policy(self, filename):
         self.kube.run("apply", "-n", self.namespace, "-f", FIXTURES / filename)
@@ -111,9 +164,9 @@ class NetworkFixture:
     def logs(self):
         return self.kube.run("logs", "-n", self.namespace, "echo", "--timestamps=true").stdout
 
-    def request(self, probe, address, method):
+    def request(self, probe, address, method, timeout=20):
         marker = "request-" + uuid.uuid4().hex
-        result = self.kube.run("exec", "-n", self.namespace, probe, "--", "curl", "--noproxy", "*", "--silent", "--show-error", "--connect-timeout", "2", "--max-time", "3", "--request", method, "--write-out", "\nSTATUS:%{http_code}", f"http://{address}:5678/{marker}", check=False, timeout=20)
+        result = self.kube.run("exec", "-n", self.namespace, probe, "--", "curl", "--noproxy", "*", "--silent", "--show-error", "--connect-timeout", "2", "--max-time", "3", "--request", method, "--write-out", "\nSTATUS:%{http_code}", f"http://{address}:5678/{marker}", check=False, timeout=timeout)
         return result, marker
 
     def allowed(self, probe, converge=False):

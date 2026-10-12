@@ -82,3 +82,7 @@ The next bounded slice is 1B gateway/identity with the selected immutable artifa
 - [Calico on kind](https://docs.tigera.io/calico/latest/getting-started/kubernetes/kind) and [selected official manifest](https://github.com/projectcalico/calico/blob/v3.33.0/manifests/calico.yaml).
 - [Kubernetes NetworkPolicy semantics](https://kubernetes.io/docs/concepts/services-networking/network-policies/), including additive allows and CNI implementation requirements.
 - [http-echo request logging implementation](https://github.com/hashicorp/http-echo/blob/v1.0.0/handlers.go).
+
+## Service prerequisite correction
+
+A later [focused Service readiness investigation](service-readiness.md) reproduced a strict Service control failure while kube-proxy still held a no-endpoints REJECT rule after EndpointSlice Ready. The trusted fixture now requires bounded observed Service readiness before fresh strict controls. Final corrected source passed the complete ordinary-pod suite on two further fresh clusters with confirmed UID/container cleanup; earlier failures and a pre-review pass remain retained. This supplements the original qualification and resolves [ISSUE-0003](../development/issues/ISSUE-0003-service-control-readiness.md) for fixture admission sequencing. It neither promises immediate routing after Pod Ready nor attributes the individual historical curl timeout. OpenShell's separate later records retain their own scope.
