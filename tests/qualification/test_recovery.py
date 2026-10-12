@@ -83,9 +83,9 @@ def recovery_spec(image, memory):
 
 
 @contextmanager
-def owned(kube, native, sdk, record, memory):
+def owned(kube, native, sdk, record, memory, *, name=None):
     image = image_receipt('python')
-    name = record['name'] = 'rec-' + uuid.uuid4().hex[:12]
+    name = record['name'] = name or ('rec-' + uuid.uuid4().hex[:12])
     record.update(outcome='failed', cleanup_confirmed=False, artifact=image)
     spec = recovery_spec(image['image'], memory)
     sandbox, resources, container_ids = None, [], []
