@@ -172,3 +172,6 @@ PR21's updated head933f071 was independently re-reviewed, its usage/merge/record
 
 
 Post-merge integration: full offline363/6.29s and the deterministic native fixture6 cases/30 assertions pass. The new reviewer wire test uses explicit `server="vllm"`; no additional real inference or durable/OpenShell qualification was run. See HANDOFF-0033 for the verified PR merge and continuation boundary.
+
+
+PR22 review at exact head28feef4 adds [published comments](https://github.com/X-McKay/corsair/pull/22#pullrequestreview-5494630076) on individual-attempt calibration labels, honest unsupported planning output and pre-registered judge validation. The isolated exact-head offline suite passed367/6.44s; no live calibration/inference ran. Its dataset and specs remain unmerged/draft, and ISSUE-0007 remains blocked. See HANDOFF-0035 for review scope and continuation; current-main native/corpus state from HANDOFF-0034 is unchanged.
