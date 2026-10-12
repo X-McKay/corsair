@@ -2,9 +2,9 @@
 id: SPEC-0022
 kind: spec
 title: Read-only test planning agent
-status: draft
+status: accepted
 updated: 2026-10-12
-related: [IDEA-0003, SPEC-0014, SPEC-0017, SPEC-0018, SPEC-0019, SPEC-0020, SPEC-0021, SPEC-0024, ISSUE-0006, ISSUE-0007]
+related: [IDEA-0003, IDEA-0004, PLAN-0025, SPEC-0014, SPEC-0017, SPEC-0018, SPEC-0019, SPEC-0020, SPEC-0021, SPEC-0024, ISSUE-0006, ISSUE-0007]
 ---
 
 # Read-only test planning agent
@@ -44,3 +44,5 @@ Semantic adequacy (no mocked sink, no constant assertion, witness actually obser
 The planner precedes the environment agent because it is read-only and its inputs can be frozen now, while environment execution waits on ISSUE-0006 and a setup-recipe contract. `EnvironmentEvidence` is deliberately minimal and operator-authored; the environment stage will have to produce exactly this contract or supersede it explicitly. Whether a per-framework convention reference (pytest, JUnit 5) belongs in the environment evidence as admitted data or in a second skill is open; the default is data, to keep the skill general across languages. Whether the planner should see the existing baseline test content or only its identity is resolved as: content, through the inventory, because conventions matter and the inventory is already bounded. A plan and a later implementation record will follow if this spec is accepted.
 
 The user accepted narrowing the analyst in SPEC-0024. This draft now consumes the small identification handoff; the legacy IssueAnalysis hypothesis output is not silently converted. Planner implementation and admission remain separate work, with actual test validity and execution evidence required before dispositions.
+
+Accepted with IDEA-0004 and implemented offline under [PLAN-0025](../plans/PLAN-0025-test-planning-agent.md). Implementation refinements: `EnvironmentEvidence` carries `observation_facilities` and `BaselineTest{test_id, path}` (whose file must be in the inventory); the draft union arrives as one `plan` argument of the native output function; approved paths and discovery tokens are enforced by the contract validator under native validation context; `ReadyTestPlan` adds `security_expectation{failure_type, safe_behavior}` as typed identifiers for the SPEC-0027 gates (assertion lines belong to the authoring patch); the stage uses the windowed `read_source` (tool-computed end); evaluation uses a native `cases.yaml` with metadata oracles rather than `fixtures/*.json` and `oracles.json`. Live provider qualification remains open.
