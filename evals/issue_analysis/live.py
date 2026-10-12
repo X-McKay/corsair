@@ -18,6 +18,7 @@ from pydantic_evals.evaluators import EvaluationReason, Evaluator, HasMatchingSp
 
 from corsair.agents.issue_analysis import FixtureDependencies, IssueAnalysis, IssueAnalysisInput, create_issue_analysis_agent, fixture_prompt
 from corsair.agents.issue_analysis.agent import PROMPT_VERSION
+from corsair.agents.issue_analysis.skills import SKILL_ID, SKILL_SHA256
 from corsair.agents.issue_analysis.provider import LocalModelConfig, local_model
 
 ROOT = Path(__file__).parent
@@ -92,7 +93,10 @@ def live_dataset(case_names: tuple[str, ...]) -> Dataset:
 
 
 async def evaluate_local(config: LocalModelConfig, evidence: Path, *, repeat: int = 2,
-                         case_names: tuple[str, ...] = ("path_traversal", "missing_source", "instruction_injection", "confined_source")):
+                         case_names: tuple[str, ...] = ("path_traversal", "missing_source", "instruction_injection", "confined_source"),
+                         response_token_limit: int = 2048):
+    if response_token_limit not in (2048, 4096, 8192):
+        raise ValueError("select a planned comparison response limit: 2048, 4096 or 8192")
     logfire.configure(send_to_logfire=False, console=False)
     async with local_model(config) as model:
         agent = create_issue_analysis_agent(model, output_retries=1)
@@ -111,7 +115,7 @@ async def evaluate_local(config: LocalModelConfig, evidence: Path, *, repeat: in
                         result = await agent.run(fixture_prompt(inputs), deps=FixtureDependencies(inputs), usage=usage,
                                                  usage_limits=UsageLimits(request_limit=4, tool_calls_limit=2,
                                                                           total_tokens_limit=16000),
-                                                 model_settings={"temperature": 0, "max_tokens": 2048,
+                                                 model_settings={"temperature": 0, "max_tokens": response_token_limit,
                                                                  "parallel_tool_calls": False})
                 set_eval_attribute("input_digest", inputs.input_digest)
                 set_eval_attribute("observed_native_tool_calls", usage.tool_calls)
@@ -142,14 +146,18 @@ async def evaluate_local(config: LocalModelConfig, evidence: Path, *, repeat: in
                                                         max_concurrency=1,
                                                         metadata={"mode": "direct_local_provider_saved_source", "model": config.model_name,
                                                                   "base_url": config.base_url, "weights_revision": "unknown",
+                                                                  "thinking_mode": config.thinking_mode,
+                                                                  "thinking_token_budget": config.thinking_token_budget,
                                                                   "openai": version("openai"), "pydantic_ai": version("pydantic-ai-slim"),
                                                                   "prompt_version": PROMPT_VERSION, "rubric_version": "local-finite-semantics-v3",
+                                                                  "skill_id": SKILL_ID, "skill_sha256": SKILL_SHA256,
+                                                                  "skill_delivery": "eager_native_capability_instructions",
                                                                   "structured_output_mode": "prompted", "schema_transformer": "InlineDefsJsonSchemaTransformer",
                                                                   "strict_tool_definition": False,
                                                                   "multiple_system_messages": False,
                                                                   "sdk_retries": 0, "output_retries": 1, "task_retries": 0,
                                                                   "request_limit": 4, "tool_calls_limit": 2, "total_tokens_limit": 16000,
-                                                                  "max_tokens_per_response": 2048, "case_timeout_seconds": 180,
+                                                                  "max_tokens_per_response": response_token_limit, "case_timeout_seconds": 180,
                                                                   "billing": "user states local no cost; billing unmeasured"})
 
 
@@ -157,14 +165,19 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--model", required=True)
+    parser.add_argument("--thinking-mode", choices=("server_default", "disabled"), default="server_default")
+    parser.add_argument("--thinking-token-budget", type=int)
+    parser.add_argument("--response-token-limit", type=int, choices=(2048, 4096, 8192), default=2048)
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--repeat", type=int, default=2, choices=(1, 2))
     parser.add_argument("--case", choices=("path_traversal", "missing_source", "instruction_injection", "confined_source"))
     args = parser.parse_args()
     args.evidence.mkdir(parents=True, exist_ok=False)
-    config = LocalModelConfig(base_url=args.base_url, model_name=args.model)
+    config = LocalModelConfig(base_url=args.base_url, model_name=args.model, thinking_mode=args.thinking_mode,
+                              thinking_token_budget=args.thinking_token_budget)
     cases = (args.case,) if args.case else ("path_traversal", "missing_source", "instruction_injection", "confined_source")
-    report = asyncio.run(evaluate_local(config, args.evidence, repeat=args.repeat, case_names=cases))
+    report = asyncio.run(evaluate_local(config, args.evidence, repeat=args.repeat, case_names=cases,
+                                        response_token_limit=args.response_token_limit))
     with (args.evidence / "report.json").open("xb") as destination:
         destination.write(TypeAdapter(type(report)).dump_json(report, indent=2))
     report.print(include_input=False, include_output=False)

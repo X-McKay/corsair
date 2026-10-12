@@ -14,6 +14,7 @@ from pydantic_ai.usage import UsageLimits
 
 from corsair.agents.issue_analysis import FixtureDependencies, IssueAnalysis, IssueAnalysisInput, create_issue_analysis_agent, fixture_prompt
 from corsair.agents.issue_analysis.provider import LocalModelConfig, local_model
+from corsair.agents.issue_analysis.skills import SKILL_TEXT
 from evals.issue_analysis.live import HypothesisSemantics, ProviderUsageCoverage
 
 ROOT = Path(__file__).resolve().parents[2] / "evals/issue_analysis"
@@ -31,7 +32,8 @@ def test_local_provider_requires_explicit_verified_endpoint(base_url):
         LocalModelConfig(base_url=base_url, model_name="explicit-model")
 
 
-def test_native_provider_uses_explicit_model_endpoint_and_closes_client(monkeypatch):
+@pytest.mark.parametrize("thinking_mode,thinking_token_budget,response_token_limit", [("server_default", None, 2048), ("disabled", None, 2048), ("server_default", 768, 2048), ("server_default", None, 4096), ("server_default", None, 8192)])
+def test_native_provider_uses_explicit_model_endpoint_and_closes_client(monkeypatch, thinking_mode, thinking_token_budget, response_token_limit):
     inputs, output = case()
     requests = []
     monkeypatch.setenv("OPENAI_API_KEY", "unrelated-cloud-secret")
@@ -43,9 +45,24 @@ def test_native_provider_uses_explicit_model_endpoint_and_closes_client(monkeypa
         assert request.url.path == "/v1/chat/completions"
         assert request.headers["authorization"] == "Bearer corsair-local-anonymous"
         assert body["model"] == "explicit-model"
+        if thinking_mode == "disabled":
+            assert body["chat_template_kwargs"] == {"enable_thinking": False}
+        else:
+            assert "chat_template_kwargs" not in body
+        if thinking_token_budget is None:
+            assert "thinking_token_budget" not in body
+        else:
+            assert body["thinking_token_budget"] == thinking_token_budget
+        assert "reasoning_effort" not in body
+        assert body["temperature"] == 0 and body["max_completion_tokens"] == response_token_limit
+        assert body["parallel_tool_calls"] is False
         assert "response_format" not in body
         assert "strict" not in body["tools"][0]["function"]
         assert any('"hypothesis"' in str(message["content"]) for message in body["messages"])
+        description = IssueAnalysis.model_json_schema()["properties"]["missing_facts"]["description"]
+        assert any(description in str(message["content"]) for message in body["messages"])
+        assert any(SKILL_TEXT in str(message["content"]) for message in body["messages"])
+        assert [tool["function"]["name"] for tool in body["tools"]] == ["read_source"]
         assert body["messages"][0]["role"] == "system"
         assert sum(message["role"] == "system" for message in body["messages"]) == 1
         if len(requests) == 1:
@@ -62,16 +79,27 @@ def test_native_provider_uses_explicit_model_endpoint_and_closes_client(monkeypa
                                         "usage": {"prompt_tokens": 20, "completion_tokens": 10, "total_tokens": 30}})
     client = httpx2.AsyncClient(transport=httpx2.MockTransport(respond))
     async def exercise():
-        async with local_model(LocalModelConfig(base_url="https://llm.example/v1", model_name="explicit-model"), http_client=client) as model:
+        async with local_model(LocalModelConfig(base_url="https://llm.example/v1", model_name="explicit-model", thinking_mode=thinking_mode,
+                                                thinking_token_budget=thinking_token_budget), http_client=client) as model:
             assert model.provider.client.max_retries == 0
             result = await create_issue_analysis_agent(model).run(fixture_prompt(inputs), deps=FixtureDependencies(inputs),
-                                                                usage_limits=UsageLimits(request_limit=3, tool_calls_limit=1))
+                                                                usage_limits=UsageLimits(request_limit=3, tool_calls_limit=1),
+                                                                model_settings={"temperature": 0, "max_tokens": response_token_limit,
+                                                                                "parallel_tool_calls": False})
             assert result.output == output
             assert result.usage.input_tokens == 40 and result.usage.output_tokens == 20
             assert result.usage.requests == 2 and result.usage.tool_calls == 1
             assert all(message.provider_response_id for message in result.all_messages() if isinstance(message, ModelResponse))
     asyncio.run(exercise())
     assert len(requests) == 2 and client.is_closed
+
+
+@pytest.mark.parametrize("options", [{"thinking_token_budget": 0}, {"thinking_token_budget": 2049},
+                                    {"thinking_token_budget": True},
+                                    {"thinking_mode": "disabled", "thinking_token_budget": 768}])
+def test_provider_refuses_invalid_or_conflicting_thinking_budget(options):
+    with pytest.raises(ValidationError):
+        LocalModelConfig(base_url="https://llm.example/v1", model_name="explicit-model", **options)
 
 
 @pytest.mark.parametrize("status", [401, 429, 500])

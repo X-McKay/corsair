@@ -70,15 +70,15 @@ class Hypothesis(Contract):
     attacker_capabilities: Fact
     preconditions: tuple[Fact, ...] = Field(min_length=1, max_length=16)
     sensitive_operation: Fact
-    observable_effect: Fact
+    observable_effect: Fact = Field(description="Conditional behavior predicted from the source, including rejection or prevention when supported; not an execution verdict.")
 
 
 class IssueAnalysis(Contract):
-    status: Literal["ready", "missing_information", "unsupported"]
+    status: Literal["ready", "missing_information", "unsupported"] = Field(description="ready: cited, testable behavioral prediction, not confirmation of a vulnerability. Other statuses require blocking missing facts and a null hypothesis.")
     scope: Literal["component", "application_path"]
     hypothesis: Hypothesis | None
     citations: tuple[SourceExcerpt, ...] = Field(max_length=16)
-    missing_facts: tuple[Fact, ...] = Field(max_length=16)
+    missing_facts: tuple[Fact, ...] = Field(max_length=16, description="Only unknowns that prevent a grounded prediction at the authorized scope. Must be empty for ready. Conditional assumptions belong in preconditions; wider-context unknowns in limitations.")
     limitations: tuple[Fact, ...] = Field(min_length=1, max_length=16)
 
     @model_validator(mode="after")

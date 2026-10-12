@@ -20,6 +20,7 @@ from corsair.agents.issue_analysis import (
     FixtureDependencies, IssueAnalysis, IssueAnalysisInput, create_issue_analysis_agent, fixture_prompt,
 )
 from corsair.agents.issue_analysis.agent import PROMPT_VERSION
+from corsair.agents.issue_analysis.skills import SKILL_ID, SKILL_SHA256
 
 ROOT = Path(__file__).parent
 
@@ -81,6 +82,8 @@ async def evaluate_fixture() -> object:
 
     return await dataset().evaluate(task, max_concurrency=1, repeat=2,
                                     metadata={"mode": "direct_fixture", "prompt_version": PROMPT_VERSION,
+                                              "skill_id": SKILL_ID, "skill_sha256": SKILL_SHA256,
+                                              "skill_delivery": "eager_native_capability_instructions",
                                               "rubric_version": "fixture-contract-v1",
                                               "pydantic_ai_slim": version("pydantic-ai-slim"),
                                               "pydantic_evals": version("pydantic-evals"),

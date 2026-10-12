@@ -7,7 +7,7 @@ from urllib.parse import urlsplit
 
 from httpx2 import AsyncClient
 from openai import AsyncOpenAI
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic_ai import InlineDefsJsonSchemaTransformer
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.profiles.openai import OpenAIModelProfile
@@ -21,6 +21,14 @@ class LocalModelConfig(BaseModel):
     model_name: str = Field(min_length=1, max_length=256)
     api_key_env: Literal["CORSAIR_LOCAL_MODEL_API_KEY"] | None = None
     timeout_seconds: float = Field(default=60, gt=0, le=120)
+    thinking_mode: Literal["server_default", "disabled"] = "server_default"
+    thinking_token_budget: int | None = Field(default=None, ge=1, le=2048, strict=True)
+
+    @model_validator(mode="after")
+    def distinct_thinking_controls(self) -> "LocalModelConfig":
+        if self.thinking_mode == "disabled" and self.thinking_token_budget is not None:
+            raise ValueError("a thinking budget cannot be combined with disabled thinking")
+        return self
 
     @field_validator("base_url")
     @classmethod
@@ -43,7 +51,11 @@ async def local_model(config: LocalModelConfig, *, http_client: AsyncClient | No
     async with AsyncOpenAI(base_url=config.base_url, api_key=key,
                            organization="", project="", max_retries=0,
                            timeout=config.timeout_seconds, http_client=http_client) as client:
-        yield OpenAIChatModel(config.model_name, provider=OpenAIProvider(openai_client=client),
+        settings = ({"extra_body": {"chat_template_kwargs": {"enable_thinking": False}}}
+                    if config.thinking_mode == "disabled" else None)
+        if config.thinking_token_budget is not None:
+            settings = {"extra_body": {"thinking_token_budget": config.thinking_token_budget}}
+        yield OpenAIChatModel(config.model_name, provider=OpenAIProvider(openai_client=client), settings=settings,
                               profile=OpenAIModelProfile(
                                   json_schema_transformer=InlineDefsJsonSchemaTransformer,
                                   default_structured_output_mode="prompted",
