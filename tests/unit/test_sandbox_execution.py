@@ -7,10 +7,12 @@ import resource
 import time
 from uuid import uuid4
 
+import grpc
 import pytest
+from openshell.errors import ErrorInfo, FieldViolation
 
 from corsair.adapters import openshell_execution as module
-from corsair.adapters.openshell_execution import OpenShellConnection, OpenShellExecution
+from corsair.adapters.openshell_execution import OpenShellConnection, OpenShellExecution, native_worker
 from corsair.ports.execution import ExecutionLimits, ExecutionError
 from corsair.ports.sandbox import SandboxHandle
 
@@ -116,3 +118,58 @@ def test_start_failure_is_conservatively_unknown(setup,monkeypatch):
     monkeypatch.setattr(multiprocessing.process.BaseProcess,'start',fail)
     with pytest.raises(ExecutionError) as e:adapter.execute(handle,('nonzero',),uuid4())
     assert e.value.receipt.delivery=='unknown' and e.value.receipt.worker_cleanup=='unconfirmed'
+
+
+class RichFailure(grpc.RpcError):
+    """Carries the SDK GatewayError typed attributes; message text varies."""
+    def __init__(self, message):
+        super().__init__(message)
+        self.error_info=ErrorInfo('RESOURCE_VERSION_CONFLICT','openshell.fixture',{})
+        self.retry_delay=1.25
+        self.field_violations=(FieldViolation('command','fixture violation'),)
+        self.raw_status=None
+    def code(self): return grpc.StatusCode.ABORTED
+
+
+class PlainFailure(grpc.RpcError):
+    def code(self): return grpc.StatusCode.UNAVAILABLE
+
+
+class FailingClient:
+    failure=None
+    def __init__(self,*args,**kwargs): pass
+    def __enter__(self): return self
+    def __exit__(self,*args): pass
+    def get(self,name,**kwargs): raise FailingClient.failure
+
+
+def real_worker_failing_with(monkeypatch,failure):
+    """Real native_worker in the forked child; only host admission and the SDK client are replaced."""
+    monkeypatch.setattr(module,'native_worker',native_worker)
+    monkeypatch.setattr(module,'host_profile',lambda memory:{'memory_limit':(memory,memory),'cpu_affinity':[0],'glibc':'2.39','allocator_arenas':2})
+    monkeypatch.setattr(module,'TlsConfig',lambda **kwargs:None)
+    monkeypatch.setattr(module,'SandboxClient',FailingClient)
+    monkeypatch.setattr(FailingClient,'failure',failure)
+
+
+@pytest.mark.parametrize('message',['outcome uncertain','unrelated wording'])
+def test_real_worker_error_path_journals_typed_gateway_details(setup,monkeypatch,message):
+    adapter,handle,path=setup;op=uuid4()
+    real_worker_failing_with(monkeypatch,RichFailure(message))
+    with pytest.raises(ExecutionError) as e:adapter.execute(handle,('true',),op)
+    r=e.value.receipt
+    assert (r.reason,r.delivery,r.failure_layer,r.native_code,r.error_detail)==('native_error','not_dispatched','native_identity','ABORTED',message)
+    assert (r.native_reason,r.native_domain,r.native_retry_delay,r.native_field_violations)==('RESOURCE_VERSION_CONFLICT','openshell.fixture',1.25,('command: fixture violation',))
+    assert r.native_calls==('get',) and r.worker_cleanup=='confirmed'
+    result=json.loads((path/f'{op}.result.json').read_text())
+    assert (result['native_reason'],result['native_domain'],result['native_retry_delay'])==('RESOURCE_VERSION_CONFLICT','openshell.fixture',1.25)
+    assert result['native_field_violations']==['command: fixture violation'] and result['native_status'] is None
+
+
+def test_real_worker_plain_rpc_error_records_code_without_rich_details(setup,monkeypatch):
+    adapter,handle,path=setup;op=uuid4()
+    real_worker_failing_with(monkeypatch,PlainFailure('plain'))
+    with pytest.raises(ExecutionError) as e:adapter.execute(handle,('true',),op)
+    r=e.value.receipt
+    assert (r.reason,r.native_code,r.native_status,r.native_reason,r.native_domain,r.native_retry_delay,r.native_field_violations)==('native_error','UNAVAILABLE',None,None,None,None,())
+    assert json.loads((path/f'{op}.result.json').read_text())['native_reason'] is None

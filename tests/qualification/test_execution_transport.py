@@ -20,6 +20,7 @@ import pytest
 from openshell import SandboxClient, TlsConfig
 
 from corsair.adapters.openshell import OpenShellLifecycle
+from corsair.ports.sandbox import LifecycleLimits
 from corsair.adapters.openshell_execution import OpenShellConnection, OpenShellExecution, serialized
 from corsair.ports.execution import ExecutionError, ExecutionLimits
 from tests.qualification.gateway import gateway
@@ -169,7 +170,7 @@ def test_actual_transport_loss_unknown_execution_and_original_cleanup(kube, adap
             client = clients.enter_context(SandboxClient(native['endpoint'],tls=tls,timeout=60))
             observed = ObservedClient(SdkReceipts(client,kube.evidence))
             with OpenShellLifecycle(observed,spec=recovery_spec(image_receipt('python')['image'],'512Mi'),
-                    workspace='default',owner=owner,receipts=lifecycle_receipts) as lifecycle:
+                    workspace='default',owner=owner,receipts=lifecycle_receipts,limits=LifecycleLimits(ready_seconds=300, delete_seconds=60)) as lifecycle:
                 driver = AdapterHarness(lifecycle,observed); driver.creation=uuid4()
                 sandbox = record['sandbox'] = {}
                 with owned(kube,native,driver,sandbox,'512Mi',name='cs-'+driver.creation.hex[:16]):

@@ -14,6 +14,20 @@ class SandboxHandle:
 
 
 @dataclass(frozen=True)
+class LifecycleLimits:
+    """Operator-owned native wait budgets; no implicit SDK defaults."""
+    ready_seconds: int
+    delete_seconds: int
+
+    def __post_init__(self):
+        values = (self.ready_seconds, self.delete_seconds)
+        if any(type(v) is not int for v in values):
+            raise ValueError('Lifecycle limits must be integer operator budgets')
+        if not all(1 <= v <= 600 for v in values):
+            raise ValueError('Lifecycle limits outside the admitted range')
+
+
+@dataclass(frozen=True)
 class LifecycleReceipt:
     operation: str
     action: Literal['create', 'wait_ready', 'delete']
@@ -30,6 +44,10 @@ class LifecycleReceipt:
     native_code: str | None = None
     native_status: str | None = None
     storage_error: str | None = None
+    native_reason: str | None = None
+    native_domain: str | None = None
+    native_retry_delay: float | None = None
+    native_field_violations: tuple[str, ...] = ()
 
 
 class LifecycleError(RuntimeError):

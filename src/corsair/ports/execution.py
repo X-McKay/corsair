@@ -50,6 +50,10 @@ class ExecutionReceipt:
     native_code: str | None = None
     native_status: str | None = None
     storage_error: str | None = None
+    native_reason: str | None = None
+    native_domain: str | None = None
+    native_retry_delay: float | None = None
+    native_field_violations: tuple[str, ...] = ()
 
 
 class ExecutionError(RuntimeError):

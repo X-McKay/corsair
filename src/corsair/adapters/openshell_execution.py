@@ -10,14 +10,18 @@ import resource
 import time
 from uuid import UUID
 
-import grpc
-from google.protobuf.json_format import MessageToJson
 from openshell import SandboxClient, TlsConfig, ExecChunk, ExecResult
 from openshell._proto import openshell_pb2
 
+from corsair.adapters.openshell import native_error_fields
 from corsair.adapters.receipts import ReceiptDirectory
 from corsair.ports.execution import ExecutionLimits, ExecutionReceipt, ExecutionError
 from corsair.ports.sandbox import SandboxHandle
+
+
+# OpenShell exec: 124 is a gateway-generated timeout that does not prove the
+# remote process stopped; 74 is a stdin buffer overflow. Neither is completion.
+NATIVE_UNCERTAIN_EXITS = frozenset({74, 124})
 
 
 @dataclass(frozen=True)
@@ -91,12 +95,9 @@ def native_worker(pipe, connection, handle, command, workdir, limits):
                     raise TypeError('Unsupported native execution event')
             raise RuntimeError('Native stream returned no terminal result')
     except Exception as error:
-        code = error.code() if isinstance(error, grpc.RpcError) else None
-        status = getattr(error, 'raw_status', None)
         pipe.send(('error', {'delivery': 'unknown' if dispatched else 'not_dispatched',
                    'error_type':type(error).__name__, 'error_detail':str(error),
-                   'native_code':code.name if code else None,
-                   'native_status':MessageToJson(status) if status is not None else None, 'failure_layer':layer}))
+                   **native_error_fields(error), 'failure_layer':layer}))
     finally:
         pipe.close()
 
@@ -153,7 +154,7 @@ class OpenShellExecution:
             receipt = replace(receipt, delivery='unknown', worker_cleanup='unconfirmed')
             process.start()
             child.close()
-            receipt = replace(receipt, worker_pid=process.pid, worker_cleanup='unconfirmed', delivery='unknown')
+            receipt = replace(receipt, worker_pid=process.pid)
             deadline = started + self._limits.host_seconds
             while True:
                 remaining = deadline-time.monotonic()
@@ -180,10 +181,11 @@ class OpenShellExecution:
                                       worker_glibc=value['glibc'], worker_allocator_arenas=value['allocator_arenas'])
                 elif kind=='terminal':
                     value, rss = value['exit'], value['maxrss_kib']
+                    uncertain = value in NATIVE_UNCERTAIN_EXITS
                     receipt = replace(receipt, delivery='acknowledged', native_exit=value, worker_maxrss_kib=rss,
-                        completion='unknown' if value in (74,124) else 'terminal_observed',
-                        reason='native_special_status' if value in (74,124) else 'terminal',
-                        failure_layer='native_execution' if value in (74,124) else None)
+                        completion='unknown' if uncertain else 'terminal_observed',
+                        reason='native_special_status' if uncertain else 'terminal',
+                        failure_layer='native_execution' if uncertain else None)
                     break
                 elif kind=='error':
                     receipt = replace(receipt, reason='native_error', **value)

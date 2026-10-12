@@ -2,8 +2,9 @@
 
 Delete checks refuse observed replacements; the native name-based API has no
 atomic expected-ID delete. Do not use against concurrent external mutation.
-The client and fixed native spec are operator-provided; client must use the
-qualified TLS configuration. This adapter does not manage transport or agents.
+The client, fixed native spec and wait budgets are operator-provided; client
+must use the qualified TLS configuration. This adapter does not manage
+transport or agents.
 """
 from dataclasses import asdict, replace
 from datetime import datetime, timezone
@@ -18,17 +19,43 @@ from google.protobuf.json_format import MessageToJson
 from openshell import SandboxClient, DeletionOutcome
 from openshell._proto import openshell_pb2
 
-from corsair.ports.sandbox import SandboxHandle, LifecycleReceipt, LifecycleError
+from corsair.ports.sandbox import SandboxHandle, LifecycleLimits, LifecycleReceipt, LifecycleError
 from corsair.adapters.receipts import ReceiptDirectory
+
+
+def native_error_fields(error: BaseException) -> dict:
+    """Vendor-free copy of the SDK's decoded gateway details.
+
+    Only typed attributes are read; message text is retained as detail but
+    never parsed. A retry delay is guidance only and never authorizes a retry.
+    """
+    if not isinstance(error, grpc.RpcError):
+        return {}
+    code = error.code() if callable(getattr(error, 'code', None)) else None
+    status = getattr(error, 'raw_status', None)
+    info = getattr(error, 'error_info', None)
+    delay = getattr(error, 'retry_delay', None)
+    return {'native_code': code.name if code is not None else None,
+            'native_status': MessageToJson(status) if status is not None else None,
+            'native_reason': (info.reason or None) if info is not None else None,
+            'native_domain': (info.domain or None) if info is not None else None,
+            'native_retry_delay': float(delay) if delay is not None else None,
+            'native_field_violations': tuple(f'{v.field}: {v.description}'
+                                             for v in getattr(error, 'field_violations', None) or ())}
 
 
 class OpenShellLifecycle:
     def __init__(self, client: SandboxClient, *, spec: openshell_pb2.SandboxSpec,
-                 workspace: str, owner: UUID, receipts: Path):
+                 workspace: str, owner: UUID, receipts: Path, limits: LifecycleLimits):
         if not workspace or not isinstance(owner, UUID):
             raise ValueError('Explicit workspace and UUID owner required')
+        if not isinstance(limits, LifecycleLimits):
+            raise ValueError('Explicit operator lifecycle limits required')
         if not re.fullmatch(r'.+@sha256:[0-9a-f]{64}', spec.template.image):
             raise ValueError('Operator workload image must have an immutable digest')
+        if spec.restart_policy != openshell_pb2.SANDBOX_RESTART_POLICY_NEVER:
+            raise ValueError('Operator spec must state restart policy NEVER explicitly')
+        self._limits = limits
         self._journal = ReceiptDirectory(receipts)
         self._client = client
         self._workspace = workspace
@@ -53,7 +80,7 @@ class OpenShellLifecycle:
                                    'unconfirmed' if action in ('create','delete') else 'not_required', handle)
         try:
             self._write(operation, 'intent', dict(asdict(receipt), workspace=self._workspace,
-                        owner=self._owner, spec_sha256=self._spec_digest,
+                        owner=self._owner, spec_sha256=self._spec_digest, limits=asdict(self._limits),
                         requested_name=('cs-' + operation.hex[:16]) if action=='create' else handle.name,
                         pending_delivery='unknown until an authoritative result is observed'))
         except Exception as error:
@@ -64,11 +91,8 @@ class OpenShellLifecycle:
     def _finish(self, receipt, started, error=None):
         receipt = replace(receipt, elapsed_seconds=time.monotonic()-started)
         if error is not None:
-            code = error.code() if isinstance(error, grpc.RpcError) else None
-            native_status = getattr(error, 'raw_status', None)
             receipt = replace(receipt, outcome='unknown' if receipt.delivery=='unknown' and receipt.action in ('create','delete') else 'failed', error_type=type(error).__name__,
-                              error_detail=str(error), native_code=code.name if code else None,
-                              native_status=MessageToJson(native_status) if native_status is not None else None)
+                              error_detail=str(error), **native_error_fields(error))
         try:
             self._write(receipt.operation, 'result', asdict(receipt))
         except Exception as storage_error:
@@ -93,10 +117,9 @@ class OpenShellLifecycle:
             native = self._client.create(workspace=self._workspace, name=name,
                         spec=openshell_pb2.SandboxSpec.FromString(self._spec),
                         labels={'corsair.owner':self._owner,'corsair.operation':str(operation)})
+            # The SDK raises SandboxError before returning an empty immutable ID.
             handle = SandboxHandle(native.id, name, self._workspace, self._owner, str(operation))
             receipt = replace(receipt, handle=handle, delivery='acknowledged')
-            if not native.id:
-                raise ValueError('Native create returned no immutable ID; reconciliation required')
             self._check(handle, native)
             receipt = replace(receipt, outcome='completed')
         except Exception as error:
@@ -109,7 +132,8 @@ class OpenShellLifecycle:
         try:
             self._check(handle, self._client.get(handle.name, workspace=handle.workspace))
             receipt = replace(receipt, delivery='unknown')
-            native = self._client.wait_ready(handle.name, workspace=handle.workspace)
+            native = self._client.wait_ready(handle.name, workspace=handle.workspace,
+                                             timeout_seconds=self._limits.ready_seconds)
             receipt = replace(receipt, delivery='acknowledged', phase=openshell_pb2.SandboxPhase.Name(native.phase))
             self._check(handle, native)
             if native.phase != openshell_pb2.SANDBOX_PHASE_READY:
@@ -128,7 +152,8 @@ class OpenShellLifecycle:
             receipt = replace(receipt, delivery='acknowledged', native_delete_outcome=native.outcome.name)
             if native.sandbox_id != handle.id or native.outcome not in (DeletionOutcome.ACCEPTED,DeletionOutcome.COMPLETED):
                 raise ValueError('Native deletion did not acknowledge the original ID')
-            self._client.wait_deleted(handle.name, workspace=handle.workspace, expected_sandbox_id=handle.id)
+            self._client.wait_deleted(handle.name, workspace=handle.workspace, expected_sandbox_id=handle.id,
+                                      timeout_seconds=self._limits.delete_seconds)
             try:
                 self._client.get(handle.name, workspace=handle.workspace)
             except grpc.RpcError as error:
