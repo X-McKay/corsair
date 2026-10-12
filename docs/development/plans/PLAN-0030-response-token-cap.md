@@ -4,7 +4,7 @@ kind: plan
 title: Per-caller 16384 response-token cap for the local model
 status: complete
 updated: 2026-10-12
-related: [ISSUE-0007, SPEC-0016, SPEC-0024]
+related: [ISSUE-0007, SPEC-0016, SPEC-0024, HANDOFF-0048]
 ---
 
 # Per-caller 16384 response-token cap for the local model
