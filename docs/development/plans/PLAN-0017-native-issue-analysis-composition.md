@@ -2,7 +2,7 @@
 id: PLAN-0017
 kind: plan
 title: Native issue-analysis fixture composition
-status: completed
+status: complete
 updated: 2026-10-12
 related: [SPEC-0015, PLAN-0015, PLAN-0016]
 ---
