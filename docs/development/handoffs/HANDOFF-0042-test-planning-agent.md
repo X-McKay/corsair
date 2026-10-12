@@ -15,7 +15,7 @@ Work began on clean main `83dec61` on branch `claude/test-planning-agent-mpdk0y`
 
 ## Validation and blockers
 
-`make test-config`: 390 passed before the change, 417 after (one existing deprecation warning). Scripted native evals: 12/12 attempts passed every assertion, zero unknown tools. Two live local-provider runs on RIG0 (see PLAN-0025): live001 3/12 completed (reasoning exhausted the response cap); live002 with prompt v2 and a 2048 thinking budget 10/12 passed every assertion, with two budget-exhaustion failures and manual-review defects (fixtures outside scratch, a weak safe-behavior oracle). Not qualified. No Temporal or OpenShell check ran. ISSUE-0007 still blocks end-to-end admission of the identification the planner consumes.
+`make test-config`: 390 passed before the change, 419 after (one existing deprecation warning). Scripted native evals: 12/12 attempts passed every assertion, zero unknown tools. Two live local-provider runs on RIG0 (see PLAN-0025): live001 3/12 completed (reasoning exhausted the response cap); live002 with prompt v2 and a 2048 thinking budget 10/12 passed every assertion, with two budget-exhaustion failures and manual-review defects (fixtures outside scratch, a weak safe-behavior oracle). Not qualified. No Temporal or OpenShell check ran. ISSUE-0007 still blocks end-to-end admission of the identification the planner consumes.
 
 ## Decisions and next steps
 

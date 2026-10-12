@@ -40,10 +40,11 @@ class PlanningDependencies:
 
 def planning_prompt(inputs: TestPlanningInput) -> str:
     """Identification without its quotation (source evidence is re-derived from reads), environment and inventory only."""
+    inventory = ", ".join(
+        f"{source.path} (saved-file inclusive lines 1..{len(source.content.splitlines())})" for source in inputs.source_files
+    ) or "(empty)"
     return inputs.model_dump_json(exclude={"source_files": True, "identification": {"target": {"source": {"quote"}}}}) + (
-        "\nSaved source inventory: " + ", ".join(
-            f"{source.path} (saved-file inclusive lines 1..{len(source.content.splitlines())})" for source in inputs.source_files
-        ) if inputs.source_files else "\nSaved source inventory: (empty)")
+        "\nSaved source inventory: " + inventory)
 
 
 def create_test_planning_agent(
@@ -84,7 +85,8 @@ def create_test_planning_agent(
         data = draft.model_dump()
         data["citations"] = [quoted(reference) for reference in draft.citations]
         if draft.status == "unsupported":
-            if inputs.source_files and not draft.citations:
+            # Only a file with at least one line can be read and cited.
+            if any(source.content.splitlines() for source in inputs.source_files) and not draft.citations:
                 raise ModelRetry("an unsupported plan must cite the saved source read in this run that grounds it")
             return UnsupportedTestPlan.model_validate(data, context=inputs)
         symbol = inputs.identification.target.symbol

@@ -83,6 +83,24 @@ def test_unsupported_plan_must_cite_listed_source():
         run(create_test_planning_agent(responding(draft, reads=("documents.py",)), output_retries=0), c.inputs)
 
 
+def test_prompt_keeps_structured_input_for_empty_inventory():
+    data = case("implementation_absent").inputs.model_dump()
+    data["source_files"] = []
+    data["environment"]["baseline_test"] = None
+    prompt = planning_prompt(TestPlanningInput.model_validate(data))
+    assert prompt.endswith("Saved source inventory: (empty)") and '"scope":"component"' in prompt
+    assert '"environment"' in prompt and '"identification"' in prompt
+
+
+def test_unsupported_plan_may_be_uncited_when_no_listed_file_has_lines():
+    data = case("implementation_absent").inputs.model_dump()
+    data["source_files"] = [{"path": "test_existing.py", "content": ""}]
+    inputs = TestPlanningInput.model_validate(data)
+    draft = dict(case("implementation_absent").metadata.reference_plan) | {"citations": []}
+    result = run(create_test_planning_agent(responding(draft, reads=()), output_retries=0), inputs)
+    assert isinstance(result.output, UnsupportedTestPlan) and result.output.citations == ()
+
+
 @pytest.mark.parametrize("change", [
     {"status": "missing_information", "target": None, "reason": "The report names no input."},
     {"scope": "application_path"},
