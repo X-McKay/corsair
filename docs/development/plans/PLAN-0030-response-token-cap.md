@@ -2,7 +2,7 @@
 id: PLAN-0030
 kind: plan
 title: Per-caller 16384 response-token cap for the local model
-status: in-progress
+status: in_progress
 updated: 2026-10-12
 related: [ISSUE-0007, SPEC-0016, PLAN-0029, PLAN-0025, SPEC-0024]
 ---
@@ -37,7 +37,7 @@ Each agent records its selection with its own config/prompt version on its own b
 
 ## Validation and progress
 
-- `make test-config`: 391 passed (390 on main plus the new 16384 request-body case).
+- `make test-config`: 391 passed (390 on main plus the new 16384 request-body case). The first CI run failed the work-record check on a mistyped plan status (`in-progress`); corrected to `in_progress`.
 
 ## Decisions and next action
 
