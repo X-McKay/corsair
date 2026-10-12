@@ -59,7 +59,7 @@ def test_native_function_model_reads_cited_source_and_override_restores_model():
 
 def test_native_test_model_returns_explicit_missing_facts_without_tools():
     inputs, expected = load_case("missing_source")
-    result = run(create_issue_analysis_agent(TestModel(call_tools=[], custom_output_args=expected.model_dump(mode="json"))), inputs)
+    result = run(create_issue_analysis_agent(TestModel(call_tools=[], custom_output_args=expected.model_dump(mode="json", exclude={"citations": {"__all__": {"quote"}}}))), inputs)
     assert result.output == expected
     assert result.usage.tool_calls == 0
 
@@ -81,7 +81,7 @@ def test_fixture_read_refuses_invalid_ranges(start, end):
 @pytest.mark.parametrize("mutation", ["quote", "scope", "unread", "extra_verdict"])
 def test_native_output_validation_rejects_unfounded_output(mutation):
     inputs, expected = load_case()
-    output = expected.model_dump(mode="json")
+    output = expected.model_dump(mode="json", exclude={"citations": {"__all__": {"quote"}}})
     if mutation == "quote":
         output["citations"][0]["quote"] = "invented source"
     elif mutation == "scope":
@@ -180,7 +180,9 @@ def test_only_successful_reads_authorise_citations(deps_type):
     else:
         # The failed read is refused with the attributable grounding reason, not a
         # schema error that echoes the tool failure text back to the model.
-        assert (outcomes, corrections) == (["failed"], ["citation must reference source read during this run"])
+        assert outcomes == ["failed"] and len(corrections) == 1
+        assert corrections[0].startswith("citation documents.py:3-4 must reference source read during this run. "
+                                         "Available saved-file read ranges: none.")
 
 
 def test_native_tool_refusal_preserves_contract_failure():
@@ -193,12 +195,72 @@ def test_prior_run_source_reads_do_not_authorize_current_citations():
     prior_inputs, output = load_case()
     prior = run(create_issue_analysis_agent(scripted_model(output)), prior_inputs)
     current_inputs = prior_inputs.model_copy(update={"fixture_id": "distinct-new-fixture"})
-    agent = create_issue_analysis_agent(TestModel(call_tools=[], custom_output_args=output.model_dump(mode="json")),
+    agent = create_issue_analysis_agent(TestModel(call_tools=[], custom_output_args=output.model_dump(mode="json", exclude={"citations": {"__all__": {"quote"}}})),
                                          output_retries=0)
     with pytest.raises(UnexpectedModelBehavior):
         agent.run_sync(fixture_prompt(current_inputs), deps=FixtureDependencies(current_inputs),
                        message_history=prior.all_messages(),
                        usage_limits=UsageLimits(request_limit=1, tool_calls_limit=0))
+
+
+@pytest.mark.parametrize("read_start,read_end,cite_start,cite_end,accepted", [
+    (1, 4, 3, 4, True), (3, 4, 3, 3, True),
+    (3, 4, 1, 4, False), (1, 3, 3, 4, False), (1, 4, 4, 5, False),
+])
+def test_native_reference_output_requires_read_coverage_and_derives_exact_quote(
+    read_start, read_end, cite_start, cite_end, accepted,
+):
+    inputs, expected = load_case()
+    draft = expected.model_dump(mode="json", exclude={"citations": {"__all__": {"quote"}}})
+    draft["citations"] = [{"path": "documents.py", "start_line": cite_start, "end_line": cite_end}]
+    calls = []
+
+    async def respond(messages, info):
+        calls.append(len(messages))
+        if len(calls) == 1:
+            return ModelResponse(parts=[ToolCallPart("read_source", {
+                "path": "documents.py", "start_line": read_start, "end_line": read_end,
+            })])
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, draft)])
+
+    agent = create_issue_analysis_agent(FunctionModel(respond), output_retries=0)
+    if accepted:
+        result = run(agent, inputs)
+        assert type(result.output) is IssueAnalysis
+        assert result.output.citations == (FixtureDependencies(inputs).read_source("documents.py", cite_start, cite_end),)
+        assert result.usage.tool_calls == 1
+    else:
+        with pytest.raises(UnexpectedModelBehavior):
+            run(agent, inputs)
+    assert len(calls) == 2
+
+
+@pytest.mark.parametrize("split_reads", [False, True])
+def test_reference_cannot_borrow_other_file_or_combine_disjoint_reads(split_reads):
+    inputs, expected = load_case()
+    inputs = IssueAnalysisInput.model_validate(inputs.model_dump() | {
+        "source_files": [*inputs.model_dump()["source_files"], {"path": "reference.txt", "content": "separate evidence\n"}],
+    })
+    draft = expected.model_dump(mode="json", exclude={"citations": {"__all__": {"quote"}}})
+    draft["citations"] = [{"path": "documents.py" if split_reads else "reference.txt",
+                           "start_line": 3 if split_reads else 1, "end_line": 4 if split_reads else 1}]
+    reads = [(3, 3), (4, 4)] if split_reads else [(1, 4)]
+    calls = []
+
+    async def respond(messages, info):
+        index = len(calls)
+        calls.append(index)
+        if index < len(reads):
+            start, end = reads[index]
+            return ModelResponse(parts=[ToolCallPart("read_source", {
+                "path": "documents.py", "start_line": start, "end_line": end,
+            })])
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, draft)])
+
+    with pytest.raises(UnexpectedModelBehavior):
+        run(create_issue_analysis_agent(FunctionModel(respond), output_retries=0),
+            inputs, request_limit=4, tool_limit=2)
+    assert len(calls) == len(reads) + 1
 
 
 def test_evaluation_cli_refuses_existing_attempt_without_running(monkeypatch, tmp_path):
@@ -274,3 +336,62 @@ def test_native_evals_missing_agent_spans_fail_coverage():
                                  evaluators=[HasMatchingSpan(query={"has_attributes": {"gen_ai.operation.name": "chat"}})])
                          .evaluate(uninstrumented_task, progress=False))
     assert not report.cases[0].assertions["HasMatchingSpan"].value
+
+
+def test_native_citation_correction_reports_local_ranges_without_another_read():
+    inputs, expected = load_case()
+    valid = expected.model_dump(mode="json", exclude={"citations": {"__all__": {"quote"}}})
+    invalid = valid | {"citations": [{"path": "documents.py", "start_line": 611, "end_line": 631}]}
+    calls = []
+
+    async def respond(messages, info):
+        index = len(calls)
+        calls.append(index)
+        if index == 0:
+            return ModelResponse(parts=[ToolCallPart("read_source", {
+                "path": "documents.py", "start_line": 1, "end_line": 4,
+            })])
+        if index == 1:
+            return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, invalid)])
+        correction = str(messages[-1].parts)
+        assert "documents.py:611-631" in correction
+        assert "documents.py:1-4" in correction
+        assert "saved-file coordinates" in correction
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, valid)])
+
+    result = run(create_issue_analysis_agent(FunctionModel(respond), output_retries=1),
+                 inputs, request_limit=3, tool_limit=1)
+    assert result.output == expected
+    assert result.usage.tool_calls == 1
+    assert len(calls) == 3
+
+
+def test_native_numbered_read_preserves_blank_lines_and_saved_file_coordinates():
+    from corsair.agents.issue_analysis.contracts import SourceRead
+    inputs, expected = load_case()
+    inputs = IssueAnalysisInput.model_validate(inputs.model_dump() | {
+        "source_files": [{"path": "documents.py", "content": "header\nvalue\n\nend\n"}],
+    })
+    draft = expected.model_dump(mode="json", exclude={"citations": {"__all__": {"quote"}}})
+    draft["citations"] = [{"path": "documents.py", "start_line": 2, "end_line": 3}]
+    calls = []
+
+    async def respond(messages, info):
+        from pydantic_ai.messages import ToolReturnPart
+        calls.append(len(messages))
+        if len(calls) == 1:
+            return ModelResponse(parts=[ToolCallPart("read_source", {
+                "path": "documents.py", "start_line": 2, "end_line": 3,
+            })])
+        returned = next(part for part in messages[-1].parts if isinstance(part, ToolReturnPart))
+        read = SourceRead.model_validate(returned.content)
+        assert [(line.number, line.text) for line in read.lines] == [(2, "value"), (3, "")]
+        assert "quote" not in read.model_dump()
+        for changed in ({"end_line": 4}, {"lines": list(reversed(read.model_dump()["lines"]))}):
+            with pytest.raises(ValidationError):
+                SourceRead.model_validate(read.model_dump() | changed)
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, draft)])
+
+    result = run(create_issue_analysis_agent(FunctionModel(respond), output_retries=0), inputs)
+    assert result.output.citations[0].quote == "value\n"
+    assert result.usage.tool_calls == 1
