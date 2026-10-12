@@ -31,9 +31,22 @@ def _junit_file(test_id: str) -> str | None:
     return match[1].replace(".", "/") + ".java" if match else None
 
 
+def _pytest_targets(command: tuple[str, ...], test_id: str) -> bool:
+    # Exactly one node-id selector, the claimed one; no deselection or filtering among pytest's arguments.
+    starts = [i for i, token in enumerate(command) if token == "pytest" or token.endswith("/pytest")]
+    if not starts:
+        return False
+    arguments = command[starts[0] + 1:]
+    filters = ("-k", "-m", "--deselect", "--ignore", "--ignore-glob", "--lf", "--last-failed", "--ff", "--sw", "--stepwise")
+    return ([t for t in arguments if "::" in t] == [test_id] and "::" not in "".join(command[:starts[0] + 1])
+            and not any(t.split("=", 1)[0] in filters or t[:2] in ("-k", "-m") for t in arguments))
+
+
 def _junit_targets(command: tuple[str, ...], test_id: str) -> bool:
+    # Exactly one Surefire selector, naming only the claimed method by qualified or simple class name.
+    selectors = [token for token in command if token.startswith("-Dtest=") or token.startswith("-Dsurefire.") or token.startswith("-Dit.test=")]
     simple = test_id.rsplit(".", 1)[-1]
-    return any(token.endswith("=" + simple) or token.endswith("=" + test_id) for token in command)
+    return selectors in (["-Dtest=" + test_id], ["-Dtest=" + simple])
 
 
 def _surefire_passed(output: bytes) -> bool:
@@ -42,7 +55,7 @@ def _surefire_passed(output: bytes) -> bool:
 
 
 FRAMEWORKS = {
-    "pytest": Framework(_pytest_file, lambda command, test_id: test_id in command,
+    "pytest": Framework(_pytest_file, _pytest_targets,
                         lambda output: _PYTEST_SUMMARY.search(output) is not None),
     # Maven Surefire with JUnit 5; ids are `fully.qualified.Class#method`, files end with the class path.
     "junit5": Framework(_junit_file, _junit_targets, _surefire_passed),
