@@ -1,0 +1,44 @@
+---
+id: SPEC-0022
+kind: spec
+title: Read-only test planning agent
+status: draft
+updated: 2026-10-12
+related: [IDEA-0003, SPEC-0014, SPEC-0017, SPEC-0018, SPEC-0019, SPEC-0020, SPEC-0021, ISSUE-0006, ISSUE-0007]
+---
+
+# Read-only test planning agent
+
+## Goal and scope
+
+Implement the third planned agent of the [architecture](../../architecture.md) graph as an independently runnable PydanticAI stage, following the build order in [IDEA-0003](../ideas/IDEA-0003-remaining-agent-graph-inventory.md). Given an admitted issue analysis, operator-supplied environment evidence and the saved source inventory, it produces the two-test specification the [investigation contract](../../investigation-contract.md) requires: one benign control and one security regression, each naming its fixtures, the real implementation call, required behavior, observable witness, discovery command and scope limits. It writes no test code, executes nothing and emits no finding or fix verdict.
+
+Excluded: test authoring, the environment stage that will later produce the evidence contract, the parent investigation workflow, real-provider qualification and every real corpus case. The analysis it consumes is still gated by ISSUE-0007; this stage is evaluated over frozen, reviewed analyses so that gate does not block it.
+
+## Boundaries and design
+
+**Package.** `src/corsair/agents/test_planning/` mirrors the issue-analysis layout verified on main: `agent.py` (factory, `PROMPT_VERSION`, `CONFIG_VERSION`, trusted output function), `contracts.py`, `skills/__init__.py` with `skills/plan-two-tests/SKILL.md`, and no `tools/` package of its own. Evaluation lives in `evals/test_planning/` (`evaluate.py`, `fixtures/*.json`, `oracles.json`) and deterministic tests in `tests/agents/test_test_planning.py`.
+
+**Shared code, now with a second consumer.** The planner needs the same confined saved-source inventory, `read_source` toolset and `SourceReference`/`SourceExcerpt`/`SourceRead` citation contracts as issue analysis, and the same `LocalModelConfig` provider seam. Those move from `agents/issue_analysis/` to `agents/source/` (contracts and toolset) and `agents/provider.py`, with the issue-analysis package re-exporting its public names so existing imports, tests and the durable fixture histories' tool identity (`issue_analysis_source`) are unchanged. This is the demonstrated second consumer the principles require; nothing else is shared.
+
+**Inputs.** `TestPlanningInput` is an immutable Pydantic contract with no SDK objects: the authorized `scope`; an `IssueAnalysis` whose status must be `ready` (a `missing_information` or `unsupported` analysis is refused at construction, not planned around); the saved `source_files` inventory, which may include existing test files, under the SPEC-0014 limits; and `EnvironmentEvidence`. That evidence is operator-supplied data today and the future environment stage's output later: language, runtime and framework identities, the native discovery command tokens, approved test paths, the discovered and executed baseline test identity, and the scratch location fixtures may use. Evaluator labels, variant names and the fixed revision never enter the input. The analysis is supplied in the prompt without its quotations, as the reviewer does; quotations are re-derived from reads.
+
+**Skill.** One mandatory operator-owned procedure, `plan-two-tests`, delivered eagerly through native `Capability` as SPEC-0019 established, recorded by SHA256. It covers: confirming the entry point and sensitive operation by reading source before planning; reading the baseline test for conventions; choosing a benign input through the real path and an adversarial condition from the hypothesis; stating the required safe behavior precisely (a specific rejection or absence of effect, never an arbitrary exception); naming an observable witness and separating the application observation from a sandbox observation; keeping fixtures inside the scratch location; and returning `unsupported` with limitations when the hypothesis cannot be observed at the authorized scope with the supplied environment. It contains no language, framework or case-specific recipe; those facts arrive as environment evidence.
+
+**Tools.** Only the shared `read_source` tool, with the existing zero tool-retry budget. No execution, write, shell, network or filesystem tool exists for this stage, so no execution backend is configured.
+
+**Output.** `TestPlanDraft` (model-facing, line references) and `TestPlan` (final, exact quotations), following SPEC-0020. A plan has `status` `ready` or `unsupported`, `scope`, exactly two `TestSpecification`s named `control` and `security`, `discovery_command` tokens, `evidence_requirements`, `citations`, and `limitations`. Each specification states `test_id`, `test_path`, `fixture_setup`, `implementation_call`, `input`, `required_behavior`, `observable_witness` and `source_references`. Pydantic validation refuses a third test, identical test ids, a test path outside the approved paths, a discovery command whose tokens differ from the evidence's command, unknown fields including any verdict, and a `ready` plan without citations. The trusted output function admits only the input scope, citations covered by successful `read_source` returns stamped with the current `run_id`, and an `implementation_call` naming the analysis entry point; it attaches quotations. These checks establish structure and provenance, not that the planned assertion measures the right property.
+
+**Modes and budgets.** The factory takes an explicit `Model`, separate `retries={"tools": 0, "output": n}`, content-excluded native instrumentation and an optional injected `TemporalDurability`, so direct and durable modes reuse one factory as SPEC-0015 established. Callers inject `UsageLimits`; nothing in the prompt can change them. Durable registration gets its own later workflow; none is added here.
+
+## Acceptance and validation
+
+Deterministic checks with `TestModel`/`FunctionModel` and real-request blocking: accepted plan over the reviewed fixture; refusal of a non-ready analysis, a third test, duplicate ids, unapproved test paths, altered discovery tokens, uncited or stale-run citations, scope expansion, verdict fields and an implementation call that does not name the entry point; skill and tool delivery on the actual native request; local span coverage.
+
+Native Pydantic Evals over frozen development cases, two repeats, concurrency one: the SPEC-0018 pair supplies the first oracle, since `benchmarks/fixtures/path-traversal/test_documents.py` is the reviewed realization of a correct plan (allowed sentinel control, outside sentinel inside scratch, specific `ValueError`, open-event witness, exactly two tests). Negative cases: environment evidence without a discovered baseline test, a hypothesis whose sensitive operation is absent from the inventory, and instruction injection inside a saved test file. Dimensions reported separately: oracle correctness, contract adherence, read-before-cite trajectory, tool correctness, robustness, security authority and estimated usage.
+
+Semantic adequacy (no mocked sink, no constant assertion, witness actually observes the effect) cannot be proven by these checks; independent review of actual outputs remains mandatory before any live qualification, as ISSUE-0007 showed for the analyst. Live provider repeats, durable composition and connection to the graph are separate gates and are not claimed by this spec.
+
+## Decisions and open questions
+
+The planner precedes the environment agent because it is read-only and its inputs can be frozen now, while environment execution waits on ISSUE-0006 and a setup-recipe contract. `EnvironmentEvidence` is deliberately minimal and operator-authored; the environment stage will have to produce exactly this contract or supersede it explicitly. Whether a per-framework convention reference (pytest, JUnit 5) belongs in the environment evidence as admitted data or in a second skill is open; the default is data, to keep the skill general across languages. Whether the planner should see the existing baseline test content or only its identity is resolved as: content, through the inventory, because conventions matter and the inventory is already bounded. A plan and a later implementation record will follow if this spec is accepted.

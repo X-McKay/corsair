@@ -55,4 +55,4 @@ Complexity cost: four packages shaped like `agents/issue_analysis`, one `core/` 
 
 ## Decision
 
-Proposed. The next experiment is a spec for the test planning agent with its frozen fixture inputs and oracle, followed by the deterministic disposition gates. Each later agent gets its own spec and plan when its prerequisite row above changes state.
+Proposed. The test planning agent is specified in [SPEC-0022](../specs/SPEC-0022-test-planning-agent.md) (draft); the deterministic disposition gates and the evidence assessment agent follow. Each later agent gets its own spec and plan when its prerequisite row above changes state.
