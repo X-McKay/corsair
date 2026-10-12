@@ -175,3 +175,5 @@ Post-merge integration: full offline363/6.29s and the deterministic native fixtu
 
 
 PR22 review at exact head28feef4 adds [published comments](https://github.com/X-McKay/corsair/pull/22#pullrequestreview-5494630076) on individual-attempt calibration labels, honest unsupported planning output and pre-registered judge validation. The isolated exact-head offline suite passed367/6.44s; no live calibration/inference ran. Its dataset and specs remain unmerged/draft, and ISSUE-0007 remains blocked. See HANDOFF-0035 for review scope and continuation; current-main native/corpus state from HANDOFF-0034 is unchanged.
+
+PR22 re-review at head39dbf11: planner abstention, independent confirmation and handoff findings addressed; the new calibration filter still admits output identity without skill identity. [Follow-up review](https://github.com/X-McKay/corsair/pull/22#pullrequestreview-5494723439) records the reproduced gap. Exact-head offline369/6.48s and Development guards CI pass. PR remains open; no live inference or qualification. See HANDOFF-0037.
