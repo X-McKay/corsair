@@ -58,3 +58,5 @@ Complexity cost: four packages shaped like `agents/issue_analysis`, one `core/` 
 Proposed. The test planning agent is specified in [SPEC-0022](../specs/SPEC-0022-test-planning-agent.md) (draft); the deterministic disposition gates and the evidence assessment agent follow. Each later agent gets its own spec and plan when its prerequisite row above changes state.
 
 Accepted first-stage scope change: SPEC-0024/PLAN-0024 implement an isolated issue-identification replacement candidate. It preserves the reported concern and locates source; the planner now owns conditional setup and the test hypothesis. The inventory above remains the pre-change survey, and the old analyst/reviewer remain disconnected historical implementations until explicit migration.
+
+[IDEA-0004](IDEA-0004-end-to-end-agent-plan.md) re-checks this inventory after SPEC-0024 and proposes per-agent contracts, tools, evaluations and a fixture-first end-to-end path.

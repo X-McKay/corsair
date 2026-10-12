@@ -3,8 +3,8 @@ id: ISSUE-0006
 kind: issue
 title: Native transfer retry and resource admission
 status: blocked
-updated: 2026-10-11
-related: [SPEC-0011, PLAN-0013]
+updated: 2026-10-12
+related: [SPEC-0011, PLAN-0013, SPEC-0025, SPEC-0026]
 ---
 
 # Native transfer retry and resource admission
@@ -65,3 +65,7 @@ SPEC-0011 now defines a qualification-only small-file consumer through existing 
 The [fixed generated-report consumer](../../qualification/openshell-untrusted-file.md) now passes on two distinct fresh admitted nodes with unchanged72 frozen inputs: raw native ExecChunk bytes via existing OpenShellExecution, four exact immutable artifacts and ten descriptor-first refusals per node, original worker/resource/cluster cleanup and independent paired raw audits. Mandatory storage/remount/kernel/CNI and native gateway TLS/auth/fence controls passed on each current node. No native archive download or host extraction was dispatched, and no application API/runner/transport/retry layer was added. Every preparation failure, CNI convergence/readiness observation and expected original post-delete NOT_FOUND read remains retained privately.
 
 This resolves only the reviewed small inert exclusive-file recipe. Native CLI archive extraction still lacks pre-extraction aggregate byte/member/inode bounds and supported retry-off/authoritative reconciliation. Arbitrary environments/recipes, active writers, atomic snapshots, file-specific interruption/reconciliation and production consumers remain unqualified. Overall ISSUE-0006 and PLAN-0013 stay blocked; no external issue closure is authorized. Select one concrete approved report consumer over the already-qualified execution/artifact boundaries for a subsequent focused contract review, or inspect a compatible immutable upstream candidate meeting the original general-transfer criteria. Do not widen this recipe or resume the withdrawn staging profile.
+
+## Proposed narrower route for full source trees
+
+On 2026-10-12 the user selected in-sandbox fetch for real-project source: the sandbox fetches one pinned public commit over HTTPS itself, the host compares commit and tree identity with its own `GitSource` capture before any repository code runs, and repository-host egress is narrowed after the fetch. Draft [SPEC-0025](../specs/SPEC-0025-sandbox-source-fetch.md) defines it, including private repositories through OpenShell's credential proxy, and draft [SPEC-0026](../specs/SPEC-0026-sandbox-dependency-fetch.md) installs dependencies from public registries inside the sandbox, so no dependency state is transferred from the host either. No host-side extraction occurs, and a failed or unknown fetch discards the sandbox instead of retrying in place. This is proposed, not qualified. This issue's general transfer criteria, native download extraction and interrupted-transfer reconciliation remain blocked and unchanged.
