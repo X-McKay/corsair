@@ -31,7 +31,7 @@ def scripted_model(output: IssueAnalysis, *, path: str = "documents.py") -> Func
         returned = any(isinstance(part, ToolReturnPart) for message in messages for part in message.parts)
         if output.citations and not returned:
             return ModelResponse(parts=[ToolCallPart("read_source", {"path": path, "start_line": 1, "end_line": 4})])
-        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, output.model_dump(mode="json"))])
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, output.model_dump(mode="json", exclude={"citations": {"__all__": {"quote"}}}))])
     return FunctionModel(respond)
 
 
@@ -84,6 +84,10 @@ async def evaluate_fixture() -> object:
                                     metadata={"mode": "direct_fixture", "prompt_version": PROMPT_VERSION,
                                               "skill_id": SKILL_ID, "skill_sha256": SKILL_SHA256,
                                               "skill_delivery": "eager_native_capability_instructions",
+                                              "source_tool_contract": "SourceRead",
+                                              "model_output_contract": "IssueAnalysisDraft",
+                                              "final_output_contract": "IssueAnalysis",
+                                              "citation_text_owner": "trusted_output_function",
                                               "rubric_version": "fixture-contract-v1",
                                               "pydantic_ai_slim": version("pydantic-ai-slim"),
                                               "pydantic_evals": version("pydantic-evals"),

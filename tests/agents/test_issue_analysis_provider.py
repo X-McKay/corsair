@@ -62,6 +62,9 @@ def test_native_provider_uses_explicit_model_endpoint_and_closes_client(monkeypa
         description = IssueAnalysis.model_json_schema()["properties"]["missing_facts"]["description"]
         assert any(description in str(message["content"]) for message in body["messages"])
         assert any(SKILL_TEXT in str(message["content"]) for message in body["messages"])
+        system = body["messages"][0]["content"]
+        assert '"start_line"' in system and '"end_line"' in system
+        assert '"quote"' not in system and '"draft"' not in system
         assert [tool["function"]["name"] for tool in body["tools"]] == ["read_source"]
         assert body["messages"][0]["role"] == "system"
         assert sum(message["role"] == "system" for message in body["messages"]) == 1
@@ -72,7 +75,11 @@ def test_native_provider_uses_explicit_model_endpoint_and_closes_client(monkeypa
         else:
             assert not any('"$defs"' in str(message["content"]) for message in body["messages"])
             assert [tool["function"]["name"] for tool in body["tools"]] == ["read_source"]
-            message = {"role": "assistant", "content": output.model_dump_json()}
+            tool_result = json.loads(next(item["content"] for item in body["messages"] if item["role"] == "tool"))
+            assert "quote" not in tool_result
+            assert [line["number"] for line in tool_result["lines"]] == [1, 2, 3, 4]
+            assert "\n".join(line["text"] for line in tool_result["lines"]) == inputs.source_files[0].content.rstrip("\n")
+            message = {"role": "assistant", "content": output.model_dump_json(exclude={"citations": {"__all__": {"quote"}}})}
             finish_reason = "stop"
         return httpx2.Response(200, json={"id": f"fixture-{len(requests)}", "object": "chat.completion", "created": 1,
                                         "model": "explicit-model", "choices": [{"index": 0, "finish_reason": finish_reason, "message": message}],
@@ -193,7 +200,7 @@ def test_semantic_rubric_rejects_incomplete_combined_citations(line):
 def test_fixture_prompt_exposes_exact_read_bounds_without_source_or_oracle():
     inputs, output = case()
     prompt = fixture_prompt(inputs)
-    assert "documents.py (inclusive lines 1..4)" in prompt
+    assert "documents.py (saved-file inclusive lines 1..4)" in prompt
     assert inputs.source_files[0].content not in prompt
     assert output.hypothesis.observable_effect not in prompt
 

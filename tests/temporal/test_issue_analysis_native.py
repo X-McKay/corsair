@@ -80,8 +80,10 @@ def test_issue_analysis_same_agent_direct_durable_replay_local_spans(temporal_ad
             direct_spans = exporter.get_finished_spans()
             assert sum(s.attributes.get("gen_ai.operation.name") == "chat"
                        for s in direct_spans) == direct.requests
-            assert sum(s.attributes.get("gen_ai.operation.name") == "execute_tool"
-                       for s in direct_spans) == direct.tool_calls
+            direct_tools = [s for s in direct_spans if s.attributes.get("gen_ai.operation.name") == "execute_tool"]
+            assert sum(s.attributes.get("gen_ai.tool.name") == "read_source" for s in direct_tools) == direct.tool_calls
+            assert sum(s.attributes.get("gen_ai.tool.name") == "final_result" for s in direct_tools) == 1
+            assert len(direct_tools) == direct.tool_calls + 1
             async with Worker(client, task_queue=identity, workflows=[FixtureIssueAnalysisWorkflow]):
                 handle = await client.start_workflow(FixtureIssueAnalysisWorkflow.run,
                                                     args=[inputs(key), key, 3], id=identity, task_queue=identity)
@@ -104,7 +106,9 @@ def test_issue_analysis_same_agent_direct_durable_replay_local_spans(temporal_ad
         model_spans = [s for s in durable_spans if s.attributes.get("gen_ai.operation.name") == "chat"]
         tool_spans = [s for s in durable_spans if s.attributes.get("gen_ai.operation.name") == "execute_tool"]
         assert len(model_spans) == durable.requests
-        assert len(tool_spans) == durable.tool_calls
+        assert sum(s.attributes.get("gen_ai.tool.name") == "read_source" for s in tool_spans) == durable.tool_calls
+        assert sum(s.attributes.get("gen_ai.tool.name") == "final_result" for s in tool_spans) == 1
+        assert len(tool_spans) == durable.tool_calls + 1
         assert all(s.context.trace_id in workflow_traces for s in model_spans + tool_spans)
         assert any(s.name.startswith("RunWorkflow:") for s in durable_spans)
         assert sum(s.name.startswith("RunActivity:") for s in durable_spans) == len(activities)

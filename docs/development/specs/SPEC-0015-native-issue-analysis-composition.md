@@ -15,7 +15,7 @@ Exercise the existing read-only issue-analysis factory/contracts in direct and n
 
 ## Boundaries and design
 
-Use native PydanticAI 2.55.0 `TemporalDurability`, `PydanticAIWorkflow`, `PydanticAIPlugin` and replay-safe `LogfirePlugin`, with Temporal SDK 1.34.0 and the existing verified CLI 1.9.1/service 1.32.0. Reuse `create_issue_analysis_agent`, `IssueAnalysisInput`, `IssueAnalysis`, fixture dependencies, prompt, tools, output validators and native usage limits. The factory gains only an operator-injected native durability capability, coordinated with its owning agent; domain contracts remain independent of Temporal.
+Use native PydanticAI 2.55.0 `TemporalDurability`, `PydanticAIWorkflow`, `PydanticAIPlugin` and replay-safe `LogfirePlugin`, with Temporal SDK 1.34.0 and the existing verified CLI 1.9.1/service 1.32.0. Reuse `create_issue_analysis_agent`, `IssueAnalysisInput`, `IssueAnalysis`, fixture dependencies, prompt, tools, native output validation and usage limits. The factory gains only an operator-injected native durability capability, coordinated with its owning agent; domain contracts remain independent of Temporal.
 
 Source provides one small native workflow base; the test-only top-level concrete workflow binds the same factory-built fixture agent. Native registered model keys select trusted worker fixture models. Expected labels/oracles remain in evaluator/test worker configuration and never enter agent prompts or run dependencies. No dynamic scheduler, provider wrapper, model protocol or opaque whole-agent activity is introduced.
 
@@ -35,3 +35,5 @@ Local telemetry uses native instrumentation and supported LogfirePlugin with sen
 ## Decisions and open questions
 
 Root owns shared dependencies/Make/Git/CURRENT and runtime assignment; no installation or publication by this agent. SDK source/documentation is verified against the selected installed version and retained immutable v2.55.0 documentation, with Context7 used for discovery. Native references: [selected integration docs](https://github.com/pydantic/pydantic-ai/blob/v2.55.0/docs/durable_execution/temporal.md), [selected integration source](https://github.com/pydantic/pydantic-ai/tree/v2.55.0/pydantic_ai_slim/pydantic_ai/durable_exec/temporal). Context7 examples are not standalone compatibility proof.
+
+SPEC-0020 uses an async typed output function for exact evidence resolution. Its native final_result span is attributed separately from read_source and does not count as a source tool call in RunUsage. Fresh histories/replay must qualify that execution path; original histories do not prove migration compatibility.

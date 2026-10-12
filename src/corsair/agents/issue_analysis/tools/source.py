@@ -7,7 +7,7 @@ from pydantic import Field
 from pydantic_ai import ModelRetry, RunContext
 from pydantic_ai.toolsets import FunctionToolset
 
-from ..contracts import IssueAnalysisInput, SourceExcerpt, confined_path
+from ..contracts import IssueAnalysisInput, SourceExcerpt, SourceLine, SourceRead, confined_path
 
 
 @dataclass(frozen=True)
@@ -34,11 +34,18 @@ def source_tools() -> FunctionToolset[FixtureDependencies]:
 
     @tools.tool(retries=0)
     async def read_source(ctx: RunContext[FixtureDependencies], path: str,
-                    start_line: Annotated[int, Field(ge=1, description="First one-based inclusive source line")],
-                    end_line: Annotated[int, Field(ge=1, description="Last one-based inclusive source line")]) -> SourceExcerpt:
-        """Read at most 80 lines from an available inventory path; inventory metadata is not source content."""
+                    start_line: Annotated[int, Field(ge=1, description="First one-based inclusive line in the saved file, not an upstream document line number")],
+                    end_line: Annotated[int, Field(ge=1, description="Last one-based inclusive line in the saved file, not an upstream document line number")]) -> SourceRead:
+        """Read at most 80 saved-file-local lines from an inventory path.
+
+        Returned start_line/end_line use that saved file's coordinates. Numbers
+        printed inside line text are content, not coordinates. Inventory metadata
+        is not source content."""
         try:
-            return ctx.deps.read_source(path, start_line, end_line)
+            excerpt = ctx.deps.read_source(path, start_line, end_line)
+            return SourceRead(path=excerpt.path, start_line=excerpt.start_line, end_line=excerpt.end_line,
+                              lines=tuple(SourceLine(number=excerpt.start_line + offset, text=text)
+                                          for offset, text in enumerate(excerpt.quote.split("\n"))))
         except ValueError as exc:
             raise ModelRetry(str(exc)) from exc
 
