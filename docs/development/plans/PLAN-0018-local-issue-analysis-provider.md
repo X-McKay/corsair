@@ -172,3 +172,6 @@ PR21's updated head933f071 was independently re-reviewed, its usage/merge/record
 
 
 Post-merge integration: full offline363/6.29s and the deterministic native fixture6 cases/30 assertions pass. The new reviewer wire test uses explicit `server="vllm"`; no additional real inference or durable/OpenShell qualification was run. See HANDOFF-0033 for the verified PR merge and continuation boundary.
+
+
+Skill-evaluation continuation: [PLAN-0023](PLAN-0023-issue-analysis-rubric-and-skill-protocol.md) applies the SPEC-0023 protocol (coded rubric labels, judge calibration, held-out guard, baseline) before any further analyze-issue skill candidate is compared.
