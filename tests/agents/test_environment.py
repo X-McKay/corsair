@@ -137,6 +137,8 @@ def test_prompt_lists_inventory_without_file_content():
     (SETUP, DISCOVERED, ready(recipe=[{"phase": "dependency", "command": list(INSTALL), "source": {"path": "README.md", "start_line": 1, "end_line": 1}}])),
     # baseline path is not the discovered test's file
     (SETUP, DISCOVERED, ready(baseline_test_path="tests/test_other.py")),
+    # approved test path overlaps a saved source file
+    (SETUP, DISCOVERED, ready(approved_test_paths=["requirements.txt"])),
     # different toolchain than the prepared sandbox
     (SETUP, DISCOVERED, ready(toolchain_id="java-17")),
 ])

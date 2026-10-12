@@ -83,6 +83,8 @@ def create_environment_agent(model: Model, *, output_retries: int = 1) -> Agent[
             discovery = succeeded[positions[-2]]
             if draft.baseline_test_id.encode() not in deps.ledger.outputs[discovery][0]:
                 raise ModelRetry("baseline_test_id must appear in the discovery command's output")
+            if set(draft.approved_test_paths) & {s.path for s in deps.inputs.source_files}:
+                raise ModelRetry("approved_test_paths must not name saved source files")
             if draft.baseline_test_path not in draft.baseline_test_id:
                 raise ModelRetry("baseline_test_path must be the file named in baseline_test_id")
             toolchain = next(t for t in deps.inputs.toolchains if t.toolchain_id == deps.toolchain_id)
