@@ -103,8 +103,9 @@ def summarize(number: int, observed: NativeTestRun, *, control_id: str, security
     cases = {case.test_id: case for case in (execution.cases if execution else ())}
     security = cases.get(security_id)
     if security is not None and not reveal_security:
-        # A fixture/setup error says nothing about the planned assertion; any other outcome is withheld.
-        security_view = _outcome(security) if security.outcome == "error" else "withheld"
+        # A setup error or skip means the body did not run validly and says nothing about the planned
+        # assertion; only the pass/fail verdict is withheld.
+        security_view = _outcome(security) if security.outcome in ("error", "skipped") else "withheld"
     else:
         security_view = _outcome(security)
     errors = (discovery.errors if discovery else "") or (execution.detail if execution else "") or observed.detail
@@ -130,24 +131,30 @@ def authoring_tools() -> FunctionToolset[AuthoringDependencies]:
             raise ModelRetry(f"test file exceeds {MAX_PATCH_FILE_BYTES} bytes")
         return WrittenFile(path=path, sha256=sha256(data).hexdigest(), size=len(data))
 
-    @tools.tool(name=RUN_TOOL, retries=TOOL_RETRIES)
+    @tools.tool(name=RUN_TOOL, retries=TOOL_RETRIES, sequential=True)
     def run_tests(ctx: RunContext[AuthoringDependencies]) -> DevelopmentRun:
         """Apply the current patch to a fresh copy of the baseline source in the development sandbox, run native discovery and, when exactly the two planned tests are found, execute them once.
 
-        Returns discovered test ids, collection or compile errors and the control outcome. The security test's pass/fail outcome is withheld. Runs are capped by an operator budget.
+        Returns discovered test ids, collection or compile errors and the control outcome. The security test's pass/fail outcome is withheld; a setup error or skip is shown. Every call counts against an operator run budget.
         """
         deps = ctx.deps
         plan = deps.inputs.plan
-        prior = [run for run in development_runs(ctx) if run.status != "not_run"]
+        # Reserve against every run_tests call dispatched in this run, including others in the same
+        # model response whose returns are not yet in history; each call gets its own operation.
+        dispatched = [part.tool_call_id for message in ctx.messages
+                      if isinstance(message, ModelResponse) and message.run_id == ctx.run_id
+                      for part in message.parts if isinstance(part, ToolCallPart) and part.tool_name == RUN_TOOL]
+        if dispatched.count(ctx.tool_call_id) != 1:
+            raise RuntimeError("run_tests call id must identify exactly one dispatched call in this run")
+        number = dispatched.index(ctx.tool_call_id) + 1
         files = current_files(ctx)
-        number = len(prior) + 1
-        if not files or len(prior) >= deps.budget.dev_runs:
+        if not files or number > deps.budget.dev_runs:
             reason = "no test file has been written" if not files else f"development run budget of {deps.budget.dev_runs} is spent"
             return DevelopmentRun(run=number, operation="", patch_sha256=sha256(b"").hexdigest(), status="not_run",
                                   discovered_test_ids=(), errors=reason, control=None, security=None,
                                   run_command=(), cleanup="not_required")
         patch = approved_patch(files, deps.inputs.environment.approved_test_paths)
-        operation = uuid5(NAMESPACE_URL, f"corsair:test-authoring:{ctx.run_id}:{number}")
+        operation = uuid5(NAMESPACE_URL, f"corsair:test-authoring:{ctx.run_id}:{ctx.tool_call_id}")
         observed = deps.runner.run(patch, control_test_id=plan.control.test_id,
                                    security_test_id=plan.security.test_id,
                                    discovery_command=plan.discovery_command, operation=operation)

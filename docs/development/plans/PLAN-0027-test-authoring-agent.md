@@ -27,6 +27,8 @@ Implement [SPEC-0028](../specs/SPEC-0028-test-authoring-agent.md) offline. Build
 
 Base: planner branch `e041021` over main `83dec61`. `make test-config`: 494 passed (one existing pydantic_graph deprecation warning); the planner branch alone reports 416. New checks: 18 JUnit, 35 runner, 25 authoring. Scripted native evals: 12/12 attempts (6 cases × 2 repeats) passed every assertion, zero unknown tools, zero revealed security outcomes. Real pytest over reviewed SPEC-0018 bytes: vulnerable gives control passed and security `AssertionError` at `test_documents.py:64` in `test_security_rejects_outside_read`, exit 1; fixed gives both passed, exit 0. First eval run failed 6/12 because fixture models were keyed by input digest and four cases share inputs; corrected by a `fixture_id` wrapper kept out of the prompt. One static check initially missed `from unittest import mock`; fixed. No provider, Temporal or OpenShell check ran.
 
+Review of `ec73e0b` (Al) reproduced two defects, now fixed with regressions: a skipped security test was shown as `withheld` and admitted as a patch, and several `run_tests` calls in one model response all saw the same history, exceeded the run budget and shared one operation identity. Budget reservation now counts dispatched calls, operations use the tool call id, duplicate call ids are refused, and skips are shown like setup errors. The branch was merged with the planner head `3d95ec9`, keeping both CURRENT rows. `make test-config` after the fix: 497 passed.
+
 ## Decisions and next action
 
 - The patch is rebuilt from current-run write calls, so deps stay immutable and durable-safe.

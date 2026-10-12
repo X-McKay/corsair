@@ -45,7 +45,7 @@ class ScriptedRun(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     status: Literal["discovered", "collection_error"]
     control: Literal["passed", "failed"] = "passed"
-    security: Literal["passed", "failed"] = "failed"
+    security: Literal["passed", "failed", "skipped"] = "failed"
 
 
 class AuthoringCase(BaseModel):

@@ -1,6 +1,7 @@
 """Exercise the authoring stage's confinement, run budget, withheld outcome and provenance through native SDK calls."""
 
 import asyncio
+from dataclasses import replace
 
 import pytest
 from pydantic import ValidationError
@@ -64,7 +65,10 @@ def responding(steps, final=PATCH, seen=None):
         if seen is not None:
             seen[:] = [p.content for m in messages for p in m.parts if isinstance(p, ToolReturnPart) and p.tool_name == "run_tests"]
         if done < len(steps):
-            return ModelResponse(parts=[steps[done]])
+            step = steps[done]
+            # Fresh ids per response unless a test pins them, as a real provider would issue.
+            return ModelResponse(parts=[part if isinstance(step, tuple) else replace(part, tool_call_id=f"call-{done}")
+                                        for part in (step if isinstance(step, tuple) else (step,))])
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {"result": final})])
     return FunctionModel(respond)
 
@@ -126,6 +130,33 @@ def test_run_budget_is_operator_owned_and_spent_runs_execute_nothing():
     assert len(fake.calls) == 2 and [r.status for r in result.output.dev_runs] == ["collection_error"] * 2 + ["not_run"]
     with pytest.raises(ValueError):
         AuthoringBudget(dev_runs=0)
+
+
+def test_runs_requested_together_each_reserve_budget_and_identity():
+    seen = []
+    two = (ToolCallPart("run_tests", {}, tool_call_id="first"), ToolCallPart("run_tests", {}, tool_call_id="second"))
+    blocked = {"status": "blocked", "layer": "unknown", "reason": "Stopped"}
+    (result, fake) = run(create_test_authoring_agent(responding([write(), two], blocked, seen)), case().inputs.inputs,
+                         runner({"status": "discovered"}, {"status": "discovered"}), budget=AuthoringBudget(dev_runs=1))
+    assert len(fake.calls) == 1
+    runs = sorted(result.output.dev_runs, key=lambda r: r.run)
+    assert [(r.run, r.status) for r in runs] == [(1, "discovered"), (2, "not_run")]
+    (result, fake) = run(create_test_authoring_agent(responding([write(), two], blocked)), case().inputs.inputs,
+                         runner({"status": "discovered"}, {"status": "discovered"}))
+    operations = {r.operation for r in result.output.dev_runs}
+    assert len(fake.calls) == 2 and len(operations) == 2
+
+
+def test_skipped_security_is_shown_and_refuses_a_patch_by_default():
+    seen = []
+    skipped = {"status": "discovered", "security": "skipped"}
+    with pytest.raises(UnexpectedModelBehavior):
+        run(create_test_authoring_agent(responding([write(), RUN], seen=seen), output_retries=0), case().inputs.inputs,
+            runner(skipped))
+    assert seen[0].security.outcome == "skipped"
+    blocked = {"status": "blocked", "layer": "fixture", "reason": "The security test was skipped"}
+    (result, _) = run(create_test_authoring_agent(responding([write(), RUN], blocked)), case().inputs.inputs, runner(skipped))
+    assert isinstance(result.output, BlockedAuthoring)
 
 
 def test_security_outcome_is_withheld_unless_the_operator_reveals_it():
