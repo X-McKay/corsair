@@ -1,6 +1,6 @@
 # OpenShell lifecycle adapter qualification
 
-Date: 2026-10-11. **Qualified for this bounded lifecycle slice: three real cycles on each of two fresh owned nodes with confirmed cleanup.** [SPEC-0009](../development/specs/SPEC-0009-sandbox-lifecycle-adapter.md), [PLAN-0011](../development/plans/PLAN-0011-sandbox-lifecycle-adapter.md), [runbook](../runbooks/openshell-adapter-lifecycle.md). This admits only the typed create/readiness/delete and host-receipt slice of Milestone 2; execution/transfers/output bounds/artifact service/agents/Temporal remain unimplemented.
+Date: 2026-10-11. **Qualified for this bounded lifecycle slice: three real cycles on each of two fresh owned nodes with confirmed cleanup.** [SPEC-0009](../development/specs/SPEC-0009-sandbox-lifecycle-adapter.md), [PLAN-0011](../development/plans/PLAN-0011-sandbox-lifecycle-adapter.md), [runbook](../runbooks/openshell-adapter-lifecycle.md). This admits only the typed create/readiness/delete and host-receipt slice of Milestone 2; this historical report excludes execution/transfers/output bounds/artifact service/agents/Temporal; the subsequent [execution qualification](openshell-adapter-execution.md) records the new bounded application slice.
 
 ## Contract and native reuse
 
@@ -45,3 +45,7 @@ adapter-host-002 passed 1/121.952s on node c40e33c1-2e70-45e7-b7b5-54403ff071dc,
 | tests/unit/test_sandbox_lifecycle.py | f403c9b38325c608249f264fa4692e7ac35ae6fc47a19e1b198222e4de9aa80f |
 
 Independent raw/source audits confirmed both distinct node IDs, all six original sandbox/CR/pod/storage/container identities, 36 method observations per matrix and complete fixture/private/cluster cleanup. No live native or adapter failure occurred in the new counted runs. Final Corsair review found no blocking finding in this slice; the name-based deletion race and unrun worker/storage-fault and journal-attack coverage remain limits. Only the stated operator-exclusive lifecycle boundary is admitted.
+
+## Subsequent shared journal consumer
+
+The execution slice extracts the same inode-held, exclusive mode0600/fsynced writer into ReceiptDirectory, justified by a demonstrated second consumer. Current lifecycle source is re-exercised through six actual create/readiness/delete cycles in execution-host-004/005, with original identity/resource/fixture/cluster cleanup. All 15 lifecycle contract cases still pass within the 123 offline suite. This does not rewrite the original matrices or source hashes above; the [new report](openshell-adapter-execution.md) binds current source and scope.

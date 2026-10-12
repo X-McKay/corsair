@@ -8,11 +8,8 @@ qualified TLS configuration. This adapter does not manage transport or agents.
 from dataclasses import asdict, replace
 from datetime import datetime, timezone
 import hashlib
-import json
-import os
 from pathlib import Path
 import re
-import stat
 import time
 from uuid import UUID
 
@@ -22,6 +19,7 @@ from openshell import SandboxClient, DeletionOutcome
 from openshell._proto import openshell_pb2
 
 from corsair.ports.sandbox import SandboxHandle, LifecycleReceipt, LifecycleError
+from corsair.adapters.receipts import ReceiptDirectory
 
 
 class OpenShellLifecycle:
@@ -31,15 +29,7 @@ class OpenShellLifecycle:
             raise ValueError('Explicit workspace and UUID owner required')
         if not re.fullmatch(r'.+@sha256:[0-9a-f]{64}', spec.template.image):
             raise ValueError('Operator workload image must have an immutable digest')
-        if not receipts.is_absolute():
-            raise ValueError('Host receipt directory must be absolute')
-        # Hold the actual protected directory inode, not a mutable pathname.
-        fd = os.open(receipts, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-        info = os.fstat(fd)
-        if info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) != 0o700:
-            os.close(fd)
-            raise ValueError('Host receipt directory must be owned by this user with mode0700')
-        self._dir = fd
+        self._journal = ReceiptDirectory(receipts)
         self._client = client
         self._workspace = workspace
         self._owner = str(owner)
@@ -50,17 +40,10 @@ class OpenShellLifecycle:
         return self
 
     def __exit__(self, *args):
-        os.close(self._dir)
+        self._journal.close()
 
     def _write(self, operation, suffix, value):
-        data = (json.dumps(value, sort_keys=True, indent=2) + '\n').encode()
-        fd = os.open(f'{operation}.{suffix}.json', os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
-                     0o600, dir_fd=self._dir)
-        with os.fdopen(fd, 'wb') as stream:
-            stream.write(data)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.fsync(self._dir)
+        self._journal.write(operation, suffix, value)
 
     def _begin(self, operation, action, handle=None):
         if not isinstance(operation, UUID):
