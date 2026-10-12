@@ -38,7 +38,7 @@ def test_local_provider_requires_explicit_admitted_server(server):
         LocalModelConfig(base_url="https://llm.example/v1", model_name="explicit-model", **server)
 
 
-@pytest.mark.parametrize("thinking_mode,thinking_token_budget,response_token_limit", [("server_default", None, 2048), ("disabled", None, 2048), ("server_default", 768, 2048), ("server_default", None, 4096), ("server_default", None, 8192)])
+@pytest.mark.parametrize("thinking_mode,thinking_token_budget,response_token_limit", [("server_default", None, 2048), ("disabled", None, 2048), ("server_default", 768, 2048), ("server_default", None, 4096), ("server_default", None, 8192), ("server_default", 2048, 16384)])
 def test_native_provider_uses_explicit_model_endpoint_and_closes_client(monkeypatch, thinking_mode, thinking_token_budget, response_token_limit):
     inputs, output = case()
     requests = []
@@ -112,7 +112,7 @@ def test_native_provider_uses_explicit_model_endpoint_and_closes_client(monkeypa
 @pytest.mark.parametrize("options", [{"thinking_token_budget": 0}, {"thinking_token_budget": 2049},
                                     {"thinking_token_budget": True},
                                     {"thinking_mode": "disabled", "thinking_token_budget": 768},
-                                    {"response_token_limit": 3000}, {"response_token_limit": 16384}])
+                                    {"response_token_limit": 3000}, {"response_token_limit": 32768}])
 def test_provider_refuses_invalid_or_conflicting_thinking_budget(options):
     with pytest.raises(ValidationError):
         LocalModelConfig(server="vllm", base_url="https://llm.example/v1", model_name="explicit-model", **options)

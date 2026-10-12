@@ -43,8 +43,9 @@ class LocalModelConfig(BaseModel):
     model_name: str = Field(min_length=1, max_length=256)
     api_key_env: Literal["CORSAIR_LOCAL_MODEL_API_KEY"] | None = None
     timeout_seconds: float = Field(default=60, gt=0, le=120)
-    # Planned comparison caps only; the cap includes reasoning and answer tokens.
-    response_token_limit: Literal[2048, 4096, 8192] = 2048
+    # Per-request cap covering reasoning and answer tokens; each caller selects its own.
+    # Thinking budgets stay a separate control below.
+    response_token_limit: Literal[2048, 4096, 8192, 16384] = 2048
     thinking_mode: Literal["server_default", "disabled"] = "server_default"
     thinking_token_budget: int | None = Field(default=None, ge=1, le=2048, strict=True)
 

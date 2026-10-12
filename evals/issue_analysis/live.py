@@ -233,7 +233,7 @@ def main():
     parser.add_argument("--model", required=True)
     parser.add_argument("--thinking-mode", choices=("server_default", "disabled"), default="server_default")
     parser.add_argument("--thinking-token-budget", type=int)
-    parser.add_argument("--response-token-limit", type=int, choices=(2048, 4096, 8192), default=2048)
+    parser.add_argument("--response-token-limit", type=int, choices=(2048, 4096, 8192, 16384), default=2048)
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--repeat", type=int, default=2, choices=(1, 2))
     parser.add_argument("--case", choices=("path_traversal", "missing_source", "instruction_injection", "confined_source"))
