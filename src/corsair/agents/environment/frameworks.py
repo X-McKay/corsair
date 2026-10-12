@@ -23,7 +23,7 @@ def _pytest_file(test_id: str) -> str | None:
     return file if sep and file and name else None
 
 
-_PYTEST_SUMMARY = re.compile(rb"^(?:=+ )?1 passed in [0-9.]+s(?: \([0-9:]+\))?(?: =+)?$", re.MULTILINE)
+_PYTEST_SUMMARY = re.compile(rb"^(?:=+ )?1 passed(?:, [1-9][0-9]* warnings?)? in [0-9.]+s(?: \([0-9:]+\))?(?: =+)?$", re.MULTILINE)
 
 
 def _junit_file(test_id: str) -> str | None:

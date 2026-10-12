@@ -227,6 +227,10 @@ def test_read_output_returns_retained_bytes_beyond_the_tail():
 
 @pytest.mark.parametrize("framework,test_id,path,command,output,ok", [
     ("pytest", "tests/a_test.py::test_x[1]", "tests/a_test.py", ("pytest", "tests/a_test.py::test_x[1]"), b"== 1 passed in 0.2s ==\n", True),
+    ("pytest", "tests/a_test.py::test_x", "tests/a_test.py", ("pytest", "tests/a_test.py::test_x"), b"1 passed, 1 warning in 0.03s\n", True),
+    ("pytest", "tests/a_test.py::test_x", "tests/a_test.py", ("pytest", "tests/a_test.py::test_x"), b"== 1 passed, 3 warnings in 0.03s ==\n", True),
+    ("pytest", "tests/a_test.py::test_x", "tests/a_test.py", ("pytest", "tests/a_test.py::test_x"), b"1 passed, 1 skipped, 1 warning in 0.03s\n", False),
+    ("pytest", "tests/a_test.py::test_x", "tests/a_test.py", ("pytest", "tests/a_test.py::test_x"), b"1 passed, 1 warning, 1 error in 0.03s\n", False),
     ("pytest", "tests/a_test.py::test_x", "a_test.py", ("pytest", "tests/a_test.py::test_x"), b"1 passed in 0.2s\n", False),
     ("pytest", "::test_x", "tests/a_test.py", ("pytest", "::test_x"), b"1 passed in 0.2s\n", False),
     ("pytest", "tests/a_test.py::test_x", "tests/a_test.py", ("pytest", "tests"), b"1 passed in 0.2s\n", False),
@@ -268,3 +272,13 @@ def test_dependencies_refuse_uncatalogued_toolchain_and_relative_scratch():
         deps(ScriptedExecution(), toolchain_id="ruby-3")
     with pytest.raises(ValueError):
         EnvironmentDependencies(inputs=inputs(), execution=ScriptedExecution(), handle=HANDLE, toolchain_id="python-3.12", scratch_location="scratch")
+
+
+@pytest.mark.parametrize("body,ok", [("warnings.warn('review warning', UserWarning)", True), ("pytest.skip('x')", False)])
+def test_pytest_admission_reads_a_genuine_summary(tmp_path, body, ok):
+    import subprocess, sys
+    from corsair.agents.environment.frameworks import FRAMEWORKS
+    (tmp_path / "test_genuine.py").write_text(f"import warnings, pytest\ndef test_genuine():\n    {body}\n")
+    run_ = subprocess.run([sys.executable, "-m", "pytest", "-c", "/dev/null", "--rootdir", ".", "-q", "-p", "no:cacheprovider",
+                           "test_genuine.py::test_genuine"], cwd=tmp_path, capture_output=True, timeout=60)
+    assert run_.returncode == 0 and FRAMEWORKS["pytest"].passed(run_.stdout) is ok
