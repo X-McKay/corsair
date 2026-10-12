@@ -265,7 +265,7 @@ def _compose(inputs, root, store, reveal):
                       budget=AuthoringBudget(reveal_security_outcome=reveal))
     patch = result.output
     assert isinstance(patch, TestPatch) and patch.dev_runs[0].status == "discovered"
-    assert patch.dev_runs[0].control.outcome == "passed" and patch.run_command[:2] == ("sh", "-c")
+    assert patch.dev_runs[0].control.outcome == "passed" and patch.run_command[:2] == ("/bin/sh", "-c")
     if reveal:
         failure = seen[0].security
         assert (failure.outcome, failure.failure_type, failure.failure_path) == ("failed", "AssertionError", "test_documents.py")
