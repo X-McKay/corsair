@@ -1,6 +1,6 @@
 # OpenShell qualification in kind
 
-Status: ordinary-pod kind/Calico and remaining 1A storage/native-kernel admission each passed twice with confirmed cleanup. See the [platform record](qualification/network-platform.md) and [admission record](qualification/openshell-admission.md). The focused [1B gateway/identity record](qualification/openshell-gateway.md) tracks the native OpenShell v0.1.3 installation and its separate actual coverage; later slices remain planned.
+Status: ordinary-pod kind/Calico and remaining 1A storage/native-kernel admission each passed twice with confirmed cleanup. See the [platform record](qualification/network-platform.md) and [admission record](qualification/openshell-admission.md). The focused [1B gateway/identity record](qualification/openshell-gateway.md) tracks the native OpenShell v0.1.3 installation and its separate actual coverage; the bounded [1C native lifecycle/execution/transfer record](qualification/openshell-lifecycle.md) now passed three repetitions on each of two fresh clusters with immutable cleanup. Initial Service readiness remains tracked in [ISSUE-0003](development/issues/ISSUE-0003-service-control-readiness.md); 1D and later slices remain unqualified.
 
 ## Objective and scope
 
@@ -17,7 +17,7 @@ Only create files when a qualified slice needs them; do not scaffold empty packa
 ```text
 corsair/
   README.md
-  pyproject.toml                       Python 3.12; pytest/YAML now, SDK later
+  pyproject.toml                       Python 3.12; pytest/YAML and matching pinned SDK
   uv.lock                             native Python dependency lock
   Makefile                            a few transparent command aliases
   .gitignore
@@ -222,7 +222,7 @@ Deliver the repeatable setup, qualification tests, runbook, and evidence report.
 
 - [Kubernetes setup](https://github.com/NVIDIA/OpenShell/blob/v0.1.2/docs/kubernetes/setup.mdx): official charts, Agent Sandbox prerequisites, network enforcement, split ownership.
 - [Support matrix](https://github.com/NVIDIA/OpenShell/blob/v0.1.2/docs/about/support-matrix.mdx): actual kernel/runtime admission requirements.
-- [Python SDK](https://github.com/NVIDIA/OpenShell/blob/v0.1.2/docs/sdk/python.mdx) and [implementation](https://github.com/NVIDIA/OpenShell/blob/v0.1.2/python/openshell/sandbox.py): explicit workspaces, execution, lifecycle and identity-aware waits.
+- [Python SDK](https://github.com/NVIDIA/OpenShell/blob/v0.1.3/docs/sdk/python.mdx) and [implementation](https://github.com/NVIDIA/OpenShell/blob/v0.1.3/python/openshell/sandbox.py): explicit workspaces, execution, lifecycle and identity-aware waits.
 - [Sandbox commands](https://github.com/NVIDIA/OpenShell/blob/v0.1.2/docs/how-it-works/sandboxes/overview.mdx): create, exec, limits, transfers and lifecycle semantics.
 - [Policy schema](https://github.com/NVIDIA/OpenShell/blob/v0.1.2/docs/how-it-works/policies/schema.mdx) and [network rules](https://github.com/NVIDIA/OpenShell/blob/v0.1.2/docs/how-it-works/policies/network-rules.mdx): fail-closed filesystem compatibility, request enforcement and binary matching.
 - [Access control](https://github.com/NVIDIA/OpenShell/blob/v0.1.2/docs/kubernetes/access-control.mdx): local access, OIDC and supervisor/workload identity.
