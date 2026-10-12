@@ -59,3 +59,7 @@ make kind-down
 ```
 
 Use fresh evidence directories, inspect failures before any new dispatch, retain original identities and confirm all cleanup. A passed version command, installation, test collection or earlier node report cannot replace these live gates.
+
+## Subsequent source composition
+
+The separate [captured-source arrival report](openshell-source-upload.md) records a later five-file GitSource/artifact/native-directory-upload composition passing on two fresh admitted nodes. It qualifies idle pre-execution arrival and actual admission refusals only; this original single-file matrix and its failed preparation remain unchanged. Source immutability during execution, general application transfers, untrusted downloads and interruption/reconciliation remain unqualified.
