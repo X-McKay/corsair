@@ -4,12 +4,16 @@ kind: plan
 title: Local issue-analysis provider qualification
 status: blocked
 updated: 2026-10-12
-related: [SPEC-0016, SPEC-0019, PLAN-0016, ISSUE-0007]
+related: [SPEC-0016, SPEC-0019, SPEC-0021, PLAN-0016, ISSUE-0007]
 ---
 
 # Local issue-analysis provider qualification
 
 ## Objective and dependencies
+
+2026-10-12 renewed objective: [SPEC-0021](../specs/SPEC-0021-issue-analysis-evidence-review.md) evaluates a separate evidence reviewer against independently frozen balanced candidates before connecting one bounded revision. Root owns integration; Sol lanes implement the isolated reviewer, freeze its evaluation and freeze fresh composition contrasts independently. Existing semantic failures remain in the record. Qualification order: isolated offline checks → isolated reviewer live evaluation and independent review → bounded direct composition and fresh contrasts → model-authored synthetic drafting/execution. No dependent step inherits a pass from an earlier incomplete gate.
+
+The isolated reviewer and disconnected direct sequence are implemented with native agents, restricted source tools, Pydantic outputs and per-invocation receipts. Reviewer-only full offline checks passed283/5.92s. Private `issue0007-resolution-20261012/reviewer-live001` freezes eight independently authored cases, two repeats each and separate oracle. Its first missing-condition pair (attempts07/08) incorrectly approves an existence-only return prediction: adding a reviewer alone does not solve ISSUE-0007. Empty-source fabricated analyses are blocked correctly but use `insufficient_evidence` rather than the oracle's `needs_revision`; keep those exact-label failures distinct from the real missed-condition defect. Composition remains disconnected. A separately frozen four-case native-operation set under `reviewer-next/` will test the next general condition-audit procedure, without changing these original receipts or their oracle.
 
 Qualify one explicit native local OpenAI-compatible model using the [SPEC-0014 factory](../specs/SPEC-0014-issue-analysis-template.md) and only synthetic saved source. [SPEC-0016](../specs/SPEC-0016-local-issue-analysis-provider.md) freezes scope. Root owns shared dependency install, current/handoff, Git and cross-component checks; Temporal owner independently exercises durable fixture composition.
 
@@ -150,3 +154,10 @@ Numbered-read preflight: full offline272/5.82s, deterministic6/30 and fresh scri
 Numbered-read live010 completed8/8 typed,6/8 finite, with no native failures. Independent review confirms one genuine missing process read-permission precondition. The guarded finite flag is lexical: its cited line6 ValueError stops execution before line7 read_text, but the effect omits the evaluator's read keyword. It also includes an unnecessary caller exception-handling assumption. All six source-present outputs use narrow application/reference spans rather than the full73-line reference; one reference still describes resolve instead of directly supporting unguarded read_text. Provenance is valid, relevance/interpretation remain imperfect. Recorded totals21 responses/12 reads,55547 input/18135 output/14714 reasoning tokens,150.586534s summed attempt latency; provider usage exists on all8. ISSUE-0007 remains blocked. No rubric or failed output was changed and no further inference was dispatched.
 
 All55 source-v12 current inputs/copies match post-run; public final schema remains unchanged and reference verifier passes. Remaining work is semantic completeness and citation relevance, not typed output delivery or another budget increase justified by truncation. Plan the next bounded general procedure/contract comparison around those actual defects, with fresh independently frozen cases and unchanged failure accounting. Current stage does not execute findings or admit real projects. Final record/diff checks and publication are recorded in HANDOFF-0030.
+
+
+## Bounded evidence-review implementation checkpoint
+
+SPEC-0021 adds isolated reviewer contracts/skill/toolset and a direct-only analyst/reviewer sequence with one optional fresh revision. Pydantic budgets reject coercion/non-finite values before a model call, and draft admission checks both ready analysis and supported review. Independent code review found and prompted the strict-budget correction; no other material sequence finding remains. Full `make test-config`:321 passed/6.04s with the existing SDK event-loop deprecation warning. No Temporal integration was changed.
+
+Private reviewer live001:16 typed,12 exact-label passes,14 safe semantic decisions after independent review; two real omitted-access misses prohibit integration. Live002 freezes the condition-audit candidate and12 cases (8 regression,4 fresh), two repeats each, before dispatch with the same explicit16384/64000/6/4/120s/300s profile. In progress; root will inspect retained receipts and independent adjudication before connecting the sequence.
