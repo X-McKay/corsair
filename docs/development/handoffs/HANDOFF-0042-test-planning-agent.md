@@ -15,11 +15,11 @@ Work began on clean main `83dec61` on branch `claude/test-planning-agent-mpdk0y`
 
 ## Validation and blockers
 
-`make test-config`: 390 passed before the change, 417 after (one existing deprecation warning). Scripted native evals: 12/12 attempts passed every assertion, zero unknown tools. No provider, Temporal or OpenShell check ran. The local-provider smoke is unrun: it needs the local model endpoint, reachable only from RIG0. ISSUE-0007 still blocks end-to-end admission of the identification the planner consumes.
+`make test-config`: 390 passed before the change, 417 after (one existing deprecation warning). Scripted native evals: 12/12 attempts passed every assertion, zero unknown tools. Two live local-provider runs on RIG0 (see PLAN-0025): live001 3/12 completed (reasoning exhausted the response cap); live002 with prompt v2 and a 2048 thinking budget 10/12 passed every assertion, with two budget-exhaustion failures and manual-review defects (fixtures outside scratch, a weak safe-behavior oracle). Not qualified. No Temporal or OpenShell check ran. ISSUE-0007 still blocks end-to-end admission of the identification the planner consumes.
 
 ## Decisions and next steps
 
-See PLAN-0025 decisions: `plan` argument wrapping of the draft union, contract validation under native validation context, `observation_facilities` and `BaselineTest` in the environment evidence, windowed reader, `cases.yaml` layout. The test authoring thread consumes these contracts. Next bounded action: freeze source/corpus/config and run the provider smoke on RIG0, then review actual outputs; stop before connecting the planner to any other stage.
+See PLAN-0025 decisions: `plan` argument wrapping of the draft union, contract validation under native validation context, `observation_facilities` and `BaselineTest` in the environment evidence, windowed reader, `cases.yaml` layout. The test authoring thread consumes these contracts. Next bounded action: freeze fresh held-out cases and decide the scratch-confinement and re-read responses recorded in PLAN-0025; stop before connecting the planner to any other stage.
 
 ## Continuation prompt
 
