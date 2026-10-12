@@ -19,6 +19,7 @@ from corsair.reports.test_observations import AdmittedTestClaims
 
 MAX_PATCH_FILES = 4
 MAX_PATCH_FILE_BYTES = 32768
+MAX_TEST_ID = 128
 TEST_ID = re.compile(r'^[A-Za-z0-9_./-]+\.py(::[A-Za-z_][A-Za-z0-9_]*){1,2}$')
 
 

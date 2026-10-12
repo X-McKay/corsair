@@ -5,12 +5,12 @@ from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
 
-from corsair.ports.test_runner import MAX_PATCH_FILE_BYTES, MAX_PATCH_FILES, TEST_ID
+from corsair.ports.test_runner import MAX_PATCH_FILE_BYTES, MAX_PATCH_FILES, MAX_TEST_ID, TEST_ID
 
 from ..source.contracts import Contract, Fact, SourceFile, bounded_inventory, confined_path
 from ..test_planning.contracts import EnvironmentEvidence, ReadyTestPlan
 
-TestId = Annotated[str, Field(min_length=1, max_length=256, pattern=TEST_ID.pattern)]
+TestId = Annotated[str, Field(min_length=1, max_length=MAX_TEST_ID, pattern=TEST_ID.pattern)]
 Layer = Literal["compile", "discovery", "dependency", "fixture", "sandbox", "unknown"]
 Excerpt = Annotated[str, Field(max_length=4096)]
 
@@ -33,9 +33,16 @@ class TestAuthoringInput(Contract):
                 raise ValueError(f"planned test path {spec.test_path} is not approved")
             if not spec.test_id.startswith(spec.test_path + "::"):
                 raise ValueError(f"planned test id {spec.test_id} must be a native node id in {spec.test_path}")
-            if not TEST_ID.fullmatch(spec.test_id):
+            if len(spec.test_id) > MAX_TEST_ID or not TEST_ID.fullmatch(spec.test_id):
                 raise ValueError(f"planned test id {spec.test_id} is not a supported native node id")
-        sources = {source.path for source in self.source_files}
+        contents = {source.path: source.content.splitlines() for source in self.source_files}
+        for excerpt in (*self.plan.citations, *self.plan.control.source_references, *self.plan.security.source_references):
+            # The plan must have been made over exactly this inventory, not same-named files of another revision.
+            lines = contents.get(excerpt.path)
+            if lines is None or excerpt.end_line > len(lines) or \
+                    "\n".join(lines[excerpt.start_line - 1:excerpt.end_line]) != excerpt.quote:
+                raise ValueError(f"plan excerpt {excerpt.path}:{excerpt.start_line}-{excerpt.end_line} does not match the saved source")
+        sources = set(contents)
         if sources & set(self.environment.approved_test_paths):
             # A new test file must not replace saved source; editing existing tests is a separate decision.
             raise ValueError("approved test paths must not overwrite saved source files")

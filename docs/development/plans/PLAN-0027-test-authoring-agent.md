@@ -29,6 +29,8 @@ Base: planner branch `e041021` over main `83dec61`. `make test-config`: 494 pass
 
 Review of `ec73e0b` (Al) reproduced two defects, now fixed with regressions: a skipped security test was shown as `withheld` and admitted as a patch, and several `run_tests` calls in one model response all saw the same history, exceeded the run budget and shared one operation identity. Budget reservation now counts dispatched calls, operations use the tool call id, duplicate call ids are refused, and skips are shown like setup errors. The branch was merged with the planner head `3d95ec9`, keeping both CURRENT rows. `make test-config` after the fix: 497 passed. Re-review of `f794f24` found the `TestPatch` validator compared the patch with the last run entry, so a budget-refused `not_run` after a successful run invalidated the patch; it now compares with the last executed run, with a regression that fails without the fix.
 
+Codex review of `0669f59` raised three findings, all reproduced and fixed with regressions that fail on the old source: authoring input now checks every plan excerpt against the supplied inventory, so a plan made over another revision of same-named files is refused; planned and patch node ids share the runner's 128-character bound (`MAX_TEST_ID`); and security assertion lines count only checks the test body itself runs (not nested functions, classes or lambdas) and only `pytest.raises` bound by a module-level pytest import. `make test-config`: 502 passed; scripted evals 12/12.
+
 ## Decisions and next action
 
 - The patch is rebuilt from current-run write calls, so deps stay immutable and durable-safe.

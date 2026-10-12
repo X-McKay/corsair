@@ -21,20 +21,51 @@ def _function(tree: ast.Module, test_id: str) -> ast.FunctionDef | ast.AsyncFunc
     raise ValueError(f"{test_id} names no test function")
 
 
+def _executable(function: ast.FunctionDef | ast.AsyncFunctionDef) -> list[ast.AST]:
+    """Nodes the test body itself runs; nested functions, classes and lambdas run only if called."""
+    deferred = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
+    nodes: list[ast.AST] = []
+    pending: list[ast.AST] = [node for node in function.body if not isinstance(node, deferred)]
+    while pending:
+        node = pending.pop()
+        nodes.append(node)
+        pending.extend(child for child in ast.iter_child_nodes(node) if not isinstance(child, deferred))
+    return nodes
+
+
+def _pytest_raises(tree: ast.Module) -> tuple[set[str], set[str]]:
+    """Module-level bindings of pytest and of pytest.raises."""
+    modules, names = set(), set()
+    for node in tree.body:
+        if isinstance(node, ast.Import):
+            modules |= {alias.asname or alias.name for alias in node.names if alias.name == "pytest"}
+        elif isinstance(node, ast.ImportFrom) and node.module == "pytest" and not node.level:
+            names |= {alias.asname or alias.name for alias in node.names if alias.name == "raises"}
+    return modules, names
+
+
+def _checks(tree: ast.Module, function: ast.FunctionDef | ast.AsyncFunctionDef) -> set[int]:
+    modules, names = _pytest_raises(tree)
+
+    def raises(call: ast.expr) -> bool:
+        if not isinstance(call, ast.Call):
+            return False
+        func = call.func
+        return (isinstance(func, ast.Attribute) and func.attr == "raises" and isinstance(func.value, ast.Name)
+                and func.value.id in modules) or (isinstance(func, ast.Name) and func.id in names)
+
+    return {node.lineno for node in _executable(function)
+            if isinstance(node, ast.Assert) or (isinstance(node, (ast.With, ast.AsyncWith))
+                                                and any(raises(item.context_expr) for item in node.items))}
+
+
 def assertion_lines(content: str, test_id: str) -> tuple[int, ...]:
-    """Lines where the named test can fail on its own check: assert statements and pytest.raises blocks."""
+    """Lines where the named test can fail on its own check: assert statements and pytest.raises blocks it runs."""
     try:
         tree = ast.parse(content)
     except SyntaxError as exc:
         raise ValueError(f"test file does not parse: {exc.msg} at line {exc.lineno}") from exc
-    lines = set()
-    for node in ast.walk(_function(tree, test_id)):
-        if isinstance(node, ast.Assert):
-            lines.add(node.lineno)
-        elif isinstance(node, (ast.With, ast.AsyncWith)) and any(
-                isinstance(item.context_expr, ast.Call) and _name(item.context_expr.func) == "raises"
-                for item in node.items):
-            lines.add(node.lineno)
+    lines = _checks(tree, _function(tree, test_id))
     if not lines:
         raise ValueError(f"{test_id} has no assertion")
     return tuple(sorted(lines))
@@ -68,8 +99,5 @@ def static_checks(content: str, test_id: str, target_symbol: str) -> dict[str, b
             isinstance(n, ast.ExceptHandler) and (n.type is None or _name(n.type) in {"Exception", "BaseException"})
             for n in nodes),
         "no_constant_assert": not any(isinstance(n, ast.Assert) and isinstance(n.test, ast.Constant) for n in nodes),
-        "has_assertion": any(isinstance(n, ast.Assert) for n in body) or any(
-            isinstance(n, (ast.With, ast.AsyncWith)) and any(
-                isinstance(i.context_expr, ast.Call) and _name(i.context_expr.func) == "raises" for i in n.items)
-            for n in body),
+        "has_assertion": bool(_checks(tree, function)),
     }

@@ -6,7 +6,7 @@ from uuid import UUID, uuid5
 from corsair.ports.artifacts import ArtifactStore
 from corsair.ports.execution import ExecutionReceipt, SandboxExecution
 from corsair.ports.sandbox import SandboxHandle
-from corsair.ports.test_runner import (TEST_ID, ApprovedPatch, Discovery, Execution, NativeTestRun,
+from corsair.ports.test_runner import (MAX_TEST_ID, TEST_ID, ApprovedPatch, Discovery, Execution, NativeTestRun,
                                        PreparedWorkspace, TestWorkspace)
 from corsair.reports.junit import MAX_JUNIT_BYTES, JUnitError, parse_junit
 from corsair.reports.test_observations import AdmittedTestClaims, TestClaim, WorkloadTestReport
@@ -79,7 +79,7 @@ class PytestRunner:
             raise ValueError('Operator operation and approved patch required')
         ids = (control_test_id, security_test_id)
         paths = {item.path for item in patch.files}
-        if (any(type(i) is not str or not TEST_ID.fullmatch(i) or len(i) > 128 or i[0] == '-'
+        if (any(type(i) is not str or not TEST_ID.fullmatch(i) or len(i) > MAX_TEST_ID or i[0] == '-'
                 or i.split('::')[0] not in paths for i in ids) or len(set(ids)) != 2):
             raise ValueError('Two distinct plain node ids inside the patch are required')
         if any(path[0] == '-' for path in paths) or self._config.junit_path in paths:

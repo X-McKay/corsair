@@ -185,7 +185,10 @@ def test_input_refuses_unapproved_or_mismatched_plans():
     for change in (lambda d: d["plan"]["security"].update(test_path="tests/elsewhere.py"),
                    lambda d: d["environment"].update(discovery_command=["pytest"]),
                    lambda d: d["environment"].update(approved_test_paths=["test_documents.py", "documents.py"]),
-                   lambda d: d["plan"]["security"].update(test_id="test_other.py::test_x")):
+                   lambda d: d["plan"]["security"].update(test_id="test_other.py::test_x"),
+                   lambda d: d["plan"]["security"].update(test_id="test_documents.py::test_" + "x" * 120),
+                   lambda d: d["plan"]["citations"][0].update(quote=d["plan"]["citations"][0]["quote"] + " "),
+                   lambda d: d["source_files"][0].update(content="# another revision\n" + d["source_files"][0]["content"])):
         altered = TestAuthoringInput.model_validate(data).model_dump()
         change(altered)
         with pytest.raises(ValidationError):
@@ -210,6 +213,25 @@ def test_assertion_lines_belong_to_the_named_function():
         assertion_lines("def test_x(:\n", "t.py::test_x")
     with pytest.raises(ValueError):
         assertion_lines("def test_x():\n    pass\n", "t.py::test_x")
+
+
+@pytest.mark.parametrize("body", [
+    "def test_x():\n    def unused():\n        assert False\n",
+    "def test_x():\n    check = lambda: [x for x in ()]\n    class Helper:\n        def m(self):\n            assert False\n",
+    "def test_x(obj):\n    with obj.raises(ValueError):\n        pass\n",
+    "def raises(e):\n    return open(__file__)\n\ndef test_x():\n    with raises(ValueError):\n        pass\n",
+])
+def test_unexecuted_or_non_pytest_checks_are_not_assertions(body):
+    with pytest.raises(ValueError):
+        assertion_lines(body, "t.py::test_x")
+    assert not static_checks(body, "t.py::test_x", "x")["has_assertion"]
+
+
+def test_pytest_raises_bindings_are_assertions():
+    assert assertion_lines("import pytest as p\n\ndef test_x():\n    with p.raises(ValueError):\n        int('a')\n",
+                           "t.py::test_x") == (4,)
+    assert assertion_lines("from pytest import raises\n\ndef test_x():\n    with raises(ValueError):\n        int('a')\n",
+                           "t.py::test_x") == (4,)
 
 
 def test_native_evals_repeat_and_preserve_receipts(tmp_path):
