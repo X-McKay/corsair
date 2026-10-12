@@ -78,8 +78,8 @@ def report(sdk, name, remote, expected, record):
 
 
 def python_offline(sdk, name, remote, record):
-    result = execute(sdk, name, ['/usr/local/bin/python3.12', '-c', 'import sys,pytest; assert sys.version_info[:2]==(3,12); assert pytest.__version__=="9.0.2"; print(sys.version); print(pytest.__version__)'], remote)
-    expect_completed(result, 0, '9.0.2')
+    result = execute(sdk, name, ['/usr/local/bin/python3.12', '-c', 'import sys,pytest; assert sys.version_info[:2]==(3,12); assert pytest.__version__=="9.0.3"; print(sys.version); print(pytest.__version__)'], remote)
+    expect_completed(result, 0, '9.0.3')
     record['versions'] = result.stdout
     result = execute(sdk, name, ['/usr/local/bin/python3.12', '-m', 'pytest', '-q', 'test_native.py', '--junitxml=' + remote + '/passed.xml'], remote)
     expect_completed(result, 0, '1 passed')
