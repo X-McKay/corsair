@@ -8,7 +8,7 @@ import pytest
 from openshell import SandboxClient, TlsConfig
 
 from corsair.adapters.openshell import OpenShellLifecycle
-from corsair.ports.sandbox import LifecycleError
+from corsair.ports.sandbox import LifecycleError, LifecycleLimits
 from tests.qualification.support import ROOT
 from tests.qualification.gateway import gateway
 from tests.qualification.test_policy import require_network
@@ -67,7 +67,7 @@ def test_real_adapter_lifecycle_and_host_receipts(kube,adapter_gateway):
     tls=TlsConfig(ca_path=native['mtls']/'ca.crt',cert_path=native['mtls']/'tls.crt',key_path=native['mtls']/'tls.key')
     with SandboxClient(native['endpoint'],tls=tls,timeout=60) as client:
         observed=ObservedClient(SdkReceipts(client,kube.evidence))
-        with OpenShellLifecycle(observed,spec=recovery_spec(image_receipt('python')['image'],'512Mi'),workspace='default',owner=uuid4(),receipts=receipts) as adapter:
+        with OpenShellLifecycle(observed,spec=recovery_spec(image_receipt('python')['image'],'512Mi'),workspace='default',owner=uuid4(),receipts=receipts,limits=LifecycleLimits(ready_seconds=300, delete_seconds=60)) as adapter:
             driver=AdapterHarness(adapter,observed)
             try:
                 for index in range(3):

@@ -17,6 +17,7 @@ from openshell import SandboxClient, TlsConfig
 
 from corsair.adapters.local_artifacts import ArtifactStorageError, LocalArtifacts
 from corsair.adapters.openshell import OpenShellLifecycle
+from corsair.ports.sandbox import LifecycleLimits
 from corsair.adapters.openshell_execution import OpenShellConnection, OpenShellExecution
 from corsair.ports.execution import ExecutionError, ExecutionLimits
 from tests.qualification.test_adapter_lifecycle import ObservedClient, AdapterHarness, adapter_gateway
@@ -76,7 +77,7 @@ def test_completed_native_output_is_immutable_after_sandbox_cleanup(kube, adapte
     try:
         with SandboxClient(native['endpoint'], tls=tls, timeout=60) as client:
             observed = ObservedClient(SdkReceipts(client, kube.evidence))
-            with OpenShellLifecycle(observed, spec=recovery_spec(image_receipt('python')['image'], '512Mi'), workspace='default', owner=owner, receipts=receipts) as lifecycle, OpenShellExecution(connection, workspace='default', owner=owner, workdir='/tmp', limits=limits, receipts=receipts) as adapter, LocalArtifacts(objects, max_bytes=4096) as store:
+            with OpenShellLifecycle(observed, spec=recovery_spec(image_receipt('python')['image'], '512Mi'), workspace='default', owner=owner, receipts=receipts, limits=LifecycleLimits(ready_seconds=300, delete_seconds=60)) as lifecycle, OpenShellExecution(connection, workspace='default', owner=owner, workdir='/tmp', limits=limits, receipts=receipts) as adapter, LocalArtifacts(objects, max_bytes=4096) as store:
                 driver = AdapterHarness(lifecycle, observed); driver.creation = uuid4()
                 with owned(kube, native, driver, summary['sandbox'], '512Mi', name='cs-'+driver.creation.hex[:16]):
                     operation = uuid4(); summary['execution_operation'] = str(operation)

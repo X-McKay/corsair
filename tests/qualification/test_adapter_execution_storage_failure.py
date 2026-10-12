@@ -20,6 +20,7 @@ import pytest
 from openshell import SandboxClient, TlsConfig
 
 from corsair.adapters.openshell import OpenShellLifecycle
+from corsair.ports.sandbox import LifecycleLimits
 from corsair.adapters.openshell_execution import OpenShellConnection, OpenShellExecution, serialized
 from corsair.ports.execution import ExecutionError, ExecutionLimits
 from tests.qualification.test_adapter_lifecycle import AdapterHarness, ObservedClient, adapter_gateway
@@ -184,7 +185,7 @@ def test_actual_worker_loss_storage_refusal_and_original_cleanup(kube, adapter_g
         with SandboxClient(native['endpoint'], tls=tls, timeout=60) as client:
             observed = ObservedClient(SdkReceipts(client, kube.evidence))
             with OpenShellLifecycle(observed, spec=recovery_spec(image_receipt('python')['image'], '512Mi'),
-                                   workspace='default', owner=owner, receipts=lifecycle_receipts) as lifecycle:
+                                   workspace='default', owner=owner, receipts=lifecycle_receipts, limits=LifecycleLimits(ready_seconds=300, delete_seconds=60)) as lifecycle:
                 driver = AdapterHarness(lifecycle, observed)
                 for mode in ('worker-loss', 'result-storage-refusal'):
                     record = {'mode': mode}; summary['sandboxes'].append(record)

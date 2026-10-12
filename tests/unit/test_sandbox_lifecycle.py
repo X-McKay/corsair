@@ -4,18 +4,38 @@ import json
 from pathlib import Path
 from uuid import uuid4
 
+from google.rpc import error_details_pb2, status_pb2
 import grpc
 import pytest
-from openshell import SandboxRef, SandboxStatusRef, DeletionOutcome, DeletionResult
+from openshell import SandboxRef, SandboxStatusRef, DeletionOutcome, DeletionResult, SandboxError
 from openshell._proto import openshell_pb2
+from openshell.errors import GatewayError
 
 from corsair.adapters.openshell import OpenShellLifecycle
-from corsair.ports.sandbox import LifecycleError
+from corsair.ports.sandbox import LifecycleError, LifecycleLimits
+
+LIMITS = LifecycleLimits(ready_seconds=17, delete_seconds=11)
+NEVER = openshell_pb2.SANDBOX_RESTART_POLICY_NEVER
 
 
 class NotFound(grpc.RpcError):
     def code(self): return grpc.StatusCode.NOT_FOUND
     def details(self): return 'absent'
+
+
+def gateway_error(message):
+    """Real SDK GatewayError decoded from a synthetic rich status; no gateway."""
+    status = status_pb2.Status(code=grpc.StatusCode.UNAVAILABLE.value[0], message=message)
+    status.details.add().Pack(error_details_pb2.ErrorInfo(reason='REQUEST_OUTCOME_UNCERTAIN', domain='openshell.fixture'))
+    retry = error_details_pb2.RetryInfo(); retry.retry_delay.seconds = 2; retry.retry_delay.nanos = 500_000_000
+    status.details.add().Pack(retry)
+    status.details.add().Pack(error_details_pb2.BadRequest(field_violations=[
+        error_details_pb2.BadRequest.FieldViolation(field='spec.name', description='fixture violation')]))
+    class Raw(grpc.RpcError):
+        def code(self): return grpc.StatusCode.UNAVAILABLE
+        def details(self): return message
+        def trailing_metadata(self): return (('grpc-status-details-bin', status.SerializeToString()),)
+    return GatewayError(Raw(message))
 
 
 class Native:
@@ -47,23 +67,25 @@ class Native:
 def setup(tmp_path):
     tmp_path.chmod(0o700)
     native=Native()
-    spec=openshell_pb2.SandboxSpec(template=openshell_pb2.SandboxTemplate(image='fixture@sha256:'+'a'*64))
-    with OpenShellLifecycle(native,spec=spec,workspace='default',owner=uuid4(),receipts=tmp_path) as adapter:
+    spec=openshell_pb2.SandboxSpec(template=openshell_pb2.SandboxTemplate(image='fixture@sha256:'+'a'*64),restart_policy=NEVER)
+    with OpenShellLifecycle(native,spec=spec,workspace='default',owner=uuid4(),receipts=tmp_path,limits=LIMITS) as adapter:
         yield native,adapter,tmp_path
 
 
-def test_lifecycle_receipts_and_native_defaults(setup):
+def test_lifecycle_receipts_and_explicit_native_budgets(setup):
     native,adapter,path=setup
     creation,ready,deletion=uuid4(),uuid4(),uuid4()
     handle=adapter.create(creation);adapter.wait_ready(handle,ready);adapter.delete(handle,deletion)
     receipts=[json.loads((path/f'{op}.result.json').read_text()) for op in (creation,ready,deletion)]
     assert all(r['outcome']=='completed' and r['delivery']=='acknowledged' for r in receipts)
     assert receipts[-1]['cleanup']=='confirmed' and receipts[-1]['handle']['id']==handle.id
-    assert all('timeout_seconds' not in kw for method,kw in native.calls if method=='wait_ready')
-    assert next(kw for method,kw in native.calls if method=='wait_deleted')['expected_sandbox_id']==handle.id
+    assert [kw['timeout_seconds'] for method,kw in native.calls if method=='wait_ready']==[17]
+    deleted=next(kw for method,kw in native.calls if method=='wait_deleted')
+    assert deleted['expected_sandbox_id']==handle.id and deleted['timeout_seconds']==11
     assert all(p.stat().st_mode & 0o777 == 0o600 for p in path.iterdir())
     intent=json.loads((path/f'{creation}.intent.json').read_text())
     assert intent['requested_name']==handle.name and intent['spec_sha256']
+    assert intent['limits']=={'ready_seconds':17,'delete_seconds':11}
 
 
 def test_completed_never_authorizes_readiness(setup):
@@ -143,17 +165,64 @@ def test_wait_deleted_replacement_is_not_confirmed(setup,monkeypatch):
 def test_protected_host_directory_and_immutable_spec(setup, tmp_path):
     native,adapter,path=setup
     adapter.create(uuid4())
-    spec=openshell_pb2.SandboxSpec(template=openshell_pb2.SandboxTemplate(image='mutable:tag'))
-    with pytest.raises(ValueError): OpenShellLifecycle(native,spec=spec,workspace='default',owner=uuid4(),receipts=path)
+    spec=openshell_pb2.SandboxSpec(template=openshell_pb2.SandboxTemplate(image='mutable:tag'),restart_policy=NEVER)
+    with pytest.raises(ValueError,match='immutable digest'): OpenShellLifecycle(native,spec=spec,workspace='default',owner=uuid4(),receipts=path,limits=LIMITS)
     spec.template.image='fixed@sha256:'+'a'*64
+    for policy in ('SANDBOX_RESTART_POLICY_UNSPECIFIED','SANDBOX_RESTART_POLICY_ON_FAILURE','SANDBOX_RESTART_POLICY_ALWAYS'):
+        spec.restart_policy=openshell_pb2.SandboxRestartPolicy.Value(policy)
+        with pytest.raises(ValueError,match='restart policy'): OpenShellLifecycle(native,spec=spec,workspace='default',owner=uuid4(),receipts=path,limits=LIMITS)
+    spec.restart_policy=NEVER
+    with pytest.raises(ValueError,match='lifecycle limits'): OpenShellLifecycle(native,spec=spec,workspace='default',owner=uuid4(),receipts=path,limits={'ready_seconds':17,'delete_seconds':11})
     path.chmod(0o755)
-    with pytest.raises(ValueError): OpenShellLifecycle(native,spec=spec,workspace='default',owner=uuid4(),receipts=path)
+    with pytest.raises(ValueError): OpenShellLifecycle(native,spec=spec,workspace='default',owner=uuid4(),receipts=path,limits=LIMITS)
 
 
 def test_operator_spec_is_snapshotted(tmp_path):
     tmp_path.chmod(0o700);native=Native()
-    spec=openshell_pb2.SandboxSpec(template=openshell_pb2.SandboxTemplate(image='fixed@sha256:'+'b'*64))
-    with OpenShellLifecycle(native,spec=spec,workspace='default',owner=uuid4(),receipts=tmp_path) as adapter:
+    spec=openshell_pb2.SandboxSpec(template=openshell_pb2.SandboxTemplate(image='fixed@sha256:'+'b'*64),restart_policy=NEVER)
+    with OpenShellLifecycle(native,spec=spec,workspace='default',owner=uuid4(),receipts=tmp_path,limits=LIMITS) as adapter:
         spec.template.image='operator-mutated:tag'
         adapter.create(uuid4())
         assert native.calls[0][1]['spec'].template.image=='fixed@sha256:'+'b'*64
+
+
+@pytest.mark.parametrize('limits',[(0,60),(300,0),(601,60),(300,601),(300.0,60),(True,60),('300',60)])
+def test_lifecycle_limits_are_bounded_integer_operator_budgets(limits):
+    with pytest.raises(ValueError): LifecycleLimits(*limits)
+
+
+def test_sdk_empty_id_refusal_is_recorded_as_unknown_delivery(setup):
+    native,adapter,path=setup;op=uuid4()
+    native.create_error=SandboxError('CreateSandbox returned empty sandbox id')
+    with pytest.raises(LifecycleError) as e: adapter.create(op)
+    assert (e.value.receipt.delivery,e.value.receipt.outcome,e.value.receipt.handle)==('unknown','unknown',None)
+    assert e.value.receipt.error_type=='SandboxError' and e.value.receipt.native_code is None
+    assert json.loads((path/f'{op}.result.json').read_text())['delivery']=='unknown'
+    assert sum(method=='create' for method,_ in native.calls)==1
+
+
+@pytest.mark.parametrize('message',['gateway said: retry later','completely different wording'])
+def test_gateway_details_are_typed_and_independent_of_message_text(setup,message):
+    native,adapter,path=setup;op=uuid4()
+    native.create_error=gateway_error(message)
+    with pytest.raises(LifecycleError) as e: adapter.create(op)
+    receipt=e.value.receipt
+    assert e.value.__cause__ is native.create_error and receipt.error_detail==message
+    assert (receipt.delivery,receipt.outcome,receipt.native_code)==('unknown','unknown','UNAVAILABLE')
+    assert (receipt.native_reason,receipt.native_domain,receipt.native_retry_delay)==('REQUEST_OUTCOME_UNCERTAIN','openshell.fixture',2.5)
+    assert receipt.native_field_violations==('spec.name: fixture violation',)
+    result=json.loads((path/f'{op}.result.json').read_text())
+    assert (result['native_reason'],result['native_domain'],result['native_retry_delay'])==('REQUEST_OUTCOME_UNCERTAIN','openshell.fixture',2.5)
+    assert result['native_field_violations']==['spec.name: fixture violation']
+    assert json.loads(result['native_status'])['code']==grpc.StatusCode.UNAVAILABLE.value[0]
+    assert sum(method=='create' for method,_ in native.calls)==1
+
+
+def test_plain_rpc_error_without_rich_details_records_code_only(setup):
+    native,adapter,path=setup;handle=adapter.create(uuid4());op=uuid4()
+    native.delete_error=NotFound()
+    with pytest.raises(LifecycleError) as e: adapter.delete(handle,op)
+    receipt=e.value.receipt
+    assert (receipt.native_code,receipt.native_status,receipt.native_reason,receipt.native_domain,receipt.native_retry_delay)==('NOT_FOUND',None,None,None,None)
+    assert receipt.native_field_violations==() and receipt.outcome=='unknown' and receipt.cleanup=='unconfirmed'
+    assert json.loads((path/f'{op}.result.json').read_text())['native_reason'] is None

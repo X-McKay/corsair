@@ -11,6 +11,7 @@ from openshell import SandboxClient, TlsConfig
 
 from corsair.adapters.local_artifacts import LocalArtifacts
 from corsair.adapters.openshell import OpenShellLifecycle
+from corsair.ports.sandbox import LifecycleLimits
 from corsair.adapters.openshell_execution import OpenShellConnection, OpenShellExecution, serialized
 from corsair.ports.artifacts import ArtifactRef
 from corsair.ports.execution import ExecutionLimits
@@ -39,7 +40,7 @@ def test_native_fixed_report_claims(kube, adapter_gateway):
         with SandboxClient(native['endpoint'], tls=tls, timeout=60) as client, LocalArtifacts(objects, max_bytes=4096) as store:
             source, tests = store.put(b'inert source identity fixture'), store.put(b'inert two-test identity fixture')
             observed = ObservedClient(SdkReceipts(client, kube.evidence))
-            with OpenShellLifecycle(observed, spec=recovery_spec(image_receipt('python')['image'], '512Mi'), workspace='default', owner=owner, receipts=receipts) as lifecycle, OpenShellExecution(connection, workspace='default', owner=owner, workdir='/tmp', limits=limits, receipts=receipts) as execution:
+            with OpenShellLifecycle(observed, spec=recovery_spec(image_receipt('python')['image'], '512Mi'), workspace='default', owner=owner, receipts=receipts, limits=LifecycleLimits(ready_seconds=300, delete_seconds=60)) as lifecycle, OpenShellExecution(connection, workspace='default', owner=owner, workdir='/tmp', limits=limits, receipts=receipts) as execution:
                 driver = AdapterHarness(lifecycle, observed); driver.creation = uuid4()
                 with owned(kube, native, driver, summary['sandbox'], '512Mi', name='cs-'+driver.creation.hex[:16]):
                     for exit_code, security in ((0, 'passed'), (1, 'failed')):
