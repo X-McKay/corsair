@@ -10,7 +10,7 @@ Deliverables are an example input, environment recipe, two-test specification, e
 
 ## Milestone 1 OpenShell in kind
 
-Status: bounded native 1A–1F qualified on the selected single-node Linux amd64 tuple; [the closure report](qualification/openshell-recovery.md) records the two final recovery matrices, failures and immutable cleanup. Startup-latency [ISSUE-0004](development/issues/ISSUE-0004-native-admission-readiness.md) remains an observation; exceeding the original local 120-second wait is not proof of an upstream defect. Future sandbox-readiness calls use the pinned API default 300s; the corrected harness has no fresh live baseline. Historical qualification retains its original source/budget. Production reliability and subsequent milestones remain unqualified; each fresh runtime must pass its mandatory native gates.
+Status: bounded native 1A–1F qualified on the selected single-node Linux amd64 tuple; [the closure report](qualification/openshell-recovery.md) records the two final recovery matrices, failures and immutable cleanup. Startup-latency [ISSUE-0004](development/issues/ISSUE-0004-native-admission-readiness.md) is resolved as a bounded measured observation; exceeding the original local 120-second wait is not proof of an upstream defect. Future sandbox-readiness calls use the pinned API default 300s; a separate [six-sample native baseline](qualification/openshell-readiness.md) passed with full cleanup. The complete corrected1F interruption matrix subsequently passed on two further fresh admitted nodes with strong raw evidence and original cluster cleanup. Historical qualification retains its original source/budget. Production reliability and subsequent milestones remain unqualified; each fresh runtime must pass its mandatory native gates.
 
 The [detailed OpenShell milestone](openshell-milestone.md) specifies the proposed files, topology, progressive test slices, native SDK/CLI paths, evidence, and handoff to the application adapter.
 
@@ -22,11 +22,17 @@ Deliver a minimal repeatable setup and qualification command, evidence report, v
 
 ## Milestone 2 Sandbox and artifact adapters
 
+Status: the first [create/readiness/delete and host receipt slice](qualification/openshell-adapter-lifecycle.md) is qualified on two fresh admitted nodes. The [bounded execution/output/failure slice](qualification/openshell-adapter-execution.md) also passed three cycles on each of two new admitted nodes with complete cleanup and 123 offline checks. Its supported SDK worker requires the qualified Linux/glibc 2.39 single-CPU/two-arena profile under unchanged hard limits. The independent [local immutable artifact/source slice](qualification/local-source-artifacts.md) passed two actual-host matrices and148 offline checks. The full milestone is incomplete: native transfers are blocked on [retry/resource admission](development/issues/ISSUE-0006-native-transfer-retry-admission.md), and broader source/workload-file integration plus controller/storage-durability, cancellation and transport coverage remain. Bounded completed stdout/stderr-to-artifact composition, actual original SDK-worker loss and result-receipt EACCES now passed on two further fresh admitted nodes under the same profile, with full original cleanup; these narrow cases do not admit broader recovery or file extraction. Native deletion lacks an atomic expected-ID condition, so the current slice requires an operator-exclusive workspace and nonreused names.
+
+The fixed [captured-source arrival composition](qualification/openshell-source-upload.md) also passed on two fresh admitted nodes, with exact manifest/blob/inventory admission and full cleanup. Arrival is pre-execution preparation. The fixed [captured staging-source execution/output composition](qualification/openshell-source-execution.md) subsequently passed on two fresh admitted nodes under the existing immutable-input/integrity contract; its approved test-patch set is empty and dependencies are stdlib only. The separate [original-forward transport-loss case](qualification/openshell-execution-transport.md) also passed twice, preserving unknown execution without replay and original cleanup. Nonempty approved patches, issue discovery/assertions, arbitrary recipes, untrusted downloads and broader recovery remain unqualified. No general materializer/transfer API follows from these cases.
+
 Implement only the required port methods using SDKs/standard storage operations. Exercise create, transfers, exec, event collection, destroy, output bounds, timeout, interrupted transport, and unknown delivery. Capture immutable source snapshots without running hooks; validate file types, path confinement, and digest identity.
 
 Acceptance: real adapter contract tests pass, completed/unknown commands are distinguishable, artifacts survive worker restart, and untrusted workloads cannot alter authoritative records. Fixture adapters are explicit alternatives for tests.
 
 ## Milestone 3 Temporal foundation
+
+Status: the [independent native fixture slice](qualification/temporal-fixture-foundation.md) passed parent/child, retry/failure, waiting-child cancellation, graceful worker replacement, same-SQLite service restart and actual history replay. Production durability, mid-activity failures, tracing and agent/OpenShell integration remain unqualified; this does not complete Milestone 3.
 
 Provision persistent local Temporal, then use deterministic fixture stages to demonstrate parent/child workflow execution, activity failure, restart, cancellation, replay compatibility, and supported tracing. No live model is needed.
 
@@ -39,6 +45,8 @@ Run manually supplied environment recipes, plans, and test patches through fresh
 Acceptance: controls pass both revisions; security assertions distinguish the pair; wrong assertions, skipped tests, changed source, stale results, sandbox interference, dependency failures, and unknown execution cannot verify a fix. A saved case can rerun without an agent.
 
 ## Milestone 5 Model adapters and agent template
+
+Status: the [read-only issue-analysis template](qualification/issue-analysis-fixture.md) implements explicit saved-source authority, native contracts/limits/instrumentation and deterministic local Evals. Real provider compatibility/usage, semantic reasoning and direct/durable composition remain unqualified.
 
 Use native PydanticAI local endpoint and Bedrock integrations. Establish TestModel/FunctionModel, native overrides, instrumented factory, output schema, tool authority, usage limits, and one isolated evaluation entry point.
 

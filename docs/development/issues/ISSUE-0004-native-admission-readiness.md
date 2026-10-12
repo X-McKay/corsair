@@ -1,13 +1,13 @@
 ---
 id: ISSUE-0004
 kind: issue
-title: Native sandbox startup latency is uncharacterized
-status: open
+title: Native sandbox startup latency observation
+status: resolved
 updated: 2026-10-11
-related: [SPEC-0008, PLAN-0009, ISSUE-0003]
+related: [SPEC-0008, PLAN-0009, ISSUE-0003, PLAN-0010]
 ---
 
-# Native sandbox startup latency is uncharacterized
+# Native sandbox startup latency observation
 
 ## Observed and expected behavior
 
@@ -25,6 +25,8 @@ Run 009 logs show supervision starting without an observed gateway policy-fetch 
 
 ## Resolution criteria and next action
 
-The earlier resolution criteria treated the harness deadline as a mandatory runtime criterion and demanded a supported repair. That interpretation is withdrawn. The four explicit 120-second SandboxClient.wait_ready overrides now use the pinned API's 300-second default. Original run results are never relabeled, and there is no claim that the failed attempts would have passed at 300 seconds. The corrected harness has not been live requalified. The known functional qualification remains attributable to source 4aacc8a and its original 120-second budget.
+The earlier resolution criteria treated the harness deadline as a mandatory runtime criterion and demanded a supported repair. That interpretation is withdrawn. The four explicit 120-second SandboxClient.wait_ready overrides now use the pinned API's 300-second default. Original run results are never relabeled, and there is no claim that the failed attempts would have passed at 300 seconds. The complete corrected 1F interruption matrix has not been rerun; the separately recorded native readiness sample passed. The known functional qualification remains attributable to source 4aacc8a and its original 120-second budget.
 
-This record stays open as a startup-latency observation, rather than a demonstrated upstream defect or an automatic Milestone 2 blocker. Next: collect a bounded fresh-native readiness sample using the actual API default, retaining timings, native state and original-ID cleanup for every attempt. Define an operational startup SLO only if a product requirement needs one. Close the observation when its characterization and operational decision are documented; do not infer fleet reliability from a small sample. If actual native Ready is not reached within the supported bounded wait, keep that attempt failed and investigate before using that runtime. Planning the next component can proceed; speculative host/CNI patches, automatic repair and unknown-command replay remain excluded.
+Resolved after the authorized [bounded readiness sample](../../qualification/openshell-readiness.md): three actual native-default waits on each of two fresh admitted nodes, with original-resource and full private/cluster cleanup. Waits 142.237/9.015/8.014s and 8.014/8.015/9.017s characterize only this fixture. No cause, fleet guarantee or upstream defect/repair is established. Original failed 120s attempts retain unknown eventual readiness and their original results. Full corrected 1F interruption matrix remains unrerun; this sample does not relabel historical qualification.
+
+Operational decision: retain the pinned 300s native default, require actual Ready and mandatory security controls for each runtime, retain and investigate future timeouts before workload use, and create a product SLO only when a product requirement needs one. These measurements and decision satisfy this observation’s resolution criteria. This closes the repository observation, not an external issue or production reliability claim. Automatic repairs, policy weakening and blind replay remain excluded.
