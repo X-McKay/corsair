@@ -18,7 +18,7 @@ The bootstrap, trusted ordinary-pod fixtures, and independent ingress/egress tes
 | Calico | v3.33.0 official manifest checksum verified; all deployed images digest-pinned |
 | Fixtures | HashiCorp http-echo 1.0.0 and curlimages/curl 8.14.1 selected by immutable digest |
 | Topology | One local control-plane node; no multi-node claim |
-| OpenShell / Agent Sandbox | Not selected, installed or admitted |
+| OpenShell / Agent Sandbox | Not selected/installed/admitted during this ordinary-pod qualification; later bounded admission is recorded [separately](openshell-admission.md) |
 
 Exact tool URLs, SHA-256 checksums and OCI digests live in [runtime-lock.yaml](../../deploy/runtime-lock.yaml). The capacity and kernel hints above are observations, not evidence that later OpenShell Landlock/seccomp/task-memory checks will pass.
 
@@ -71,9 +71,9 @@ The earlier managed environment remains unsupported: Docker 28.4.0, kernel 6.18.
 
 ## Next acceptance gate
 
-Select mutually compatible immutable Agent Sandbox, OpenShell, Helm and workload artifacts from primary sources. Then implement the remaining bounded 1A slice: supported installation prerequisites, storage/PVC behavior, and actual production-topology kernel/runtime admission for Landlock, seccomp notification/addfd, task-memory access and listener mode. A version string, chart render or installed resource cannot pass that gate.
+The remaining 1A Agent Sandbox installation, local-path PVC persistence and native OpenShell kernel primitive admission have since passed on two fresh clusters with confirmed cleanup; see the [separate reviewed admission record](openshell-admission.md), [PLAN-0003](../development/plans/PLAN-0003-openshell-admission.md) and [runbook](../runbooks/openshell-admission.md). This does not broaden the ordinary-pod report's own coverage. The historical raw evidence referenced above is absent in the continuation checkout; that session verified the published revision/report and matching source, without claiming a raw-log re-audit.
 
-Only after mandatory 1A admission succeeds should work proceed to gateway/identity, lifecycle, policy, toolchain and recovery slices in the [OpenShell milestone](../openshell-milestone.md). Do not start application adapters, agents or Temporal integration first.
+The next bounded slice is 1B gateway/identity with the selected immutable artifacts, native chart preflight, verified TLS/local isolation and actual generated identities/mounts. Lifecycle, policy, toolchain and recovery follow separately in the [OpenShell milestone](../openshell-milestone.md). Application adapters, PydanticAI agents and Temporal remain later work.
 
 ## Primary sources
 

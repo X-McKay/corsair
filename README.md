@@ -2,9 +2,9 @@
 
 Corsair is a planned system for validating a reported security issue against an exact repository revision and, when available, a proposed fix. It produces reproducible tests and evidence for InfoSec review. Implementation proceeds through independently qualified components before the complete agent graph is connected.
 
-Status: the first local platform qualification slice is implemented and passed on two clean kind/Calico clusters on the qualified Linux amd64 host. Ten offline guard checks also pass. OpenShell and agents are not yet implemented or qualified. See the [qualification record](docs/qualification/network-platform.md).
+Status: the ordinary-pod kind/Calico boundary and the remaining 1A Agent Sandbox installation/storage/native OpenShell kernel admission slice each passed on two clean clusters on the qualified Linux amd64 host. Fourteen offline guards pass. See the [network record](docs/qualification/network-platform.md) and [admission record](docs/qualification/openshell-admission.md). Gateway identity, full sandbox lifecycle and agents remain unqualified.
 
-The next implementation milestone is [OpenShell qualification in kind](docs/implementation-plan.md#milestone-1-openshell-in-kind), using trusted fixtures to establish execution, policy enforcement, diagnostics, and cleanup before agent integration.
+The next bounded slice is 1B gateway/identity within [OpenShell qualification in kind](docs/implementation-plan.md#milestone-1-openshell-in-kind), using native installation, verified TLS and trusted fixtures before lifecycle or agent integration.
 
 ## Development across sessions
 
@@ -23,6 +23,8 @@ make kind-down
 ```
 
 Setup and qualification are separate commands. Failed prerequisites produce errors, and evidence is retained under `.runs/`. Local ownership and kubeconfig state live separately under `.state/`. Both directories are excluded from Git. The [local platform runbook](docs/runbooks/local-platform.md) explains setup, failure diagnosis, and safe cleanup.
+
+The remaining 1A admission commands and limitations are documented in the [admission runbook](docs/runbooks/openshell-admission.md). They install prerequisites and stage the trusted runtime probe without deploying a gateway.
 
 ## Agreed decisions
 

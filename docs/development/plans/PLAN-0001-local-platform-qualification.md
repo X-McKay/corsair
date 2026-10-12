@@ -32,3 +32,5 @@ Baseline implementation commit: `047e0bf5dac888f0bbe64c03e24a3e9e09b66397`. Ten 
 No fake kernel device, policy weakening, unpinned image or undocumented runtime patch was admitted. The failed host and failed archive-import attempt remain part of the evidence history. The native CRI pull change is limited to bootstrap image delivery; the deployed references and qualification assertions remain digest-pinned.
 
 [HANDOFF-0004](../handoffs/HANDOFF-0004-kind-calico-qualified.md) records the qualified result and the next bounded action. Select compatible immutable Agent Sandbox, OpenShell, Helm and workload artifacts before extending 1A to supported installation, storage/PVC behavior and actual kernel/runtime admission. Ordinary-pod CNI qualification does not qualify those later boundaries.
+
+The continuation [PLAN-0003](PLAN-0003-openshell-admission.md) completed that bounded remaining 1A prerequisite/storage/native-kernel slice on two fresh clusters; full OpenShell gateway/lifecycle qualification remains separate.

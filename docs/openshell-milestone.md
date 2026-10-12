@@ -166,7 +166,18 @@ make qualify-network CORSAIR_QUAL_RUN=.runs/local-network-001
 make kind-down
 ```
 
-This qualifies ordinary-pod CNI behavior only after the live tests pass. Storage and actual OpenShell kernel admission remain mandatory later checks within 1A. Illustrative commands for remaining slices, to implement one at a time:
+This qualifies ordinary-pod CNI behavior only after the live tests pass. The remaining 1A prerequisite/storage/native-kernel slice is also implemented and has a separate [qualification report](qualification/openshell-admission.md) and [runbook](runbooks/openshell-admission.md):
+
+```shell
+make admission-artifacts
+make test-config
+make kind-up
+make admission-install
+make qualify-admission CORSAIR_QUAL_RUN=.runs/admission-001
+make kind-down
+```
+
+These commands do not install a gateway or qualify the authenticated boundary service. Illustrative commands for later slices, to implement one at a time:
 
 ```shell
 CORSAIR_QUAL_RUN=.runs/local-001

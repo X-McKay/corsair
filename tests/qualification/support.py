@@ -21,24 +21,43 @@ class Kubectl:
         self.counter = 0
 
     def run(self, *args, check=True, timeout=120):
+        return self.native(self.argv + list(map(str, args)), check=check, timeout=timeout)
+
+    def native(self, argv, check=True, timeout=120):
+        """Retain an operator native-tool receipt, including uncertain delivery."""
         self.counter += 1
-        receipt = {"argv": self.argv + list(map(str, args)), "started_at": datetime.now(timezone.utc).isoformat()}
+        receipt = {"argv": list(map(str, argv)), "started_at": datetime.now(timezone.utc).isoformat()}
         started = time.monotonic()
         try:
             result = subprocess.run(receipt["argv"], capture_output=True, text=True, timeout=timeout)
             receipt.update(exit_code=result.returncode, stdout=result.stdout, stderr=result.stderr)
         except subprocess.TimeoutExpired as error:
             receipt.update(timed_out=True, stdout=(error.stdout or b"").decode(), stderr=(error.stderr or b"").decode())
-            raise RuntimeError("kubectl timed out; remote completion unknown; see command receipt") from error
+            raise RuntimeError("Native command timed out; remote completion unknown; see command receipt") from error
         finally:
             receipt["elapsed_seconds"] = time.monotonic() - started
             (self.evidence / f"command-{self.counter:04d}.json").write_text(json.dumps(receipt, indent=2))
         if check and result.returncode:
-            raise RuntimeError(f"kubectl infrastructure/resource error ({result.returncode}): {result.stderr[-2000:]}")
+            raise RuntimeError(f"Native infrastructure/resource error ({result.returncode}): {result.stderr[-2000:]}")
         return result
 
     def get(self, *args):
         return json.loads(self.run("get", *args, "-o", "json").stdout)
+
+
+def require_owned_cluster(kube):
+    """Compare the dedicated node's Docker identity before operator mutations."""
+    owner = json.loads((ROOT / ".state/kind/owner.json").read_text())
+    found = kube.native(["docker", "--host=unix:///var/run/docker.sock", "inspect", "--format", "{{.Id}}", "corsair-control-plane"])
+    if found.stdout.strip() != owner["container_id"]:
+        raise RuntimeError("Cluster container identity changed; refusing mutations")
+    server = kube.run("config", "view", "--minify", "-o", "jsonpath={.clusters[0].cluster.server}").stdout
+    if not server.startswith("https://127.0.0.1:"):
+        raise RuntimeError("Qualification requires a localhost-bound kind API")
+    nodes = kube.get("nodes")["items"]
+    if len(nodes) != 1 or nodes[0]["metadata"]["name"] != "corsair-control-plane":
+        raise RuntimeError("Unexpected cluster topology; refusing mutations")
+    return nodes[0]
 
 
 def require_platform(kube):
