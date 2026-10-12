@@ -19,10 +19,10 @@ Work began on main `83dec61` on branch `claude/evidence-assessment-checks-e694q5
 
 ## Decisions and next steps
 
-Defaults: a failed control blocks a conclusive finding; `not_reproduced` needs every baseline run safe; fix verification needs every run on both revisions valid and in one environment; unknown-reach test-phase sandbox events are attributed. Open: the typed `ObservationPlan` fields (expected exception, path, function, assertion lines, safe-behavior token) are not in SPEC-0022's free-text plan and need an owner. Next: the report renderer or the native runner adapter that produces `RunEvidence`.
+Defaults: a failed control blocks a conclusive finding; `not_reproduced` needs every baseline run safe; fix verification needs every run on both revisions valid and in one environment; unknown-reach test-phase sandbox events are attributed. The typed `ObservationPlan` sources were later agreed with the planner and authoring threads (SPEC-0027 decisions). Next: the `ObservationPlan` builder once those contracts merge, then the report renderer.
 
 ## Continuation prompt
 
 ```text
-Read AGENTS.md, docs/development/CURRENT.md, SPEC-0027, PLAN-0026 and this handoff. Inspect git/source state and verify recorded facts. Use the Corsair development skill. On RIG0, map the six retained SPEC-0018 runs in .runs/benchmark-admission-20261012/ into RunEvidence and record the gate results in PLAN-0026 without publishing raw evidence. Agree the ObservationPlan source with the SPEC-0022 planner work. Do not connect the gates to an agent before the assessment agent has its own spec. Run make test-config, update records/CURRENT.md and write a new handoff.
+Read AGENTS.md, docs/development/CURRENT.md, SPEC-0027, PLAN-0026 and this handoff. Inspect git/source state and verify recorded facts. Use the Corsair development skill. Once the planner and authoring contracts are on main, add the ObservationPlan builder described in SPEC-0027, then the report renderer. Do not connect the gates to an agent before the assessment agent has its own spec. Run make test-config, update records/CURRENT.md and write a new handoff.
 ```
