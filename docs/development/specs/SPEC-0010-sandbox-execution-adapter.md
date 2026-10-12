@@ -3,7 +3,7 @@ id: SPEC-0010
 kind: spec
 title: Sandbox execution adapter
 status: accepted
-updated: 2026-10-11
+updated: 2026-10-12
 related: [PLAN-0012, SPEC-0009, ISSUE-0005]
 ---
 
@@ -36,3 +36,13 @@ These checks cover bounded synthetic execution output, original SDK-worker loss 
 ## Original transport interruption candidate
 
 One separate qualification case may interrupt the original owned gateway port-forward after independent operation-marker/PID/start-time proof of remote execution. Verify its original Popen identity and exact argv, terminate and reap it through supported process methods, and preserve actual native transport detail with unknown delivery/completion. The candidate requires native UNAVAILABLE: [gRPC Core's status table](https://grpc.github.io/grpc/core/md_doc_statuscodes.html) maps a TCP break after transmitted data to that client status. Other RPC errors, cancellation or host deadlines do not pass this transport-loss oracle. Do not replay execution. Restore only the documented forward on the same endpoint so existing original-ID lifecycle cleanup can proceed; register the new original process with the existing fixture for teardown. Remote observations after reconnect are facts, not cancellation guarantees. Require worker reap, authoritative intent/result attribution and original resource/storage/task/transport/cluster cleanup on two fresh mandatory-admitted nodes. This does not qualify controller crash, storage durability, cancellation or concurrency.
+
+## Fresh-process receipt observation
+
+Extend the existing actual worker-loss/result-EACCES case after each original sandbox/resource cleanup. One isolated stdlib host process independently opens the original mode0700 receipt root and mode0600 regular files using no-follow descriptors, verifies original root/file identities, bounds each receipt read to16384 bytes, and binds the persisted operation/handle. Its inputs are selection and original identities only; no parent in-memory terminal receipt/output is supplied to the reader. The persisted unknown worker-loss control is read from disk; output fields are not interpreted or emitted.
+
+The persisted worker-loss control must retain unknown delivery/completion and confirmed original worker reap. In the actual EACCES case, the new process observes only the original intent and absent authoritative result, so it retains unknown delivery/completion and refuses replay even though the original parent observed native terminal0. The initial intent's not_dispatched value is preparatory state, not proof that execution was never dispatched. Preserve the parent's separate actual native outcome/EACCES evidence, restored original directory, observer/worker cleanup and zero replay.
+
+Require meaningful local fresh-process identity/refusal controls, actual marker discovery, unchanged operator execution budgets, a complete new source/dependency/runtime freeze and two fresh mandatory storage/kernel/CNI/gateway-admitted nodes. This qualifies independent persisted-receipt observation only; no production reader/reconciliation API, controller crash, storage power-loss/durability, cancellation, concurrent tenancy or restart orchestration is admitted.
+
+The 2026-10-12 qualification passed the extended existing case on two distinct fresh mandatory-admitted nodes under unchanged pins, policy, TLS, kernel profile and execution limits. Four isolated readers retained unknown delivery/completion without replay, after original sandbox/task deletion; both original clusters and all original resources/processes were confirmed absent. See the [scoped qualification report](../../qualification/openshell-adapter-execution.md). These observations qualify the frozen qualification helper and existing adapter evidence, not a production recovery service.

@@ -7,7 +7,6 @@ import hashlib
 import json
 from uuid import uuid4
 
-import pytest
 from openshell import SandboxClient, TlsConfig
 
 from corsair.adapters.local_artifacts import LocalArtifacts
@@ -17,13 +16,13 @@ from corsair.ports.artifacts import ArtifactRef
 from corsair.ports.execution import ExecutionLimits
 from corsair.reports.test_observations import consume_test_report
 from tests.qualification.test_adapter_lifecycle import ObservedClient, AdapterHarness, adapter_gateway
+from tests.qualification.gateway import gateway
 from tests.qualification.test_lifecycle import SdkReceipts
 from tests.qualification.test_recovery import owned, recovery_spec, PYTHON
 from tests.qualification.prepare_toolchains import image_receipt
 from tests.qualification.support import ROOT
 
 
-@pytest.mark.execution_artifacts
 def test_native_fixed_report_claims(kube, adapter_gateway):
     native = adapter_gateway
     summary = dict(outcome='failed', scope='fixed report claims only; no actual application tests',
