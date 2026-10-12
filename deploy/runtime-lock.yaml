@@ -1,5 +1,5 @@
 schema_version: 1
-scope: single-node Linux amd64 platform and OpenShell primitive admission; gateway unqualified
+scope: single-node Linux amd64 platform, OpenShell primitive admission and bounded local gateway/identity qualification
 platform: linux-amd64
 kind:
   version: v0.33.0
@@ -42,6 +42,10 @@ agent_sandbox:
 openshell:
   version: v0.1.3
   source_revision: e1f3c82caa3ed3b65de22889ae7ef32a774878ef
+  cli:
+    binary_sha256: 557f8e2af1d91221211bb29cc7152d975084d2a8c9ab8c549d46c4370ccf492e
+    url: https://github.com/NVIDIA/OpenShell/releases/download/v0.1.3/openshell-x86_64-unknown-linux-musl.tar.gz
+    sha256: ed08ea7874c47f22d6e5dcc4b27d9ef1ef5d2060f83035b35ff725d5160830a3
   chart:
     version: 0.1.3
     registry: ghcr.io

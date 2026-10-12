@@ -1,6 +1,6 @@
 # OpenShell qualification in kind
 
-Status: the initial kind/Calico bootstrap and independent network tests are implemented and passed on two clean clusters with confirmed cleanup. See the [platform qualification record](qualification/network-platform.md) and [runbook](runbooks/local-platform.md). Actual storage and OpenShell kernel/runtime admission remain within 1A; later slices below are planned. Source review uses OpenShell v0.1.2 documentation, but compatible immutable release artifacts must be selected and pinned before installation.
+Status: ordinary-pod kind/Calico and remaining 1A storage/native-kernel admission each passed twice with confirmed cleanup. See the [platform record](qualification/network-platform.md) and [admission record](qualification/openshell-admission.md). The focused [1B gateway/identity record](qualification/openshell-gateway.md) tracks the native OpenShell v0.1.3 installation and its separate actual coverage; later slices remain planned.
 
 ## Objective and scope
 
@@ -177,7 +177,7 @@ make qualify-admission CORSAIR_QUAL_RUN=.runs/admission-001
 make kind-down
 ```
 
-These commands do not install a gateway or qualify the authenticated boundary service. Illustrative commands for later slices, to implement one at a time:
+These commands do not install a gateway or qualify the authenticated boundary service. The native gateway/identity commands are documented in the [1B runbook](runbooks/openshell-gateway.md). Illustrative commands for later slices, to implement one at a time:
 
 ```shell
 CORSAIR_QUAL_RUN=.runs/local-001

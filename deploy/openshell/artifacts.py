@@ -93,6 +93,13 @@ def main():
         TOOLS.mkdir(parents=True, exist_ok=True)
         (TOOLS / 'helm').write_bytes(binary)
         (TOOLS / 'helm').chmod(0o755)
+        download(LOCK['openshell']['cli'], CACHE / 'cli.tar.gz')
+        with tarfile.open(CACHE / 'cli.tar.gz') as archive:
+            cli = archive.extractfile('openshell').read()
+        if hashlib.sha256(cli).hexdigest() != LOCK['openshell']['cli']['binary_sha256']:
+            raise RuntimeError('OpenShell CLI binary checksum mismatch')
+        (TOOLS / 'openshell').write_bytes(cli)
+        (TOOLS / 'openshell').chmod(0o755)
         download(LOCK['agent_sandbox'], CACHE / 'sandbox.yaml')
         download(LOCK['storage'], CACHE / 'kind-storage.go')
         # Render kind's own native storage constant, replacing only image pins.
