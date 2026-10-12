@@ -112,7 +112,8 @@ def test_native_provider_uses_explicit_model_endpoint_and_closes_client(monkeypa
 @pytest.mark.parametrize("options", [{"thinking_token_budget": 0}, {"thinking_token_budget": 2049},
                                     {"thinking_token_budget": True},
                                     {"thinking_mode": "disabled", "thinking_token_budget": 768},
-                                    {"response_token_limit": 3000}, {"response_token_limit": 32768}])
+                                    {"response_token_limit": 3000}, {"response_token_limit": 32768},
+                                    {"timeout_seconds": 241}])
 def test_provider_refuses_invalid_or_conflicting_thinking_budget(options):
     with pytest.raises(ValidationError):
         LocalModelConfig(server="vllm", base_url="https://llm.example/v1", model_name="explicit-model", **options)
