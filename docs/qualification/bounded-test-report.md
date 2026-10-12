@@ -1,0 +1,9 @@
+# Bounded test-observation report consumer
+
+[Scope](../development/specs/SPEC-0017-bounded-test-report-consumer.md) and [plan](../development/plans/PLAN-0019-bounded-test-report-consumer.md) define one finite UTF8 JSON consumer. It accepts an operator-selected immutable stdout artifact only when a matching host execution receipt acknowledges terminal completion, worker cleanup and retained receipt storage. Exact bytes, operation, sandbox handle and source/test identities are bound independently of workload claims.
+
+The schema has exactly two named claims, control and security, and no finding/fix disposition. Unknown fields, duplicate JSON keys, unsupported versions, malformed/oversized bytes and identity mismatches are refused. A skipped/failed control remains visible and cannot prove an application fix. Digest agreement establishes byte integrity, not that an untrusted runner performed the test it claims.
+
+Host checks use actual LocalArtifacts with simulated host execution receipts:26 passed in0.32s, including a distinct process rereading persisted original artifact bytes and operator metadata. Initial native-case collection failed because the serialized receipt helper was imported from the wrong module; corrected collection found one case in0.06s. These attempts are retained privately under `.runs/four-priorities-20261012/root`.
+
+The independent live case uses an inert literal JSON producer inside OpenShell, native exits0 and1, existing execution/immutable artifact adapters and this consumer. Two fresh mandatory-admitted nodes and original cleanup are required before its native-composition claim; those live results are currently pending. It runs under the OpenShell lane's exclusive cluster ownership with a separate evidence root from receipt-recovery checks. No application tests, real discovery, agent assessment, security reproduction, fix verification, arbitrary files or archive extraction are admitted by this case.
