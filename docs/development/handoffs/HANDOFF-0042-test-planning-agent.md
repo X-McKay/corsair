@@ -15,7 +15,7 @@ Work began on clean main `83dec61` on branch `claude/test-planning-agent-mpdk0y`
 
 ## Validation and blockers
 
-`make test-config`: 390 passed before the change, 416 after (one existing deprecation warning). Scripted native evals: 12/12 attempts passed every assertion, zero unknown tools. No provider, Temporal or OpenShell check ran. The local-provider smoke is unrun: it needs the local model endpoint, reachable only from RIG0. ISSUE-0007 still blocks end-to-end admission of the identification the planner consumes.
+`make test-config`: 390 passed before the change, 417 after (one existing deprecation warning). Scripted native evals: 12/12 attempts passed every assertion, zero unknown tools. No provider, Temporal or OpenShell check ran. The local-provider smoke is unrun: it needs the local model endpoint, reachable only from RIG0. ISSUE-0007 still blocks end-to-end admission of the identification the planner consumes.
 
 ## Decisions and next steps
 

@@ -23,15 +23,17 @@ Implement [SPEC-0022](../specs/SPEC-0022-test-planning-agent.md), steps 1 and 2 
 
 ## Validation and progress
 
-Base: main `83dec61`. `make test-config` passed 390 before any change, and 416 after (26 new planner checks; one existing event-loop deprecation warning). Scripted native evals: 12/12 attempts (6 cases × 2 repeats) passed every assertion with zero unknown tools, evidence written only to a scratch directory. Each parametrized refusal was checked to fail for its intended reason (extra field, distinct ids, approved path, discovery tokens, minimum citations, current-run read coverage, scope, target call). No provider, Temporal or OpenShell check ran; no live qualification is claimed.
+Base: main `83dec61`. `make test-config` passed 390 before any change, and 417 after (27 new planner checks; one existing event-loop deprecation warning). Scripted native evals: 12/12 attempts (6 cases × 2 repeats) passed every assertion with zero unknown tools, evidence written only to a scratch directory. Each parametrized refusal was checked to fail for its intended reason (extra field, distinct ids, approved path, discovery tokens, minimum citations, current-run read coverage, scope, target call). No provider, Temporal or OpenShell check ran; no live qualification is claimed.
 
 ## Decisions and next action
 
 - The draft discriminated union reaches the native output function as one `plan` argument (PydanticAI wraps a non-model parameter); the model sees `{"plan": {...}}`. Separate output functions were rejected because prompted mode would add a second wrapper.
 - Approved-path and discovery-token checks live in the contract validator and run under native `validation_context` (the run's `TestPlanningInput`); structure and distinct ids are checked without context.
-- `EnvironmentEvidence` adds `observation_facilities` (needed for the spec's unsupported-witness case) and `BaselineTest{test_id, path}`; the baseline file must be in the inventory. The planner uses the windowed reader (tool-computed end), which fixed the identification v2 failure.
+- `EnvironmentEvidence` adds `observation_facilities` (needed for the spec's unsupported-witness case) and `BaselineTest{test_id, path}`; the baseline file must be in the inventory. `observation_facilities` is operator/sandbox configuration, not something the environment agent discovers (PR #27); whoever assembles `EnvironmentEvidence` supplies it from the sandbox profile. The planner uses the windowed reader (tool-computed end), which fixed the identification v2 failure.
 - Evaluation uses a native `cases.yaml` with oracles in metadata (SPEC-0023 convention) instead of the spec's earlier `fixtures/*.json` and `oracles.json` layout.
 - `ReadyTestPlan.security_expectation{failure_type, safe_behavior}` gives the SPEC-0027 disposition gates typed identifiers (pattern `^[A-Za-z0-9_.:-]+$`) instead of prose, as the gates work requested. The security test path and function come from `test_path` and `test_id`; planned assertion lines exist only in the frozen patch, so the authoring output must carry them.
+- Approved test paths may not overlap saved source paths (refused at input construction), as the authoring stage (PR #28) requires. Its stricter pytest node-id shape (`path.py::name`) stays an authoring check, because the planner contract is framework-neutral.
+- The fixture discovery tokens `python -m pytest --collect-only -q` are evaluation data, not a runnable command: real pytest needs operator flags such as `-c /dev/null --rootdir .` (pytest 9 prints node ids with an empty file part without `--rootdir`). The corpus stays frozen for the live run; a real environment supplies its own tokens.
 - Read collection from current-run messages stays inline per stage; only what SPEC-0022 names is shared.
 
 Next: run the frozen provider smoke on RIG0 and record it here; keep the planner disconnected until identification and authoring are admitted.
