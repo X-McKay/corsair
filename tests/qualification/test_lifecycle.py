@@ -97,7 +97,7 @@ def test_native_lifecycle_execution_and_transfers(kube, gateway):
                 try:
                     sandbox = sdk.call('create', workspace=WORKSPACE, name=name, spec=inert_spec())
                     record.update(create_delivery='acknowledged', sandbox_id=sandbox.id)
-                    ready = sdk.call('wait_ready', name, workspace=WORKSPACE, timeout_seconds=120)
+                    ready = sdk.call('wait_ready', name, workspace=WORKSPACE)
                     assert ready.id == sandbox.id and ready.phase == openshell_pb2.SANDBOX_PHASE_READY
                     actual = json.loads(gateway['cli']('sandbox', 'get', name, '-o', 'json').stdout)
                     assert actual['id'] == sandbox.id and actual['policy'].get('network_policies', {}) == {}
