@@ -95,7 +95,8 @@ def scripted(final, calls):
 
 READ_CI = ("read_source", {"path": ".github/workflows/ci.yml"})
 SETUP = [READ_CI, ("list_toolchains", {})] + [("run_setup_command", {"command": list(c)}) for c in (INSTALL, BUILD, DISCOVER, BASELINE)]
-DISCOVERED = {DISCOVER: (0, (TEST_ID + "\n1 test collected\n").encode(), "terminal")}
+DISCOVERED = {DISCOVER: (0, (TEST_ID + "\n1 test collected\n").encode(), "terminal"),
+              BASELINE: (0, b".                                                                        [100%]\n1 passed in 0.01s\n", "terminal")}
 
 
 def run(final, calls, execution, *, output_retries=0, **kwargs):
@@ -141,6 +142,14 @@ def test_prompt_lists_inventory_without_file_content():
     (SETUP, DISCOVERED, ready(recipe=[{"phase": "dependency", "command": list(INSTALL), "source": {"path": "README.md", "start_line": 1, "end_line": 1}}])),
     # baseline path is not the discovered test's file
     (SETUP, DISCOVERED, ready(baseline_test_path="tests/test_other.py")),
+    # skipped, xfailed or partially skipped baseline exits 0 but did not pass
+    (SETUP, DISCOVERED | {BASELINE: (0, b"s [100%]\n1 skipped in 0.01s\n", "terminal")}, ready()),
+    (SETUP, DISCOVERED | {BASELINE: (0, b"x [100%]\n1 xfailed in 0.01s\n", "terminal")}, ready()),
+    (SETUP, DISCOVERED | {BASELINE: (0, b"1 passed, 1 skipped in 0.01s\n", "terminal")}, ready()),
+    # baseline path is only a substring of the discovered file
+    (SETUP, DISCOVERED, ready(baseline_test_path="test_documents.py")),
+    # framework without an operator-owned admission entry
+    (SETUP, DISCOVERED, ready(framework="nose")),
     # approved test path overlaps a saved source file
     (SETUP, DISCOVERED, ready(approved_test_paths=["requirements.txt"])),
     # different toolchain than the prepared sandbox
@@ -211,9 +220,28 @@ def test_unsupported_toolchain_is_grounded_and_runs_nothing():
 
 def test_read_output_returns_retained_bytes_beyond_the_tail():
     long = b"x" * 5000 + TEST_ID.encode()
-    execution = ScriptedExecution({DISCOVER: (0, long, "terminal")})
+    execution = ScriptedExecution(DISCOVERED | {DISCOVER: (0, long, "terminal")})
     calls = SETUP[:5] + [("read_output", {"run_id": 3, "stream": "stdout", "offset": 0})] + SETUP[5:]
     assert run(ready(), calls, execution).output.status == "ready"
+
+
+@pytest.mark.parametrize("framework,test_id,path,command,output,ok", [
+    ("pytest", "tests/a_test.py::test_x[1]", "tests/a_test.py", ("pytest", "tests/a_test.py::test_x[1]"), b"== 1 passed in 0.2s ==\n", True),
+    ("pytest", "tests/a_test.py::test_x", "a_test.py", ("pytest", "tests/a_test.py::test_x"), b"1 passed in 0.2s\n", False),
+    ("pytest", "::test_x", "tests/a_test.py", ("pytest", "::test_x"), b"1 passed in 0.2s\n", False),
+    ("pytest", "tests/a_test.py::test_x", "tests/a_test.py", ("pytest", "tests"), b"1 passed in 0.2s\n", False),
+    ("pytest", "tests/a_test.py::test_x", "tests/a_test.py", ("pytest", "tests/a_test.py::test_x"), b"1 passed, 1 deselected in 0.2s\n", False),
+    ("junit5", "org.example.WikiTest#forwards", "src/test/java/org/example/WikiTest.java", ("mvn", "-o", "test", "-Dtest=WikiTest#forwards"),
+     b"[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0\n[INFO] BUILD SUCCESS\n", True),
+    ("junit5", "org.example.WikiTest#forwards", "src/test/java/other/WikiTest.java", ("mvn", "-Dtest=WikiTest#forwards"),
+     b"[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0\n[INFO] BUILD SUCCESS\n", False),
+    ("junit5", "org.example.WikiTest#forwards", "src/test/java/org/example/WikiTest.java", ("mvn", "-Dtest=WikiTest#forwards"),
+     b"[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 1\n[INFO] BUILD SUCCESS\n", False),
+])
+def test_framework_admission_is_exact(framework, test_id, path, command, output, ok):
+    from corsair.agents.environment.frameworks import FRAMEWORKS, file_matches
+    entry = FRAMEWORKS[framework]
+    assert (file_matches(framework, test_id, path) and entry.targets(command, test_id) and entry.passed(output)) is ok
 
 
 @pytest.mark.parametrize("change", [
