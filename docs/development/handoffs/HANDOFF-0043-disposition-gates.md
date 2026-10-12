@@ -15,11 +15,11 @@ Work began on main `83dec61` on branch `claude/evidence-assessment-checks-e694q5
 
 ## Validation and blockers
 
-`tests/unit/test_disposition.py`: 50 passed. `make test-config`: 440 passed with the existing warning, after one earlier run failed only because this handoff did not yet exist. Local shape check: actual pytest JUnit for the reviewed SPEC-0018 vulnerable variant fails at `test_documents.py:64: AssertionError`, a planned assertion line, and a scratch mapping of one actual run per variant gave `completed`/`reproduced`/`verified` (details and limits in PLAN-0026). Unrun: validation against the six retained SPEC-0018 runs on RIG0, because this cloud session was refused access to that checkout; no live, provider, Temporal or OpenShell checks were needed.
+`tests/unit/test_disposition.py`: 50 passed. `make test-config`: 440 passed with the existing warning, after one earlier run failed only because this handoff did not yet exist. Local shape check: actual pytest JUnit for the reviewed SPEC-0018 vulnerable variant fails at `test_documents.py:64: AssertionError`, a planned assertion line, and a scratch mapping of one actual run per variant gave `completed`/`reproduced`/`verified` (details and limits in PLAN-0026). Retained-run validation later ran on RIG0 and is recorded in PLAN-0026: literal ids fail on a path base mismatch, and with an explicit rebase both retained sets give the expected dispositions. No provider, Temporal or OpenShell checks were needed.
 
 ## Decisions and next steps
 
-Defaults: a failed control blocks a conclusive finding; `not_reproduced` needs every baseline run safe; fix verification needs every run on both revisions valid and in one environment; unknown-reach test-phase sandbox events are attributed. Open: the typed `ObservationPlan` fields (expected exception, path, function, assertion lines, safe-behavior token) are not in SPEC-0022's free-text plan and need an owner. Next: retained-run validation on RIG0, then the report renderer or the native runner adapter that produces `RunEvidence`.
+Defaults: a failed control blocks a conclusive finding; `not_reproduced` needs every baseline run safe; fix verification needs every run on both revisions valid and in one environment; unknown-reach test-phase sandbox events are attributed. Open: the typed `ObservationPlan` fields (expected exception, path, function, assertion lines, safe-behavior token) are not in SPEC-0022's free-text plan and need an owner. Next: the report renderer or the native runner adapter that produces `RunEvidence`.
 
 ## Continuation prompt
 

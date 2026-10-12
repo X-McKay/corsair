@@ -16,7 +16,7 @@ from .tools import READ_EVIDENCE_TOOL, TOOL_RETRIES, AssessmentDependencies, evi
 
 # PROMPT_VERSION covers everything the model sees (instructions, skill, rendered prompt,
 # tool and output schema text); CONFIG_VERSION covers retry budgets and instrumentation.
-PROMPT_VERSION = "evidence-assessment-v1"
+PROMPT_VERSION = "evidence-assessment-v2"
 CONFIG_VERSION = "evidence-assessment-config-v1"
 SKILL_ID = "assess-evidence"
 SKILL_BYTES = (Path(__file__).parent / "skills" / SKILL_ID / "SKILL.md").read_bytes()
