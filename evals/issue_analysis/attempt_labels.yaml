@@ -1,0 +1,12 @@
+# Independent review findings per retained attempt. One entry per identified attempt; an entry
+# enters judge calibration only with its output SHA256, which must be computed from the private
+# retained copy. Entries without it document a published finding awaiting identification.
+- case: path_traversal
+  run: local-model-improvement-20261012/live-001
+  attempt: path-repeat-2
+  outcome: typed_output
+  output_sha256: null
+  skill_sha256: null
+  labels: [imprecise_api_wording]
+  reviewed_by: root_and_sol
+  source: "issue-analysis-local-provider.md: actual-output review caught an incidental incorrect description in path repeat2: pathlib joining itself does not resolve `..`"
