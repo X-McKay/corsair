@@ -9,6 +9,10 @@ from pydantic_ai.toolsets import FunctionToolset
 
 from ..contracts import IssueAnalysisInput, SourceExcerpt, SourceLine, SourceRead, confined_path
 
+READ_SOURCE_TOOL = "read_source"
+# Native per-tool budget: an invented or failing read is refused at once.
+TOOL_RETRIES = 0
+
 
 @dataclass(frozen=True)
 class FixtureDependencies:
@@ -28,12 +32,12 @@ class FixtureDependencies:
                              quote="\n".join(lines[start_line - 1:end_line]))
 
 
-
 def source_tools() -> FunctionToolset[FixtureDependencies]:
     tools = FunctionToolset[FixtureDependencies](id="issue_analysis_source")
 
-    @tools.tool(retries=0)
-    async def read_source(ctx: RunContext[FixtureDependencies], path: str,
+    @tools.tool(name=READ_SOURCE_TOOL, retries=TOOL_RETRIES)
+    async def read_source(ctx: RunContext[FixtureDependencies],
+                    path: Annotated[str, Field(description="Saved source path exactly as listed in the inventory")],
                     start_line: Annotated[int, Field(ge=1, description="First one-based inclusive line in the saved file, not an upstream document line number")],
                     end_line: Annotated[int, Field(ge=1, description="Last one-based inclusive line in the saved file, not an upstream document line number")]) -> SourceRead:
         """Read at most 80 saved-file-local lines from an inventory path.

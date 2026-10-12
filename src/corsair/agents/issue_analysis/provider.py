@@ -1,4 +1,4 @@
-"""Explicit native OpenAI Chat Completions composition for an operator endpoint."""
+"""Explicit native vLLM (OpenAI Chat Completions) composition for an operator endpoint."""
 
 from contextlib import asynccontextmanager
 import os
@@ -11,16 +11,40 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from pydantic_ai import InlineDefsJsonSchemaTransformer
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.profiles.openai import OpenAIModelProfile
-from pydantic_ai.providers.openai import OpenAIProvider
+from pydantic_ai.providers.vllm import VLLMProvider
+from pydantic_ai.settings import ModelSettings
+
+# Explicit server selection: each admitted server maps to its native provider.
+PROVIDERS = {"vllm": VLLMProvider}
+
+# Overrides the recorded live evidence requires on top of the native provider
+# profile. VLLMProvider already supplies a single leading system message for every
+# model; the inline-definitions schema transformer it supplies only for some model
+# families (for example Qwen), so it stays pinned here rather than depending on the
+# served model name.
+PROFILE_OVERRIDES = OpenAIModelProfile(
+    json_schema_transformer=InlineDefsJsonSchemaTransformer,
+    default_structured_output_mode="prompted",
+    supports_json_schema_output=False,
+    supports_json_object_output=False,
+    openai_supports_strict_tool_definition=False,
+)
+
+# Model-level settings, so direct, evaluation and durable runs send the same request.
+# The response cap (default 2048) comes from the explicit configuration below.
+MODEL_SETTINGS = ModelSettings(temperature=0, parallel_tool_calls=False)
 
 
 class LocalModelConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    server: Literal["vllm"]
     base_url: str
     model_name: str = Field(min_length=1, max_length=256)
     api_key_env: Literal["CORSAIR_LOCAL_MODEL_API_KEY"] | None = None
     timeout_seconds: float = Field(default=60, gt=0, le=120)
+    # Planned comparison caps only; the cap includes reasoning and answer tokens.
+    response_token_limit: Literal[2048, 4096, 8192] = 2048
     thinking_mode: Literal["server_default", "disabled"] = "server_default"
     thinking_token_budget: int | None = Field(default=None, ge=1, le=2048, strict=True)
 
@@ -40,6 +64,16 @@ class LocalModelConfig(BaseModel):
         return value.rstrip("/")
 
 
+def model_settings(config: LocalModelConfig) -> ModelSettings:
+    """One model-level mapping: fixed request controls, response cap and explicit thinking control."""
+    settings = ModelSettings(**MODEL_SETTINGS, max_tokens=config.response_token_limit)
+    if config.thinking_mode == "disabled":
+        settings["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
+    if config.thinking_token_budget is not None:
+        settings["extra_body"] = {"thinking_token_budget": config.thinking_token_budget}
+    return settings
+
+
 @asynccontextmanager
 async def local_model(config: LocalModelConfig, *, http_client: AsyncClient | None = None):
     """No environment model/endpoint/key fallback; native SDK owns request translation."""
@@ -51,15 +85,5 @@ async def local_model(config: LocalModelConfig, *, http_client: AsyncClient | No
     async with AsyncOpenAI(base_url=config.base_url, api_key=key,
                            organization="", project="", max_retries=0,
                            timeout=config.timeout_seconds, http_client=http_client) as client:
-        settings = ({"extra_body": {"chat_template_kwargs": {"enable_thinking": False}}}
-                    if config.thinking_mode == "disabled" else None)
-        if config.thinking_token_budget is not None:
-            settings = {"extra_body": {"thinking_token_budget": config.thinking_token_budget}}
-        yield OpenAIChatModel(config.model_name, provider=OpenAIProvider(openai_client=client), settings=settings,
-                              profile=OpenAIModelProfile(
-                                  json_schema_transformer=InlineDefsJsonSchemaTransformer,
-                                  default_structured_output_mode="prompted",
-                                  supports_json_schema_output=False,
-                                  supports_json_object_output=False,
-                                  openai_chat_supports_multiple_system_messages=False,
-                                  openai_supports_strict_tool_definition=False))
+        yield OpenAIChatModel(config.model_name, provider=PROVIDERS[config.server](openai_client=client),
+                              profile=PROFILE_OVERRIDES, settings=model_settings(config))

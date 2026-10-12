@@ -19,6 +19,7 @@ from openshell import SandboxClient, TlsConfig
 
 from corsair.adapters.local_artifacts import ArtifactStorageError, LocalArtifacts
 from corsair.adapters.openshell import OpenShellLifecycle
+from corsair.ports.sandbox import LifecycleLimits
 from corsair.adapters.openshell_execution import OpenShellConnection, OpenShellExecution, serialized
 from corsair.adapters.receipts import ReceiptDirectory
 from corsair.ports.execution import ExecutionError, ExecutionLimits
@@ -156,7 +157,7 @@ def test_fixed_generated_file_bounded_output_admission(kube, adapter_gateway):
         with SandboxClient(native['endpoint'], tls=tls, timeout=60) as client, closing(ReceiptDirectory(composition)) as journal:
             journal.write(operation, 'intent', dict(scope=summary['scope'], roots=roots, limits=asdict(limits), native_spec=summary['native_spec']))
             observed = ObservedClient(SdkReceipts(client, kube.evidence))
-            with OpenShellLifecycle(observed, spec=spec, workspace='default', owner=owner, receipts=receipts) as lifecycle, OpenShellExecution(connection, workspace='default', owner=owner, workdir=remote, limits=limits, receipts=receipts) as adapter, LocalArtifacts(objects, max_bytes=4096) as store:
+            with OpenShellLifecycle(observed, spec=spec, workspace='default', owner=owner, receipts=receipts, limits=LifecycleLimits(ready_seconds=300, delete_seconds=60)) as lifecycle, OpenShellExecution(connection, workspace='default', owner=owner, workdir=remote, limits=limits, receipts=receipts) as adapter, LocalArtifacts(objects, max_bytes=4096) as store:
                 driver = AdapterHarness(lifecycle, observed); driver.creation = uuid4()
                 try:
                     with owned(kube, native, driver, summary['sandbox'], '512Mi', name='cs-'+driver.creation.hex[:16]) as (name, pair):
