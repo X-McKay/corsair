@@ -11,14 +11,14 @@ from pydantic_ai.models import Model
 from pydantic_ai.models.instrumented import InstrumentationSettings
 
 from .contracts import IssueAnalysis, IssueAnalysisInput, SourceExcerpt, SourceRead, SourceReference
-from .review_contracts import ReviewDraft, ReviewFinding, ReviewReport
+from .review_contracts import ConditionAudit, ConditionAuditDraft, ReviewDraft, ReviewFinding, ReviewReport
 from .tools import FixtureDependencies, source_tools
 
 
 _SKILL_PATH = Path(__file__).parent / "skills" / "review-evidence" / "SKILL.md"
 REVIEW_SKILL_TEXT = _SKILL_PATH.read_text(encoding="utf-8")
 REVIEW_SKILL_SHA256 = sha256(_SKILL_PATH.read_bytes()).hexdigest()
-REVIEW_PROMPT_VERSION = "issue-evidence-review-v2"
+REVIEW_PROMPT_VERSION = "issue-evidence-review-v3"
 
 
 @dataclass(frozen=True)
@@ -79,13 +79,32 @@ def create_evidence_reviewer(model: Model, *, output_retries: int = 1) -> Agent[
             except ValueError as exc:
                 raise ModelRetry(str(exc)) from exc
 
+        def resolve_condition(item: ConditionAuditDraft) -> ConditionAudit:
+            locator = item.candidate_locator
+            statement = None
+            if locator is not None:
+                hypothesis = ctx.deps.analysis.hypothesis
+                if hypothesis is None:
+                    raise ModelRetry("candidate locator requires a ready hypothesis")
+                if locator.field == "preconditions":
+                    if locator.index is None or locator.index >= len(hypothesis.preconditions):
+                        raise ModelRetry("candidate precondition locator is outside the immutable analysis")
+                    statement = hypothesis.preconditions[locator.index]
+                else:
+                    statement = getattr(hypothesis, locator.field)
+            return ConditionAudit(
+                operation=item.operation, required_condition=item.required_condition,
+                coverage=item.coverage, basis=item.basis,
+                candidate_locator=locator, candidate_statement=statement,
+            )
+
         return ReviewReport(
             assessment=draft.assessment, scope=draft.scope,
             findings=tuple(ReviewFinding(field_path=finding.field_path, problem=finding.problem,
                                          citations=tuple(resolve(ref) for ref in finding.citations))
                            for finding in draft.findings),
             citations=tuple(resolve(ref) for ref in draft.citations),
-            condition_audit=draft.condition_audit,
+            condition_audit=tuple(resolve_condition(item) for item in draft.condition_audit),
             limitations=draft.limitations,
         )
 

@@ -20,7 +20,8 @@ from corsair.agents.issue_analysis.review import (
 ROOT = Path(__file__).resolve().parents[2] / "evals" / "issue_analysis"
 AUDIT = [{"operation": "A sensitive operation may run.",
           "required_condition": "Its input and resource are available.",
-          "coverage": "entailed", "basis": "The candidate's stated preconditions cover this."}]
+          "coverage": "entailed", "basis": "The candidate's stated preconditions cover this.",
+          "candidate_locator": {"field": "preconditions", "index": 0}}]
 
 
 @pytest.fixture(autouse=True)
@@ -62,6 +63,7 @@ def test_supported_review_reads_source_and_materializes_current_run_quote():
     assert isinstance(result.output, ReviewReport)
     assert result.output.assessment == "supported" and result.output.findings == ()
     assert result.output.citations[0].quote == "\n".join(inputs.source_files[0].content.splitlines()[2:4])
+    assert result.output.condition_audit[0].candidate_statement == analysis.hypothesis.preconditions[0]
     assert result.usage.tool_calls == 1
     prompt = review_prompt(inputs, analysis)
     assert inputs.fixture_id not in prompt
@@ -188,7 +190,8 @@ def test_condition_audit_blocks_unmet_condition_and_ungrounded_support():
         run(inputs, analysis, scripted_review(supported))
 
     missing = {"operation": "A claimed operation", "required_condition": "An ordinary prerequisite",
-               "coverage": "missing", "basis": "The candidate omits it."}
+               "coverage": "missing", "basis": "The candidate omits it.",
+               "candidate_locator": None}
     with pytest.raises(ValidationError):
         ReviewDraft.model_validate(supported | {"condition_audit": [missing]})
     with pytest.raises(ValidationError):
@@ -207,3 +210,50 @@ def test_condition_audit_blocks_unmet_condition_and_ungrounded_support():
         "findings": [{"field_path": "hypothesis.preconditions", "problem": "A prerequisite is absent.",
                       "citations": []}],
     })
+
+
+@pytest.mark.parametrize("locator", [
+    None,
+    {"field": "preconditions"},
+    {"field": "preconditions", "index": -1},
+    {"field": "preconditions", "index": True},
+    {"field": "preconditions", "index": 0.5},
+    {"field": "observable_effect", "index": 0},
+])
+def test_covered_audit_requires_well_formed_candidate_locator(locator):
+    item = AUDIT[0] | {"candidate_locator": locator}
+    with pytest.raises(ValidationError):
+        ReviewDraft.model_validate({
+            "assessment": "supported", "scope": "component", "findings": [],
+            "citations": [], "condition_audit": [item], "limitations": ["No execution evidence."],
+        })
+
+
+def test_missing_audit_cannot_claim_candidate_statement():
+    item = AUDIT[0] | {"coverage": "missing"}
+    with pytest.raises(ValidationError):
+        ReviewDraft.model_validate({
+            "assessment": "needs_revision", "scope": "component",
+            "findings": [{"field_path": "hypothesis.preconditions", "problem": "A condition is absent.",
+                          "citations": []}], "citations": [], "condition_audit": [item],
+            "limitations": ["No execution evidence."],
+        })
+
+
+def test_candidate_locator_is_resolved_from_immutable_analysis():
+    inputs, analysis = case()
+    base = {"assessment": "supported", "scope": "component", "findings": [],
+            "citations": [{"path": "documents.py", "start_line": 3, "end_line": 4}],
+            "limitations": ["No execution evidence."]}
+    for field in ("attacker_capabilities", "observable_effect"):
+        draft = base | {"condition_audit": [AUDIT[0] | {
+            "candidate_locator": {"field": field},
+        }]}
+        result = run(inputs, analysis, scripted_review(draft))
+        assert result.output.condition_audit[0].candidate_statement == getattr(analysis.hypothesis, field)
+
+    invalid = base | {"condition_audit": [AUDIT[0] | {
+        "candidate_locator": {"field": "preconditions", "index": len(analysis.hypothesis.preconditions)},
+    }]}
+    with pytest.raises(UnexpectedModelBehavior):
+        run(inputs, analysis, scripted_review(invalid))

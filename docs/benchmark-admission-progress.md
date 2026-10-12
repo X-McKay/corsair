@@ -4,7 +4,7 @@
 
 | Lane | Completed preparation | Not completed |
 | --- | --- | --- |
-| Java10 | Prior primary-fix shortlist: JSPWiki forwarding decision and Plexus shell handling | Full ten-case admission, defensible vulnerable pins, native builds and tests |
+| Java10 | JSPWiki exact parent/fix, complete tree inventories, Apache licensing and native POM/test framework inspected; Plexus remains a prior shortlist item | Historical dependency closure, Java compatibility, common benign assertion and native discovery/execution; other cases incomplete |
 | Python10 / JavaScript10 | Eighteen pinned commit-summary artifacts retrieved; Werkzeug cookie parser nominated for component review | Admission report/test drafts incomplete after subagent service content-filter error; no native execution |
 | Ruby10 / Perl10 | Twenty advisory admission records,12 fix-reference captures and6 Rack source/metadata captures; root checked linked file hashes | All vulnerable pins unresolved; test designs proposed only, no drafted/native test pair |
 
@@ -36,6 +36,10 @@ The original [candidate inventory](../benchmarks/candidate-cases.json) supplies 
 | sprockets / CVE-2018-3760 | Map disclosure to exact source path and immutable fix |
 
 ## Continuation rules
+
+Additional JSPWiki primary-source review verified fix [`88d89d6523802c044cfcb7930cba40d8eeb21da2`](https://github.com/apache/jspwiki/commit/88d89d6523802c044cfcb7930cba40d8eeb21da2) has sole parent `f140a2a4371735ad24d04a1d78c6e1d9ceaed76f`. Root independently checked ten retained raw Git blob identities and both complete tree captures. LICENSE/NOTICE and build POMs are identical across the pair. The production change replaces `getPathInfo()` with `Wiki.jsp`; the real servlet's dispatcher-forward target is the faithful proposed observation, not proof of file disclosure. Private retained source evidence is `.runs/issue0007-resolution-20261012/jspwiki/`.
+
+The POM uses Java8 source/target, Surefire2.22.0, JUnit5.4.0 and Stripes1.7.0-async-beta. Java17 compatibility and the full reactor/plugin/dependency closure remain unverified. Upstream tests assert the fixed literal forward target; copying that expectation into the benign control would likely fail on the parent. Review an actual common benign forward/page-parameter behavior before freezing exactly two tests. No downloaded project code, build, discovery or test ran during this research. All50 real-case executions remain zero.
 
 Draft actual native control/security code only after source and observation scope are reviewed. Run the same frozen artifact on both revisions, retaining individual results and real-path witnesses. Do not infer results from design text, advisory labels, upstream mocks or report claims. Keep blocked/unsupported cases in totals.
 

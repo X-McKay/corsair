@@ -69,7 +69,8 @@ def scripted_reviewer(*, first="supported", final="supported"):
                   "citations": [{"path": "documents.py", "start_line": 3, "end_line": 4}],
                   "condition_audit": [{"operation": "A resource action may occur",
                                        "required_condition": "The input is usable",
-                                       "coverage": "entailed", "basis": "Candidate preconditions cover it."}],
+                                       "coverage": "entailed", "basis": "Candidate preconditions cover it.",
+                                       "candidate_locator": {"field": "preconditions", "index": 0}}],
                   "limitations": ["No execution evidence was supplied."]}
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, output)])
 
