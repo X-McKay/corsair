@@ -15,11 +15,11 @@ Built on the [HANDOFF-0043](HANDOFF-0043-disposition-gates.md) gates, on the sam
 
 ## Validation and blockers
 
-`tests/agents/test_evidence_assessment.py`: 17 passed. `make test-config`: 457 passed with the existing deprecation warnings. A six-attempt live smoke of prompt v1 on llm.almckay.io and the gates' retained-run validation ran on RIG0; results and limits are in PLAN-0029 and PLAN-0026. Prompt v2 (skill clarifications from that smoke) was rerun: it fixed neither error, and the gate rejected every over-claim in both rounds. Unrun and not claimed: Pydantic Evals and durable mode.
+`tests/agents/test_evidence_assessment.py`: 17 passed. `make test-config`: 457 passed with the existing deprecation warnings. A six-attempt live smoke of prompt v1 on llm.almckay.io and the gates' retained-run validation ran on RIG0; results and limits are in PLAN-0029 and PLAN-0026. Prompt v2 (skill clarifications from that smoke) was rerun: in an unconfounded sandbox-denial rerun, 2 of 3 attempts proposed exactly the permitted triple and one hit the 8192-token cap; the gate rejected every over-claim across all 15 attempts. Unrun and not claimed: Pydantic Evals and durable mode.
 
 ## Decisions and next steps
 
-Rejected proposals are recorded, not retried; `read_source` deferred until `agents/source/` is on main. Next: an unconfounded sandbox-denial case, then native Evals cases for this stage.
+Rejected proposals are recorded, not retried; `read_source` deferred until `agents/source/` is on main. Next: native Evals cases for this stage; the response cap failures belong to ISSUE-0007.
 
 ## Continuation prompt
 

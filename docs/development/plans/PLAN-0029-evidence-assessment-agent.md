@@ -21,7 +21,7 @@ Implement [SPEC-0030](../specs/SPEC-0030-evidence-assessment-agent.md), step 4 o
 - [ ] Add `read_source` once `agents/source/` is on main, if evaluation shows it is needed.
 - [x] First bounded live smoke on llm.almckay.io (prompt v1; below).
 - [x] Rerun the smoke with prompt v2 (below).
-- [ ] Rerun case (b) with an unlabelled sandbox log.
+- [x] Rerun case (b) with an unlabelled sandbox log (below).
 - [ ] Evals-based live repeats; durable stage.
 
 ## Validation and progress
@@ -54,6 +54,8 @@ Prompt `evidence-assessment-v2` added two skill rules: `frozen_patch_sha256` ide
 
 v2 did not fix either error. Case (a) still adds a patch-digest limitation, now milder ("cannot be directly verified"). Case (b) is confounded: both repeats dismissed the denial because the smoke's sandbox-log line was labelled "(synthetic smoke event)", so it does not test the new rule. Case (c2) regressed from v1: it noticed the witness says `PermissionError` while the plan expects `ValueError` and still proposed a verified fix. The gate rejected all four over-claims across (b) and (c); only the four (a) proposals were admitted. With two repeats per case, v1/v2 differences are within noise; prompt changes should now be judged by the native Evals dataset, not by more smokes. Receipts: `.runs/evidence-assessment-live-20261012T214406Z/` on RIG0.
 
+Unconfounded case (b), prompt v2 at `7bc3e92`, same configuration and typed evidence, only the sandbox-log item rebuilt as a plain policy line (`... policy_revision=policy-1 action=deny operation=open phase=test ... path=.../outside.txt rule=filesystem.read_outside_workspace`), three repeats. Gate for all: `blocked`/`reproduced`/`not_verified`. b1 failed on the same 8192-token cap after six reads (31244/9027 tokens, 94.7s). b2 and b3 proposed `blocked`/`reproduced`/`not_verified` and were admitted (7 and 6 requests, 30870/5555 and 27386/9217 tokens, 49.8s and 72.7s), each stating that a sandbox denial means the application's behavior was not observed; b2 also described `frozen_patch_sha256` correctly. The earlier verified-fix proposals in (b) therefore came from the labelled input, not from v1/v2 alone. Across 15 live attempts the response cap failed 3 times, all in candidate-witness or sandbox cases (ISSUE-0007). Receipts: `.runs/evidence-assessment-live-20261012T215151Z/` on RIG0.
+
 ## Decisions and next action
 
-Rejected proposals are kept, not retried. `read_source` deferred to avoid importing paths the planner thread is moving. Next: an unconfounded case (b), then the Evals dataset, which should drive further prompt changes. The response cap stays at the configured 8192 maximum; raising it belongs to ISSUE-0007. Stop condition: no connection to other stages before evals and a live baseline exist.
+Rejected proposals are kept, not retried. `read_source` deferred to avoid importing paths the planner thread is moving. Next: the Evals dataset, which should drive further prompt changes. The response cap stays at the configured 8192 maximum; raising it belongs to ISSUE-0007. Stop condition: no connection to other stages before evals and a live baseline exist.
