@@ -19,7 +19,8 @@ Implement [SPEC-0027](../specs/SPEC-0027-disposition-gates.md), step 3 of the ac
 - [x] Table-driven unit tests over SPEC-0018-shaped synthetic evidence, including every same-outcome negative IDEA-0004 lists.
 - [x] Local check that the gate's failure-location contract matches actual pytest JUnit output for the reviewed pair.
 - [ ] Validate against the six retained SPEC-0018 runs in `.runs/benchmark-admission-20261012/` on RIG0 (blocked from this session, below).
-- [ ] Typed `ObservationPlan` source: agree with the planner thread whether SPEC-0022 exposes these fields or a reviewed builder derives them.
+- [x] Typed `ObservationPlan` source agreed with the planner thread (SPEC-0027 decisions).
+- [ ] Builder from `ReadyTestPlan` and `TestPatch` to `ObservationPlan`, once both are on main.
 - [ ] Report renderer, as its own step.
 
 ## Validation and progress
@@ -33,4 +34,4 @@ Implement [SPEC-0027](../specs/SPEC-0027-disposition-gates.md), step 3 of the ac
 
 ## Decisions and next action
 
-Defaults recorded in SPEC-0027. Next: run the six retained runs through the gate on RIG0, then settle the `ObservationPlan` source with the planner. Stop condition: none of this connects to an agent until the assessment agent's own spec exists.
+Defaults recorded in SPEC-0027. Next: run the six retained runs through the gate on RIG0, then add the `ObservationPlan` builder when the planner and authoring contracts merge. The assessment agent consumes these gates under SPEC-0030.
