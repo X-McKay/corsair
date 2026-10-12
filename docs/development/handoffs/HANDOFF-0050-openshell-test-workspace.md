@@ -15,7 +15,7 @@ Branch `claude/openshell-test-workspace-2d8497` from main `102fbef`, draft PR #3
 
 ## Validation and blockers
 
-`make test-config` 766 passed in the cloud container and on RIG0. Live on one fresh RIG0 kind node at `aca85a4`: the reviewed SPEC-0018 pair ran in four fresh sandboxes with exact discovery, the expected vulnerable/fixed outcomes, confirmed cleanup and no remaining cluster resources; the cluster was torn down. Unrun: a second fresh node, model-authored patches, real repositories. General source delivery stays blocked on the SPEC-0025 storage quota volume and the 0.1.3 credential placeholder check (ISSUE-0006). No witness exists; candidate telemetry is listed in SPEC-0032.
+`make test-config` 766 passed in the cloud container and on RIG0, then 771 after the Codex review fixes (staging retained on upload timeout; receipt storage failures attributed to upload), which postdate the live run. Live on one fresh RIG0 kind node at `aca85a4`: the reviewed SPEC-0018 pair ran in four fresh sandboxes with exact discovery, the expected vulnerable/fixed outcomes, confirmed cleanup and no remaining cluster resources; the cluster was torn down. Unrun: a second fresh node, model-authored patches, real repositories. General source delivery stays blocked on the SPEC-0025 storage quota volume and the 0.1.3 credential placeholder check (ISSUE-0006). No witness exists; candidate telemetry is listed in SPEC-0032.
 
 ## Decisions and next steps
 

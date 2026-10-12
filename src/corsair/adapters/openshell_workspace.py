@@ -86,9 +86,14 @@ class WorkspaceConfig:
 
 
 class UploadError(RuntimeError):
-    """A failed or unacknowledged upload; the native CLI may already have mutated the sandbox."""
-    def __init__(self, detail: str, delivery: Literal['not_dispatched', 'unknown']):
-        self.delivery = delivery
+    """A failed or unrecorded upload; unless not dispatched, the native CLI may have mutated the sandbox.
+
+    `descendants_unknown` marks a timeout: only the direct CLI process was reaped, so its transport
+    descendants may still read staging. `storage_error` marks a lost receipt; delivery keeps what was known.
+    """
+    def __init__(self, detail: str, delivery: Literal['not_dispatched', 'unknown', 'acknowledged'], *,
+                 descendants_unknown: bool = False, storage_error: str | None = None):
+        self.delivery, self.descendants_unknown, self.storage_error = delivery, descendants_unknown, storage_error
         super().__init__(detail)
 
 
@@ -121,8 +126,12 @@ class CliUpload:
         receipt = dict(operation=str(operation), handle=asdict(handle), argv=argv, delivery='not_dispatched',
                        started_at=datetime.now(timezone.utc).isoformat(), application_retries=0,
                        native_internal_attempts='unknown')
-        self._journal.write(operation, 'intent', receipt)
+        try:
+            self._journal.write(operation, 'intent', receipt)
+        except Exception as error:
+            raise UploadError(f'intent receipt storage: {error}', 'not_dispatched', storage_error=str(error)) from error
         started = time.monotonic()
+        failure = None
         try:
             if hashlib.sha256(self._binary.read_bytes()).hexdigest() != self._sha256:
                 raise UploadError('native CLI binary differs from its pin', 'not_dispatched')
@@ -130,8 +139,10 @@ class CliUpload:
             try:
                 done = subprocess.run(argv, capture_output=True, timeout=self._timeout, env=self._env)
             except subprocess.TimeoutExpired as error:
-                receipt.update(timed_out=True, stderr=(error.stderr or b'')[-2048:].decode('utf-8', 'replace'))
-                raise UploadError('native upload timed out; remote mutation unknown', 'unknown') from error
+                receipt.update(timed_out=True, descendants='unknown',
+                               stderr=(error.stderr or b'')[-2048:].decode('utf-8', 'replace'))
+                raise UploadError('native upload timed out; remote mutation and descendants unknown', 'unknown',
+                                  descendants_unknown=True) from error
             receipt.update(exit_code=done.returncode, stdout=done.stdout[-2048:].decode('utf-8', 'replace'),
                            stderr=done.stderr[-2048:].decode('utf-8', 'replace'))
             if done.returncode != 0:
@@ -139,13 +150,23 @@ class CliUpload:
             receipt['delivery'] = 'acknowledged'
         except UploadError as error:
             receipt.update(error_type='UploadError', error_detail=str(error), delivery=error.delivery)
-            raise
+            failure = error
         except Exception as error:
             receipt.update(error_type=type(error).__name__, error_detail=str(error))
-            raise UploadError(f'{type(error).__name__}: {error}', receipt['delivery']) from error
-        finally:
-            receipt['elapsed_seconds'] = time.monotonic() - started
+            failure = UploadError(f'{type(error).__name__}: {error}', receipt['delivery'])
+            failure.__cause__ = error
+        receipt['elapsed_seconds'] = time.monotonic() - started
+        try:
             self._journal.write(operation, 'result', receipt)
+        except Exception as error:
+            # Keep the known outcome; a lost receipt is an upload evidence failure, never success.
+            if failure is None:
+                failure = UploadError(f'result receipt storage: {error}', receipt['delivery'], storage_error=str(error))
+                failure.__cause__ = error
+            else:
+                failure.storage_error = str(error)
+        if failure is not None:
+            raise failure
 
 
 class WorkspaceError(RuntimeError):
@@ -153,6 +174,7 @@ class WorkspaceError(RuntimeError):
     def __init__(self, layer: Literal['staging', 'sandbox', 'upload', 'admission'], detail: str,
                  cleanup: Literal['not_required', 'confirmed', 'unconfirmed'], receipt: ExecutionReceipt | None = None):
         self.layer, self.detail, self.cleanup, self.receipt = layer, detail, cleanup, receipt
+        self.staging: Literal['removed', 'retained'] = 'removed'
         super().__init__(f'{layer}: {detail}; cleanup {cleanup}')
 
 
@@ -254,7 +276,7 @@ class OpenShellTestWorkspace:
             base, root = self._stage(operation, patch, parents)
         except Exception as error:
             raise WorkspaceError('staging', f'{type(error).__name__}: {error}', 'not_required') from error
-        handle = None
+        handle, retain = None, False
         try:
             try:
                 handle = self._lifecycle.create(uuid5(operation, 'create'))
@@ -267,7 +289,9 @@ class OpenShellTestWorkspace:
             try:
                 self._upload.upload(handle, root, self._config.remote_parent, uuid5(operation, 'upload'))
             except UploadError as error:
-                raise WorkspaceError('upload', f'{error} (delivery {error.delivery})', 'unconfirmed') from error
+                retain = error.descendants_unknown
+                detail = f'{error} (delivery {error.delivery}' + (f'; receipt storage {error.storage_error})' if error.storage_error else ')')
+                raise WorkspaceError('upload', detail, 'unconfirmed') from error
             observed, receipt = self._observe(handle, uuid5(operation, 'verify'))
             try:
                 self._admit(observed, files, parents)
@@ -279,12 +303,15 @@ class OpenShellTestWorkspace:
                 'sandbox', f'{type(error).__name__}: {error}', 'unconfirmed')
             # Without a handle, create may still have dispatched: cleanup stays unconfirmed.
             failure.cleanup = self._delete(handle, uuid5(operation, 'discard')) if handle is not None else 'unconfirmed'
+            failure.staging = 'retained' if retain else 'removed'
             if failure is error:
                 raise
             raise failure from error
         finally:
-            # The CLI has exited; the authoritative bytes stay in the store, never in staging.
-            shutil.rmtree(base, ignore_errors=True)
+            # The authoritative bytes stay in the store. After a timeout, CLI descendants may still read
+            # staging (SPEC-0011), so it is retained for the operator rather than removed.
+            if not retain:
+                shutil.rmtree(base, ignore_errors=True)
 
     def _delete(self, handle: SandboxHandle, operation: UUID) -> Literal['confirmed', 'unconfirmed']:
         try:

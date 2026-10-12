@@ -28,6 +28,8 @@ Implement [SPEC-0032](../specs/SPEC-0032-openshell-test-workspace.md): an OpenSh
 
 2026-10-12, RIG0, one fresh kind node, worktree at PR head `aca85a4`: network (3 passed), admission (1 passed), gateway install, toolchain image build/load and `make qualify-test-workspace` all exited 0; JUnit 1 passed in 148.6 s. Four fresh sandboxes: vulnerable twice with control passed and security failed at `test_documents.py:64` (exit 1), fixed twice with both passed (exit 0); every run discovered exactly the two ids, had no failure layer, confirmed cleanup and no remaining Sandbox resource or boundary pod; staging empty; `make kind-down` confirmed. No reruns. Limits: one node, not two; native upload internal retries unobserved; fixture envelope only.
 
+2026-10-12, Codex review on `fafc7b8`: two findings fixed. A timed-out upload now retains host staging (CLI descendants may still read it, per SPEC-0011) and reports `staging: retained`; a failed intent or result receipt write is an upload failure that keeps the known delivery state instead of surfacing as a `sandbox` error. `make test-config` 771 passed (5 new checks). The success path is unchanged apart from receipt-write ordering; the live run above predates this change and was not repeated.
+
 ## Decisions and next action
 
 Delivery reuses the qualified CLI upload with in-sandbox inventory admission instead of a new transfer mechanism; the verifier reports and the host decides. Two execution adapters are wired, one at `/tmp` for the verifier and one at the workspace root for the runner. Next: the fixture chain consumes this adapter; a second fresh node would strengthen the qualification; real repositories wait on SPEC-0025 fetch and the storage quota.

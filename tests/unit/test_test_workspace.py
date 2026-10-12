@@ -258,3 +258,53 @@ def test_unexpected_error_after_create_still_discards(store, tmp_path):
         adapter.prepare(PATCH, operation)
     assert (refused.value.layer, refused.value.cleanup) == ('sandbox', 'confirmed')
     assert lifecycle.calls[-1] == ('delete', uuid5(operation, 'discard')) and len(upload.calls) == 1
+
+
+def test_timed_out_upload_retains_staging_for_unknown_descendants(store, tmp_path):
+    upload = Upload(error=UploadError('timed out', 'unknown', descendants_unknown=True))
+    adapter, (lifecycle, _, _), config = workspace(store, tmp_path, upload=upload)
+    operation = uuid4()
+    with pytest.raises(WorkspaceError) as refused:
+        adapter.prepare(PATCH, operation)
+    assert (refused.value.layer, refused.value.staging, refused.value.cleanup) == ('upload', 'retained', 'confirmed')
+    assert (config.staging / operation.hex / 'workspace' / 'tests/test_app.py').read_bytes() == PATCH.files[0].content
+
+
+def cli(tmp_path, code=0, sleep=0):
+    receipts = tmp_path / 'receipts'; receipts.mkdir(mode=0o700, exist_ok=True)
+    binary = tmp_path / 'openshell'
+    binary.write_text(f'#!/bin/sh\nsleep {sleep}\nexit {code}\n'); binary.chmod(0o700)
+    return CliUpload(binary, hashlib.sha256(binary.read_bytes()).hexdigest(), gateway='q', env={'PATH': '/usr/bin:/bin'},
+                     timeout_seconds=1, receipts=receipts), receipts
+
+
+def test_cli_timeout_marks_descendants_unknown(tmp_path):
+    upload, receipts = cli(tmp_path, sleep=5)
+    with upload, pytest.raises(UploadError) as failed:
+        upload.upload(SandboxHandle('id', 'n', 'default', 'o', 'op'), tmp_path, '/tmp', uuid4())
+    assert (failed.value.delivery, failed.value.descendants_unknown) == ('unknown', True)
+
+
+@pytest.mark.parametrize('code, delivery', [(0, 'acknowledged'), (3, 'unknown')])
+def test_lost_result_receipt_keeps_known_delivery(tmp_path, code, delivery):
+    upload, receipts = cli(tmp_path, code=code)
+    operation = uuid4()
+    with upload:
+        original = upload._journal.write
+        def fail_result(op, suffix, value):
+            if suffix == 'result': raise OSError(28, 'No space left on device')
+            original(op, suffix, value)
+        upload._journal.write = fail_result
+        with pytest.raises(UploadError) as failed:
+            upload.upload(SandboxHandle('id', 'n', 'default', 'o', 'op'), tmp_path, '/tmp', operation)
+    assert failed.value.delivery == delivery and 'No space left' in failed.value.storage_error
+    assert (receipts / f'{operation}.intent.json').exists() and not (receipts / f'{operation}.result.json').exists()
+
+
+def test_receipt_storage_failure_is_attributed_to_upload(store, tmp_path):
+    upload = Upload(error=UploadError('result receipt storage: full', 'acknowledged', storage_error='full'))
+    adapter, _, _ = workspace(store, tmp_path, upload=upload)
+    with pytest.raises(WorkspaceError) as refused:
+        adapter.prepare(PATCH, uuid4())
+    assert refused.value.layer == 'upload' and 'delivery acknowledged; receipt storage full' in refused.value.detail
+    assert (refused.value.staging, refused.value.cleanup) == ('removed', 'confirmed')
