@@ -32,6 +32,8 @@ Acceptance: real adapter contract tests pass, completed/unknown commands are dis
 
 ## Milestone 3 Temporal foundation
 
+Status: the [independent native fixture slice](qualification/temporal-fixture-foundation.md) passed parent/child, retry/failure, waiting-child cancellation, graceful worker replacement, same-SQLite service restart and actual history replay. Production durability, mid-activity failures, tracing and agent/OpenShell integration remain unqualified; this does not complete Milestone 3.
+
 Provision persistent local Temporal, then use deterministic fixture stages to demonstrate parent/child workflow execution, activity failure, restart, cancellation, replay compatibility, and supported tracing. No live model is needed.
 
 Acceptance: progress and artifacts remain consistent after interruption; unknown side effects are not blindly repeated; cleanup outcomes remain visible; workflow history is the job state authority. Local development configuration is clearly separate from production service configuration.
@@ -43,6 +45,8 @@ Run manually supplied environment recipes, plans, and test patches through fresh
 Acceptance: controls pass both revisions; security assertions distinguish the pair; wrong assertions, skipped tests, changed source, stale results, sandbox interference, dependency failures, and unknown execution cannot verify a fix. A saved case can rerun without an agent.
 
 ## Milestone 5 Model adapters and agent template
+
+Status: the [read-only issue-analysis template](qualification/issue-analysis-fixture.md) implements explicit saved-source authority, native contracts/limits/instrumentation and deterministic local Evals. Real provider compatibility/usage, semantic reasoning and direct/durable composition remain unqualified.
 
 Use native PydanticAI local endpoint and Bedrock integrations. Establish TestModel/FunctionModel, native overrides, instrumented factory, output schema, tool authority, usage limits, and one isolated evaluation entry point.
 
