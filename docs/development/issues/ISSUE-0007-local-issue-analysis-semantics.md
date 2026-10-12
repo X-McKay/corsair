@@ -4,10 +4,18 @@ kind: issue
 title: Local issue-analysis semantic and consistency gate
 status: blocked
 updated: 2026-10-12
-related: [SPEC-0016, PLAN-0018]
+related: [SPEC-0016, PLAN-0018, PLAN-0023, SPEC-0023]
 ---
 
 # Local issue-analysis semantic and consistency gate
+
+## Current assessment after PR22
+
+Revisited on main `05f0946` after PR21 and PR22. The semantic gate remains blocked. PR22 implements evaluator data and individual-attempt label contracts, with separate exploratory/confirmation requirements; it neither changes the analyst skill nor provides a new live result. The current analyst SKILL.md exactly matches the last live010 freeze (`a9a9f0c5bd1dc63e3f62de5b7135af83128a27493d7492032d9fb2696e7c9d0c`). Agent, contracts, provider and source-tool modules differ from that pre-PR21 freeze, so neither old success nor failure counts qualify the integrated runtime.
+
+The retained local evidence is available; the earlier PR22 implementation container's lack of it is not a current blocker. Reinspection verified 55/55 frozen source-v12 copies and 8/8 completed live010 receipts/input digests, with report inputs matching the frozen augmented fixtures. Three independently reviewed defects now have output and skill identities in `evals/issue_analysis/attempt_labels.yaml`: missing process read permission, an irrelevant reference citation and unnecessary caller exception handling. This is a small negative-example collection, not a balanced calibration or confirmation set. The legacy seed predates the skill file and remains excluded despite its recovered output identity.
+
+Next bounded work is [PLAN-0023](../plans/PLAN-0023-issue-analysis-rubric-and-skill-protocol.md): complete independent per-output labels including clean examples and failed-attempt attribution; pair outputs with exact historical inputs/profile evidence; freeze disjoint exploratory and confirmation sets before judge use. The old live010 inputs include dependency references absent from the current public dataset. Joining by case name alone would score against different evidence. See the [evaluation data notes](../../../evals/issue_analysis/README.md) for identity encoding and coverage limits. No judge, candidate inference or direct analyst/reviewer composition ran during this reassessment. Larger budgets alone are not supported as the next remedy by the all-completed analyst run; consistent conditions and evidence relevance remain the demonstrated gap.
 
 ## Observed and expected behavior
 

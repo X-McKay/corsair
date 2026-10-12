@@ -94,5 +94,10 @@ def test_committed_attempt_labels_load_and_name_dataset_cases():
     labels = load_attempt_labels()
     names = {case.name for case in load_dataset().cases}
     assert labels and all(item.case in names for item in labels)
-    # Published findings lack output and skill identity until coded from private copies: none is calibration-ready yet.
-    assert calibration_attempts(labels) == ()
+    # Historical prompt-only findings remain excluded even after their output is identified.
+    legacy = [item for item in labels if item.run == "local-model-improvement-20261012/live-001"]
+    assert len(legacy) == 1 and legacy[0].output_sha256 and legacy[0].skill_sha256 is None
+    admitted = calibration_attempts(labels)
+    assert legacy[0] not in admitted
+    assert len(admitted) == 3 and all(item.labels for item in admitted)
+    assert {item.run for item in admitted} == {"issue-0007-research-20261012/live-010"}
