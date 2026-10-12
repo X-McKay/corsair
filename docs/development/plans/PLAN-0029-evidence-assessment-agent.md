@@ -20,7 +20,9 @@ Implement [SPEC-0030](../specs/SPEC-0030-evidence-assessment-agent.md), step 4 o
 - [ ] Native Pydantic Evals cases (SPEC-0018 runs plus the IDEA-0004 negatives), development and held-out splits.
 - [ ] Add `read_source` once `agents/source/` is on main, if evaluation shows it is needed.
 - [x] First bounded live smoke on llm.almckay.io (prompt v1; below).
-- [ ] Rerun the smoke with prompt v2, then Evals-based live repeats; durable stage.
+- [x] Rerun the smoke with prompt v2 (below).
+- [ ] Rerun case (b) with an unlabelled sandbox log.
+- [ ] Evals-based live repeats; durable stage.
 
 ## Validation and progress
 
@@ -39,8 +41,19 @@ Live smoke, prompt `evidence-assessment-v1` at `acf07a8` on RIG0, vLLM at llm.al
 
 Every attempt read every item; no tool call was refused. In (b) the model cited the denial but read it as the sandbox blocking the traversal and proposed a verified fix; the gate rejected it both times. In (c2) the model noticed the JUnit/witness discrepancy and weakened its own proposal. Both (a) attempts added a wrong limitation comparing the candidate source digest with `frozen_patch_sha256`. c1 is a provider response-cap failure, the same 8192-token cap ISSUE-0007 tracks; it is kept in the denominator. Six attempts are a smoke, not qualification. Receipts are retained privately under `.runs/evidence-assessment-live-20261012T213319Z/` on RIG0.
 
-Prompt `evidence-assessment-v2` answers the two semantic errors: the skill now says `frozen_patch_sha256` identifies only the test patch, and that a sandbox denial or resource limit is never evidence of application safety. Its effect is unmeasured until the smoke is rerun.
+Prompt `evidence-assessment-v2` added two skill rules: `frozen_patch_sha256` identifies only the test patch, and a sandbox denial or resource limit is never evidence of application safety. Rerun at `7bc3e92` (skill `634be043…`) with the same inputs byte for byte and the same configuration:
+
+| Attempt | Proposed | Admitted | Gate | Requests / tools | Tokens in/out | Latency |
+| --- | --- | --- | --- | --- | --- | --- |
+| a1 | completed/reproduced/verified | yes | same | 6 / 5 | 24392/2270 | 20.7s |
+| a2 | completed/reproduced/verified | yes | same | 6 / 5 | 25471/2826 | 25.7s |
+| b1 | completed/reproduced/verified | no | blocked/reproduced/not_verified | 7 / 6 | 32245/5523 | 57.1s |
+| b2 | completed/reproduced/verified | no | blocked/reproduced/not_verified | 7 / 6 | 29980/4800 | 55.7s |
+| c1 | none: same 8192-token cap failure after five reads | n/a | completed/reproduced/not_verified | 6 / 5 | 25386/9132 | 93.4s |
+| c2 | completed/reproduced/verified | no | completed/reproduced/not_verified | 6 / 5 | 25389/3002 | 34.2s |
+
+v2 did not fix either error. Case (a) still adds a patch-digest limitation, now milder ("cannot be directly verified"). Case (b) is confounded: both repeats dismissed the denial because the smoke's sandbox-log line was labelled "(synthetic smoke event)", so it does not test the new rule. Case (c2) regressed from v1: it noticed the witness says `PermissionError` while the plan expects `ValueError` and still proposed a verified fix. The gate rejected all four over-claims across (b) and (c); only the four (a) proposals were admitted. With two repeats per case, v1/v2 differences are within noise; prompt changes should now be judged by the native Evals dataset, not by more smokes. Receipts: `.runs/evidence-assessment-live-20261012T214406Z/` on RIG0.
 
 ## Decisions and next action
 
-Rejected proposals are kept, not retried. `read_source` deferred to avoid importing paths the planner thread is moving. Next: rerun the smoke with prompt v2, then the Evals dataset. The response cap stays at the configured 8192 maximum; raising it belongs to ISSUE-0007. Stop condition: no connection to other stages before evals and a live baseline exist.
+Rejected proposals are kept, not retried. `read_source` deferred to avoid importing paths the planner thread is moving. Next: an unconfounded case (b), then the Evals dataset, which should drive further prompt changes. The response cap stays at the configured 8192 maximum; raising it belongs to ISSUE-0007. Stop condition: no connection to other stages before evals and a live baseline exist.
