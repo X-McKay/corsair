@@ -4,7 +4,7 @@ kind: handoff
 title: Direct-mode fixture composition
 status: recorded
 updated: 2026-10-12
-related: [SPEC-0031, PLAN-0031, IDEA-0004, SPEC-0027, SPEC-0032, ISSUE-0007]
+related: [SPEC-0031, PLAN-0031, IDEA-0004, SPEC-0027, ISSUE-0007]
 ---
 
 # Direct-mode fixture composition
