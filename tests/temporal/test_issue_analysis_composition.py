@@ -1,45 +1,120 @@
 """Small direct/native payload checks before any service allocation."""
 
 import asyncio
+from dataclasses import replace
 
 import pytest
-from pydantic_ai import models
-from pydantic_ai.exceptions import UsageLimitExceeded, UserError
-from pydantic_ai.usage import UsageLimits
+from pydantic_ai import capture_run_messages, models
+from pydantic_ai.durable_exec.temporal import PydanticAIPayloadConverter, TemporalDurability
+from pydantic_ai.exceptions import UsageLimitExceeded
+from pydantic_ai.messages import ModelResponse, ToolCallPart
+from pydantic_ai.models.function import FunctionModel
+from pydantic_ai.models.wrapper import WrapperModel
+from pydantic_ai.usage import RequestUsage, UsageLimits
 from temporalio.converter import DataConverter
-from pydantic_ai.durable_exec.temporal import PydanticAIPayloadConverter
+from temporalio.exceptions import ApplicationError
 
-from corsair.agents.issue_analysis import FixtureDependencies, fixture_prompt
-from corsair.workflows.issue_analysis import IssueAnalysisExecution, IssueAnalysisWorkflow
-from tests.temporal.test_issue_analysis_support import AGENT, EXPECTED, MODELS, inputs
+from corsair.agents.issue_analysis import FixtureDependencies, create_issue_analysis_agent, fixture_prompt
+from corsair.workflows.issue_analysis import (
+    IssueAnalysisExecution, IssueAnalysisRequest, IssueAnalysisWorkflow,
+)
+from tests.temporal.test_issue_analysis_support import (
+    ACTIVITY_CONFIG, BUDGET, EXPECTED, MODELS, admitted, fixture_agent, inputs,
+)
 
 
+@admitted
 class DirectConfiguredWorkflow(IssueAnalysisWorkflow):
-    __pydantic_ai_agents__ = [AGENT]
+    __pydantic_ai_agents__ = [fixture_agent()]
     model_keys = tuple(MODELS)
+    budget_ceiling = BUDGET
 
 
 def test_same_capability_agent_remains_direct_and_payload_roundtrips():
     async def check():
+        request = IssueAnalysisRequest(inputs(), "path_traversal", BUDGET)
         with models.override_allow_model_requests(False):
-            result = await DirectConfiguredWorkflow().run(inputs(), "path_traversal")
+            result = await DirectConfiguredWorkflow().run(request)
         assert result.output == EXPECTED["path_traversal"]
-        assert (result.requests, result.tool_calls) == (2, 1)
+        assert (result.requests, result.tool_calls, result.output_corrections) == (2, 1, 0)
+        assert result.mode == "direct" and result.run_id and result.elapsed_seconds >= 0
+        # Fixture models report estimated usage, so it is present rather than unknown.
+        assert result.usage_reported and result.input_tokens > 0 and result.output_tokens > 0
         converter = DataConverter(payload_converter_class=PydanticAIPayloadConverter)
-        restored, = await converter.decode(await converter.encode([result]), [IssueAnalysisExecution])
-        assert restored == result
+        restored, restored_request = await converter.decode(
+            await converter.encode([result, request]), [IssueAnalysisExecution, IssueAnalysisRequest])
+        assert (restored, restored_request) == (result, request)
     asyncio.run(check())
 
 
-@pytest.mark.parametrize("key,limit", [("unadmitted-provider", 3), ("path_traversal", 4), ("path_traversal", True)])
-def test_operator_admission_refuses_before_agent_execution(key, limit):
-    with pytest.raises(UserError):
-        asyncio.run(DirectConfiguredWorkflow().run(inputs(), key, limit))
+@pytest.mark.parametrize("key,budget,failure_type", [
+    ("unadmitted-provider", BUDGET, "ModelKeyNotAdmitted"),
+    ("path_traversal", replace(BUDGET, request_limit=4), "BudgetNotAdmitted"),
+    ("path_traversal", replace(BUDGET, request_limit=True), "BudgetNotAdmitted"),
+    ("path_traversal", replace(BUDGET, request_limit=0), "BudgetNotAdmitted"),
+    ("path_traversal", replace(BUDGET, tool_calls_limit=2), "BudgetNotAdmitted"),
+    ("path_traversal", replace(BUDGET, total_tokens_limit=5001), "BudgetNotAdmitted"),
+])
+def test_operator_admission_refuses_before_agent_execution(key, budget, failure_type):
+    with capture_run_messages() as messages, pytest.raises(ApplicationError) as refusal:
+        asyncio.run(DirectConfiguredWorkflow().run(IssueAnalysisRequest(inputs(), key, budget)))
+    assert (refusal.value.type, refusal.value.non_retryable) == (failure_type, True)
+    assert messages == []
+
+
+@pytest.mark.parametrize("agents", [[], [fixture_agent(), fixture_agent()]])
+def test_agent_configuration_refuses_before_agent_execution(agents):
+    class Misconfigured(DirectConfiguredWorkflow):
+        __pydantic_ai_agents__ = agents
+    with capture_run_messages() as messages, pytest.raises(ApplicationError) as refusal:
+        asyncio.run(Misconfigured().run(IssueAnalysisRequest(inputs(), "path_traversal", BUDGET)))
+    assert (refusal.value.type, refusal.value.non_retryable) == ("AgentConfigurationInvalid", True)
+    assert messages == []
+
+
+class UnreportedUsage(WrapperModel):
+    """Fixture provider that reports no usage at all."""
+
+    async def request(self, messages, model_settings, model_request_parameters):
+        response = await super().request(messages, model_settings, model_request_parameters)
+        return replace(response, usage=RequestUsage())
+
+
+def test_unreported_usage_is_unknown_and_output_corrections_are_counted():
+    expected = EXPECTED["missing_source"]
+
+    async def respond(messages, info):
+        corrected = any(part.part_kind == "retry-prompt" for message in messages for part in message.parts)
+        output = expected if corrected else expected.model_copy(update={"scope": "application_path"})
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, output.model_dump(mode="json"))])
+
+    corrected = FunctionModel(respond)
+    durability = TemporalDurability(models={"corrected": corrected, "unreported": UnreportedUsage(corrected)},
+                                    activity_config=ACTIVITY_CONFIG)
+
+    class Correcting(IssueAnalysisWorkflow):
+        __pydantic_ai_agents__ = [create_issue_analysis_agent(corrected, output_retries=1, durability=durability)]
+        model_keys = ("corrected", "unreported")
+        budget_ceiling = BUDGET
+
+    async def check():
+        with models.override_allow_model_requests(False):
+            return [await Correcting().run(IssueAnalysisRequest(inputs("missing_source"), key, BUDGET))
+                    for key in Correcting.model_keys]
+    reported, unreported = asyncio.run(check())
+    for result in (reported, unreported):
+        assert result.output == expected
+        assert (result.requests, result.tool_calls, result.output_corrections) == (2, 0, 1)
+    assert reported.usage_reported and reported.input_tokens > 0
+    # A provider that reports nothing yields unknown token counts, never zero.
+    assert not unreported.usage_reported
+    assert (unreported.input_tokens, unreported.output_tokens) == (None, None)
 
 
 def test_native_direct_request_limit_remains_effective():
     async def check():
         with models.override_allow_model_requests(False), pytest.raises(UsageLimitExceeded):
-            await AGENT.run(fixture_prompt(inputs()), model="path_traversal", deps=FixtureDependencies(inputs()),
-                            usage_limits=UsageLimits(request_limit=1, tool_calls_limit=1, total_tokens_limit=5000))
+            await fixture_agent().run(
+                fixture_prompt(inputs()), model="path_traversal", deps=FixtureDependencies(inputs()),
+                usage_limits=UsageLimits(request_limit=1, tool_calls_limit=1, total_tokens_limit=5000))
     asyncio.run(check())
