@@ -126,3 +126,15 @@ qualify-execution-receipts:
 	test ! -e "$(CORSAIR_QUAL_RUN)"
 	mkdir -p "$(CORSAIR_QUAL_RUN)"
 	uv run --locked python -m pytest tests/qualification -m execution_receipts --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
+
+# Separate existing-component matrices; fixture evidence roots must not overlap.
+.PHONY: qualify-source-execution qualify-execution-transport
+qualify-source-execution:
+	test ! -e "$(CORSAIR_QUAL_RUN)"
+	mkdir -p "$(CORSAIR_QUAL_RUN)"
+	uv run --locked python -m pytest tests/qualification -m source_execution --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
+
+qualify-execution-transport:
+	test ! -e "$(CORSAIR_QUAL_RUN)"
+	mkdir -p "$(CORSAIR_QUAL_RUN)"
+	uv run --locked python -m pytest tests/qualification -m execution_transport --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"

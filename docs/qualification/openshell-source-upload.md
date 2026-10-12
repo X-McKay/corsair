@@ -46,3 +46,7 @@ The [execution contract](../execution-and-recovery.md) explicitly permits an adm
 Final contract review withdrew a proposed mandatory root-owned source-image/read-only-PVC gate as stronger than the accepted staging contract. Stronger sealed-source media can be reviewed later if a concrete consumer requires that guarantee. No new image or driver/PVC profile is adopted here; the standard native upload path remains the selected arrival operation.
 
 General source materialization/API, source execution, active/concurrent workspace uploads, interrupted transfer/host descendants, cancellation/reconciliation, untrusted downloads, controller/transport/storage durability, agents/Temporal and production reliability remain unqualified. The withdrawn Docker staging experiment remains withdrawn. This result advances source arrival without changing ISSUE-0006's broader blocked criteria.
+
+## Qualified fixed execution follow-up
+
+The subsequent [fixed staging-source execution/output composition](openshell-source-execution.md) passed on two fresh admitted nodes with full original cleanup. This advances only a five-file stdlib fixture with an empty approved test-patch set, exact input/runtime/policy binding, post-execution source observations and immutable bounded outputs. General recipes/patches, transient integrity, untrusted files and transfer reconciliation remain unqualified; the arrival evidence above retains its original scope.
