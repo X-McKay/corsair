@@ -28,3 +28,10 @@ Subsequent [controlled native upload qualification](../../qualification/openshel
 ## Resolution criteria and next action
 
 Require a compatible immutable supported release offering no-retry/authoritative operation reconciliation and enforceable bounded transfer/extraction, or a specifically reviewed safe narrower contract supported by actual native semantics. Requalify affected runtime/transfer boundaries with fresh nodes and negative paths before resolving. Independent local immutable source/artifact store may proceed. Do not close an external issue or contact upstream without authorization.
+
+
+## Parallel qualification and native download review
+
+Fresh primary release/source/help review reconfirms the selected runtime tuple. Native single-file download stages in a temporary directory and requires a regular expected basename before rename, but extracts all archive members first. It supplies no aggregate-byte/member/inode quota, exactly-one-entry admission or supported retry-off/reconciliation; whole-operation attempts remain four. Digest checks and host deadlines cannot bound extraction or freeze concurrent writers. ISSUE-0006 stays blocked for untrusted workload files and application transfer recovery. See [pinned implementation](https://github.com/NVIDIA/OpenShell/blob/e1f3c82caa3ed3b65de22889ae7ef32a774878ef/crates/openshell-cli/src/ssh.rs).
+
+Already bounded completed ExecutionReceipt stdout/stderr can enter LocalArtifacts directly, without downloading files. That existing-component composition and actual host worker/receipt failures are separate PLAN-0012 qualifications; corrected full native1F is independent PLAN-0009 work. Do not add a trusted download merely to accrue passing checks or resume the withdrawn staging profile. Concrete source-upload consumer/writer admission remains a next scoped review, with no new transfer runtime or generic retry framework.
