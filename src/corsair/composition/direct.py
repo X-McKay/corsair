@@ -85,6 +85,8 @@ class FixtureCase:
     issue: IssueAnalysisInput
     environment: EnvironmentEvidence
     environment_identity: EnvironmentIdentity
+    # Operator-known digest of each revision's captured source; a run from any other source is refused.
+    revision_sources: dict[Literal["baseline", "candidate"], str]
 
 
 @dataclass(frozen=True)
@@ -215,9 +217,17 @@ async def run_direct(case: FixtureCase, models: StageModels, runners: Runners,
         executions.append(FrozenExecution(revision, operation, observed, failure))
     done = {"identification": identification, "plan": plan, "patch": patch, "observation_plan": expected,
             "executions": tuple(executions)}
-    refused = [e for e in executions if e.observed is None]
-    if refused:
-        return stop("execution", "; ".join(f"{e.revision} run refused: {e.failure}" for e in refused)[:2048], **done)
+    problems = []
+    for e in executions:
+        if e.observed is None:
+            problems.append(f"{e.revision} run refused: {e.failure}")
+        elif e.observed.operation != str(e.operation) or e.observed.patch_sha256 != frozen.sha256:
+            problems.append(f"{e.revision} runner returned another operation or patch")
+        elif (e.observed.workspace is not None
+              and e.observed.workspace.source.sha256 != case.revision_sources[e.revision]):
+            problems.append(f"{e.revision} workspace source is not the {e.revision} revision")
+    if problems:
+        return stop("execution", "; ".join(problems)[:2048], **done)
 
     identity = case.environment_identity
     runs = {e.revision: (e.observed,) for e in executions}

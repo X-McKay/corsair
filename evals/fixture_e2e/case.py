@@ -56,7 +56,9 @@ def fixture_case() -> FixtureCase:
         policy_revision="host-reviewed-bytes-only", limits_sha256=_digest("subprocess-timeout=60s"))
     return FixtureCase(issue=IssueAnalysisInput(fixture_id="path-traversal-e2e-v1", issue=ISSUE, scope="component",
                                                 source_files=sources),
-                       environment=environment, environment_identity=identity)
+                       environment=environment, environment_identity=identity,
+                       revision_sources={revision: _digest((FIXTURE / VARIANTS[revision] / "documents.py").read_bytes())
+                                         for revision in ("baseline", "candidate")})
 
 
 def reviewed_runners(store, root: Path):

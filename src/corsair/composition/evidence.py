@@ -13,7 +13,7 @@ from corsair.agents.evidence_assessment.contracts import MAX_ITEM_CHARS, Evidenc
 from corsair.agents.test_authoring.contracts import TestPatch
 from corsair.agents.test_planning.contracts import ReadyTestPlan
 from corsair.core.disposition import (ClassifiedFailure, EnvironmentIdentity, ExpectedFailure, ObservationPlan,
-                                      ObservedOutcome, Revision, RunEvidence, Witness)
+                                      ObservedOutcome, Revision, RunEvidence, SandboxEvent, Witness)
 from corsair.ports.execution import ExecutionReceipt
 from corsair.ports.test_runner import ApprovedPatch, NativeTestRun, PatchFile, TestCaseResult
 
@@ -69,9 +69,15 @@ def _receipt(observed: NativeTestRun) -> ExecutionReceipt | None:
     return discovery.receipt if discovery is not None else None
 
 
-def run_evidence(observed: NativeTestRun, *, environment: EnvironmentIdentity,
-                 witness: Witness | None = None) -> RunEvidence:
-    """One fresh native run as gate input. Delivery and completion come from the last receipt."""
+def run_evidence(observed: NativeTestRun, *, environment: EnvironmentIdentity, witness: Witness | None = None,
+                 sandbox_events: tuple[SandboxEvent, ...] | None = None) -> RunEvidence:
+    """One fresh native run as gate input. Delivery and completion come from the last receipt.
+
+    The gate reads an empty event tuple as observed absence, so a witness is admitted only together with
+    sandbox events the execution node actually observed; unobserved events stay None and no witness is used.
+    """
+    if witness is not None and sandbox_events is None:
+        raise ValueError('a witness needs the sandbox events observed for the same run')
     receipt = _receipt(observed)
     layer = observed.failure_layer
     if receipt is None:
@@ -89,7 +95,8 @@ def run_evidence(observed: NativeTestRun, *, environment: EnvironmentIdentity,
     return RunEvidence(
         delivery=delivery, completion=completion, execution_failure=failure, patch_sha256=observed.patch_sha256,
         discovered_test_ids=observed.discovery.test_ids if observed.discovery is not None else (),
-        outcomes=tuple(_outcome(case) for case in cases), witness=witness, environment=environment)
+        outcomes=tuple(_outcome(case) for case in cases), witness=witness, environment=environment,
+        sandbox_events=sandbox_events or ())
 
 
 def _item(item_id: str, kind: str, content: str, revision: Revision | None = None,

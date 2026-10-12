@@ -107,8 +107,9 @@ def test_the_witness_is_the_only_missing_gate_input(store, tmp_path):
     reached = Witness(artifact_sha256="0" * 64, path_reached=True, effect="observed")
     rejected = Witness(artifact_sha256="1" * 64, path_reached=True, effect="absent", safe_behavior="ValueError")
     evidence = AssessmentEvidence(plan=run.observation_plan,
-                                  baseline=(run_evidence(baseline, environment=identity, witness=reached),),
-                                  candidate=(run_evidence(candidate, environment=identity, witness=rejected),))
+                                  baseline=(run_evidence(baseline, environment=identity, witness=reached, sandbox_events=()),),
+                                  candidate=(run_evidence(candidate, environment=identity, witness=rejected,
+                                                          sandbox_events=()),))
     result = assess(evidence)
     assert result.permitted == Disposition(execution="completed", finding="reproduced", fix="verified")
     assert result.limitations == ()
@@ -118,6 +119,9 @@ def test_handoff_builders_refuse_a_patch_that_is_not_this_plan(store, tmp_path):
     run = compose(store, tmp_path)
     with pytest.raises(ValueError, match="test ids"):
         observation_plan(run.plan, run.patch.model_copy(update={"security_test_id": "test_documents.py::test_other"}))
+    with pytest.raises(ValueError, match="sandbox events"):
+        run_evidence(run.executions[0].observed, environment=fixture_case().environment_identity,
+                     witness=Witness(artifact_sha256="0" * 64, path_reached=True, effect="observed"))
     with pytest.raises(ValueError, match="digest"):
         freeze(run.patch.model_copy(update={"patch_sha256": "0" * 64}), ("test_documents.py",))
 
@@ -163,3 +167,13 @@ def test_unreviewed_test_bytes_never_execute_on_the_host(store, tmp_path):
     (dev_run,) = authored.dev_runs
     assert dev_run.status == "workspace_failure" and "reviewed SPEC-0018" in dev_run.errors
     assert not (tmp_path / "work" / "development").exists() and run.executions == ()
+
+
+def test_a_run_from_the_wrong_revision_is_never_labelled_as_the_requested_one(store, tmp_path):
+    """A runner factory that hands the candidate the baseline source is refused before any gate evidence."""
+    (tmp_path / "work").mkdir()
+    runners = reviewed_runners(store, tmp_path / "work")
+    runner = lambda purpose: runners("baseline" if purpose == "candidate" else purpose)
+    run = asyncio.run(run_direct(fixture_case(), stages(), runner))
+    assert run.stopped_at == "execution" and run.gate is None
+    assert run.reason == "candidate workspace source is not the candidate revision"
