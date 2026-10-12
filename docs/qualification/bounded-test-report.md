@@ -37,3 +37,9 @@ UV_CACHE_DIR="$PWD/.cache/uv" uv run --locked python -m pytest \
 ```
 
 Never reuse an evidence root or a gateway namespace cleaned by an earlier function-scoped case.
+
+## Test-pair audit (2026-10-12)
+
+Independent Sol/root review confirmed that the current producer stores inert source/test identities and prints literal claims with selected exits. It does not draft tests, perform pytest/JUnit discovery, call a target application or verify security assertions. Infrastructure toolchain roundtrips are also distinct from finding-specific tests. The consumer intentionally retains failed/skipped claims without a finding/fix disposition; no semantic validity follows from admission.
+
+The next application boundary must implement the [investigation contract](../investigation-contract.md#the-two-tests): one reviewed frozen two-test patch on immutable vulnerable/fixed component fixtures. Native collection must discover exactly the intended benign control and security regression. Both invoke the real implementation and have bounded observable witnesses. The control passes on both revisions; the security regression asserts safe behavior, fails for the expected security assertion on the vulnerable baseline and passes on the corrected revision. Preserve fresh individual outcomes, source/test identities and application versus sandbox observations. Skips, setup/build failures, failed controls, incomplete delivery and boundary denials cannot verify safety. Agent-authored test drafting and its independent semantic review remain unimplemented/unqualified; this audit does not promote literal report claims to execution evidence.

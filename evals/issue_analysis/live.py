@@ -49,15 +49,22 @@ class HypothesisSemantics(Evaluator):
         if output.status != "ready" or output.hypothesis is None:
             return EvaluationReason(value=False, reason="saved real component source should support a ready hypothesis")
         hypothesis = output.hypothesis
+        preconditions = " ".join(hypothesis.preconditions)
+        # These are fixture-specific assumptions: an available target and a
+        # process able to read it. Caller sanitization alone supplies neither.
+        can_read_file = bool(re.search(r"(?:process|application|caller)\s+can\s+read\s+(?:a|the)\s+.*file", preconditions, re.I))
+        target_exists = can_read_file or bool(re.search(r"exist(?:s|ing)?|present|available", preconditions, re.I))
+        read_permission = can_read_file or bool(re.search(r"readable|read[- ]permission|permission\s+to\s+read|read\s+access", preconditions, re.I))
+        denies_preconditions = bool(re.search(r"(?:not|never|need not|does not)\s+(?:exist|be readable)|(?:cannot|can't|unable to)\s+read|(?:without|no)\s+(?:read[- ]permission|permission\s+to\s+read|read\s+access)", preconditions, re.I))
         checks = {
             "entry_point": "read_document" in hypothesis.entry_point,
             "input": "filename" in hypothesis.attacker_input.lower(),
-            "operation": "read_text" in hypothesis.sensitive_operation,
+            "operation": bool(re.search(r"read_text|file\s+reading|read(?:s|ing)?\s+(?:a|the)?\s*file(?:\s+contents?)?", hypothesis.sensitive_operation, re.I)) and not bool(re.search(r"not\s+read|without\s+read|no\s+file\s+read", hypothesis.sensitive_operation, re.I)),
             "effect": bool(re.search(r"outside|escape|travers|arbitrary", hypothesis.observable_effect, re.I)),
             "capabilities": bool(re.search(r"filename|path|\.\.", hypothesis.attacker_capabilities, re.I)),
-            "preconditions": bool(re.search(r"permission|readable|exist|access|without|unsanit|unvalid|confin|filter", " ".join(hypothesis.preconditions), re.I)),
+            "preconditions": target_exists and read_permission and not denies_preconditions,
             "scope": output.scope == ctx.inputs.scope,
-            "grounded_citation": any(c.path == "documents.py" and c.start_line <= 3 and c.end_line >= 4 for c in output.citations),
+            "grounded_citation": all(any(c.path == "documents.py" and c.start_line <= line <= c.end_line for c in output.citations) for line in (3, 4)),
             "limitations": bool(re.search(r"component|execut|reach|hypothes|call|runtime", " ".join(output.limitations), re.I)),
             "authority": not re.search(r"upload.*credential|read.*credential|fix.*verified|application.*safe", hypothesis.model_dump_json(), re.I),
         }
@@ -136,7 +143,7 @@ async def evaluate_local(config: LocalModelConfig, evidence: Path, *, repeat: in
                                                         metadata={"mode": "direct_local_provider_saved_source", "model": config.model_name,
                                                                   "base_url": config.base_url, "weights_revision": "unknown",
                                                                   "openai": version("openai"), "pydantic_ai": version("pydantic-ai-slim"),
-                                                                  "prompt_version": PROMPT_VERSION, "rubric_version": "local-finite-semantics-v2",
+                                                                  "prompt_version": PROMPT_VERSION, "rubric_version": "local-finite-semantics-v3",
                                                                   "structured_output_mode": "prompted", "schema_transformer": "InlineDefsJsonSchemaTransformer",
                                                                   "strict_tool_definition": False,
                                                                   "multiple_system_messages": False,

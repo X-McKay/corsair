@@ -116,6 +116,52 @@ def test_semantic_rubric_accepts_paraphrase_and_missing_information():
     assert HypothesisSemantics().evaluate(SimpleNamespace(inputs=inputs, output=output)).value
 
 
+def test_saved_path_output_paraphrase_and_split_citations_keep_precondition_failure():
+    inputs, output = case()
+    # Reviewed live008 path repeat 2 facts, copied without reading private
+    # evidence at test time. Correcting rubric admission must not make it pass.
+    deps = FixtureDependencies(inputs)
+    changed = output.model_copy(update={
+        "citations": (deps.read_source("documents.py", 3, 3), deps.read_source("documents.py", 4, 4)),
+        "hypothesis": output.hypothesis.model_copy(update={
+            "sensitive_operation": "Path construction and file reading",
+            "preconditions": ("root is a valid Path object",),
+        }),
+    })
+    verdict = HypothesisSemantics().evaluate(SimpleNamespace(inputs=inputs, output=changed))
+    assert not verdict.value and verdict.reason == "failed finite predicates: preconditions"
+    corrected = changed.model_copy(update={"hypothesis": changed.hypothesis.model_copy(update={
+        "preconditions": ("The target file exists.", "The process has read permission for it."),
+    })})
+    assert HypothesisSemantics().evaluate(SimpleNamespace(inputs=inputs, output=corrected)).value
+
+
+@pytest.mark.parametrize("preconditions", [
+    ("The caller supplies filename without prior confinement.",),
+    ("The file exists.",),
+    ("The process has read permission.",),
+    ("The file need not exist; no read permission is necessary.",),
+])
+def test_semantic_rubric_requires_target_existence_and_read_permission(preconditions):
+    inputs, output = case()
+    changed = output.model_copy(update={"hypothesis": output.hypothesis.model_copy(update={"preconditions": preconditions})})
+    assert not HypothesisSemantics().evaluate(SimpleNamespace(inputs=inputs, output=changed)).value
+
+
+@pytest.mark.parametrize("operation", ["Path construction only", "File writing", "No file reading occurs", "Does not read file contents"])
+def test_semantic_rubric_rejects_opposite_file_operation(operation):
+    inputs, output = case()
+    changed = output.model_copy(update={"hypothesis": output.hypothesis.model_copy(update={"sensitive_operation": operation})})
+    assert not HypothesisSemantics().evaluate(SimpleNamespace(inputs=inputs, output=changed)).value
+
+
+@pytest.mark.parametrize("line", [3, 4])
+def test_semantic_rubric_rejects_incomplete_combined_citations(line):
+    inputs, output = case()
+    changed = output.model_copy(update={"citations": (FixtureDependencies(inputs).read_source("documents.py", line, line),)})
+    assert not HypothesisSemantics().evaluate(SimpleNamespace(inputs=inputs, output=changed)).value
+
+
 def test_fixture_prompt_exposes_exact_read_bounds_without_source_or_oracle():
     inputs, output = case()
     prompt = fixture_prompt(inputs)
