@@ -4,7 +4,7 @@
 
 | Lane | Completed preparation | Not completed |
 | --- | --- | --- |
-| Java10 | JSPWiki exact parent/fix, complete tree inventories, Apache licensing and native POM/test framework inspected; Plexus remains a prior shortlist item | Historical dependency closure, Java compatibility, common benign assertion and native discovery/execution; other cases incomplete |
+| Java10 | JSPWiki exact parent/fix, complete tree inventories, Apache licensing and native POM/test framework inspected; two native tests drafted and independently source-reviewed; Plexus remains a prior shortlist item | Historical dependency closure, Java compatibility, nonempty source/test recipe and native discovery/execution; other cases incomplete |
 | Python10 / JavaScript10 | Eighteen pinned commit-summary artifacts retrieved; Werkzeug cookie parser nominated for component review | Admission report/test drafts incomplete after subagent service content-filter error; no native execution |
 | Ruby10 / Perl10 | Twenty advisory admission records,12 fix-reference captures and6 Rack source/metadata captures; root checked linked file hashes | All vulnerable pins unresolved; test designs proposed only, no drafted/native test pair |
 
@@ -46,3 +46,9 @@ Draft actual native control/security code only after source and observation scop
 The user permits additional skills/tools where warranted, but generality is required. Put case facts/assertions in data and test artifacts. Reusable capabilities should concern source identity, native test discovery/execution, immutable artifacts and failure attribution; no project/CVE branches in core tools or prompts. A small reviewed recipe is preferable to another runner or orchestration framework.
 
 Fresh runtime startup was stopped on the user's checkpoint request, before mandatory admission or workload execution; original cluster cleanup is recorded in HANDOFF-0028. General transfer and model-composition gates remain under ISSUE-0006/ISSUE-0007. No50-case accuracy or multilingual execution claim is available yet.
+
+## Reviewed JSPWiki draft (2026-10-12)
+
+The subsequent [evaluator-only draft](../benchmarks/cases/jspwiki-forwarding/README.md) now contains exactly two Java/Jupiter tests with unchanged SHA256 `6ebf62443a54fc98b0d3f3680d4aa0fde239888db10bc8b5158026faa369b95d`. The benign assertion checks the common ordinary-page parameter; the security assertion observes the real servlet's dispatcher choice for an inert existing web-root readme. Independent pinned Stripes source review confirms explicit `setPathInfo` is required and the dispatcher records a URL without executing its target. This is not evidence of file disclosure or of a fixed application.
+
+All build POMs remain unchanged. Historical Maven dependency/plugin closure and Java17 compatibility are still unverified. The existing Java cache contains only synthetic-fixture dependencies. The first shallow research clone remains untouched; a new private complete bare repository and actual existing-adapter source captures now verify both full trees. Capture used explicit2048-file/4MiB-file/20MiB-total/60s-wall bounds and passed in6.052/6.168s; independent fresh-store readback and root review verified all3447 file references. The concrete reviewed source/nonempty-test/dependency/report recipe remains a separate gate. A proposed JUnit Platform1.4.0 `Launcher.discover` probe is retained privately and has not run. No Java project build, native discovery or real-case execution has occurred. Root is independently requalifying the post-PR21 runtime; successful infrastructure controls cannot promote this case.
