@@ -37,16 +37,45 @@ def user():
     return f'{os.getuid()}:{os.getgid()}'
 
 
-def setup(image, checkout, bundle, evidence, docker_args):
-    # The project's default groups, as `bundle install` resolves them; optional groups stay out.
-    script = (f'cp -R /src {WORK}; cd {WORK}; BUNDLE_PATH={GEMS} {BUNDLE} install --jobs 4; '
+def sha256(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
+
+
+def redacted(docker_args):
+    """Setup's extra `docker run` flags with environment values hidden (a proxy URL can carry a token)."""
+    shown, after_env = [], False
+    for arg in docker_args:
+        if after_env or arg.startswith(('--env=', '-e=')):
+            prefix, _, rest = arg.rpartition('=') if not after_env else ('', '', arg)
+            name = rest.split('=', 1)[0] if after_env else arg.split('=', 2)[1] if arg.count('=') > 1 else ''
+            shown.append((prefix.split('=', 1)[0] + '=' if prefix else '') + (f'{name}=<redacted>' if name else '<redacted>'))
+        else:
+            shown.append(arg)
+        after_env = arg in ('-e', '--env')
+    return shown
+
+
+def setup(image, checkout, bundle, commit, evidence, docker_args):
+    # The project's default groups; optional groups stay out. A committed lock installs exactly as committed
+    # (frozen: a lock that would need re-resolving fails setup); without one, Bundler's resolution is the
+    # harness's choice and is recorded as such.
+    committed = (checkout / 'Gemfile.lock').exists()
+    frozen = 'BUNDLE_FROZEN=true ' if committed else ''
+    script = (f'cp -R /src {WORK}; cd {WORK}; {frozen}BUNDLE_PATH={GEMS} {BUNDLE} install --jobs 4; '
               f'cp {WORK}/Gemfile.lock /bundle/Gemfile.lock')
     result = docker('run', '--rm', '--cap-drop=ALL', '--security-opt=no-new-privileges', '--user', user(), '-e', 'HOME=/tmp',
                     *docker_args, '-v', f'{checkout}:/src:ro', '-v', f'{bundle}:/bundle', image, '/bin/sh', '-ec', script,
                     timeout=1800)
     (evidence / 'setup.stdout').write_bytes(result.stdout)
     (evidence / 'setup.stderr').write_bytes(result.stderr)
-    return result.returncode
+    record = {'image': image, 'commit': commit, 'lock': 'committed' if committed else 'resolved',
+              'committed_lock_sha256': sha256(checkout / 'Gemfile.lock'), 'installed_lock_sha256': sha256(bundle / 'Gemfile.lock'),
+              'setup_docker_args': redacted(docker_args), 'exit': result.returncode}
+    if result.returncode == 0 and committed and record['committed_lock_sha256'] != record['installed_lock_sha256']:
+        record['exit'], record['detail'] = 1, 'installed Gemfile.lock differs from the committed one'
+    for path in (evidence / 'setup.json', bundle / 'setup.json'):
+        path.write_text(json.dumps(record, indent=2))
+    return record
 
 
 class DockerCase:
@@ -129,7 +158,11 @@ def run(image, checkout, bundle, commit, ids, evidence, tests_from, includes, ti
         result = MinitestRunner(case, case, store, config).run(patch, control_test_id=ids[0], security_test_id=ids[1],
                                                                discovery_command=config.command, operation=uuid4())
         elapsed = round(time.monotonic() - clock, 3)
+    setup_record = json.loads((bundle / 'setup.json').read_text())
+    assert setup_record['image'] == image and setup_record['commit'] == commit and setup_record['exit'] == 0, setup_record
     summary = {'image': image, 'commit': commit, 'ids': ids, 'tests_from': str(tests_from), 'patch_sha256': patch.sha256,
+               'lock': setup_record['lock'], 'lock_sha256': sha256(bundle / 'Gemfile.lock'), 'includes': list(includes),
+               'setup_docker_args': setup_record['setup_docker_args'],
                'elapsed_seconds': elapsed, 'container_cleanup': case.cleanup, 'failure_layer': result.failure_layer,
                'detail': result.detail, 'cleanup': result.cleanup,
                'discovery': result.discovery and {'status': result.discovery.status, 'test_ids': result.discovery.test_ids},
@@ -167,9 +200,9 @@ def main():
                             check=True).stdout.strip()
     if args.phase == 'setup':
         args.bundle.mkdir(parents=True, exist_ok=True)
-        code = setup(args.image, args.checkout.resolve(), args.bundle.resolve(), args.evidence, args.setup_docker_arg)
-        print(json.dumps({'phase': 'setup', 'commit': commit, 'exit': code}))
-        raise SystemExit(code)
+        record = setup(args.image, args.checkout.resolve(), args.bundle.resolve(), commit, args.evidence, args.setup_docker_arg)
+        print(json.dumps({'phase': 'setup', **record}))
+        raise SystemExit(record['exit'])
     summary = run(args.image, args.checkout.resolve(), args.bundle.resolve(), commit, tuple(args.id), args.evidence,
                   (args.tests_from or args.checkout).resolve(), args.include, args.timeout)
     print(json.dumps({k: v for k, v in summary.items() if k != 'run'}, indent=2, default=str))
