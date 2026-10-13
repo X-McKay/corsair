@@ -15,6 +15,8 @@ Branch `claude/live-witness-full-chain-6z24yc` from main `334aa03`. Delivered: t
 
 Live on RIG0 (details and evidence paths in PLAN-0039): the SPEC-0033 witness gate passed (reproduced / verified with admitted witnesses on the reviewed pair); the credential placeholder is now observed in the exec environment as `openshell:resolve:env:v{revision}_CORSAIR_QUAL_FAKE_TOKEN` with the raw value absent from every readable scope; the fully live chain with the PLAN-0035 stage profiles reached the gate 1/3, kept the planned security-test direction, and had both witnesses admitted live, but the gate could not use the baseline (`pytest.raises` failure type versus the planned `AssertionError`).
 
+A further rerun with `test-authoring-v5` (Al chose plain `assert` for planned `AssertionError`) produced the first fully live admitted completed / reproduced / verified verdict (1/3); the other two runs failed on author-invented audit-hook checks and the 10 tool-call limit.
+
 Not qualified: egress substitution and private repository fetch (SPEC-0025), the live agents, any benchmark case. The witness is tamper-evident, not tamper-proof.
 
 ## Validation and blockers
@@ -25,7 +27,7 @@ Blocking the fully live chain: (1) agents reading the test file they are meant t
 
 ## Decisions and next steps
 
-The RIG0 worktree is on local branch `live-witness-20261013` (= `334aa03`) with `live-cred-20261013` at `3efa446`; nothing committed there. The OpenShell gateway is uninstalled (last gate's teardown); the kind cluster is up and free. RIG0 layout (user, 2026-10-13): no new sibling worktrees under `/home/al/git`; new worktrees go under `/home/al/git/corsair/.worktrees/<branch>` (git-ignored) and run evidence under `/home/al/git/corsair/.runs`. Once this PR merges, move `/home/al/git/corsair-live-e2e/.runs` content into `/home/al/git/corsair/.runs` and remove that worktree with `git worktree remove`; its `.state/` (kind kubeconfig and owner records) must be restaged into the new location first, since the qualification fixtures read it from the running worktree. Next: the user decides item (2); planner and source-tool owners take item (1); then rerun the profiled live chain.
+The RIG0 worktree is on local branch `live-witness-20261013` (= `334aa03`) with `live-cred-20261013` at `3efa446`; nothing committed there. The OpenShell gateway is uninstalled (last gate's teardown); the kind cluster is up and free. RIG0 layout (user, 2026-10-13): no new sibling worktrees under `/home/al/git`; new worktrees go under `/home/al/git/corsair/.worktrees/<branch>` (git-ignored) and run evidence under `/home/al/git/corsair/.runs`. Once this PR merges, move `/home/al/git/corsair-live-e2e/.runs` content into `/home/al/git/corsair/.runs` and remove that worktree with `git worktree remove`; its `.state/` (kind kubeconfig and owner records) must be restaged into the new location first, since the qualification fixtures read it from the running worktree. Item (2) is settled (`test-authoring-v5`). Next: authoring skill forbids its own audit hooks; review the tool-call limits; planner and source-tool owners take item (1); then rerun the profiled live chain.
 
 ## Continuation prompt
 
