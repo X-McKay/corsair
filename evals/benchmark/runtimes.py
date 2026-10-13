@@ -206,10 +206,12 @@ def recommend(results: list[dict]) -> list[tuple[str, str, list[str]]]:
 
 def _outcome(record: dict) -> str:
     """A supported case counts as qualified only on live rows; image-only selections are counted apart."""
-    revision = record.get('revisions', {}).get('baseline') or record.get('revisions', {}).get('fix') or {}
-    if record['status'] == 'supported' and revision.get('evidence') != 'live':
-        return 'supported (' + revision.get('evidence', 'evidence unrecorded') + ')'
-    return record['status']
+    if record['status'] != 'supported': return record['status']
+    # The weakest evidence across every evaluated revision: one image-only commit makes the case image-only.
+    levels = [r.get('evidence', 'evidence unrecorded') for r in record.get('revisions', {}).values() if r.get('status') == 'supported']
+    for level in ('evidence unrecorded', 'image-only'):
+        if not levels or level in levels: return 'supported (' + (level if levels else 'evidence unrecorded') + ')'
+    return 'supported'
 
 
 def markdown(results: list[dict]) -> str:

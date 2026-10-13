@@ -261,6 +261,9 @@ def test_benchmark_report_counts_image_only_apart():
     def record(case, evidence=None):
         revision = {'status': 'supported', 'image_id': 'perl-5.26-make', **({'evidence': evidence} if evidence else {})}
         return {'case_id': case, 'language': 'perl', 'status': 'supported', 'revisions': {'baseline': revision}}
+    mixed = record('d', 'live')
+    mixed['revisions']['fix'] = {'status': 'supported', 'image_id': 'perl-5.26-make', 'evidence': 'image-only'}
+    assert '| d | perl | supported (image-only) |' in markdown([mixed])
     report = markdown([record('a', 'live'), record('b', 'image-only'), record('c')])
     assert '| b | perl | supported (image-only) |' in report
     assert 'Outcomes: supported 1, supported (evidence unrecorded) 1, supported (image-only) 1' in report
