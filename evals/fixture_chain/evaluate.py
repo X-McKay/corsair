@@ -35,7 +35,7 @@ from corsair.core.disposition import Disposition
 from evals.fixture_e2e.case import (BASELINE_TEST, _reads_then, fixture_case, scripted_assessment, scripted_authoring,
                                     scripted_identification, scripted_planning)
 from evals.fixture_e2e.reviewed import FIXTURE, PREFIX, ReviewedLocalExecution, ReviewedWorkspace
-from evals.fixture_e2e.run import STAGES, VERSIONS, Journal, attempt_record, result_record
+from evals.fixture_e2e.run import STAGES, VERSION_FIELDS, VERSIONS, Journal, attempt_record, result_record
 from corsair.workflows.chain import run_durable
 from corsair.workflows.chain_runtime import ChainResult, FailureRecord
 from evals.issue_analysis.evaluate import describe_model, record_count
@@ -189,7 +189,7 @@ async def evaluate(evidence: Path, budget: CompositionBudget = CompositionBudget
     metadata = {"mode": mode, "composition": f"{run.__module__}.{run.__qualname__}", "live_stages": list(live),
                 "budget": budget.model_dump(), "provider": config.model_dump() if config else None,
                 "model": describe_model(model) if model is not None else "scripted",
-                "versions": {stage: dict(zip(("prompt_version", "config_version", "skill_sha256"), VERSIONS[stage]))
+                "versions": {stage: dict(zip(VERSION_FIELDS, VERSIONS[stage]))
                              for stage in STAGES},
                 "runner": "reviewed_host_workspace", "witness_capture": "none", "repeat": repeat, "max_concurrency": 1,
                 "task_retries": 0, "dataset_sha256": _digest(CASES), "source": {"python": sys.version}}
