@@ -13,6 +13,11 @@ kind-up:
 kind-down:
 	uv run --locked python deploy/kind/bootstrap.py down
 
+# SPEC-0036 workspace quota class on the owned node (proposed, unqualified).
+.PHONY: workspace-storage
+workspace-storage:
+	uv run --locked python deploy/kind/bootstrap.py workspace-storage
+
 test-config:
 	uv run --locked python -m pytest tests/configuration tests/unit tests/agents tests/temporal/test_fixture_contracts.py tests/temporal/test_issue_analysis_composition.py tests/temporal/test_chain_composition.py
 
