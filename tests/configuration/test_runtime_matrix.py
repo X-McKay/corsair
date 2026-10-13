@@ -10,6 +10,7 @@ RECORDS = {p.name.split('-', 2)[0] + '-' + p.name.split('-', 2)[1]
 
 
 def test_rows_are_the_prepared_toolchain_images():
+    # A prepared image gets its row only after its live gate passes, so rows are a subset of the prepared images.
     matrix = load()
     # Every row is a prepared image; a prepared image gets its row only once its live gate passes (SPEC-0045).
     assert {(Path(row.image_source).name, row.base_image) for row in matrix.images} <= set(BASES.items())

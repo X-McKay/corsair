@@ -15,9 +15,13 @@ from tests.qualification.support import ROOT, NetworkFixture
 from tests.qualification.gateway import native_gateway
 from tests.qualification.test_lifecycle import SdkReceipts
 from tests.qualification.test_policy import require_network, owned_sandbox, observe_policy, global_policy_observation, wait_logging_activation
-from tests.qualification.prepare_toolchains import JAVA_TESTS, LAUNCHER, SOURCE, image_receipt, source_hashes
+from tests.qualification.prepare_toolchains import JAVA_TESTS, LAUNCHER, PYTHONS, SOURCE, image_receipt, source_hashes
 from corsair.adapters.maven_runner import WRAPPER, MavenRunner, MavenRunnerConfig, selection
 from corsair.reports.junit_listing import listed
+
+# Exact interpreter and pytest each Python toolchain image carries (its requirements.txt pins).
+PYTHON_TOOLCHAINS = {'python': ('/usr/local/bin/python3.12', (3, 12), '9.0.3'),
+                     'python37': ('/usr/local/bin/python3.7', (3, 7), '7.4.4')}
 
 
 @pytest.fixture
@@ -41,7 +45,7 @@ def toolchain_gateway(kube, request):
 
 def toolchain_policy(language):
     policy = yaml.safe_load((ROOT / 'policies/openshell/identity.yaml').read_text())
-    policy['filesystem_policy']['read_only'] += ['/opt/corsair-fixture'] + ([] if language == 'python' else ['/opt/java/openjdk', '/opt/corsair-m2', '/opt/corsair-m2.sha256', '/opt/corsair-junit', '/opt/corsair-junit.sha256'])
+    policy['filesystem_policy']['read_only'] += ['/opt/corsair-fixture'] + ([] if language in PYTHONS else ['/opt/java/openjdk', '/opt/corsair-m2', '/opt/corsair-m2.sha256', '/opt/corsair-junit', '/opt/corsair-junit.sha256'])
     return policy
 
 
@@ -66,8 +70,8 @@ def expect_completed(result, exit_code, evidence_text):
 def stage_project(kube, cli, sdk, name, language, record):
     project = kube.evidence / (language + '-project')
     project.mkdir()
-    if language == 'python':
-        shutil.copyfile(SOURCE / 'python/test_native.py', project / 'test_native.py')
+    if language in PYTHONS:
+        shutil.copyfile(SOURCE / language / 'test_native.py', project / 'test_native.py')
     else:
         shutil.copyfile(SOURCE / language / 'pom.xml', project / 'pom.xml')
         shutil.copytree(SOURCE / language / 'src', project / 'src')
@@ -93,20 +97,21 @@ def report(sdk, name, remote, expected, record):
     record.setdefault('native_reports', []).append(native_report(result.stdout, expected))
 
 
-def python_offline(sdk, name, remote, record):
-    result = execute(sdk, name, ['/usr/local/bin/python3.12', '-c', 'import sys,pytest; assert sys.version_info[:2]==(3,12); assert pytest.__version__=="9.0.3"; print(sys.version); print(pytest.__version__)'], remote)
-    expect_completed(result, 0, '9.0.3')
+def python_offline(sdk, name, remote, record, language='python'):
+    python, series, pytest_version = PYTHON_TOOLCHAINS[language]
+    result = execute(sdk, name, [python, '-c', f'import sys,pytest; assert sys.version_info[:2]=={series!r}; assert pytest.__version__=={pytest_version!r}; print(sys.version); print(pytest.__version__)'], remote)
+    expect_completed(result, 0, pytest_version)
     record['versions'] = result.stdout
-    result = execute(sdk, name, ['/usr/local/bin/python3.12', '-m', 'pytest', '-q', 'test_native.py', '--junitxml=' + remote + '/passed.xml'], remote)
+    result = execute(sdk, name, [python, '-m', 'pytest', '-q', 'test_native.py', '--junitxml=' + remote + '/passed.xml'], remote)
     expect_completed(result, 0, '1 passed')
     report(sdk, name, remote + '/passed.xml', [('test_native', 'test_native_roundtrip')], record)
     setup = execute(sdk, name, ['/bin/sh', '-ec', 'mkdir /tmp/no-tests; printf "def test_syntax(:\\n" > /tmp/test_syntax.py; printf "def test_assertion():\\n    assert 1 == 2\\n" > /tmp/test_assertion.py'], remote)
     expect_completed(setup, 0, '')
-    result = execute(sdk, name, ['/usr/local/bin/python3.12', '-m', 'pytest', '-q', '/tmp/test_syntax.py'], remote)
+    result = execute(sdk, name, [python, '-m', 'pytest', '-q', '/tmp/test_syntax.py'], remote)
     expect_completed(result, 2, 'SyntaxError')
-    result = execute(sdk, name, ['/usr/local/bin/python3.12', '-m', 'pytest', '-q', '/tmp/no-tests'], remote)
+    result = execute(sdk, name, [python, '-m', 'pytest', '-q', '/tmp/no-tests'], remote)
     expect_completed(result, 5, 'no tests ran')
-    result = execute(sdk, name, ['/usr/local/bin/python3.12', '-m', 'pytest', '-q', '/tmp/test_assertion.py'], remote)
+    result = execute(sdk, name, [python, '-m', 'pytest', '-q', '/tmp/test_assertion.py'], remote)
     expect_completed(result, 1, 'AssertionError')
     record['offline_diagnostics'] = ['syntax/collection', 'no-discovery', 'assertion']
 
@@ -173,7 +178,8 @@ def native_events(logs):
 
 def expect_registry_unavailable(result, events, before, sandbox_id):
     assert result.exit_code == 1
-    assert any(detail in result.stderr for detail in ('http.client.RemoteDisconnected: Remote end closed connection without response', 'TimeoutError: timed out'))
+    # CPython before 3.10 names a socket timeout `socket.timeout`; 3.10+ aliases it to TimeoutError.
+    assert any(detail in result.stderr for detail in ('http.client.RemoteDisconnected: Remote end closed connection without response', 'TimeoutError: timed out', 'socket.timeout: timed out'))
     address = str(ipaddress.ip_address(result.stdout.strip()))
     assert result.stdout == address + '\n'
     fresh = [e for e in events if e.get('metadata', {}).get('uid') and e['metadata']['uid'] not in before and e.get('container', {}).get('uid') == sandbox_id]
@@ -183,13 +189,13 @@ def expect_registry_unavailable(result, events, before, sandbox_id):
     return failure
 
 
-def dependency_policy(endpoint):
-    policy = toolchain_policy('python')
-    wheel = next(w for w in json.loads((SOURCE / 'python/wheels.json').read_text()) if w['name'] == 'six')
+def dependency_policy(endpoint, language='python'):
+    policy = toolchain_policy(language)
+    wheel = next(w for w in json.loads((SOURCE / language / 'wheels.json').read_text()) if w['name'] == 'six')
     missing = '/simple/corsair-qualification-missing-artifact-1e-0001/'
     local = f'echo.{endpoint.namespace}.svc.cluster.local'
     unavailable = f'unavailable.{endpoint.namespace}.svc.cluster.local'
-    policy['network_policies'] = {'dependencies': {'name': 'fixed-native-dependencies', 'binaries': [{'path': '/usr/local/bin/python3.12'}], 'endpoints': [
+    policy['network_policies'] = {'dependencies': {'name': 'fixed-native-dependencies', 'binaries': [{'path': PYTHON_TOOLCHAINS[language][0]}], 'endpoints': [
         {'host': 'files.pythonhosted.org', 'port': 443, 'protocol': 'rest', 'enforcement': 'enforce', 'rules': [{'allow': {'method': 'GET', 'path': urlparse(wheel['url']).path}}]},
         {'host': 'pypi.org', 'port': 443, 'protocol': 'rest', 'enforcement': 'enforce', 'rules': [{'allow': {'method': 'GET', 'path': missing}}]},
         {'host': local, 'port': 5678, 'allowed_ips': [endpoint.endpoints['service'] + '/32'], 'protocol': 'rest', 'enforcement': 'enforce', 'rules': [{'allow': {'method': 'GET', 'path': '/**'}}]},
@@ -198,9 +204,11 @@ def dependency_policy(endpoint):
     return policy, wheel, missing, local, unavailable
 
 
-def python_dependencies(kube, cli, sdk, name, remote, record, endpoint, pair):
+def python_dependencies(kube, cli, sdk, name, remote, record, endpoint, pair, language='python'):
+    python = PYTHON_TOOLCHAINS[language][0]
+    prefix = '' if language == 'python' else language + '-'  # keep each image's evidence when both run
     service = {'apiVersion': 'v1', 'kind': 'Service', 'metadata': {'name': 'unavailable'}, 'spec': {'selector': {'app': 'corsair-qualification', 'role': 'echo'}, 'ports': [{'port': 5679, 'targetPort': 5679}]}}
-    service_file = kube.evidence / 'unavailable-registry.yaml'
+    service_file = kube.evidence / (prefix + 'unavailable-registry.yaml')
     service_file.write_text(yaml.safe_dump(service))
     kube.run('create', '-n', endpoint.namespace, '-f', service_file)
     actual = kube.get('service', 'unavailable', '-n', endpoint.namespace)
@@ -213,27 +221,27 @@ def python_dependencies(kube, cli, sdk, name, remote, record, endpoint, pair):
     endpoint.allowed('probe-allowed')
     cli('settings', 'set', name, '--key', 'ocsf_json_enabled', '--value', 'true')
     wait_logging_activation(kube, pair['supervisor'])
-    policy, wheel, missing, local, unavailable = dependency_policy(endpoint)
-    path = kube.evidence / 'dependencies-policy.yaml'
+    policy, wheel, missing, local, unavailable = dependency_policy(endpoint, language)
+    path = kube.evidence / (prefix + 'dependencies-policy.yaml')
     path.write_text(yaml.safe_dump(policy))
     cli('policy', 'set', name, '--policy', str(path), '--wait')
     observe_policy(cli, name, policy, record)
     requirement = f"six @ {wheel['url']} --hash=sha256:{wheel['sha256']}\n"
-    execute(sdk, name, ['/usr/local/bin/python3.12', '-c', 'from pathlib import Path; Path("cold.txt").write_text(' + repr(requirement) + ')'], remote)
-    result = execute(sdk, name, ['/usr/local/bin/python3.12', '-m', 'pip', '--isolated', 'install', '--disable-pip-version-check', '--no-cache-dir', '--no-deps', '--require-hashes', '--retries', '0', '--timeout', '10', '--target', remote + '/cold', '-r', 'cold.txt'], remote)
+    execute(sdk, name, [python, '-c', 'from pathlib import Path; Path("cold.txt").write_text(' + repr(requirement) + ')'], remote)
+    result = execute(sdk, name, [python, '-m', 'pip', '--isolated', 'install', '--disable-pip-version-check', '--no-cache-dir', '--no-deps', '--require-hashes', '--retries', '0', '--timeout', '10', '--target', remote + '/cold', '-r', 'cold.txt'], remote)
     expect_completed(result, 0, 'Successfully installed six-1.17.0')
-    result = execute(sdk, name, ['/usr/local/bin/python3.12', '-c', 'import sys; sys.path.insert(0,"cold"); import six; assert six.__version__=="1.17.0"; assert six.__file__.startswith(' + repr(remote + '/cold/') + '); print(six.__version__); print(six.__file__)'], remote)
+    result = execute(sdk, name, [python, '-c', 'import sys; sys.path.insert(0,"cold"); import six; assert six.__version__=="1.17.0"; assert six.__file__.startswith(' + repr(remote + '/cold/') + '); print(six.__version__); print(six.__file__)'], remote)
     expect_completed(result, 0, '1.17.0')
     # Keep native HTTP detail separate from pip's resolver diagnostic.
     request = 'import urllib.request,urllib.error;\ntry:\n r=urllib.request.urlopen(' + repr('https://pypi.org' + missing) + ',timeout=10); print(r.status); print(r.read().decode())\nexcept urllib.error.HTTPError as e:\n print(e.code); print(e.read().decode())'
-    result = execute(sdk, name, ['/usr/local/bin/python3.12', '-c', request], remote)
+    result = execute(sdk, name, [python, '-c', request], remote)
     expect_completed(result, 0, '404')
     assert result.stdout.startswith('404\n') and 'policy_denied' not in result.stdout
-    result = execute(sdk, name, ['/usr/local/bin/python3.12', '-m', 'pip', '--isolated', 'download', '--disable-pip-version-check', '--no-cache-dir', '--no-deps', '--retries', '0', '--timeout', '10', '--index-url', 'https://pypi.org/simple/', '--dest', '/tmp/missing', 'corsair-qualification-missing-artifact-1e-0001==0.0.0'], remote)
+    result = execute(sdk, name, [python, '-m', 'pip', '--isolated', 'download', '--disable-pip-version-check', '--no-cache-dir', '--no-deps', '--retries', '0', '--timeout', '10', '--index-url', 'https://pypi.org/simple/', '--dest', '/tmp/missing', 'corsair-qualification-missing-artifact-1e-0001==0.0.0'], remote)
     expect_completed(result, 1, 'No matching distribution found')
     assert 'policy_denied' not in result.stdout + result.stderr and 'CERTIFICATE_VERIFY_FAILED' not in result.stdout + result.stderr
     control_request = 'import urllib.request; r=urllib.request.urlopen(' + repr(f'http://{local}:5678/simple/six/') + ',timeout=10); print(r.status); print(r.read().decode())'
-    result = execute(sdk, name, ['/usr/local/bin/python3.12', '-c', control_request], remote)
+    result = execute(sdk, name, [python, '-c', control_request], remote)
     expect_completed(result, 0, 'corsair-network-ok')
     assert result.stdout.startswith('200\n')
     request = request.replace(repr('https://pypi.org' + missing), repr(f'http://{unavailable}:5679/simple/six/'))
@@ -241,7 +249,7 @@ def python_dependencies(kube, cli, sdk, name, remote, record, endpoint, pair):
     before_logs = kube.run('logs', '-n', 'openshell', pair['supervisor']['metadata']['name'], '--timestamps=true').stdout
     before = {e['metadata']['uid'] for e in native_events(before_logs)}
     try:
-        result = execute(sdk, name, ['/usr/local/bin/python3.12', '-c', request], remote)
+        result = execute(sdk, name, [python, '-c', request], remote)
     finally:
         # Export before original supervisor deletion, including failed assertions.
         logs = kube.run('logs', '-n', 'openshell', pair['supervisor']['metadata']['name'], '--timestamps=true').stdout
@@ -254,7 +262,7 @@ def toolchain_gate(kube, gateway, language):
     """One image's gate, into its own evidence subdirectory; select one image by its test node id."""
     assert not (kube.evidence / 'toolchain.json').exists(), 'Another toolchain gate already wrote this evidence directory'
     sources = ['tests/qualification/test_toolchains.py', 'tests/qualification/prepare_toolchains.py', 'tests/qualification/test_policy.py', 'tests/qualification/test_lifecycle.py', 'tests/qualification/gateway.py', 'tests/qualification/support.py', 'src/corsair/adapters/maven_runner.py', 'src/corsair/reports/junit_listing.py', 'policies/openshell/identity.yaml', 'deploy/runtime-lock.yaml', 'pyproject.toml', 'uv.lock']
-    (kube.evidence / 'toolchain-source-hashes.json').write_text(json.dumps(dict(source_hashes(), **{p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest() for p in sources}), indent=2))
+    (kube.evidence / 'toolchain-source-hashes.json').write_text(json.dumps(dict(source_hashes(language), **{p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest() for p in sources}), indent=2))
     summary = {'outcome': 'failed', 'sandboxes': [], 'internal_retry_counts': 'unknown'}
     endpoint = NetworkFixture(kube, 'toolchain-endpoint')
     attempted = False
@@ -271,9 +279,9 @@ def toolchain_gate(kube, gateway, language):
             summary['sandboxes'].append(record)
             with owned_sandbox(kube, gateway['cli'], sdk, image, toolchain_policy(language), record) as (name, pair):
                 remote = stage_project(kube, gateway['cli'], sdk, name, language, record)
-                if language == 'python':
-                    python_offline(sdk, name, remote, record)
-                    python_dependencies(kube, gateway['cli'], sdk, name, remote, record, endpoint, pair)
+                if language in PYTHONS:
+                    python_offline(sdk, name, remote, record, language)
+                    python_dependencies(kube, gateway['cli'], sdk, name, remote, record, endpoint, pair, language)
                 else:
                     java_offline(sdk, name, remote, record, language)
             assert all(r['outcome'] == 'passed' and r['cleanup_confirmed'] for r in summary['sandboxes'])
@@ -300,3 +308,9 @@ def test_native_java_toolchain(image_kube, toolchain_gateway):
 @pytest.mark.toolchain('python')
 def test_native_python_toolchain(image_kube, toolchain_gateway):
     toolchain_gate(image_kube, toolchain_gateway, 'python')
+
+
+@pytest.mark.toolchain('python37')
+def test_native_python37_toolchain(image_kube, toolchain_gateway):
+    """The CPython 3.7 image through the same offline, diagnostic and dependency checks as the 3.12 image."""
+    toolchain_gate(image_kube, toolchain_gateway, 'python37')

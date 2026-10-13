@@ -16,7 +16,10 @@ BASES = {
     'python': 'docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d',
     'java': 'docker.io/library/maven@sha256:5394efaabc436795b507ca400aaf86311db03543072e0e87ae66c595965d4aed',
     'java8': 'docker.io/library/maven@sha256:f2cb52730ea0bde9dc8ba20e5e539d000dcdd7ab9e498d70c301fe04fbddb656',
+    'python37': 'docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b',
 }
+# Interpreter each Python toolchain directory is built for; its wheels are fetched hash-checked before an offline build.
+PYTHONS = {'python': 'python3.12', 'python37': 'python3.7'}
 # Both Java images hold the pinned JUnit Platform console launcher for SPEC-0041 discovery.
 LAUNCHER = '/opt/corsair-junit/junit-platform-console-standalone-1.14.4.jar'
 JAVA_TESTS = ('nativeRoundtrip', 'nativeRuntime')
@@ -38,13 +41,13 @@ def image_receipt(language):
 
 def control(kube, image, language):
     cidfile = kube.evidence / (language + '-control.id')
-    command = ('cp /opt/corsair-fixture/test_native.py /tmp/test_native.py; cd /tmp; python3.12 -m pytest -q test_native.py --junitxml=/tmp/result.xml; cat /tmp/result.xml' if language == 'python' else
+    command = ('cp /opt/corsair-fixture/test_native.py /tmp/test_native.py; cd /tmp; ' + PYTHONS[language] + ' -m pytest -q test_native.py --junitxml=/tmp/result.xml; cat /tmp/result.xml' if language in PYTHONS else
                'sha256sum -c /opt/corsair-junit.sha256 >/dev/null; cd /opt/corsair-m2; sha256sum -c /opt/corsair-m2.sha256 >/dev/null; printf "CACHE-BEGIN\\n"; cat /opt/corsair-m2.sha256; printf "CACHE-END\\n"; cp -R /opt/corsair-fixture /tmp/project; cp -R /opt/corsair-m2 /tmp/m2; /usr/share/maven/bin/mvn -B -ntp -o -f /tmp/project/pom.xml -Dmaven.repo.local=/tmp/m2 test; cat /tmp/project/target/surefire-reports/TEST-corsair.NativeTest.xml')
     try:
         result = kube.native(DOCKER + ['run', '--rm', '--cidfile', str(cidfile), '--network=none', '--cap-drop=ALL', '--security-opt=no-new-privileges', '--user=10001:10001', image, '/bin/sh', '-ec', command], timeout=180)
-        assert 'tests="%d"' % (1 if language == 'python' else len(JAVA_TESTS)) in result.stdout and 'failures="0"' in result.stdout and 'skipped="0"' in result.stdout
-        assert all(name in result.stdout for name in (('test_native_roundtrip',) if language == 'python' else JAVA_TESTS))
-        if language != 'python':
+        assert 'tests="%d"' % (1 if language in PYTHONS else len(JAVA_TESTS)) in result.stdout and 'failures="0"' in result.stdout and 'skipped="0"' in result.stdout
+        assert all(name in result.stdout for name in (('test_native_roundtrip',) if language in PYTHONS else JAVA_TESTS))
+        if language not in PYTHONS:
             (kube.evidence / (language + '-maven-cache.sha256')).write_text(result.stdout.split('CACHE-BEGIN\n', 1)[1].split('CACHE-END\n', 1)[0])
     finally:
         cleanup = {'confirmed': False}
@@ -82,20 +85,20 @@ def main():
                 context = cache / 'context'
                 shutil.copytree(SOURCE / language, context)
                 hashes = source_hashes(language)
-                if language == 'python':
+                if language in PYTHONS:
                     wheel_dir = context / 'wheels'
                     wheel_dir.mkdir()
-                    for wheel in json.loads((SOURCE / 'python/wheels.json').read_text()):
+                    for wheel in json.loads((SOURCE / language / 'wheels.json').read_text()):
                         data = urllib.request.urlopen(wheel['url'], timeout=30).read()
                         assert hashlib.sha256(data).hexdigest() == wheel['sha256']
                         (wheel_dir / wheel['filename']).write_bytes(data)
-                    (evidence / 'wheels.json').write_text((SOURCE / 'python/wheels.json').read_text())
+                    (evidence / (language + '-wheels.json')).write_text((SOURCE / language / 'wheels.json').read_text())
                 source_digest = hashlib.sha256(json.dumps(hashes, sort_keys=True).encode()).hexdigest()
                 tag = 'docker.io/library/corsair-' + language + ':' + source_digest[:16]
                 kube.native(DOCKER + ['pull', base], timeout=180)
                 # Maven's trusted preparation explicitly downloads exact pinned artifacts;
                 # its strict native checksums and complete cache hashes are retained.
-                kube.native(DOCKER + ['build', '--network=' + ('none' if language == 'python' else 'default'), '--pull=false', '--tag', tag, str(context)], timeout=300)
+                kube.native(DOCKER + ['build', '--network=' + ('none' if language in PYTHONS else 'default'), '--pull=false', '--tag', tag, str(context)], timeout=300)
                 config = kube.native(DOCKER + ['image', 'inspect', '--format', '{{.Id}}', tag]).stdout.strip()
                 control(kube, config, language)
                 receipt = {'tag': tag, 'config_id': config, 'base': base, 'sources': hashes, 'evidence': str(evidence), 'trusted_control_passed': True}
