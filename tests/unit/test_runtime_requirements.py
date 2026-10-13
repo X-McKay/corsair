@@ -225,30 +225,29 @@ def test_selection_supported_unsupported_conflict():
         check_ready(ready('junit5'), selection, prepared)
 
 
-# SPEC-0056 image row, staged here until its live gate passes; runtime and make are what the image measured.
-STAGED_PERL526 = {'id': 'perl-5.26-make', 'language': 'perl',
-                  'base_image': 'docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7',
-                  'image_source': 'deploy/qualification/toolchains/perl526', 'runtime': {'name': 'perl', 'version': '5.26.3'},
-                  'tools': {'make': '4.2.1'}, 'selector': {}, 'qualification': {'records': ['SPEC-0056'], 'report': 'x'}}
-
-
-def test_perl526_row_meets_runtime_and_make_and_waits_for_a_tap_runner():
+def test_perl526_rows_select_the_fixture_and_need_the_tap_runner():
     fixture = Path(__file__).resolve().parents[2] / 'deploy/qualification/toolchains/perl526/Makefile.PL'
     requirement = detect({'Makefile.PL': fixture.read_bytes()}, 'perl')
-    matrix = load().model_dump()
-    staged = Matrix.model_validate({**matrix, 'images': [*matrix['images'], STAGED_PERL526]})
-    # No Corsair runner and report parser for TAP yet, so no framework row: the image alone does not run a case.
-    selection = select(requirement, staged)
-    assert selection.status == 'unsupported' and [n.name for n in selection.needs] == ['tap-harness']
-    assert [check.name for check in selection.rejected[0].unmet] == ['tap-harness']
-    # The SPEC-0061 row: Test::More 1.302073 (core in the image) writes the TAP that `tap_runner.py` admits.
-    runner = {'name': 'tap-harness', 'language': 'perl', 'versions': '==1.302073', 'runner': 'src/corsair/adapters/tap_runner.py',
-              'images': ['perl-5.26-make'], 'qualification': {'records': ['SPEC-0056', 'SPEC-0061'], 'report': 'x'}}
-    selection = select(requirement, Matrix.model_validate({**staged.model_dump(), 'frameworks': [*matrix['frameworks'], runner]}))
+    matrix = load()
+    selection = select(requirement, matrix)
     assert selection.status == 'supported' and selection.image_id == 'perl-5.26-make'
+    # Without the tap-harness framework row the image alone does not run a case.
+    bare = Matrix.model_validate({**matrix.model_dump(), 'frameworks': [f for f in matrix.model_dump()['frameworks'] if f['name'] != 'tap-harness']})
+    selection = select(requirement, bare)
+    assert selection.status == 'unsupported' and [n.name for n in selection.needs] == ['tap-harness']
     # A project that needs a newer Perl is not routed to 5.26.
     newer = detect({'Makefile.PL': fixture.read_bytes().replace(b"'5.026'", b"'5.028'")}, 'perl')
-    assert select(newer, staged).status == 'unsupported' and 'perl' in [n.name for n in select(newer, staged).needs]
+    assert select(newer, matrix).status == 'unsupported' and 'perl' in [n.name for n in select(newer, matrix).needs]
+
+
+def test_rows_state_their_evidence():
+    data = load().model_dump()
+    del data['images'][0]['qualification']['evidence']
+    with pytest.raises(ValueError, match='evidence'): Matrix.model_validate(data)
+    data = load().model_dump()
+    data['images'][0]['qualification']['evidence'] = 'docker'
+    with pytest.raises(ValueError): Matrix.model_validate(data)
+
 
 def test_matrix_refuses_selector_rows_and_duplicates():
     data = load().model_dump()
@@ -493,7 +492,7 @@ def test_java_unread_pins_and_version_file_names():
     others = [row for row in load().model_dump()['frameworks'] if row['name'] != 'junit5']
     matrix = Matrix.model_validate({**load().model_dump(), 'frameworks': [*others, {
         'name': 'junit5', 'language': 'java', 'versions': '5.14.*', 'runner': 'x', 'images': ['temurin-17-maven'],
-        'qualification': {'records': ['SPEC-0039'], 'report': 'x'}}]})
+        'qualification': {'evidence': 'live', 'records': ['SPEC-0039'], 'report': 'x'}}]})
     base = '<properties><maven.compiler.release>17</maven.compiler.release></properties>'
     assert select(detect({'pom.xml': pom(base + junit)}, 'java'), matrix).status == 'supported'
     # Al's re-review: an unreadable or undefined toolchains JDK pin was dropped and 17 was selected.
