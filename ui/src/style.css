@@ -1,39 +1,48 @@
+/* Aladdin public-brand reference: black/white, #00cfba teal, #005eb8 blue.
+   Darker teal is used for small text on light surfaces to retain contrast. */
 :root {
-  font-family:
-    Inter,
-    ui-sans-serif,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+  font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
   color: var(--text);
   background: var(--bg);
   font-size: 14px;
   font-synthesis: none;
-  --bg: hsl(240 12% 98%);
-  --card: #fff;
-  --text: hsl(240 10% 12%);
-  --muted: hsl(240 5% 43%);
-  --border: hsl(240 8% 88%);
-  --soft: hsl(240 8% 94%);
-  --accent: hsl(242 69% 58%);
-  --accent-soft: hsl(242 69% 96%);
-  --warning: #855007;
-  --warning-bg: #fff4dd;
+  --bg: #f2f2f2;
+  --card: #ffffff;
+  --text: #111111;
+  --muted: #595959;
+  --border: #d6d6d6;
+  --soft: #eaeaea;
+  --brand: #00cfba;
+  --accent: #006f64;
+  --accent-soft: #e3f5f1;
+  --info: #005eb8;
+  --info-bg: #e8f1fa;
+  --action: #000000;
+  --action-text: #ffffff;
+  --selected: #111111;
+  --selected-text: #ffffff;
+  --warning: #805000;
+  --warning-bg: #fff3d6;
   --sidebar: var(--card);
   --sidebar-muted: var(--muted);
   --shadow: none;
   color-scheme: light;
 }
 .dark {
-  --bg: hsl(240 8% 8%);
-  --card: hsl(240 7% 10%);
-  --text: hsl(240 8% 93%);
-  --muted: hsl(240 5% 64%);
-  --border: hsl(240 5% 21%);
-  --soft: hsl(240 6% 15%);
-  --accent: hsl(242 85% 75%);
-  --accent-soft: hsl(242 25% 19%);
+  --bg: #101414;
+  --card: #191e1e;
+  --text: #f5f7f6;
+  --muted: #afbaba;
+  --border: #374242;
+  --soft: #263030;
+  --accent: #00cfba;
+  --accent-soft: #123b36;
+  --info: #8fc5ff;
+  --info-bg: #16334f;
+  --action: #00cfba;
+  --action-text: #071c19;
+  --selected: #003c35;
+  --selected-text: #f5fffd;
   --warning: #f0c276;
   --warning-bg: #44361e;
   --sidebar: var(--card);
@@ -87,7 +96,7 @@ summary:focus-visible {
 button,
 select {
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: 2px;
 }
 h1,
 h2,
@@ -97,7 +106,7 @@ p {
 }
 h1 {
   font-size: 27px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.22;
   letter-spacing: -1.05px;
   overflow-wrap: anywhere;
@@ -143,7 +152,7 @@ svg {
   align-items: center;
   padding: 0 10px 46px;
   font-size: 23px;
-  font-weight: 650;
+  font-weight: 700;
   letter-spacing: -0.75px;
 }
 .brand small {
@@ -159,10 +168,10 @@ svg {
   height: 43px;
   display: grid;
   place-items: center;
-  background: var(--accent-soft);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  color: var(--accent);
+  background: #000000;
+  border: 1px solid #000000;
+  border-radius: 2px;
+  color: var(--brand);
 }
 .nav-label {
   padding: 0 15px 12px;
@@ -182,7 +191,7 @@ nav {
   gap: 12px;
   padding: 12px 14px;
   font-size: 13px;
-  border-radius: 7px;
+  border-radius: 2px;
   color: var(--muted);
   transition: background 0.15s;
 }
@@ -191,11 +200,16 @@ nav {
   color: var(--text);
 }
 .nav-link.selected {
-  background: var(--soft);
-  color: var(--text);
+  background: var(--selected);
+  color: var(--selected-text);
+  box-shadow: inset 3px 0 var(--brand);
+}
+.nav-link.selected .nav-count {
+  color: var(--selected-text);
+  background: transparent;
 }
 .nav-link.selected svg {
-  color: var(--accent);
+  color: var(--brand);
 }
 .nav-count {
   color: var(--text);
@@ -203,14 +217,14 @@ nav {
   background: var(--border);
   font-size: 10px;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: 2px;
 }
 .sidebar-bottom {
   margin-top: auto;
 }
 .local-note {
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 2px;
   padding: 15px;
   display: grid;
   grid-template-columns: 7px 1fr;
@@ -316,7 +330,7 @@ main {
 .stat {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 2px;
   padding: 21px 21px 20px;
   box-shadow: var(--shadow);
 }
@@ -354,7 +368,7 @@ main {
 .panel {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 2px;
   box-shadow: var(--shadow);
   overflow: hidden;
   margin-bottom: 22px;
@@ -446,7 +460,7 @@ tbody tr:hover {
   font-weight: 550;
   line-height: 1.6;
   padding: 3px 7px;
-  border-radius: 5px;
+  border-radius: 2px;
   background: var(--soft);
   color: var(--muted);
 }
@@ -458,13 +472,9 @@ tbody tr:hover {
   background: var(--warning-bg);
   color: var(--warning);
 }
-.badge.purple {
-  background: #eeeafa;
-  color: #665495;
-}
-.dark .badge.purple {
-  background: #342e49;
-  color: #d4c4f3;
+.badge.info {
+  background: var(--info-bg);
+  color: var(--info);
 }
 .status-dot {
   display: inline-block;
@@ -484,7 +494,7 @@ tbody tr:hover {
 .bar {
   width: 49px;
   height: 5px;
-  border-radius: 9px;
+  border-radius: 2px;
   background: var(--soft);
   overflow: hidden;
 }
@@ -492,7 +502,7 @@ tbody tr:hover {
   display: block;
   height: 100%;
   background: var(--accent);
-  border-radius: 9px;
+  border-radius: 2px;
 }
 .numeric {
   font-variant-numeric: tabular-nums;
@@ -503,7 +513,7 @@ tbody tr:hover {
 }
 .guide {
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 2px;
   padding: 24px;
   background: var(--card);
   margin-bottom: 22px;
@@ -516,7 +526,7 @@ tbody tr:hover {
   background: var(--accent-soft);
   color: var(--accent);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 2px;
   margin-bottom: 20px;
 }
 .guide h2 {
@@ -574,7 +584,7 @@ tbody tr:hover {
   justify-content: space-between;
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 2px;
   padding: 7px 9px;
   max-width: 100%;
   text-align: left;
@@ -602,7 +612,7 @@ tbody tr:hover {
   gap: 10px;
   background: var(--soft);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 2px;
   padding: 15px 18px;
   font-size: 11px;
   color: var(--muted);
@@ -653,7 +663,7 @@ tbody tr:hover {
   place-items: center;
   width: 63px;
   height: 63px;
-  border-radius: 17px;
+  border-radius: 2px;
   background: var(--soft);
   color: var(--accent);
   border: 1px solid var(--border);
@@ -665,10 +675,10 @@ tbody tr:hover {
   justify-content: center;
   gap: 8px;
   padding: 9px 13px;
-  background: var(--accent);
-  color: var(--card);
+  background: var(--action);
+  color: var(--action-text);
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 2px;
   font-size: 11px;
 }
 .button.subtle {
@@ -688,7 +698,7 @@ tbody tr:hover {
   gap: 10px;
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: 2px;
   padding: 10px 13px;
   min-width: 220px;
   flex: 1;
@@ -882,7 +892,7 @@ footer {
   background: var(--soft);
   color: var(--accent);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 2px;
 }
 .runtime-card h2 {
   font-size: 21px;
@@ -968,7 +978,7 @@ footer {
   z-index: 100;
   background: var(--card);
   border: 2px solid var(--accent);
-  border-radius: 5px;
+  border-radius: 2px;
 }
 .skip-link:focus {
   top: 10px;
@@ -1096,7 +1106,7 @@ footer {
     position: fixed;
     inset: 0;
     z-index: 25;
-    background: #101015b0;
+    background: #000000b0;
     border: 0;
     border-radius: 0;
   }
@@ -1220,15 +1230,15 @@ progress.bar {
 }
 progress.bar::-webkit-progress-bar {
   background: var(--soft);
-  border-radius: 9px;
+  border-radius: 2px;
 }
 progress.bar::-webkit-progress-value {
   background: var(--accent);
-  border-radius: 9px;
+  border-radius: 2px;
 }
 progress.bar::-moz-progress-bar {
   background: var(--accent);
-  border-radius: 9px;
+  border-radius: 2px;
 }
 
 @media (max-width: 720px) {

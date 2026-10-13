@@ -240,7 +240,7 @@ export function RunsTable({ runs }: { runs: Evaluation[] }) {
                 </span>
               </td>
               <td>
-                <Badge tone={run.mode === "live" ? "purple" : "neutral"}>
+                <Badge tone={run.mode === "live" ? "info" : "neutral"}>
                   {run.mode}
                 </Badge>
                 <span className="row-subtitle">{run.set}</span>
