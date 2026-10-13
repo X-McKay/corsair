@@ -4,7 +4,7 @@ kind: handoff
 title: Agent behaviour fixes
 status: recorded
 updated: 2026-10-13
-related: [PLAN-0035, PLAN-0031, PLAN-0034, PLAN-0025, PLAN-0029, PLAN-0030]
+related: [PLAN-0035, PLAN-0031, PLAN-0025, PLAN-0029, PLAN-0030]
 ---
 
 # Agent behaviour fixes
