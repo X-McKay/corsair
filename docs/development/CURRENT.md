@@ -1,5 +1,7 @@
 # Current work
 
+Evaluation proposals: [IDEA-0009](ideas/IDEA-0009-eval-runner-measurement.md) proposes simple standalone reporting, failure accounting and reliable comparisons; [IDEA-0008](ideas/IDEA-0008-agent-release-policies.md) keeps release policies deferred. Documentation only; [publication handoff](handoffs/HANDOFF-0099-evaluation-ideas.md).
+
 Provider configuration: [SPEC-0066](specs/SPEC-0066-provider-configuration.md), [PLAN-0072](plans/PLAN-0072-provider-configuration.md). Per-agent native inference selection and GitHub/Azure ticket capture implemented; offline checks passed, live integrations unqualified. Latest handoff: [HANDOFF-0093](handoffs/HANDOFF-0093-provider-review-corrections.md).
 
 Current diagnostics work: [SPEC-0053](specs/SPEC-0053-actionable-blockers.md), [PLAN-0057](plans/PLAN-0057-actionable-blockers.md), [operator guidance](../runbooks/setup-blockers.md). PR63 integrated main 93a0fab, preserving junit4; removed Maven-wrapper recovery and retains at most two explicit pytest-argument corrections. Budget-refused readiness remains fixed. Full offline checks: 1326 passed; frozen environment eval 16/16. [Handoff](handoffs/HANDOFF-0085-pytest-only-correction.md). Live correction effectiveness and full real-case composition remain unqualified.
