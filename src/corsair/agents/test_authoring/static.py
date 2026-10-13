@@ -92,8 +92,8 @@ def static_checks(content: str, test_id: str, target_symbol: str, *, absence_tes
     """Structural evaluation facts; target calls exclude deferred bodies, without proving reachability or semantics.
 
     ``absence_test`` names the security test of an absence plan (safe behavior ``no_<effect>``): it catches broadly
-    around the planned call, since the target may avoid the effect by raising, so a broad handler inside that one
-    test is the skill's shape, not swallowing.
+    around the planned call, since the target may avoid the effect by raising, so a broad handler of a ``try`` whose
+    body calls the target, inside that one test, is the skill's shape, not swallowing; any other broad handler is.
     """
     try:
         tree = ast.parse(content)
@@ -103,9 +103,13 @@ def static_checks(content: str, test_id: str, target_symbol: str, *, absence_tes
     nodes = list(ast.walk(tree))
     body = _executable(function)
     try:
-        allowed = set(map(id, ast.walk(_function(tree, absence_test)))) if absence_test else set()
+        absence = _function(tree, absence_test) if absence_test else None
     except ValueError:
-        allowed = set()
+        absence = None
+    allowed = {id(handler) for node in (ast.walk(absence) if absence else ())
+               if isinstance(node, ast.Try) and any(isinstance(n, ast.Call) and _name(n.func) == target_symbol
+                                                    for stmt in node.body for n in ast.walk(stmt))
+               for handler in node.handlers}
     return {
         "parses_and_defines_test": True,
         "calls_target": any(isinstance(n, ast.Call) and _name(n.func) == target_symbol for n in body),

@@ -294,6 +294,11 @@ def test_a_broad_catch_is_the_absence_plan_shape_only_in_the_security_test():
     control = REFERENCE.replace("def test_benign_control(files):\n", "def test_benign_control(files):\n    try:\n        pass\n    except Exception:\n        pass\n")
     assert control != REFERENCE
     assert not static_checks(control, SECURITY, "read_document", absence_test=SECURITY)["no_swallowing_except"]
+    name = SECURITY.rsplit("::", 1)[1]
+    header = next(line for line in broad.splitlines() if line.startswith(f"def {name}("))
+    swallowed = broad.replace(header + "\n", header + "\n    try:\n        assert False\n    except Exception:\n        pass\n", 1)
+    assert swallowed != broad
+    assert not static_checks(swallowed, SECURITY, "read_document", absence_test=SECURITY)["no_swallowing_except"]
 
 
 def test_assertion_lines_belong_to_the_named_function():
