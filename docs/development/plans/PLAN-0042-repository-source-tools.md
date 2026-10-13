@@ -21,6 +21,7 @@ Implement [SPEC-0038](../specs/SPEC-0038-repository-source-tools.md): bounded li
 - [x] Offline tests over a fixture tree and through the native agent (`tests/agents/test_repository_source.py`).
 - [x] Measurement harness and JSPWiki smoke case (`evals/repository_identification/`); measured in the container.
 - [x] Live smoke on the local model on RIG0 (three repeats); harness fixes from it (selection evaluator, absolute paths).
+- [ ] First follow-up: a read of an absent path (for example the approved test file a stage is meant to create, seen in 2 of 3 profiled live runs under PLAN-0039) returns a short typed notice, like `RepeatedRead`, instead of a run-ending `ModelRetry`, in both the repository and the inline window tools; the inline change needs its frozen evals rerun.
 - [ ] Adopt in test planning after PR #38 merges, then authoring, environment and assessment, each with its eval set rerun.
 - [ ] Durable repository mode: a serialisable tree reference resolved inside the activity.
 
