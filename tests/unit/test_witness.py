@@ -329,3 +329,19 @@ def test_security(tmp_path):
     found = witness_evidence(capture(record, request), request, SECURITY)
     assert [o['planned'] for o in json.loads(record)['tests'][SECURITY]['opens']] == [True]
     assert (found.witness.effect, found.witness.safe_behavior) == ('observed', 'ValueError')
+
+
+def test_a_runtime_without_monitoring_runs_the_tests_and_records_itself_unsupported(tmp_path):
+    # CPython before 3.12 has no sys.monitoring: the run must proceed and the record must be refused by name.
+    (tmp_path / 'target.py').write_text(TARGET)
+    (tmp_path / 'test_case.py').write_text('import target\n\ndef test_security(tmp_path):\n    assert False\n')
+    argv = list(probe_argv(COMMAND, REQUEST, root=str(tmp_path), record_path='witness.json', nonce=NONCE))
+    argv[0], argv[2] = sys.executable, 'import sys; del sys.monitoring\n' + BOOTSTRAP
+    done = subprocess.run(argv, cwd=tmp_path, capture_output=True, timeout=60, env={'PYTHONPATH': '.'})
+    record = json.loads((tmp_path / 'witness.json').read_bytes())
+    assert done.returncode == 1 and b'1 failed' in done.stdout
+    assert (record['tool_registered'], record['intact']) == (False, False)
+    assert record['unsupported'].endswith('has no sys.monitoring (3.12+)')
+    assert record['tests'][SECURITY]['complete'] is True
+    found = witness_evidence(capture((tmp_path / 'witness.json').read_bytes()), REQUEST, SECURITY)
+    assert (found.witness, found.sandbox_events) == (None, None) and 'unsupported on this runtime' in found.reason

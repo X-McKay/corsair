@@ -1,0 +1,23 @@
+"""The environment toolset offers exactly its registered tools; any change to what it offers changes its digest."""
+
+from corsair.agents.environment.tools import TOOLSET_SHA256, environment_tools, toolset_sha256
+
+# SPEC-0053 adds explicit bounded correction arguments and guidance after the SPEC-0052 split.
+OFFERED_SHA256 = "bfdd901000c3de152f25474869658a1eabf588a19a173fdfb6c7278eb652fc63"
+
+
+def test_toolset_offers_exactly_the_registered_tools_in_order():
+    tools = environment_tools()
+    assert tools.id == "environment"
+    assert list(tools.tools) == ["read_source", "list_toolchains", "run_setup_command", "read_output"]
+    assert {name: tool.max_retries for name, tool in tools.tools.items()} == dict.fromkeys(tools.tools, 0)
+
+
+def test_toolset_digest_matches_reviewed_correction_contract():
+    assert TOOLSET_SHA256 == toolset_sha256(environment_tools()) == OFFERED_SHA256
+
+
+def test_digest_changes_when_an_offered_definition_changes():
+    tools = environment_tools()
+    tools.add_function(lambda: None, name="unreviewed")
+    assert toolset_sha256(tools) != OFFERED_SHA256

@@ -36,7 +36,8 @@ This spec covers the command and results layout, and the authoring agent's host 
   <UTC stamp>-<set>-<mode>/
     command.json                   argv, git commit and dirty state, note, exit code, start and end
     evidence/                      the suite's configuration.json, report.json and per-attempt receipts
-    summary.json                   identity (prompt, config, skill digest, model, dataset digest, mode, runner, budget),
+    summary.json                   identity (prompt, config, skill digest, toolset digest where reported (SPEC-0052),
+                                   model, dataset digest, mode, runner, budget),
                                    per-assertion and per-case pass counts, task failures, efficiency means
     comparison.md                  identity changes, then assertion, case and efficiency tables against the reference
 ```

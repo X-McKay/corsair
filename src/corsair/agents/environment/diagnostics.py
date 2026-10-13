@@ -64,7 +64,7 @@ def setup_blocker(receipt: ExecutionReceipt, run_id: int, error: str | None) -> 
                       "Ask the operator to reclaim owned resources or review the workspace budget; do not delete unknown resources."], "reported")
     return issue("setup_command_failed", f"Setup command exited with status {receipt.native_exit}.",
                  ["Inspect the cited command and output to distinguish dependency, compilation, test discovery or baseline-test failure.",
-                  "Check the repository's declared procedure and required inputs; correct the cause before a new attempt. No automatic retry or security verdict."], "unknown", "developer")
+                  "Check the repository's declared procedure and required inputs. Only an explicit correction_available result permits a bounded changed invocation; otherwise start a new attempt after correcting the cause. No automatic retry or security verdict."], "unknown", "developer")
 
 
 def budget_blocker() -> Blocker:
