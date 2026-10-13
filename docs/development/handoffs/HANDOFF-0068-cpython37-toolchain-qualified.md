@@ -20,7 +20,7 @@ Branch `claude/toolchain-python37-drklks`, restarted from main bb4f3b7 after #55
 Live on RIG0 (details and identities in [the toolchain report](../../qualification/openshell-toolchains.md#spec-0046-cpython-37-image-real-case-and-witness-v2-probe-2026-10-13)):
 - Toolchain gate passed at 794a003.
 - CVE-2021-32839 passed at both commits at 4117e3f, with the witness refused by name.
-- `make qualify-witness` passed at 4117e3f, qualifying the `corsair-witness-v2` probe c89e0d65….
+- `make qualify-witness` passed at 4117e3f with probe c89e0d65…. Main's probe has since changed under #44 (64d21d9d…) and is unqualified until the gate reruns on it.
 - The scripted assessment development baseline was promoted at 51/51.
 
 Remaining limits:
