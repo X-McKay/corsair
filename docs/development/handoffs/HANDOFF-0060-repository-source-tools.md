@@ -15,7 +15,7 @@ Branch `claude/repo-scale-source-tools-l7bldu` from main `334aa03`, draft PR. De
 
 ## Validation and blockers
 
-- Offline: `tests/agents/test_repository_source.py` 21 passed; existing identification suite unchanged and passing; `make test-config` 874 passed (853 on main). CI `offline-guards` green on the first push.
+- Offline: `tests/agents/test_repository_source.py` 25 passed; existing identification suite unchanged and passing; `make test-config` 878 passed (853 on main), including fixes for four Codex review findings. CI `offline-guards` green on the first push.
 - Measurement on JSPWiki f140a2a4 in the container (full bare clone, `GitSource` capture 19.3 s): 1,723 files, 1,471 readable text files; probe of seven tool calls returned 7,944 B of the 131,072 B run budget, and the repeated window returned a 248 B notice. Details in PLAN-0042.
 - Live smoke on RIG0 (Qwen3.6-35B-A3B-NVFP4, three repeats of the JSPWiki case, details in PLAN-0042): 2/3 completed and selected `doGet` in `WikiServlet.java` 88–101. Rescored offline from the stored report with `selection_checks`: status, scope, report identity, target selection and source range all true on both. Attempt 1 failed by calling a nonexistent `status` tool after eight calls. Completed attempts used all 10 allowed tool calls, about 22 KB of the 128 KiB budget, one `RepeatedRead` each. Not qualified: one case.
 - Harness defects found by that run and fixed: the live dataset lacked the selection evaluator, and a relative `--evidence` path failed `LocalArtifacts`'s absolute-root check.

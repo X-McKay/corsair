@@ -310,3 +310,34 @@ def test_smoke_case_keeps_oracles_out_of_agent_inputs():
 def test_live_run_scores_the_selection():
     from evals.repository_identification.evaluate import LiveBudget, MatchesRepositorySelection, live_evaluators
     assert any(isinstance(evaluator, MatchesRepositorySelection) for evaluator in live_evaluators(LiveBudget()))
+
+
+def test_file_size_limit_applies_on_every_call_not_only_the_first():
+    source = raw({"a.py": "x = 1\n" * 10})
+    assert len(source.lines("a.py", RepositoryLimits())) == 10
+    with pytest.raises(UnreadableSource, match="exceeds 8 bytes"):
+        source.lines("a.py", RepositoryLimits(file_bytes=8))
+    strict_first = raw({"b.py": "y\n" * 10})
+    with pytest.raises(UnreadableSource):
+        strict_first.lines("b.py", RepositoryLimits(file_bytes=8))
+    assert len(strict_first.lines("b.py", RepositoryLimits())) == 10
+
+
+def test_paths_beyond_the_citation_contract_are_unreadable_not_crashing():
+    long_path = "/".join(["d" * 60] * 5) + "/x.py"
+    source = raw({long_path: "z\n"})
+    assert list_tree(source, RepositoryLimits(), pattern="*.py").entries[0].path == long_path
+    with pytest.raises(UnreadableSource, match="256"):
+        source.window_end(long_path, 1, RepositoryLimits())
+    assert search_tree(source, RepositoryLimits(), "z").files_skipped == 1
+
+
+def test_inline_handoff_keeps_exact_text():
+    source = raw({"crlf.txt": "a\r\nb", "empty.py": ""})
+    files = source.source_files(("crlf.txt", "empty.py"), RepositoryLimits())
+    assert [f.content for f in files] == ["a\r\nb", ""]
+
+
+def test_search_refuses_an_absent_directory():
+    with pytest.raises(ValueError, match="absent"):
+        search_tree(tree(), RepositoryLimits(), "doGet", directory="invented")

@@ -50,7 +50,7 @@ class SourceTree:
     sizes: Mapping[str, int]
     _load: Callable[[str], bytes] = field(repr=False)
     identity: tuple[str, str] | None = None
-    _text: dict[str, tuple[str, ...] | str] = field(default_factory=dict, repr=False, compare=False)
+    _text: dict[str, tuple[str, tuple[str, ...]] | str] = field(default_factory=dict, repr=False, compare=False)
 
     def __post_init__(self):
         for path in self.sizes:
@@ -74,27 +74,33 @@ class SourceTree:
         return cls({path: len(content) for path, content in data.items()}, data.__getitem__, identity)
 
     def source_files(self, paths: tuple[str, ...], limits: RepositoryLimits) -> tuple[SourceFile, ...]:
-        """Inline handoff of selected files to stages that still take a SPEC-0014 inventory."""
-        files = tuple(SourceFile(path=path, content="\n".join(self.lines(path, limits)) + "\n") for path in paths)
+        """Inline handoff of selected files, with their exact decoded text, to stages that still take a SPEC-0014 inventory."""
+        files = tuple(SourceFile(path=path, content=self._readable(path, limits)[0]) for path in paths)
         bounded_inventory(files)
         return files
 
     def lines(self, path: str, limits: RepositoryLimits) -> tuple[str, ...]:
         """Newline-separated lines without terminators; a trailing newline adds no line."""
+        return self._readable(path, limits)[1]
+
+    def _readable(self, path: str, limits: RepositoryLimits) -> tuple[str, tuple[str, ...]]:
+        """Limit checks run on every call; only limit-independent decoding is cached."""
         confined_path(path)
         if path not in self.sizes:
             raise ValueError("source path is absent from the repository")
+        if len(path) > 256:
+            raise UnreadableSource("source path exceeds 256 characters")
+        if self.sizes[path] > limits.file_bytes:
+            raise UnreadableSource(f"source file exceeds {limits.file_bytes} bytes")
         cached = self._text.get(path)
         if cached is None:
-            cached = self._decode(path, limits)
+            cached = self._decode(path)
             self._text[path] = cached
         if isinstance(cached, str):
             raise UnreadableSource(cached)
         return cached
 
-    def _decode(self, path: str, limits: RepositoryLimits) -> tuple[str, ...] | str:
-        if self.sizes[path] > limits.file_bytes:
-            return f"source file exceeds {limits.file_bytes} bytes"
+    def _decode(self, path: str) -> tuple[str, tuple[str, ...]] | str:
         data = self._load(path)
         if len(data) != self.sizes[path]:
             raise ValueError("source bytes do not match the recorded size")
@@ -110,7 +116,7 @@ class SourceTree:
         lines = [line[:-1] if line.endswith("\r") else line for line in lines]
         if any(len(line) > 16384 for line in lines):
             return "source line exceeds 16384 characters"
-        return tuple(lines)
+        return text, tuple(lines)
 
     def excerpt(self, path: str, start_line: int, end_line: int, limits: RepositoryLimits) -> SourceExcerpt:
         lines = self.lines(path, limits)
@@ -222,6 +228,8 @@ def search_tree(tree: SourceTree, limits: RepositoryLimits, text: str, directory
         raise ValueError(f"search text must be one non-blank line of at most {limits.query_chars} characters")
     if pattern is not None and not 0 < len(pattern) <= limits.query_chars:
         raise ValueError(f"pattern must be 1..{limits.query_chars} characters")
+    if _directory(directory) and not tree.under(directory):
+        raise ValueError("directory is absent from the repository")
     needle = text.casefold() if ignore_case else text
     matches: list[SearchMatch] = []
     total = files_with = searched = skipped = 0
