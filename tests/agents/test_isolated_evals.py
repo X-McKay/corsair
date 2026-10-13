@@ -187,3 +187,34 @@ def test_adversarial_control_literals_remain_refused_inside_nested_scopes(contro
 def test_eval_command_offers_no_retired_planning_set():
     from evals.test_planning.evaluate import RETIRED
     assert not RETIRED & set(eval_run.SUITES["planning"].sets)
+
+
+def test_authoring_eval_matches_unit_dependency_admission_and_retains_witness_boundary():
+    from corsair.agents.test_planning.contracts import PlannedObservation
+
+    witness_plan = next(c for c in dataset().cases if c.name == "reference_realization").inputs.inputs.plan
+    observation = PlannedObservation(kind="dependency_call", property="Planned arguments reach the dependency",
+                                     seam="Application-owned dependency reference", controlled_dependency="Recording mock")
+    unit_plan = witness_plan.model_copy(update={
+        "control": witness_plan.control.model_copy(update={"witness": None, "observation": observation}),
+        "security": witness_plan.security.model_copy(update={"witness": None, "observation": observation}),
+    })
+    content = """from unittest.mock import Mock
+import documents
+
+def test_benign_control():
+    dependency = Mock()
+    documents.read_document(dependency, "document.txt")
+    assert dependency.call_args.args == ("document.txt",)
+
+def test_security_rejects_outside_read():
+    dependency = Mock()
+    documents.read_document(dependency, "../outside.txt")
+    assert dependency.call_args.args == ("../outside.txt",)
+"""
+    files = {"test_documents.py": content}
+    # Admission accepts the syntax; semantic validity remains a separate review.
+    assert admission_facts(unit_plan, files, (13,))["stage_admitted"]
+    assert not admission_facts(witness_plan, files, (13,))["stage_admitted"]
+    files["test_documents.py"] += "\nimport sys\nsys.settrace(lambda *args: None)\n"
+    assert not admission_facts(unit_plan, files, (13,))["stage_admitted"]

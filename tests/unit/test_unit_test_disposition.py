@@ -84,3 +84,23 @@ def test_optional_contradictory_witness_blocks_unit_verdict(security, witness):
     observed = unit_run(security).model_copy(update={"witness": witness})
     result = gate((observed,))
     assert result.permitted.finding == "inconclusive"
+
+
+@pytest.mark.parametrize('missing', ['control', 'exploit'])
+def test_both_probe_outcomes_are_required_even_with_valid_review(missing):
+    observed = unit_run('passed')
+    absent_id = UNIT_PLAN.control_test_id if missing == 'control' else UNIT_PLAN.security_test_id
+    observed = observed.model_copy(update={
+        'outcomes': tuple(outcome for outcome in observed.outcomes if outcome.test_id != absent_id),
+    })
+    result = gate((observed,))
+    assert result.permitted.finding == 'inconclusive'
+    assert 'discovery_mismatch' in codes(result)
+
+
+@pytest.mark.parametrize('probe', ['control', 'exploit'])
+def test_skipping_either_probe_cannot_establish_security(probe):
+    observed = unit_run('skipped') if probe == 'exploit' else unit_run('passed', control='skipped')
+    result = gate((observed,))
+    assert result.permitted.finding == 'inconclusive'
+    assert 'test_skipped' in codes(result)

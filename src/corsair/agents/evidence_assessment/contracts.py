@@ -32,6 +32,7 @@ class EvidenceItem(Contract):
     source_sha256: str | None = Field(default=None, pattern=r'^[0-9a-f]{64}$',
                                      exclude_if=lambda value: value is None)
     content: str = Field(min_length=1, max_length=MAX_ITEM_CHARS)
+    complete: bool = Field(default=True, exclude_if=lambda value: value is True)
 
     @model_validator(mode="after")
     def run_belongs_to_revision(self) -> "EvidenceItem":
@@ -107,9 +108,9 @@ class Observation(Contract, Generic[Citation]):
 class ValidityReview(Contract, Generic[Citation]):
     """Independent assessment of the frozen test property against one revision."""
     revision: Literal["baseline", "candidate"]
-    source_linked: bool
-    condition_exercised: bool
-    assertions_relevant: bool
+    source_linked: bool = Field(description="Both control and exploit probes call the intended real source implementation")
+    condition_exercised: bool = Field(description="The control exercises benign input and the exploit exercises the reported adversarial input and preconditions")
+    assertions_relevant: bool = Field(description="Both probes make relevant non-vacuous assertions; the exploit asserts the required safe behavior")
     dependency_scope_valid: bool
     rationale: Observation[Citation]
 

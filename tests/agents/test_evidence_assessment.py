@@ -99,7 +99,8 @@ def scripted(output, reads=READS, seen=None, retries=None):
         assert [tool.name for tool in info.function_tools] == ['read_evidence']
         step = sum(1 for message in messages if message.kind == 'request') - 1
         if step < len(reads):
-            return ModelResponse(parts=[ToolCallPart('read_evidence', {'item_id': reads[step]})])
+            return ModelResponse(parts=[ToolCallPart('read_evidence',
+                reads[step] if isinstance(reads[step], dict) else {'item_id': reads[step]})])
         if retries is not None and step > len(reads):
             retries.extend(part.content for part in messages[-1].parts if isinstance(part, RetryPromptPart))
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, outputs[min(step - len(reads),
@@ -418,3 +419,72 @@ def test_unit_review_cannot_cover_repeats_from_different_sources():
         'baseline': baseline + (baseline[0].model_copy(update={'source_sha256': digest('other-source')}),)})})
     with pytest.raises(UnexpectedModelBehavior):
         unit_assess(unit_draft(), data)
+
+
+@pytest.mark.parametrize('item_id', ['patch', 'baseline-source', 'test-plan', 'reported-condition'])
+def test_truncated_semantic_evidence_cannot_support_affirmative_review(item_id):
+    from corsair.agents.evidence_assessment.contracts import MAX_ITEM_CHARS
+    from corsair.composition.evidence import _item
+
+    data = unit_inputs()
+    original = next(i for i in data.items if i.item_id == item_id)
+    truncated = _item(item_id, original.kind, 'x' * (MAX_ITEM_CHARS + 1),
+                      original.revision, original.run, original.source_sha256)
+    assert not truncated.complete
+    assert 'truncated by trusted code' in truncated.content
+    data = data.model_copy(update={'items': tuple(truncated if i.item_id == item_id else i for i in data.items)})
+    with pytest.raises(UnexpectedModelBehavior):
+        unit_assess(unit_draft(), data)
+    output = unit_draft()
+    for review in output['validity_reviews']:
+        review['assertions_relevant'] = False
+    assert unit_assess(output, data).disposition.finding == 'inconclusive'
+
+
+def test_uncited_incomplete_patch_also_blocks_affirmative_review():
+    data = unit_inputs()
+    extra = item('patch-extra', 'patch', 'truncated fixture overrides application behavior').model_copy(
+        update={'complete': False})
+    data = data.model_copy(update={'items': data.items + (extra,)})
+    # The model cannot avoid the completeness guard by omitting this item from citations or reads.
+    with pytest.raises(UnexpectedModelBehavior):
+        unit_assess(unit_draft(), data, reads=tuple(i.item_id for i in data.items if i.item_id != 'patch-extra'))
+
+
+def test_complete_evidence_preserves_historical_serialization():
+    original = item('receipt', 'receipt', 'native receipt')
+    assert 'complete' not in original.model_dump()
+    assert EvidenceItem.model_validate(original.model_dump()).complete
+
+
+@pytest.mark.parametrize('item_id', ['patch', 'baseline-source', 'test-plan', 'reported-condition'])
+def test_affirmative_review_requires_complete_read_windows(item_id):
+    data = unit_inputs()
+    original = next(i for i in data.items if i.item_id == item_id)
+    content = '\n'.join(['visible line'] * 80 + ['unread behavior-changing line'])
+    extended = original.model_copy(update={'content': content, 'sha256': digest(content)})
+    data = data.model_copy(update={'items': tuple(extended if i.item_id == item_id else i for i in data.items)})
+    # This scripted model reads only the first window, while citing a genuine observed line.
+    with pytest.raises(UnexpectedModelBehavior):
+        unit_assess(unit_draft(), data)
+
+
+def test_affirmative_review_requires_uncited_patch_file_read():
+    data = unit_inputs()
+    extra = item('patch-extra', 'patch', 'fixture replaces the implementation under test')
+    data = data.model_copy(update={'items': data.items + (extra,)})
+    with pytest.raises(UnexpectedModelBehavior):
+        unit_assess(unit_draft(), data, reads=tuple(i.item_id for i in data.items if i.item_id != 'patch-extra'))
+
+
+def test_affirmative_review_accepts_complete_paginated_patch():
+    data = unit_inputs()
+    content = '\n'.join(['reviewed patch line'] * 81)
+    data = data.model_copy(update={'items': tuple(
+        i.model_copy(update={'content': content, 'sha256': digest(content)}) if i.item_id == 'patch' else i
+        for i in data.items)})
+    reads = tuple(i.item_id for i in data.items) + ({'item_id': 'patch', 'start_line': 81},)
+    agent = create_evidence_assessment_agent(scripted(unit_draft(), reads=reads), output_retries=0)
+    result = agent.run_sync(assessment_prompt(data), deps=AssessmentDependencies(data),
+        usage_limits=UsageLimits(request_limit=16, tool_calls_limit=14)).output
+    assert result.disposition.fix == 'verified'

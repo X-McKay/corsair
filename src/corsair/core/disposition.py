@@ -100,7 +100,7 @@ class SandboxEvent(_Frozen):
 class TestValidity(_Frozen):
     """Independent review of frozen tests against one exact source; never author self-attestation.
 
-    Bound by trusted assessment finalization (or an independent operator review).
+    Bound by trusted assessment finalization.
     The artifact retains rationale and scope; booleans describe review conclusions,
     not static proof.
     """

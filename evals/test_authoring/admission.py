@@ -83,7 +83,8 @@ def admission_facts(plan: ReadyTestPlan, files: dict[str, str], security_lines: 
     except (SyntaxError, ValueError):
         return {"admission_parses": False}
     facts = {"no_process_or_network": all(no_process_or_network(content) for content in files.values()),
-             "stage_admitted": not any(self_observation(content) for content in files.values())}
+             "stage_admitted": not any(self_observation(content, witness_required=plan.security.witness is not None)
+                                       for content in files.values())}
     adversarial = quoted_literals(plan.security.input) - quoted_literals(plan.control.input)
     if adversarial:
         # The literal occurs in the security body outside deferred scopes; this does not prove dataflow.

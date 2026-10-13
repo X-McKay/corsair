@@ -44,7 +44,6 @@ from corsair.agents.test_planning.agent import create_test_planning_agent
 from corsair.agents.test_planning.dependencies import PlanningDependencies
 from corsair.agents.test_planning.prompts import planning_prompt
 from corsair.agents.test_planning.contracts import EnvironmentEvidence, ReadyTestPlan, TestPlanningInput
-from corsair.core.disposition import TestValidity
 from corsair.core.disposition import AssessmentEvidence, EnvironmentIdentity, GateResult, ObservationPlan, assess
 from corsair.nodes.runtime.contracts import RuntimeInputs, RuntimeOutcome
 from corsair.nodes.runtime.environment import RuntimeCatalog, check_ready, ready_evidence, select_runtime
@@ -242,8 +241,6 @@ class FixtureCase:
     # `witness_from_recorders` lets the environment's operator witness facilities bind one (SPEC-0073).
     witness_envelope: WitnessRequest | None = None
     witness_from_recorders: bool = False
-    # Independent review records keyed by exact source/plan; never produced by the test author.
-    test_validity: tuple[TestValidity, ...] = ()
     review_sources: dict[Literal["baseline", "candidate"], CapturedReviewSource] | None = None
     # The baseline revision's build files (SPEC-0060); without them the runtime is the operator's declaration.
     runtime: RuntimeInputs | None = None
@@ -661,14 +658,14 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         return stop("planning", f"plan unsupported: {plan.missing_capability}", identification=identification)
     ready("planning", lambda: f"control {plan.control.test_id}; security {plan.security.test_id}")
 
-    try:
-        recorders = environment.witness_facilities if case.witness_from_recorders else ()
-        request, unrequested = witness_request(identification, case.witness_envelope, plan.security.witness,
-                                               recorders), ()
-    except ValueError as exc:
-        # No approved envelope covers the identified target: run without a witness and say so.
-        request, unrequested = None, ((f"no witness requested: {exc}"[:512],)
-                                      if plan.security.witness is not None else ())
+    request, unrequested = None, ()
+    if plan.security.witness is not None:
+        try:
+            recorders = environment.witness_facilities if case.witness_from_recorders else ()
+            request = witness_request(identification, case.witness_envelope, plan.security.witness, recorders)
+        except ValueError as exc:
+            # A legacy plan outside the available instrumentation envelope runs with an explicit limitation.
+            unrequested = (f"no witness requested: {exc}"[:512],)
     # Development runs observe the same envelope, so authoring can refuse a test that cannot see the effect.
     development_witness = (DevelopmentWitness(target_path=request.target_path, target_symbol=request.target_symbol,
                                               effect_name=request.effect_name) if request is not None else None)
@@ -738,17 +735,10 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
     witnesses = {e.revision: witness_of(e) for e in executions}
     done["witnesses"] = tuple(witnesses.values())
 
-    validity = {}
-    for revision, source in case.revision_sources.items():
-        matching = [record for record in case.test_validity
-                    if record.source_sha256 == source and record.observation_plan_sha256 == expected.review_digest]
-        if len(matching) == 1:
-            validity[revision] = matching[0]
-
     def gate_run(revision):
         found = witnesses[revision]
         return run_evidence(runs[revision][0], environment=identity, witness=found.witness,
-                            sandbox_events=found.sandbox_events, test_validity=validity.get(revision))
+                            sandbox_events=found.sandbox_events)
     evidence = AssessmentEvidence(plan=expected, baseline=(gate_run("baseline"),),
                                   candidate=(gate_run("candidate"),) if "candidate" in runs else ())
     gate = assess(evidence)
@@ -766,7 +756,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         assessment_input = AssessmentInput(scope=issue.scope, evidence=evidence,
                                            items=evidence_items(expected, patch, identity, runs, admitted={
                                                revision for revision, found in witnesses.items()
-                                               if found.witness is not None}, validity=validity,
+                                               if found.witness is not None},
                                                review_sources=review_sources
                                                if expected.observation_mode == "unit_test" else None,
                                                test_plan=plan, issue=issue.issue))

@@ -158,6 +158,21 @@ def names_test_in(test_id: str, path: str) -> bool:
     return False
 
 
+def native_test_function(test_id: str) -> str:
+    """The function/subtest name reported by an admitted native runner grammar.
+
+    Keep id syntax at the runner boundary; shared evidence code does not assume
+    pytest's separator for method-based or TAP test identifiers.
+    """
+    for file_of in _ID_FILES:
+        try:
+            file_of(test_id)
+        except ValueError:
+            continue
+        return test_id.rsplit("#", 1)[-1].rsplit("::", 1)[-1]
+    raise ValueError("test id has no admitted native runner grammar")
+
+
 @dataclass(frozen=True)
 class PatchFile:
     path: str

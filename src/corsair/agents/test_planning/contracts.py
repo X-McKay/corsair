@@ -142,7 +142,7 @@ class TestSpecification(Contract, Generic[Citation]):
     fixture_setup: tuple[Fact, ...] = Field(min_length=1, max_length=8, description="Explicit preconditions and resources, created inside the scratch location")
     implementation_call: Fact = Field(description="The real implementation call, naming the identified target")
     input: Fact
-    required_behavior: Fact = Field(description="Specific required behavior; for security, a specific rejection or absence of effect, never an arbitrary exception")
+    required_behavior: Fact = Field(description="Concrete required application property: output, specific exception, fixture state or dependency interaction; never an arbitrary exception or vacuous assertion")
     observable_witness: Fact = Field(description="Explanation of the native assertion or witness and its scope; sandbox observations are separate; never read by a gate")
     witness: PlannedWitness | None = None
     observation: PlannedObservation | None = None

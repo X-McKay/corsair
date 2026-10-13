@@ -39,9 +39,13 @@ def unit_assessor(seen, candidate=True, fix_applicable=True):
         prompt = next(p.content for m in messages for p in m.parts if p.part_kind == "user-prompt")
         items = [m.groupdict() for m in INVENTORY.finditer(prompt)]
         seen[:] = items
-        done = sum(isinstance(p, ToolReturnPart) for m in messages for p in m.parts)
-        if done < len(items):
-            return ModelResponse(parts=[ToolCallPart("read_evidence", {"item_id": items[done]["item"]})])
+        reads = [p.content for m in messages for p in m.parts if isinstance(p, ToolReturnPart)
+                 and p.tool_name == "read_evidence"]
+        for item in items:
+            end = max((read.end_line for read in reads if read.item_id == item['item']), default=0)
+            if end < int(item['lines']):
+                return ModelResponse(parts=[ToolCallPart("read_evidence", {
+                    "item_id": item['item'], "start_line": end + 1})])
         def cite(item):
             return {"item_id": item["item"], "start_line": 1, "end_line": min(80, int(item["lines"]))}
         def reviews(revision):

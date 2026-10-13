@@ -75,6 +75,13 @@ async def finalize_assessment(ctx: RunContext[AssessmentDependencies],
             runs = getattr(evidence, review.revision)
             if not runs:
                 raise ModelRetry("validity review names an absent revision")
+            relevant_items = [item for item in inputs.items if item.kind in ("plan", "patch")
+                              or (item.kind == "source" and item.revision == review.revision)]
+            if (all((review.source_linked, review.condition_exercised,
+                     review.assertions_relevant, review.dependency_scope_valid))
+                    and any(not item.complete for item in relevant_items)):
+                raise ModelRetry("incomplete source, patch or plan evidence cannot support affirmative test validity; "
+                                 "mark unsupported conclusions false and report the missing evidence")
             review_items = [item for item in inputs.items
                             if item.item_id in {c.item_id for c in review.rationale.citations}]
             if not all(any(item.kind == kind and (kind != "source" or item.revision == review.revision)
@@ -90,6 +97,16 @@ async def finalize_assessment(ctx: RunContext[AssessmentDependencies],
             required_plan_items = {"test-plan", "reported-condition"}
             if not required_plan_items <= {item.item_id for item in review_items if item.kind == "plan"}:
                 raise ModelRetry("each validity review must cite the full test-plan and reported-condition items")
+            if all((review.source_linked, review.condition_exercised,
+                    review.assertions_relevant, review.dependency_scope_valid)):
+                required_reads = [item for item in inputs.items if item.kind == "patch"
+                                  or item.item_id in required_plan_items or item in cited_sources]
+                for item in required_reads:
+                    if any(not any(read.item_id == item.item_id and read.start_line <= line <= read.end_line
+                                   for read in reads)
+                           for line in range(1, len(item.content.splitlines()) + 1)):
+                        raise ModelRetry("affirmative test validity requires complete reads of every patch, "
+                                         "the test-plan, reported-condition and cited source items")
             quoted_review = review.model_dump() | {"rationale": quoted(review.rationale)}
             reviews.append(quoted_review)
             review_sha256 = sha256(json.dumps(quoted_review, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
