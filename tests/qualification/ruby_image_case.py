@@ -147,6 +147,10 @@ def plain(value):
 
 def run(image, checkout, bundle, commit, ids, evidence, tests_from, includes, timeout):
     path = RubyTestId.parse(ids[0]).path
+    # The bundle must be exactly what setup produced for this image and commit, checked before anything runs.
+    setup_record = json.loads((bundle / 'setup.json').read_text())
+    assert setup_record['image'] == image and setup_record['commit'] == commit and setup_record['exit'] == 0, setup_record
+    assert sha256(bundle / 'Gemfile.lock') == setup_record['installed_lock_sha256'], 'Gemfile.lock changed since setup'
     patch = ApprovedPatch((PatchFile(path, (Path(tests_from) / path).read_bytes()),), (path,))
     config = MinitestRunnerConfig(command=('/usr/bin/env', 'BUNDLE_FROZEN=true', f'BUNDLE_PATH={GEMS}', BUNDLE, 'exec',
                                            '/usr/local/bin/ruby', *(f'-I{item}' for item in includes)),
@@ -158,8 +162,6 @@ def run(image, checkout, bundle, commit, ids, evidence, tests_from, includes, ti
         result = MinitestRunner(case, case, store, config).run(patch, control_test_id=ids[0], security_test_id=ids[1],
                                                                discovery_command=config.command, operation=uuid4())
         elapsed = round(time.monotonic() - clock, 3)
-    setup_record = json.loads((bundle / 'setup.json').read_text())
-    assert setup_record['image'] == image and setup_record['commit'] == commit and setup_record['exit'] == 0, setup_record
     summary = {'image': image, 'commit': commit, 'ids': ids, 'tests_from': str(tests_from), 'patch_sha256': patch.sha256,
                'lock': setup_record['lock'], 'lock_sha256': sha256(bundle / 'Gemfile.lock'), 'includes': list(includes),
                'setup_docker_args': setup_record['setup_docker_args'],

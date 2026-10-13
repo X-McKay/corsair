@@ -22,18 +22,25 @@ from corsair.reports.test_observations import AdmittedTestClaims, TestClaim, Wor
 CHDIR = 'cd -- "$1" || exit 125; shift; exec "$@"'
 # Shared prologue: keep the real stdout for the runner, send every other byte (Ruby, C extensions, children)
 # to stderr, disable autorun so loading the file runs nothing, and resolve the class by its constant path.
+# Only methods whose definition is in the loaded patch file count: a patch that reopens a repository class
+# must not let an inherited or helper-defined test stand in for the control or security test.
 PROLOGUE = '''file, name, *wanted = ARGV
 out = $stdout.dup
 $stdout.reopen($stderr)
 require "minitest"
 def Minitest.autorun; end
-load File.expand_path(file)
+path = File.expand_path(file)
+load path
 klass = begin
   name.split("::").inject(Object) { |scope, part| scope.const_get(part, false) }
 rescue NameError
   nil
 end
 abort "corsair: #{name} is not a Minitest test class in #{file}" unless klass.is_a?(Class) && klass < Minitest::Runnable
+wanted = wanted.select do |method|
+  location = klass.public_method_defined?(method) && klass.instance_method(method).source_location
+  location && File.expand_path(location[0]) == path
+end
 '''
 # Minitest 5.16+ orders runnable methods with the run's seed, which only `Minitest.run` sets.
 LIST = PROLOGUE + '''Minitest.seed ||= 0 if Minitest.respond_to?(:seed=)
