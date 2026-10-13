@@ -2,7 +2,7 @@
 
 from typing import Generic, Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from .contracts import Citation, Contract, Fact, SourceExcerpt, SourceReference
 
@@ -10,6 +10,13 @@ from .contracts import Citation, Contract, Fact, SourceExcerpt, SourceReference
 class Target(Contract, Generic[Citation]):
     symbol: str = Field(min_length=1, max_length=256, description="Exact local source symbol naming the relevant implementation")
     source: Citation
+
+    @field_validator("symbol")
+    @classmethod
+    def exact_symbol_spelling(cls, value: str) -> str:
+        if any(char.isspace() for char in value):
+            raise ValueError("target symbol must use exact spelling without whitespace")
+        return value
 
 
 class _Location(Contract, Generic[Citation]):
