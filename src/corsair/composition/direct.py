@@ -47,7 +47,7 @@ from corsair.agents.test_planning.contracts import EnvironmentEvidence, ReadyTes
 from corsair.core.disposition import AssessmentEvidence, EnvironmentIdentity, GateResult, ObservationPlan, assess
 from corsair.nodes.runtime.contracts import RuntimeInputs, RuntimeOutcome
 from corsair.nodes.runtime.environment import RuntimeCatalog, check_ready, ready_evidence, select_runtime
-from corsair.nodes.witness import WitnessEvidence, witness_evidence
+from corsair.nodes.witness import Calibration, WitnessEvidence, witness_evidence
 from corsair.ports.execution import SandboxExecution
 from corsair.ports.sandbox import SandboxHandle
 from corsair.ports.test_runner import ApprovedPatch, NativeTestRun, PatchFile, TestRunner, WitnessRequest
@@ -726,13 +726,15 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
 
     ready("execution", lambda: "both revisions ran")
     runs = {e.revision: (e.observed,) for e in executions}
+    # SPEC-0040: an absence counts as the planned safe behavior on either revision only when the plan's control
+    # witness is observed in the same run, so an uncalibrated baseline absence is never not_reproduced.
+    control = Calibration(plan.control.test_id, plan.control.witness.subject)
+
     def witness_of(e):
         if not request:
             return WitnessEvidence(None, None, "no witness was requested or captured for this run")
-        # An absence counts as the planned safe behavior only on the candidate until SPEC-0040's control
-        # calibration lands: an uncalibrated baseline absence (a vacuous payload) must not be not_reproduced.
-        planned = plan.security_expectation.safe_behavior if e.revision == "candidate" else None
-        return witness_evidence(e.observed.witness, request, plan.security.test_id, planned_safe_behavior=planned)
+        return witness_evidence(e.observed.witness, request, plan.security.test_id,
+                                planned_safe_behavior=plan.security_expectation.safe_behavior, control=control)
     witnesses = {e.revision: witness_of(e) for e in executions}
     done["witnesses"] = tuple(witnesses.values())
 
