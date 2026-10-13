@@ -10,7 +10,7 @@ import json
 import re
 
 from corsair.agents.evidence_assessment.contracts import MAX_ITEM_CHARS, EvidenceItem
-from corsair.agents.issue_analysis.identification_contracts import IssueIdentification
+from corsair.agents.issue_identification.contracts import IssueIdentification
 from corsair.agents.test_authoring.contracts import TestPatch
 from corsair.agents.test_planning.contracts import ReadyTestPlan
 from corsair.core.disposition import (ClassifiedFailure, EnvironmentIdentity, ExpectedFailure, ObservationPlan,

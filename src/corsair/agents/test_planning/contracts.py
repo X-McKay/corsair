@@ -5,7 +5,7 @@ from typing import Annotated, Any, Generic, Literal
 
 from pydantic import Field, ValidationInfo, field_validator, model_validator
 
-from ..issue_analysis.identification_contracts import IssueIdentification
+from ..issue_identification.contracts import IssueIdentification
 from ..source.contracts import (
     Citation, Contract, Fact, SourceExcerpt, SourceFile, SourceReference, bounded_inventory, confined_path,
 )
