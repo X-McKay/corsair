@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import urllib.request
 import uuid
@@ -18,6 +19,7 @@ BASES = {
     'java8': 'docker.io/library/maven@sha256:f2cb52730ea0bde9dc8ba20e5e539d000dcdd7ab9e498d70c301fe04fbddb656',
     'python37': 'docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b',
     'ruby31': 'docker.io/library/ruby@sha256:91627f55e8969006aab67d15c92fb930500ff73948803da1330b8a853fecebb5',
+    'perl526': 'docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7',
 }
 # Interpreter each Python toolchain directory is built for; its wheels are fetched hash-checked before an offline build.
 PYTHONS = {'python': 'python3.12', 'python37': 'python3.7'}
@@ -28,6 +30,9 @@ JAVA_TESTS = ('nativeRoundtrip', 'nativeRuntime')
 RUBY_TESTS = ('test_native_roundtrip', 'test_native_runtime')
 RUBY_SUMMARY = '2 runs, 4 assertions, 0 failures, 0 errors, 0 skips'
 RUBY_RUN = ['/usr/bin/env', 'BUNDLE_FROZEN=true', '/usr/local/bin/bundle', 'exec', '/usr/local/bin/ruby', '-Itest', 'test/native_test.rb', '-v']
+# Perl image directories: the upstream image already carries make and the core TAP harness, so nothing is fetched.
+PERLS = ('perl526',)
+TAP_TESTS = ('native_roundtrip', 'native_runtime')
 
 
 def source_hashes(language=None):
@@ -44,15 +49,30 @@ def image_receipt(language):
     return receipt
 
 
+def tap_report(text, expected):
+    """Admit one passing `prove -v` run of a single test file: its plan, exactly the expected top-level subtests ok
+    in order, no failing, skipped or todo line, and prove's own summary. Exit 0 alone is not a pass: prove also exits
+    0 when it finds no tests (`Result: NOTESTS`)."""
+    lines = text.splitlines()
+    assert f'1..{len(expected)}' in lines and lines.count(f'1..{len(expected)}') == 1
+    assert [line for line in lines if re.match(r'(not )?ok \d+', line)] == [f'ok {n} - {name}' for n, name in enumerate(expected, 1)]
+    assert not any(re.match(r'\s*not ok\b', line) or re.search(r'#\s*(SKIP|TODO)', line, re.I) for line in lines)
+    assert any(line.startswith(f'Files=1, Tests={len(expected)}, ') for line in lines) and lines[-1] == 'Result: PASS'
+    return {'tests': len(expected), 'ids': list(expected), 'sha256': hashlib.sha256(text.encode()).hexdigest()}
+
+
 def control(kube, image, language):
     cidfile = kube.evidence / (language + '-control.id')
-    command = ('cp /opt/corsair-fixture/test_native.py /tmp/test_native.py; cd /tmp; ' + PYTHONS[language] + ' -m pytest -q test_native.py --junitxml=/tmp/result.xml; cat /tmp/result.xml' if language in PYTHONS else
+    command = ('cp -R /opt/corsair-fixture /tmp/project; cd /tmp/project; perl Makefile.PL; make; prove -b -v t/' if language in PERLS else
+               'cp /opt/corsair-fixture/test_native.py /tmp/test_native.py; cd /tmp; ' + PYTHONS[language] + ' -m pytest -q test_native.py --junitxml=/tmp/result.xml; cat /tmp/result.xml' if language in PYTHONS else
                'sha256sum -c /opt/corsair-junit.sha256 >/dev/null; cd /opt/corsair-m2; sha256sum -c /opt/corsair-m2.sha256 >/dev/null; printf "CACHE-BEGIN\\n"; cat /opt/corsair-m2.sha256; printf "CACHE-END\\n"; cp -R /opt/corsair-fixture /tmp/project; cp -R /opt/corsair-m2 /tmp/m2; /usr/share/maven/bin/mvn -B -ntp -o -f /tmp/project/pom.xml -Dmaven.repo.local=/tmp/m2 test; cat /tmp/project/target/surefire-reports/TEST-corsair.NativeTest.xml')
     if language == 'ruby31':
         command = 'cp -R /opt/corsair-fixture /tmp/project; cd /tmp/project; ' + ' '.join(RUBY_RUN)
     try:
         result = kube.native(DOCKER + ['run', '--rm', '--cidfile', str(cidfile), '--network=none', '--cap-drop=ALL', '--security-opt=no-new-privileges', '--user=10001:10001', image, '/bin/sh', '-ec', command], timeout=180)
-        if language == 'ruby31':
+        if language in PERLS:
+            tap_report(result.stdout, TAP_TESTS)
+        elif language == 'ruby31':
             assert result.stdout.rstrip().endswith(RUBY_SUMMARY) and all(f'NativeTest#{name} = ' in result.stdout for name in RUBY_TESTS)
         else:
             assert 'tests="%d"' % (1 if language in PYTHONS else len(JAVA_TESTS)) in result.stdout and 'failures="0"' in result.stdout and 'skipped="0"' in result.stdout
@@ -107,7 +127,7 @@ def main():
                 tag = 'docker.io/library/corsair-' + language + ':' + source_digest[:16]
                 kube.native(DOCKER + ['pull', base], timeout=180)
                 # Maven's trusted preparation explicitly downloads exact pinned artifacts;
-                # its strict native checksums and complete cache hashes are retained.
+                # its strict native checksums and complete cache hashes are retained. Python, Perl and Ruby build offline.
                 kube.native(DOCKER + ['build', '--network=' + ('default' if language.startswith('java') else 'none'), '--pull=false', '--tag', tag, str(context)], timeout=300)
                 config = kube.native(DOCKER + ['image', 'inspect', '--format', '{{.Id}}', tag]).stdout.strip()
                 control(kube, config, language)
