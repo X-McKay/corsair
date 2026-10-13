@@ -314,7 +314,7 @@ def test_scratch_check_rejects_fixtures_outside_the_scratch_location():
     assert "../" in plan.security.input
 
 
-@pytest.mark.parametrize("name", sorted(MANIFESTS))
+@pytest.mark.parametrize("name", sorted(set(MANIFESTS) - {"unit"}))
 def test_heldout_cases_stay_disjoint_and_retired_sets_cannot_run_again(tmp_path, name):
     heldout = dataset(name)
     assert len(heldout.cases) == 6 and {c.metadata.status for c in heldout.cases} == {"ready", "unsupported"}
@@ -400,3 +400,44 @@ def test_curated_implementation_call_check_refuses_partial_identifiers(call):
     assert plan_checks(c.inputs, plan, c.metadata)["implementation_call"]
     altered = plan.model_copy(update={"security": plan.security.model_copy(update={"implementation_call": call})})
     assert not plan_checks(c.inputs, altered, c.metadata)["implementation_call"]
+
+
+def unit_reference(kind="return_value"):
+    plan = reference()
+    for name in ("control", "security"):
+        plan[name].pop("witness")
+        plan[name]["observation"] = {
+            "kind": kind,
+            "property": "Assert the returned document content" if name == "control" else "Assert ValueError rejects traversal",
+            "seam": "Call read_document through its existing function interface",
+        }
+        if kind == "dependency_call":
+            plan[name]["observation"]["controlled_dependency"] = "Recording dependency preserves input arguments and returns fixture content"
+    return plan
+
+
+@pytest.mark.parametrize("kind", ["return_value", "exception", "fixture_state", "dependency_call"])
+def test_unit_observation_plan_needs_no_operator_recorder(kind):
+    inputs = case().inputs.model_dump()
+    inputs["environment"]["witness_facilities"] = []
+    admitted = TestPlanningInput.model_validate(inputs)
+    result = run(create_test_planning_agent(responding(unit_reference(kind))), admitted)
+    assert isinstance(result.output, ReadyTestPlan)
+    assert result.output.control.witness is None
+    assert result.output.security.observation.kind == kind
+    assert result.output.security.source_references[0].quote.startswith("def read_document")
+
+
+@pytest.mark.parametrize("change", ["missing", "mixed", "ambiguous", "undescribed_double"])
+def test_unit_observation_contract_refuses_incomplete_or_mixed_evidence(change):
+    plan = unit_reference()
+    if change == "missing":
+        plan["security"].pop("observation")
+    elif change == "mixed":
+        plan["security"] = reference()["security"]
+    elif change == "ambiguous":
+        plan["security"]["witness"] = reference()["security"]["witness"]
+    else:
+        plan["security"]["observation"]["kind"] = "dependency_call"
+    with pytest.raises(ValidationError):
+        ReadyTestPlanDraft.model_validate(plan, context=case().inputs)

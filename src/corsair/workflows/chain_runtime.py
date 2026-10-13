@@ -178,6 +178,7 @@ class ChainResult:
     executions: tuple[ExecutionRecord, ...] = ()
     gate: GateResult | None = None
     assessment: EvidenceAssessment | None = None
+    validity_review: EvidenceAssessment | None = None
     witnesses: tuple[WitnessEvidence, ...] = ()
     limitations: tuple[str, ...] = ()
     runtime: RuntimeOutcome | None = None
@@ -210,7 +211,7 @@ def chain_result(run: DirectRun) -> ChainResult:
         identification=run.identification, plan=run.plan, patch=run.patch, observation_plan=run.observation_plan,
         executions=tuple(ExecutionRecord(revision=e.revision, operation=e.operation, observed=e.observed,
                                          failure=failure(e.failure)) for e in run.executions),
-        gate=run.gate, assessment=run.assessment, witnesses=run.witnesses,
+        gate=run.gate, assessment=run.assessment, validity_review=run.validity_review, witnesses=run.witnesses,
         limitations=run.limitations, runtime=run.runtime, environment=run.environment)
 
 

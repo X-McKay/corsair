@@ -3,9 +3,9 @@
 from corsair.agents.test_authoring.tools import TOOLSET_SHA256, authoring_tools, source_tools
 from corsair.agents.toolset_identity import toolsets_sha256
 
-# Recorded from the pre-split tools.py (SPEC-0052); change only with a reviewed tool change.
-# PLAN-0082: run_tests results carry security_contradicts_witness.
-OFFERED_SHA256 = "47cf3ee9e62986f9bb2c728ec8e1ae4a5d827c201c2c443f7e242762abf2e66a"
+# Recorded after the intentional unit-observation write_test_file guidance change.
+# Keep this explicit identity synchronized with reviewed model-facing tool changes.
+UNIT_OBSERVATION_SHA256 = "40f832e60ff04a26565da8c7941f4e3746d8b7106a253fb3768a651e196c580e"
 
 
 def test_toolsets_offer_exactly_the_registered_tools():
@@ -16,5 +16,5 @@ def test_toolsets_offer_exactly_the_registered_tools():
     assert authoring.tools["run_tests"].sequential and not authoring.tools["write_test_file"].sequential
 
 
-def test_toolset_digest_is_unchanged_by_the_package_split():
-    assert TOOLSET_SHA256 == toolsets_sha256(source_tools(), authoring_tools()) == OFFERED_SHA256
+def test_toolset_digest_records_unit_observation_tool_guidance():
+    assert TOOLSET_SHA256 == toolsets_sha256(source_tools(), authoring_tools()) == UNIT_OBSERVATION_SHA256

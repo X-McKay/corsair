@@ -21,19 +21,19 @@ async def write_test_file(ctx: RunContext[AuthoringDependencies],
                           content: Annotated[str, Field(description="Complete new file content; replaces any earlier write of this path")]) -> WrittenFile | RefusedWrite:
     """Write one complete test file into the patch. Only approved test paths are accepted; application source and test configuration are never writable.
 
-    Test code that installs audit hooks, monitoring, tracing or profiling, raises audit events, or patches file, process, network or import facilities is refused: the operator witness observes the target, and a refused write leaves the file unchanged."""
+    Unit observations may use native doubles at existing dependency seams. Interpreter hooks and global file, process, network or import rewrites are refused; witness plans additionally refuse mock facilities. A refused write leaves the file unchanged."""
     if path not in ctx.deps.inputs.environment.approved_test_paths:
         raise ModelRetry(f"{path} is not an approved test path")
     data = content.encode()
     if len(data) > MAX_PATCH_FILE_BYTES:
         raise ModelRetry(f"test file exceeds {MAX_PATCH_FILE_BYTES} bytes")
-    findings = self_observation(content)
+    findings = self_observation(content, witness_required=ctx.deps.inputs.plan.security.witness is not None)
     if findings:
         left = max(ctx.deps.budget.admission_refusals - len(refused_writes(ctx)), 0)
         return RefusedWrite(status="refused", path=path, findings=findings[:32], refusals_left=left, reason=(
-            "Refused: test code must not observe, forge or replace what the operator witness observes ("
-            + "; ".join(f"line {f.line}: {f.facility}" for f in findings[:8]) + "). The operator witness already "
-            "records the target's calls, raised exceptions and file opens; remove these constructs and assert only "
+            "Refused: test code violates the planned observation or interpreter boundary ("
+            + "; ".join(f"line {f.line}: {f.facility}" for f in findings[:8]) + "). Use the planned observation boundary. "
+            "Remove these constructs and assert "
             "the planned required behavior. The file keeps its previous content. "
             + ("Another refusal ends this stage blocked." if left else "This stage now ends blocked at admission.")))
     return WrittenFile(path=path, sha256=sha256(data).hexdigest(), size=len(data))

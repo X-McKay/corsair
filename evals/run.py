@@ -51,11 +51,12 @@ SUITES: dict[str, Suite] = {
     "identification": Suite("evals.issue_identification.evaluate", {"development": ()}, repeat=False),
     "planning": Suite("evals.test_planning.evaluate", {
         # heldout and heldout2 are retired (SPEC-0040); the suite refuses them, so they are not offered here.
-        "development": ("--cases", "development"), "heldout3": ("--cases", "heldout3")}),
-    "authoring": Suite("evals.test_authoring.evaluate", {"development": ()},
+        "development": ("--cases", "development"), "heldout3": ("--cases", "heldout3"), "unit": ("--cases", "unit")}),
+    "authoring": Suite("evals.test_authoring.evaluate", {"development": (), "unit": ("--cases", "unit")},
                        note="runs answered by injected observations or the static host runner; tests are not executed"),
     "assessment": Suite("evals.evidence_assessment.evaluate", {
-        "development": ("--split", "development"), "held_out": ("--split", "held_out")}),
+        "development": ("--split", "development"), "held_out": ("--split", "held_out"), "unit": ()},
+        set_modules={"unit": "evals.evidence_assessment.unit_test"}),
     "chain": Suite("evals.fixture_chain.evaluate", {"fixture": (), "jest": ("--cohort", "jest")},
                    live=("--live", "identification,planning,assessment"),
                    note="fixture: live authoring needs the sandbox, so authoring stays scripted on the host; cohorts "

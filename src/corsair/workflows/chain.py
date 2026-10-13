@@ -31,7 +31,7 @@ with workflow.unsafe.imports_passed_through():
     from temporalio.client import Client
     from temporalio.worker import Worker
 
-    from corsair.agents.evidence_assessment.contracts import AssessmentInput, EvidenceAssessment
+    from corsair.agents.evidence_assessment.contracts import AssessmentInput, ValidityInput, EvidenceAssessment
     from corsair.agents.issue_analysis.contracts import IssueAnalysisInput
     from corsair.agents.issue_identification.contracts import IssueIdentification
     from corsair.agents.test_authoring.contracts import AuthoringResult, TestAuthoringInput
@@ -125,7 +125,7 @@ class AssessmentStage(ChainStage):
     stage = "assessment"
 
     @workflow.run
-    async def run(self, request: StageRequest[AssessmentInput]) -> StageRecord[EvidenceAssessment]:
+    async def run(self, request: StageRequest[AssessmentInput | ValidityInput]) -> StageRecord[EvidenceAssessment]:
         return await self.invoke(request)
 
 
@@ -150,7 +150,7 @@ class ChainInvestigation:
             try:
                 record = await workflow.execute_child_workflow(
                     CHILDREN[stage].run, StageRequest(inputs, getattr(request.models, stage), request.budget),
-                    id=f"{parent}/{stage}", execution_timeout=timedelta(seconds=limits.timeout_seconds))
+                    id=f"{parent}/{stage}-validity" if isinstance(inputs, ValidityInput) else f"{parent}/{stage}", execution_timeout=timedelta(seconds=limits.timeout_seconds))
             except ChildWorkflowError as exc:
                 # Timed out or failed without returning: usage and messages were not observed here.
                 failure = recorded(exc)

@@ -37,13 +37,19 @@ References: [agentic evaluators](https://pydantic.dev/docs/ai/evals/evaluators/a
 | --- | --- | --- |
 | Issue identification | Exact trusted report preservation, correct source symbol/location, scope and justified abstention against frozen curated expectations | Wrong concern, decoy module, invented source, repository instruction injection |
 | Environment | Successful fresh replay, relevant build, actual test discovery/execution | Missing dependency, registry/TLS denial, wrong JDK, changes to application behavior |
-| Test planning | Two tests distinguish reviewed vulnerable/fixed behavior at stated scope | Constant assertions, mocked vulnerability, sandbox denial treated as fix |
-| Test authoring | Exactly two tests; control passes both; security assertion fails baseline and passes fixed | Skips, fake runner output, unreachable target, source modification, stale results |
+| Test planning | Exactly two native tests through existing real application seams, unit scope by default; assertions distinguish reviewed behavior at stated scope | Constant assertions, replaced security logic, irrelevant doubles, unnecessary telemetry dependency, sandbox denial treated as fix |
+| Test authoring | Exactly two tests exercising intended source and reported condition; control passes both; relevant security assertion fails baseline and passes fixed | Skips, fake runner output, unreachable target, altered behavior, inappropriate dependency double, stale results |
 | Evidence assessment | Correct scoped disposition and limitations from frozen evidence | Failed control, incomplete delivery, contradictory results, ungrounded fix/refutation |
 
 Fixtures include real repositories and minimal adversarial cases. Gold labels, vulnerable/fixed variant identities, and evaluator-only tests remain outside agent-visible source. Separate development cases from held-out cases; do not repeatedly tune prompts against the held-out answer key.
 
 The [benchmark dataset plan](benchmark-datasets.md) identifies public sources and 50 metadata-reviewed candidate issue pairs, ten per ecosystem. Candidates are not qualified cases. Admit each pair through its licensing, environment, two-test oracle, fresh replay, and policy-interference gates before scoring live-agent security correctness. Benchmark expansion does not automatically extend the initial runtime support envelope.
+
+## Unit-test evidence acceptance
+
+Evaluate planning, authoring and disposition against the same language-independent rules in the [investigation contract](investigation-contract.md). Existing native test seams, return values, exceptions, fixture state and recording dependency doubles are first-class observations. Include a valid query-construction case with a recording database double and no database telemetry, alongside negative cases that replace the query-building logic, never call the target, assert an irrelevant property, or treat arbitrary failure as safe rejection. The valid case must remain admissible without a new recorder; the invalid cases must remain inconclusive.
+
+Evaluate the outcome-blind pre-execution validity call separately from native discovery and result parsing. Verify that result evidence is unavailable to validity review and that result assessment cannot replace the bound review. Preserve legacy frozen sets and add unit-mode sets for each affected agent; scripted success establishes plumbing, while live evaluation measures semantic quality. A generated assertion passing is insufficient semantic proof. Optional witnesses need their own behavior-preservation and coverage checks, including unobserved effects and empty traces; their availability must not silently change the supported scope. Qualification remains specific to executed runtimes/frameworks and measured properties.
 
 ## Consistency and robustness
 

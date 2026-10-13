@@ -16,10 +16,11 @@ from pydantic_ai.models.function import FunctionModel
 
 from corsair.adapters.pytest_runner import PytestRunnerConfig
 from corsair.investigation.frameworks import harness
+from corsair.agents.environment.frameworks import FRAMEWORKS
 from corsair.agents.issue_analysis.contracts import IssueAnalysisInput
 from corsair.agents.source.contracts import SourceFile
 from corsair.agents.test_planning.contracts import BaselineTest, EnvironmentEvidence, WitnessFacility
-from corsair.composition.direct import FixtureCase
+from corsair.composition.direct import CapturedReviewSource, FixtureCase
 from corsair.core.disposition import EnvironmentIdentity
 from corsair.ports.test_runner import WitnessRequest
 
@@ -65,6 +66,7 @@ def fixture_case(case: str = "exploitable") -> FixtureCase:
             "Native JUnit XML outcomes, failure locations and captured stdout per test",
             "Operator witness probe, not test code: calls, returns, raised exceptions and file opens attributed to "
             "the identified target function during each test's call phase"),
+        assertion_facts=FRAMEWORKS["pytest"].assertion_facts,
         witness_facilities=(WitnessFacility(
             id="audit_open", kind="file_open",
             description="Python sys.addaudithook 'open' events recording each path the test process opens during the call"),))
@@ -77,6 +79,11 @@ def fixture_case(case: str = "exploitable") -> FixtureCase:
                                                 source_files=sources),
                        environment=environment, environment_identity=identity,
                        witness_envelope=WitnessRequest("documents.py", "read_document", "outside.txt"),
+                       review_sources={revision: CapturedReviewSource(
+                           source_sha256=_digest((FIXTURE / variants[revision] / "documents.py").read_bytes()),
+                           files=(SourceFile(path="documents.py", content=(FIXTURE / variants[revision] / "documents.py").read_text()),
+                                  SourceFile(path="test_existing.py", content=BASELINE_TEST)))
+                           for revision in ("baseline", "candidate")},
                        revision_sources={revision: _digest((FIXTURE / variants[revision] / "documents.py").read_bytes())
                                          for revision in ("baseline", "candidate")})
 

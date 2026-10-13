@@ -9,14 +9,15 @@ from hashlib import sha256
 import json
 import re
 
-from corsair.agents.evidence_assessment.contracts import MAX_ITEM_CHARS, EvidenceItem
+from corsair.agents.evidence_assessment.contracts import MAX_ITEM_CHARS, EvidenceAssessment, EvidenceItem
 from corsair.agents.issue_identification.contracts import IssueIdentification
 from corsair.agents.test_authoring.contracts import TestPatch
+from corsair.agents.source.contracts import SourceFile
 from corsair.agents.test_planning.contracts import PlannedWitness, ReadyTestPlan, WitnessFacility
 from corsair.core.disposition import (ClassifiedFailure, EnvironmentIdentity, ExpectedFailure, ObservationPlan,
                                       ObservedOutcome, Revision, RunEvidence, SandboxEvent, Witness)
 from corsair.ports.execution import ExecutionReceipt
-from corsair.ports.test_runner import ApprovedPatch, NativeTestRun, PatchFile, TestCaseResult, WitnessRequest
+from corsair.ports.test_runner import ApprovedPatch, NativeTestRun, PatchFile, TestCaseResult, WitnessRequest, native_test_function
 
 TOKEN = re.compile(r'^[A-Za-z0-9_.:-]{1,128}$')
 
@@ -33,10 +34,12 @@ def observation_plan(plan: ReadyTestPlan, patch: TestPatch) -> ObservationPlan:
         control_test_id=plan.control.test_id, security_test_id=plan.security.test_id,
         expected_failure=ExpectedFailure(exception_type=plan.security_expectation.failure_type,
                                          path=plan.security.test_path,
-                                         function=plan.security.test_id.split('::')[-1],
+                                         function=native_test_function(plan.security.test_id),
                                          assertion_lines=patch.security_assertion_lines),
         expected_safe_behavior=plan.security_expectation.safe_behavior,
-        frozen_patch_sha256=patch.patch_sha256)
+        frozen_patch_sha256=patch.patch_sha256,
+        observation_mode="unit_test" if plan.security.observation is not None else "effect_witness",
+        test_plan_sha256=sha256(plan.model_dump_json().encode()).hexdigest())
 
 
 # The effects the operator probe records (SPEC-0033); a recorder of any other kind cannot bind a request yet.
@@ -44,7 +47,7 @@ PROBE_EFFECTS = frozenset({"file_open"})
 
 
 def witness_request(identification: IssueIdentification, envelope: WitnessRequest | None,
-                    planned: PlannedWitness, recorders: tuple[WitnessFacility, ...] = ()) -> WitnessRequest:
+                    planned: PlannedWitness | None, recorders: tuple[WitnessFacility, ...] = ()) -> WitnessRequest:
     """The operator's approved envelope, used only when the admitted identification names exactly its target
     and the plan's security witness is the effect that envelope records.
 
@@ -56,6 +59,8 @@ def witness_request(identification: IssueIdentification, envelope: WitnessReques
     Until SPEC-0040 binds the plan's subject at execution, a planned effect the probe does not record, or a
     subject other than the envelope's file, is refused here so its gates stay inconclusive.
     """
+    if planned is None:
+        raise ValueError('unit test plan does not request instrumentation')
     if identification.status != 'ready' or identification.target is None:
         raise ValueError('a witness needs a ready identification target')
     target = identification.target
@@ -140,17 +145,20 @@ def run_evidence(observed: NativeTestRun, *, environment: EnvironmentIdentity, w
         delivery=delivery, completion=completion, execution_failure=failure, patch_sha256=observed.patch_sha256,
         discovered_test_ids=observed.discovery.test_ids if observed.discovery is not None else (),
         outcomes=tuple(_outcome(case) for case in cases), witness=witness, environment=environment,
-        sandbox_events=sandbox_events or ())
+        sandbox_events=sandbox_events or (),
+        source_sha256=observed.workspace.source.sha256 if observed.workspace is not None else None)
 
 
 def _item(item_id: str, kind: str, content: str, revision: Revision | None = None,
-          run: int | None = None) -> EvidenceItem:
-    if len(content) > MAX_ITEM_CHARS:
+          run: int | None = None, source_sha256: str | None = None, path: str | None = None) -> EvidenceItem:
+    complete = len(content) <= MAX_ITEM_CHARS
+    if not complete:
         marker = f'\n[truncated by trusted code from {len(content)} characters]'
         content = content[:MAX_ITEM_CHARS - len(marker)] + marker
     content = content or '(empty)'
     return EvidenceItem(item_id=item_id, kind=kind, revision=revision, run=run,
-                        sha256=sha256(content.encode('utf-8')).hexdigest(), content=content)
+                        sha256=sha256(content.encode('utf-8')).hexdigest(), content=content,
+                        source_sha256=source_sha256, complete=complete, path=path)
 
 
 def _receipt_summary(observed: NativeTestRun) -> str:
@@ -166,13 +174,58 @@ def _receipt_summary(observed: NativeTestRun) -> str:
     return json.dumps(summary, indent=2, sort_keys=True)
 
 
+def review_items(plan: ObservationPlan, patch: TestPatch,
+                 review_sources: dict[Revision, tuple[SourceFile, ...]],
+                 source_identities: dict[Revision, str],
+                 test_plan: ReadyTestPlan, issue: str) -> tuple[EvidenceItem, ...]:
+    """Outcome-blind frozen artifacts, captured before either native probe executes.
+
+    Paths are metadata, so an admitted source file's full content still fits the evidence
+    bound. Source stays whole and available for selective numbered reads; this function
+    neither chooses a language-specific symbol boundary nor silently drops helpers.
+    """
+    items = [_item('plan', 'plan', plan.model_dump_json(indent=2)),
+             _item('test-plan', 'plan', test_plan.model_dump_json(indent=2)),
+             _item('reported-condition', 'plan', issue)]
+    for revision, sources in review_sources.items():
+        if revision not in source_identities:
+            continue
+        for index, source in enumerate(sources):
+            items.append(_item(f'{revision}-source-{index}', 'source', source.content,
+                               revision, 0, source_sha256=source_identities[revision], path=source.path))
+    items.extend(_item(f'patch-{index}', 'patch', item.content, path=item.path)
+                 for index, item in enumerate(patch.files))
+    return tuple(items)
+
+
 def evidence_items(plan: ObservationPlan, patch: TestPatch, environment: EnvironmentIdentity,
                    runs: dict[Revision, tuple[NativeTestRun, ...]],
-                   admitted: frozenset[Revision] | set[Revision] = frozenset()) -> tuple[EvidenceItem, ...]:
+                   admitted: frozenset[Revision] | set[Revision] = frozenset(),
+                   review_sources: dict[Revision, tuple[SourceFile, ...]] | None = None,
+                   test_plan: ReadyTestPlan | None = None, issue: str | None = None,
+                   frozen_review: EvidenceAssessment | None = None) -> tuple[EvidenceItem, ...]:
     """Frozen artifacts the assessment agent may read; revisions are named baseline and candidate only."""
     items = [_item('plan', 'plan', plan.model_dump_json(indent=2)),
              _item('environment', 'environment', environment.model_dump_json(indent=2))]
-    items += [_item(f'patch-{index}', 'patch', item.content) for index, item in enumerate(patch.files)]
+    if frozen_review is not None:
+        items.append(_item('test-validity', 'test_validity', frozen_review.model_dump_json(indent=2)))
+    if review_sources is not None:
+        if test_plan is not None:
+            items.append(_item('test-plan', 'plan', test_plan.model_dump_json(indent=2)))
+        if issue is not None:
+            items.append(_item('reported-condition', 'plan', issue))
+        for revision, sources in review_sources.items():
+            if revision not in runs:
+                continue
+            for index, source in enumerate(sources):
+                items.append(_item(f'{revision}-source-{index}', 'source',
+                                   source.content, revision, 0,
+                                   source_sha256=(runs[revision][0].workspace.source.sha256
+                                                  if runs[revision][0].workspace is not None else None),
+                                   path=source.path))
+    items += [_item(f'patch-{index}', 'patch',
+                    item.content, path=item.path if review_sources is not None else None)
+              for index, item in enumerate(patch.files)]
     for revision, observed_runs in runs.items():
         for index, observed in enumerate(observed_runs):
             prefix = f'{revision}-{index}'

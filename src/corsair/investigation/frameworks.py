@@ -5,8 +5,7 @@ pinned runtimes and hold none of it.
 An entry gives the runner adapter and its config, the setup step that installs the project's own dependencies from
 its manifests with registry access (the framework comes from the project's lockfile, never the image), where those
 dependencies live in the tree and which lockfiles bind them, the scratch and observation facilities declared to the
-planner, and the operator's witness recorders. A framework without witness recorders reaches planning and stops
-there (SPEC-0040 needs a listed facility); one without a setup step cannot run on the image-only route yet.
+planner, and the operator's witness recorders. Native unit observations do not require witness recorders; a framework without a setup step cannot run on the image-only route yet.
 """
 from dataclasses import dataclass
 import shlex

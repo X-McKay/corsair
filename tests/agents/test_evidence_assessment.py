@@ -47,9 +47,9 @@ def run(security, sandbox_events=()):
                        witness=witness, environment=ENV, sandbox_events=sandbox_events)
 
 
-def item(item_id, kind, content, revision=None, run_index=None):
+def item(item_id, kind, content, revision=None, run_index=None, source_sha256=None):
     return EvidenceItem(item_id=item_id, kind=kind, revision=revision, run=run_index,
-                        sha256=digest(content), content=content)
+                        sha256=digest(content), content=content, source_sha256=source_sha256)
 
 
 JUNIT_FAIL = '<testcase name="test_benign_control"/>\n<testcase name="test_security_rejects_outside_read">\n<failure>test_documents.py:64: AssertionError</failure>'
@@ -99,7 +99,8 @@ def scripted(output, reads=READS, seen=None, retries=None):
         assert [tool.name for tool in info.function_tools] == ['read_evidence']
         step = sum(1 for message in messages if message.kind == 'request') - 1
         if step < len(reads):
-            return ModelResponse(parts=[ToolCallPart('read_evidence', {'item_id': reads[step]})])
+            return ModelResponse(parts=[ToolCallPart('read_evidence',
+                reads[step] if isinstance(reads[step], dict) else {'item_id': reads[step]})])
         if retries is not None and step > len(reads):
             retries.extend(part.content for part in messages[-1].parts if isinstance(part, RetryPromptPart))
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, outputs[min(step - len(reads),
@@ -291,3 +292,239 @@ def test_incomplete_baseline_repeat_preserves_cited_reproduction():
     result = assess_with(scripted(draft(execution='unknown', fix='not_verified')), data).output
     assert result.admission.admitted and result.finding == 'reproduced'
     assert 'incomplete_repeats' in {limitation.code for limitation in result.gate_limitations}
+
+
+def unit_inputs():
+    plan = PLAN.model_copy(update={'observation_mode': 'unit_test', 'test_plan_sha256': digest('test-plan')})
+    baseline = run('failed').model_copy(update={'witness': None, 'source_sha256': digest('baseline-source')})
+    candidate = run('passed').model_copy(update={'witness': None, 'source_sha256': digest('candidate-source')})
+    data = inputs(witnesses=False)
+    return data.model_copy(update={'evidence': AssessmentEvidence(plan=plan, baseline=(baseline,), candidate=(candidate,)),
+        'items': tuple(i for i in data.items if i.kind != 'plan') + (
+            item('plan', 'plan', plan.model_dump_json()),
+            item('test-plan', 'plan', 'real query seam; adversarial condition; required parameter binding'),
+            item('reported-condition', 'plan', 'reported SQL injection through user input'),
+            item('patch', 'patch', 'control calls real query function; security asserts bound parameters'),
+            item('baseline-source', 'source', 'def query(input): return "SELECT " + input', 'baseline', 0, digest('baseline-source')),
+            item('candidate-source', 'source', 'def query(input): return "SELECT ?", (input,)', 'candidate', 0, digest('candidate-source')))})
+
+
+def unit_draft(**changes):
+    reviews = [{'revision': revision, 'source_linked': True, 'condition_exercised': True,
+                'assertions_relevant': True, 'dependency_scope_valid': True,
+                'rationale': observation('Real query construction is exercised with recording dependency; assertions check binding',
+                    (f'{revision}-source', 1, 1), ('patch', 1, 1), ('plan', 1, 1), ('test-plan', 1, 1), ('reported-condition', 1, 1))}
+               for revision in ('baseline', 'candidate')]
+    return draft(**JUNIT_ONLY, validity_reviews=reviews) | changes
+
+
+def unit_assess(output, data=None, reads=None):
+    from corsair.agents.evidence_assessment.contracts import ValidityInput
+    data = data or unit_inputs()
+    # Trusted pre-execution capture admits one identity per revision.
+    source_ids = {}
+    for revision in ('baseline', 'candidate'):
+        ids = {r.source_sha256 for r in getattr(data.evidence, revision)}
+        if len(ids) != 1 or None in ids:
+            raise UnexpectedModelBehavior('mixed or missing captured source identities')
+        source_ids[revision] = ids.pop()
+    review_input = ValidityInput(scope=data.scope, plan=data.plan, revision_sources=source_ids,
+        items=tuple(i for i in data.items if i.kind in ('source', 'patch', 'plan')))
+    reads = reads or tuple(i.item_id for i in review_input.items)
+    admitted = {i.item_id for i in review_input.items}
+    reads = tuple(r for r in reads if (r if isinstance(r, str) else r["item_id"]) in admitted)
+    review_output = output | dict(execution='unknown', finding='inconclusive', fix='not_applicable',
+        application_observations=[], sandbox_observations=[],
+        interpretation=observation('Frozen tests reviewed before execution', ('plan', 1, 1)))
+    agent = create_evidence_assessment_agent(scripted(review_output, reads=reads), output_retries=0)
+    reviewed = agent.run_sync(assessment_prompt(review_input), deps=AssessmentDependencies(review_input),
+        usage_limits=UsageLimits(request_limit=20, tool_calls_limit=18)).output
+    evidence = data.evidence.model_copy(update={revision: tuple(r.model_copy(update={
+        'test_validity': reviewed.bound_validity.get(revision)}) for r in getattr(data.evidence, revision))
+        for revision in ('baseline', 'candidate')})
+    final_data = data.model_copy(update={'evidence': evidence})
+    final_output = output | {'validity_reviews': []}
+    agent = create_evidence_assessment_agent(scripted(final_output, reads=tuple(i.item_id for i in data.items)), output_retries=0)
+    result = agent.run_sync(assessment_prompt(final_data), deps=AssessmentDependencies(final_data),
+        usage_limits=UsageLimits(request_limit=20, tool_calls_limit=18)).output
+    return result.model_copy(update={'validity_reviews': reviewed.validity_reviews})
+
+
+def test_independent_unit_review_admits_without_database_witness():
+    result = unit_assess(unit_draft())
+    assert result.disposition.fix == 'verified'
+    assert result.gate_result.permitted.fix == 'verified'
+    assert len(result.validity_reviews) == 2
+    for revision in ('baseline', 'candidate'):
+        run_evidence = getattr(result.evidence, revision)[0]
+        assert run_evidence.witness is None
+        assert run_evidence.test_validity.observation_plan_sha256 == result.evidence.plan.review_digest
+        assert run_evidence.test_validity.source_sha256 == run_evidence.source_sha256
+    assert result.validity_reviews[0].rationale.citations[0].quote.startswith('def query')
+
+
+def test_missing_unit_review_remains_inconclusive():
+    result = unit_assess(unit_draft(validity_reviews=[]))
+    assert result.disposition.finding == 'inconclusive'
+    assert 'test_validity_missing' in {lim.code for lim in result.gate_limitations}
+
+
+def test_unit_review_rejects_irrelevant_assertion_and_substituted_security_logic():
+    output = unit_draft()
+    output['validity_reviews'][0] |= {'assertions_relevant': False, 'dependency_scope_valid': False}
+    result = unit_assess(output)
+    assert result.disposition.finding == 'inconclusive'
+    assert 'test_validity_unsupported' in {lim.code for lim in result.gate_limitations}
+
+
+@pytest.mark.parametrize('missing', ['patch', 'baseline-source', 'test-plan', 'reported-condition'])
+def test_unit_review_requires_read_source_patch_and_plan_citations(missing):
+    output = unit_draft()
+    review = output['validity_reviews'][0]
+    review['rationale']['citations'] = [c for c in review['rationale']['citations'] if c['item_id'] != missing]
+    with pytest.raises(UnexpectedModelBehavior):
+        unit_assess(output)
+
+
+def test_unit_review_cannot_cite_source_from_another_revision():
+    output = unit_draft()
+    output['validity_reviews'][0]['rationale']['citations'][0]['item_id'] = 'candidate-source'
+    with pytest.raises(UnexpectedModelBehavior):
+        unit_assess(output)
+
+
+def test_unit_author_cannot_choose_review_source_or_plan_identity():
+    output = unit_draft()
+    output['validity_reviews'][0]['source_sha256'] = digest('forged-source')
+    with pytest.raises(UnexpectedModelBehavior):
+        unit_assess(output)
+
+
+def test_unit_review_artifact_digest_identifies_retained_quoted_review():
+    import json
+    result = unit_assess(unit_draft())
+    retained = result.validity_reviews[0].model_dump()
+    actual = hashlib.sha256(json.dumps(retained, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+    assert result.evidence.baseline[0].test_validity.artifact_sha256 == actual
+
+
+def test_legacy_saved_assessment_deserializes_without_new_review_fields():
+    from corsair.agents.evidence_assessment.contracts import EvidenceAssessment
+    result = assess_with(scripted(draft()), inputs()).output
+    historical = result.model_dump(exclude={'gate_result', 'evidence', 'validity_reviews'})
+    restored = EvidenceAssessment.model_validate(historical)
+    assert restored.gate_result is None and restored.evidence is None
+    assert restored.validity_reviews == ()
+    assert restored.disposition == result.disposition
+
+
+def test_legacy_evidence_serialization_omits_default_review_fields():
+    plan = PLAN.model_dump()
+    assert 'observation_mode' not in plan and 'test_plan_sha256' not in plan
+    observed = run('failed').model_dump()
+    assert 'source_sha256' not in observed and 'test_validity' not in observed
+    assert ObservationPlan.model_validate(plan).observation_mode == 'effect_witness'
+    assert RunEvidence.model_validate(observed).test_validity is None
+
+
+@pytest.mark.parametrize('identity', [None, digest('forged-source')])
+def test_unit_source_citation_requires_trusted_run_identity(identity):
+    data = unit_inputs()
+    data = data.model_copy(update={'items': tuple(i.model_copy(update={'source_sha256': identity})
+        if i.item_id == 'baseline-source' else i for i in data.items)})
+    with pytest.raises(UnexpectedModelBehavior):
+        unit_assess(unit_draft(), data)
+
+
+def test_unit_review_cannot_cover_repeats_from_different_sources():
+    data = unit_inputs()
+    baseline = data.evidence.baseline
+    data = data.model_copy(update={'evidence': data.evidence.model_copy(update={
+        'baseline': baseline + (baseline[0].model_copy(update={'source_sha256': digest('other-source')}),)})})
+    with pytest.raises(UnexpectedModelBehavior):
+        unit_assess(unit_draft(), data)
+
+
+@pytest.mark.parametrize('item_id', ['patch', 'baseline-source', 'test-plan', 'reported-condition'])
+def test_truncated_semantic_evidence_cannot_support_affirmative_review(item_id):
+    from corsair.agents.evidence_assessment.contracts import MAX_ITEM_CHARS
+    from corsair.composition.evidence import _item
+
+    data = unit_inputs()
+    original = next(i for i in data.items if i.item_id == item_id)
+    truncated = _item(item_id, original.kind, 'x' * (MAX_ITEM_CHARS + 1),
+                      original.revision, original.run, original.source_sha256)
+    assert not truncated.complete
+    assert 'truncated by trusted code' in truncated.content
+    data = data.model_copy(update={'items': tuple(truncated if i.item_id == item_id else i for i in data.items)})
+    with pytest.raises(UnexpectedModelBehavior):
+        unit_assess(unit_draft(), data)
+    output = unit_draft()
+    for review in output['validity_reviews']:
+        review['assertions_relevant'] = False
+    assert unit_assess(output, data).disposition.finding == 'inconclusive'
+
+
+def test_uncited_incomplete_patch_also_blocks_affirmative_review():
+    data = unit_inputs()
+    extra = item('patch-extra', 'patch', 'truncated fixture overrides application behavior').model_copy(
+        update={'complete': False})
+    data = data.model_copy(update={'items': data.items + (extra,)})
+    # The model cannot avoid the completeness guard by omitting this item from citations or reads.
+    with pytest.raises(UnexpectedModelBehavior):
+        unit_assess(unit_draft(), data, reads=tuple(i.item_id for i in data.items if i.item_id != 'patch-extra'))
+
+
+def test_complete_evidence_preserves_historical_serialization():
+    original = item('receipt', 'receipt', 'native receipt')
+    assert 'complete' not in original.model_dump()
+    assert EvidenceItem.model_validate(original.model_dump()).complete
+
+
+@pytest.mark.parametrize('item_id', ['patch', 'test-plan', 'reported-condition'])
+def test_affirmative_review_requires_complete_read_windows(item_id):
+    data = unit_inputs()
+    original = next(i for i in data.items if i.item_id == item_id)
+    content = '\n'.join(['visible line'] * 80 + ['unread behavior-changing line'])
+    extended = original.model_copy(update={'content': content, 'sha256': digest(content)})
+    data = data.model_copy(update={'items': tuple(extended if i.item_id == item_id else i for i in data.items)})
+    # This scripted model reads only the first window, while citing a genuine observed line.
+    with pytest.raises(UnexpectedModelBehavior):
+        unit_assess(unit_draft(), data)
+
+
+def test_affirmative_review_requires_uncited_patch_file_read():
+    data = unit_inputs()
+    extra = item('patch-extra', 'patch', 'fixture replaces the implementation under test')
+    data = data.model_copy(update={'items': data.items + (extra,)})
+    with pytest.raises(UnexpectedModelBehavior):
+        unit_assess(unit_draft(), data, reads=tuple(i.item_id for i in data.items if i.item_id != 'patch-extra'))
+
+
+def test_affirmative_review_accepts_complete_paginated_patch():
+    data = unit_inputs()
+    content = '\n'.join(['reviewed patch line'] * 81)
+    data = data.model_copy(update={'items': tuple(
+        i.model_copy(update={'content': content, 'sha256': digest(content)}) if i.item_id == 'patch' else i
+        for i in data.items)})
+    reads = tuple(i.item_id for i in data.items) + ({'item_id': 'patch', 'start_line': 81},)
+    result = unit_assess(unit_draft(), data, reads=reads)
+    assert result.disposition.fix == 'verified'
+
+
+def test_pre_execution_validity_input_rejects_runtime_evidence():
+    from pydantic import ValidationError
+    from corsair.agents.evidence_assessment.contracts import ValidityInput
+    data = unit_inputs()
+    with pytest.raises(ValidationError, match='execution evidence'):
+        ValidityInput(scope=data.scope, plan=data.plan,
+            revision_sources={'baseline': digest('baseline-source')}, items=data.items)
+
+
+def test_final_assessor_cannot_rewrite_validity_after_seeing_outcomes():
+    data = unit_inputs()
+    agent = create_evidence_assessment_agent(scripted(unit_draft(), reads=tuple(i.item_id for i in data.items)),
+                                            output_retries=0)
+    with pytest.raises(UnexpectedModelBehavior, match='output retries'):
+        agent.run_sync(assessment_prompt(data), deps=AssessmentDependencies(data),
+                       usage_limits=UsageLimits(request_limit=20, tool_calls_limit=18))

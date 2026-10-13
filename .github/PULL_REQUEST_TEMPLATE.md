@@ -12,6 +12,7 @@ Actual commands and outcomes, relevant negative cases, evaluation dimensions/met
 
 ## Continuity
 
+- [ ] Investigation changes preserve native unit tests at real application seams across languages/frameworks/CWEs; both control and exploit probes execute per revision; dependency boundaries and outcome-blind, artifact-bound validity review are explicit, and any integration requirement is justified by the property.
 - [ ] Relevant tests/evaluations run and failures retained, or limitations explained.
 - [ ] Design/qualification claims match actual evidence.
 - [ ] Work records and current index updated; handoff added for substantial work.
