@@ -248,6 +248,7 @@ def main():
         parser.error("--live names unknown stages or lacks --provider-config")
     if args.evidence.exists() or args.evidence.is_symlink():
         parser.error("evidence directory already exists")
+    args.evidence = args.evidence.absolute()  # LocalArtifacts takes an absolute root; the README passes a relative one
     config = load_inference(args.provider_config) if args.provider_config else None
     profiles = json.loads(args.stage_profiles.read_bytes()) if args.stage_profiles else None
     if profiles is not None:
