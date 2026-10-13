@@ -37,6 +37,8 @@ Implement [SPEC-0063](../specs/SPEC-0063-minitest-runner.md) on main after the `
 
 2026-10-13, after #68 merged (branch restarted from main a8a9e88): records renumbered from SPEC-0059/PLAN-0064 (taken on other branches). The gate's Ruby steps including the new runner argv passed against the image under Docker (listing both fixture tests, both passed; `GEM_HOME` write gives EROFS under Docker where Landlock gives EACCES). CVE-2025-27610 rerun through the guarded harness with the image config id `sha256:751591eb…`: same outcomes (vulnerable: control passed, security failed; fix: both passed; cleanup confirmed). A tag is refused.
 
+2026-10-13, review of 187a24f: setup now installs a committed `Gemfile.lock` frozen (`BUNDLE_FROZEN=true`) and fails if the installed lock differs; `setup.json`/`run.json` record `lock` (`committed` or `resolved`), lock digests, `-I` directories and setup's docker flags with environment values redacted. Checked under Docker: a committed-lock fixture installed with identical digests (8ac8a7a5…); the same fixture with the Gemfile changed and the lock not regenerated failed setup (Bundler exit 16, frozen). Rack (no committed lock, `resolved`) rerun at both commits: identical lock (8c8e9bc6…, Minitest 5.27.0) and identical outcomes. `make test-config` after merging main 497db9f: 1426 passed.
+
 Not run: sanitize CVE-2023-36823 (the benchmark records only its fix revision), sinatra CVE-2024-21510, Rails CVE-2023-22794 (component directory and database setup still to check).
 
 ## Decisions and next action
