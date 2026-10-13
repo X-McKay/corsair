@@ -1,4 +1,5 @@
 """Native 1E fixed projects; no application adapter or finding-validation claim."""
+import copy
 import hashlib
 import ipaddress
 import json
@@ -17,6 +18,16 @@ from tests.qualification.test_policy import require_network, owned_sandbox, obse
 from tests.qualification.prepare_toolchains import JAVA_TESTS, LAUNCHER, SOURCE, image_receipt, source_hashes
 from corsair.adapters.maven_runner import WRAPPER, MavenRunner, MavenRunnerConfig, selection
 from corsair.reports.junit_listing import listed
+
+
+@pytest.fixture
+def kube(kube, request):
+    """Per-image evidence: each gate (and its gateway fixture) writes under `<evidence>/<test name>/`, so one run
+    of all toolchain gates keeps every image's receipts apart."""
+    view = copy.copy(kube)
+    view.evidence = kube.evidence / request.node.name
+    view.evidence.mkdir(mode=0o700)
+    return view
 
 
 @pytest.fixture
@@ -237,8 +248,7 @@ def python_dependencies(kube, cli, sdk, name, remote, record, endpoint, pair):
 
 
 def toolchain_gate(kube, gateway, language):
-    """One image's gate: run alone per evidence directory (`-k test_native_<dir>_toolchain`), since the gateway
-    fixture and SDK receipts write fixed names into the run's evidence."""
+    """One image's gate, into its own evidence subdirectory; `-k test_native_<dir>_toolchain` selects one image."""
     assert not (kube.evidence / 'toolchain.json').exists(), 'Another toolchain gate already wrote this evidence; run one image per run'
     sources = ['tests/qualification/test_toolchains.py', 'tests/qualification/prepare_toolchains.py', 'tests/qualification/test_policy.py', 'tests/qualification/test_lifecycle.py', 'tests/qualification/gateway.py', 'tests/qualification/support.py', 'src/corsair/adapters/maven_runner.py', 'src/corsair/reports/junit_listing.py', 'policies/openshell/identity.yaml', 'deploy/runtime-lock.yaml', 'pyproject.toml', 'uv.lock']
     (kube.evidence / 'toolchain-source-hashes.json').write_text(json.dumps(dict(source_hashes(), **{p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest() for p in sources}), indent=2))
