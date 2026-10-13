@@ -89,6 +89,10 @@ def detect(c: Collector) -> None:
         if (spec := typed(c, project, 'requires-python', str, RUNTIME, here)) is not None:
             _requires_python(c, here, 'requires-python', spec)
         _classifiers(c, here, [x for x in project.get('classifiers') or [] if isinstance(x, str)] if isinstance(project.get('classifiers'), list) else [])
+        required = typed(c, project, 'dependencies', list, FRAMEWORK, here) or []
+        if any(not isinstance(r, str) for r in required):
+            c.unparsed(*FRAMEWORK, here, 'dependencies', '[project] dependencies lists a non-string entry')
+        _requirement_lines(c, here, [r for r in required if isinstance(r, str)], 'dependencies')
         optional = typed(c, project, 'optional-dependencies', dict, FRAMEWORK, here) or {}
         for group in list(optional):
             entries = typed(c, optional, group, list, FRAMEWORK, here) or []
@@ -148,8 +152,9 @@ def detect(c: Collector) -> None:
             for section in ('options.extras_require',):
                 if parser.has_section(section):
                     _requirement_lines(c, 'setup.cfg', [l for _, v in parser.items(section) for l in v.splitlines()], 'extras')
-            if parser.has_option('options', 'tests_require'):
-                _requirement_lines(c, 'setup.cfg', parser.get('options', 'tests_require').splitlines(), 'tests_require')
+            for option in ('install_requires', 'tests_require'):
+                if parser.has_option('options', option):
+                    _requirement_lines(c, 'setup.cfg', parser.get('options', option).splitlines(), option)
             if parser.has_section('tool:pytest'):
                 c.add(*FRAMEWORK, 'constraint', 'config', 'setup.cfg', '[tool:pytest]', pep440(''))
     if (text := c.text('setup.py')) is not None:
