@@ -32,12 +32,30 @@ enforcement, the container runs as the operator's uid.
   ValueError). Usage: identification 2 requests / 1 tool call / 4.5 s, planning 3 / 2 / 28.7 s, authoring 6 / 4 /
   22.1 s, assessment 10 / 9 / 28.1 s. Evidence on RIG0:
   `/home/al/git/corsair/.worktrees/docker-route-live/.runs/fixture-e2e-docker/{scripted-001,live-001}`.
+- Batch of six live runs, as reported by the RIG0 run session (same worktree, commit, provider and stage profiles as
+  live-001; evidence `.runs/fixture-e2e-docker/live-001..006`, redacted tarball
+  `/mnt/project-files/e2e-docker-batch.tar.gz`). Seconds are identification / planning / authoring / assessment.
+  Three of six reached reproduced / verified. Identification and planning were stable in all six, no run hit a tool
+  limit, and both witnesses were admitted in every run that executed tests.
+  - live-001: reproduced / verified, admitted; the test asserted ValueError (4.5 / 29 / 22 / 28).
+  - live-002: inconclusive; the assessment proposed not_reproduced and was not admitted. The security test wrote
+    `allowed/note.txt` without creating `allowed/` and raised FileNotFoundError on both revisions before the
+    traversal call; authoring accepted it (6 / 27 / 12 / 48).
+  - live-003: reproduced / verified, admitted; the test asserted any exception (7 / 28 / 29 / 43).
+  - live-004: reproduced / verified, admitted; the test asserted ValueError (4 / 23 / 24 / 36).
+  - live-005: reproduced / not_verified, admitted at that level; the test asserted the result is not "outside" and
+    did not expect the fix's ValueError, so the fixed revision failed it (9 / 30 / 57 / 64).
+  - live-006: stopped at authoring; the final answer had prose before the JSON, its one correction was rejected, and
+    its test only checked that an outside file was unchanged (authoring 70 s).
 - Cloud container (dockerd with `--registry-mirror=https://mirror.gcr.io`): scripted Docker runs at da0667f and on the
   merged head reached `complete`, gate reproduced / verified, all three containers removal-confirmed.
 - `make test-config` 1782 passed at da0667f's parent content; after merging c0a1904, the fixture Docker, sandbox,
   composition and case e2e tests passed (41). CI `offline-guards` green on da0667f.
 
 ## Decisions and next steps
+
+- The batch's failures are authoring quality (a test that fails before the traversal call, a test that rejects the
+  fix's safe behaviour, prose around the final JSON), not the route: each executed run ran in Docker as planned.
 
 - The route is a stand-in behind the same ports; the OpenShell route stays the only one that qualifies a result.
 - Next: retarget #113 to main once #109 merges; Docker runs of corpus cases through `corsair run` (PLAN-0079's
