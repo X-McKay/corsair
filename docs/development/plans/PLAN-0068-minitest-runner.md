@@ -18,12 +18,13 @@ Implement [SPEC-0063](../specs/SPEC-0063-minitest-runner.md) on main after the `
 - [x] `RubyTestId`, `reports/minitest.py`, `adapters/minitest_runner.py` with fixed listing and run scripts.
 - [x] Captured runner output for Minitest 5.14.4, 5.15.0 and 5.27.0 in the `ruby31` image; offline unit checks.
 - [x] Runner listing and run argv on the fixture inside `test_native_ruby31_toolchain` (`ruby_runner_commands`), checked image-only.
-- [x] Image row `ruby-3.1-bundler` and framework row `minitest` (`==5.14.4 || ==5.15.0 || ==5.27.0`) staged in `tests/unit/test_runtime_requirements.py`: the four Minitest cases select the image only with the runner row; the two RSpec cases stay unsupported.
+- [x] Image row `ruby-3.1-bundler` and framework row `minitest` (`==5.14.4 || ==5.15.0 || ==5.27.0`) in `deploy/runtime-matrix.yaml` as `evidence: image-only` (staged unit-test rows removed): the four Minitest cases select the image only with the runner row, image-only; the two RSpec cases stay unsupported.
 - [x] Docker harness refuses image tags and dirty checkouts or overlay directories, as #74 does for Java.
 - [x] Image-only real case under Docker: CVE-2025-27610 (rack) at both commits through `tests/qualification/ruby_image_case.py`.
-- [ ] Sandbox run of a real case in the batch before the framework row lands (process of 2026-10-13: image PRs and runners are checked image-only; the kind gate is reserved for sandbox changes and the batch before a row).
-- [x] `minitest` admission in the environment agent and skill text (see note below); live environment eval pending.
-- [ ] Matrix rows in an evidence-only PR after the gate, handoff.
+- [ ] Sandbox run of a real case in the milestone gate batch; flips both rows to `live`.
+- [ ] Rack CVE-2025-27610 through the chain end to end once the model server is free (CI case replay deferred by Al, 2026-10-13 15:43Z, until end-to-end runs are on the board).
+- [x] `minitest` admission in the environment agent and skill text (#101, see note below); live environment eval pending.
+- [ ] Handoff.
 
 ## Validation and progress
 
@@ -50,4 +51,4 @@ Not run: sanitize CVE-2023-36823 (the benchmark records only its fix revision), 
 
 ## Decisions and next action
 
-The environment-agent admission waits for the real case, so the agent's prompt and eval are changed once, with evidence. Next: the RIG0 gate batch for `ruby31` (with the runner argv), then the evidence-only row PR.
+The environment-agent admission waits for the real case, so the agent's prompt and eval are changed once, with evidence. Under the lighter path (Al, 2026-10-13 13:55Z) the rows landed as `image-only` from the Docker evidence above; the milestone gate batch for `ruby31` (with the runner argv) flips them to `live`. Next: the rack case end to end through the chain (the environment agent admits `minitest` since #101).

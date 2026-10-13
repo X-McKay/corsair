@@ -89,6 +89,18 @@ qualify-toolchain:
 	mkdir -p "$(CORSAIR_QUAL_RUN)"
 	uv run --locked python -m pytest $(PYTEST_ROOT) tests/qualification -m toolchain $(foreach language,$(TOOLCHAINS),--toolchain $(language)) --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
 
+# Refresh each Java image's reviewed Maven cache list (SPEC-0064) from a clean build of its preparation stage, then
+# review the diff: the image build fails on any difference from the checked-in list. TOOLCHAINS names the Java images
+# (default: both).
+.PHONY: maven-hashes
+maven-hashes:
+	for dir in $(or $(TOOLCHAINS),java java8); do \
+	  docker --host=unix:///var/run/docker.sock build --no-cache --target cache --tag corsair-m2-$$dir deploy/qualification/toolchains/$$dir \
+	  && docker --host=unix:///var/run/docker.sock run --rm --network=none corsair-m2-$$dir cat /opt/corsair-m2.sha256 > deploy/qualification/toolchains/$$dir/m2.sha256.new \
+	  && mv deploy/qualification/toolchains/$$dir/m2.sha256.new deploy/qualification/toolchains/$$dir/m2.sha256 \
+	  || { rm -f deploy/qualification/toolchains/$$dir/m2.sha256.new; exit 1; }; \
+	done
+
 .PHONY: qualify-recovery
 qualify-recovery:
 	test ! -e "$(CORSAIR_QUAL_RUN)"

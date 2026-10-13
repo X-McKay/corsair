@@ -26,7 +26,8 @@ from corsair.agents.issue_identification import (
 )
 from corsair.agents.issue_identification.skills import SKILL_SHA256
 from corsair.agents.issue_identification.contracts import IssueIdentification, IssueIdentificationDraft
-from corsair.agents.issue_analysis.provider import LocalModelConfig, local_model
+from corsair.inference.config import load_agent_config
+from corsair.inference.models import configured_model
 from corsair.agents.issue_analysis.tools import FixtureDependencies
 from evals.issue_analysis.evaluate import describe_model, record_count
 from evals.issue_analysis.live import NoUnknownToolAttempts, ProviderUsageCoverage, message_counts, output_tool_names
@@ -179,15 +180,15 @@ def passed(report) -> bool:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence", type=Path, required=True)
-    parser.add_argument("--provider-config", type=Path, help="Explicit LocalModelConfig JSON; omitted means scripted fixture only")
+    parser.add_argument("--provider-config", type=Path, help="Explicit provider configuration JSON; omitted means scripted fixture only")
     args = parser.parse_args()
     if args.evidence.exists() or args.evidence.is_symlink():
         parser.error("evidence path already exists")
     async def run():
         if args.provider_config is None:
             return await evaluate(args.evidence, EvaluationBudget())
-        config = LocalModelConfig.model_validate_json(args.provider_config.read_text())
-        async with local_model(config) as model:
+        config = load_agent_config(args.provider_config, "identification")
+        async with configured_model(config) as model:
             return await evaluate(args.evidence, EvaluationBudget(), model=model)
     report = asyncio.run(run())
     report.print(include_input=False, include_output=False)

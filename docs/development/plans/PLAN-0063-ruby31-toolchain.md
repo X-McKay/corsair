@@ -17,9 +17,9 @@ Implement [SPEC-0058](../specs/SPEC-0058-ruby31-toolchain.md) with the `corsair-
 
 - [x] Image source: official `ruby:3.1.7-bookworm` by index digest, fixture `Gemfile`/`Gemfile.lock`/`test/native_test.rb`; `BASES`, trusted control, offline build.
 - [x] Gate `test_native_ruby31_toolchain` (`TOOLCHAINS=ruby31`): versions, fixture, read-only `GEM_HOME`, missing gem, no discovery, syntax, assertion; selection test row.
-- [ ] RIG0: build and load `ruby31` on a fresh admitted node; run the gate.
-- [ ] After the gate passes: `ruby-3.1-bundler` matrix row with the measured versions, qualification report entry (tag, platform, index and manifest digests, upstream Dockerfile source commit, run table), handoff.
-- [ ] Second PR: Minitest runner and verbose-output parser on the native runner contract (`adapters/native_runner.py`), offline parser check against real Minitest output for each version claimed, `minitest` framework admission and its framework row after a real case (CVE-2025-27610 or CVE-2024-21510) passes on RIG0.
+- [x] `ruby-3.1-bundler` matrix row with the measured versions, `evidence: image-only` (lighter path, SPEC-0062): image built, gate body and the Minitest runner's argv under plain Docker, CVE-2025-27610 through the runner at both commits (PLAN-0068). Rows PR from main 1c6d26a.
+- [ ] Milestone gate batch: build and load `ruby31` on a fresh admitted node, run the gate, qualification report entry (tag, platform, index and manifest digests, upstream Dockerfile source commit, run table), flip the row to `live`.
+- [x] Second PR (#84, merged as e090d27; framework row with the image row above): Minitest runner and verbose-output parser on the native runner contract (`adapters/native_runner.py`), offline parser check against real Minitest output for each version claimed, `minitest` framework admission and its framework row after a real case (CVE-2025-27610 or CVE-2024-21510) passes on RIG0.
 
 ## Validation and progress
 

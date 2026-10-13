@@ -35,7 +35,8 @@ from corsair.agents.evidence_assessment import (CONFIG_VERSION, PROMPT_VERSION, 
 from corsair.agents.evidence_assessment.contracts import AssessmentInput, EvidenceAssessment, EvidenceRead
 from corsair.agents.evidence_assessment.dependencies import AssessmentDependencies
 from corsair.agents.evidence_assessment.tools import READ_EVIDENCE_TOOL
-from corsair.agents.provider import LocalModelConfig, local_model
+from corsair.inference.config import load_agent_config
+from corsair.inference.models import configured_model
 from corsair.composition.direct import CompositionBudget, StageLimits, stage_limits
 from corsair.core.disposition import Disposition, admit, assess
 from evals.issue_analysis.evaluate import describe_model, record_count
@@ -331,7 +332,7 @@ def passed(report) -> bool:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence", type=Path, required=True)
-    parser.add_argument("--provider-config", type=Path, help="Explicit LocalModelConfig JSON; omitted means scripted fixture only")
+    parser.add_argument("--provider-config", type=Path, help="Explicit provider configuration JSON; omitted means scripted fixture only")
     parser.add_argument("--split", choices=("development", "held_out", "all"), default="development")
     parser.add_argument("--case", action="append", default=[], help="Only this case; repeatable")
     parser.add_argument("--repeat", type=int, default=3)
@@ -343,8 +344,8 @@ def main():
     async def run():
         if args.provider_config is None:
             return await evaluate(args.evidence, budget, split=args.split, cases=tuple(args.case))
-        config = LocalModelConfig.model_validate_json(args.provider_config.read_text())
-        async with local_model(config) as model:
+        config = load_agent_config(args.provider_config, "assessment")
+        async with configured_model(config) as model:
             return await evaluate(args.evidence, budget, split=args.split, cases=tuple(args.case), model=model)
     report = asyncio.run(run())
     report.print(include_input=False, include_output=False)

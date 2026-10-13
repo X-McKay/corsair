@@ -38,7 +38,8 @@ from corsair.agents.environment.agent import (
 )
 from corsair.agents.environment.contracts import EnvironmentInput, EnvironmentDraft
 from corsair.agents.environment.dependencies import EnvironmentDependencies, SetupBudget
-from corsair.agents.provider import LocalModelConfig, local_model
+from corsair.inference.config import load_agent_config
+from corsair.inference.models import configured_model
 from corsair.ports.execution import ExecutionReceipt, ExecutionError
 from corsair.ports.sandbox import SandboxHandle
 from evals.issue_analysis.evaluate import describe_model, record_count
@@ -413,8 +414,8 @@ def main():
         budget = EvaluationBudget(repeat=args.repeat)
         if args.provider_config is None:
             return await evaluate(args.evidence, budget)
-        config = LocalModelConfig.model_validate_json(args.provider_config.read_text())
-        async with local_model(config) as model:
+        config = load_agent_config(args.provider_config, "environment")
+        async with configured_model(config) as model:
             return await evaluate(
                 args.evidence,
                 budget,

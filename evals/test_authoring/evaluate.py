@@ -24,7 +24,8 @@ from pydantic_ai.usage import RunUsage, UsageLimits
 from pydantic_evals import Dataset, set_eval_attribute
 from pydantic_evals.evaluators import Evaluator, HasMatchingSpan, MaxModelRequests, MaxToolCalls
 
-from corsair.agents.provider import LocalModelConfig, local_model
+from corsair.inference.config import load_agent_config
+from corsair.inference.models import configured_model
 from corsair.agents.source.tools import READ_SOURCE_TOOL
 from corsair.agents.test_authoring.agent import (
     CONFIG_VERSION, PROMPT_VERSION, authoring_prompt, create_test_authoring_agent,
@@ -324,7 +325,7 @@ def passed(report) -> bool:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence", type=Path, required=True)
-    parser.add_argument("--provider-config", type=Path, help="Explicit LocalModelConfig JSON; omitted means scripted fixture only")
+    parser.add_argument("--provider-config", type=Path, help="Explicit provider configuration JSON; omitted means scripted fixture only")
     parser.add_argument("--repeat", type=int, default=EvaluationBudget().repeat)
     args = parser.parse_args()
     if args.evidence.exists() or args.evidence.is_symlink():
@@ -334,8 +335,8 @@ def main():
         budget = EvaluationBudget(repeat=args.repeat)
         if args.provider_config is None:
             return await evaluate(args.evidence, budget)
-        config = LocalModelConfig.model_validate_json(args.provider_config.read_text())
-        async with local_model(config) as model:
+        config = load_agent_config(args.provider_config, "authoring")
+        async with configured_model(config) as model:
             return await evaluate(args.evidence, budget, model=model,
                                   provider=config.model_dump(mode="json", exclude={"api_key_env"}))
     report = asyncio.run(run())

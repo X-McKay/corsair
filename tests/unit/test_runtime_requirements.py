@@ -616,17 +616,6 @@ def test_setup_cfg_install_requires_is_read():
     assert select(detect(files, 'python'), load()).status == 'unsupported'
 
 
-# SPEC-0058 image row and SPEC-0063 runner row, staged here until the live gate passes; runtime and Bundler are what
-# the image measured, and the Minitest versions are the ones the runner's own scripts ran against (PLAN-0068).
-STAGED_RUBY31 = {'id': 'ruby-3.1-bundler', 'language': 'ruby',
-                 'base_image': 'docker.io/library/ruby@sha256:91627f55e8969006aab67d15c92fb930500ff73948803da1330b8a853fecebb5',
-                 'image_source': 'deploy/qualification/toolchains/ruby31', 'runtime': {'name': 'ruby', 'version': '3.1.7'},
-                 'tools': {'bundler': '2.3.27'}, 'selector': {}, 'qualification': {'evidence': 'image-only', 'records': ['SPEC-0058'], 'report': 'x'}}
-STAGED_MINITEST = {'name': 'minitest', 'language': 'ruby', 'versions': '==5.14.4 || ==5.15.0 || ==5.27.0',
-                   'runner': 'src/corsair/adapters/minitest_runner.py', 'images': ['ruby-3.1-bundler'],
-                   'qualification': {'evidence': 'image-only', 'records': ['SPEC-0063', 'PLAN-0068'], 'report': 'x'}}
-
-
 def test_ruby_selection_admits_a_minitest_ready_result():
     # The environment agent's `minitest` ready result is admitted by a Ruby selection that admitted the Minitest row.
     from corsair.agents.environment.contracts import ReadyEnvironment
@@ -634,9 +623,8 @@ def test_ruby_selection_admits_a_minitest_ready_result():
     requirements = json.loads((Path(__file__).resolve().parents[2] / 'benchmarks/runtime-requirements.json').read_text())
     rack = next(RuntimeRequirement.model_validate(revision['requirement']) for r in requirements['results']
                 if r['case_id'] == 'CVE-2025-27610' for revision in r['revisions'].values() if 'requirement' in revision)
-    matrix = load().model_dump()
-    selection = select(rack, Matrix.model_validate({**matrix, 'images': [*matrix['images'], STAGED_RUBY31],
-                                                    'frameworks': [*matrix['frameworks'], STAGED_MINITEST]}))
+    selection = select(rack, load())
+    assert selection.status == 'supported' and selection.image_id == 'ruby-3.1-bundler'
     prepared = {'ruby-3.1-bundler': 'docker.io/library/corsair-ruby31@sha256:' + '0' * 64}
     ready = lambda framework: ReadyEnvironment.model_construct(toolchain_id='ruby-3.1-bundler',
                                                                toolchain_image=prepared['ruby-3.1-bundler'], framework=framework)
@@ -650,21 +638,22 @@ def test_ruby31_rows_select_the_four_minitest_cases_and_not_the_rspec_ones():
     revisions = {(r['case_id'], name): RuntimeRequirement.model_validate(revision['requirement'])
                  for r in requirements['results'] if r['language'] == 'ruby' and 'revisions' in r
                  for name, revision in r['revisions'].items() if 'requirement' in revision}
-    matrix = load().model_dump()
-    image_only = Matrix.model_validate({**matrix, 'images': [*matrix['images'], STAGED_RUBY31]})
-    both = Matrix.model_validate({**image_only.model_dump(), 'frameworks': [*matrix['frameworks'], STAGED_MINITEST]})
+    matrix = load()
+    data = matrix.model_dump()
+    bare = Matrix.model_validate({**data, 'frameworks': [f for f in data['frameworks'] if f['name'] != 'minitest']})
     minitest = {'CVE-2023-22794', 'CVE-2025-27610', 'CVE-2023-36823', 'CVE-2024-21510'}
     assert {case for case, _ in revisions} >= minitest | {'CVE-2020-10187', 'CVE-2017-0889'}
     for (case, name), requirement in revisions.items():
         if case in minitest:
             # The image alone runs nothing: without the runner row the only need is Minitest itself.
-            selection = select(requirement, image_only)
+            selection = select(requirement, bare)
             assert selection.status == 'unsupported' and [n.name for n in selection.needs] == ['minitest'], (case, name)
-            selection = select(requirement, both)
+            selection = select(requirement, matrix)
             assert selection.status == 'supported' and selection.image_id == 'ruby-3.1-bundler', (case, name)
+            assert selection.evidence == 'image-only', (case, name)
         elif case in ('CVE-2020-10187', 'CVE-2017-0889'):
             # These need Ruby 2.4-2.7 and RSpec; 3.1 is never substituted.
-            assert select(requirement, both).status == 'unsupported', (case, name)
+            assert select(requirement, matrix).status == 'unsupported', (case, name)
 
 
 def test_perl_selection_admits_a_tap_harness_ready_result():

@@ -2,7 +2,7 @@ name: Toolchain images (image-only)
 
 # Image-only tier (SPEC-0062): build each toolchain image a PR changes and run its trusted control in the container.
 # No cluster, no OpenShell: this is the evidence an `evidence: image-only` matrix row starts from, never sandbox
-# evidence. The real-case run joins this job once the shared image-case harness (consolidation PR) is on main.
+# evidence. Real cases (tests/qualification/image_cases.py) are not run here until end-to-end runs exist (Al, 2026-10-13).
 on:
   pull_request:
     paths:
