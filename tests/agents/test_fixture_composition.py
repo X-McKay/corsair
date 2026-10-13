@@ -402,7 +402,7 @@ def test_stage_limits_are_derived_from_each_stage_input_and_recorded(store, tmp_
         limits["assessment"].read_windows + 3
     for attempt in run.attempts:
         assert attempt.exhausted is None and attempt.usage.tool_calls <= attempt.limits.tool_calls_limit
-        assert attempt.limits.request_limit == attempt.limits.tool_calls_limit + 3
+        assert attempt.limits.request_limit == attempt.limits.tool_calls_limit + CompositionBudget().output_retries + 2
 
 
 def test_a_stage_that_cannot_finish_without_its_withdrawn_tools_is_tool_budget_exhausted(store, tmp_path):

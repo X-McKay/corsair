@@ -124,7 +124,9 @@ class CompositionBudget(Contract):
     assessment: StageBudget = StageBudget(request_limit=32, tool_calls_limit=28, total_tokens_limit=262144,
                                           timeout_seconds=600, slack_tool_calls=3, tokens_per_request=10000)
     dev_runs: int = Field(default=3, strict=True, ge=1, le=5)
-    output_retries: int = Field(default=1, strict=True, ge=0, le=1)
+    # Two corrections (Al, 2026-10-13, as a measured PLAN-0087 candidate): a second, different refusal often
+    # appears only after the first is fixed (schema, then citation; order, then discovery ids).
+    output_retries: int = Field(default=2, strict=True, ge=0, le=2)
     admission_refusals: int = Field(default=1, strict=True, ge=0, le=2)
 
 
