@@ -1,15 +1,17 @@
 """The operator's per-framework harness table: the selected framework row's runner picks the runner adapter, its
 config and the image-only Docker harness that installs dependencies and gives each run a fresh revision workspace.
 
-Keyed by the matrix framework row's `runner` path (deploy/runtime-matrix.yaml), so a case reaches the runner its
-own build files selected, never pytest's by default. A language joins by adding one row whose functions follow its
-`tests/qualification/<language>_image_case.py` module; a selected framework with no row stops the case before any
-model request.
+Keyed by the framework runtime selection fixed (the matrix framework row's name, deploy/runtime-matrix.yaml), so a
+case reaches the runner its own build files selected, never pytest's by default; the environment stage can only
+confirm that framework (`check_ready` refuses any other). A language joins by adding one row whose functions follow
+its `tests/qualification/<language>_image_case.py` module; a selected framework with no row stops the case before
+any model request.
 """
 from dataclasses import dataclass
 from typing import Any, Callable
 
 from corsair.adapters.jest_runner import JestRunner
+from corsair.agents.test_planning.contracts import WitnessFacility
 from corsair.nodes.runtime.matrix import FrameworkRow
 from tests.qualification import node_image_case
 
@@ -28,10 +30,13 @@ class Harness:
     # Declared to the planner and author; the environment stage observes the rest.
     scratch_location: str
     observation_facilities: tuple[str, ...]
+    # The operator's witness recorders for this framework; none yet outside Python, so planning cannot be admitted
+    # (SPEC-0040 requires a listed facility) and the case stops there with that reason.
+    witness_facilities: tuple[WitnessFacility, ...] = ()
 
 
 HARNESSES = {
-    "src/corsair/adapters/jest_runner.py": Harness(
+    "jest": Harness(
         runner=JestRunner, config=node_image_case.CONFIG, setup=node_image_case.setup,
         setup_identity=node_image_case.setup_identity, workspace=node_image_case.workspace,
         registry_env=node_image_case.SETUP_ENV,
@@ -41,8 +46,8 @@ HARNESSES = {
 
 
 def harness(row: FrameworkRow) -> Harness:
-    """The harness for the selected framework row's runner; refused when no harness serves that runner yet."""
+    """The harness for the selected framework row; refused when no harness serves that framework yet."""
     try:
-        return HARNESSES[row.runner]
+        return HARNESSES[row.name]
     except KeyError:
         raise ValueError(f"no case harness for the {row.name} runner {row.runner} yet") from None

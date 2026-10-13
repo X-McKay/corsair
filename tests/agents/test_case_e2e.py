@@ -144,3 +144,53 @@ def test_a_case_run_records_the_environment_stage_and_its_ports(tmp_path):
     assert (tmp_path / "e2e/attempt-0-environment.json").exists()
     with pytest.raises(ValueError, match=r"stages \['environment'\] are neither live nor scripted"):
         asyncio.run(record_run(tmp_path / "other", (), None, env_case(), None, {}, stages=AGENT_STAGES))
+
+
+def test_an_environment_framework_other_than_the_selected_one_stops_the_run(tmp_path):
+    """The runner is picked from the selection before the chain; the environment stage cannot report another framework."""
+    from corsair.composition.direct import StageModels, run_direct
+    (tmp_path / "artifacts").mkdir(mode=0o700)
+    (tmp_path / "work").mkdir()
+    models = StageModels(identification=scripted_identification(), planning=scripted_planning(),
+                         authoring=scripted_authoring(), assessment=scripted_assessment(),
+                         environment=environment_model([BUILD, DISCOVER, BASELINE], ready_draft(framework="jest")))
+    with LocalArtifacts(tmp_path / "artifacts", max_bytes=1024 * 1024) as store:
+        run = asyncio.run(run_direct(env_case(), models, reviewed_runners(store, tmp_path / "work"), catalog=catalog(),
+                                     preparation=Sandboxes(OK)))
+    # The agent's own admission refuses a framework its outputs do not show; check_ready refuses one the selection
+    # did not admit. Either way no ready environment, and so no runner, follows.
+    assert run.stopped_at == "environment" and run.environment is None and run.executions == ()
+
+
+def test_result_lines_and_the_cohort_roll_up(tmp_path):
+    from corsair.composition.direct import DirectRun
+    from evals.case_e2e.results import cohort_summary, markdown, result_line
+    from evals.fixture_chain.evaluate import ChainOracle
+    refused = result_line("CVE-1", "JavaScript", None, tmp_path, refused="runtime undetermined: no engines")
+    assert (refused["reached"], refused["reason"], refused["selected"], refused["usage"]) == (
+        "case", "runtime undetermined: no engines", None, {})
+    stopped = DirectRun(stopped_at="planning", reason="plan unsupported: no witness recorder", attempts=())
+    oracle = ChainOracle(stopped_at="planning", gate=None, assessment_admitted=None)
+    planning = result_line("CVE-2", "JavaScript", oracle, tmp_path, run=stopped)
+    assert (planning["reached"], planning["matches_expected"], planning["baseline_basis"]) == ("planning", True, None)
+    done = result_line("CVE-3", "Python", None, tmp_path, run=DirectRun(stopped_at=None, reason="complete", attempts=()))
+    summary = cohort_summary([refused, planning, done])
+    assert summary["by_language"]["JavaScript"]["case"] == 2 and summary["by_language"]["JavaScript"]["runtime"] == 1
+    assert summary["by_language"]["JavaScript"]["authoring"] == 0 and summary["total"]["complete"] == 1
+    assert "| total | 3 | 2 | 2 | 2 | 2 | 1 | 1 | 1 | 1 |" in markdown(summary)
+
+
+def test_a_cohort_records_a_case_that_cannot_start_before_any_model(tmp_path, monkeypatch):
+    from evals.case_e2e import evaluate
+    monkeypatch.setattr(evaluate, "cohort", lambda name: ("CVE-2020-15123",))
+    stop = lambda: (_ for _ in ()).throw(AssertionError("no model may be built"))
+    report, summary = asyncio.run(evaluate.evaluate(tmp_path / "run", "jest", tmp_path / "no-sources", {NODE: CONFIG},
+                                                    models={stage: stop for stage in AGENT_STAGES}))
+    line = json.loads((tmp_path / "run/results.jsonl").read_text())
+    assert line["reached"] == "case" and "does not hold the baseline commit" in line["reason"]
+    assert summary["total"]["case"] == 1 and summary["total"]["runtime"] == 0
+    assert report.cases[0].assertions["started"].value is False and not report.failures
+    assert json.loads((tmp_path / "run/configuration.json").read_text())["dataset"] == "jest"
+    # The eval wrapper's summary and comparison read the native report like any other suite's.
+    from evals.run import summarize
+    assert summarize(tmp_path / "run")["identity"]["dataset"] == "jest" and summarize(tmp_path / "run")["attempts"] == 1

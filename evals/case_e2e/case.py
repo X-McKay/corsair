@@ -25,6 +25,7 @@ from tests.qualification.image_case import commit_tree
 
 from .frameworks import Harness, harness as harness_for
 
+REPOSITORY = Path(__file__).resolve().parents[2]
 REVISIONS = ("baseline", "candidate")
 # A local image's config id in reference form: image-only evidence names the image Docker ran, not a registry manifest.
 LOCAL = "local/corsair-{row}@{config}"
@@ -108,7 +109,8 @@ def build_case(found: BenchmarkEntry, repository: Path, work: Path, images: dict
         language=agent.language, runtime=toolchain.runtime, framework=framework.name,
         discovery_command=harness.config.command, approved_test_paths=("declared-before-environment-stage",),
         baseline_test=None,
-        scratch_location=harness.scratch_location, observation_facilities=harness.observation_facilities)
+        scratch_location=harness.scratch_location, observation_facilities=harness.observation_facilities,
+        witness_facilities=harness.witness_facilities)
     installed = {revision: harness.setup_identity(image, trees[revision], commit) for revision, commit in commits.items()}
     identity = EnvironmentIdentity(
         image_digest=outcome.image.rsplit("@sha256:", 1)[1], recipe_sha256=_digest("declared before the environment stage"),

@@ -1,27 +1,31 @@
-"""Run one benchmark case through the chain: case id in, every stage receipt out (image-only, Docker).
+"""`make run CASE=<id>`: one benchmark case through the chain for diagnosis, never a baseline (image-only, Docker).
+Cohorts, comparisons and baselines go through `make eval AGENT=chain SET=<cohort>` (`evaluate.py`).
 
 The case's manifest and a local clone holding its baseline and candidate commits become the chain input
 (`case.py`); runtime selection picks the matrix row from the baseline's build files and its framework row picks the
 runner (`frameworks.py`). Each revision's own dependencies are installed once with registry access, then the
 environment stage prepares the selected image with the environment agent and every test run is offline in a fresh
-container (`docker.py`). Every agent stage is live on the provider: a real case has no scripted plumbing.
-Existing evidence directories are refused.
+container (`docker.py`). Every agent stage is live on the provider: a real case has no scripted plumbing. The case
+runs once, never retried; a case that cannot start is recorded with its reason before any model request. The result
+line (`results.py`) is printed and kept beside the receipts. Existing evidence directories are refused.
 """
 import argparse
 import asyncio
 from contextlib import ExitStack
-from hashlib import sha256
+from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 import re
 
 from corsair.adapters.local_artifacts import LocalArtifacts
 from corsair.composition.direct import DirectRun
 from corsair.inference.config import InferenceConfig, load_inference
-from evals.fixture_e2e.run import AGENT_STAGES, record_run, stage_configs, summary
+from evals.fixture_e2e.run import AGENT_STAGES, record_run, stage_configs
 
-from .case import CaseRefused, CaseRun, build_case, entry
+from .case import REPOSITORY, CaseRefused, CaseRun, build_case, entry
 from .docker import DockerPreparation, DockerRunners, install
+from .results import result_line
 
 IMAGE = re.compile(r"(?P<row>[a-z0-9][a-z0-9.-]*)=(?P<config>sha256:[0-9a-f]{64})")
 
@@ -60,23 +64,42 @@ async def run_case(prepared: CaseRun, evidence: Path, config: InferenceConfig, t
                                 preparation=preparation)
 
 
+def images(path: Path) -> dict[str, str]:
+    """The operator's prepared local images, `{"<row id>": "sha256:<config id>"}`."""
+    loaded = json.loads(path.read_text())
+    if not isinstance(loaded, dict) or not all(IMAGE.fullmatch(f"{row}={config}") for row, config in loaded.items()):
+        raise ValueError(f"{path}: expected {{\"<row id>\": \"sha256:<config id>\"}}")
+    return loaded
+
+
 def main():
+    """`make run CASE=<id>`: one case for diagnosis, never a baseline; the result line goes to stdout."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--case", required=True, help="Benchmark case id or manifest directory under benchmarks/cases")
-    parser.add_argument("--repository", required=True, type=Path, help="Local clone holding both commits")
-    parser.add_argument("--image", action="append", required=True,
-                        help="Prepared local image per matrix row: <row id>=sha256:<config id>")
-    parser.add_argument("--evidence", required=True, type=Path)
+    parser.add_argument("--evidence", type=Path, help="New private directory; default .runs/cases/<case>-<UTC stamp>")
     parser.add_argument("--provider-config", required=True, type=Path, help="Per-agent provider JSON")
+    parser.add_argument("--repository", type=Path, help="Local clone holding both commits; default "
+                        "$CORSAIR_CASE_SOURCES/<case id>/repo")
+    parser.add_argument("--images", type=Path, default=os.environ.get("CORSAIR_CASE_IMAGES"),
+                        help='JSON {"<row id>": "sha256:<config id>"}; default $CORSAIR_CASE_IMAGES')
     parser.add_argument("--stage-profiles", type=Path, help="Optional JSON of per-stage request controls")
     parser.add_argument("--timeout", type=int, default=600, help="Seconds per runner or setup command")
     args = parser.parse_args()
-    images = {}
-    for value in args.image:
-        if not (match := IMAGE.fullmatch(value)):
-            parser.error(f"--image {value!r} is not <row id>=sha256:<64 hex config id>")
-        images[match["row"]] = match["config"]
-    if args.evidence.exists() or args.evidence.is_symlink():
+    try:
+        found = entry(args.case)
+        prepared_images = images(args.images) if args.images else None
+    except (CaseRefused, ValueError, OSError) as exc:
+        parser.error(str(exc))
+    if prepared_images is None:
+        parser.error("pass --images or set CORSAIR_CASE_IMAGES")
+    case_id = found.inventory.case_id
+    repository = args.repository or (Path(os.environ["CORSAIR_CASE_SOURCES"]) / case_id.replace("/", "_") / "repo"
+                                     if os.environ.get("CORSAIR_CASE_SOURCES") else None)
+    if repository is None:
+        parser.error("pass --repository or set CORSAIR_CASE_SOURCES")
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    evidence = args.evidence or REPOSITORY / ".runs/cases" / f"{case_id.replace('/', '_')}-{stamp}"
+    if evidence.exists() or evidence.is_symlink():
         parser.error("evidence directory already exists")
     config = load_inference(args.provider_config)
     profiles = json.loads(args.stage_profiles.read_bytes()) if args.stage_profiles else None
@@ -85,14 +108,19 @@ def main():
             stage_configs(config, profiles, AGENT_STAGES)
         except ValueError as exc:
             parser.error(str(exc))
-    args.evidence.mkdir(parents=True, mode=0o700)
+    evidence.mkdir(parents=True, mode=0o700)
+    expected = found.manifest.evaluator.expected
+    context = dict(case_id=case_id, language=found.inventory.language, expected=expected.chain if expected else None,
+                   evidence=evidence)
     try:
-        prepared = prepare_case(args.case, args.repository, args.evidence, images, args.timeout)
+        prepared = prepare_case(args.case, repository, evidence, prepared_images, args.timeout)
     except CaseRefused as refused:
-        raise SystemExit(f"case refused: {refused}")
-    run = asyncio.run(run_case(prepared, args.evidence, config, args.timeout, profiles))
-    print(json.dumps(summary(run) | {
-        "config_sha256": sha256((args.evidence / "e2e" / "configuration.json").read_bytes()).hexdigest()}, indent=2))
+        line = result_line(**context, refused=str(refused))
+    else:
+        line = result_line(**context, prepared=prepared,
+                           run=asyncio.run(run_case(prepared, evidence, config, args.timeout, profiles)))
+    (evidence / "result-line.json").write_text(json.dumps(line, indent=2, default=str))
+    print(json.dumps(line, indent=2, default=str))
 
 
 if __name__ == "__main__":
