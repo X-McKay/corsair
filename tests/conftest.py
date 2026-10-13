@@ -11,3 +11,4 @@ def pytest_addoption(parser):
     parser.addoption("--provider-config", help="Explicit LocalModelConfig JSON for live fixture E2E stages")
     parser.addoption("--e2e-live", help="Comma-separated fixture E2E stages to run on the provider")
     parser.addoption("--e2e-runs", help="Live fixture E2E runs after the scripted control (0-6)")
+    parser.addoption("--e2e-stage-profiles", help="Optional per-stage provider profiles JSON for live fixture E2E")

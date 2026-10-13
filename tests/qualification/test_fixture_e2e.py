@@ -26,7 +26,7 @@ from corsair.agents.provider import LocalModelConfig
 from corsair.ports.execution import ExecutionLimits
 from corsair.ports.sandbox import LifecycleLimits
 from deploy.openshell.artifacts import TOOLS
-from evals.fixture_e2e.run import STAGES, record_run, summary as run_summary
+from evals.fixture_e2e.run import STAGES, record_run, stage_configs, summary as run_summary
 from evals.fixture_e2e.sandbox import PYTHON, sandbox_case, sandbox_runners
 from tests.qualification.prepare_toolchains import image_receipt
 from tests.qualification.support import LOCK, ROOT
@@ -89,9 +89,14 @@ def test_fixture_chain_in_fresh_sandbox_workspaces(kube, adapter_gateway, reques
     provider = request.config.getoption('--provider-config')
     assert not set(live) - set(STAGES) and 0 <= repetitions <= 6, (live, repetitions)
     config = LocalModelConfig.model_validate_json(Path(provider).read_bytes()) if live and repetitions else None
+    profile_path = request.config.getoption('--e2e-stage-profiles')
+    profiles = json.loads(Path(profile_path).read_bytes()) if profile_path and config else None
+    if profiles is not None:
+        stage_configs(config, profiles)
     summary = dict(outcome='failed', scope='SPEC-0018 E2E-0 chain through OpenShellTestWorkspace; fixture only',
-                   live_stages=list(live), application_retries=0, stage_retries=0, runs=[],
+                   live_stages=list(live), stage_profiles=None, application_retries=0, stage_retries=0, runs=[],
                    witness='SPEC-0033 operator probe in the test interpreter; tamper-evident, not tamper-proof')
+    summary['stage_profiles'] = profiles
     kube.evidence.chmod(0o700)
     (kube.evidence/'fixture-e2e-hashes.json').write_text(json.dumps(
         {p: hashlib.sha256((ROOT/p).read_bytes()).hexdigest() for p in SOURCES}, indent=2))
@@ -136,7 +141,8 @@ def test_fixture_chain_in_fresh_sandbox_workspaces(kube, adapter_gateway, reques
                 summary['runs'].append(record)
                 started = time.monotonic()
                 try:
-                    run = asyncio.run(record_run(evidence, stages, config if stages else None, case, runners, route))
+                    run = asyncio.run(record_run(evidence, stages, config if stages else None, case, runners, route,
+                                                     profiles if stages else None))
                 finally:
                     record['elapsed_seconds'] = round(time.monotonic()-started, 1)
                     if (evidence/'native-runs.json').exists():
