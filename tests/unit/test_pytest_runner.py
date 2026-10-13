@@ -89,7 +89,7 @@ def test_discovers_then_executes_once_and_admits_claims_from_junit(store):
     assert discover == DISCOVER + ('tests/test_a.py',)
     assert (first, second) == (uuid5(operation, 'discovery'), uuid5(operation, 'execution'))
     # Ids and paths are positional arguments to a fixed script; nothing agent-derived is in the script text.
-    assert argv[:5] == ('sh', '-c', WRAPPER, 'corsair-pytest', '.corsair-junit.xml')
+    assert argv[:5] == ('/bin/sh', '-c', WRAPPER, 'corsair-pytest', '.corsair-junit.xml')
     assert argv[5:] == PREFIX + ('--tb=native',) + IDS and not any(i in WRAPPER for i in IDS)
     run_ = result.execution
     assert run_.status == 'completed' and store.get(run_.junit) == FAILED
