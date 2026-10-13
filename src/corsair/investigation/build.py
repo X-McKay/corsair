@@ -28,6 +28,8 @@ from corsair.ports.tickets import TicketSnapshot
 from .frameworks import Harness, NoHarness, harness as harness_for
 from .request import IssueRequest
 
+# The checkout a relative repository path is resolved against (committed corpus repositories).
+CHECKOUT = Path(__file__).resolve().parents[3]
 # A local image's config id in reference form: image-only evidence names the image Docker ran, not a registry manifest.
 LOCAL = "local/corsair-{row}@{config}"
 SETUP_POLICY = "setup-public"
@@ -124,9 +126,15 @@ def named_files(text: str, tree: Path, paths: list[str]) -> tuple[SourceFile, ..
     return _bounded(_readable(tree, sorted({p for p in named if p in present})), SOURCE_FILES, SOURCE_BYTES)
 
 
-def _acquire(repository: str, commits: dict[str, str], work: Path, roots: tuple[Path, ...], acquisition) -> dict[str, Path]:
+def _acquire(repository: str, commits: dict[str, str], work: Path, roots: tuple[Path, ...], acquisition,
+             checkout: Path = CHECKOUT) -> dict[str, Path]:
     """Each revision's tree as its commit records it."""
-    if repository.startswith("file://"):
+    if not repository.startswith(("file://", "https://")):
+        source = (checkout / repository).resolve()
+        if not source.is_relative_to(checkout.resolve()):
+            raise Refused(f"{repository} escapes the checkout")
+        clones = dict.fromkeys(commits, source)
+    elif repository.startswith("file://"):
         source = local_repository(repository, roots)
         clones = dict.fromkeys(commits, source)
     else:
@@ -159,16 +167,20 @@ def _acquire(repository: str, commits: dict[str, str], work: Path, roots: tuple[
 
 def build(request: IssueRequest, work: Path, images: dict[str, str], *, roots: tuple[Path, ...] = (),
           acquisition=None, matrix: Matrix | None = None, timeout: int = 600,
-          default_scope: str = "component") -> Investigation:
+          default_scope: str = "component", checkout: Path = CHECKOUT) -> Investigation:
     """Chain input for one request; `images` maps matrix row ids to the operator's local image config ids, `roots`
     are the allowed local repository roots and `acquisition` a `GitAcquisition` for https repositories."""
+    try:
+        issue_text = request.issue_text()
+    except ValueError as error:
+        raise Refused(f"the issue text does not fit the identification input: {error}"[:2048]) from error
     repository, repository_basis = repository_of(request)
     if request.revision is None:
         raise Refused("the request names no revision (resolving a branch to a commit is not built yet)")
     if request.fixed_revision is None:
         raise Refused("the request names no fixed revision (a vulnerable-only run is not built yet)")
     commits = {"baseline": request.revision, "candidate": request.fixed_revision}
-    trees = _acquire(repository, commits, work, roots, acquisition)
+    trees = _acquire(repository, commits, work, roots, acquisition, checkout)
     baseline = trees["baseline"]
     paths = sorted(p.relative_to(baseline).as_posix() for p in baseline.rglob("*") if p.is_file() and not p.is_symlink())
     runtime = runtime_inputs({p: (baseline / p).read_bytes() for p in paths if is_build_file(p)})
@@ -185,7 +197,7 @@ def build(request: IssueRequest, work: Path, images: dict[str, str], *, roots: t
     setup = setup_files(baseline, paths)
     if not setup:
         raise Refused("no build or CI file of the revision fits the environment stage's setup source")
-    sources = named_files(request.issue_text(), baseline, paths)
+    sources = named_files(issue_text, baseline, paths)
     if not sources:
         raise Refused("the issue names no file of the revision; repository-scale identification (SPEC-0038) is not "
                       "in the chain yet")
@@ -204,12 +216,14 @@ def build(request: IssueRequest, work: Path, images: dict[str, str], *, roots: t
         dependency_inventory_sha256=_digest(json.dumps(installed, sort_keys=True)), policy_revision=TEST_POLICY,
         limits_sha256=_digest(json.dumps({"network": "none", "timeout_seconds": timeout}, sort_keys=True)))
     scope = request.scope or default_scope
-    issue = IssueAnalysisInput(fixture_id=request.label[:128], issue=request.issue_text(), scope=scope,
+    issue = IssueAnalysisInput(fixture_id=request.label[:128], issue=issue_text, scope=scope,
                                source_files=sources)
     case = FixtureCase(
         issue=issue, environment=environment, environment_identity=identity,
         # The Docker workspace digests the commit it copied (DockerCase.prepare).
         revision_sources={revision: _digest(commit) for revision, commit in commits.items()},
+        # A real issue has no per-case envelope; the framework table's recorders bind the request (SPEC-0073).
+        witness_from_recorders=True,
         runtime=runtime,
         setup=SetupSource(commit=request.revision, source_private=False, policy_profile=SETUP_POLICY, source_files=setup))
     return Investigation(request, case, catalog, framework, harness, outcome.selection.image_id, image, commits, trees,

@@ -17,6 +17,7 @@ import os
 from pathlib import Path
 import re
 import sys
+import traceback
 
 import logfire
 
@@ -44,7 +45,9 @@ def images(path: Path) -> dict[str, str]:
 
 
 async def _chain(investigation: Investigation, evidence: Path, config: InferenceConfig | None, models: dict | None,
-                 profiles: dict | None, timeout: int) -> DirectRun:
+                 profiles: dict | None, timeout: int, progress: dict) -> DirectRun:
+    """`progress["phase"]` names where the run is, so a crash is recorded where it happened."""
+    progress["phase"] = "dependency setup"
     revisions = {}
     for revision, commit in investigation.commits.items():
         dependencies = evidence / "dependencies" / revision
@@ -56,6 +59,7 @@ async def _chain(investigation: Investigation, evidence: Path, config: Inference
     receipts = evidence / "receipts"
     logfire.configure(send_to_logfire=False, console=False)
     budget = CompositionBudget()
+    progress["phase"] = "model setup"
     async with AsyncExitStack() as stack:
         if models is None:
             configs = stage_configs(config, profiles or {}, AGENT_STAGES)
@@ -87,6 +91,7 @@ async def _chain(investigation: Investigation, evidence: Path, config: Inference
         with ExitStack() as containers, LocalArtifacts(evidence / "artifacts", max_bytes=8 * 1024 * 1024) as store:
             journal = Journal(DockerRunners(investigation.harness, investigation.image, revisions, store, timeout,
                                             evidence / "runs", containers, preparation))
+            progress["phase"], progress["journal"] = "chain", journal
             try:
                 run = await run_direct(investigation.case, StageModels(**selected), journal, budget,
                                        catalog=investigation.catalog, preparation=preparation)
@@ -95,6 +100,7 @@ async def _chain(investigation: Investigation, evidence: Path, config: Inference
                 with (receipts / "native-runs.json").open("x") as destination:
                     json.dump(journal.entries if drained else journal.entries + [{"in_flight_after_seconds": 900}],
                               destination, indent=2)
+    progress["phase"] = "receipts"
     for index, attempt in enumerate(run.attempts):
         with (receipts / f"attempt-{index}-{attempt.stage}.json").open("x") as destination:
             json.dump(attempt_record(attempt), destination, indent=2)
@@ -138,12 +144,21 @@ def investigate(request: IssueRequest, evidence: Path, images: dict[str, str], *
     except Refused as refused:
         item = record(request.label, evidence, refused=str(refused))
     else:
+        progress = {"phase": "dependency setup"}
         try:
-            run = asyncio.run(_chain(investigation, evidence, config, models, profiles, timeout))
-        except RuntimeError as failure:
-            if "dependency setup" not in str(failure):
-                raise
-            item = record(request.label, evidence, investigation=investigation, refused=str(failure))
+            run = asyncio.run(_chain(investigation, evidence, config, models, profiles, timeout, progress))
+        except Exception as failure:
+            if isinstance(failure, RuntimeError) and "dependency setup" in str(failure):
+                item = record(request.label, evidence, investigation=investigation, refused=str(failure))
+            else:
+                # A crash (Docker, harness, provider setup, receipts) is recorded as ERROR where it happened, with
+                # its traceback beside the record; never retried.
+                (evidence / "error.txt").write_text(traceback.format_exc())
+                phase = progress["phase"]
+                if phase == "chain":
+                    phase += f" after {len(progress['journal'].entries)} runner calls"
+                item = record(request.label, evidence, investigation=investigation,
+                              error=f"{type(failure).__name__}: {failure}"[:2048], crashed_in=phase)
         else:
             item = record(request.label, evidence, investigation=investigation, run=run)
     item["summary"] = summary_line(item)

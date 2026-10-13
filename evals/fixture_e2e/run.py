@@ -153,6 +153,7 @@ def main():
         parser.error("--live names unknown stages or lacks --provider-config")
     if args.evidence.exists() or args.evidence.is_symlink():
         parser.error("evidence directory already exists")
+    args.evidence = args.evidence.absolute()  # LocalArtifacts takes an absolute root; the README passes a relative one
     config = load_inference(args.provider_config) if args.provider_config else None
     profiles = json.loads(args.stage_profiles.read_bytes()) if args.stage_profiles else None
     if profiles is not None:
@@ -162,6 +163,9 @@ def main():
             stage_configs(config, profiles, live)
         except ValueError as exc:
             parser.error(str(exc))
+    # SPEC-0072: the run's activity on stderr; stdout keeps the JSON summary.
+    from corsair.adapters.terminal import TerminalDisplay
+    from corsair.composition.progress import observing
     if args.sandbox == "docker":
         from .docker import ROW
         try:
@@ -170,9 +174,11 @@ def main():
             parser.error(f"--images needs a {ROW} entry: {exc}"[:2048])
         if image is None:
             parser.error("--sandbox docker needs --images or CORSAIR_IMAGES")
-        run = asyncio.run(docker_async(args.evidence, live, config, image, profiles, args.timeout))
+        with TerminalDisplay(f"fixture run (docker, unqualified) → {args.evidence}") as display, observing(display):
+            run = asyncio.run(docker_async(args.evidence, live, config, image, profiles, args.timeout))
     else:
-        run = asyncio.run(main_async(args.evidence, live, config, profiles))
+        with TerminalDisplay(f"fixture run → {args.evidence}") as display, observing(display):
+            run = asyncio.run(main_async(args.evidence, live, config, profiles))
     route = json.loads((args.evidence / "configuration.json").read_text())["runner"]
     containers = args.evidence / "docker" / "containers.json"
     removed = ([c["cleanup"] for c in json.loads(containers.read_text())] if containers.exists() else None)

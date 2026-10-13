@@ -20,7 +20,7 @@ PYTHONPATH=src:. .venv/bin/python -m evals.fixture_e2e.run --sandbox docker --im
   --evidence .runs/fixture-e2e-<date>/docker-001 [--provider-config <config.json> --live identification,planning,authoring,assessment]
 ```
 
-`sandbox.py` runs every purpose in a fresh OpenShell sandbox through the [SPEC-0032](../../docs/development/specs/SPEC-0032-openshell-test-workspace.md) test workspace, so a live author's tests execute there and never on the host ([PLAN-0034](../../docs/development/plans/PLAN-0034-fixture-e2e-sandbox-runner.md)). It needs a qualified kind/OpenShell runtime; the live gate runs an all-scripted control first, then the live runs:
+`sandbox.py` runs every purpose in a fresh OpenShell sandbox through the [SPEC-0032](../../docs/development/specs/SPEC-0032-openshell-test-workspace.md) test workspace, so a live author's tests execute there and never on the host ([PLAN-0034](../../docs/development/plans/PLAN-0034-fixture-e2e-sandbox-runner.md)). It needs a qualified kind/OpenShell runtime, set up as in the [toolchain runbook](../../docs/runbooks/openshell-toolchains.md) (`make toolchain-images` builds the images that `make toolchain-images-load` puts on the node, so it comes first on a fresh worktree); the live gate runs an all-scripted control first, then the live runs:
 
 ```sh
 make qualify-fixture-e2e CORSAIR_NETWORK_RUN=<network evidence> CORSAIR_PROVIDER_CONFIG=<LocalModelConfig.json> \

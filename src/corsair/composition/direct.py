@@ -13,6 +13,7 @@ and the durable chain (``corsair.workflows.chain``) binds child workflows and ac
 import asyncio
 import re
 from dataclasses import dataclass, field, replace
+from functools import partial
 from time import perf_counter
 from typing import Any, Awaitable, Callable, Literal, Protocol
 from uuid import UUID, uuid4
@@ -49,9 +50,11 @@ from corsair.nodes.runtime.environment import RuntimeCatalog, check_ready, ready
 from corsair.nodes.witness import WitnessEvidence, witness_evidence
 from corsair.ports.execution import SandboxExecution
 from corsair.ports.sandbox import SandboxHandle
-from corsair.ports.test_runner import ApprovedPatch, NativeTestRun, TestRunner, WitnessRequest
+from corsair.ports.test_runner import ApprovedPatch, NativeTestRun, PatchFile, TestRunner, WitnessRequest
 
 from .evidence import evidence_items, freeze, observation_plan, run_evidence, witness_request
+from .progress import (Activity, GateDecided, RevisionEnded, RevisionStarted, RunEnded, RunEvent, RunObserver,
+                       StageEnded, StageStarted, Usage, clean, current_observer, ignore)
 
 Stage = Literal["runtime", "environment", "identification", "planning", "authoring", "execution", "assessment"]
 AgentStage = Literal["environment", "identification", "planning", "authoring", "assessment"]
@@ -207,16 +210,21 @@ class PreparedSandbox:
     """A sandbox of one prepared toolchain image, live until the preparation port releases it.
 
     ``read_source`` returns a file's bytes from the operator's capture of the revision placed in the sandbox
-    (never from the sandbox), or None when the capture has no such file."""
+    (never from the sandbox), or None when the capture has no such file; ``source_paths`` lists every file of that
+    capture (SPEC-0071: without it a smoke baseline is refused)."""
     execution: SandboxExecution
     handle: SandboxHandle
     scratch_location: str
     read_source: Callable[[str], bytes | None]
+    source_paths: Callable[[], tuple[str, ...]] | None = None
 
 
 class Preparation(Protocol):
     """Operator-owned sandbox lifecycle for the environment stage; adapters are chosen outside the chain."""
-    def prepare(self, toolchain: Toolchain, operation: UUID) -> PreparedSandbox: ...
+    def prepare(self, toolchain: Toolchain, operation: UUID, *, overlay: tuple[PatchFile, ...] = ()) -> PreparedSandbox:
+        """`overlay`: operator files (SPEC-0071 smoke tests) written beside the captured commit; an overlay path the
+        capture already has is refused before any sandbox is created."""
+        ...
     def release(self, sandbox: PreparedSandbox, operation: UUID) -> Literal["confirmed", "unconfirmed"]: ...
 
 
@@ -228,8 +236,10 @@ class FixtureCase:
     environment_identity: EnvironmentIdentity
     # Operator-known digest of each revision's captured source; a run from any other source is refused.
     revision_sources: dict[Literal["baseline", "candidate"], str]
-    # Operator-approved probe target and planned effect file; without it no witness is requested.
+    # Operator-approved probe target and planned effect file; without it no witness is requested unless
+    # `witness_from_recorders` lets the environment's operator witness facilities bind one (SPEC-0073).
     witness_envelope: WitnessRequest | None = None
+    witness_from_recorders: bool = False
     # The baseline revision's build files (SPEC-0060); without them the runtime is the operator's declaration.
     runtime: RuntimeInputs | None = None
     # The baseline revision's setup source (SPEC-0068); with it the environment agent prepares the environment.
@@ -337,14 +347,18 @@ def stage_call(stage: AgentStage, inputs: Any, budget: CompositionBudget, runner
             return assessment_prompt(inputs), AssessmentDependencies(inputs)
 
 
-async def _invoke(stage: AgentStage, agent: Agent[Any, Any], prompt: str, deps: Any, limits: StageLimits) -> StageAttempt:
+async def _invoke(stage: AgentStage, agent: Agent[Any, Any], prompt: str, deps: Any, limits: StageLimits,
+                  observe: RunObserver | None = None) -> StageAttempt:
     usage, messages, output, failure = RunUsage(), [], None, None
     started = perf_counter()
     deadline = asyncio.timeout(limits.timeout_seconds)
+    # SPEC-0072: an observed stage reports its turns and tool calls through PydanticAI's capability hooks.
+    watched = {"capabilities": [Activity(stage, observe, limits, started)]} if observe else {}
     try:
         with capture_run_messages() as messages:
             async with deadline:
-                output = (await agent.run(prompt, deps=deps, usage=usage, usage_limits=limits.usage_limits())).output
+                output = (await agent.run(prompt, deps=deps, usage=usage, usage_limits=limits.usage_limits(),
+                                          **watched)).output
     except Exception as exc:
         failure = exc
     return StageAttempt(stage, output, usage, tuple(messages), perf_counter() - started, failure, limits,
@@ -352,7 +366,7 @@ async def _invoke(stage: AgentStage, agent: Agent[Any, Any], prompt: str, deps: 
 
 
 async def prepare_environment(inputs: EnvironmentInput, model: Model | None, preparation: Preparation | None,
-                              budget: CompositionBudget) -> StageAttempt:
+                              budget: CompositionBudget, observe: RunObserver | None = None) -> StageAttempt:
     """The environment stage, once and in one process in every mode: prepare a sandbox of the selected toolchain,
     run the environment agent there and release it. The setup ledger and live sandbox never leave this call."""
     limits = stage_limits("environment", inputs, budget)
@@ -360,7 +374,8 @@ async def prepare_environment(inputs: EnvironmentInput, model: Model | None, pre
         return StageAttempt("environment", None, None, (), 0.0, PreparationMissing(NO_PREPARATION), limits)
     (selected,), operation, started = inputs.toolchains, uuid4(), perf_counter()
     try:
-        sandbox = await asyncio.to_thread(preparation.prepare, selected, operation)
+        overlay = tuple(PatchFile(t.path, t.content.encode()) for t in inputs.smoke_tests)
+        sandbox = await asyncio.to_thread(partial(preparation.prepare, overlay=overlay), selected, operation)
     except Exception as exc:
         # Nothing was handed back to release; whether a sandbox exists is the adapter's to report.
         return StageAttempt("environment", None, None, (), perf_counter() - started, exc, limits, cleanup="unconfirmed")
@@ -368,10 +383,14 @@ async def prepare_environment(inputs: EnvironmentInput, model: Model | None, pre
         agent = AGENTS["environment"](model, output_retries=budget.output_retries)
         deps = EnvironmentDependencies(inputs=inputs, execution=sandbox.execution, handle=sandbox.handle,
                                        toolchain_id=selected.toolchain_id, scratch_location=sandbox.scratch_location,
-                                       budget=SetupBudget(max_commands=budget.setup_commands), new_operation=uuid4)
-        attempt = await _invoke("environment", agent, environment_prompt(inputs), deps, limits)
+                                       budget=SetupBudget(max_commands=budget.setup_commands), new_operation=uuid4,
+                                       checkout_paths=sandbox.source_paths() if sandbox.source_paths else None)
+        attempt = await _invoke("environment", agent, environment_prompt(inputs), deps, limits, observe)
         if isinstance(attempt.output, ReadyEnvironment):
-            source, refusal = captured(sandbox, attempt.output.baseline_test_path)
+            # SPEC-0071: a smoke baseline is the operator's overlay file, so its saved source is the template itself.
+            smoke = next((t for t in inputs.smoke_tests if t.path == attempt.output.baseline_test_path), None)
+            source, refusal = (SourceFile(path=smoke.path, content=smoke.content), None) if smoke else \
+                captured(sandbox, attempt.output.baseline_test_path)
             attempt = replace(attempt, baseline_source=source, baseline_refusal=refusal)
     except Exception as exc:
         attempt = StageAttempt("environment", None, None, (), perf_counter() - started, exc, limits)
@@ -414,6 +433,8 @@ UNOBSERVED = ("The witness probe runs inside the test interpreter: it is operato
               "events elsewhere are not observed.",
               "Environment identity is the operator's declaration for both revisions, not an observed image or "
               "dependency digest.")
+SMOKE_BASELINE = ("Baseline test is the operator smoke test: the project ships no test that ran. It shows that the "
+                  "runtime, framework and discovery work after setup, not that the project's own code loads.")
 UNSELECTED = "Runtime not selected from build files: the runtime is the operator's declaration."
 MESSAGES_OMITTED = "environment stage messages omitted: the encoded stage record exceeded its payload bound"
 OBSERVED_IDENTITY = ("Environment image and recipe observed by the environment stage; scratch location, dependency "
@@ -423,18 +444,21 @@ OBSERVED_IDENTITY = ("Environment image and recipe observed by the environment s
 
 async def run_direct(case: FixtureCase, models: StageModels, runners: Runners,
                      budget: CompositionBudget = CompositionBudget(), *, catalog: RuntimeCatalog | None = None,
-                     preparation: Preparation | None = None) -> DirectRun:
+                     preparation: Preparation | None = None, observe: RunObserver | None = None) -> DirectRun:
     """One E2E-0 investigation over a baseline and candidate revision; never retries a stage.
 
     ``catalog`` is the operator's runtime matrix and prepared images; a case with build files needs it.
     ``preparation`` prepares the environment stage's sandbox; a case with setup source needs it and
-    ``models.environment``."""
+    ``models.environment``. ``observe`` (default: the one ``progress.observing`` set, if any) receives the
+    run's activity (SPEC-0072)."""
+    observe = observe or current_observer()
+
     async def invoke(stage: AgentStage, inputs: Any) -> StageAttempt:
         if stage == "environment":
-            return await prepare_environment(inputs, models.environment, preparation, budget)
+            return await prepare_environment(inputs, models.environment, preparation, budget, observe)
         agent = AGENTS[stage](getattr(models, stage), output_retries=budget.output_retries)
         prompt, deps = stage_call(stage, inputs, budget, runners("development") if stage == "authoring" else None)
-        return await _invoke(stage, agent, prompt, deps, stage_limits(stage, inputs, budget))
+        return await _invoke(stage, agent, prompt, deps, stage_limits(stage, inputs, budget), observe)
 
     async def execute(revision, patch, **request) -> NativeTestRun:
         return runners(revision).run(patch, **request)
@@ -444,7 +468,7 @@ async def run_direct(case: FixtureCase, models: StageModels, runners: Runners,
             raise RuntimeCatalogMissing(NO_CATALOG)
         return select_runtime(inputs, catalog)
 
-    return await run_chain(case, invoke, execute, select, new_operation=uuid4)
+    return await run_chain(case, invoke, execute, select, new_operation=uuid4, observe=observe or ignore)
 
 
 # Spellings of an admitted framework's name that the grammar below cannot read: "JUnit Jupiter 5.10" is JUnit 5.
@@ -480,8 +504,11 @@ def declared_mismatch(case: FixtureCase, outcome: RuntimeOutcome) -> str | None:
 
 
 async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionExecutor, select: RuntimeSelector, *,
-                    new_operation: Callable[[], UUID]) -> DirectRun:
-    """Mode-independent routing: each stage at most once, revisions once each, gates over frozen evidence."""
+                    new_operation: Callable[[], UUID], observe: RunObserver = ignore) -> DirectRun:
+    """Mode-independent routing: each stage at most once, revisions once each, gates over frozen evidence.
+
+    ``observe`` receives each stage's start and end, each revision run and the gate (SPEC-0072); it never
+    changes the routing."""
     attempts: list[StageAttempt] = []
     issue, environment, identity = case.issue, case.environment, case.environment_identity
     source_files = issue.source_files
@@ -489,12 +516,36 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
     # What the environment stage could not confirm or keep; every later stop carries it.
     stage_notes: tuple[str, ...] = ()
 
+    def report(event: Callable[[], RunEvent]) -> None:
+        # Built only when someone watches, and never able to end or reroute the run (SPEC-0072).
+        if observe is not ignore:
+            try:
+                observe(event())
+            except Exception:
+                pass
+
     async def _stage(stage: AgentStage, inputs: Any) -> Any:
+        report(lambda: StageStarted(stage))
         attempts.append(await invoke(stage, inputs))
         return attempts[-1].output
 
+    def spent(stage: Stage) -> Usage | None:
+        attempt = attempts[-1] if attempts and attempts[-1].stage == stage else None
+        if attempt is None or attempt.usage is None:
+            return None
+        limits = attempt.limits
+        return Usage(attempt.usage.requests, attempt.usage.tool_calls, attempt.usage.total_tokens,
+                     attempt.elapsed_seconds, limits and limits.request_limit, limits and limits.tool_calls_limit,
+                     limits and limits.total_tokens_limit, limits and limits.timeout_seconds)
+
+    def ready(stage: Stage, detail: Callable[[], str]) -> None:
+        report(lambda: StageEnded(stage, "ready", clean(detail()), spent(stage)))
+
     def stop(stage: Stage, reason: str, **values) -> DirectRun:
         values.setdefault("limitations", stage_notes)
+        report(lambda: StageEnded(stage, "stopped", clean(reason, 2048), spent(stage)))
+        report(lambda: RunEnded(stage, clean(reason, 2048), values["gate"] and verdict(values["gate"].permitted)
+                                if "gate" in values else None))
         return DirectRun(stopped_at=stage, reason=reason, attempts=tuple(attempts), runtime=runtime,
                          environment=prepared, **values)
 
@@ -509,6 +560,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         return f"{stage} produced no output: {kind}: {failed}"[:2048]
 
     if case.runtime is not None:
+        report(lambda: StageStarted("runtime"))
         try:
             runtime = await select(case.runtime)
         except Exception as exc:
@@ -519,13 +571,15 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         if case.setup is None and (mismatch := declared_mismatch(case, runtime)):
             return stop("runtime", mismatch[:2048])
         selected = ("Runtime selected from the baseline revision's build files; the candidate's were not read.",)
+        ready("runtime", lambda: f"{runtime.selection.image_id} ({runtime.requirement.language})")
 
     if case.setup is not None:
         # SPEC-0068: the environment agent prepares the selected toolchain; its admitted result replaces the declaration.
         if runtime is None:
             return stop("environment", "setup source needs a runtime selected from build files; the case carries none")
         try:
-            environment_input = EnvironmentInput(toolchains=(runtime.toolchain,), **case.setup.model_dump())
+            environment_input = EnvironmentInput(toolchains=(runtime.toolchain,), smoke_tests=runtime.smoke_tests,
+                                                 **case.setup.model_dump())
         except ValueError as exc:
             return stop("environment", f"environment input refused: {exc}"[:2048])
         result = await _stage("environment", environment_input)
@@ -546,6 +600,8 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         except ValueError as exc:
             return stop("environment", f"ready environment refused: {exc}"[:2048], limitations=unconfirmed)
         provenance, stage_notes = OBSERVED_IDENTITY + unconfirmed, unconfirmed
+        if result.baseline_basis == "operator_smoke":
+            provenance += (SMOKE_BASELINE,)
         # The agent chose the baseline test while the case ran; its file joins the saved inventory from the capture.
         if result.baseline_test_path not in {source.path for source in source_files}:
             baseline = attempts[-1].baseline_source
@@ -554,6 +610,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
                 return stop("environment", f"ready environment refused: baseline test file "
                                            f"{result.baseline_test_path} {why}"[:2048])
             source_files += (baseline,)
+        ready("environment", lambda: f"{result.language} {result.runtime}; baseline tests {result.baseline_outcome}")
 
     identification = await _stage("identification", issue)
     if not isinstance(identification, IssueIdentification):
@@ -561,6 +618,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
     if identification.status != "ready":
         return stop("identification", f"identification {identification.status}: {identification.reason}",
                     identification=identification)
+    ready("identification", lambda: "issue located in the source")
 
     try:
         planning_input = TestPlanningInput(scope=issue.scope, identification=identification,
@@ -572,6 +630,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         return stop("planning", failure_of("planning"), identification=identification)
     if not isinstance(plan, ReadyTestPlan):
         return stop("planning", f"plan unsupported: {plan.missing_capability}", identification=identification)
+    ready("planning", lambda: f"control {plan.control.test_id}; security {plan.security.test_id}")
 
     try:
         authoring_input = TestAuthoringInput(plan=plan, source_files=source_files, environment=environment)
@@ -583,7 +642,9 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
     if not isinstance(patch, TestPatch):
         return stop("authoring", f"authoring blocked at {patch.layer}: {patch.reason}",
                     identification=identification, plan=plan)
+    ready("authoring", lambda: f"{len(patch.files)} test file(s) written")
 
+    report(lambda: StageStarted("execution"))
     try:
         expected = observation_plan(plan, patch)
         frozen = freeze(patch, environment.approved_test_paths)
@@ -592,12 +653,15 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
                     patch=patch)
     executions = []
     try:
-        request, unrequested = witness_request(identification, case.witness_envelope, plan.security.witness), ()
+        recorders = environment.witness_facilities if case.witness_from_recorders else ()
+        request, unrequested = witness_request(identification, case.witness_envelope, plan.security.witness,
+                                               recorders), ()
     except ValueError as exc:
         # No approved envelope covers the identified target: run without a witness and say so.
         request, unrequested = None, (f"no witness requested: {exc}"[:512],)
     for revision in ("baseline", "candidate"):
         operation, observed, failure = new_operation(), None, None
+        report(lambda: RevisionStarted(revision))
         try:
             observed = await execute(revision, frozen, control_test_id=plan.control.test_id,
                                      security_test_id=plan.security.test_id,
@@ -607,6 +671,8 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
             # A refused request (bad ids or patch) dispatched nothing; it is recorded, never retried.
             failure = exc
         executions.append(FrozenExecution(revision, operation, observed, failure))
+        report(lambda: RevisionEnded(revision, "ran", outcomes(observed)) if observed is not None
+               else RevisionEnded(revision, "refused", clean(f"{type(failure).__name__}: {failure}")))
     done = {"identification": identification, "plan": plan, "patch": patch, "observation_plan": expected,
             "executions": tuple(executions)}
     problems = []
@@ -621,6 +687,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
     if problems:
         return stop("execution", "; ".join(problems)[:2048], **done)
 
+    ready("execution", lambda: "both revisions ran")
     runs = {e.revision: (e.observed,) for e in executions}
     def witness_of(e):
         if not request:
@@ -638,6 +705,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
                             sandbox_events=found.sandbox_events)
     evidence = AssessmentEvidence(plan=expected, baseline=(gate_run("baseline"),), candidate=(gate_run("candidate"),))
     gate = assess(evidence)
+    report(lambda: GateDecided(verdict(gate.permitted)))
     limitations = UNOBSERVED[:2] + provenance + selected + unrequested + tuple(f"{revision} witness not admitted: {found.reason}"
                                      for revision, found in witnesses.items() if found.witness is None) + tuple(
         f"{e.revision} workspace cleanup {e.observed.cleanup}" for e in executions if e.observed.cleanup != "confirmed")
@@ -652,5 +720,20 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
     assessment = await _stage("assessment", assessment_input)
     if not isinstance(assessment, EvidenceAssessment):
         return stop("assessment", failure_of("assessment"), gate=gate, limitations=limitations, **done)
+    ready("assessment", lambda: f"{verdict(assessment.disposition)}; proposal "
+                        f"{'admitted' if assessment.admission.admitted else 'rejected'}")
+    report(lambda: RunEnded(None, "complete", verdict(assessment.disposition)))
     return DirectRun(stopped_at=None, reason="complete", attempts=tuple(attempts), gate=gate, assessment=assessment,
                      limitations=limitations, runtime=runtime, environment=prepared, **done)
+
+
+def verdict(disposition) -> str:
+    return f"execution {disposition.execution}, finding {disposition.finding}, fix {disposition.fix}"
+
+
+def outcomes(observed: NativeTestRun) -> str:
+    """One revision run in a line: each executed test's outcome, or the layer that stopped it."""
+    if observed.failure_layer is not None:
+        return clean(f"{observed.failure_layer} failed: {observed.detail}")
+    cases = observed.execution.cases if observed.execution else ()
+    return clean("; ".join(f"{c.test_id.rsplit('::', 1)[-1]} {c.outcome}" for c in cases) or observed.detail)
