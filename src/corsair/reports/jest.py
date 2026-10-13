@@ -7,6 +7,7 @@ import json
 import re
 
 from corsair.ports.test_runner import FailureDetail, JsTestId, TestCaseResult
+from corsair.reports.admission import exactly, record
 from corsair.reports.junit import MAX_JUNIT_BYTES, MAX_MESSAGE_CHARS, JUnitError
 
 MAX_JEST_BYTES = MAX_JUNIT_BYTES
@@ -129,14 +130,10 @@ def parse_jest(data: bytes, test_ids: tuple[str, ...], *, root: str, test_paths:
             if test['status'] != 'pending':
                 raise JestError(f'Unexpected test ran: {" ".join([*test["ancestorTitles"], test["title"]])!r}')
             continue
-        if test_id in results:
-            raise JestError(f'Duplicate test {test_id}')
         outcome = OUTCOMES[test['status']]
         if (outcome == 'failed') != bool(test['failureMessages']):
             raise JestError(f'Outcome and failure messages disagree for {test_id}')
         failure = (_failure(test['failureMessages'], root, test_paths, JsTestId.parse(test_id).name)
                    if outcome == 'failed' else None)
-        results[test_id] = TestCaseResult(test_id, outcome, failure, '')
-    if set(results) != set(test_ids):
-        raise JestError(f'Missing tests: {sorted(set(test_ids) - set(results))}')
-    return tuple(results[test_id] for test_id in test_ids)
+        record(results, TestCaseResult(test_id, outcome, failure, ''), 'test', JestError)
+    return exactly(results, test_ids, 'tests', JestError)

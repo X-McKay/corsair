@@ -8,6 +8,7 @@ subtest makes it skipped, a bail-out or a skip-all plan is refused, and the exit
 import re
 
 from corsair.ports.test_runner import FailureDetail, PerlTestId, TestCaseResult
+from corsair.reports.admission import admit_text, exactly, failed_count, record
 from corsair.reports.junit import MAX_JUNIT_BYTES, MAX_MESSAGE_CHARS, MAX_OUTPUT_CHARS, JUnitError
 
 HEADER = re.compile(r'# Subtest: (?P<name>.+)')
@@ -48,12 +49,7 @@ def parse_tap(data: bytes, test_ids: tuple[str, ...], *, exit_status: int, test_
         raise TapError(str(error)) from error
     if len({item.path for item in parsed}) != 1 or len({item.name for item in parsed}) != len(parsed):
         raise TapError('Expected test ids must be distinct subtests of one file')
-    if len(data) > max_bytes:
-        raise TapError('TAP stream exceeds the admitted size')
-    try:
-        lines = data.decode('utf-8').splitlines()
-    except UnicodeError as error:
-        raise TapError('TAP stream is not UTF-8') from error
+    lines = admit_text(data, max_bytes, 'TAP stream', TapError).splitlines()
     names = {item.name: test_id for item, test_id in zip(parsed, test_ids)}
     results, plans, header, block, last = {}, [], None, [], 0
     for index, text in enumerate(lines):
@@ -83,8 +79,6 @@ def parse_tap(data: bytes, test_ids: tuple[str, ...], *, exit_status: int, test_
         test_id = names.get(header)
         if test_id is None:
             raise TapError(f'Unexpected subtest {header[:200]!r}')
-        if test_id in results:
-            raise TapError(f'Duplicate subtest {header[:200]!r}')
         directive = (match['directive'] or '').lower()
         if directive == 'todo':
             raise TapError('A todo subtest hides its outcome')
@@ -99,18 +93,17 @@ def parse_tap(data: bytes, test_ids: tuple[str, ...], *, exit_status: int, test_
                     break
                 after.append(following)
             kind = 'error' if died else 'failure'
-            results[test_id] = TestCaseResult(test_id, 'error' if died else 'failed',
-                                              _failure(kind, header, block + after, test_paths),
-                                              '\n'.join(block + after)[:MAX_OUTPUT_CHARS])
+            record(results, TestCaseResult(test_id, 'error' if died else 'failed',
+                                           _failure(kind, header, block + after, test_paths),
+                                           '\n'.join(block + after)[:MAX_OUTPUT_CHARS]), 'subtest', TapError)
         else:
             skipped = directive == 'skip' or any(NESTED_SKIP.fullmatch(text) for text in block)
-            results[test_id] = TestCaseResult(test_id, 'skipped' if skipped else 'passed', None,
-                                              '\n'.join(block)[:MAX_OUTPUT_CHARS])
+            record(results, TestCaseResult(test_id, 'skipped' if skipped else 'passed', None,
+                                           '\n'.join(block)[:MAX_OUTPUT_CHARS]), 'subtest', TapError)
         header, block = None, []
-    if set(results) != set(test_ids):
-        raise TapError(f'Missing subtests: {sorted(set(test_ids) - set(results))}')
-    errors = sum(case.outcome == 'error' for case in results.values())
-    failed = sum(case.outcome in ('failed', 'error') for case in results.values())
+    cases = exactly(results, test_ids, 'subtests', TapError)
+    errors = sum(case.outcome == 'error' for case in cases)
+    failed = failed_count(cases)
     # Test::More exits with the number of failed tests, or 255 when the file died (its plan is then unfinished).
     if errors:
         if exit_status != 255:
@@ -119,4 +112,4 @@ def parse_tap(data: bytes, test_ids: tuple[str, ...], *, exit_status: int, test_
         raise TapError(f'Expected exactly one plan of {len(test_ids)} tests, found {plans}')
     elif exit_status != failed:
         raise TapError(f'Exit {exit_status} conflicts with {failed} failed subtests')
-    return tuple(results[test_id] for test_id in test_ids)
+    return cases
