@@ -1,12 +1,21 @@
 """Trusted finalization: the patch is assembled from this run's own writes and runs; the model restates no file or outcome."""
 
-from pydantic_ai import ModelRetry, RunContext
+from pydantic_ai import CallToolsNode, ModelRetry, RunContext
+from pydantic_ai.exceptions import UnexpectedModelBehavior
+from pydantic_ai.result import FinalResult
+from pydantic_graph import End
 
 from .admission import self_observation
 from .contracts import AuthoringDraft, AuthoringResult, BlockedAuthoring, PatchedFile, TestPatch
 from .dependencies import AuthoringDependencies
 from .static import assertion_lines
-from .tools._history import admission_spent, approved_patch, current_files, development_runs, refused_writes
+from .tools._history import (RUN_TOOL, WRITE_TOOL, admission_spent, approved_patch, current_files, development_runs,
+                             refused_writes)
+from .tools._preparation import withdrawal
+
+
+def _patched(ctx: RunContext[AuthoringDependencies]) -> tuple[PatchedFile, ...]:
+    return tuple(PatchedFile(path=path, content=content) for path, content in sorted(current_files(ctx).items()))
 
 
 async def finalize_authoring(ctx: RunContext[AuthoringDependencies], result: AuthoringDraft) -> AuthoringResult:
@@ -15,7 +24,7 @@ async def finalize_authoring(ctx: RunContext[AuthoringDependencies], result: Aut
     plan = inputs.plan
     files = current_files(ctx)
     runs = tuple(development_runs(ctx))
-    patched = tuple(PatchedFile(path=path, content=content) for path, content in sorted(files.items()))
+    patched = _patched(ctx)
     if admission_spent(ctx):
         # Trusted code names the layer: the author kept writing what the admission check refuses.
         return BlockedAuthoring(status="blocked", layer="admission", reason=refused_writes(ctx)[-1].reason[:512],
@@ -45,6 +54,21 @@ async def finalize_authoring(ctx: RunContext[AuthoringDependencies], result: Aut
         raise ModelRetry("the final run's control must pass; otherwise return blocked")
     if final.security is None or (final.security != "withheld" and final.security.outcome in ("error", "skipped")):
         raise ModelRetry("the final run's security test must run without a setup error or skip; otherwise return blocked")
+    planned = plan.security_expectation.failure_type
+    if (final.security != "withheld" and final.security.outcome == "failed"
+            and final.security.failure_type != planned):
+        # Gap 9 (Docker run live-002): an error in the test body before the planned assertion fails the same way on
+        # every revision, so the test cannot distinguish them.
+        raise ModelRetry(f"the final run's security test failed with {final.security.failure_type or 'an unclassified error'}"
+                         f" at line {final.security.failure_line}, not through its planned {planned} assertion; an error"
+                         " before the planned assertion cannot distinguish the revisions: fix the observed error and run"
+                         " again, or return blocked")
+    if final.security_contradicts_witness:
+        # Gap 11: the gate would classify this run security_passed_with_effect; nothing the test asserts sees the effect.
+        raise ModelRetry("the final run's security test passed although the operator witness recorded the target "
+                         f"performing the planned effect on {plan.security.witness.subject}: its assertion cannot detect "
+                         "that effect; assert on what the call returned or on fixture state the effect changes, run again, "
+                         "or return blocked")
     try:
         assertion_lines(files[plan.control.test_path], plan.control.test_id)
         security_lines = assertion_lines(files[plan.security.test_path], plan.security.test_id)
@@ -57,3 +81,20 @@ async def finalize_authoring(ctx: RunContext[AuthoringDependencies], result: Aut
                      run_command=final.run_command, patch_sha256=patch.sha256,
                      security_assertion_lines=tuple(sorted(set(result.security_assertion_lines))), dev_runs=runs,
                      limitations=result.limitations)
+
+
+async def end_on_withdrawn_call(ctx: RunContext[AuthoringDependencies], *, node, error: Exception):
+    """A call to a withdrawn write or run ends the stage blocked instead of failing it.
+
+    Withdrawn tools are no longer offered, so PydanticAI refuses such a call as an unknown tool and, with tool
+    retries at 0, ends the run on UnexpectedModelBehavior. Trusted code names the reason; the layer is admission
+    when the refusals are spent and otherwise unknown, since no run observed what an edit would have changed.
+    """
+    why = withdrawal(ctx)
+    called = [name for name in (WRITE_TOOL, RUN_TOOL) if f"'{name}'" in str(error)]
+    if not (why and called and isinstance(error, UnexpectedModelBehavior) and isinstance(node, CallToolsNode)):
+        raise error
+    reason = f"the author called {called[0]} after it was withdrawn: {why}"
+    blocked = BlockedAuthoring(status="blocked", layer="admission" if admission_spent(ctx) else "unknown",
+                               reason=reason[:2048], files=_patched(ctx), dev_runs=tuple(development_runs(ctx)))
+    return End(FinalResult(blocked))

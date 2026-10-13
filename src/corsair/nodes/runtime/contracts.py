@@ -9,7 +9,7 @@ from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from corsair.agents.environment.contracts import Toolchain
+from corsair.agents.environment.contracts import SmokeTest, Toolchain
 from corsair.core.blockers import Blocker
 
 Language = Literal['python', 'java', 'javascript', 'ruby', 'perl']
@@ -94,6 +94,11 @@ class Supported(_Frozen):
     checks: tuple[AxisCheck, ...]
     evidence: Literal['live', 'image-only'] = Field(description='Weakest evidence of the selected image row and the '
                                                                  'framework rows that satisfied it; only live is qualified')
+    runtime_basis: Literal['declared', 'inferred'] = Field(
+        default='declared', description="'inferred': the build files declare no runtime version, so the runtime range came "
+                                        "from operator inference rows for the declared test framework (SPEC-0069)")
+    inferred_from: tuple[Text, ...] = Field(default=(), max_length=16,
+                                            description='Each inference row used: framework versions, runtime range, source')
 
 
 class Unsupported(_Frozen):
@@ -144,12 +149,14 @@ class RuntimeOutcome(_Frozen):
     reason: str = Field(max_length=2048)
     diagnostic: Blocker | None = Field(default=None, description='Operator or developer guidance; absent only when supported')
     toolchain: Toolchain | None = Field(default=None, description="The selected row as the environment agent's only toolchain (SPEC-0068)")
+    smoke_tests: tuple[SmokeTest, ...] = Field(default=(), max_length=4, description="SPEC-0071: the admitted framework rows' smoke templates")
 
     @model_validator(mode='after')
     def consistent(self) -> 'RuntimeOutcome':
         supported = isinstance(self.selection, Supported)
         if (self.status == 'supported') != (self.image is not None) or (self.status == 'supported') != (self.diagnostic is None) or \
                 (self.toolchain is not None and (self.status != 'supported' or self.toolchain.image != self.image)) or \
+                (self.smoke_tests and self.status != 'supported') or \
                 (self.status in ('supported', 'not_prepared')) != supported or (self.requirement is None) == (self.detection is None):
             raise ValueError('runtime outcome fields disagree with its status')
         return self

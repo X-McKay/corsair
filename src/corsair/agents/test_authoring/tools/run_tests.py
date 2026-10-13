@@ -6,7 +6,8 @@ from uuid import NAMESPACE_URL, uuid5
 from pydantic_ai import RunContext
 from pydantic_ai.messages import ModelResponse, ToolCallPart
 
-from corsair.ports.test_runner import FailureDetail, NativeTestRun, TestCaseResult
+from corsair.nodes.witness import witness_evidence
+from corsair.ports.test_runner import FailureDetail, NativeTestRun, TestCaseResult, WitnessRequest
 
 from ..contracts import DevelopmentOutcome, DevelopmentRun
 from ..dependencies import AuthoringDependencies
@@ -26,9 +27,24 @@ def _outcome(case: TestCaseResult | None) -> DevelopmentOutcome | None:
                               message=(failure.message if failure else "")[:EXCERPT])
 
 
+def _contradicts(observed: NativeTestRun, request: WitnessRequest | None, security: TestCaseResult | None) -> bool:
+    """The security test passed while the admitted witness shows the target performed the planned effect."""
+    if request is None or security is None or security.outcome != "passed":
+        return False
+    found = witness_evidence(observed.witness, request, security.test_id).witness
+    return found is not None and found.path_reached is True and found.effect == "observed"
+
+
 def summarize(number: int, observed: NativeTestRun, *, control_id: str, security_id: str,
-              reveal_security: bool) -> DevelopmentRun:
-    """What the author may see: discovery, compile/collection errors and the control; never the security verdict by default."""
+              reveal_security: bool, planned_failure: str | None = None,
+              witness: WitnessRequest | None = None) -> DevelopmentRun:
+    """What the author may see: discovery, compile/collection errors and the control; never the security verdict by default.
+
+    A security failure of another type than ``planned_failure`` is shown: the test broke before its planned
+    assertion (a fixture or call error), which is a test-code problem on any revision, not a verdict. A pass
+    while the operator witness recorded the planned effect is shown too: the assertion cannot detect the effect,
+    whichever revision is vulnerable (the gate's ``security_passed_with_effect``).
+    """
     discovery, execution = observed.discovery, observed.execution
     status: str = {"workspace": "workspace_failure", "discovery": "collection_error",
                    "execution": "execution_failure", "report": "report_failure", None: "discovered"}[observed.failure_layer]
@@ -39,7 +55,11 @@ def summarize(number: int, observed: NativeTestRun, *, control_id: str, security
     if security is not None and not reveal_security:
         # A setup error or skip means the body did not run validly and says nothing about the planned
         # assertion; only the pass/fail verdict is withheld.
-        security_view = _outcome(security) if security.outcome in ("error", "skipped") else "withheld"
+        broken = security.outcome == "failed" and planned_failure is not None and (
+            security.failure is None or security.failure.type != planned_failure)
+        contradicted = _contradicts(observed, witness, security)
+        security_view = (_outcome(security) if security.outcome in ("error", "skipped") or broken or contradicted
+                         else "withheld")
     else:
         security_view = _outcome(security)
     errors = (discovery.errors if discovery else "") or (execution.detail if execution else "") or observed.detail
@@ -47,6 +67,7 @@ def summarize(number: int, observed: NativeTestRun, *, control_id: str, security
         run=number, operation=observed.operation, patch_sha256=observed.patch_sha256, status=status,
         discovered_test_ids=discovery.test_ids[:64] if discovery else (), errors=errors[:EXCERPT],
         control=_outcome(cases.get(control_id)), security=security_view,
+        security_contradicts_witness=_contradicts(observed, witness, security),
         run_command=execution.command if execution else (), cleanup=observed.cleanup)
 
 
@@ -81,10 +102,15 @@ def run_tests(ctx: RunContext[AuthoringDependencies]) -> DevelopmentRun:
                               run_command=(), cleanup="not_required")
     patch = approved_patch(files, deps.inputs.environment.approved_test_paths)
     operation = uuid5(NAMESPACE_URL, f"corsair:test-authoring:{ctx.run_id}:{ctx.tool_call_id}")
+    envelope = deps.inputs.witness
+    request = (WitnessRequest(envelope.target_path, envelope.target_symbol, envelope.effect_name)
+               if envelope is not None else None)
     observed = deps.runner.run(patch, control_test_id=plan.control.test_id,
                                security_test_id=plan.security.test_id,
-                               discovery_command=plan.discovery_command, operation=operation)
+                               discovery_command=plan.discovery_command, operation=operation,
+                               **({"witness": request} if request is not None else {}))
     if observed.operation != str(operation) or observed.patch_sha256 != patch.sha256:
         raise RuntimeError("runner returned an observation for a different operation or patch")
     return summarize(number, observed, control_id=plan.control.test_id, security_id=plan.security.test_id,
-                     reveal_security=deps.budget.reveal_security_outcome)
+                     reveal_security=deps.budget.reveal_security_outcome,
+                     planned_failure=plan.security_expectation.failure_type, witness=request)

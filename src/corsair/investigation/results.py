@@ -107,6 +107,8 @@ def record(label: str, evidence: Path, *, investigation: Investigation | None = 
             # The framework row's own qualification; this route is plain Docker whatever the row says.
             "evidence": investigation.framework.qualification.evidence,
             "witness_recorders": [f.id for f in investigation.harness.witness_facilities]},
+        # The route's own qualification: plain Docker never qualifies a result (PLAN-0081), whatever the row says.
+        "sandbox": "docker", "qualification": "unqualified",
         "bases": None if investigation is None else investigation.bases,
         "setup_network": None if investigation is None else SETUP_NETWORK,
         "environment_framework": getattr(environment, "framework", None),
@@ -136,7 +138,8 @@ def record(label: str, evidence: Path, *, investigation: Investigation | None = 
 def summary_line(item: dict) -> str:
     """One line: the disposition and how it was reached, or where and why the run stopped."""
     selected = item["selected"]
-    chosen = (f"{selected['image_row']} over plain Docker (row evidence {selected['evidence']}), {selected['framework']}"
+    chosen = (f"{selected['image_row']} over plain Docker, {item['qualification']} (row evidence {selected['evidence']}), "
+              f"{selected['framework']}"
               if selected else "nothing selected")
     requests = sum(u["requests"] or 0 for u in item["usage"].values())
     head = item["issue"]

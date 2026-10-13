@@ -74,7 +74,8 @@ async def _chain(investigation: Investigation, evidence: Path, config: Inference
         else:
             configs, selected = {}, {stage: models[stage]() for stage in AGENT_STAGES}
         (receipts / "configuration.json").write_text(json.dumps({
-            "mode": "direct", "route": "docker_image_only", "setup_network": SETUP_NETWORK,
+            "mode": "direct", "route": "docker_image_only", "sandbox": "docker", "qualification": "unqualified",
+            "setup_network": SETUP_NETWORK,
             "test_network": "none", "live_stages": list(configs),
             "stage_providers": {stage: c.model_dump() for stage, c in configs.items()}, "stage_profiles": profiles,
             "budget": budget.model_dump(),
@@ -180,6 +181,8 @@ def main(argv: list[str] | None = None, prog: str = "corsair run") -> int:
     parser.add_argument("--evidence", type=Path, help="New directory; default .runs/investigations/<UTC stamp>")
     parser.add_argument("--stage-profiles", type=Path, help="Optional JSON of per-stage request controls")
     parser.add_argument("--timeout", type=int, default=600, help="Seconds per runner or setup command")
+    parser.add_argument("--sandbox", choices=("docker",), default="docker",
+                        help="docker: plain Docker, unqualified (risk accepted); the only route this command has yet")
     args = parser.parse_args(argv)
     try:
         request = IssueRequest.model_validate_json(args.issue_json.read_bytes())

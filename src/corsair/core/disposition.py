@@ -122,7 +122,7 @@ LimitationCode = Literal[
     'unplanned_failure', 'unclassified_failure', 'witness_missing', 'witness_unsupported',
     'sandbox_attributed', 'sandbox_event_recorded', 'contradiction', 'no_valid_run',
     'incomplete_repeats', 'baseline_not_reproduced', 'environment_mismatch',
-    'candidate_not_safe']
+    'candidate_not_safe', 'security_passed_with_effect', 'security_failed_with_safe_witness']
 
 
 class Limitation(_Frozen):
@@ -202,6 +202,16 @@ def _assess_run(plan: ObservationPlan, revision: Revision, index: int, run: RunE
         note('control_failed')
         return done('control_failed')
     security, witness = by_id[plan.security_test_id], run.witness
+    # The security test cannot distinguish the revisions when its outcome contradicts the witness: it passed
+    # while the target performed the planned effect, or failed while the target showed the planned safe behavior.
+    if witness is not None and witness.path_reached is True:
+        if security.outcome == 'passed' and witness.effect == 'observed':
+            note('security_passed_with_effect')
+            return done('unusable')
+        if (security.outcome == 'failed' and witness.effect == 'absent'
+                and witness.safe_behavior == plan.expected_safe_behavior):
+            note('security_failed_with_safe_witness')
+            return done('unusable')
     if security.outcome == 'failed':
         failure, expected = security.failure, plan.expected_failure
         if (failure is None or None in (failure.exception_type, failure.path,

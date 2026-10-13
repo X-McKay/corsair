@@ -4,6 +4,7 @@ Use [PLAN-0010](../development/plans/PLAN-0010-native-readiness-sample.md) and [
 
 ```shell
 UV_OFFLINE=true make test-config
+make toolchain-images
 make kind-up
 make admission-install
 make toolchain-images-load
