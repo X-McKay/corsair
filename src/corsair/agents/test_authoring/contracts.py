@@ -12,6 +12,8 @@ from ..test_planning.contracts import EnvironmentEvidence, ReadyTestPlan
 
 TestId = Annotated[str, Field(min_length=1, max_length=MAX_TEST_ID, pattern=TEST_ID.pattern)]
 Layer = Literal["compile", "discovery", "dependency", "fixture", "sandbox", "unknown"]
+# Assigned by trusted code only: refused authored tests and a spent stage budget are not model claims.
+ResultLayer = Layer | Literal["admission"]
 Excerpt = Annotated[str, Field(max_length=4096)]
 
 
@@ -55,9 +57,31 @@ class TestAuthoringInput(Contract):
 
 class WrittenFile(Contract):
     """What write_test_file returns; the content stays in the model's own call arguments."""
+    status: Literal["written"] = "written"
     path: str = Field(min_length=1, max_length=256)
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     size: int = Field(ge=0, le=MAX_PATCH_FILE_BYTES)
+
+
+class AdmissionFinding(Contract):
+    line: int = Field(ge=1)
+    facility: str = Field(min_length=1, max_length=128)
+
+
+class RefusedWrite(Contract):
+    """A write the admission check refused; the file keeps its previous content and nothing ran."""
+    status: Literal["refused"]
+    path: str = Field(min_length=1, max_length=256)
+    findings: tuple[AdmissionFinding, ...] = Field(min_length=1, max_length=32)
+    reason: Excerpt
+    refusals_left: int = Field(ge=0)
+
+
+class UnreadSource(Contract):
+    """A read_source call the stage cannot serve; nothing changed and the stage continues."""
+    status: Literal["not_in_source", "past_end"]
+    path: str = Field(max_length=256)
+    reason: Excerpt
 
 
 class DevelopmentOutcome(Contract):
@@ -138,7 +162,7 @@ class TestPatch(Contract):
 
 class BlockedAuthoring(Contract):
     status: Literal["blocked"]
-    layer: Layer
+    layer: ResultLayer
     reason: Fact
     files: tuple[PatchedFile, ...] = Field(max_length=MAX_PATCH_FILES, description="Last written files, retained for review")
     dev_runs: tuple[DevelopmentRun, ...] = Field(max_length=8)
