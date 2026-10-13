@@ -2116,72 +2116,73 @@
   },
   "CVE-2023-31486": {
    "case_id": "CVE-2023-31486",
-   "url": "https://salsa.debian.org/perl-team/interpreter/perl.git",
-   "fetched_url": "https://salsa.debian.org/perl-team/interpreter/perl",
-   "commit": "1490431e40e22052f75a0b3449f1f53cbd27ba92",
-   "via": "patch",
-   "repository_matches_inventory": false,
+   "url": "https://github.com/Perl-Toolchain-Gang/HTTP-Tiny",
+   "commit": "77f557ef84698efeb6eed04e4a9704eaf85b741d",
+   "via": "commit",
+   "repository_matches_inventory": true,
    "depth": null,
    "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
-    "commit": "1490431e40e22052f75a0b3449f1f53cbd27ba92",
-    "tree": "89efb62609a7a2431bda836f17dcb315b69b77d5",
-    "entries": 7409,
-    "regular_files": 7409,
-    "regular_bytes": 87386910,
-    "largest_file_bytes": 4114121,
-    "executables": 130,
-    "symlinks": 0,
+    "commit": "77f557ef84698efeb6eed04e4a9704eaf85b741d",
+    "tree": "19a4bf065847eede9b6c3bf885bb43516458775d",
+    "entries": 120,
+    "regular_files": 119,
+    "regular_bytes": 191631,
+    "largest_file_bytes": 64169,
+    "executables": 1,
+    "symlinks": 1,
     "submodules": 0,
     "noncanonical_paths": 0
    },
    "parents": [
-    "0372847c4b0aa916347c0977a90ebacd8479b3e2"
+    "7bdf71f5bdb8d97c8554b59e339d4b82fa41954c"
    ],
    "first_parent": {
-    "commit": "0372847c4b0aa916347c0977a90ebacd8479b3e2",
-    "tree": "6ad4ba0cf182b8476003e7c81732f388b3fe7343",
-    "entries": 7409,
-    "regular_files": 7409,
-    "regular_bytes": 87387040,
-    "largest_file_bytes": 4114121,
-    "executables": 130,
-    "symlinks": 0,
+    "commit": "7bdf71f5bdb8d97c8554b59e339d4b82fa41954c",
+    "tree": "8bac4269140fbc3f6753a4d38c7206f408c8d790",
+    "entries": 118,
+    "regular_files": 117,
+    "regular_bytes": 185891,
+    "largest_file_bytes": 63887,
+    "executables": 1,
+    "symlinks": 1,
     "submodules": 0,
     "noncanonical_paths": 0
    },
    "shallow": false,
-   "repository_bytes": 60790508,
-   "fetched_at": "2026-10-13T05:11:15.141300+00:00",
-   "elapsed_seconds": 7.164,
+   "repository_bytes": 543555,
+   "fetched_at": "2026-10-13T11:12:08.034216+00:00",
+   "elapsed_seconds": 0.729,
    "git_version": "git version 2.43.0",
    "fsck_warnings": [],
-   "baseline_candidate": "0372847c4b0aa916347c0977a90ebacd8479b3e2",
+   "baseline_candidate": "7bdf71f5bdb8d97c8554b59e339d4b82fa41954c",
    "capture": {
     "commit": {
      "outcome": "completed",
-     "files": 7409,
+     "files": 119,
      "manifest": {
-      "sha256": "e2f369e5d265148d5c2b80d0bfe01c8989b19e70160081e81cd0a2235b916985",
-      "size": 1575194
+      "sha256": "e38efb1ee2ff3ab8dadfbb12477e50d1a0262a3f0d14e461bf629210b665e376",
+      "size": 23976
      },
-     "skipped": [],
+     "skipped": [
+      "symlink README.mkdn"
+     ],
      "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
-     "files": 7409,
+     "files": 117,
      "manifest": {
-      "sha256": "f1164315cb381398081c093c54c00ce2c87716bc4998891c15f0198c20578fba",
-      "size": 1575194
+      "sha256": "62a65953db63c04d9e80afb99df80e338cb67b5b259ed4ab060cd3955b6a128c",
+      "size": 23577
      },
-     "skipped": [],
+     "skipped": [
+      "symlink README.mkdn"
+     ],
      "fsck_ignore": []
     }
-   },
-   "acquired_on": "operator workstation RIG0 (direct egress); this cloud container is refused by its egress proxy",
-   "note": "Fix lives in Debian perl packaging history, not the inventory repository (HTTP-Tiny); needs case review. Fetched before acquisition stopped following redirects: GitLab redirects a repository URL without .git to the .git URL now pinned (seen on gitlab.com; salsa runs GitLab and is unreachable from the cloud container). Not yet refetched under the no-redirect rule; the commit identity is verified either way."
+   }
   },
   "CVE-2026-15043": {
    "case_id": "CVE-2026-15043",
