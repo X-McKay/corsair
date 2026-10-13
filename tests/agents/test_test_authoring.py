@@ -1,6 +1,7 @@
 """Exercise the authoring stage's confinement, run budget, withheld outcome and provenance through native SDK calls."""
 
 import asyncio
+import json
 from dataclasses import replace
 from hashlib import sha256
 
@@ -598,3 +599,37 @@ def test_a_security_test_that_passes_while_the_witness_sees_the_effect_is_refuse
                 inputs, native)
     assert seen[0].security_contradicts_witness and seen[0].security.outcome == "passed"
     assert seen[0].control.outcome == "passed"
+
+
+LIVE_006_PROSE = ("\n\nBoth tests were discovered and the control passed. The patch is ready.\n\n"
+                  '{"result": {"status": "patch", "security_assertion_lines": [64, 65, 66], '
+                  '"limitations": ["Development runs only"]}}')
+
+
+@pytest.mark.parametrize("text, kept", [
+    (LIVE_006_PROSE, True), ('{"result": {}}', False), ("no object here", False),
+    ('Prose {"a": 1} and more prose', False), ('Two objects {"a": 1}\n{"b": 2}', True)])
+def test_only_prose_before_one_final_json_object_is_dropped(text, kept):
+    from corsair.agents.prompted_output import trailing_object
+    found = trailing_object(text)
+    assert (found is not None) == kept
+    if kept:
+        assert json.loads(found[1]) and not found[1].startswith(" ")
+
+
+def test_prompted_output_with_leading_prose_needs_no_correction():
+    """Gap 10 (Docker live-006): prose before a bare JSON answer no longer spends the only output correction."""
+    from pydantic_ai.messages import RetryPromptPart, TextPart
+    from pydantic_ai.profiles.openai import OpenAIModelProfile
+    from corsair.agents.prompted_output import PROSE_KEY
+    steps, retries = [write(), RUN], []
+
+    async def respond(messages, info):
+        retries.extend(p for m in messages for p in m.parts if isinstance(p, RetryPromptPart))
+        done = sum(isinstance(p, ToolReturnPart) for m in messages for p in m.parts)
+        return ModelResponse(parts=[steps[done] if done < len(steps) else TextPart(LIVE_006_PROSE)])
+    model = FunctionModel(respond, profile=OpenAIModelProfile(default_structured_output_mode="prompted"))
+    (result, _) = run(create_test_authoring_agent(model, output_retries=0), case().inputs.inputs)
+    assert isinstance(result.output, TestPatch) and not retries
+    final = result.all_messages()[-1]
+    assert final.provider_details[PROSE_KEY].strip().startswith("Both tests were discovered")

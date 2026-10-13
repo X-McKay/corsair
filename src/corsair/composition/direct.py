@@ -519,7 +519,10 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
                     f"{exhausted.limits.work_tool_calls} work calls)")
         failed = attempts[-1].failure
         kind = failed.kind if isinstance(failed, RecordedFailure) else type(failed).__name__
-        return f"{stage} produced no output: {kind}: {failed}"[:2048]
+        # Spent output retries hide the last refusal in the cause (live-006: a wrong assertion line); keep it.
+        cause = failed.__cause__ if not isinstance(failed, RecordedFailure) else None
+        last = f"; last refusal: {cause}" if cause is not None else ""
+        return f"{stage} produced no output: {kind}: {failed}{last}"[:2048]
 
     if case.runtime is not None:
         try:
