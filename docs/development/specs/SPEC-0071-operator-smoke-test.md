@@ -35,4 +35,6 @@ Out of scope: a smoke test that imports the project's code (the environment stag
 ## Decisions and open questions
 
 - The smoke file is written up front rather than after a discovery that lists nothing, since the sandbox is prepared once; the agent's choice is constrained by the skill and recorded in `baseline_basis`.
+- Residual: a project whose own configuration changes the test convention (pytest `python_files = tests.py`, a Jest `testMatch` override) is caught only by the discovery-output check, and a discovery narrowed without naming the smoke file (`-k`, `--ignore`) could still hide such tests. Accepted (review 2026-10-13 18:28Z); the convention check covers runner defaults.
+- Wiring: the checkout listing is inert until each production preparation adapter supplies `source_paths` (#109's Docker route, #116's OpenShell); without it smoke baselines are refused, which fails safe.
 - Open: Jest and JUnit templates not yet run in their images (no Docker in this container); a project-import smoke variant once a target is known; whether the kick-off note's per-case result line takes `baseline_basis` as is.
