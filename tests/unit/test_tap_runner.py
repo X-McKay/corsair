@@ -87,13 +87,13 @@ def test_the_lister_names_subtests_and_refuses_tests_outside_them():
     assert EXITS['syntaxerr']['list_exit'] != 0 and EXITS['bail']['list_exit'] != 0
 
 
-def run(store, name, *steps, witness=None):
+def run(store, name, *steps, witness=None, discovery=PERL):
     path = f't/{name}.t'
     patch = ApprovedPatch((PatchFile(path, (CAPTURES / f'{name}.t').read_bytes()),), (path,))
     workspace, execution = Workspace(store, ROOT), Scripted(*steps)
     runner = TapRunner(workspace, execution, store, TapRunnerConfig(PERL, ROOT))
     operation = uuid4()
-    result = runner.run(patch, control_test_id=ids(name)[0], security_test_id=ids(name)[1], discovery_command=PERL,
+    result = runner.run(patch, control_test_id=ids(name)[0], security_test_id=ids(name)[1], discovery_command=discovery,
                         operation=operation, witness=witness)
     return result, execution, workspace, operation
 
@@ -137,11 +137,17 @@ def test_operator_prefix_is_an_absolute_perl_with_relative_includes_only(command
         TapRunnerConfig(command, ROOT)
 
 
-def test_discovery_command_must_be_the_operator_prefix(store):
-    with pytest.raises(ValueError, match='operator'):
-        TapRunner(Workspace(store, ROOT), Scripted(), store, TapRunnerConfig(PERL, ROOT)).run(
-            ApprovedPatch((PatchFile('t/pass.t', b''),), ('t/pass.t',)), control_test_id=ids('pass')[0],
-            security_test_id=ids('pass')[1], discovery_command=PERL[:1], operation=uuid4())
+@pytest.mark.parametrize('command', [('prove', '--dry', '-b', 't/'), ('/usr/local/bin/perl',)])
+def test_environment_discovery_command_is_recorded_not_run(store, command):
+    # The runner builds its own listing, so the environment's discovery command is carried, never run: the argv
+    # executed and the result are those of the operator prefix. An empty command is still refused.
+    steps = (((CAPTURES / 'fail.list').read_bytes(), 0), (tap('fail'), 1))
+    expected, executed, *_ = run(store, 'fail', *steps)
+    result, execution, *_ = run(store, 'fail', *steps, discovery=command)
+    assert [call[0] for call in execution.calls] == [call[0] for call in executed.calls]
+    assert result.execution.status == expected.execution.status == 'completed'
+    with pytest.raises(ValueError):
+        run(store, 'fail', discovery=())
 
 
 def test_tap_runs_become_gate_evidence(store):

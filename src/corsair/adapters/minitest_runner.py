@@ -115,7 +115,6 @@ def listed(stdout: bytes) -> tuple[tuple[str, str], ...] | None:
 class MinitestRunner(NativeRunner):
     # The admitted discovery command must be exactly the operator's prefix: a command that names a test
     # file or program would run test bodies before the listing.
-    exact_discovery = 'Minitest discovery command must equal the operator\'s Ruby prefix'
     tool, report_format = 'ruby', 'Minitest'
 
     def _validate(self, patch: ApprovedPatch, ids: tuple[str, str], witness: WitnessRequest | None) -> None:

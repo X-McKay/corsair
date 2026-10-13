@@ -67,7 +67,6 @@ def listed(stdout: bytes) -> tuple[str, ...] | None:
 
 
 class TapRunner(NativeRunner):
-    exact_discovery = 'TAP discovery command must equal the operator\'s Perl prefix'
     tool, report_format = 'perl', 'TAP'
 
     @staticmethod

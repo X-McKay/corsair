@@ -27,7 +27,6 @@ Not in scope: changing any runner's commands, ids, refusals or outcomes; the env
 - the typed failure (`_failure`);
 - exit agreement and the control and security claims (`_completed`): every runner passes through it, so none can skip the check; the default rule is exit 1 exactly when a test failed or errored, and TAP overrides `_exit_agrees` with Test::More's failed count or 255 for a died file;
 - the absent-witness answer for frameworks without a probe (`_no_witness`);
-- the operator-prefix rule (`exact_discovery`);
 - the id rule (`check_ids`): a typed witness request, two distinct ids in the driver's grammar, each naming a file the patch itself carries, both in one report unit (file or class), and no patch path that reads as an option;
 - the shared configuration checks (`check_command`, `check_root`, `check_bounds`).
 
