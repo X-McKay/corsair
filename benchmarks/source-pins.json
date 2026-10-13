@@ -1,0 +1,2695 @@
+{
+ "schema_version": 1,
+ "spec": "SPEC-0037",
+ "note": "Host acquisition of each case's fix commit; first parent is a baseline candidate only.",
+ "cases": {
+  "VUL4J-2": {
+   "case_id": "VUL4J-2",
+   "url": "https://github.com/apache/xmlgraphics-batik",
+   "commit": "660ef628d637af636ea113243fe73f170ac43958",
+   "via": "commit",
+   "repository_matches_inventory": false,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "660ef628d637af636ea113243fe73f170ac43958",
+    "tree": "362657e85c430ccd9c3ce8a81790fb3c8b97cb6a",
+    "entries": 3473,
+    "regular_files": 3473,
+    "regular_bytes": 54047628,
+    "largest_file_bytes": 3154938,
+    "executables": 18,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "efb98a96b9b64a557a1caf030e2c16c3902b9712"
+   ],
+   "first_parent": {
+    "commit": "efb98a96b9b64a557a1caf030e2c16c3902b9712",
+    "tree": "a5c44205ae87c1a442575b1c72b4676db05f1560",
+    "entries": 3473,
+    "regular_files": 3473,
+    "regular_bytes": 54047434,
+    "largest_file_bytes": 3154938,
+    "executables": 18,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 151658955,
+   "fetched_at": "2026-10-13T05:10:03.810330+00:00",
+   "elapsed_seconds": 9.322,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "efb98a96b9b64a557a1caf030e2c16c3902b9712",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 3473,
+     "manifest": {
+      "sha256": "ef68a5c6ba8bfb61d989c11398b25f83984c1ea96326f4bb7e98ac4ca5138fef",
+      "size": 867458
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 3473,
+     "manifest": {
+      "sha256": "f41b8e8fbd035c916e679c7b908ed66e7c829048a6746e4281a6c270d4dfc41c",
+      "size": 867458
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "VUL4J-6": {
+   "case_id": "VUL4J-6",
+   "url": "https://github.com/apache/commons-compress",
+   "commit": "2a2f1dc48e22a34ddb72321a4db211da91aa933b",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "2a2f1dc48e22a34ddb72321a4db211da91aa933b",
+    "tree": "a91e46fd48c99ff122d69f88d7c3307c08f5008b",
+    "entries": 570,
+    "regular_files": 570,
+    "regular_bytes": 31936433,
+    "largest_file_bytes": 8344644,
+    "executables": 2,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "dcb0486fb4cb2b6592c04d6ec2edbd3f690df5f2"
+   ],
+   "first_parent": {
+    "commit": "dcb0486fb4cb2b6592c04d6ec2edbd3f690df5f2",
+    "tree": "943956393d4de60155ea84ef15ef87d975987d07",
+    "entries": 570,
+    "regular_files": 570,
+    "regular_bytes": 31936432,
+    "largest_file_bytes": 8344644,
+    "executables": 2,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 14453902,
+   "fetched_at": "2026-10-13T05:10:52.223599+00:00",
+   "elapsed_seconds": 2.232,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "dcb0486fb4cb2b6592c04d6ec2edbd3f690df5f2",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 570,
+     "manifest": {
+      "sha256": "76627c0a23085d7188c3f3668789ea7d8ae49930938efe1e76da6288c4398588",
+      "size": 140211
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 570,
+     "manifest": {
+      "sha256": "81a5f2d8118ab2a38714740a0a4190d69ac24a312571278ffde86d3387f45ec3",
+      "size": 140211
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "VUL4J-18": {
+   "case_id": "VUL4J-18",
+   "url": "https://github.com/apache/jspwiki",
+   "commit": "88d89d6523802c044cfcb7930cba40d8eeb21da2",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "88d89d6523802c044cfcb7930cba40d8eeb21da2",
+    "tree": "e40f3fe60cdfe206fafa0fd7c8dfc80cfeaabf8f",
+    "entries": 1724,
+    "regular_files": 1724,
+    "regular_bytes": 14132441,
+    "largest_file_bytes": 3423516,
+    "executables": 268,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "f140a2a4371735ad24d04a1d78c6e1d9ceaed76f"
+   ],
+   "first_parent": {
+    "commit": "f140a2a4371735ad24d04a1d78c6e1d9ceaed76f",
+    "tree": "d8f10520bc2f482b42542963ff9a837bb61e8f4f",
+    "entries": 1723,
+    "regular_files": 1723,
+    "regular_bytes": 14129990,
+    "largest_file_bytes": 3423516,
+    "executables": 268,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 54232587,
+   "fetched_at": "2026-10-13T05:11:01.985956+00:00",
+   "elapsed_seconds": 7.071,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "f140a2a4371735ad24d04a1d78c6e1d9ceaed76f",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 1724,
+     "manifest": {
+      "sha256": "e9e89a5a082a415db0044d1f3a4a591e28ee8504fce9fcd0c80d837d736ec64f",
+      "size": 429420
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 1723,
+     "manifest": {
+      "sha256": "ddb4639c7558b8b8cbf7b4fa78e06a523fb7917540a341749d27dd982f947774",
+      "size": 429174
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "VUL4J-22": {
+   "case_id": "VUL4J-22",
+   "url": "https://github.com/apache/shiro",
+   "commit": "b15ab927709ca18ea4a02538be01919a19ab65af",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "b15ab927709ca18ea4a02538be01919a19ab65af",
+    "tree": "9d35fe7b75ea84a0ef80b64de3bb27f0f5cf4502",
+    "entries": 823,
+    "regular_files": 823,
+    "regular_bytes": 3663349,
+    "largest_file_bytes": 46475,
+    "executables": 0,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "d41afcc6e722ec112918c2cc56a386dd6267a1d5"
+   ],
+   "first_parent": {
+    "commit": "d41afcc6e722ec112918c2cc56a386dd6267a1d5",
+    "tree": "577a135319a75ea20f76c01337e0dd79f8ad799c",
+    "entries": 822,
+    "regular_files": 822,
+    "regular_bytes": 3656037,
+    "largest_file_bytes": 46475,
+    "executables": 0,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 23374486,
+   "fetched_at": "2026-10-13T05:11:31.249222+00:00",
+   "elapsed_seconds": 2.611,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "d41afcc6e722ec112918c2cc56a386dd6267a1d5",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 823,
+     "manifest": {
+      "sha256": "54d66892f64c533e2dbc3c8e8293a8fbd04828bd423f665dec1d7d42c9c7bfbf",
+      "size": 207963
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 822,
+     "manifest": {
+      "sha256": "31496a13fb5708828887822936b672d1264041eda5327107576296e8f09e226e",
+      "size": 207715
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "VUL4J-33": {
+   "case_id": "VUL4J-33",
+   "url": "https://github.com/apache/struts",
+   "commit": "f238cf4f1091be19fbcfd086b042c86a1bcaa7fc",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "f238cf4f1091be19fbcfd086b042c86a1bcaa7fc",
+    "tree": "36a1be9c7f4ba15b829789ce2e63bd6897451081",
+    "entries": 4133,
+    "regular_files": 4133,
+    "regular_bytes": 21082492,
+    "largest_file_bytes": 1444224,
+    "executables": 4,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "016b8eedd5ca47fce95e2a16069e640e3842906d"
+   ],
+   "first_parent": {
+    "commit": "016b8eedd5ca47fce95e2a16069e640e3842906d",
+    "tree": "b0cb9db916d42836d56aa6efddd4f3bcfaa2c2ae",
+    "entries": 4133,
+    "regular_files": 4133,
+    "regular_bytes": 21081841,
+    "largest_file_bytes": 1444224,
+    "executables": 4,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 73720965,
+   "fetched_at": "2026-10-13T05:11:42.596440+00:00",
+   "elapsed_seconds": 6.522,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "016b8eedd5ca47fce95e2a16069e640e3842906d",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 4133,
+     "manifest": {
+      "sha256": "5c25eb9f7b08883c429f4af0c4a0f194853bc7b94fb3a6888cc9088fb1fecc71",
+      "size": 1110859
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 4133,
+     "manifest": {
+      "sha256": "2dc6c7563eaef81b5f6d768802455e16bc3524fb65c3d14dd6e80052ec686277",
+      "size": 1110859
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "VUL4J-35": {
+   "case_id": "VUL4J-35",
+   "url": "https://github.com/apache/struts",
+   "commit": "1f301038a751bf16e525607c3db513db835b2999",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "1f301038a751bf16e525607c3db513db835b2999",
+    "tree": "cd57d3e77eaabc8d351684779ce6bbd681579b46",
+    "entries": 4721,
+    "regular_files": 4721,
+    "regular_bytes": 23030948,
+    "largest_file_bytes": 1122711,
+    "executables": 6,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "e1025a207ddfa1b8971ec6261ea2c09da2af157f"
+   ],
+   "first_parent": {
+    "commit": "e1025a207ddfa1b8971ec6261ea2c09da2af157f",
+    "tree": "e750173a0e1daa14f8dc611b929fced5276a9bf0",
+    "entries": 4721,
+    "regular_files": 4721,
+    "regular_bytes": 23030907,
+    "largest_file_bytes": 1122711,
+    "executables": 6,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 66528814,
+   "fetched_at": "2026-10-13T05:12:32.788525+00:00",
+   "elapsed_seconds": 6.24,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "e1025a207ddfa1b8971ec6261ea2c09da2af157f",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 4721,
+     "manifest": {
+      "sha256": "c12000abac87095057affc598d62d137f020179ff4a254030113a6d395e6d159",
+      "size": 1248665
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 4721,
+     "manifest": {
+      "sha256": "3292f60674f9abd40eb7fc56d308f387271d439ad7034fa5309f88724c27f5d1",
+      "size": 1248665
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "VUL4J-37": {
+   "case_id": "VUL4J-37",
+   "url": "https://github.com/apache/tomee",
+   "commit": "58cdbbef9c77ab2b44870f9d606593b49cde76d9",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "58cdbbef9c77ab2b44870f9d606593b49cde76d9",
+    "tree": "5b8b8744521ab70416bcc58456b0fb1b18c0dcb9",
+    "entries": 6733,
+    "regular_files": 6733,
+    "regular_bytes": 35798091,
+    "largest_file_bytes": 597275,
+    "executables": 110,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "5689b25ac70a243c4d838962e068856f889ea87f"
+   ],
+   "first_parent": {
+    "commit": "5689b25ac70a243c4d838962e068856f889ea87f",
+    "tree": "61310096af9ed3c7406ffdee0b36338ab589338e",
+    "entries": 6733,
+    "regular_files": 6733,
+    "regular_bytes": 35796248,
+    "largest_file_bytes": 597275,
+    "executables": 110,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 46377859,
+   "fetched_at": "2026-10-13T05:13:26.437583+00:00",
+   "elapsed_seconds": 11.493,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "5689b25ac70a243c4d838962e068856f889ea87f",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 6733,
+     "manifest": {
+      "sha256": "19c46f4f9d75914974fb394ac328abea971ece095800165334bdf307467797c7",
+      "size": 1814915
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 6733,
+     "manifest": {
+      "sha256": "3057c09ca85b473833e0a7a68734d05a95d9df090294407c022028e915305c0f",
+      "size": 1814915
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "VUL4J-42": {
+   "case_id": "VUL4J-42",
+   "url": "https://github.com/codehaus-plexus/plexus-utils",
+   "commit": "b38a1b3a4352303e4312b2bb601a0d7ec6e28f41",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "b38a1b3a4352303e4312b2bb601a0d7ec6e28f41",
+    "tree": "60a36b3044777337fa50aaa310e048d7b74eb37e",
+    "entries": 158,
+    "regular_files": 158,
+    "regular_bytes": 1389700,
+    "largest_file_bytes": 136660,
+    "executables": 0,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "86c37983bb2bd92b1df43fe73f321ffbfa155070"
+   ],
+   "first_parent": {
+    "commit": "86c37983bb2bd92b1df43fe73f321ffbfa155070",
+    "tree": "6ba94f05085106523de3998e4d8caf16101b9ff1",
+    "entries": 158,
+    "regular_files": 158,
+    "regular_bytes": 1388674,
+    "largest_file_bytes": 136660,
+    "executables": 0,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 1573687,
+   "fetched_at": "2026-10-13T05:14:50.450605+00:00",
+   "elapsed_seconds": 1.047,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "86c37983bb2bd92b1df43fe73f321ffbfa155070",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 158,
+     "manifest": {
+      "sha256": "febb930b97d73d7277fa2b5d191967c423792fd787f19207c539e2c89de67a48",
+      "size": 38357
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 158,
+     "manifest": {
+      "sha256": "e6fb3c07cc5ba2cacb3bd4d17fa97581e3db47e551a1feea5b1293cc879cd3b6",
+      "size": 38357
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "VUL4J-51": {
+   "case_id": "VUL4J-51",
+   "url": "https://github.com/jenkinsci/ccm-plugin",
+   "commit": "066cb43b4413b3490d822ec8b8a32072ebd213ca",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "066cb43b4413b3490d822ec8b8a32072ebd213ca",
+    "tree": "6acfdf15e4fb878bfc76ed5bb3ccc5a4ec60e549",
+    "entries": 78,
+    "regular_files": 78,
+    "regular_bytes": 97816,
+    "largest_file_bytes": 6918,
+    "executables": 0,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "fed6ee7435429b7f6a4576acb823a84277c669fc"
+   ],
+   "first_parent": {
+    "commit": "fed6ee7435429b7f6a4576acb823a84277c669fc",
+    "tree": "7daa9840403bdbf318dbb8ecbe350afccb0fa504",
+    "entries": 75,
+    "regular_files": 75,
+    "regular_bytes": 92526,
+    "largest_file_bytes": 6918,
+    "executables": 0,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 301655,
+   "fetched_at": "2026-10-13T05:14:53.350475+00:00",
+   "elapsed_seconds": 0.623,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "fed6ee7435429b7f6a4576acb823a84277c669fc",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 78,
+     "manifest": {
+      "sha256": "b2742183cc381fe8ec7f952a54ae39a23a3839a56d738000fb5fb0c9fd217314",
+      "size": 18294
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 75,
+     "manifest": {
+      "sha256": "a5896ad7d4132db494f9b0ca9ca499fef0adaf71506a81ca0280935f5cdc600e",
+      "size": 17588
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "VUL4J-57": {
+   "case_id": "VUL4J-57",
+   "url": "https://github.com/jenkinsci/pipeline-build-step-plugin",
+   "commit": "3dfefdec1f7b2a4ee0ef8902afdea720b1572cb3",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "3dfefdec1f7b2a4ee0ef8902afdea720b1572cb3",
+    "tree": "a5a4e0f7da4bccb800c84391d4fcca81fbc817f2",
+    "entries": 22,
+    "regular_files": 22,
+    "regular_bytes": 98483,
+    "largest_file_bytes": 25523,
+    "executables": 0,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "c82f48fb270ec96a3f6a84d6ad61ae214f572fe4"
+   ],
+   "first_parent": {
+    "commit": "c82f48fb270ec96a3f6a84d6ad61ae214f572fe4",
+    "tree": "de4e9c3241fdd966b3e49d13160ec5e03ddf591b",
+    "entries": 22,
+    "regular_files": 22,
+    "regular_bytes": 96255,
+    "largest_file_bytes": 25523,
+    "executables": 0,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 379808,
+   "fetched_at": "2026-10-13T05:14:54.809829+00:00",
+   "elapsed_seconds": 0.717,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "c82f48fb270ec96a3f6a84d6ad61ae214f572fe4",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 22,
+     "manifest": {
+      "sha256": "ea6ba2f4de887411a93180962bdae9b479d83ef1da7452aeb0dec343a5d5e114",
+      "size": 5952
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 22,
+     "manifest": {
+      "sha256": "e8ded56a210b333500106d70b1fe56d73d3046ca8fd3ff12fce9c2f045901704",
+      "size": 5952
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "CVE-2018-7753": {
+   "case_id": "CVE-2018-7753",
+   "url": "https://github.com/mozilla/bleach",
+   "commit": "c5df5789ec3471a31311f42c2d19fc2cf21b35ef",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "c5df5789ec3471a31311f42c2d19fc2cf21b35ef",
+    "tree": "e865d09b34fd95c81cadebc08f197daea7e4804e",
+    "entries": 57,
+    "regular_files": 57,
+    "regular_bytes": 180296,
+    "largest_file_bytes": 24390,
+    "executables": 4,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "e7f83b82b023e4956f99e9316fc7a621f6f507af",
+    "61bf0e6db3bdce6294633555e08dd061af465c3c"
+   ],
+   "first_parent": {
+    "commit": "e7f83b82b023e4956f99e9316fc7a621f6f507af",
+    "tree": "fc0eada2d6b1e933186a06454a37ddcab34c0a2d",
+    "entries": 57,
+    "regular_files": 57,
+    "regular_bytes": 175394,
+    "largest_file_bytes": 21671,
+    "executables": 4,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 621315,
+   "fetched_at": "2026-10-13T05:14:55.869840+00:00",
+   "elapsed_seconds": 0.77,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": null,
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 57,
+     "manifest": {
+      "sha256": "d0e1e51ef3839314d8121f65e2086609bf8cc30f5e5966ae2989951cb3dc49dc",
+      "size": 11475
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "CVE-2019-1010017": {
+   "case_id": "CVE-2019-1010017",
+   "url": "https://github.com/savon-noir/python-libnmap",
+   "commit": "71b707758851e4b622f87d9a73266e06f60aeab4",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "71b707758851e4b622f87d9a73266e06f60aeab4",
+    "tree": "3fe6ed5608ad341d3d708ba06256c8352b131c0d",
+    "entries": 97,
+    "regular_files": 97,
+    "regular_bytes": 944879,
+    "largest_file_bytes": 321878,
+    "executables": 0,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "cf1aee77980b295e2d632dbedea1cb3abf661c9a"
+   ],
+   "first_parent": {
+    "commit": "cf1aee77980b295e2d632dbedea1cb3abf661c9a",
+    "tree": "9ae8b43489dd4f5f908b93396f389a5a97f916de",
+    "entries": 94,
+    "regular_files": 94,
+    "regular_bytes": 942578,
+    "largest_file_bytes": 321878,
+    "executables": 0,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 1434197,
+   "fetched_at": "2026-10-13T05:14:56.986305+00:00",
+   "elapsed_seconds": 0.769,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "cf1aee77980b295e2d632dbedea1cb3abf661c9a",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 97,
+     "manifest": {
+      "sha256": "29473f41132fb6de0530a07fd5a85be5e21248a399e7d82c8f2e55b2a1fb4458",
+      "size": 20453
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 94,
+     "manifest": {
+      "sha256": "05da489fbc611dfdefef612acdfc5d634d664361c7ef625bbbbaab9f25467334",
+      "size": 19784
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "CVE-2021-32839": {
+   "case_id": "CVE-2021-32839",
+   "url": "https://github.com/andialbrecht/sqlparse",
+   "commit": "8238a9e450ed1524e40cb3a8b0b3c00606903aeb",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "8238a9e450ed1524e40cb3a8b0b3c00606903aeb",
+    "tree": "76757406d040030ad733b946eb09fb06ed11e5fc",
+    "entries": 73,
+    "regular_files": 73,
+    "regular_bytes": 281862,
+    "largest_file_bytes": 29560,
+    "executables": 1,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "e66046785b816e5c2d22f101f36faefd19c4a771"
+   ],
+   "first_parent": {
+    "commit": "e66046785b816e5c2d22f101f36faefd19c4a771",
+    "tree": "1ed2d7e7ba4956bcd0fb2287fe485f6647c91240",
+    "entries": 73,
+    "regular_files": 73,
+    "regular_bytes": 280889,
+    "largest_file_bytes": 29560,
+    "executables": 1,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 1565516,
+   "fetched_at": "2026-10-13T05:14:58.939442+00:00",
+   "elapsed_seconds": 0.821,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "e66046785b816e5c2d22f101f36faefd19c4a771",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 73,
+     "manifest": {
+      "sha256": "7fd373a08eb42216d02e9e6895ef81dc1496c4a15af391127e82da938975d50c",
+      "size": 15002
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 73,
+     "manifest": {
+      "sha256": "213cf84b78060384bc0454574a89e11247566e221cf835b9dcdc0b0e3a5b1e24",
+      "size": 15002
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "CVE-2022-24065": {
+   "case_id": "CVE-2022-24065",
+   "url": "https://github.com/cookiecutter/cookiecutter",
+   "commit": "fdffddb31fd2b46344dfa317531ff155e7999f77",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "fdffddb31fd2b46344dfa317531ff155e7999f77",
+    "tree": "555ea01df350052fb5359bbbfd5fdcd87caf3a11",
+    "entries": 243,
+    "regular_files": 238,
+    "regular_bytes": 654484,
+    "largest_file_bytes": 93083,
+    "executables": 7,
+    "symlinks": 5,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "94036d0324d09cd6a4eb5e2a5707062c1e409cd1",
+    "85a7884f11a5200535706a6c5d31a9acbdadae1a"
+   ],
+   "first_parent": {
+    "commit": "94036d0324d09cd6a4eb5e2a5707062c1e409cd1",
+    "tree": "907e385de99acc8861df8117b7788ad169d6354a",
+    "entries": 243,
+    "regular_files": 238,
+    "regular_bytes": 654100,
+    "largest_file_bytes": 93083,
+    "executables": 7,
+    "symlinks": 5,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 3156649,
+   "fetched_at": "2026-10-13T05:15:00.759844+00:00",
+   "elapsed_seconds": 1.186,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": null,
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 238,
+     "manifest": {
+      "sha256": "253310952850e8d98395e3baa105894518c46544dcaf64b202f6c6af8430ca32",
+      "size": 54198
+     },
+     "skipped": [
+      "symlink docs/AUTHORS.md",
+      "symlink docs/CODE_OF_CONDUCT.md",
+      "symlink docs/CONTRIBUTING.md",
+      "symlink docs/HISTORY.md",
+      "symlink docs/README.md"
+     ],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "CVE-2022-24439": {
+   "case_id": "CVE-2022-24439",
+   "url": "https://github.com/gitpython-developers/GitPython",
+   "commit": "2625ed9fc074091c531c27ffcba7902771130261",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "2625ed9fc074091c531c27ffcba7902771130261",
+    "tree": "0f3589b06f2b63851addf126b245073cad7eacbf",
+    "entries": 177,
+    "regular_files": 176,
+    "regular_bytes": 1842017,
+    "largest_file_bytes": 302879,
+    "executables": 3,
+    "symlinks": 0,
+    "submodules": 1,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "787359d80d80225095567340aa5e7ec01847fa9a"
+   ],
+   "first_parent": {
+    "commit": "787359d80d80225095567340aa5e7ec01847fa9a",
+    "tree": "41947c5be7875e746b6e1452add2b92283e926b4",
+    "entries": 177,
+    "regular_files": 176,
+    "regular_bytes": 1839378,
+    "largest_file_bytes": 302879,
+    "executables": 3,
+    "symlinks": 0,
+    "submodules": 1,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 9331949,
+   "fetched_at": "2026-10-13T05:15:03.632057+00:00",
+   "elapsed_seconds": 2.614,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "787359d80d80225095567340aa5e7ec01847fa9a",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 176,
+     "manifest": {
+      "sha256": "4bcc6bfa7f9a6787540bf5a3e6efa5752e38f37ac2a6d5647148592daac7ce43",
+      "size": 36440
+     },
+     "skipped": [
+      "submodule git/ext/gitdb"
+     ],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 176,
+     "manifest": {
+      "sha256": "a18a734c0f657ad0b2417132a09173347aef23269c2e51e7c76a40ab227e6bc6",
+      "size": 36440
+     },
+     "skipped": [
+      "submodule git/ext/gitdb"
+     ],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "CVE-2022-29217": {
+   "case_id": "CVE-2022-29217",
+   "url": "https://github.com/jpadilla/pyjwt",
+   "commit": "9c528670c455b8d948aff95ed50e22940d1ad3fc",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "9c528670c455b8d948aff95ed50e22940d1ad3fc",
+    "tree": "235ecb85818e072ef5377f8e965ef50a41356336",
+    "entries": 77,
+    "regular_files": 77,
+    "regular_bytes": 252504,
+    "largest_file_bytes": 34937,
+    "executables": 1,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "24b29adfebcb4f057a3cef5aaf35653bc0c1c8cc"
+   ],
+   "first_parent": {
+    "commit": "24b29adfebcb4f057a3cef5aaf35653bc0c1c8cc",
+    "tree": "e8496fb90c15e9f45bb89476ed70f8bd3abd72af",
+    "entries": 76,
+    "regular_files": 76,
+    "regular_bytes": 245998,
+    "largest_file_bytes": 34931,
+    "executables": 1,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 929915,
+   "fetched_at": "2026-10-13T05:15:09.697371+00:00",
+   "elapsed_seconds": 0.752,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "24b29adfebcb4f057a3cef5aaf35653bc0c1c8cc",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 77,
+     "manifest": {
+      "sha256": "a791689d3b46de57365987b84c187b3007b63cb31818dc22045df243bd9e1bd2",
+      "size": 15823
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 76,
+     "manifest": {
+      "sha256": "0c6a3d3bb4ae9d10d6b76592472b403617d2f59dc345593e875e30ac9fb5846a",
+      "size": 15618
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "CVE-2023-23934": {
+   "case_id": "CVE-2023-23934",
+   "url": "https://github.com/pallets/werkzeug",
+   "commit": "cf275f42acad1b5950c50ffe8ef58fe62cdce028",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [
+    "badTimezone",
+    "missingSpaceBeforeEmail",
+    "zeroPaddedFilemode"
+   ],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "cf275f42acad1b5950c50ffe8ef58fe62cdce028",
+    "tree": "8ac9f248a25b93ac99221b513fa5c7304ab7fc0b",
+    "entries": 295,
+    "regular_files": 295,
+    "regular_bytes": 2021740,
+    "largest_file_bytes": 209112,
+    "executables": 2,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "7c7ce5cb73f3f7d3b9c09340e4f322aeb583dbc5",
+    "8c2b4b82d0cade0d37e6a88e2cd2413878e8ebd4"
+   ],
+   "first_parent": {
+    "commit": "7c7ce5cb73f3f7d3b9c09340e4f322aeb583dbc5",
+    "tree": "6a45955f05a5fa20b538e34dee450e157abc4849",
+    "entries": 295,
+    "regular_files": 295,
+    "regular_bytes": 2021535,
+    "largest_file_bytes": 209112,
+    "executables": 2,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 15774931,
+   "fetched_at": "2026-10-13T05:16:45.834317+00:00",
+   "elapsed_seconds": 3.22,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [
+    "missingSpaceBeforeEmail"
+   ],
+   "baseline_candidate": null,
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 295,
+     "manifest": {
+      "sha256": "8064a6f927fa5fd05edafccbb3a644246d8c719b5d1fe486fc344d80f7a815d9",
+      "size": 62440
+     },
+     "skipped": [],
+     "fsck_ignore": [
+      "badTimezone",
+      "missingSpaceBeforeEmail",
+      "zeroPaddedFilemode"
+     ]
+    }
+   }
+  },
+  "CVE-2023-25577": {
+   "case_id": "CVE-2023-25577",
+   "url": "https://github.com/pallets/werkzeug",
+   "commit": "517cac5a804e8c4dc4ed038bb20dacd038e7a9f1",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [
+    "badTimezone",
+    "missingSpaceBeforeEmail",
+    "zeroPaddedFilemode"
+   ],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "517cac5a804e8c4dc4ed038bb20dacd038e7a9f1",
+    "tree": "5d11cbfd5fc510a10c416a1f9d42823b6d9986f6",
+    "entries": 295,
+    "regular_files": 295,
+    "regular_bytes": 2023781,
+    "largest_file_bytes": 209112,
+    "executables": 2,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "cf275f42acad1b5950c50ffe8ef58fe62cdce028",
+    "babc8d9e8c9fa995ef26050698bc9b5a92803664"
+   ],
+   "first_parent": {
+    "commit": "cf275f42acad1b5950c50ffe8ef58fe62cdce028",
+    "tree": "8ac9f248a25b93ac99221b513fa5c7304ab7fc0b",
+    "entries": 295,
+    "regular_files": 295,
+    "regular_bytes": 2021740,
+    "largest_file_bytes": 209112,
+    "executables": 2,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 15789628,
+   "fetched_at": "2026-10-13T05:16:51.958871+00:00",
+   "elapsed_seconds": 3.349,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [
+    "missingSpaceBeforeEmail"
+   ],
+   "baseline_candidate": null,
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 295,
+     "manifest": {
+      "sha256": "e2990ce78b544234dbd2ea6ad303df6613a157033bd2aa85095208e38737c171",
+      "size": 62441
+     },
+     "skipped": [],
+     "fsck_ignore": [
+      "badTimezone",
+      "missingSpaceBeforeEmail",
+      "zeroPaddedFilemode"
+     ]
+    }
+   }
+  },
+  "CVE-2023-32681": {
+   "case_id": "CVE-2023-32681",
+   "url": "https://github.com/psf/requests",
+   "commit": "74ea7cf7a6a27a4eeb2ae24e162bcc942a6706d5",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [
+    "badTimezone",
+    "missingSpaceBeforeEmail",
+    "zeroPaddedFilemode"
+   ],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "74ea7cf7a6a27a4eeb2ae24e162bcc942a6706d5",
+    "tree": "ab6e18cda9d2c7bb7479e6f17f323aa379821ada",
+    "entries": 100,
+    "regular_files": 100,
+    "regular_bytes": 5138048,
+    "largest_file_bytes": 2189478,
+    "executables": 1,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "302225334678490ec66b3614a9dddb8a02c5f4fe"
+   ],
+   "first_parent": {
+    "commit": "302225334678490ec66b3614a9dddb8a02c5f4fe",
+    "tree": "e30937c0f917b4fa66d6e4b795505f2a46c89a84",
+    "entries": 100,
+    "regular_files": 100,
+    "regular_bytes": 5137218,
+    "largest_file_bytes": 2189478,
+    "executables": 1,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 13359056,
+   "fetched_at": "2026-10-13T05:16:58.363912+00:00",
+   "elapsed_seconds": 2.127,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [
+    "badTimezone"
+   ],
+   "baseline_candidate": "302225334678490ec66b3614a9dddb8a02c5f4fe",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 100,
+     "manifest": {
+      "sha256": "ba326d7541ad8e657d19d009809d2bb5385a6b8ac2cc361c20d9bf0e26a8b984",
+      "size": 20467
+     },
+     "skipped": [],
+     "fsck_ignore": [
+      "badTimezone",
+      "missingSpaceBeforeEmail",
+      "zeroPaddedFilemode"
+     ]
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 100,
+     "manifest": {
+      "sha256": "7adf731d002680edd7a46f09b48a0fcff7c2ea9c8f6a1cd90599ac8756601e74",
+      "size": 20467
+     },
+     "skipped": [],
+     "fsck_ignore": [
+      "badTimezone",
+      "missingSpaceBeforeEmail",
+      "zeroPaddedFilemode"
+     ]
+    }
+   }
+  },
+  "CVE-2023-34457": {
+   "case_id": "CVE-2023-34457",
+   "url": "https://github.com/MechanicalSoup/MechanicalSoup",
+   "commit": "d57c4a269bba3b9a0c5bfa20292955b849006d9e",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "d57c4a269bba3b9a0c5bfa20292955b849006d9e",
+    "tree": "96f5befab16360a5890cbadaf6d5e7dc66da6f1f",
+    "entries": 46,
+    "regular_files": 46,
+    "regular_bytes": 316086,
+    "largest_file_bytes": 102064,
+    "executables": 0,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "b9c8a0c48e44d70b9128a8e0befa3a50df0e4b58"
+   ],
+   "first_parent": {
+    "commit": "b9c8a0c48e44d70b9128a8e0befa3a50df0e4b58",
+    "tree": "0eaf4b834a89914f80b620aecc6ad85a97a1fc12",
+    "entries": 46,
+    "regular_files": 46,
+    "regular_bytes": 313436,
+    "largest_file_bytes": 102064,
+    "executables": 0,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 790606,
+   "fetched_at": "2026-10-13T05:15:13.379424+00:00",
+   "elapsed_seconds": 0.677,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "b9c8a0c48e44d70b9128a8e0befa3a50df0e4b58",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 46,
+     "manifest": {
+      "sha256": "cb8aeb590b5b1ffbfa8c580e75c0e5b455ade5529b5d3e4b2b3f723a247c2bad",
+      "size": 9455
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 46,
+     "manifest": {
+      "sha256": "7effd27a7392f816640104dd3a17c6c9266a3018499cea64ce182dc63a751465",
+      "size": 9455
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "CVE-2019-10744": {
+   "case_id": "CVE-2019-10744",
+   "url": "https://github.com/sailshq/lodash",
+   "commit": "c3fd203b3be87a8177f7f00824033c95f981f984",
+   "via": "pull_request",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "c3fd203b3be87a8177f7f00824033c95f981f984",
+    "tree": "c003153aeaa209366c1c6d8ed2a0593410990344",
+    "entries": 8,
+    "regular_files": 8,
+    "regular_bytes": 434524,
+    "largest_file_bytes": 422647,
+    "executables": 2,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "a6214449f29dc9cfc63e26172e6c70dd5ed082b4"
+   ],
+   "first_parent": {
+    "commit": "a6214449f29dc9cfc63e26172e6c70dd5ed082b4",
+    "tree": "cd90e402d7e166407d76c88a276ed6da6ecc2e91",
+    "entries": 8,
+    "regular_files": 8,
+    "regular_bytes": 434515,
+    "largest_file_bytes": 422638,
+    "executables": 2,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 221149,
+   "fetched_at": "2026-10-13T05:15:14.636972+00:00",
+   "elapsed_seconds": 0.538,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "a6214449f29dc9cfc63e26172e6c70dd5ed082b4",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 8,
+     "manifest": {
+      "sha256": "b09c3387bbbad2b792c03c341ab1be6388c3fbdb7038b62f548ed4ce01f54d9e",
+      "size": 1669
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 8,
+     "manifest": {
+      "sha256": "1bcd795ee5d02f2e8bafef7f16bd832b13098cc52459b529d220239c39bd6854",
+      "size": 1669
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "CVE-2020-8116": {
+   "case_id": "CVE-2020-8116",
+   "url": "https://github.com/sindresorhus/dot-prop",
+   "commit": "3039c8c07f6fdaa8b595ec869ae0895686a7a0f2",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "3039c8c07f6fdaa8b595ec869ae0895686a7a0f2",
+    "tree": "24f105ac9a1cbdcce5ebc5185e6becd59bad4909",
+    "entries": 15,
+    "regular_files": 15,
+    "regular_bytes": 20786,
+    "largest_file_bytes": 6172,
+    "executables": 0,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "e0f8abf71164321caf1b20109000b08be506f227"
+   ],
+   "first_parent": {
+    "commit": "e0f8abf71164321caf1b20109000b08be506f227",
+    "tree": "0c045fbfd8f723b11bd8a1c074667d640f29d9d0",
+    "entries": 15,
+    "regular_files": 15,
+    "regular_bytes": 20095,
+    "largest_file_bytes": 5927,
+    "executables": 0,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 63424,
+   "fetched_at": "2026-10-13T05:15:15.366849+00:00",
+   "elapsed_seconds": 0.498,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "e0f8abf71164321caf1b20109000b08be506f227",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 15,
+     "manifest": {
+      "sha256": "e95200e6f184ed1990b4e8e6f17afd7f1ec15253f03d946afa93c33f5ff58e6b",
+      "size": 3026
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 15,
+     "manifest": {
+      "sha256": "67de87badbff35bf7dde5f5d22cee37ecf082bb864a76e4268e986342f09ec85",
+      "size": 3026
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "CVE-2020-15123": {
+   "case_id": "CVE-2020-15123",
+   "url": "https://github.com/codecov/codecov-node",
+   "commit": "c0711c656686e902af2cd92d6aecc8074de4d83d",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "c0711c656686e902af2cd92d6aecc8074de4d83d",
+    "tree": "6d19004e965923c8df2c87a8fd21ab3b30508f69",
+    "entries": 65,
+    "regular_files": 65,
+    "regular_bytes": 309149,
+    "largest_file_bytes": 231334,
+    "executables": 1,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "5f6cc62d4f83bf3a75c973868259798814cd231e"
+   ],
+   "first_parent": {
+    "commit": "5f6cc62d4f83bf3a75c973868259798814cd231e",
+    "tree": "787a4bf7644b227ebeae1db2d2768942abd1f466",
+    "entries": 64,
+    "regular_files": 64,
+    "regular_bytes": 308526,
+    "largest_file_bytes": 231334,
+    "executables": 1,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 646444,
+   "fetched_at": "2026-10-13T05:15:16.093815+00:00",
+   "elapsed_seconds": 0.672,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "5f6cc62d4f83bf3a75c973868259798814cd231e",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 65,
+     "manifest": {
+      "sha256": "aa070d3d5899c19ddf840a0648f71722d65550ad2dbee936ed29d2c207d581ce",
+      "size": 13378
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 64,
+     "manifest": {
+      "sha256": "ba01baa1530d12e7e30eb7ebc02503d5670486820ab61baf372f01d9c7b0e930",
+      "size": 13180
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "CVE-2020-7730": {
+   "case_id": "CVE-2020-7730",
+   "url": "https://github.com/nfriedly/node-bestzip",
+   "commit": "45d4a901478c6a8f396c8b959dd6cf8fd3f955b6",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "45d4a901478c6a8f396c8b959dd6cf8fd3f955b6",
+    "tree": "3b99adbc5edfad2bbda6b9d6a41a0b6db7e15654",
+    "entries": 22,
+    "regular_files": 22,
+    "regular_bytes": 296848,
+    "largest_file_bytes": 247499,
+    "executables": 0,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "fcea252e52b6078eff6caf5531bd32c53fccb59f"
+   ],
+   "first_parent": {
+    "commit": "fcea252e52b6078eff6caf5531bd32c53fccb59f",
+    "tree": "6d5b617727c9aa0b1946764e831d62fc6560919c",
+    "entries": 22,
+    "regular_files": 22,
+    "regular_bytes": 271962,
+    "largest_file_bytes": 222684,
+    "executables": 0,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 306307,
+   "fetched_at": "2026-10-13T05:15:17.546986+00:00",
+   "elapsed_seconds": 0.637,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "fcea252e52b6078eff6caf5531bd32c53fccb59f",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 22,
+     "manifest": {
+      "sha256": "ca6f8ca454b67b188e20c1de2d0eb58950731782b028999c1c0aabad881debe9",
+      "size": 4504
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 22,
+     "manifest": {
+      "sha256": "c0ed43b9214c809262132e9baf1efd5707f2ec580818214dcef8657ab8e9f110",
+      "size": 4504
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "GHSA-4rvg-955w-h68q": {
+   "case_id": "GHSA-4rvg-955w-h68q",
+   "url": "https://github.com/simonh1000/angular-http-server",
+   "commit": "8bafc9577161469f5dea01e0b98ea9c525d063e9",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "8bafc9577161469f5dea01e0b98ea9c525d063e9",
+    "tree": "ac9d253b373128877dac1d4d6293f3ed0865426c",
+    "entries": 9,
+    "regular_files": 9,
+    "regular_bytes": 129552,
+    "largest_file_bytes": 102024,
+    "executables": 1,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "d171a771a92e4685b24fb77cb894a7b7b8024c5c"
+   ],
+   "first_parent": {
+    "commit": "d171a771a92e4685b24fb77cb894a7b7b8024c5c",
+    "tree": "82e0e72fe7d8cc68f4712dd0b34c84c08db6e8fc",
+    "entries": 9,
+    "regular_files": 9,
+    "regular_bytes": 129401,
+    "largest_file_bytes": 102024,
+    "executables": 1,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 147031,
+   "fetched_at": "2026-10-13T05:15:18.566574+00:00",
+   "elapsed_seconds": 0.538,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "d171a771a92e4685b24fb77cb894a7b7b8024c5c",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 9,
+     "manifest": {
+      "sha256": "12815b8d0013f37b68b80519b48b07bf2784da4a8d12b5ecdc309b69cb4822ed",
+      "size": 1894
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 9,
+     "manifest": {
+      "sha256": "194e749be2a7a2d9bfb778a0332c6612fcf5d447aebcd8c188d2086d5c5faa03",
+      "size": 1894
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "@vivaxy/here-3.1.0": {
+   "case_id": "@vivaxy/here-3.1.0",
+   "url": "https://github.com/vivaxy/here",
+   "commit": "298dbab41344dfb7f95f66b1fa7b5cfb436bd4a2",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "298dbab41344dfb7f95f66b1fa7b5cfb436bd4a2",
+    "tree": "d5058600b1f33b10fc25240409c417d45fcce3bd",
+    "entries": 48,
+    "regular_files": 48,
+    "regular_bytes": 547335,
+    "largest_file_bytes": 278574,
+    "executables": 0,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "4f27246f7f0e544900b0822979a7c91c7e95a1e9",
+    "68f0c70ed57bbf00b278b5ffcc69abef5ea0082f"
+   ],
+   "first_parent": {
+    "commit": "4f27246f7f0e544900b0822979a7c91c7e95a1e9",
+    "tree": "99281092a736158981f4c4d9742bcffbe8d264e6",
+    "entries": 48,
+    "regular_files": 48,
+    "regular_bytes": 548614,
+    "largest_file_bytes": 278574,
+    "executables": 0,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 1007188,
+   "fetched_at": "2026-10-13T05:15:19.258772+00:00",
+   "elapsed_seconds": 0.645,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": null,
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 48,
+     "manifest": {
+      "sha256": "b292b867810002e6779047ed0fda1bdc9c555b5ea0a8ff8dc517bbb5421c4240",
+      "size": 9752
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "GHSA-xxvw-45rp-3mj2": {
+   "case_id": "GHSA-xxvw-45rp-3mj2",
+   "url": "https://github.com/nodeca/js-yaml",
+   "commit": "e18afbf1edcafb7add2c4c7b22abc8d6ebc2fa61",
+   "via": "pull_request",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "e18afbf1edcafb7add2c4c7b22abc8d6ebc2fa61",
+    "tree": "6bfdcca17ca4655329e419729172f8e37bba42c2",
+    "entries": 723,
+    "regular_files": 723,
+    "regular_bytes": 7768732,
+    "largest_file_bytes": 7182063,
+    "executables": 4,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "9d4ce5e2895365c943d2bdf7e7c8ac1be3ec51a3"
+   ],
+   "first_parent": {
+    "commit": "9d4ce5e2895365c943d2bdf7e7c8ac1be3ec51a3",
+    "tree": "fa2c4c4494494b42f2f18d701035f143cbd4e2ed",
+    "entries": 718,
+    "regular_files": 718,
+    "regular_bytes": 7766518,
+    "largest_file_bytes": 7182063,
+    "executables": 4,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 3895746,
+   "fetched_at": "2026-10-13T05:15:20.211384+00:00",
+   "elapsed_seconds": 1.117,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "9d4ce5e2895365c943d2bdf7e7c8ac1be3ec51a3",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 723,
+     "manifest": {
+      "sha256": "29d2bbe364de3c9c3e6433fcfa7759adf8398656c2a5901d7fcd91583235911b",
+      "size": 156481
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 718,
+     "manifest": {
+      "sha256": "784b3ad80d192281e975ae9d658150cd3e21d7cd6249a75380e5a3bd153fb3fb",
+      "size": 155451
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "CVE-2017-18077": {
+   "case_id": "CVE-2017-18077",
+   "url": "https://github.com/juliangruber/brace-expansion",
+   "commit": "b13381281cead487cbdbfd6a69fb097ea5e456c3",
+   "via": "pull_request",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "b13381281cead487cbdbfd6a69fb097ea5e456c3",
+    "tree": "bc6cb20ba034f9ea0b392321a2253dfe1d01f6e6",
+    "entries": 20,
+    "regular_files": 20,
+    "regular_bytes": 26210,
+    "largest_file_bytes": 8585,
+    "executables": 1,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "265f6cd6586383eebebbfc3c45da2eaa153d9e63"
+   ],
+   "first_parent": {
+    "commit": "265f6cd6586383eebebbfc3c45da2eaa153d9e63",
+    "tree": "7fc219d6deeb227e7e7cc6da919e16c40c30217d",
+    "entries": 20,
+    "regular_files": 20,
+    "regular_bytes": 26214,
+    "largest_file_bytes": 8585,
+    "executables": 1,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 53174,
+   "fetched_at": "2026-10-13T05:15:28.961987+00:00",
+   "elapsed_seconds": 0.561,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "265f6cd6586383eebebbfc3c45da2eaa153d9e63",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 20,
+     "manifest": {
+      "sha256": "1d6d3ec8ce079971c174fa2bb9c7f24de55ac0dd6bf4dda08f3957518cae600a",
+      "size": 4062
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 20,
+     "manifest": {
+      "sha256": "6d6c61d799508395c422f943513dee90221653dd2d68e2fc5224964d770624be",
+      "size": 4062
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "CVE-2018-12015": {
+   "case_id": "CVE-2018-12015",
+   "url": "https://github.com/jib/archive-tar-new",
+   "commit": "ae65651eab053fc6dc4590dbb863a268215c1fc5",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "ae65651eab053fc6dc4590dbb863a268215c1fc5",
+    "tree": "bcc7f3d1c813784cf22c7f2b8cc8ad51f957ce17",
+    "entries": 32,
+    "regular_files": 32,
+    "regular_bytes": 248076,
+    "largest_file_bytes": 75597,
+    "executables": 0,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "2c5ec581d26907a58345ce3b8fdd99e905156121"
+   ],
+   "first_parent": {
+    "commit": "2c5ec581d26907a58345ce3b8fdd99e905156121",
+    "tree": "fc68c368052bbf868de8f78aef0872f8b410fe4a",
+    "entries": 32,
+    "regular_files": 32,
+    "regular_bytes": 247363,
+    "largest_file_bytes": 74884,
+    "executables": 0,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 342395,
+   "fetched_at": "2026-10-13T05:15:29.801519+00:00",
+   "elapsed_seconds": 0.641,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "2c5ec581d26907a58345ce3b8fdd99e905156121",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 32,
+     "manifest": {
+      "sha256": "3eea9e5540b46298c07b5ecc4f8234d8fb1f8c204ea8cd238d6c0c07d7e3f0f8",
+      "size": 6493
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 32,
+     "manifest": {
+      "sha256": "8a579db692833f59fd3b4ac7dbc73212533711c54ef36cb564603b02d4159188",
+      "size": 6493
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "CVE-2018-25100": {
+   "case_id": "CVE-2018-25100",
+   "url": "https://github.com/mojolicious/mojo",
+   "commit": "c16a56a9d6575ddc53d15e76d58f0ebcb0eeb149",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "c16a56a9d6575ddc53d15e76d58f0ebcb0eeb149",
+    "tree": "785db9933a0ebfe505a11ab020e06eaf8465722c",
+    "entries": 356,
+    "regular_files": 356,
+    "regular_bytes": 2705807,
+    "largest_file_bytes": 164552,
+    "executables": 3,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "74e4900142ff074df8a3979289f7e29c06b20d4f"
+   ],
+   "first_parent": {
+    "commit": "74e4900142ff074df8a3979289f7e29c06b20d4f",
+    "tree": "5555b26a9caf82894856f73803e8ded75dc05ccf",
+    "entries": 356,
+    "regular_files": 356,
+    "regular_bytes": 2705558,
+    "largest_file_bytes": 164360,
+    "executables": 3,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 27838431,
+   "fetched_at": "2026-10-13T05:15:30.941631+00:00",
+   "elapsed_seconds": 9.176,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "74e4900142ff074df8a3979289f7e29c06b20d4f",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 356,
+     "manifest": {
+      "sha256": "0f27118b74d14e4a2224aa28e335137c3886db8558b45cf48ab22ea19656bfd9",
+      "size": 75548
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 356,
+     "manifest": {
+      "sha256": "a08739d8a6328c345a64ad9c7ec3d0834679705d1d02a31c44df5bb63e8d4319",
+      "size": 75548
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "CPANSA-Dancer2-2018-01": {
+   "case_id": "CPANSA-Dancer2-2018-01",
+   "url": "https://github.com/PerlDancer/Dancer2",
+   "commit": "3580f5d0874a9abf5483528f73bda9a7fd9ec7f1",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "3580f5d0874a9abf5483528f73bda9a7fd9ec7f1",
+    "tree": "1e0799b6e0d744744353fdfe82e36f051d87b98e",
+    "entries": 379,
+    "regular_files": 379,
+    "regular_bytes": 1155491,
+    "largest_file_bytes": 94411,
+    "executables": 3,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "0e540029e2fa43ba857f3c71b8d3b58ccbbf313c"
+   ],
+   "first_parent": {
+    "commit": "0e540029e2fa43ba857f3c71b8d3b58ccbbf313c",
+    "tree": "ccfa7dcee1264d2c78081243b51ad382f574e14c",
+    "entries": 379,
+    "regular_files": 379,
+    "regular_bytes": 1154908,
+    "largest_file_bytes": 94411,
+    "executables": 3,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 6022301,
+   "fetched_at": "2026-10-13T05:15:53.246909+00:00",
+   "elapsed_seconds": 1.903,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "0e540029e2fa43ba857f3c71b8d3b58ccbbf313c",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 379,
+     "manifest": {
+      "sha256": "cbb1407845387d8f07560d8510edc146172efb0c238b0cbd6481e6459d0f4409",
+      "size": 79070
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 379,
+     "manifest": {
+      "sha256": "bd49110439ca44e996abecf097cb5126dc61feb5000ebda229cd4d72b909a9cd",
+      "size": 79070
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "CVE-2026-8450": {
+   "case_id": "CVE-2026-8450",
+   "url": "https://github.com/libwww-perl/HTTP-Daemon",
+   "commit": "945d35141d94490f749640bd4390acd6a2193995",
+   "via": "patch",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "945d35141d94490f749640bd4390acd6a2193995",
+    "tree": "4ead97a0e3c20a65f4eef7a811a516068f98919b",
+    "entries": 22,
+    "regular_files": 22,
+    "regular_bytes": 102373,
+    "largest_file_bytes": 28586,
+    "executables": 1,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "6bef13437a21a73d06ad713b300a7a184c2bbeec"
+   ],
+   "first_parent": {
+    "commit": "6bef13437a21a73d06ad713b300a7a184c2bbeec",
+    "tree": "89faf61d65ecc7a3dda4c52ee1080c50e0809d81",
+    "entries": 22,
+    "regular_files": 22,
+    "regular_bytes": 100252,
+    "largest_file_bytes": 27231,
+    "executables": 1,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 2811640,
+   "fetched_at": "2026-10-13T05:15:59.869833+00:00",
+   "elapsed_seconds": 1.296,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "6bef13437a21a73d06ad713b300a7a184c2bbeec",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 22,
+     "manifest": {
+      "sha256": "b548d8dd92d3d5dd8a4de33079101b2398aaf69a4cc4900fa2dbbaa13590d4bd",
+      "size": 4484
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 22,
+     "manifest": {
+      "sha256": "639e4cd54975cedce552e3677c932c1d33067cabc430016c0b255a4c08f7bfeb",
+      "size": 4484
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "CVE-2023-31486": {
+   "case_id": "CVE-2023-31486",
+   "url": "https://salsa.debian.org/perl-team/interpreter/perl.git",
+   "fetched_url": "https://salsa.debian.org/perl-team/interpreter/perl",
+   "commit": "1490431e40e22052f75a0b3449f1f53cbd27ba92",
+   "via": "patch",
+   "repository_matches_inventory": false,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "1490431e40e22052f75a0b3449f1f53cbd27ba92",
+    "tree": "89efb62609a7a2431bda836f17dcb315b69b77d5",
+    "entries": 7409,
+    "regular_files": 7409,
+    "regular_bytes": 87386910,
+    "largest_file_bytes": 4114121,
+    "executables": 130,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "0372847c4b0aa916347c0977a90ebacd8479b3e2"
+   ],
+   "first_parent": {
+    "commit": "0372847c4b0aa916347c0977a90ebacd8479b3e2",
+    "tree": "6ad4ba0cf182b8476003e7c81732f388b3fe7343",
+    "entries": 7409,
+    "regular_files": 7409,
+    "regular_bytes": 87387040,
+    "largest_file_bytes": 4114121,
+    "executables": 130,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 60790508,
+   "fetched_at": "2026-10-13T05:11:15.141300+00:00",
+   "elapsed_seconds": 7.164,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "0372847c4b0aa916347c0977a90ebacd8479b3e2",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 7409,
+     "manifest": {
+      "sha256": "e2f369e5d265148d5c2b80d0bfe01c8989b19e70160081e81cd0a2235b916985",
+      "size": 1575194
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 7409,
+     "manifest": {
+      "sha256": "f1164315cb381398081c093c54c00ce2c87716bc4998891c15f0198c20578fba",
+      "size": 1575194
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   },
+   "acquired_on": "operator workstation RIG0 (direct egress); this cloud container is refused by its egress proxy",
+   "note": "Fix lives in Debian perl packaging history, not the inventory repository (HTTP-Tiny); needs case review. Fetched before acquisition stopped following redirects: GitLab redirects a repository URL without .git to the .git URL now pinned (seen on gitlab.com; salsa runs GitLab and is unreachable from the cloud container). Not yet refetched under the no-redirect rule; the commit identity is verified either way."
+  },
+  "CVE-2026-15043": {
+   "case_id": "CVE-2026-15043",
+   "url": "https://github.com/perl5-dbi/dbi",
+   "commit": "e9742ef85a75867cbd696860e3bf3e32b681f98d",
+   "via": "patch",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "e9742ef85a75867cbd696860e3bf3e32b681f98d",
+    "tree": "254158960c7299ff2dfb3459921b66c1654f58db",
+    "entries": 444,
+    "regular_files": 444,
+    "regular_bytes": 5817492,
+    "largest_file_bytes": 698332,
+    "executables": 10,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "a930b1a9ddda3ada136ac9d32a0c3c961e0b4f4c"
+   ],
+   "first_parent": {
+    "commit": "a930b1a9ddda3ada136ac9d32a0c3c961e0b4f4c",
+    "tree": "28134b691e626257d100eca6d793c5552f0735fa",
+    "entries": 444,
+    "regular_files": 444,
+    "regular_bytes": 5817240,
+    "largest_file_bytes": 698332,
+    "executables": 10,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 8330104,
+   "fetched_at": "2026-10-13T05:16:02.234328+00:00",
+   "elapsed_seconds": 4.046,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "a930b1a9ddda3ada136ac9d32a0c3c961e0b4f4c",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 444,
+     "manifest": {
+      "sha256": "264701c944fb59e50520d7a0c0da22557a130b09a4e365bf367ac395e181e12c",
+      "size": 92601
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 444,
+     "manifest": {
+      "sha256": "875270ecb8bd67afca42a19393268d97c5089029131ba52ddf7efdafaf89fc3c",
+      "size": 92601
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "CVE-2023-22794": {
+   "case_id": "CVE-2023-22794",
+   "url": "https://github.com/rails/rails",
+   "commit": "d7aba06953f9fa789c411676b941d20df8ef73de",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [
+    "badTimezone",
+    "missingSpaceBeforeEmail",
+    "zeroPaddedFilemode"
+   ],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "d7aba06953f9fa789c411676b941d20df8ef73de",
+    "tree": "da629c9a3f68544c0c91bbb304155e97a500be7f",
+    "entries": 4414,
+    "regular_files": 4413,
+    "regular_bytes": 27471512,
+    "largest_file_bytes": 1124062,
+    "executables": 36,
+    "symlinks": 1,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "8d82687f3b04b2803320b64f985308239a8c3d2f"
+   ],
+   "first_parent": {
+    "commit": "8d82687f3b04b2803320b64f985308239a8c3d2f",
+    "tree": "1877e96cb1be52b145a1f3a5f1afc1b948e293d7",
+    "entries": 4414,
+    "regular_files": 4413,
+    "regular_bytes": 27470386,
+    "largest_file_bytes": 1124062,
+    "executables": 36,
+    "symlinks": 1,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 209172851,
+   "fetched_at": "2026-10-13T05:17:03.112621+00:00",
+   "elapsed_seconds": 46.191,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [
+    "badTimezone",
+    "zeroPaddedFilemode"
+   ],
+   "baseline_candidate": "8d82687f3b04b2803320b64f985308239a8c3d2f",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 4413,
+     "manifest": {
+      "sha256": "8f72829329e3cfce419de21e1ae07848784fa370e625dda83159eb6d3dd1b485",
+      "size": 1033551
+     },
+     "skipped": [
+      "symlink activerecord/test/fixtures/all/admin"
+     ],
+     "fsck_ignore": [
+      "badTimezone",
+      "missingSpaceBeforeEmail",
+      "zeroPaddedFilemode"
+     ]
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 4413,
+     "manifest": {
+      "sha256": "65d51fec04258fee9e525d53a15d43009f34f1dc0550b54dee5f11f87921a044",
+      "size": 1033551
+     },
+     "skipped": [
+      "symlink activerecord/test/fixtures/all/admin"
+     ],
+     "fsck_ignore": [
+      "badTimezone",
+      "missingSpaceBeforeEmail",
+      "zeroPaddedFilemode"
+     ]
+    }
+   }
+  },
+  "CVE-2020-10187": {
+   "case_id": "CVE-2020-10187",
+   "url": "https://github.com/doorkeeper-gem/doorkeeper",
+   "commit": "25d038022c2fcad45af5b73f9d003cf38ff491f6",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "25d038022c2fcad45af5b73f9d003cf38ff491f6",
+    "tree": "15a90337ecc5e4211d6b96ded0f67da12049f637",
+    "entries": 302,
+    "regular_files": 302,
+    "regular_bytes": 845164,
+    "largest_file_bytes": 144832,
+    "executables": 3,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "ca3b6441f039a8e4cdb5de5c2b3dd85822bc25bf"
+   ],
+   "first_parent": {
+    "commit": "ca3b6441f039a8e4cdb5de5c2b3dd85822bc25bf",
+    "tree": "5e1f98f71e12a09176cd551131685a41cfed733c",
+    "entries": 302,
+    "regular_files": 302,
+    "regular_bytes": 840713,
+    "largest_file_bytes": 144832,
+    "executables": 3,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 4056859,
+   "fetched_at": "2026-10-13T05:16:16.153164+00:00",
+   "elapsed_seconds": 1.5,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "ca3b6441f039a8e4cdb5de5c2b3dd85822bc25bf",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 302,
+     "manifest": {
+      "sha256": "87f5a72d211c640bf0677e47d71e311a1a92124573b8476b13c70d1724cf29e4",
+      "size": 67272
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 302,
+     "manifest": {
+      "sha256": "c0371f9db03db411a74dc2653ce47915ffb49dd7e5496bb58a585d97f2732c4c",
+      "size": 67272
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "CVE-2017-0889": {
+   "case_id": "CVE-2017-0889",
+   "url": "https://github.com/thoughtbot/paperclip",
+   "commit": "4ebedfbd11d20d03ed03a1274ed281eee62715d4",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "4ebedfbd11d20d03ed03a1274ed281eee62715d4",
+    "tree": "30a340f59eb17f55a1cc7f773e0efbbbe725681a",
+    "entries": 186,
+    "regular_files": 186,
+    "regular_bytes": 878808,
+    "largest_file_bytes": 83068,
+    "executables": 0,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "80847b44f1965d20a2ed6e98a3fa4bf4c1194515"
+   ],
+   "first_parent": {
+    "commit": "80847b44f1965d20a2ed6e98a3fa4bf4c1194515",
+    "tree": "81f7bceb5d00758e71e6d4bb3f535f7a91c90e83",
+    "entries": 186,
+    "regular_files": 186,
+    "regular_bytes": 877897,
+    "largest_file_bytes": 83068,
+    "executables": 0,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 3666936,
+   "fetched_at": "2026-10-13T05:16:21.005933+00:00",
+   "elapsed_seconds": 1.189,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "80847b44f1965d20a2ed6e98a3fa4bf4c1194515",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 186,
+     "manifest": {
+      "sha256": "bc5badbbda0275187c32491e9d66d4c9d4431c122bbb15b0d843daca72b46c30",
+      "size": 40780
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 186,
+     "manifest": {
+      "sha256": "b67b24f5eedb3d989c4d5231a21e5de030cb436b8ce6b7b558cfe14b8237f089",
+      "size": 40780
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "CVE-2025-27610": {
+   "case_id": "CVE-2025-27610",
+   "url": "https://github.com/rack/rack",
+   "commit": "50caab74fa01ee8f5dbdee7bb2782126d20c6583",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "50caab74fa01ee8f5dbdee7bb2782126d20c6583",
+    "tree": "eac9ba7a2b4aef957350b84fad03f1c1350299e3",
+    "entries": 180,
+    "regular_files": 180,
+    "regular_bytes": 5012527,
+    "largest_file_bytes": 3451122,
+    "executables": 0,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "2db5cfb37479af9d503ee85500e5bfb1f3f3ddd4"
+   ],
+   "first_parent": {
+    "commit": "2db5cfb37479af9d503ee85500e5bfb1f3f3ddd4",
+    "tree": "fc6d92217dc114bfb1d75f40be448d26be0da8f1",
+    "entries": 180,
+    "regular_files": 180,
+    "regular_bytes": 5012279,
+    "largest_file_bytes": 3451122,
+    "executables": 0,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 10019387,
+   "fetched_at": "2026-10-13T05:16:24.695428+00:00",
+   "elapsed_seconds": 1.955,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "2db5cfb37479af9d503ee85500e5bfb1f3f3ddd4",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 180,
+     "manifest": {
+      "sha256": "51be2cc8209c35d826e7d6cf765a35836d15e801b3c4a1230a9517b25a91f9db",
+      "size": 37308
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 180,
+     "manifest": {
+      "sha256": "47baa6b57d0c38e95e1591545df4ac9b11ccab21344e26268ac9a78164c11b89",
+      "size": 37308
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   }
+  },
+  "CVE-2023-36823": {
+   "case_id": "CVE-2023-36823",
+   "url": "https://github.com/rgrove/sanitize",
+   "commit": "76ed46e6dc70820f38efe27de8dabd54dddb5220",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [
+    "badTimezone",
+    "missingSpaceBeforeEmail",
+    "zeroPaddedFilemode"
+   ],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "76ed46e6dc70820f38efe27de8dabd54dddb5220",
+    "tree": "690f385d9e5d6121eb77656dd55df334d05f5308",
+    "entries": 42,
+    "regular_files": 42,
+    "regular_bytes": 7511584,
+    "largest_file_bytes": 7172510,
+    "executables": 1,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "a92f21cd223a32a1737262d68e56a4fb8b9470f9",
+    "3481ac3f1255c6584c67fad2f9e44d809273125d"
+   ],
+   "first_parent": {
+    "commit": "a92f21cd223a32a1737262d68e56a4fb8b9470f9",
+    "tree": "ad1123cc2d11fd5269316965e319692893436ce5",
+    "entries": 42,
+    "regular_files": 42,
+    "regular_bytes": 7510482,
+    "largest_file_bytes": 7172510,
+    "executables": 1,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 2012224,
+   "fetched_at": "2026-10-13T05:19:19.607120+00:00",
+   "elapsed_seconds": 1.05,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [
+    "zeroPaddedFilemode"
+   ],
+   "baseline_candidate": null,
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 42,
+     "manifest": {
+      "sha256": "26e331bc23c6aadde250b30e27a8163c10af7eb6a77795d7fc1de84356df7146",
+      "size": 8812
+     },
+     "skipped": [],
+     "fsck_ignore": [
+      "badTimezone",
+      "missingSpaceBeforeEmail",
+      "zeroPaddedFilemode"
+     ]
+    }
+   }
+  },
+  "CVE-2024-21510": {
+   "case_id": "CVE-2024-21510",
+   "url": "https://github.com/sinatra/sinatra",
+   "commit": "cd3e00de20ddaff34ea30f7a74a7b9dad189d1d8",
+   "via": "commit",
+   "repository_matches_inventory": true,
+   "depth": null,
+   "fsck_warn": [
+    "badTimezone",
+    "missingSpaceBeforeEmail",
+    "zeroPaddedFilemode"
+   ],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "cd3e00de20ddaff34ea30f7a74a7b9dad189d1d8",
+    "tree": "3d74dad6e67e5ed375191ddf1d22ff5192ef1f0d",
+    "entries": 292,
+    "regular_files": 292,
+    "regular_bytes": 927221,
+    "largest_file_bytes": 79569,
+    "executables": 2,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "8c4cd0ba05af0ef5902c53608daab094825d1e96"
+   ],
+   "first_parent": {
+    "commit": "8c4cd0ba05af0ef5902c53608daab094825d1e96",
+    "tree": "e2b0d539645a325ed7aa8c9ccf3038f790a7b9e9",
+    "entries": 289,
+    "regular_files": 289,
+    "regular_bytes": 903510,
+    "largest_file_bytes": 79569,
+    "executables": 2,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 8050159,
+   "fetched_at": "2026-10-13T05:19:21.082078+00:00",
+   "elapsed_seconds": 2.395,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [
+    "zeroPaddedFilemode"
+   ],
+   "baseline_candidate": "8c4cd0ba05af0ef5902c53608daab094825d1e96",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 292,
+     "manifest": {
+      "sha256": "5227279595f6419f2a16f4114d5ddaa52a557313412c8326dd2afda051495364",
+      "size": 63710
+     },
+     "skipped": [],
+     "fsck_ignore": [
+      "badTimezone",
+      "missingSpaceBeforeEmail",
+      "zeroPaddedFilemode"
+     ]
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 289,
+     "manifest": {
+      "sha256": "bb3c7b0355186b5f94853bf36cdd5bb14e45ed0208c7f5d00d76b4a969d6be1b",
+      "size": 63005
+     },
+     "skipped": [],
+     "fsck_ignore": [
+      "badTimezone",
+      "missingSpaceBeforeEmail",
+      "zeroPaddedFilemode"
+     ]
+    }
+   }
+  }
+ },
+ "unresolved": {
+  "CVE-2017-18214": "no fix reference and no repository",
+  "CVE-2020-28464": "no fix reference and no repository",
+  "CPANSA-YAML-2017-01": "no fix reference",
+  "CVE-2012-5526": "no fix reference",
+  "CPANSA-Plack-2014-0801": "no fix reference",
+  "CVE-2014-0477": "no fix reference",
+  "CVE-2024-54133": "no fix reference and no repository",
+  "CVE-2023-28120": "no fix reference and no repository",
+  "CVE-2019-16892": "no fix reference",
+  "CVE-2018-3760": "no fix reference and no repository"
+ }
+}
