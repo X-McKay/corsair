@@ -2,7 +2,7 @@
  "schema_version": 1,
  "spec": "SPEC-0042",
  "inputs": {
-  "detector": "sha256:5cd050461e9adf0d07885b2514f6821a7c6174684bd78f7941c9bbb87fb6dda0",
+  "detector": "sha256:a1553ecfc8e92ec75da095e436e1e941b093d3c3f867cebf07cf887573b478fd",
   "matrix": "sha256:cc26c8a2f1b18793493124594f7b9e2b4eb3322e45aa8d6ffbcda065f980de3f",
   "pins": "sha256:25452710a9f0ee21cf7fbfa8b8ed4171ceebeda049f63bb98d88d5b1890be8c2",
   "inventory": "sha256:8d0f8159580d0a38fb9c6806f5f32aa9f73ceee046b55451e55a2a211fc521c8",

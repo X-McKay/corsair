@@ -372,7 +372,8 @@ def test_structurally_malformed_metadata_never_raises():
     keys = ['project', 'requires', 'packages', 'dev-packages', 'metadata', 'requires-python', 'python-versions', 'tool', 'poetry',
             'build-system', '_meta', 'engines', 'scripts', 'dependencies', 'devDependencies', 'dev-dependencies', 'packageManager',
             'prereqs', 'runtime', 'jobs', 'matrix', 'strategy', 'include', 'steps', 'with', 'python', 'python-version', 'node_js',
-            'perl', 'test', 'pytest', 'jest', 'version', 'python_version', 'python_full_version', 'optional-dependencies', 'node']
+            'perl', 'test', 'pytest', 'jest', 'version', 'python_version', 'python_full_version', 'optional-dependencies', 'node',
+            'dependency-groups', 'include-group', 'group', 'uv']
     leaves = [1, 1.5, True, [], ['x'], [1, {}], 'x', '>=3', '3.12']
 
     def value(depth):
@@ -426,6 +427,23 @@ def test_modern_pytest_constraints_are_read(files):
     requirement = detect(files, 'python')
     assert parse_set(component(requirement, 'test_framework', 'pytest').allowed).contains(v('7.4'))
     assert select(requirement, load()).status == 'unsupported'
+
+
+@pytest.mark.parametrize('include', ['["test"]', '{name = "test"}', '1', '"missing"'])
+def test_malformed_include_group_is_unparsed_not_raised(include):
+    # Al's review of f61e948: a list or table include-group raised TypeError (unhashable) instead of blocking.
+    toml = f'[project]\nrequires-python = ">=3.12"\n[dependency-groups]\ntest = ["pytest>=9"]\ndev = [{{include-group = {include}}}]\n'
+    requirement = detect({'pyproject.toml': toml.encode()}, 'python')
+    assert 'include-group' in component(requirement, 'test_framework', 'pytest').unparsed[0].reason
+    assert select(requirement, load()).status == 'undetermined'
+
+
+def test_poetry_source_without_version_is_unread():
+    # Al's f61e948 review nit: a git-sourced pytest has no declared version, so it cannot count as the 9.0 runner.
+    toml = b'[tool.poetry.dependencies]\npython = "^3.12"\n[tool.poetry.group.dev.dependencies]\npytest = {git = "https://example.invalid/pytest.git"}\n[tool.pytest.ini_options]\n'
+    requirement = detect({'pyproject.toml': toml}, 'python')
+    assert 'names no version' in component(requirement, 'test_framework', 'pytest').unparsed[0].reason
+    assert select(requirement, load()).status == 'undetermined'
 
 
 def test_java_unread_pins_and_version_file_names():
