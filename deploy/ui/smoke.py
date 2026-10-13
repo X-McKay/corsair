@@ -105,8 +105,13 @@ def check(image: str, results: Path, runtime_matrix: Path) -> None:
             print('Mounted results check passed.' if mounted else 'Missing results correctly fail readiness with HTTP 503.')
         finally:
             docker('stop', '--time', '5', cid)
-            removed = subprocess.run(['docker', 'inspect', cid], capture_output=True, timeout=10)
-            if removed.returncode != 1 or b'no such object' not in removed.stderr.lower():
+            # --rm can finish after stop returns. Confirm absence through a successful
+            # native listing, without depending on Docker's version-specific error text.
+            for _ in range(20):
+                if not docker('container', 'ls', '--all', '--no-trunc', '--filter', f'id={cid}', '--format', '{{.ID}}'):
+                    break
+                time.sleep(.25)
+            else:
                 raise RuntimeError(f'Cleanup unconfirmed for owned container {cid}')
             print(f'Removed owned container {cid[:12]}.')
 

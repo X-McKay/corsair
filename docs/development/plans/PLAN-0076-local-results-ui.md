@@ -95,7 +95,7 @@ User requested real data/service connections without placeholders and selected d
 - [x] Verify actual eval producer output through deployed-style mounts/server, source failures, UI routes and full offline guards.
 - [x] Review, document operator configuration and remaining live gates; update PR and handoff.
 
-Pinned production WSGI server chosen because stdlib HTTP is only a development server; reuse its narrow application routes without another web framework. Gunicorn official docs/release notes and PyPI inspected:26.2.1 appears in upstream release material but is not installable from current PyPI; pin available 26.2.0. An initial uv lock at26.2.1 failed before installation; corrected to the published release. Separate `ui` dependency group includes only server, matrix validation and native service SDKs, without model/evaluation frameworks.
+Pinned production WSGI server chosen because stdlib HTTP is only a development server; reuse its narrow application routes without another web framework. Gunicorn official docs/release notes and PyPI inspected:26.2.1 appears in upstream release material but is not installable from current PyPI; pin available 26.2.0. An initial uv lock at26.2.1 failed before installation; corrected to the published release. The separate `ui` dependency group includes the server, matrix validation and required native SDK dependencies. Existing eager agent-package imports require PydanticAI; the viewer does not invoke models or evaluations.
 
 
 Implementation and review evidence:
@@ -110,3 +110,6 @@ Implementation and review evidence:
 - First full offline integration check: 1862passed/1failed due to using unsupported plan status 'active'. Changed it to 'in_progress'; final suite recorded below. Initial dependency resolution failed on unavailable Gunicorn 26.2.1; official PyPI available 26.2.0 pinned. Initial renderer subprocess test lacked its documented PYTHONPATH; corrected module invocation. No failed check is counted as a pass.
 
 Final integration validation: `UV_CACHE_DIR=/tmp/corsair-provider-uv-cache make test-config` passed **1873 tests in 109.54s**. Final development-record checks and publication are performed with this revision; remote CI must be checked at its published head. Target-cluster live gates remain unqualified as scoped above.
+
+
+Publication follow-up: dbd4b94 pushed to PR107. Remote UI run38448429354 passed frontend/browser checks, built the production image, generated the actual16-attempt report and matched its API/native distributions, then failed the immediate post-stop cleanup confirmation. The log does not establish whether Docker diagnostic wording or removal timing caused that assertion. Replaced diagnostic-text matching with up to5seconds of successful read-only container-list queries filtered by the exact owned ID; no blind stop/delete retries. Failure still leaves cleanup explicitly unconfirmed. Final local smoke and remote rerun are checked before reporting completion.
