@@ -121,7 +121,7 @@ def test_environment_stage_in_an_openshell_preparation_sandbox(kube, adapter_gat
                 assert selected_image == image['image'], selected_image
                 return OpenShellTestWorkspace(lifecycle, verifier, upload, store, setup, workspace)
             preparation = OpenShellPreparation(
-                source_workspace, execution, policy, snapshot=setup, private_source=False, base_policy=base_policy,
+                source_workspace, execution, policy, store=store, snapshot=setup, private_source=False, base_policy=base_policy,
                 resolvers={'python': (PYTHON,)}, scratch_location='/tmp/corsair-scratch', receipts=dirs['preparation-receipts'],
                 budget=WorkspaceBudget(workspace_bytes=1 << 28, reserve_bytes=1 << 30, node_path=str(ROOT)))
 

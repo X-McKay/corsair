@@ -19,7 +19,7 @@ from corsair.agents.environment.contracts import Toolchain
 from corsair.composition.direct import PreparationRefused, PreparedSandbox
 from corsair.nodes.phase_policy import dependency_policy
 from corsair.nodes.source_fetch import WorkspaceBudget, WorkspaceBudgetRefused, admit_workspace_budget, node_free_bytes
-from corsair.ports.artifacts import SourceSnapshot
+from corsair.ports.artifacts import ArtifactStore, SourceSnapshot
 from corsair.ports.execution import SandboxExecution
 from corsair.ports.sandbox import PolicyError, SandboxHandle, SandboxPolicy
 
@@ -37,12 +37,13 @@ class OpenShellPreparation:
     `resolvers` names each ecosystem's resolver binaries for the dependency-setup policy."""
 
     def __init__(self, workspace: Callable[[str], SourceWorkspace], execution: SandboxExecution,
-                 policy: SandboxPolicy, *, snapshot: SourceSnapshot, private_source: bool, base_policy: Mapping,
+                 policy: SandboxPolicy, *, store: ArtifactStore, snapshot: SourceSnapshot, private_source: bool, base_policy: Mapping,
                  resolvers: Mapping[str, tuple[str, ...]], budget: WorkspaceBudget, scratch_location: str,
                  receipts: Path, free_bytes: Callable[[WorkspaceBudget], int] = node_free_bytes):
         if type(private_source) is not bool or not scratch_location.startswith('/'):
             raise ValueError('Explicit source visibility and absolute scratch location required')
         self._workspace, self._execution, self._policy = workspace, execution, policy
+        self._store, self._files = store, {f.path: f.artifact for f in snapshot.files}
         self._snapshot, self._private, self._base, self._resolvers = snapshot, private_source, base_policy, dict(resolvers)
         self._budget, self._scratch, self._free = budget, scratch_location, free_bytes
         self._receipts, self._journal = receipts, ReceiptDirectory(receipts)
@@ -80,7 +81,12 @@ class OpenShellPreparation:
             cleanup = self._release(workspace, handle, uuid5(operation, 'discard'))
             raise PreparationRefused(layer, f'{type(error).__name__}: {error}'[:2048], cleanup) from error
         self._live[handle.id] = workspace
-        return PreparedSandbox(self._execution, handle, self._scratch)
+        return PreparedSandbox(self._execution, handle, self._scratch, self._read_source)
+
+    def _read_source(self, path: str) -> bytes | None:
+        """The captured bytes of one file of the revision placed in the sandbox, from the operator's store."""
+        artifact = self._files.get(path)
+        return None if artifact is None else self._store.get(artifact)
 
     @staticmethod
     def _release(workspace: SourceWorkspace, handle: SandboxHandle, operation: UUID) -> Cleanup:

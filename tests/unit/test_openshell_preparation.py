@@ -1,6 +1,7 @@
 """SPEC-0070 OpenShell preparation for the environment stage, against host doubles for the source workspace and
 policy ports: step order, refusals that discard, release and sweep confirmed only on observed deletes."""
 from dataclasses import replace
+import hashlib
 from uuid import uuid4, uuid5
 
 import pytest
@@ -11,7 +12,7 @@ from corsair.agents.environment.contracts import Toolchain
 from corsair.composition.direct import PreparationRefused
 from corsair.nodes.source_fetch import WorkspaceBudget
 from corsair.ports.sandbox import PolicyError, PolicyReceipt, SandboxHandle
-from tests.unit.test_source_fetch import snapshot
+from tests.unit.test_source_fetch import FILES, snapshot
 
 IMAGE = 'docker.io/library/corsair-python@sha256:' + 'a' * 64
 TOOLCHAIN = Toolchain(toolchain_id='cpython-3.12-pytest', image=IMAGE, language='python', runtime='CPython 3.12',
@@ -56,6 +57,15 @@ class Policies:
         return receipt
 
 
+class Store:
+    """The operator's artifact store over the fixture capture, by digest."""
+    def __init__(self):
+        self.objects = {hashlib.sha256(data).hexdigest(): data for _, _, data in FILES}
+
+    def get(self, reference):
+        return self.objects[reference.sha256]
+
+
 @pytest.fixture
 def make(tmp_path):
     def build(*, fail=None, policy_fail=False, private=False, free=1 << 40, resolvers=None):
@@ -64,7 +74,7 @@ def make(tmp_path):
         receipts.mkdir(mode=0o700)
         workspaces, policies = Workspaces(log, fail), Policies(log, policy_fail)
         adapter = OpenShellPreparation(
-            workspaces, object(), policies, snapshot=snapshot(), private_source=private, base_policy=BASE,
+            workspaces, object(), policies, store=Store(), snapshot=snapshot(), private_source=private, base_policy=BASE,
             resolvers={'python': ('/usr/local/bin/python3.12',)} if resolvers is None else resolvers,
             budget=BUDGET, scratch_location='/sandbox/scratch', receipts=receipts, free_bytes=lambda budget: free)
         return adapter, log, workspaces, policies
@@ -148,3 +158,11 @@ def test_releasing_an_unknown_sandbox_is_unconfirmed(make):
     other, _, _, _ = make()
     prepared = other.prepare(TOOLCHAIN, uuid4())
     assert adapter.release(prepared, uuid4()) == 'unconfirmed'
+
+
+def test_the_baseline_file_is_read_from_the_capture_not_the_sandbox(make):
+    adapter, log, _, _ = make()
+    sandbox = adapter.prepare(TOOLCHAIN, uuid4())
+    entries = len(log)
+    assert sandbox.read_source('src/a/b.txt') == b'b\r\n' and sandbox.read_source('missing.py') is None
+    assert len(log) == entries  # No sandbox step ran to answer it.
