@@ -11,6 +11,7 @@ and the durable chain (``corsair.workflows.chain``) binds child workflows and ac
 """
 
 import asyncio
+import re
 from dataclasses import dataclass, field
 from time import perf_counter
 from typing import Any, Awaitable, Callable, Literal, Protocol
@@ -329,6 +330,11 @@ def declared_mismatch(case: FixtureCase, outcome: RuntimeOutcome) -> str | None:
                 f"{outcome.selection.image_id} image {outcome.image}")
     if case.environment.language.casefold() != language:
         return f"declared environment language {case.environment.language} is not the selected {language}"
+    # "pytest 9.0.3" -> "pytest903", "JUnit 5" -> "junit5": the declaration must name a framework the row admitted.
+    declared = re.sub(r"[^a-z0-9]", "", case.environment.framework.casefold())
+    admitted = sorted(c.name for c in outcome.selection.checks if c.kind == "test_framework" and c.satisfied)
+    if not any(declared.startswith(name) for name in admitted):
+        return f"declared environment framework {case.environment.framework} is not one the selection admitted ({', '.join(admitted)})"
     return None
 
 

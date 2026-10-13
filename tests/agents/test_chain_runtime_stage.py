@@ -70,6 +70,10 @@ def test_a_declared_environment_off_the_selection_ends_the_run(run):
     java = replace(fixture_case(), environment=fixture_case().environment.model_copy(update={'language': 'Java'}),
                    runtime=pyproject('>=3.10'))
     assert run(java, catalog=catalog()).reason == 'declared environment language Java is not the selected python'
+    junit = replace(fixture_case(), environment=fixture_case().environment.model_copy(update={'framework': 'JUnit 4.12'}),
+                    runtime=pyproject('>=3.10'))
+    assert run(junit, catalog=catalog()).reason == ('declared environment framework JUnit 4.12 is not one the selection '
+                                                   'admitted (pytest)')
 
 
 def test_build_files_without_a_catalog_stop_with_the_failure_kind(run):
