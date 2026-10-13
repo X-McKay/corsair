@@ -12,6 +12,8 @@ from corsair.agents.issue_analysis.contracts import SourceExcerpt, confined_path
 from corsair.ports.execution import SandboxExecution
 from corsair.ports.sandbox import SandboxHandle
 
+from corsair.core.blockers import Blocker
+
 from .contracts import CommandRecord, EnvironmentInput
 
 
@@ -19,10 +21,13 @@ from .contracts import CommandRecord, EnvironmentInput
 class SetupBudget:
     """Operator-owned; nothing the model or repository says can change it."""
     max_commands: int = 12
+    max_corrections: int = 2
 
     def __post_init__(self):
         if type(self.max_commands) is not int or not 1 <= self.max_commands <= 64:
             raise ValueError("setup command budget outside the admitted range")
+        if type(self.max_corrections) is not int or not 0 <= self.max_corrections <= 2:
+            raise ValueError("setup correction budget outside the admitted range")
 
 
 @dataclass
@@ -31,6 +36,9 @@ class SetupLedger:
     records: list[CommandRecord] = field(default_factory=list)
     outputs: dict[int, tuple[bytes, bytes]] = field(default_factory=dict)
     halted: str | None = None
+    pending_correction: int | None = None
+    corrections_used: int = 0
+    diagnostics: list[Blocker] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
