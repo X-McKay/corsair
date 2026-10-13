@@ -14,9 +14,9 @@ export function Evaluations({ data }: { data: EvaluationList }) {
   return (
     <>
       <Heading
-        eyebrow="Measure · compare · improve"
+        eyebrow="Recorded runs"
         title="Evaluations"
-        description="Inspect each run on its own terms: cases, assertions, telemetry and identity."
+        description="Cases, assertions, telemetry and configuration for each run."
       />
       <div className="filter-bar">
         <label className="search">

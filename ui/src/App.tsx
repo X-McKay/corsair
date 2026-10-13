@@ -160,7 +160,7 @@ export function App() {
           </label>
           <div className="sidebar-foot">
             <ShieldCheck size={13} />
-            Evidence, not assumptions.
+            Local evaluation records
           </div>
         </div>
       </aside>

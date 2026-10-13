@@ -60,3 +60,10 @@ Approved design implementation evidence (2026-10-13):
 - First iteration browser run:37passed,5failed,6skipped. Failures came from a duplicated warning strict locator and an outdated comparison-heading assertion. Deduplicated warnings and corrected the assertion; retained cancellation trace led to a server fix. Final suite passed.
 - Final UV_CACHE_DIR=/tmp/corsair-provider-uv-cache make test-config after main merge:1831passed in112.39s, including43 focused web-server tests. Earlier pre-main-merge integration:1793passed in109.96s.
 - Actual saved scripted identification report inspected in production preview at127.0.0.1:8765/agents:1run,16attempts,16observed latency/token samples. No new live inference, Temporal server or sandbox workload. Screenshots/logs remain outside Git. Final record guards and publication are recorded in HANDOFF-0101.
+
+
+## Descriptive copy revision (2026-10-13)
+
+Replaced slogans and promotional headings across overview, agents, evaluations, experiments, empty states and the sidebar with descriptive labels and instructions. The earlier mockup was updated separately outside Git, including “Did the change help?” → “Run comparison.” Metric definitions, coverage caveats and error guidance remain. No data, API, execution or styling changes. Existing browser assertions now use the revised headings; no redundant copy-only tests added.
+
+Validation: make ui-build passed17 unit tests and the production build; make ui-test passed42 checks with6 deliberately skipped duplicate mobile contrast checks. Revised Agents copy inspected in the production preview after restarting its stopped local server. Review found no behavior changes or unsupported new claims. Final make test-config:1831passed in111.98s; final development record guards:5passed. git diff --check and mockup JavaScript syntax check passed.

@@ -62,7 +62,7 @@ function RunSelection({
         </>
       ) : (
         <p className="experiment-run-time">
-          Select evidence to inspect side by side.
+          No run selected.
         </p>
       )}
     </section>
@@ -86,9 +86,9 @@ export function Experiments({
   return (
     <>
       <Heading
-        eyebrow="Review a focused change"
+        eyebrow="Run comparison"
         title="Experiments"
-        description="Choose a baseline and a candidate. Inspect what changed, where it helped, and what still needs evidence."
+        description="Compare outcomes, latency, token usage and configuration between two recorded runs."
       >
         <Badge>
           <GitCompareArrows size={13} />
@@ -138,13 +138,13 @@ export function Experiments({
           </div>
           <h2>
             {runs.length < 2
-              ? "Record two runs to start comparing"
-              : "Choose two runs to review an experiment"}
+              ? "At least two recorded runs are required"
+              : "Select a baseline and candidate"}
           </h2>
           <p>
             {runs.length < 2
-              ? "Evaluate one agent before and after a focused change using the same frozen set and provider mode."
-              : "A useful comparison keeps the frozen dataset constant, then makes intended prompt, model or tool changes explicit."}
+              ? "Run evaluations for the same agent, frozen dataset and provider mode."
+              : "Outcome comparisons require the same agent, frozen dataset and provider mode. Recorded configuration differences are listed separately."}
           </p>
           {runs.length > 0 && (
             <Link to="/evaluations" className="text-link">

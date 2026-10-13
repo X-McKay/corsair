@@ -36,9 +36,9 @@ export function Overview({
   return (
     <>
       <Heading
-        eyebrow="Your evaluation workspace"
-        title="See how your agents perform."
-        description="Trace every result to its evidence. Find the next improvement."
+        eyebrow="Local evaluations"
+        title="Overview"
+        description="Recorded runs, outcomes, latency and token usage."
       />
       <Stats
         items={[
@@ -94,23 +94,19 @@ export function Overview({
           <div className="guide-icon">
             <Terminal size={21} />
           </div>
-          <div className="eyebrow">The improvement loop</div>
-          <h2>
-            One change.
-            <br />
-            Measurable progress.
-          </h2>
+          <div className="eyebrow">Command line</div>
+          <h2>Run an evaluation</h2>
           <ol>
             <li>
-              <b>Establish a baseline</b>
+              <b>Record a baseline</b>
               <span>Run a frozen case set for one agent.</span>
             </li>
             <li>
-              <b>Make a focused change</b>
-              <span>Refine a prompt, skill, tool or budget.</span>
+              <b>Update the agent</b>
+              <span>Change the prompt, skill, tool or budget.</span>
             </li>
             <li>
-              <b>Check the evidence</b>
+              <b>Compare results</b>
               <span>Review assertions, usage and timing.</span>
             </li>
           </ol>
@@ -121,7 +117,7 @@ export function Overview({
         </aside>
       </div>
       <Notice>
-        <strong>Evidence before conclusions.</strong> Clean attempts passed the
+        Clean attempts passed the
         recorded evaluators. Scripted checks and live model runs do not, on
         their own, prove application behavior or sandbox readiness.
       </Notice>

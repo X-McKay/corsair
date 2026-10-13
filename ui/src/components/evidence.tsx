@@ -177,7 +177,7 @@ export function Empty({ filtered = false }: { filtered?: boolean }) {
       <h2>
         {filtered
           ? "No matching evaluations"
-          : "Your first evaluation starts here"}
+          : "No recorded evaluations"}
       </h2>
       <p>
         {filtered

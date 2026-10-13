@@ -251,9 +251,9 @@ export function Metrics({
   return (
     <>
       <Heading
-        eyebrow="Observe · understand · improve"
+        eyebrow="Agent metrics"
         title="Agents"
-        description="Every agent's outcomes, latency and token distributions in one place."
+        description="Recorded outcomes, latency and token usage by agent."
       />
       {state.data.warnings.map((w, i) => (
         <Notice key={i} tone="warning">

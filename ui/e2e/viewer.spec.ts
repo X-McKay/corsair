@@ -20,7 +20,7 @@ test('overview and filters reflect local records without fabricated accuracy', a
   const errors:string[]=[];
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/');
-  await expect(page.getByRole('heading',{name:'See how your agents perform.'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Overview'})).toBeVisible();
   await expect(page.getByText(/broken-record: summary unavailable/)).toBeVisible();
   await page.goto('/evaluations');
   await page.getByLabel('Filter agent').selectOption('planning');
@@ -79,7 +79,7 @@ test('empty and connection failure states are actionable', async ({page}) => {
   // Fault injection supplements, rather than replaces, the real API integration tests above.
   await page.route('**/api/evaluations',route=>route.fulfill({json:{runs:[],warnings:[]}}));
   await page.goto('/');
-  await expect(page.getByRole('heading',{name:'Your first evaluation starts here'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'No recorded evaluations'})).toBeVisible();
   await page.unroute('**/api/evaluations');
   await page.route('**/api/evaluations',route=>route.abort());
   await page.getByRole('button',{name:'Refresh evidence'}).click();
