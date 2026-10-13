@@ -43,6 +43,16 @@ VERSIONS = {
     "authoring": (authoring.PROMPT_VERSION, authoring.CONFIG_VERSION, AUTHORING_SKILL),
     "assessment": (assessment.PROMPT_VERSION, assessment.CONFIG_VERSION, assessment.SKILL_SHA256),
 }
+# Per-stage request controls an operator profile may set on top of the base provider configuration.
+PROFILE_FIELDS = {"response_token_limit", "thinking_mode", "thinking_token_budget", "timeout_seconds"}
+
+
+def stage_configs(base: LocalModelConfig, profiles: dict) -> dict[str, LocalModelConfig]:
+    """Each stage's provider configuration: the base with that stage's profile fields, revalidated."""
+    if not isinstance(profiles, dict) or set(profiles) - set(STAGES) or any(
+            not isinstance(fields, dict) or set(fields) - PROFILE_FIELDS for fields in profiles.values()):
+        raise ValueError(f"stage profiles map stages {STAGES} to fields {sorted(PROFILE_FIELDS)}")
+    return {stage: LocalModelConfig.model_validate(base.model_dump() | profiles.get(stage, {})) for stage in STAGES}
 
 
 def encode(value):
@@ -121,18 +131,24 @@ def attempt_record(attempt) -> dict:
             "messages": TypeAdapter(list[ModelMessage]).dump_python(list(attempt.messages), mode="json")}
 
 
-async def main_async(evidence: Path, live: tuple[str, ...], config: LocalModelConfig | None) -> DirectRun:
+async def main_async(evidence: Path, live: tuple[str, ...], config: LocalModelConfig | None,
+                     profiles: dict | None = None) -> DirectRun:
     evidence.mkdir(parents=True, exist_ok=False)
     logfire.configure(send_to_logfire=False, console=False)
     (evidence / "work").mkdir(mode=0o700)
     (evidence / "artifacts").mkdir(mode=0o700)
     async with AsyncExitStack() as stack:
-        model = await stack.enter_async_context(local_model(config)) if live else None
-        selected = {stage: model if stage in live else SCRIPTED[stage]() for stage in STAGES}
+        configs = stage_configs(config, profiles or {}) if live else {}
+        models = {}
+        for stage in live:
+            if configs[stage] not in models:
+                models[configs[stage]] = await stack.enter_async_context(local_model(configs[stage]))
+        selected = {stage: models[configs[stage]] if stage in live else SCRIPTED[stage]() for stage in STAGES}
         budget = CompositionBudget()
         (evidence / "configuration.json").write_text(json.dumps({
             "mode": "direct", "live_stages": list(live), "budget": budget.model_dump(),
-            "provider": config.model_dump() if config else None,
+            "provider": config.model_dump() if config else None, "stage_profiles": profiles,
+            "stage_providers": {stage: configs[stage].model_dump() for stage in live},
             "models": {stage: describe_model(selected[stage]) for stage in STAGES},
             "versions": {stage: dict(zip(("prompt_version", "config_version", "skill_sha256"), VERSIONS[stage]))
                          for stage in STAGES},
@@ -157,6 +173,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--provider-config", type=Path, help="Explicit LocalModelConfig JSON; required with --live")
+    parser.add_argument("--stage-profiles", type=Path,
+                        help="Optional JSON of per-stage request controls layered on --provider-config")
     parser.add_argument("--live", default="", help=f"Comma-separated stages to run on the provider: {','.join(STAGES)}")
     args = parser.parse_args()
     live = tuple(stage for stage in args.live.split(",") if stage)
@@ -165,7 +183,15 @@ def main():
     if args.evidence.exists() or args.evidence.is_symlink():
         parser.error("evidence directory already exists")
     config = LocalModelConfig.model_validate_json(args.provider_config.read_bytes()) if args.provider_config else None
-    run = asyncio.run(main_async(args.evidence, live, config))
+    profiles = json.loads(args.stage_profiles.read_bytes()) if args.stage_profiles else None
+    if profiles is not None:
+        if config is None:
+            parser.error("--stage-profiles needs --provider-config")
+        try:
+            stage_configs(config, profiles)
+        except ValueError as exc:
+            parser.error(str(exc))
+    run = asyncio.run(main_async(args.evidence, live, config, profiles))
     gate = run.gate.permitted.model_dump() if run.gate else None
     proposal = run.assessment.admission.model_dump(mode="json") if run.assessment else None
     print(json.dumps({"stopped_at": run.stopped_at, "reason": run.reason, "gate": gate, "admission": proposal,

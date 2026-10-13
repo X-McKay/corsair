@@ -16,7 +16,7 @@ from .tools import READ_EVIDENCE_TOOL, TOOL_RETRIES, AssessmentDependencies, evi
 
 # PROMPT_VERSION covers everything the model sees (instructions, skill, rendered prompt,
 # tool and output schema text); CONFIG_VERSION covers retry budgets and instrumentation.
-PROMPT_VERSION = "evidence-assessment-v2"
+PROMPT_VERSION = "evidence-assessment-v3"
 CONFIG_VERSION = "evidence-assessment-config-v1"
 SKILL_ID = "assess-evidence"
 SKILL_BYTES = (Path(__file__).parent / "skills" / SKILL_ID / "SKILL.md").read_bytes()
@@ -34,7 +34,23 @@ def assessment_prompt(inputs: AssessmentInput) -> str:
             "\nFrozen evidence inventory: " + ", ".join(
                 f"{item.item_id} (kind {item.kind}, "
                 + (f"{item.revision} run {item.run}, " if item.revision else "")
-                + f"lines 1..{len(item.content.splitlines())})" for item in inputs.items))
+                + f"lines 1..{len(item.content.splitlines())})" for item in inputs.items)
+            + "\nWitness items: " + ", ".join(f"{revision} {_witnesses(inputs, revision)}"
+                                              for revision in ("baseline", "candidate")))
+
+
+def _witnesses(inputs: AssessmentInput, revision: str) -> int:
+    return sum(item.kind == "witness" and item.revision == revision for item in inputs.items)
+
+
+def _witness_problem(inputs: AssessmentInput, cited: set[str], revision: str, claim: str, weaker: str) -> str | None:
+    """Only a witness item grounds a conclusion; test-process output (JUnit, stdout, receipts) is a claim."""
+    if any(item.item_id in cited and item.kind == "witness" and item.revision == revision for item in inputs.items):
+        return None
+    if not _witnesses(inputs, revision):
+        return (f"the inventory has no witness item for the {revision} revision, so {claim} is unsupported; "
+                f"propose {weaker} and record the missing witness in limitations")
+    return f"{claim} must cite a {revision} item of kind witness; test reports and output are claims"
 
 
 def create_evidence_assessment_agent(model: Model, *, output_retries: int = 1) -> Agent[AssessmentDependencies, EvidenceAssessment]:
@@ -54,12 +70,16 @@ def create_evidence_assessment_agent(model: Model, *, output_retries: int = 1) -
             if not any(read.item_id == reference.item_id and read.start_line <= reference.start_line
                        and reference.end_line <= read.end_line for read in reads):
                 raise ModelRetry("every citation must be covered by a successful read_evidence in this run")
-        revisions = {item.item_id: item.revision for item in inputs.items}
-        cited = {revisions[reference.item_id] for reference in references}
-        if draft.finding in ("reproduced", "not_reproduced") and "baseline" not in cited:
-            raise ModelRetry("a finding must cite baseline evidence")
-        if draft.fix == "verified" and not {"baseline", "candidate"} <= cited:
-            raise ModelRetry("a verified fix must cite evidence from both revisions")
+        cited = {reference.item_id for reference in references}
+        problems = []
+        if draft.finding in ("reproduced", "not_reproduced"):
+            problems.append(_witness_problem(inputs, cited, "baseline", f"finding {draft.finding}",
+                                             "finding inconclusive"))
+        if draft.fix == "verified":
+            problems += [_witness_problem(inputs, cited, revision, "fix verified", "fix not_verified")
+                         for revision in ("baseline", "candidate")]
+        if problems := [problem for problem in problems if problem]:
+            raise ModelRetry("; ".join(dict.fromkeys(problems)))
 
         def quoted(observation):
             return {"statement": observation.statement, "citations": [

@@ -19,6 +19,7 @@ from corsair.agents.test_authoring import (
 )
 from corsair.agents.test_authoring.skills import SKILL_TEXT
 from corsair.agents.test_authoring.static import assertion_lines, static_checks
+from corsair.ports.test_runner import NativeTestRun
 from evals.fixture_e2e.reviewed import DISCOVER, PREFIX, ReviewedLocalExecution, ReviewedWorkspace
 from evals.test_authoring.evaluate import (
     FILES, EvaluationBudget, ScriptedRun, ScriptedRunner, authoring_checks, dataset, evaluate, passed,
@@ -57,10 +58,16 @@ def write(content=REFERENCE, path="test_documents.py"):
 RUN = ToolCallPart("run_tests", {})
 
 
-def responding(steps, final=PATCH, seen=None):
+ALL_TOOLS, READ_ONLY = ["read_source", "write_test_file", "run_tests"], ["read_source"]
+
+
+def responding(steps, final=PATCH, seen=None, offered=None):
     async def respond(messages, info):
         assert "Write exactly the two planned tests" in info.instructions and SKILL_TEXT.strip() in info.instructions
-        assert [t.name for t in info.function_tools] == ["read_source", "write_test_file", "run_tests"]
+        tools = [t.name for t in info.function_tools]
+        assert tools in (ALL_TOOLS, READ_ONLY)
+        if offered is not None:
+            offered.append(tools)
         done = sum(isinstance(p, ToolReturnPart) for m in messages for p in m.parts)
         if seen is not None:
             seen[:] = [p.content for m in messages for p in m.parts if isinstance(p, ToolReturnPart) and p.tool_name == "run_tests"]
@@ -120,16 +127,56 @@ def test_patch_needs_exact_discovery_and_passing_control_but_blocked_is_admitted
     assert len(result.output.dev_runs) == 1
 
 
-def test_run_budget_is_operator_owned_and_spent_runs_execute_nothing():
-    seen = []
-    steps = [write(), RUN, RUN, RUN]
+def test_run_budget_is_operator_owned_and_a_spent_budget_leaves_only_the_output():
+    offered = []
     blocked = {"status": "blocked", "layer": "discovery", "reason": "Budget spent"}
-    (result, fake) = run(create_test_authoring_agent(responding(steps, blocked, seen)), case().inputs.inputs,
-                         runner({"status": "collection_error"}, {"status": "collection_error"}),
+    (result, fake) = run(create_test_authoring_agent(responding([write(), RUN, RUN], blocked, offered=offered)),
+                         case().inputs.inputs, runner({"status": "collection_error"}, {"status": "collection_error"}),
                          budget=AuthoringBudget(dev_runs=2))
-    assert len(fake.calls) == 2 and [r.status for r in result.output.dev_runs] == ["collection_error"] * 2 + ["not_run"]
+    assert len(fake.calls) == 2 and [r.status for r in result.output.dev_runs] == ["collection_error"] * 2
+    assert offered == [ALL_TOOLS] * 3 + [READ_ONLY]
     with pytest.raises(ValueError):
         AuthoringBudget(dev_runs=0)
+
+
+def test_tools_stay_offered_while_a_run_can_still_verify_a_fix():
+    """A collection error with budget left is a test-code problem the author may fix; the patch is still admitted
+    from the final in-budget run after writes and runs disappear."""
+    offered = []
+    (result, fake) = run(create_test_authoring_agent(responding([write(FILES["broken"]), RUN, write(), RUN],
+                                                                offered=offered)),
+                         case().inputs.inputs, runner({"status": "collection_error"}, {"status": "discovered"}),
+                         budget=AuthoringBudget(dev_runs=2))
+    assert isinstance(result.output, TestPatch) and len(fake.calls) == 2
+    assert offered == [ALL_TOOLS] * 4 + [READ_ONLY]
+
+
+class RefusingWorkspace:
+    """The PLAN-0031 shape: the workspace refuses every patch before any interpreter runs."""
+
+    def __init__(self):
+        self.calls = []
+
+    def run(self, patch, *, control_test_id, security_test_id, discovery_command, operation):
+        self.calls.append(patch.sha256)
+        return NativeTestRun(str(operation), patch.sha256, None, None, None, "not_required", "workspace",
+                             "reviewed workspace refused the patch")
+
+
+def test_workspace_failure_hides_writes_and_runs_so_the_author_returns_blocked():
+    offered, refusing = [], RefusingWorkspace()
+    blocked = {"status": "blocked", "layer": "sandbox", "reason": "The workspace refused the patch before tests ran"}
+    (result, _) = run(create_test_authoring_agent(responding([write(), RUN], blocked, offered=offered)),
+                      case().inputs.inputs, refusing)
+    assert offered == [ALL_TOOLS, ALL_TOOLS, READ_ONLY] and len(refusing.calls) == 1
+    assert isinstance(result.output, BlockedAuthoring) and result.output.layer == "sandbox"
+    assert [r.status for r in result.output.dev_runs] == ["workspace_failure"]
+    # A model that tries to rewrite and rerun anyway reaches no write or run.
+    refusing = RefusingWorkspace()
+    with pytest.raises(UnexpectedModelBehavior):
+        run(create_test_authoring_agent(responding([write(), RUN, write(FILES["broken"]), RUN], blocked)),
+            case().inputs.inputs, refusing)
+    assert len(refusing.calls) == 1
 
 
 def test_runs_requested_together_each_reserve_budget_and_identity():
