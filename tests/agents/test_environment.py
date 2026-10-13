@@ -76,7 +76,7 @@ def ready(**change):
                         "source": {"path": ".github/workflows/ci.yml", "start_line": 4, "end_line": 4}}],
             "build_command": list(BUILD), "discovery_command": list(DISCOVER),
             "framework": "pytest", "baseline_test_id": TEST_ID, "baseline_test_path": "tests/test_documents.py", "baseline_test_command": list(BASELINE),
-            "approved_test_paths": ["tests"]} | change
+            "approved_test_paths": ["tests/test_corsair_control.py", "tests/test_corsair_security.py"]} | change
 
 
 def scripted(final, calls):
@@ -174,12 +174,21 @@ def test_prompt_shows_the_operator_checkout_listing_so_the_agent_need_not_probe(
     (SETUP, DISCOVERED, ready(framework="nose")),
     # approved test path overlaps a saved source file
     (SETUP, DISCOVERED, ready(approved_test_paths=["requirements.txt"])),
+    # a folder, not a test file planning and authoring can name (first corpus rerun, 2026-10-13)
+    (SETUP, DISCOVERED, ready(approved_test_paths=["tests"])),
     # different toolchain than the prepared sandbox
     (SETUP, DISCOVERED, ready(toolchain_id="java-17")),
 ])
 def test_ready_refused_without_matching_current_run_evidence(calls, outcomes, draft):
     with pytest.raises(UnexpectedModelBehavior):
         run(draft, calls, ScriptedExecution(dict(outcomes)))
+
+
+def test_ready_refuses_an_existing_checkout_file_as_an_approved_test_path():
+    listing = ("requirements.txt", "tests/test_corsair_control.py", "tests/test_documents.py")
+    with pytest.raises(UnexpectedModelBehavior):
+        run(ready(), SETUP, ScriptedExecution(dict(DISCOVERED)), checkout_paths=listing)
+    assert run(ready(), SETUP, ScriptedExecution(dict(DISCOVERED)), checkout_paths=listing[::2]).output.status == "ready"
 
 
 def test_unknown_delivery_halts_commands_and_forbids_ready():
@@ -372,7 +381,7 @@ def test_framework_admission_is_exact(framework, test_id, path, command, output,
 
 
 @pytest.mark.parametrize("change", [
-    {"approved_test_paths": ["../escape"]}, {"baseline_test_path": "/abs/test.py"}, {"approved_test_paths": ["tests", "tests"]},
+    {"approved_test_paths": ["../escape"]}, {"baseline_test_path": "/abs/test.py"}, {"approved_test_paths": ["tests/test_a.py", "tests/test_a.py"]},
     {"build_command": []}, {"baseline_test_command": ["a\x00b"]}, {"verdict": "vulnerable"},
 ])
 def test_draft_contract_refuses_unsafe_fields(change):
