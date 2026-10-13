@@ -148,7 +148,8 @@
         "tests/test_documents.py::test_reads_document"
       ],
       "approved_test_paths": [
-        "tests"
+        "tests/test_corsair_control.py",
+        "tests/test_corsair_security.py"
       ]
     },
     "status": "ready",
@@ -785,7 +786,8 @@
         "-Dtest=WikiTest#forwards"
       ],
       "approved_test_paths": [
-        "src/test/java"
+        "src/test/java/org/example/CorsairControlTest.java",
+        "src/test/java/org/example/CorsairSecurityTest.java"
       ]
     },
     "status": "ready",

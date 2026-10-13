@@ -70,6 +70,8 @@ class StageLimits(Contract):
     # Derivation: windows needed to read the stage's readable inputs once, plus input-sized work calls.
     read_windows: int = Field(strict=True, ge=0)
     work_tool_calls: int = Field(strict=True, ge=0)
+    # Caps the operator's ceiling set below what the derivation gave, so a stop names its real source.
+    ceilings: tuple[Literal["request_limit", "tool_calls_limit", "total_tokens_limit"], ...] = ()
 
     def usage_limits(self) -> UsageLimits:
         return UsageLimits(request_limit=self.request_limit, tool_calls_limit=self.tool_calls_limit,
@@ -91,17 +93,26 @@ class StageBudget(Contract):
     tokens_per_request: int = Field(default=12000, strict=True, gt=0, le=32768)
 
     def limits(self, read_windows: int, work_tool_calls: int, output_retries: int) -> StageLimits:
-        tools = min(read_windows + work_tool_calls + self.slack_tool_calls, self.tool_calls_limit)
-        requests = min(tools + output_retries + 2, self.request_limit)
+        derived_tools = read_windows + work_tool_calls + self.slack_tool_calls
+        tools = min(derived_tools, self.tool_calls_limit)
+        derived_requests = tools + output_retries + 2
+        requests = min(derived_requests, self.request_limit)
+        derived_tokens = requests * self.tokens_per_request
+        clamped = (("tool_calls_limit", derived_tools > self.tool_calls_limit),
+                   ("request_limit", derived_requests > self.request_limit),
+                   ("total_tokens_limit", derived_tokens > self.total_tokens_limit))
         return StageLimits(request_limit=requests, tool_calls_limit=tools,
-                           total_tokens_limit=min(requests * self.tokens_per_request, self.total_tokens_limit),
+                           total_tokens_limit=min(derived_tokens, self.total_tokens_limit),
                            timeout_seconds=self.timeout_seconds, read_windows=read_windows,
-                           work_tool_calls=work_tool_calls)
+                           work_tool_calls=work_tool_calls, ceilings=tuple(name for name, hit in clamped if hit))
 
 
 class CompositionBudget(Contract):
     # The environment agent's isolated eval budget (evals/environment EvaluationBudget), not wider (SPEC-0068).
-    environment: StageBudget = StageBudget(request_limit=16, tool_calls_limit=20, total_tokens_limit=48000,
+    # Tokens: each request resends the whole conversation (about 5k tokens of instructions, skill and input before
+    # any tool output), so 8000 per request over the 16 requests; the former 48000 ceiling ended a short
+    # discovery after ten requests (first corpus case, 2026-10-13).
+    environment: StageBudget = StageBudget(request_limit=16, tool_calls_limit=20, total_tokens_limit=128000,
                                            timeout_seconds=240, tokens_per_request=8000)
     setup_commands: int = Field(default=12, strict=True, ge=1, le=16)
     identification: StageBudget = StageBudget(request_limit=20, tool_calls_limit=16, total_tokens_limit=128000,
@@ -398,7 +409,8 @@ async def prepare_environment(inputs: EnvironmentInput, model: Model | None, pre
                                        toolchain_id=selected.toolchain_id, scratch_location=sandbox.scratch_location,
                                        budget=SetupBudget(max_commands=budget.setup_commands), new_operation=uuid4,
                                        checkout_paths=sandbox.source_paths() if sandbox.source_paths else None)
-        attempt = await _invoke("environment", agent, environment_prompt(inputs), deps, limits, observe)
+        attempt = await _invoke("environment", agent, environment_prompt(inputs, deps.checkout_paths), deps, limits,
+                                observe)
         if isinstance(attempt.output, ReadyEnvironment):
             # SPEC-0071: a smoke baseline is the operator's overlay file, so its saved source is the template itself.
             smoke = next((t for t in inputs.smoke_tests if t.path == attempt.output.baseline_test_path), None)
@@ -565,8 +577,10 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
     def failure_of(stage: Stage) -> str:
         exhausted = attempts[-1].exhausted
         if exhausted is not None:
+            source = ("the operator's ceiling, below the derivation from" if exhausted.limit in exhausted.limits.ceilings
+                      else "derived from")
             return (f"{stage} budget exhausted: {exhausted.limit} {exhausted.cap:g} "
-                    f"(derived from {exhausted.limits.read_windows} read windows and "
+                    f"({source} {exhausted.limits.read_windows} read windows and "
                     f"{exhausted.limits.work_tool_calls} work calls)")
         failed = attempts[-1].failure
         kind = failed.kind if isinstance(failed, RecordedFailure) else type(failed).__name__
