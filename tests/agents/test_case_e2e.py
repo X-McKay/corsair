@@ -250,3 +250,18 @@ def test_setup_containers_never_use_the_host_network_or_receive_proxy_credential
     with pytest.raises(ValueError, match="carries credentials") as refused:
         registry_access(("HTTPS_PROXY",))
     assert "secret" not in str(refused.value)
+
+
+def test_the_sandbox_reads_the_baseline_file_from_the_capture_never_the_sandbox(tmp_path):
+    from corsair.investigation.docker import captured_file
+    tree, overlay = tmp_path / "tree", tmp_path / "overlay"
+    (tree / "test").mkdir(parents=True)
+    (tree / "test/a.test.js").write_text("it('a', () => expect(1).toBe(1));\n")
+    (tree / "link.js").symlink_to(tmp_path / "outside.js")
+    (tmp_path / "outside.js").write_text("secret")
+    (overlay / "tests").mkdir(parents=True)
+    (overlay / "tests/test_corsair_smoke.py").write_text("def test_environment_runs():\n    assert True\n")
+    assert captured_file(tree, "test/a.test.js").startswith(b"it('a'")
+    assert captured_file(tree, "tests/test_corsair_smoke.py", overlay).startswith(b"def test_environment_runs")
+    assert captured_file(tree, "link.js") is None and captured_file(tree, "../outside.js") is None
+    assert captured_file(tree, "missing.js") is None

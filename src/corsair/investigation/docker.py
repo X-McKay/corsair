@@ -41,6 +41,18 @@ SETUP_NETWORK = {"network": "bridge", "egress": "unenforced",
 CREDENTIALS = re.compile(r"://[^/@\s]*@")
 
 
+def captured_file(tree: Path, path: str, overlay: Path | None = None) -> bytes | None:
+    """A regular file of the operator's capture placed in the sandbox (the commit's tree, then any overlay), never
+    read back from the sandbox; None when the capture has none. Paths stay inside the capture."""
+    for root in (tree, overlay):
+        if root is None:
+            continue
+        target = (root / path).resolve()
+        if target.is_relative_to(root.resolve()) and target.is_file() and not (root / path).is_symlink():
+            return target.read_bytes()
+    return None
+
+
 def registry_access(names: tuple[str, ...]) -> tuple[str, tuple[str, ...], tuple[tuple[str, str], ...]]:
     """Network, environment and read-only mounts for registry access during setup: always the bridge, with the
     operator's proxy and CA variables among `names` that are set. A value carrying credentials (`user:pass@`) is
@@ -122,7 +134,8 @@ class DockerPreparation:
         if copied.returncode != 0:
             sandbox.__exit__(None, None, None)
             raise RuntimeError(f"environment sandbox workspace copy failed: {copied.stderr[-512:]!r}")
-        return PreparedSandbox(sandbox, sandbox.handle(operation), SCRATCH)
+        return PreparedSandbox(sandbox, sandbox.handle(operation), SCRATCH,
+                               lambda path: captured_file(self.tree, path, self.overlay))
 
     def release(self, sandbox: PreparedSandbox, operation) -> Literal["confirmed", "unconfirmed"]:
         sandbox.execution.__exit__(None, None, None)

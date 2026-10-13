@@ -1,16 +1,20 @@
 """Two-test authoring contracts; no model, workflow or execution SDK types."""
 
 from hashlib import sha256
+import re
 from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
 
-from corsair.ports.test_runner import MAX_PATCH_FILE_BYTES, MAX_PATCH_FILES, MAX_TEST_ID, TEST_ID
+from corsair.ports.test_runner import MAX_PATCH_FILE_BYTES, MAX_PATCH_FILES, MAX_TEST_ID, RUBY_TEST_ID, TEST_ID
 
 from ..source.contracts import Contract, Fact, SourceFile, bounded_inventory, confined_path
 from ..test_planning.contracts import EnvironmentEvidence, ReadyTestPlan
 
-TestId = Annotated[str, Field(min_length=1, max_length=MAX_TEST_ID, pattern=TEST_ID.pattern)]
+# Native ids the authoring checks can read: pytest node ids and Minitest `path.rb::Class#test_method`.
+_UNNAMED = (re.sub(r"\(\?P<\w+>", "(?:", id_.pattern)[1:-1] for id_ in (TEST_ID, RUBY_TEST_ID))
+AUTHORED_TEST_ID = re.compile("|".join(f"(?:{pattern})" for pattern in _UNNAMED))
+TestId = Annotated[str, Field(min_length=1, max_length=MAX_TEST_ID, pattern=f"^(?:{AUTHORED_TEST_ID.pattern})$")]
 Layer = Literal["compile", "discovery", "dependency", "fixture", "sandbox", "unknown"]
 # Assigned by trusted code only: refused authored tests and a spent stage budget are not model claims.
 ResultLayer = Layer | Literal["admission"]
@@ -35,7 +39,7 @@ class TestAuthoringInput(Contract):
                 raise ValueError(f"planned test path {spec.test_path} is not approved")
             if not spec.test_id.startswith(spec.test_path + "::"):
                 raise ValueError(f"planned test id {spec.test_id} must be a native node id in {spec.test_path}")
-            if len(spec.test_id) > MAX_TEST_ID or not TEST_ID.fullmatch(spec.test_id):
+            if len(spec.test_id) > MAX_TEST_ID or not AUTHORED_TEST_ID.fullmatch(spec.test_id):
                 raise ValueError(f"planned test id {spec.test_id} is not a supported native node id")
         contents = {source.path: source.content.splitlines() for source in self.source_files}
         for excerpt in (*self.plan.citations, *self.plan.control.source_references, *self.plan.security.source_references):

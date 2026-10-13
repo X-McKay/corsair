@@ -1,15 +1,16 @@
 """Deterministic Python AST facts about authored tests; structure, not proof of test semantics.
 
 `assertion_lines` reads each test in its own language: a Jest id (`path.js::[suite::]name`) through
-`javascript.py`, every other id as a pytest node id here. Another language adds its id grammar and reader to
+`javascript.py`, a Minitest id (`path.rb::Class#method`) through `ruby.py`, every other id as a pytest node id here. Another language adds its id grammar and reader to
 `LANGUAGES`.
 """
 
 import ast
 
-from corsair.ports.test_runner import JS_TEST_ID
+from corsair.ports.test_runner import JS_TEST_ID, RubyTestId
 
 from . import javascript
+from .ruby import ruby_assertion_lines
 
 SKIP_NAMES = {"skip", "skipif", "xfail", "importorskip"}
 MOCK_MODULES = {"mock", "unittest.mock", "pytest_mock"}
@@ -81,12 +82,31 @@ def python_assertion_lines(content: str, test_id: str) -> tuple[int, ...]:
 
 
 # Test id grammar and the reader of that language's assertion lines; ids matching none are pytest node ids.
-LANGUAGES = ((JS_TEST_ID, javascript.assertion_lines),)
+def _ruby_id(test_id: str) -> bool:
+    try:
+        RubyTestId.parse(test_id)
+    except ValueError:
+        return False
+    return True
+
+
+def ruby_lines(content: str, test_id: str) -> tuple[int, ...]:
+    """A Minitest id (`path.rb::Class#method`) through `ruby.py`."""
+    ruby = RubyTestId.parse(test_id)
+    lines = ruby_assertion_lines(content, ruby.class_name, ruby.method)
+    if not lines:
+        raise ValueError(f"{test_id} has no assertion")
+    return lines
+
+
+# Each language's test id grammar and its reader; any other id is a pytest node id.
+LANGUAGES = ((lambda test_id: JS_TEST_ID.fullmatch(test_id) is not None, javascript.assertion_lines),
+             (_ruby_id, ruby_lines))
 
 
 def assertion_lines(content: str, test_id: str) -> tuple[int, ...]:
     """Lines where the named test can fail on its own check, read in the test's own language."""
-    reader = next((read for grammar, read in LANGUAGES if grammar.fullmatch(test_id)), python_assertion_lines)
+    reader = next((read for matches, read in LANGUAGES if matches(test_id)), python_assertion_lines)
     return reader(content, test_id)
 
 
