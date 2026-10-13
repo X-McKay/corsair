@@ -1,13 +1,16 @@
 """Run one E2E-0 direct composition over the SPEC-0018 pair and keep every stage receipt.
 
-Stages not named in --live use scripted plumbing models. This CLI executes on the reviewed host
-workspace, which admits only the reviewed SPEC-0018 test bytes: a live author's own test code is
-refused before it reaches an interpreter. The live gate `make qualify-fixture-e2e` runs the same
-`record_run` over the OpenShell test workspace instead. Existing evidence directories are refused.
+Stages not named in --live use scripted plumbing models. By default this CLI executes on the reviewed
+host workspace, which admits only the reviewed SPEC-0018 test bytes: a live author's own test code is
+refused before it reaches an interpreter. `--sandbox docker` runs every purpose in a fresh offline
+container of the local CPython 3.12 toolchain image instead (unqualified, risk accepted; `docker.py`),
+so a live author's tests execute there. The live gate `make qualify-fixture-e2e` runs the same
+`record_run` over the OpenShell test workspace. Existing evidence directories are refused.
 """
 import argparse
 import asyncio
-from contextlib import AsyncExitStack
+from contextlib import AsyncExitStack, ExitStack
+import os
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -25,6 +28,7 @@ from corsair.composition.receipts import (AGENT_STAGES, PROFILE_FIELDS, STAGES, 
 from corsair.composition.direct import (CompositionBudget, DirectRun, FixtureCase, Preparation, StageModels,
                                         run_direct)
 from corsair.nodes.runtime.environment import RuntimeCatalog
+from corsair.investigate import images
 from evals.issue_analysis.evaluate import describe_model
 
 from .case import (fixture_case, reviewed_runners, scripted_assessment, scripted_authoring, scripted_identification,
@@ -86,7 +90,7 @@ async def record_run(evidence: Path, live: tuple[str, ...], config: LocalModelCo
         with (evidence / f"attempt-{index}-{attempt.stage}.json").open("x") as destination:
             json.dump(attempt_record(attempt), destination, indent=2)
     with (evidence / "result.json").open("x") as destination:
-        json.dump(result_record(run), destination, indent=2)
+        json.dump(result_record(run) | {"runner": runner}, destination, indent=2)
     return run
 
 
@@ -99,6 +103,20 @@ async def main_async(evidence: Path, live: tuple[str, ...], config: LocalModelCo
     with LocalArtifacts(evidence / "artifacts", max_bytes=4 * 1024 * 1024) as store:
         return await record_run(evidence, live, config, fixture_case(), reviewed_runners(store, evidence / "work"),
                                 {"route": "reviewed_host_workspace"}, profiles)
+
+
+async def docker_async(evidence: Path, live: tuple[str, ...], config: LocalModelConfig | InferenceConfig | None,
+                       image: str, profiles: dict | None = None, timeout: int = 120) -> DirectRun:
+    """Plain Docker: every purpose in a fresh offline container of `image`; unqualified, risk accepted."""
+    from .docker import ROUTE, ROW, docker_case, docker_runners, limits
+    evidence.mkdir(parents=True, exist_ok=False)
+    evidence = evidence.resolve()  # LocalArtifacts and the container mounts need absolute paths
+    (evidence / "artifacts").mkdir(mode=0o700)
+    (evidence / "docker").mkdir(mode=0o700)
+    with ExitStack() as containers, LocalArtifacts(evidence / "artifacts", max_bytes=4 * 1024 * 1024) as store:
+        runners = docker_runners(image, evidence / "docker", store, containers, timeout)
+        return await record_run(evidence, live, config, docker_case(image, timeout), runners,
+                                ROUTE | {"image_row": ROW, "image": image, "limits": limits(timeout)}, profiles)
 
 
 def summary(run: DirectRun) -> dict:
@@ -123,6 +141,12 @@ def main():
     parser.add_argument("--stage-profiles", type=Path,
                         help="Optional JSON of per-stage request controls layered on --provider-config")
     parser.add_argument("--live", default="", help=f"Comma-separated stages to run on the provider: {','.join(STAGES)}")
+    parser.add_argument("--sandbox", choices=("host", "docker"), default="host",
+                        help="host: the reviewed host workspace (reviewed test bytes only); docker: a fresh offline "
+                             "container per run, unqualified (risk accepted)")
+    parser.add_argument("--images", type=Path, default=os.environ.get("CORSAIR_IMAGES"),
+                        help='With --sandbox docker: JSON {"<row id>": "sha256:<config id>"}; default $CORSAIR_IMAGES')
+    parser.add_argument("--timeout", type=int, default=120, help="With --sandbox docker: seconds per container command")
     args = parser.parse_args()
     live = tuple(stage for stage in args.live.split(",") if stage)
     if set(live) - set(STAGES) or (live and args.provider_config is None):
@@ -138,8 +162,19 @@ def main():
             stage_configs(config, profiles, live)
         except ValueError as exc:
             parser.error(str(exc))
-    run = asyncio.run(main_async(args.evidence, live, config, profiles))
-    print(json.dumps(summary(run) | {
+    if args.sandbox == "docker":
+        from .docker import ROW
+        try:
+            image = images(args.images)[ROW] if args.images else None
+        except (ValueError, OSError, KeyError) as exc:
+            parser.error(f"--images needs a {ROW} entry: {exc}"[:2048])
+        if image is None:
+            parser.error("--sandbox docker needs --images or CORSAIR_IMAGES")
+        run = asyncio.run(docker_async(args.evidence, live, config, image, profiles, args.timeout))
+    else:
+        run = asyncio.run(main_async(args.evidence, live, config, profiles))
+    route = json.loads((args.evidence / "configuration.json").read_text())["runner"]
+    print(json.dumps(summary(run) | {"route": route["route"], "qualification": route.get("qualification"),
         "config_sha256": sha256((args.evidence / "configuration.json").read_bytes()).hexdigest()}, indent=2))
 
 
