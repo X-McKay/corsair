@@ -61,6 +61,7 @@ def delete_owned_namespace(kube, namespace, uid):
         current = lookup()
         if current.returncode:
             cleanup['unknown'] = f'namespace query failed ({current.returncode}); deletion not attempted'
+            cleanup['query_stderr'] = (current.stderr or '')[-2000:]
             return cleanup
         if current.stdout.strip():
             if json.loads(current.stdout)['metadata']['uid'] != uid:
@@ -70,6 +71,7 @@ def delete_owned_namespace(kube, namespace, uid):
         after = lookup()
         if after.returncode:
             cleanup['unknown'] = f'namespace query after deletion failed ({after.returncode})'
+            cleanup['query_stderr'] = (after.stderr or '')[-2000:]
             return cleanup
         cleanup['namespace_deleted'] = not after.stdout.strip()
     except Exception as error:  # timeouts and uncertain delivery stay unknown, never confirmed
