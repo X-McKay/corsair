@@ -123,7 +123,7 @@ wheels = [
 [[package]]
 name = "corsair"
 version = "0.0.0"
-source = { virtual = "." }
+source = { editable = "." }
 
 [package.dev-dependencies]
 dev = [

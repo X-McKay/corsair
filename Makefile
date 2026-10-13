@@ -32,10 +32,10 @@ eval:
 eval-baseline:
 	uv run --locked python -m evals.run "$(AGENT)" --promote "$(RUN)"
 
-# One issue end to end from a corsair-issue-request/v1 file (src/corsair/investigate.py); prepared local images
-# from CORSAIR_IMAGES. Extra flags (--repository-host, --local-root) go in INVESTIGATE_ARGS.
+# A wrapper for `uv run corsair run`: one issue end to end from a corsair-issue-request/v1 file; prepared local
+# images from CORSAIR_IMAGES. Extra flags (--repository-host, --local-root) go in INVESTIGATE_ARGS.
 investigate:
-	PYTHONPATH=src uv run --locked python -m corsair.investigate --issue-json "$(ISSUE_JSON)" --provider-config "$(PROVIDER_CONFIG)" $(INVESTIGATE_ARGS)
+	uv run --locked corsair run --issue-json "$(ISSUE_JSON)" --provider-config "$(PROVIDER_CONFIG)" $(INVESTIGATE_ARGS)
 
 # One benchmark case through `investigate` for diagnosis, never a baseline (evals/case_e2e); cohorts use
 # `make eval AGENT=chain SET=<cohort>`. Needs CORSAIR_CASE_SOURCES and CORSAIR_IMAGES.

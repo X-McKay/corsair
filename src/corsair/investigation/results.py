@@ -8,6 +8,7 @@ from pathlib import Path
 from corsair.composition.direct import DirectRun
 
 from .build import Investigation
+from .docker import SETUP_NETWORK
 
 # "admission": refused before any model request (request, acquisition, runtime selection or framework table).
 STAGES = ("admission", "runtime", "environment", "identification", "planning", "authoring", "execution", "assessment",
@@ -39,13 +40,16 @@ def record(label: str, evidence: Path, *, investigation: Investigation | None = 
         "selected": None if investigation is None else {
             "language": investigation.case.environment.language, "image_row": investigation.row,
             "image": investigation.image, "framework": investigation.framework.name,
-            "runner": investigation.framework.runner, "evidence": investigation.framework.qualification.evidence,
+            "runner": investigation.framework.runner, "route": "docker_image_only",
+            # The framework row's own qualification; this route is plain Docker whatever the row says.
+            "evidence": investigation.framework.qualification.evidence,
             "witness_recorders": [f.id for f in investigation.harness.witness_facilities]},
         "bases": None if investigation is None else investigation.bases,
+        "setup_network": None if investigation is None else SETUP_NETWORK,
         "environment_framework": getattr(environment, "framework", None),
-        # Which test proved the environment: "project" (the environment stage's existing test) or "operator_smoke"
-        # (the corpus thread's smoke test, not yet wired); None when no environment was admitted.
-        "baseline_basis": "project" if getattr(environment, "status", None) == "ready" else None,
+        # Which test proved the environment: the project's own test or the operator smoke test (SPEC-0071); None
+        # when no environment was admitted.
+        "baseline_basis": getattr(environment, "baseline_basis", None),
         "reached": "admission" if run is None else (run.stopped_at or "complete"),
         "stopped_at": "admission" if run is None else run.stopped_at,
         "reason": refused if run is None else run.reason,
@@ -57,7 +61,8 @@ def record(label: str, evidence: Path, *, investigation: Investigation | None = 
 def summary_line(item: dict) -> str:
     """One line: the disposition and how it was reached, or where and why the run stopped."""
     selected = item["selected"]
-    chosen = (f"{selected['image_row']} ({selected['evidence']}), {selected['framework']}" if selected else "nothing selected")
+    chosen = (f"{selected['image_row']} over plain Docker (row evidence {selected['evidence']}), {selected['framework']}"
+              if selected else "nothing selected")
     requests = sum(u["requests"] or 0 for u in item["usage"].values())
     head = item["issue"]
     if item["revisions"]:

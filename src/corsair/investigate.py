@@ -1,4 +1,4 @@
-"""`corsair investigate --issue-json <file>`: one issue investigated end to end.
+"""`uv run corsair run --issue-json <file>`: one issue investigated end to end.
 
 The request (`corsair-issue-request/v1`) names the issue, the repository and its vulnerable and fixed commits; the
 system selects the runtime from the repository's own build files, prepares the environment, identifies, plans,
@@ -27,7 +27,7 @@ from corsair.composition.receipts import (AGENT_STAGES, VERSION_FIELDS, VERSIONS
 from corsair.inference.config import InferenceConfig, load_inference
 from corsair.inference.models import configured_model, preflight
 from corsair.investigation.build import Investigation, Refused, build
-from corsair.investigation.docker import DockerPreparation, DockerRunners, install
+from corsair.investigation.docker import SETUP_NETWORK, DockerPreparation, DockerRunners, install
 from corsair.investigation.request import IssueRequest
 from corsair.investigation.results import record, summary_line
 
@@ -69,7 +69,8 @@ async def _chain(investigation: Investigation, evidence: Path, config: Inference
         else:
             configs, selected = {}, {stage: models[stage]() for stage in AGENT_STAGES}
         (receipts / "configuration.json").write_text(json.dumps({
-            "mode": "direct", "route": "docker_image_only", "live_stages": list(configs),
+            "mode": "direct", "route": "docker_image_only", "setup_network": SETUP_NETWORK,
+            "test_network": "none", "live_stages": list(configs),
             "stage_providers": {stage: c.model_dump() for stage, c in configs.items()}, "stage_profiles": profiles,
             "budget": budget.model_dump(),
             "versions": {stage: dict(zip(VERSION_FIELDS, VERSIONS[stage])) for stage in AGENT_STAGES},
@@ -80,10 +81,11 @@ async def _chain(investigation: Investigation, evidence: Path, config: Inference
             "runtime_inputs": sorted(investigation.case.runtime.files), "timeout_seconds": timeout,
             "source": {"python": sys.version}}, indent=2))
         preparation = DockerPreparation({investigation.row: investigation.image}, investigation.trees["baseline"],
-                                        investigation.commits["baseline"], investigation.harness, timeout)
+                                        investigation.commits["baseline"], investigation.harness, timeout,
+                                        evidence / "overlays")
         with ExitStack() as containers, LocalArtifacts(evidence / "artifacts", max_bytes=8 * 1024 * 1024) as store:
             journal = Journal(DockerRunners(investigation.harness, investigation.image, revisions, store, timeout,
-                                            evidence / "runs", containers))
+                                            evidence / "runs", containers, preparation))
             try:
                 run = await run_direct(investigation.case, StageModels(**selected), journal, budget,
                                        catalog=investigation.catalog, preparation=preparation)
@@ -148,8 +150,8 @@ def investigate(request: IssueRequest, evidence: Path, images: dict[str, str], *
     return item
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="corsair investigate", description=__doc__,
+def main(argv: list[str] | None = None, prog: str = "corsair run") -> int:
+    parser = argparse.ArgumentParser(prog=prog, description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--issue-json", required=True, type=Path, help="A corsair-issue-request/v1 file")
     parser.add_argument("--provider-config", required=True, type=Path, help="Per-agent provider JSON")

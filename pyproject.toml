@@ -4,6 +4,13 @@ version = "0.0.0"
 description = "Sandboxed security issue validation; initial platform qualification"
 requires-python = ">=3.12,<3.13"
 
+[project.scripts]
+corsair = "corsair.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.11.32,<0.12"]
+build-backend = "uv_build"
+
 [dependency-groups]
 dev = [
     "esprima==4.0.1",
@@ -16,7 +23,11 @@ dev = [
 ]
 
 [tool.uv]
-package = false
+package = true
+
+[tool.uv.build-backend]
+# src/corsair is a namespace package (no __init__.py).
+namespace = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -4,6 +4,7 @@ SPEC-0026 dependency provisioning reaches the sandbox; image evidence, not sandb
 """
 from contextlib import ExitStack
 import os
+import re
 from pathlib import Path
 from typing import Literal, Mapping
 
@@ -16,15 +17,45 @@ from .frameworks import Harness
 
 SCRATCH = "/tmp/corsair-scratch"
 DEPENDENCIES = "/dependencies"
+OVERLAY = "/overlay"
+
+
+def write_overlay(files, tree: Path, destination: Path) -> Path:
+    """SPEC-0071 operator files (smoke tests) into a fresh host directory mounted read-only beside the tree; a path
+    the commit already has is refused before any container starts."""
+    destination.mkdir(parents=True, exist_ok=False)
+    for item in files:
+        if (tree / item.path).exists() or (tree / item.path).is_symlink():
+            raise ValueError(f"overlay path {item.path} is already in the commit")
+        target = destination / item.path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(item.content)
+    return destination
+
+
+# Setup containers (dependency install, the environment stage's sandbox) run on Docker's default bridge, never the
+# host's network: model-chosen setup commands must not reach the host's own services. The bridge has no egress
+# policy, so the setup network is recorded as unenforced (SETUP_NETWORK).
+SETUP_NETWORK = {"network": "bridge", "egress": "unenforced",
+                 "note": "Docker default bridge: internet reachable, host network never used, no egress policy"}
+CREDENTIALS = re.compile(r"://[^/@\s]*@")
 
 
 def registry_access(names: tuple[str, ...]) -> tuple[str, tuple[str, ...], tuple[tuple[str, str], ...]]:
-    """Network, environment and read-only mounts for registry access during setup: the host's network only when the
-    host itself reaches the registry through the variables `names` (a proxy, its CA file), else the bridge."""
-    env = tuple(f"{name}={os.environ[name]}" for name in names if os.environ.get(name))
+    """Network, environment and read-only mounts for registry access during setup: always the bridge, with the
+    operator's proxy and CA variables among `names` that are set. A value carrying credentials (`user:pass@`) is
+    refused rather than passed into a container the model drives."""
+    env = []
+    for name in names:
+        value = os.environ.get(name)
+        if not value:
+            continue
+        if CREDENTIALS.search(value):
+            raise ValueError(f"{name} carries credentials; setup containers never receive them")
+        env.append(f"{name}={value}")
     files = tuple((value, value) for name in names if (value := os.environ.get(name, "")).startswith("/")
                   and Path(value).is_file())
-    return ("host" if env else "bridge"), env, files
+    return SETUP_NETWORK["network"], tuple(env), files
 
 
 def setup_identity(harness: Harness, image: str, tree: Path, commit: str) -> dict:
@@ -38,7 +69,10 @@ def install(harness: Harness, image: str, tree: Path, commit: str, dependencies:
     fresh directory; the receipt binds them to this image, commit and lockfiles. Raises when setup fails."""
     dependencies.mkdir(parents=True, exist_ok=False)
     evidence.mkdir(parents=True, exist_ok=False)
-    network, env, mounts = registry_access(harness.registry_env)
+    try:
+        network, env, mounts = registry_access(harness.registry_env)
+    except ValueError as error:
+        raise RuntimeError(f"dependency setup refused: {error}") from error
     script = (f"cp -R /src {WORK}; cd {WORK}; {harness.setup_script}; "
               f"cp -R {WORK}/{harness.dependencies} {DEPENDENCIES}/")
     result = docker("run", "--rm", f"--network={network}", *HARDENED, "--user", user(), "-e", "HOME=/tmp",
@@ -55,27 +89,36 @@ def install(harness: Harness, image: str, tree: Path, commit: str, dependencies:
 
 
 def workspace(harness: Harness, image: str, tree: Path, dependencies: Path, commit: str, timeout: int,
-              evidence: Path | None = None) -> DockerCase:
-    """The offline container of one revision: a fresh copy of its tree and of the dependencies setup installed."""
+              evidence: Path | None = None, overlay: Path | None = None) -> DockerCase:
+    """The offline container of one revision: a fresh copy of its tree, the environment stage's overlay and the
+    dependencies setup installed."""
+    mounts = ((dependencies, DEPENDENCIES),) + (((overlay, OVERLAY),) if overlay else ())
     return DockerCase(image, tree, commit, timeout, kind="investigation-run", docker=docker, evidence=evidence,
-                      mounts=((dependencies, DEPENDENCIES),), env=("HOME=/tmp",),
-                      copies=f"cp -R {DEPENDENCIES}/{harness.dependencies} {WORK}/;")
+                      mounts=mounts, env=("HOME=/tmp",),
+                      copies=(f"cp -R {OVERLAY}/. {WORK}/; " if overlay else "")
+                      + f"cp -R {DEPENDENCIES}/{harness.dependencies} {WORK}/;")
 
 
 class DockerPreparation:
     """The environment stage's sandbox: the selected row's local image with the vulnerable tree copied to the
     workspace and registry access, released (container removed, removal confirmed) after the stage."""
 
-    def __init__(self, images: Mapping[str, str], tree: Path, commit: str, harness: Harness, timeout: int):
+    def __init__(self, images: Mapping[str, str], tree: Path, commit: str, harness: Harness, timeout: int,
+                 overlays: Path):
         self.images, self.tree, self.commit, self.harness, self.timeout = images, tree, commit, harness, timeout
+        self.overlays, self.overlay = overlays, None  # The overlay the environment stage saw, for the runners
 
-    def prepare(self, toolchain: Toolchain, operation) -> PreparedSandbox:
+    def prepare(self, toolchain: Toolchain, operation, *, overlay=()) -> PreparedSandbox:
         network, env, mounts = registry_access(self.harness.registry_env)
+        if overlay:
+            self.overlay = write_overlay(overlay, self.tree, self.overlays / str(operation))
+            mounts = (*mounts, (str(self.overlay), OVERLAY))
         sandbox = DockerCase(self.images[toolchain.toolchain_id], self.tree, self.commit, self.timeout,
                              kind="investigation-environment", docker=docker, mounts=mounts, env=("HOME=/tmp", *env),
                              network=network)
         sandbox.__enter__()
-        copied = docker("exec", sandbox.container, "/bin/sh", "-ec", f"cp -R /src {WORK}; mkdir -p {SCRATCH}")
+        copy_overlay = f"cp -R {OVERLAY}/. {WORK}/; " if overlay else ""
+        copied = docker("exec", sandbox.container, "/bin/sh", "-ec", f"cp -R /src {WORK}; {copy_overlay}mkdir -p {SCRATCH}")
         if copied.returncode != 0:
             sandbox.__exit__(None, None, None)
             raise RuntimeError(f"environment sandbox workspace copy failed: {copied.stderr[-512:]!r}")
@@ -91,8 +134,9 @@ class DockerRunners:
     the framework's runner adapter on top. Development and baseline runs use the vulnerable revision."""
 
     def __init__(self, harness: Harness, image: str, revisions: Mapping[str, tuple[Path, Path, str]], store,
-                 timeout: int, evidence: Path, stack: ExitStack):
+                 timeout: int, evidence: Path, stack: ExitStack, preparation: "DockerPreparation | None" = None):
         self.harness, self.image, self.revisions, self.store = harness, image, revisions, store
+        self.preparation = preparation
         self.timeout, self.evidence, self.stack, self.calls = timeout, evidence, stack, 0
 
     def __call__(self, purpose):
@@ -101,5 +145,6 @@ class DockerRunners:
         self.calls += 1
         logs = self.evidence / f"{self.calls}-{purpose}"
         logs.mkdir(parents=True)
-        case = self.stack.enter_context(workspace(self.harness, self.image, tree, dependencies, commit, self.timeout, logs))
+        case = self.stack.enter_context(workspace(self.harness, self.image, tree, dependencies, commit, self.timeout, logs,
+                                                    self.preparation.overlay if self.preparation else None))
         return self.harness.runner(case, case, self.store, self.harness.config)
