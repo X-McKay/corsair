@@ -10,9 +10,10 @@ from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import UsageLimits
 
 from corsair.adapters.local_artifacts import LocalArtifacts
-from corsair.agents.issue_analysis.identification_contracts import IssueIdentification
-from corsair.agents.issue_analysis.repository_identification import (
-    SKILL_TEXT, RepositoryDependencies, RepositoryIssueInput, create_repository_identification_agent,
+from corsair.agents.issue_identification.contracts import IssueIdentification
+from corsair.agents.issue_identification.skills import REPOSITORY_SKILL_TEXT as SKILL_TEXT
+from corsair.agents.issue_identification import (
+    RepositoryDependencies, RepositoryIssueInput, create_repository_identification_agent,
     repository_identification_prompt,
 )
 from corsair.agents.source import (

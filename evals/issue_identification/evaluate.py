@@ -21,10 +21,11 @@ from pydantic_evals import Case, Dataset, set_eval_attribute
 from pydantic_evals.evaluators import Evaluator, HasMatchingSpan, MaxModelRequests, MaxToolCalls
 
 from corsair.agents.issue_analysis.contracts import IssueAnalysisInput
-from corsair.agents.issue_analysis.identification import (
-    CONFIG_VERSION, PROMPT_VERSION, SKILL_SHA256, create_issue_identification_agent, identification_prompt,
+from corsair.agents.issue_identification import (
+    CONFIG_VERSION, PROMPT_VERSION, TOOLSET_SHA256, create_issue_identification_agent, identification_prompt,
 )
-from corsair.agents.issue_analysis.identification_contracts import IssueIdentification, IssueIdentificationDraft
+from corsair.agents.issue_identification.skills import SKILL_SHA256
+from corsair.agents.issue_identification.contracts import IssueIdentification, IssueIdentificationDraft
 from corsair.agents.issue_analysis.provider import LocalModelConfig, local_model
 from corsair.agents.issue_analysis.tools import FixtureDependencies
 from evals.issue_analysis.evaluate import describe_model, record_count
@@ -110,6 +111,7 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None):
     metadata = {"mode": "scripted_fixture" if scripted else "direct_local_provider",
                 "model": describe_model(actual_model), "weights_identity": "not_applicable" if scripted else "unknown",
                 "prompt_version": PROMPT_VERSION, "config_version": CONFIG_VERSION, "skill_sha256": SKILL_SHA256,
+                "toolset_sha256": TOOLSET_SHA256,
                 "budget": budget.model_dump(), "task_retries": 0, "max_concurrency": 1,
                 "dataset_sha256": sha256((ROOT / "cases.yaml").read_bytes()).hexdigest(),
                 "output_contract": IssueIdentification.__name__, "draft_contract": IssueIdentificationDraft.__name__}
