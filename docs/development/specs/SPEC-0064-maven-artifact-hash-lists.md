@@ -1,10 +1,10 @@
 ---
-id: SPEC-0061
+id: SPEC-0064
 kind: spec
 title: Reviewed Maven artifact hash lists for the Java toolchain images
 status: accepted
 updated: 2026-10-13
-related: [SPEC-0007, SPEC-0041, SPEC-0045, IDEA-0002, PLAN-0066]
+related: [SPEC-0007, SPEC-0041, SPEC-0045, IDEA-0002, PLAN-0069]
 ---
 
 # Reviewed Maven artifact hash lists for the Java toolchain images
@@ -28,7 +28,7 @@ In scope: the image cache (fixture build, Surefire 3.6.0 and its JUnit Platform 
 - Two clean `--no-cache` fetches of each image produce the same list; a full build passes with the list; a build with one hash changed and a build with the launcher's entry removed both fail with the `diff` naming the file.
 - The fixture runs offline in each new image as the trusted control does (2 tests, 0 failures, 0 skipped).
 - Offline guard (`tests/configuration/test_maven_hashes.py`, in `make test-config`): every Java image has a list its Dockerfile checks; lists are well-formed, sorted, unique and free of sidecars; each list holds the fixture POM's pinned plugins and test dependency, the dependency plugin, the launcher (with the same hash as `junit-launcher.sha256`) and the Surefire JUnit Platform provider.
-- Live (RIG0, image-only tier): `make toolchain-images TOOLCHAINS="java java8"` builds the files as checked in (the build itself is the check against a clean fetch), the lists equal the `*-maven-cache.sha256` inventories retained from #51's runs, and VUL4J-6 through `java_image_case` on the new `java8` image matches #51's result.
+- Live (RIG0, image-only tier): `make toolchain-images TOOLCHAINS="java java8"` builds the files as checked in (the build itself is the check against a clean fetch), the lists equal the `*-maven-cache.sha256` inventories retained from #51's RIG0 builds as sets (checked), and VUL4J-6 through `java_image_case` on the new `java8` image matches #51's result.
 
 ## Decisions and open questions
 

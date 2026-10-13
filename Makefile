@@ -89,7 +89,7 @@ qualify-toolchain:
 	mkdir -p "$(CORSAIR_QUAL_RUN)"
 	uv run --locked python -m pytest $(PYTEST_ROOT) tests/qualification -m toolchain $(foreach language,$(TOOLCHAINS),--toolchain $(language)) --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
 
-# Refresh each Java image's reviewed Maven cache list (SPEC-0061) from a clean build of its preparation stage, then
+# Refresh each Java image's reviewed Maven cache list (SPEC-0064) from a clean build of its preparation stage, then
 # review the diff: the image build fails on any difference from the checked-in list. TOOLCHAINS names the Java images
 # (default: both).
 .PHONY: maven-hashes

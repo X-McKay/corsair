@@ -1,4 +1,4 @@
-"""SPEC-0061 guards on the reviewed Maven cache lists; the image build itself compares each list to a clean fetch."""
+"""SPEC-0064 guards on the reviewed Maven cache lists; the image build itself compares each list to a clean fetch."""
 import re
 import xml.etree.ElementTree as ET
 

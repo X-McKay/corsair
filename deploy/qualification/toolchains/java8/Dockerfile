@@ -17,7 +17,7 @@ RUN mvn="/usr/share/maven/bin/mvn -B -ntp -C -f /tmp/preparation/pom.xml -Dmaven
 
 FROM cache
 COPY m2.sha256 /tmp/m2.sha256
-# Fail closed (SPEC-0061): the cache must be exactly the reviewed list, file for file and hash for hash, and every
+# Fail closed (SPEC-0064): the cache must be exactly the reviewed list, file for file and hash for hash, and every
 # artifact must have come from Maven Central. Refresh the list with `make maven-hashes` and review its diff.
 RUN diff -u /tmp/m2.sha256 /opt/corsair-m2.sha256 \
     && ! find /opt/corsair-m2 -name _remote.repositories -exec cat {} + | grep -v -E -e '^#' -e '>central-8fac3ebd6edbaca3c794783fa38088af0aa128e7=$' \
