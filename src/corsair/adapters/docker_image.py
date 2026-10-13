@@ -51,7 +51,8 @@ def commit_tree(checkout, destination, commit='HEAD'):
     for mode, _, sha, path in entries:
         header_end = batch.index(b'\n', offset)
         name, _, size = batch[offset:header_end].split(b' ')
-        assert name == sha, f'cat-file returned {name!r} for {sha!r}'
+        if name != sha:
+            raise RuntimeError(f'cat-file returned {name!r} for {sha!r}')
         start = header_end + 1
         data, offset = batch[start:start + int(size)], start + int(size) + 1
         target = destination / path
@@ -110,7 +111,8 @@ class DockerCase:
         environment = [arg for pair in self.env for arg in ('-e', pair)]
         result = self.docker('run', '-d', f'--network={self.network}', *HARDENED, '--user', user(), *environment, *volumes,
                              self.image, '/bin/sleep', 'infinity')
-        assert result.returncode == 0, result.stderr
+        if result.returncode != 0:
+            raise RuntimeError(f'docker run failed: {result.stderr[-2000:]!r}')
         self.container = result.stdout.decode().strip()
         return self
 
@@ -129,11 +131,13 @@ class DockerCase:
         built = self.docker('exec', self.container, '/bin/sh', '-ec', script)
         if self.evidence is not None:
             (self.evidence / f'prepare-{operation}.log').write_bytes(built.stdout + built.stderr)
-        assert built.returncode == 0, built.stderr[-2000:]
+        if built.returncode != 0:
+            raise RuntimeError(f'workspace preparation failed: {built.stderr[-2000:]!r}')
         for item in patch.files:
             written = self.docker('exec', '-i', self.container, '/bin/sh', '-ec', 'mkdir -p "$(dirname "$1")"; cat > "$1"',
                                   'write', f'{WORK}/{item.path}', stdin=item.content)
-            assert written.returncode == 0, written.stderr
+            if written.returncode != 0:
+                raise RuntimeError(f'patch write failed for {item.path}: {written.stderr[-2000:]!r}')
         digest = lambda text: ArtifactRef(hashlib.sha256(text.encode()).hexdigest(), len(text))
         return PreparedWorkspace(self.handle(operation), digest(self.commit), digest(patch.sha256), patch.sha256)
 
@@ -141,17 +145,28 @@ class DockerCase:
         removed = self.docker('exec', self.container, '/bin/rm', '-rf', WORK, *self.scratch)
         return 'confirmed' if removed.returncode == 0 else 'unconfirmed'
 
+    def stop_workers(self):
+        """After a timed-out exec: killing the docker client leaves its process running in the container, so kill every
+        process but PID 1 (`sleep infinity`), then confirm only PID 1 is left. Never retried."""
+        try:
+            self.docker('exec', self.container, '/bin/sh', '-c', 'kill -9 -1', timeout=30)
+            listed = self.docker('top', self.container, '-o', 'pid', timeout=30)
+        except subprocess.TimeoutExpired:
+            return 'unconfirmed'
+        pids = listed.stdout.decode(errors='replace').split()[1:] if listed.returncode == 0 else None
+        return 'confirmed' if pids is not None and len(pids) == 1 else 'unconfirmed'
+
     def execute(self, handle, argv, operation):
         started, clock = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), time.monotonic()
-        # A hang (for example a vulnerable infinite loop) is a terminal-unknown failure, never retried; the
-        # container is removed with everything in it on exit.
+        # A hang (for example a vulnerable infinite loop) is a terminal-unknown failure, never retried; its processes
+        # are killed before the container is reused, and the container is removed with everything in it on exit.
         try:
             result = self.docker('exec', '-w', WORK, self.container, *argv, timeout=self.timeout)
         except subprocess.TimeoutExpired as error:
             return ExecutionReceipt(operation=str(operation), handle=handle, started_at=started,
                                     elapsed_seconds=round(time.monotonic() - clock, 3), delivery='acknowledged',
                                     completion='unknown', reason='timeout', stdout=error.stdout or b'',
-                                    stderr=error.stderr or b'', native_exit=None, worker_cleanup='unconfirmed')
+                                    stderr=error.stderr or b'', native_exit=None, worker_cleanup=self.stop_workers())
         return ExecutionReceipt(operation=str(operation), handle=handle, started_at=started,
                                 elapsed_seconds=round(time.monotonic() - clock, 3), delivery='acknowledged',
                                 completion='terminal_observed', reason='terminal', stdout=result.stdout,
