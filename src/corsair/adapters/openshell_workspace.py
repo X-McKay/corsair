@@ -25,7 +25,10 @@ from corsair.ports.execution import ExecutionError, ExecutionReceipt, SandboxExe
 from corsair.ports.sandbox import SandboxHandle, SandboxLifecycle
 from corsair.ports.test_runner import ApprovedPatch, PreparedWorkspace
 
-MAX_TREE_FILES = 64
+# Default bounds admit the SPEC-0018 fixture; an operator may raise entries up to the ceiling for a small real
+# project (SPEC-0046 ran one 73-file benchmark tree). Larger trees wait for in-sandbox source fetch (SPEC-0025).
+FIXTURE_TREE_FILES = 64
+MAX_TREE_FILES = 512
 MAX_TREE_BYTES = 4 * 1024 * 1024
 MAX_FILE_BYTES = 1024 * 1024
 MODES = {'100644': 0o400, '100755': 0o500}
@@ -64,7 +67,7 @@ class WorkspaceConfig:
     remote_parent: str
     root_name: str
     python: str
-    max_files: int = MAX_TREE_FILES
+    max_files: int = FIXTURE_TREE_FILES
     max_bytes: int = MAX_TREE_BYTES
 
     def __post_init__(self):
@@ -78,7 +81,7 @@ class WorkspaceConfig:
             raise ValueError('Absolute host staging directory required')
         if not (type(self.max_files) is int and 1 <= self.max_files <= MAX_TREE_FILES
                 and type(self.max_bytes) is int and 1 <= self.max_bytes <= MAX_TREE_BYTES):
-            raise ValueError('Workspace bounds outside the admitted fixture range')
+            raise ValueError('Workspace bounds outside the admitted range')
 
     @property
     def remote_root(self) -> str:

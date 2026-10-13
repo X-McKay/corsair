@@ -250,10 +250,10 @@ def native_run(run: Run, operation: UUID) -> NativeTestRun:
 
 
 def probe_record(security: dict, nonce: str) -> dict:
-    """The SPEC-0033 ``corsair-witness-v1`` record the operator probe writes for one run."""
-    return {"schema": "corsair-witness-v1", "nonce": nonce, "plugin_sha256": PROBE_SHA256,
+    """The SPEC-0033 ``corsair-witness-v2`` record the operator probe writes for one run."""
+    return {"schema": "corsair-witness-v2", "nonce": nonce, "plugin_sha256": PROBE_SHA256,
             "target": {"path": ENVELOPE.target_path, "symbol": ENVELOPE.target_symbol,
-                       "effect_name": ENVELOPE.effect_name}, "tool_registered": True, "intact": True,
+                       "effect_name": ENVELOPE.effect_name}, "tool_registered": True, "intact": True, "unsupported": None,
             "tests": {CONTROL: CONTROL_RECORD, SECURITY: security}}
 
 

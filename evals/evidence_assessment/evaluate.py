@@ -240,7 +240,7 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, split: Split | L
                 "budget": budget.model_dump(), "split": split, "cases": [case.name for case in corpus.cases],
                 "task_retries": 0, "max_concurrency": 1,
                 "dataset_sha256": sha256(CASES.read_bytes()).hexdigest(),
-                "output_contract": EvidenceAssessment.__name__, "witness_record_schema": "corsair-witness-v1"}
+                "output_contract": EvidenceAssessment.__name__, "witness_record_schema": "corsair-witness-v2"}
     (evidence / "configuration.json").write_text(json.dumps(metadata, indent=2))
     corpus.evaluators.extend([ScoredAssessment(), RequiredReads(), FindingLabels(), NoUnknownToolAttempts(),
                               MaxModelRequests(max_requests=budget.request_limit),

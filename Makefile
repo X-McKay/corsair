@@ -73,16 +73,18 @@ qualify-policy:
 	uv run --locked python -m pytest tests/qualification -m policy --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
 
 .PHONY: toolchain-images toolchain-images-load qualify-toolchain
+# TOOLCHAINS limits preparation to the named image directories and the gate to the gates whose images are all
+# named, e.g. TOOLCHAINS=python37 or TOOLCHAINS="java python"; a list no gate covers is a usage error.
 toolchain-images:
-	uv run --locked python -m tests.qualification.prepare_toolchains build
+	uv run --locked python -m tests.qualification.prepare_toolchains build $(foreach language,$(TOOLCHAINS),--language $(language))
 
 toolchain-images-load:
-	uv run --locked python -m tests.qualification.prepare_toolchains load
+	uv run --locked python -m tests.qualification.prepare_toolchains load $(foreach language,$(TOOLCHAINS),--language $(language))
 
 qualify-toolchain:
 	test ! -e "$(CORSAIR_QUAL_RUN)"
 	mkdir -p "$(CORSAIR_QUAL_RUN)"
-	uv run --locked python -m pytest tests/qualification -m toolchain --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
+	uv run --locked python -m pytest tests/qualification -m toolchain $(foreach language,$(TOOLCHAINS),--toolchain $(language)) --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
 
 .PHONY: qualify-recovery
 qualify-recovery:
@@ -191,6 +193,15 @@ qualify-fixture-e2e:
 	test -z "$(CORSAIR_E2E_LIVE)" -o "$(CORSAIR_E2E_RUNS)" = 0 -o -f "$(CORSAIR_PROVIDER_CONFIG)"
 	mkdir -p "$(CORSAIR_QUAL_RUN)"
 	uv run --locked python -m pytest tests/qualification -m fixture_e2e --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --provider-config "$(CORSAIR_PROVIDER_CONFIG)" --e2e-live "$(CORSAIR_E2E_LIVE)" --e2e-runs "$(CORSAIR_E2E_RUNS)" $(if $(CORSAIR_STAGE_PROFILES),--e2e-stage-profiles "$(CORSAIR_STAGE_PROFILES)") --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
+
+.PHONY: qualify-python37-case
+# SPEC-0046: host-fetch CVE-2021-32839 into RUN-sources (pins written there, not to benchmarks/), then the pytest
+# runner on its baseline and fix commits in fresh CPython 3.7 sandboxes. Needs TOOLCHAINS=python37 images loaded.
+qualify-python37-case:
+	test ! -e "$(CORSAIR_QUAL_RUN)"
+	mkdir -p "$(CORSAIR_QUAL_RUN)"
+	PYTHONPATH="$(CURDIR)/src:$(CURDIR)" uv run --locked python -m evals.benchmark.sources fetch --run-dir "$(CORSAIR_QUAL_RUN)-sources" --cases CVE-2021-32839 --keep --pins "$(CORSAIR_QUAL_RUN)-sources/source-pins.json"
+	CORSAIR_CASE_SOURCES="$(CORSAIR_QUAL_RUN)-sources" uv run --locked python -m pytest tests/qualification -m python37_case --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
 
 .PHONY: qualify-witness
 qualify-witness:
