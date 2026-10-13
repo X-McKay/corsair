@@ -391,3 +391,26 @@ def test_a_runtime_without_monitoring_runs_the_tests_and_records_itself_unsuppor
     assert record['tests'][SECURITY]['complete'] is True
     found = witness_evidence(capture((tmp_path / 'witness.json').read_bytes()), REQUEST, SECURITY)
     assert (found.witness, found.sandbox_events) == (None, None) and 'unsupported on this runtime' in found.reason
+
+
+DEFERRED = '''import asyncio, os
+
+async def read(root, name):
+    asyncio.get_running_loop().call_soon(lambda: open(os.path.join(root, name)).read())
+    await asyncio.sleep(0)
+'''
+
+
+def test_a_same_thread_open_deferred_by_the_target_is_never_an_absence(tmp_path):
+    """Codex on #44: an event-loop callback the target schedules runs on the test thread off the target's stack."""
+    done, record = run_probe(tmp_path, '''
+import asyncio
+def test_security(tmp_path):
+    (tmp_path / "outside.txt").write_text("sentinel")
+    assert (tmp_path / "outside.txt").read_text() == "sentinel"
+    asyncio.run(target.read(tmp_path, "outside.txt"))
+''', target=DEFERRED)
+    assert record, done.stdout.decode() + done.stderr.decode()
+    assert json.loads(record)['tests'][SECURITY]['offstack_planned'] >= 1
+    found = witness_evidence(capture(record), REQUEST, SECURITY, planned_safe_behavior='no_file_open')
+    assert found.witness.effect == 'unknown' and found.witness.safe_behavior != 'no_file_open'

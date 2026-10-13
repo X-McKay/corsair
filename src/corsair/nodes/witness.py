@@ -66,7 +66,7 @@ class _TestRecord(_Record):
     os_errors: tuple[_OSError, ...] = Field(max_length=32)
     truncated: bool
     complete: bool
-    # Planned-file opens on other threads during the call; None when the record predates the count.
+    # Planned-file opens off the target's stack during the call (other threads, or after the first entry); None when the record predates the count.
     offstack_planned: int | None = Field(default=None, ge=0)
 
 

@@ -5,9 +5,9 @@ load on any admitted CPython (3.7+) and pytest (old-style hook wrapper, no ``pyt
 needs CPython 3.12+ (``sys.monitoring``; audit hooks are 3.8+ and ``co_qualname`` 3.11+): on an older runtime the
 probe registers nothing, lets the run proceed and writes a record naming the runtime as unsupported. Native ``sys.monitoring`` events attribute calls, returns and unwinds to
 the identified target function; native audit ``open`` events and raised ``OSError``s count only when the
-target is on the calling stack and only during a test's call phase. Opens of the planned file on another
-thread during the call phase are counted separately (``offstack_planned``), since they cannot be attributed
-to the target but may be its effect; child processes are not observed. The record is written once, after the
+target is on the calling stack and only during a test's call phase. Opens of the planned file off the target's
+stack during the call phase, on another thread or after the target was first entered, are counted separately
+(``offstack_planned``), since they cannot be attributed to the target but may be its effect; child processes are not observed. The record is written once, after the
 session, to an operator path; the host maps it to the gate's witness. It runs inside the test interpreter,
 so it is tamper-evident (its own tool registration, events and the operator nonce are checked), not
 tamper-proof against hostile test code.
@@ -156,9 +156,10 @@ class Probe:
         if isinstance(path, bytes):
             path = path.decode('utf-8', 'replace')
         if not self._on_stack(frame):
-            # The test body's own reads run on the test thread; another thread's open of the planned file
-            # may be the target's effect moved off its stack (a worker or executor).
-            if threading.get_ident() != self.test_thread and self._planned(path):
+            # Another thread's open of the planned file, or one on the test thread once the target has been
+            # entered, may be the target's effect moved off its stack (a worker, executor or event-loop callback).
+            # Only the test body's reads before the first call are not counted.
+            if self._planned(path) and (threading.get_ident() != self.test_thread or test['entered']):
                 test['offstack_planned'] += 1
             return
         if len(test['opens']) < MAX_OPENS:
