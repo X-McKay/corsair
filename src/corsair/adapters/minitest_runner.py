@@ -167,9 +167,9 @@ class MinitestRunner(NativeRunner):
         execution, layer = self._run_once(prepared, ids, frozenset(paths), uuid5(operation, 'execution'))
         captured = None
         if witness is not None:
-            # No Ruby witness probe exists (SPEC-0059); nothing is run, so the gates see an absent witness.
+            # No Ruby witness probe exists (SPEC-0063); nothing is run, so the gates see an absent witness.
             captured = WitnessCapture('unavailable', witness, str(uuid5(operation, 'witness-nonce')), '', b'', None,
-                                      'no Ruby witness probe; see SPEC-0059', None)
+                                      'no Ruby witness probe; see SPEC-0063', None)
         return discovery, execution, layer, execution.detail, captured
 
     def _run_once(self, prepared: PreparedWorkspace, ids: tuple[str, str], test_paths: frozenset[str], operation: UUID):

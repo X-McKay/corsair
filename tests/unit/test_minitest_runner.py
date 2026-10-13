@@ -141,7 +141,7 @@ def test_parser_refuses_ambiguous_reports(mutate):
 def test_witness_requests_are_unavailable_without_running_anything(store):
     request = WitnessRequest('lib/widget.rb', 'Widget.escape', 'x.txt')
     result, execution, *_ = run(store, (listing('test_control', 'test_fixed'), 0), (PASS, 0), witness=request)
-    assert result.witness.status == 'unavailable' and 'SPEC-0059' in result.witness.detail
+    assert result.witness.status == 'unavailable' and 'SPEC-0063' in result.witness.detail
     assert len(execution.calls) == 2
 
 

@@ -1,17 +1,17 @@
 ---
-id: SPEC-0059
+id: SPEC-0063
 kind: spec
 title: Minitest runner and report parser
 status: draft
 updated: 2026-10-13
-related: [SPEC-0042, SPEC-0039, SPEC-0041, PLAN-0064]
+related: [SPEC-0042, SPEC-0039, SPEC-0041, PLAN-0068]
 ---
 
 # Minitest runner and report parser
 
 ## Goal and scope
 
-The 4 Ruby benchmark cases the Ruby 3.1 image (SPEC-0058, PR #68) serves all test with Minitest: CVE-2023-22794 (rails, Minitest 5.15.0 locked), CVE-2023-36823 (sanitize, `~> 5.14.4`), CVE-2025-27610 (rack, `~> 5.0`) and CVE-2024-21510 (sinatra, `~> 5.0`; both resolve to 5.27.0 today, since Minitest 6 is outside `~> 5.0`). SPEC-0042 supports a case only when a framework row with a Corsair runner names the image, so the image unblocks nothing alone. This spec adds the runner and its report parser on the existing native runner contract (`adapters/native_runner.py`), the Ruby analogue of the Maven runner (SPEC-0039/SPEC-0041). Not in scope: environment-agent admission of `minitest` and the matrix framework row (after a real case passes on RIG0, PLAN-0064), RSpec and test-unit, spec-style (`describe`/`it`) test names, and a Ruby witness probe.
+The 4 Ruby benchmark cases the Ruby 3.1 image (SPEC-0058, PR #68) serves all test with Minitest: CVE-2023-22794 (rails, Minitest 5.15.0 locked), CVE-2023-36823 (sanitize, `~> 5.14.4`), CVE-2025-27610 (rack, `~> 5.0`) and CVE-2024-21510 (sinatra, `~> 5.0`; both resolve to 5.27.0 today, since Minitest 6 is outside `~> 5.0`). SPEC-0042 supports a case only when a framework row with a Corsair runner names the image, so the image unblocks nothing alone. This spec adds the runner and its report parser on the existing native runner contract (`adapters/native_runner.py`), the Ruby analogue of the Maven runner (SPEC-0039/SPEC-0041). Not in scope: environment-agent admission of `minitest` and the matrix framework row (after a real case passes on RIG0, PLAN-0068), RSpec and test-unit, spec-style (`describe`/`it`) test names, and a Ruby witness probe.
 
 ## Boundaries and design
 
@@ -31,4 +31,4 @@ Offline: `make test-config`, including the parser against the runner's own outpu
 
 ## Decisions and open questions
 
-A small fixed reporter on Minitest's native plugin API instead of minitest-reporters or ci_reporter: those are project dependencies Corsair would have to add, and Al's direction is to run the project's own versions unchanged. Minitest 5.16+ orders `runnable_methods` with the run seed, which is unset outside `Minitest.run`; the listing script sets it when unset (found on 5.27.0). Rails runs its component tests from the component directory with its own helpers; whether the prefix and workspace root can express that is checked on the real case. Plan: [PLAN-0064](../plans/PLAN-0064-minitest-runner.md).
+A small fixed reporter on Minitest's native plugin API instead of minitest-reporters or ci_reporter: those are project dependencies Corsair would have to add, and Al's direction is to run the project's own versions unchanged. Minitest 5.16+ orders `runnable_methods` with the run seed, which is unset outside `Minitest.run`; the listing script sets it when unset (found on 5.27.0). Rails runs its component tests from the component directory with its own helpers; whether the prefix and workspace root can express that is checked on the real case. Plan: [PLAN-0068](../plans/PLAN-0068-minitest-runner.md).

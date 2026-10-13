@@ -1,6 +1,6 @@
 # Real Minitest runner output on Ruby 3.1.7
 
-Recorded 2026-10-13 for [SPEC-0059](../../../docs/development/specs/SPEC-0059-minitest-runner.md) in the `ruby31` toolchain image (SPEC-0058: `docker.io/library/ruby@sha256:91627f55…`, Ruby 3.1.7, Bundler 2.3.27), one container per command, `--network=none`, `--read-only` root with a `/tmp` tmpfs, UID 10001, the project mounted at `/ws`. These are image-only captures, not sandbox runs.
+Recorded 2026-10-13 for [SPEC-0063](../../../docs/development/specs/SPEC-0063-minitest-runner.md) in the `ruby31` toolchain image (SPEC-0058: `docker.io/library/ruby@sha256:91627f55…`, Ruby 3.1.7, Bundler 2.3.27), one container per command, `--network=none`, `--read-only` root with a `/tmp` tmpfs, UID 10001, the project mounted at `/ws`. These are image-only captures, not sandbox runs.
 
 The project is `project/` here (a `lib/widget.rb`, a `test/test_helper.rb` that requires `minitest/autorun` and prints to stdout, and `test/corsair_widget_test.rb` with `Widget::CorsairTest` plus an `OtherTest` class that must never run). Each version had its own `Gemfile` (`gem "minitest", "<version>"`):
 

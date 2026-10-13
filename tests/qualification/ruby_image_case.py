@@ -4,7 +4,7 @@ Two phases, each its own container. `setup` resolves the project's own gems with
 with network (no test runs) and keeps the resolved `Gemfile.lock` there. `run` starts one `--network=none`,
 capability-dropped container from the same image and drives `MinitestRunner` through a Docker-exec workspace and
 execution port: a fresh copy of the checkout plus that lockfile per run, the overlay test file as the patch, listing
-and execution exactly as SPEC-0059 builds them. This is image evidence, not sandbox qualification.
+and execution exactly as SPEC-0063 builds them. This is image evidence, not sandbox qualification.
 """
 import argparse
 import dataclasses
@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import time
 from uuid import uuid4
@@ -141,16 +142,26 @@ def run(image, checkout, bundle, commit, ids, evidence, tests_from, includes, ti
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('phase', choices=['setup', 'run'])
-    parser.add_argument('--image', required=True, help='Prepared toolchain image config id or tag')
+    parser.add_argument('--image', required=True, help='Prepared ruby31 image config id (sha256:<64 hex>)')
     parser.add_argument('--checkout', required=True, type=Path, help='Clean checkout of the case at one commit')
     parser.add_argument('--bundle', required=True, type=Path, help='Case bundle directory filled by setup')
     parser.add_argument('--evidence', required=True, type=Path)
-    parser.add_argument('--tests-from', type=Path, help='Directory supplying the test file (default: --checkout)')
+    parser.add_argument('--tests-from', type=Path, help='Committed directory supplying the test file (default: --checkout)')
     parser.add_argument('--include', action='append', default=[], help='Repository-relative `-I` directory (repeatable)')
     parser.add_argument('--setup-docker-arg', action='append', default=[], help='Extra `docker run` argument for setup only')
     parser.add_argument('--timeout', type=int, default=900, help='Seconds per runner command')
     parser.add_argument('--id', action='append', default=[], help='Control then security `path.rb::Class#test_method`')
     args = parser.parse_args()
+    # Both phases must name the same content, so a tag that could move between them is refused (as #74 does for Java).
+    if not re.fullmatch(r'sha256:[0-9a-f]{64}', args.image):
+        parser.error('--image must be an image config id (sha256:<64 hex>), not a tag')
+    # The receipt names a commit, so the bytes copied into the container must be exactly what is committed; the
+    # pathspec scopes the check to the directory, which for --tests-from may be an overlay inside this repository.
+    for directory in {args.checkout, args.tests_from or args.checkout}:
+        dirty = subprocess.run(['git', '-C', str(directory), 'status', '--porcelain', '--untracked-files=all', '--ignored', '--', '.'],
+                               capture_output=True, text=True, check=True).stdout
+        if dirty:
+            parser.error(f'{directory} is not clean at its HEAD commit:\n{dirty[:2000]}')
     args.evidence.mkdir(parents=True, exist_ok=False)
     commit = subprocess.run(['git', '-C', str(args.checkout), 'rev-parse', 'HEAD'], capture_output=True, text=True,
                             check=True).stdout.strip()

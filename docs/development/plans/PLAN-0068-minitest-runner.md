@@ -1,17 +1,17 @@
 ---
-id: PLAN-0064
+id: PLAN-0068
 kind: plan
 title: Minitest runner and report parser
 status: in_progress
 updated: 2026-10-13
-related: [SPEC-0059, SPEC-0042]
+related: [SPEC-0063, SPEC-0042]
 ---
 
 # Minitest runner and report parser
 
 ## Objective and dependencies
 
-Implement [SPEC-0059](../specs/SPEC-0059-minitest-runner.md) on main. The live steps need the `ruby31` image (PR #68, PLAN-0063) gated on RIG0 first.
+Implement [SPEC-0063](../specs/SPEC-0063-minitest-runner.md) on main. The live steps need the `ruby31` image (PR #68, PLAN-0063) gated on RIG0 first.
 
 ## Steps
 
