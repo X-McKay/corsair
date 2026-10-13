@@ -19,7 +19,8 @@ Implement [SPEC-0046](../specs/SPEC-0046-cpython37-toolchain.md): a CPython 3.7 
 - [x] Make the probe load on 3.7 and pytest 6+, record an unsupported runtime and refuse it by name; regenerate the evidence-assessment set.
 - [x] Add `deploy/qualification/toolchains/python37`, per-directory receipts, `TOOLCHAINS=` selection and the 3.7 gate; build it offline locally.
 - [x] Add `make qualify-python37-case` for CVE-2021-32839 and let the workspace bound be raised to 512 entries by the operator.
-- [ ] Live on RIG0: fresh kind node, `TOOLCHAINS=python37` build, load and gate; the real case.
+- [ ] Live on RIG0: fresh kind node; re-prepare the existing `python` and `java` images too, since per-directory receipts change every receipt digest (a mismatch there is the receipt format, not a source change); `TOOLCHAINS=python37` build, load and gate; `make qualify-python37-case`; `make qualify-witness`, because the probe bytes and schema changed for 3.12 as well.
+- [ ] Assessment baseline: re-run the scripted evidence-assessment eval on RIG0 and promote it with `make eval-baseline AGENT=assessment` against the pre-#55 baseline; if a live assessment baseline exists by then, re-run it on the regenerated set and compare.
 - [ ] Add the `cpython-3.7-pytest` matrix row and widen the pytest framework row with the gate report as evidence; regenerate the SPEC-0042 report.
 - [ ] Review, CURRENT.md, handoff.
 
@@ -32,6 +33,8 @@ Image: `docker build --network=none` of the python37 context from `python@sha256
 `make test-config`: 997 passed on 6be1b5f before the gate files; 1064 passed after merging main 42a7273 with everything above.
 
 Al's review of 72b6861 (P2): `TOOLCHAINS` reached pytest as a `-k` substring, so `TOOLCHAINS=python` also selected the 3.7 gate and `"python java"` was an invalid expression (exit 4). Fixed with exact `--toolchain` selection from marker arguments; collection-only regressions in `tests/configuration/test_toolchain_selection.py`.
+
+Review of 1ba724f (Hold, records only). The frozen evidence-assessment set (`cases.yaml`, `held_out.json`) was regenerated and re-frozen with `--freeze-held-out`, mechanically: only the schema string, probe digest, witness artifact hashes and the new `"unsupported": null` field changed, but those are agent-visible and `dataset_sha256` changes (development b614014f… to 22773b81…), so earlier assessment baselines are not comparable by hash. Scripted development comparison in the container (not a baseline): main f6a87d6 and this branch 1ede65d both 51/51 clean, identical assertion and repeat-agreement tables; mean input tokens 6105.3 to 6134.0 (+0.5%, the longer record). Held-out and live runs not run here. `evals/evidence_assessment/evaluate.py` also changes on #49 and #58 (merged): whichever of #49 and #55 merges later regenerates the set and re-runs this comparison. The SPEC-0033 qualified probe remains the pre-#55 `corsair-witness-v1` digest (PLAN-0039, `.runs/witness-20261013T042451`) until `make qualify-witness` passes on this branch.
 
 ## Decisions and next action
 
