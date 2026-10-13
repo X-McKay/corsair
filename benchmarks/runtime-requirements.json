@@ -3606,7 +3606,7 @@
         "kind": "build_tool",
         "name": "maven",
         "provider": "image",
-        "allowed": "*",
+        "allowed": "<2.1.0 || >2.1.0,<2.2.0 || >2.2.0,<3.0 || >=3.0.4",
         "preferred": null,
         "declared": true,
         "conflict": false,
@@ -3618,6 +3618,22 @@
           "strength": "constraint",
           "source": "pom",
           "declares": "*"
+         },
+         {
+          "path": "parent:org.jenkins-ci:jenkins:1.34",
+          "line": 1,
+          "text": "<requireMavenVersion>",
+          "strength": "constraint",
+          "source": "enforcer",
+          "declares": "<2.1.0 || >2.1.0,<2.2.0 || >2.2.0"
+         },
+         {
+          "path": "parent:org.jenkins-ci:jenkins:1.34",
+          "line": 1,
+          "text": "<requireMavenVersion>",
+          "strength": "constraint",
+          "source": "enforcer",
+          "declares": "<3.0 || >=3.0.4"
          }
         ],
         "unparsed": []
@@ -3649,19 +3665,88 @@
          }
         ],
         "unparsed": []
+       },
+       {
+        "kind": "test_framework",
+        "name": "junit4",
+        "provider": "registry",
+        "allowed": "4.11.*",
+        "preferred": "4.11",
+        "declared": true,
+        "conflict": false,
+        "evidence": [
+         {
+          "path": "parent:org.jvnet.hudson.plugins:analysis-pom:1.63",
+          "line": 1,
+          "text": "<artifactId>junit",
+          "strength": "constraint",
+          "source": "dependency",
+          "declares": "4.11.*"
+         }
+        ],
+        "unparsed": []
+       },
+       {
+        "kind": "build_tool",
+        "name": "surefire",
+        "provider": "registry",
+        "allowed": "2.16.*",
+        "preferred": "2.16",
+        "declared": true,
+        "conflict": false,
+        "evidence": [
+         {
+          "path": "parent:org.jenkins-ci.plugins:plugin:1.596.1",
+          "line": 1,
+          "text": "<artifactId>maven-surefire-plugin",
+          "strength": "pinned",
+          "source": "plugin",
+          "declares": "2.16.*"
+         }
+        ],
+        "unparsed": []
        }
       ],
       "files": [
        "pom.xml"
       ],
-      "unresolved": [
-       "parent POM org.jvnet.hudson.plugins:analysis-pom:1.63 not available"
-      ]
+      "unresolved": []
      },
-     "status": "undetermined",
-     "missing": [
-      "unresolved input: parent POM org.jvnet.hudson.plugins:analysis-pom:1.63 not available",
-      "test framework not identified"
+     "status": "unsupported",
+     "needs": [
+      {
+       "kind": "runtime",
+       "name": "jdk",
+       "allowed": "8.*",
+       "preferred": "8"
+      },
+      {
+       "kind": "test_framework",
+       "name": "junit4",
+       "allowed": "4.11.*",
+       "preferred": "4.11"
+      }
+     ],
+     "rejected": [
+      {
+       "image_id": "temurin-17-maven",
+       "unmet": [
+        {
+         "kind": "runtime",
+         "name": "jdk",
+         "allowed": "8.*",
+         "provided": "17.0.20.1",
+         "satisfied": false
+        },
+        {
+         "kind": "test_framework",
+         "name": "junit4",
+         "allowed": "4.11.*",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
      ]
     },
     "fix": {
@@ -3674,7 +3759,7 @@
         "kind": "build_tool",
         "name": "maven",
         "provider": "image",
-        "allowed": "*",
+        "allowed": "<2.1.0 || >2.1.0,<2.2.0 || >2.2.0,<3.0 || >=3.0.4",
         "preferred": null,
         "declared": true,
         "conflict": false,
@@ -3686,6 +3771,22 @@
           "strength": "constraint",
           "source": "pom",
           "declares": "*"
+         },
+         {
+          "path": "parent:org.jenkins-ci:jenkins:1.34",
+          "line": 1,
+          "text": "<requireMavenVersion>",
+          "strength": "constraint",
+          "source": "enforcer",
+          "declares": "<2.1.0 || >2.1.0,<2.2.0 || >2.2.0"
+         },
+         {
+          "path": "parent:org.jenkins-ci:jenkins:1.34",
+          "line": 1,
+          "text": "<requireMavenVersion>",
+          "strength": "constraint",
+          "source": "enforcer",
+          "declares": "<3.0 || >=3.0.4"
          }
         ],
         "unparsed": []
@@ -3717,23 +3818,92 @@
          }
         ],
         "unparsed": []
+       },
+       {
+        "kind": "test_framework",
+        "name": "junit4",
+        "provider": "registry",
+        "allowed": "4.11.*",
+        "preferred": "4.11",
+        "declared": true,
+        "conflict": false,
+        "evidence": [
+         {
+          "path": "parent:org.jvnet.hudson.plugins:analysis-pom:1.63",
+          "line": 1,
+          "text": "<artifactId>junit",
+          "strength": "constraint",
+          "source": "dependency",
+          "declares": "4.11.*"
+         }
+        ],
+        "unparsed": []
+       },
+       {
+        "kind": "build_tool",
+        "name": "surefire",
+        "provider": "registry",
+        "allowed": "2.16.*",
+        "preferred": "2.16",
+        "declared": true,
+        "conflict": false,
+        "evidence": [
+         {
+          "path": "parent:org.jenkins-ci.plugins:plugin:1.596.1",
+          "line": 1,
+          "text": "<artifactId>maven-surefire-plugin",
+          "strength": "pinned",
+          "source": "plugin",
+          "declares": "2.16.*"
+         }
+        ],
+        "unparsed": []
        }
       ],
       "files": [
        "pom.xml"
       ],
-      "unresolved": [
-       "parent POM org.jvnet.hudson.plugins:analysis-pom:1.63 not available"
-      ]
+      "unresolved": []
      },
-     "status": "undetermined",
-     "missing": [
-      "unresolved input: parent POM org.jvnet.hudson.plugins:analysis-pom:1.63 not available",
-      "test framework not identified"
+     "status": "unsupported",
+     "needs": [
+      {
+       "kind": "runtime",
+       "name": "jdk",
+       "allowed": "8.*",
+       "preferred": "8"
+      },
+      {
+       "kind": "test_framework",
+       "name": "junit4",
+       "allowed": "4.11.*",
+       "preferred": "4.11"
+      }
+     ],
+     "rejected": [
+      {
+       "image_id": "temurin-17-maven",
+       "unmet": [
+        {
+         "kind": "runtime",
+         "name": "jdk",
+         "allowed": "8.*",
+         "provided": "17.0.20.1",
+         "satisfied": false
+        },
+        {
+         "kind": "test_framework",
+         "name": "junit4",
+         "allowed": "4.11.*",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
      ]
     }
    },
-   "status": "undetermined",
+   "status": "unsupported",
    "revisions_agree": true
   },
   {
@@ -3750,8 +3920,8 @@
         "kind": "build_tool",
         "name": "maven",
         "provider": "image",
-        "allowed": "*",
-        "preferred": null,
+        "allowed": ">=3.0.4",
+        "preferred": "3.0.4",
         "declared": true,
         "conflict": false,
         "evidence": [
@@ -3762,6 +3932,14 @@
           "strength": "constraint",
           "source": "pom",
           "declares": "*"
+         },
+         {
+          "path": "parent:org.jenkins-ci.plugins:plugin:2.15",
+          "line": 1,
+          "text": "<requireMavenVersion>",
+          "strength": "constraint",
+          "source": "enforcer",
+          "declares": ">=3.0.4"
          }
         ],
         "unparsed": []
@@ -3770,11 +3948,28 @@
         "kind": "runtime",
         "name": "jdk",
         "provider": "image",
-        "allowed": "*",
-        "preferred": null,
-        "declared": false,
+        "allowed": "8.*",
+        "preferred": "8",
+        "declared": true,
         "conflict": false,
-        "evidence": [],
+        "evidence": [
+         {
+          "path": "parent:org.jenkins-ci.plugins:plugin:2.15",
+          "line": 1,
+          "text": "<target>1.${java.level}",
+          "strength": "constraint",
+          "source": "compiler-target",
+          "declares": ">=7,<20"
+         },
+         {
+          "path": "parent:org.jenkins-ci.plugins:plugin:2.15",
+          "line": 1,
+          "text": "<target>1.${java.level}",
+          "strength": "tested",
+          "source": "derived",
+          "declares": "8.*"
+         }
+        ],
         "unparsed": [
          {
           "path": "Jenkinsfile",
@@ -3783,21 +3978,89 @@
           "reason": "buildPlugin() without jdkVersions uses the shared library default"
          }
         ]
+       },
+       {
+        "kind": "test_framework",
+        "name": "junit4",
+        "provider": "registry",
+        "allowed": "4.12.*",
+        "preferred": "4.12",
+        "declared": true,
+        "conflict": false,
+        "evidence": [
+         {
+          "path": "parent:org.jenkins-ci.plugins:plugin:2.15",
+          "line": 1,
+          "text": "<artifactId>junit",
+          "strength": "constraint",
+          "source": "dependency",
+          "declares": "4.12.*"
+         }
+        ],
+        "unparsed": []
+       },
+       {
+        "kind": "build_tool",
+        "name": "surefire",
+        "provider": "registry",
+        "allowed": "2.19.1.*",
+        "preferred": "2.19.1",
+        "declared": true,
+        "conflict": false,
+        "evidence": [
+         {
+          "path": "parent:org.jenkins-ci.plugins:plugin:2.15",
+          "line": 1,
+          "text": "<artifactId>maven-surefire-plugin",
+          "strength": "pinned",
+          "source": "plugin",
+          "declares": "2.19.1.*"
+         }
+        ],
+        "unparsed": []
        }
       ],
       "files": [
        "Jenkinsfile",
        "pom.xml"
       ],
-      "unresolved": [
-       "parent POM org.jenkins-ci.plugins:plugin:2.15 not available"
-      ]
+      "unresolved": []
      },
-     "status": "undetermined",
-     "missing": [
-      "runtime version not declared in the build files (Jenkinsfile:1 buildPlugin() without jdkVersions uses the shared library default)",
-      "unresolved input: parent POM org.jenkins-ci.plugins:plugin:2.15 not available",
-      "test framework not identified"
+     "status": "unsupported",
+     "needs": [
+      {
+       "kind": "runtime",
+       "name": "jdk",
+       "allowed": "8.*",
+       "preferred": "8"
+      },
+      {
+       "kind": "test_framework",
+       "name": "junit4",
+       "allowed": "4.12.*",
+       "preferred": "4.12"
+      }
+     ],
+     "rejected": [
+      {
+       "image_id": "temurin-17-maven",
+       "unmet": [
+        {
+         "kind": "runtime",
+         "name": "jdk",
+         "allowed": "8.*",
+         "provided": "17.0.20.1",
+         "satisfied": false
+        },
+        {
+         "kind": "test_framework",
+         "name": "junit4",
+         "allowed": "4.12.*",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
      ]
     },
     "fix": {
@@ -3810,8 +4073,8 @@
         "kind": "build_tool",
         "name": "maven",
         "provider": "image",
-        "allowed": "*",
-        "preferred": null,
+        "allowed": ">=3.0.4",
+        "preferred": "3.0.4",
         "declared": true,
         "conflict": false,
         "evidence": [
@@ -3822,6 +4085,14 @@
           "strength": "constraint",
           "source": "pom",
           "declares": "*"
+         },
+         {
+          "path": "parent:org.jenkins-ci.plugins:plugin:2.15",
+          "line": 1,
+          "text": "<requireMavenVersion>",
+          "strength": "constraint",
+          "source": "enforcer",
+          "declares": ">=3.0.4"
          }
         ],
         "unparsed": []
@@ -3830,11 +4101,28 @@
         "kind": "runtime",
         "name": "jdk",
         "provider": "image",
-        "allowed": "*",
-        "preferred": null,
-        "declared": false,
+        "allowed": "8.*",
+        "preferred": "8",
+        "declared": true,
         "conflict": false,
-        "evidence": [],
+        "evidence": [
+         {
+          "path": "parent:org.jenkins-ci.plugins:plugin:2.15",
+          "line": 1,
+          "text": "<target>1.${java.level}",
+          "strength": "constraint",
+          "source": "compiler-target",
+          "declares": ">=7,<20"
+         },
+         {
+          "path": "parent:org.jenkins-ci.plugins:plugin:2.15",
+          "line": 1,
+          "text": "<target>1.${java.level}",
+          "strength": "tested",
+          "source": "derived",
+          "declares": "8.*"
+         }
+        ],
         "unparsed": [
          {
           "path": "Jenkinsfile",
@@ -3843,25 +4131,93 @@
           "reason": "buildPlugin() without jdkVersions uses the shared library default"
          }
         ]
+       },
+       {
+        "kind": "test_framework",
+        "name": "junit4",
+        "provider": "registry",
+        "allowed": "4.12.*",
+        "preferred": "4.12",
+        "declared": true,
+        "conflict": false,
+        "evidence": [
+         {
+          "path": "parent:org.jenkins-ci.plugins:plugin:2.15",
+          "line": 1,
+          "text": "<artifactId>junit",
+          "strength": "constraint",
+          "source": "dependency",
+          "declares": "4.12.*"
+         }
+        ],
+        "unparsed": []
+       },
+       {
+        "kind": "build_tool",
+        "name": "surefire",
+        "provider": "registry",
+        "allowed": "2.19.1.*",
+        "preferred": "2.19.1",
+        "declared": true,
+        "conflict": false,
+        "evidence": [
+         {
+          "path": "parent:org.jenkins-ci.plugins:plugin:2.15",
+          "line": 1,
+          "text": "<artifactId>maven-surefire-plugin",
+          "strength": "pinned",
+          "source": "plugin",
+          "declares": "2.19.1.*"
+         }
+        ],
+        "unparsed": []
        }
       ],
       "files": [
        "Jenkinsfile",
        "pom.xml"
       ],
-      "unresolved": [
-       "parent POM org.jenkins-ci.plugins:plugin:2.15 not available"
-      ]
+      "unresolved": []
      },
-     "status": "undetermined",
-     "missing": [
-      "runtime version not declared in the build files (Jenkinsfile:1 buildPlugin() without jdkVersions uses the shared library default)",
-      "unresolved input: parent POM org.jenkins-ci.plugins:plugin:2.15 not available",
-      "test framework not identified"
+     "status": "unsupported",
+     "needs": [
+      {
+       "kind": "runtime",
+       "name": "jdk",
+       "allowed": "8.*",
+       "preferred": "8"
+      },
+      {
+       "kind": "test_framework",
+       "name": "junit4",
+       "allowed": "4.12.*",
+       "preferred": "4.12"
+      }
+     ],
+     "rejected": [
+      {
+       "image_id": "temurin-17-maven",
+       "unmet": [
+        {
+         "kind": "runtime",
+         "name": "jdk",
+         "allowed": "8.*",
+         "provided": "17.0.20.1",
+         "satisfied": false
+        },
+        {
+         "kind": "test_framework",
+         "name": "junit4",
+         "allowed": "4.12.*",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
      ]
     }
    },
-   "status": "undetermined",
+   "status": "unsupported",
    "revisions_agree": true
   },
   {

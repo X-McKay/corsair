@@ -19,7 +19,7 @@ This spec adds three things:
 - an operator-owned runtime matrix with a matcher;
 - a report over the benchmark cases.
 
-Excluded: building or qualifying new images, wiring the selection into the environment agent or the chain (G12), dependency installation (SPEC-0026), and test runners for frameworks other than pytest (G6). Execution needs no cluster, and nothing runs project code.
+It also adds the hand-off from a selection to the environment agent's input. Excluded: building or qualifying new images, wiring that hand-off into the chain or durable workflow (G12), dependency installation (SPEC-0026), and test runners for frameworks other than pytest (G6). Execution needs no cluster, and nothing runs project code.
 
 ## Boundaries and design
 
@@ -79,7 +79,14 @@ There is no fallback row and no "close enough" version.
 
 **No new agent** (Al's question, 2026-10-13). Runtime selection is deterministic: a parser and a set intersection. Over the 39 fetched benchmark cases, 35 resolve to a fully named requirement. Two of the four undetermined cases are Jenkins plugins whose parent POMs sit in a repository this container cannot reach, and they become deterministic once the parent is supplied. The other two have no framework at all: one package's test script exits with "no test specified", and the other runs a sanity script. Choosing a framework for those is a policy decision (an open question below), not model judgement over ambiguous files.
 
-The consumer is the existing environment agent (SPEC-0029). The selected row becomes the only entry in `EnvironmentInput.toolchains`, and an `unsupported` or `undetermined` selection stops before the agent runs. The agent keeps its current job of proposing setup and test commands inside the selected image. That wiring is part of G12 and is not built here.
+The consumer is the existing environment agent (SPEC-0029). The selected row becomes the only entry in `EnvironmentInput.toolchains`, and an `unsupported` or `undetermined` selection stops before the agent runs. The agent keeps its current job of proposing setup and test commands inside the selected image.
+
+`nodes/runtime/environment.py` is that hand-off, deterministic and without SDK types:
+- `environment_input` returns an `EnvironmentInput` whose only toolchain is the selected row, with the prepared image reference from the operator's image receipt (`prepared`, row id to `repository@sha256:...`).
+- It returns a `RuntimeStop` with the reason instead when there is no requirement, the selection is `unsupported` or `undetermined`, or the selected row has no prepared image on this node.
+- `check_ready` refuses a `ReadyEnvironment` that names another toolchain or image, or a framework the selection did not admit.
+
+Calling it from the chain and the durable workflow is part of G12 and is not built here.
 
 **Report** (`evals/benchmark/runtimes.py`):
 - `checkout` makes a blobless shallow fetch of each pinned commit (from SPEC-0037's pins file) and writes only the blobs `is_build_file` selects.
@@ -112,5 +119,6 @@ Open questions:
 - Whether to accept a Maven/Gradle wrapper pin as satisfied by an image tool of the same major version (VUL4J-6 pins Maven 3.5.0).
 - Runner qualification across framework versions (pytest older than 9, JUnit 4, TestNG, Jest, Mocha, minitest, RSpec, TAP). PR #41 starts JUnit 5.
 - Parent POM fetching moving into the SPEC-0026 dependency phase.
+- The requirement root for a module that ships inside its runtime. CVE-2023-31486 pins Debian's whole perl interpreter repository; HTTP::Tiny lives under `cpan/HTTP-Tiny/` without a build file of its own, so the case is undetermined. Either the case names that directory as its project root, or a perl core checkout is treated as building its own runtime. This is a case-definition decision, not a detector gap.
 
 The plan is [PLAN-0046](../plans/PLAN-0046-runtime-selection.md).
