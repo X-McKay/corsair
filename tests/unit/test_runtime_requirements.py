@@ -494,3 +494,12 @@ def test_long_unresolved_reasons_are_bounded():
 def test_requirement_only_python_trees_are_detected(files):
     # Codex on 028d724: an explicit python language was refused because no file was in the marker list.
     assert select(detect(files, 'python'), load()).status == 'supported'
+
+
+def test_nested_requirements_files_are_read():
+    # Codex on 7b42d2e: requirements/test/dev.txt was selected as a build file but never parsed, so pytest<8 vanished.
+    files = {'requirements/test/dev.txt': b'pytest<8\n', '.python-version': b'3.12.15\n', 'pytest.ini': b'[pytest]\n'}
+    assert all(is_build_file(path) for path in files)
+    requirement = detect(files, 'python')
+    assert component(requirement, 'test_framework', 'pytest').allowed == '<8'
+    assert select(requirement, load()).status == 'unsupported'
