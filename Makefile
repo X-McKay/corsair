@@ -200,7 +200,10 @@ qualify-fixture-e2e:
 .PHONY: qualify-python37-case
 # SPEC-0046: host-fetch CVE-2021-32839 into RUN-sources (pins written there, not to benchmarks/), then the pytest
 # runner on its baseline and fix commits in fresh CPython 3.7 sandboxes. Needs TOOLCHAINS=python37 images loaded.
+# Cases each per-image case target runs; make qualify-image reads these before it installs a gateway.
+CASES_python37 := CVE-2021-32839
 qualify-python37-case:
+	test -z "$(CASE)" -o "$(CASE)" = "$(CASES_python37)"
 	test ! -e "$(CORSAIR_QUAL_RUN)"
 	mkdir -p "$(CORSAIR_QUAL_RUN)"
 	PYTHONPATH="$(CURDIR)/src:$(CURDIR)" uv run --locked python -m evals.benchmark.sources fetch --run-dir "$(CORSAIR_QUAL_RUN)-sources" --cases CVE-2021-32839 --keep --pins "$(CORSAIR_QUAL_RUN)-sources/source-pins.json"
@@ -218,3 +221,44 @@ qualify-workspace-quota:
 	test ! -e "$(CORSAIR_QUAL_RUN)"
 	mkdir -p "$(CORSAIR_QUAL_RUN)"
 	uv run --locked python -m pytest $(PYTEST_ROOT) tests/qualification -m workspace_quota --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
+
+# One image's live chain on this checkout's own cluster: tools, cluster (created only without this checkout's receipt),
+# admission and network (reused while their gate checks pass on this node and lock), image build/load, gateway, the
+# toolchain gate, then a fresh gateway and the image's qualify-<dir>-case. Stops at the first failure; evidence and
+# SUMMARY.md under .runs/qualify/<RUN>. TOOLCHAIN=<image dir>; optional CASE, RUN, ADMISSION_RUN, NETWORK_RUN.
+.PHONY: qualify-image cluster-status archive-runs
+# These targets are pre-allowed on RIG0 (deploy/rig0/settings.local.json), so they refuse to share a make invocation with
+# any other goal, accept only an existing image directory as TOOLCHAIN, and pass every other value through the
+# environment, never into recipe text.
+QUALIFY_TOOLCHAINS := $(notdir $(wildcard deploy/qualification/toolchains/*))
+ifneq ($(filter qualify-image cluster-status archive-runs,$(MAKECMDGOALS)),)
+ifneq ($(words $(MAKECMDGOALS)),1)
+$(error qualify-image, cluster-status and archive-runs each run alone, not with: $(MAKECMDGOALS))
+endif
+# A command-line variable reaches every recipe's environment (SHELL, PATH, PYTHONPATH, UV_*), so only these are taken.
+QUALIFY_VARIABLES := TOOLCHAIN CASE RUN ADMISSION_RUN NETWORK_RUN DEST
+QUALIFY_FOREIGN := $(strip $(foreach v,$(.VARIABLES),$(if $(filter command line,$(origin $(v))),$(filter-out $(QUALIFY_VARIABLES),$(v)))))
+ifneq ($(QUALIFY_FOREIGN),)
+$(error only $(QUALIFY_VARIABLES) may be set on the command line here, not: $(QUALIFY_FOREIGN))
+endif
+endif
+ifeq ($(MAKECMDGOALS),qualify-image)
+ifneq ($(words $(TOOLCHAIN))$(filter $(TOOLCHAIN),$(QUALIFY_TOOLCHAINS)),1$(TOOLCHAIN))
+$(error TOOLCHAIN must be one of: $(QUALIFY_TOOLCHAINS))
+endif
+endif
+qualify-image: export QUALIFY_CASE = $(CASE)
+qualify-image: export QUALIFY_RUN = $(RUN)
+qualify-image: export QUALIFY_ADMISSION_RUN = $(ADMISSION_RUN)
+qualify-image: export QUALIFY_NETWORK_RUN = $(NETWORK_RUN)
+qualify-image:
+	PYTHONPATH="$(CURDIR)/src:$(CURDIR)" uv run --locked python -m tests.qualification.qualify_image run --toolchain $(TOOLCHAIN) --case "$$QUALIFY_CASE" --run "$$QUALIFY_RUN" --admission "$$QUALIFY_ADMISSION_RUN" --network "$$QUALIFY_NETWORK_RUN"
+
+# Read-only: whether this checkout holds the cluster, what is installed, which evidence is reusable.
+cluster-status:
+	PYTHONPATH="$(CURDIR)/src:$(CURDIR)" uv run --locked python -m tests.qualification.qualify_image status
+
+# Copy this worktree's .runs into the main checkout's .runs/worktrees/ before the worktree is deleted; removes nothing.
+archive-runs: export QUALIFY_DEST = $(DEST)
+archive-runs:
+	PYTHONPATH="$(CURDIR)/src:$(CURDIR)" uv run --locked python -m tests.qualification.qualify_image archive --dest "$$QUALIFY_DEST"
