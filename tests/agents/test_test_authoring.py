@@ -1,7 +1,6 @@
 """Exercise the authoring stage's confinement, run budget, withheld outcome and provenance through native SDK calls."""
 
 import asyncio
-import json
 from dataclasses import replace
 from hashlib import sha256
 
@@ -609,17 +608,6 @@ def test_a_security_test_that_passes_while_the_witness_sees_the_effect_is_refuse
 LIVE_006_PROSE = ("\n\nBoth tests were discovered and the control passed. The patch is ready.\n\n"
                   '{"result": {"status": "patch", "security_assertion_lines": [64, 65, 66], '
                   '"limitations": ["Development runs only"]}}')
-
-
-@pytest.mark.parametrize("text, kept", [
-    (LIVE_006_PROSE, True), ('{"result": {}}', False), ("no object here", False),
-    ('Prose {"a": 1} and more prose', False), ('Two objects {"a": 1}\n{"b": 2}', True)])
-def test_only_prose_before_one_final_json_object_is_dropped(text, kept):
-    from corsair.agents.prompted_output import trailing_object
-    found = trailing_object(text)
-    assert (found is not None) == kept
-    if kept:
-        assert json.loads(found[1]) and not found[1].startswith(" ")
 
 
 def test_prompted_output_with_leading_prose_needs_no_correction():

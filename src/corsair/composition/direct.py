@@ -20,7 +20,7 @@ from uuid import UUID, uuid4
 
 from pydantic import Field
 from pydantic_ai import Agent, capture_run_messages
-from pydantic_ai.messages import ModelMessage
+from pydantic_ai.messages import ModelMessage, ModelRequest, RetryPromptPart
 from pydantic_ai.models import Model
 from pydantic_ai.usage import RunUsage, UsageLimits
 
@@ -240,6 +240,19 @@ class FixtureCase:
     runtime: RuntimeInputs | None = None
     # The baseline revision's setup source (SPEC-0068); with it the environment agent prepares the environment.
     setup: SetupSource | None = None
+
+
+def output_refusals(messages: tuple[ModelMessage, ...]) -> tuple[str, ...]:
+    """The output corrections a stage run was sent, oldest first, each bounded; work-tool retries excluded.
+
+    Prompted output retries name no tool; tool-mode output retries name PydanticAI's ``final_result`` tools.
+    """
+    return tuple(
+        (part.content if isinstance(part.content, str) else "; ".join(
+            f"{'.'.join(map(str, error.get('loc', ())))}: {error.get('msg', '')}" for error in part.content))[:300]
+        for message in messages if isinstance(message, ModelRequest)
+        for part in message.parts if isinstance(part, RetryPromptPart)
+        and (part.tool_name is None or part.tool_name.startswith("final_result")))
 
 
 @dataclass(frozen=True)
@@ -519,10 +532,13 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
                     f"{exhausted.limits.work_tool_calls} work calls)")
         failed = attempts[-1].failure
         kind = failed.kind if isinstance(failed, RecordedFailure) else type(failed).__name__
-        # Spent output retries hide the last refusal in the cause (live-006: a wrong assertion line); keep it.
+        # "Exceeded maximum output retries" names no refusal; keep each correction the run spent (live-006: a
+        # wrong assertion line; corpus rerun: reasoning with no output) and the final one, held in the cause.
+        refused = output_refusals(attempts[-1].messages)
         cause = failed.__cause__ if not isinstance(failed, RecordedFailure) else None
-        last = f"; last refusal: {cause}" if cause is not None else ""
-        return f"{stage} produced no output: {kind}: {failed}{last}"[:2048]
+        refused += (str(cause)[:300],) if cause is not None else ()
+        named = f"; refusals: {' | then: '.join(refused)}" if refused else ""
+        return f"{stage} produced no output: {kind}: {failed}{named}"[:2048]
 
     if case.runtime is not None:
         try:
