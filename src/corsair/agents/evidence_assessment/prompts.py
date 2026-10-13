@@ -7,7 +7,7 @@ from .contracts import AssessmentInput
 
 # PROMPT_VERSION covers everything the model sees (instructions, skill, rendered prompt,
 # tool and output schema text); CONFIG_VERSION in agent.py covers retry budgets and instrumentation.
-PROMPT_VERSION = "evidence-assessment-v5"
+PROMPT_VERSION = "evidence-assessment-v6"
 SKILL_ID = "assess-evidence"
 SKILL_BYTES = (Path(__file__).parent / "skills" / SKILL_ID / "SKILL.md").read_bytes()
 SKILL_TEXT = SKILL_BYTES.decode("utf-8")

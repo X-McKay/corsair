@@ -377,6 +377,49 @@ def test_security(tmp_path):
 ''')
     assert data['tests'][SECURITY]['offstack_planned'] == 0
     assert (found.witness.effect, found.witness.safe_behavior) == ('absent', 'ValueError')
+def test_the_test_bodys_own_read_after_the_call_is_its_own_not_off_stack(tmp_path):
+    """Live run 2: the security test re-read the outside file after the call; that read is the test's, not the target's."""
+    found, data = mapped(tmp_path, '''
+def test_security(tmp_path):
+    (tmp_path / "allowed").mkdir()
+    (tmp_path / "outside.txt").write_text("outside")
+    target.read(tmp_path / "allowed", "../outside.txt")
+    assert (tmp_path / "outside.txt").read_text() == "outside"
+    with open(tmp_path / "outside.txt") as stream:
+        assert stream.read() == "outside"
+''')
+    test = data['tests'][SECURITY]
+    assert (test['offstack_planned'], test['body_planned']) == (0, 2)
+    assert [o['planned'] for o in test['opens']] == [True]
+    assert (found.witness.path_reached, found.witness.effect) == (True, 'observed')
+
+
+def test_a_read_through_a_helper_or_the_event_loop_stays_off_stack(tmp_path):
+    """Only the test function itself, through standard file-I/O frames, is the test body; anything between stays off-stack."""
+    done, record = run_probe(tmp_path, '''
+import asyncio, functools
+def check(path):
+    return path.read_text()
+
+def test_security(tmp_path):
+    (tmp_path / "outside.txt").write_text("outside")
+    try:
+        target.read(tmp_path, "x", error="reject")
+    except ValueError:
+        pass
+    check(tmp_path / "outside.txt")
+    async def later():
+        asyncio.get_running_loop().call_soon(functools.partial((tmp_path / "outside.txt").read_text))
+        await asyncio.sleep(0)
+    asyncio.run(later())
+''')
+    assert record, done.stdout.decode() + done.stderr.decode()
+    test = json.loads(record)['tests'][SECURITY]
+    assert (test['offstack_planned'], test['body_planned']) == (2, 0)
+    found = witness_evidence(capture(record), REQUEST, SECURITY, planned_safe_behavior='no_file_open')
+    assert found.witness.effect == 'unknown'
+
+
 def test_a_runtime_without_monitoring_runs_the_tests_and_records_itself_unsupported(tmp_path):
     # CPython before 3.12 has no sys.monitoring: the run must proceed and the record must be refused by name.
     (tmp_path / 'target.py').write_text(TARGET)

@@ -21,6 +21,13 @@ ResultLayer = Layer | Literal["admission"]
 Excerpt = Annotated[str, Field(max_length=4096)]
 
 
+class DevelopmentWitness(Contract):
+    """The operator's approved witness envelope for development runs; never rendered to the model."""
+    target_path: str = Field(min_length=1, max_length=256)
+    target_symbol: str = Field(min_length=1, max_length=256)
+    effect_name: str = Field(min_length=1, max_length=128)
+
+
 class TestAuthoringInput(Contract):
     """A ready plan, the saved inventory it was planned over and the same environment evidence."""
     __test__ = False
@@ -28,6 +35,8 @@ class TestAuthoringInput(Contract):
     plan: ReadyTestPlan
     source_files: tuple[SourceFile, ...] = Field(max_length=16)
     environment: EnvironmentEvidence
+    # Set by the composition from the same envelope the frozen runs use; None runs development without a witness.
+    witness: DevelopmentWitness | None = None
 
     @model_validator(mode="after")
     def admitted_handoff(self) -> "TestAuthoringInput":
@@ -107,6 +116,8 @@ class DevelopmentRun(Contract):
     errors: Excerpt
     control: DevelopmentOutcome | None
     security: DevelopmentOutcome | Literal["withheld"] | None
+    # The security test passed while the operator witness recorded the planned effect: it cannot detect it.
+    security_contradicts_witness: bool = False
     run_command: tuple[str, ...] = Field(max_length=64)
     cleanup: Literal["not_required", "confirmed", "unconfirmed"]
 

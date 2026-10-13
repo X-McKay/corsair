@@ -7,6 +7,7 @@ from pydantic_ai.models import Model
 from pydantic_ai.models.instrumented import InstrumentationSettings
 
 from ..budget import tool_budget
+from ..prompted_output import prompted_output
 from .contracts import TestPlan
 from .dependencies import PlanningDependencies
 from .prompts import INSTRUCTIONS, PROMPT_VERSION, SKILL_ID, SKILL_SHA256, SKILL_TEXT, planning_prompt
@@ -15,7 +16,7 @@ from .validation import _symbol_occurs, finalize_plan
 
 # CONFIG_VERSION covers budgets, instrumentation and provider composition; PROMPT_VERSION
 # (prompts.py) covers everything the model sees.
-CONFIG_VERSION = "test-planning-config-v6"
+CONFIG_VERSION = "test-planning-config-v7"
 
 # Re-exported for existing callers of corsair.agents.test_planning.agent.
 __all__ = ["CONFIG_VERSION", "INSTRUCTIONS", "PROMPT_VERSION", "SKILL_ID", "SKILL_SHA256", "SKILL_TEXT", "TOOLSET_ID",
@@ -38,7 +39,7 @@ def create_test_planning_agent(
         validation_context=lambda ctx: ctx.deps.inputs,
         retries={"tools": TOOL_RETRIES, "output": output_retries},
         capabilities=[Capability(id=SKILL_ID, instructions=SKILL_TEXT, toolsets=[offered_tools()]),
-                      tool_budget(),
+                      tool_budget(), prompted_output(),
                       Instrumentation(settings=InstrumentationSettings(include_content=False, version=5)),
                       *([durability] if durability is not None else [])],
     )

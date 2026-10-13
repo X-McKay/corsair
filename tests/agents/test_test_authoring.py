@@ -21,8 +21,9 @@ from corsair.agents.test_authoring import (
 from corsair.agents.test_authoring.admission import REVIEWED_SELF_OBSERVING, self_observation
 from corsair.agents.test_authoring.skills import SKILL_TEXT
 from corsair.agents.test_authoring.static import assertion_lines, static_checks
-from corsair.ports.test_runner import NativeTestRun
-from evals.fixture_e2e.reviewed import DISCOVER, PREFIX, ReviewedLocalExecution, ReviewedWorkspace
+from corsair.ports.sandbox import SandboxHandle
+from corsair.ports.test_runner import NativeTestRun, PreparedWorkspace
+from evals.fixture_e2e.reviewed import DISCOVER, FIXTURE, PREFIX, ReviewedLocalExecution, ReviewedWorkspace
 from evals.test_authoring.evaluate import (
     FILES, EvaluationBudget, ScriptedRun, ScriptedRunner, authoring_checks, dataset, evaluate, passed,
 )
@@ -229,6 +230,19 @@ def test_skipped_security_is_shown_and_refuses_a_patch_by_default():
     assert isinstance(result.output, BlockedAuthoring)
 
 
+def test_a_security_error_before_the_planned_assertion_is_shown_and_refuses_a_patch():
+    """Docker run live-002: the security test wrote into a directory it never created and raised FileNotFoundError."""
+    seen = []
+    broken = {"status": "discovered", "security": "failed", "security_failure": "FileNotFoundError"}
+    with pytest.raises(UnexpectedModelBehavior):
+        run(create_test_authoring_agent(responding([write(), RUN], seen=seen), output_retries=0), case().inputs.inputs,
+            runner(broken))
+    assert seen[0].security.outcome == "failed" and seen[0].security.failure_type == "FileNotFoundError"
+    (result, _) = run(create_test_authoring_agent(responding([write(), RUN, write(), RUN])), case().inputs.inputs,
+                      runner(broken, {"status": "discovered"}))
+    assert isinstance(result.output, TestPatch) and result.output.dev_runs[-1].security == "withheld"
+
+
 def test_security_outcome_is_withheld_unless_the_operator_reveals_it():
     seen = []
     run(create_test_authoring_agent(responding([write(), RUN], seen=seen)), case().inputs.inputs)
@@ -284,6 +298,20 @@ def test_static_checks_flag_hollow_tests(edit, check):
     assert not static_checks(edit(REFERENCE), SECURITY, "read_document")[check]
 
 
+def test_a_broad_catch_is_the_absence_plan_shape_only_in_the_security_test():
+    broad = REFERENCE.replace("except ValueError as error:", "except Exception as error:")
+    assert static_checks(broad, SECURITY, "read_document", absence_test=SECURITY)["no_swallowing_except"]
+    assert not static_checks(broad, SECURITY, "read_document")["no_swallowing_except"]
+    control = REFERENCE.replace("def test_benign_control(files):\n", "def test_benign_control(files):\n    try:\n        pass\n    except Exception:\n        pass\n")
+    assert control != REFERENCE
+    assert not static_checks(control, SECURITY, "read_document", absence_test=SECURITY)["no_swallowing_except"]
+    name = SECURITY.rsplit("::", 1)[1]
+    header = next(line for line in broad.splitlines() if line.startswith(f"def {name}("))
+    swallowed = broad.replace(header + "\n", header + "\n    try:\n        assert False\n    except Exception:\n        pass\n", 1)
+    assert swallowed != broad
+    assert not static_checks(swallowed, SECURITY, "read_document", absence_test=SECURITY)["no_swallowing_except"]
+
+
 def test_assertion_lines_belong_to_the_named_function():
     assert assertion_lines(REFERENCE, SECURITY) == (52, 60, 64, 65, 66)
     with pytest.raises(ValueError):
@@ -314,8 +342,8 @@ def test_pytest_raises_bindings_are_assertions():
 def test_native_evals_repeat_and_preserve_receipts(tmp_path):
     evidence = tmp_path / "attempt"
     report = asyncio.run(evaluate(evidence, EvaluationBudget()))
-    assert passed(report) and len(report.cases) == 18 and len(report.case_groups()) == 9
-    assert len(list(evidence.glob("attempt-*.json"))) == 18
+    assert passed(report) and len(report.cases) == 20 and len(report.case_groups()) == 10
+    assert len(list(evidence.glob("attempt-*.json"))) == 20
     assert all(c.attributes["security_revealed"] == 0 for c in report.cases)
     assert report.experiment_metadata["runner"] == "injected_observations_and_static_host_runner"
     with pytest.raises(FileExistsError):
@@ -531,3 +559,82 @@ def test_deferred_target_calls_do_not_satisfy_structural_target_fact(deferred):
     assert facts["has_assertion"] and not facts["calls_target"]
     direct = content + "    read_document()\n"
     assert static_checks(direct, "t.py::test_security", "read_document")["calls_target"]
+
+
+# Live run 2's security test under the reviewed plan's ids: it re-reads the outside file, which a read never changes.
+INSENSITIVE = """from pathlib import Path
+
+import documents
+
+
+def test_benign_control(tmp_path: Path):
+    (tmp_path / "allowed").mkdir()
+    (tmp_path / "allowed" / "document.txt").write_text("hello")
+    assert documents.read_document(tmp_path / "allowed", "document.txt") == "hello"
+
+
+def test_security_rejects_outside_read(tmp_path: Path):
+    (tmp_path / "allowed").mkdir()
+    (tmp_path / "outside.txt").write_text("outside")
+    documents.read_document(tmp_path / "allowed", "../outside.txt")
+    assert (tmp_path / "outside.txt").read_text() == "outside"
+"""
+
+
+class FixedBytesWorkspace(ReviewedWorkspace):
+    """The vulnerable fixture with these repository-owned test bytes; nothing model-written runs on the host."""
+    def __init__(self, store, root, tests):
+        super().__init__(store, root, "vulnerable")
+        self.tests = tests
+
+    def prepare(self, patch, operation):
+        assert [(f.path, f.content) for f in patch.files] == [("test_documents.py", self.tests.encode())]
+        source = (FIXTURE / "vulnerable" / "documents.py").read_bytes()
+        self.root.mkdir(mode=0o700)
+        (self.root / "documents.py").write_bytes(source)
+        (self.root / "test_documents.py").write_text(self.tests)
+        return PreparedWorkspace(SandboxHandle("dev", "host", "local", "tests", str(operation)),
+                                 self.store.put(source), self.store.put(self.tests.encode()), patch.sha256)
+
+
+def test_a_security_test_that_passes_while_the_witness_sees_the_effect_is_refused(tmp_path):
+    """Gap 11: with the operator envelope on development runs, an insensitive security test is shown and refused."""
+    data = case().inputs.inputs.model_dump()
+    data["plan"]["discovery_command"] = data["environment"]["discovery_command"] = list(DISCOVER)
+    data["witness"] = {"target_path": "documents.py", "target_symbol": "read_document", "effect_name": "outside.txt"}
+    inputs = TestAuthoringInput.model_validate(data)
+    root = (tmp_path / "workspace").resolve()
+    (tmp_path / "artifacts").mkdir(mode=0o700)
+    seen = []
+    with LocalArtifacts(tmp_path / "artifacts", max_bytes=1024 * 1024) as store:
+        native = PytestRunner(FixedBytesWorkspace(store, root, INSENSITIVE), ReviewedLocalExecution(root), store,
+                              PytestRunnerConfig(PREFIX, ".corsair-junit.xml", str(root),
+                                                 witness_record_path=str(tmp_path / "witness.json")))
+        with pytest.raises(UnexpectedModelBehavior):
+            run(create_test_authoring_agent(responding([*READS, write(INSENSITIVE), RUN], seen=seen), output_retries=0),
+                inputs, native)
+    assert seen[0].security_contradicts_witness and seen[0].security.outcome == "passed"
+    assert seen[0].control.outcome == "passed"
+
+
+LIVE_006_PROSE = ("\n\nBoth tests were discovered and the control passed. The patch is ready.\n\n"
+                  '{"result": {"status": "patch", "security_assertion_lines": [64, 65, 66], '
+                  '"limitations": ["Development runs only"]}}')
+
+
+def test_prompted_output_with_leading_prose_needs_no_correction():
+    """Gap 10 (Docker live-006): prose before a bare JSON answer no longer spends the only output correction."""
+    from pydantic_ai.messages import RetryPromptPart, TextPart
+    from pydantic_ai.profiles.openai import OpenAIModelProfile
+    from corsair.agents.prompted_output import PROSE_KEY
+    steps, retries = [write(), RUN], []
+
+    async def respond(messages, info):
+        retries.extend(p for m in messages for p in m.parts if isinstance(p, RetryPromptPart))
+        done = sum(isinstance(p, ToolReturnPart) for m in messages for p in m.parts)
+        return ModelResponse(parts=[steps[done] if done < len(steps) else TextPart(LIVE_006_PROSE)])
+    model = FunctionModel(respond, profile=OpenAIModelProfile(default_structured_output_mode="prompted"))
+    (result, _) = run(create_test_authoring_agent(model, output_retries=0), case().inputs.inputs)
+    assert isinstance(result.output, TestPatch) and not retries
+    final = result.all_messages()[-1]
+    assert final.provider_details[PROSE_KEY].strip().startswith("Both tests were discovered")

@@ -20,7 +20,7 @@ from uuid import UUID, uuid4
 
 from pydantic import Field
 from pydantic_ai import Agent, capture_run_messages
-from pydantic_ai.messages import ModelMessage
+from pydantic_ai.messages import ModelMessage, ModelRequest, RetryPromptPart
 from pydantic_ai.models import Model
 from pydantic_ai.usage import RunUsage, UsageLimits
 
@@ -38,7 +38,7 @@ from corsair.agents.issue_analysis.tools import FixtureDependencies
 from corsair.agents.source.contracts import Contract
 from corsair.agents.source.tools import READ_LINE_LIMIT
 from corsair.agents.test_authoring.agent import authoring_prompt, create_test_authoring_agent
-from corsair.agents.test_authoring.contracts import TestAuthoringInput, TestPatch
+from corsair.agents.test_authoring.contracts import DevelopmentWitness, TestAuthoringInput, TestPatch
 from corsair.agents.test_authoring.dependencies import AuthoringBudget, AuthoringDependencies
 from corsair.agents.test_planning.agent import create_test_planning_agent
 from corsair.agents.test_planning.dependencies import PlanningDependencies
@@ -244,6 +244,19 @@ class FixtureCase:
     runtime: RuntimeInputs | None = None
     # The baseline revision's setup source (SPEC-0068); with it the environment agent prepares the environment.
     setup: SetupSource | None = None
+
+
+def output_refusals(messages: tuple[ModelMessage, ...]) -> tuple[str, ...]:
+    """The output corrections a stage run was sent, oldest first, each bounded; work-tool retries excluded.
+
+    Prompted output retries name no tool; tool-mode output retries name PydanticAI's ``final_result`` tools.
+    """
+    return tuple(
+        (part.content if isinstance(part.content, str) else "; ".join(
+            f"{'.'.join(map(str, error.get('loc', ())))}: {error.get('msg', '')}" for error in part.content))[:300]
+        for message in messages if isinstance(message, ModelRequest)
+        for part in message.parts if isinstance(part, RetryPromptPart)
+        and (part.tool_name is None or part.tool_name.startswith("final_result")))
 
 
 @dataclass(frozen=True)
@@ -557,7 +570,13 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
                     f"{exhausted.limits.work_tool_calls} work calls)")
         failed = attempts[-1].failure
         kind = failed.kind if isinstance(failed, RecordedFailure) else type(failed).__name__
-        return f"{stage} produced no output: {kind}: {failed}"[:2048]
+        # "Exceeded maximum output retries" names no refusal; keep each correction the run spent (live-006: a
+        # wrong assertion line; corpus rerun: reasoning with no output) and the final one, held in the cause.
+        refused = output_refusals(attempts[-1].messages)
+        cause = failed.__cause__ if not isinstance(failed, RecordedFailure) else None
+        refused += (str(cause)[:300],) if cause is not None else ()
+        named = f"; refusals: {' | then: '.join(refused)}" if refused else ""
+        return f"{stage} produced no output: {kind}: {failed}{named}"[:2048]
 
     if case.runtime is not None:
         report(lambda: StageStarted("runtime"))
@@ -633,7 +652,18 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
     ready("planning", lambda: f"control {plan.control.test_id}; security {plan.security.test_id}")
 
     try:
-        authoring_input = TestAuthoringInput(plan=plan, source_files=source_files, environment=environment)
+        recorders = environment.witness_facilities if case.witness_from_recorders else ()
+        request, unrequested = witness_request(identification, case.witness_envelope, plan.security.witness,
+                                               recorders), ()
+    except ValueError as exc:
+        # No approved envelope covers the identified target: run without a witness and say so.
+        request, unrequested = None, (f"no witness requested: {exc}"[:512],)
+    # Development runs observe the same envelope, so authoring can refuse a test that cannot see the effect.
+    development_witness = (DevelopmentWitness(target_path=request.target_path, target_symbol=request.target_symbol,
+                                              effect_name=request.effect_name) if request is not None else None)
+    try:
+        authoring_input = TestAuthoringInput(plan=plan, source_files=source_files, environment=environment,
+                                             witness=development_witness)
     except ValueError as exc:
         return stop("authoring", f"authoring input refused: {exc}"[:2048], identification=identification, plan=plan)
     patch = await _stage("authoring", authoring_input)
@@ -652,13 +682,6 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         return stop("execution", f"patch not frozen: {exc}"[:2048], identification=identification, plan=plan,
                     patch=patch)
     executions = []
-    try:
-        recorders = environment.witness_facilities if case.witness_from_recorders else ()
-        request, unrequested = witness_request(identification, case.witness_envelope, plan.security.witness,
-                                               recorders), ()
-    except ValueError as exc:
-        # No approved envelope covers the identified target: run without a witness and say so.
-        request, unrequested = None, (f"no witness requested: {exc}"[:512],)
     for revision in ("baseline", "candidate"):
         operation, observed, failure = new_operation(), None, None
         report(lambda: RevisionStarted(revision))
