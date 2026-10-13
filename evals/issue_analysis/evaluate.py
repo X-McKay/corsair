@@ -52,10 +52,15 @@ def describe_model(model: Model) -> dict[str, Any]:
         value = profile[name]
         return value.__name__ if isinstance(value, type) else value
     client = getattr(model, "client", None)
+    retries = "not_applicable" if client is None else getattr(client, "max_retries", "unknown")
+    if model.system == "bedrock" and client is not None:
+        native_retries = client.meta.config.retries or {}
+        retries = (native_retries["total_max_attempts"] - 1 if "total_max_attempts" in native_retries
+                   else native_retries.get("max_attempts", "unknown"))
     return {"model_name": model.model_name, "system": model.system,
             "profile": {name: flag(name) for name in PROFILE_FLAGS},
             "model_settings": dict(model.settings or {}),
-            "sdk_max_retries": client.max_retries if client is not None else "not_applicable"}
+            "sdk_max_retries": retries}
 
 
 # Descriptive labels recorded with every report; skill identity and contract names

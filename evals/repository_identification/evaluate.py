@@ -30,7 +30,8 @@ from pydantic_evals.evaluators import Evaluator, MaxModelRequests, MaxToolCalls
 from corsair.adapters.git_source import Executable, GitSource, SourceLimits
 from corsair.adapters.local_artifacts import LocalArtifacts
 from corsair.agents.issue_identification.contracts import IssueIdentification
-from corsair.agents.issue_analysis.provider import LocalModelConfig, local_model
+from corsair.inference.config import load_agent_config
+from corsair.inference.models import configured_model
 from corsair.agents.issue_identification import (
     REPOSITORY_CONFIG_VERSION as CONFIG_VERSION, REPOSITORY_PROMPT_VERSION as PROMPT_VERSION,
     REPOSITORY_TOOLSET_SHA256 as TOOLSET_SHA256, RepositoryDependencies, RepositoryIssueInput,
@@ -246,7 +247,7 @@ def main():
     parser.add_argument("mode", choices=("measure", "live"))
     parser.add_argument("--repository", type=Path, required=True, help="Complete private operator bare repository")
     parser.add_argument("--evidence", type=Path, required=True)
-    parser.add_argument("--provider-config", type=Path, help="LocalModelConfig JSON; required for live")
+    parser.add_argument("--provider-config", type=Path, help="provider configuration JSON; required for live")
     args = parser.parse_args()
     # LocalArtifacts and GitSource require absolute operator paths.
     args.evidence, args.repository = args.evidence.absolute(), args.repository.absolute()
@@ -275,10 +276,10 @@ def main():
                 k: v for k, v in summary["probe"].items() if k != "output"}}, indent=2))
             return
         (args.evidence / "tree.json").write_text(json.dumps(summary, indent=2))
-        config = LocalModelConfig.model_validate_json(args.provider_config.read_text())
+        config = load_agent_config(args.provider_config, "repository_identification")
 
         async def run():
-            async with local_model(config) as model:
+            async with configured_model(config) as model:
                 return await live(args.evidence, tree, model, LiveBudget(), limits)
         report = asyncio.run(run())
         report.print(include_input=False, include_output=False)
