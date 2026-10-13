@@ -99,7 +99,24 @@ class DockerCase:
                                 stderr=result.stderr, native_exit=result.returncode, worker_cleanup='confirmed')
 
 
+RECEIPT = 'corsair-setup.json'
+
+
+def setup_identity(image, checkout, commit):
+    """What a dependency directory was installed for: the commit, the image and the lockfile it installed."""
+    lock = checkout / 'package-lock.json'
+    return {'commit': commit, 'image': image,
+            'package_lock_sha256': hashlib.sha256(lock.read_bytes()).hexdigest() if lock.is_file() else None}
+
+
 def run(image, checkout, modules, commit, ids, evidence, test_file, timeout):
+    # The dependencies must be the ones setup installed for this commit's lockfile in this image, never another's.
+    try:
+        receipt = json.loads((modules / RECEIPT).read_text())
+    except (OSError, ValueError) as error:
+        raise SystemExit(f'{modules}: no successful setup receipt ({error})')
+    if receipt != dict(setup_identity(image, checkout, commit), exit=0):
+        raise SystemExit(f'{modules}: set up for {receipt}, not for this commit, image and lockfile')
     path = JsTestId.parse(ids[0]).path
     patch = ApprovedPatch((PatchFile(path, Path(test_file).read_bytes()),), (path,))
     config = JestRunnerConfig(command=JEST, workspace_root=WORK, report_path='/tmp/corsair-jest.json')
@@ -109,7 +126,7 @@ def run(image, checkout, modules, commit, ids, evidence, test_file, timeout):
         result = JestRunner(case, case, store, config).run(patch, control_test_id=ids[0], security_test_id=ids[1],
                                                            discovery_command=config.command, operation=uuid4())
         elapsed = round(time.monotonic() - clock, 3)
-    summary = {'image': image, 'commit': commit, 'ids': ids, 'test_file': str(test_file), 'patch_sha256': patch.sha256,
+    summary = {'image': image, 'commit': commit, 'setup_receipt': receipt, 'ids': ids, 'test_file': str(test_file), 'patch_sha256': patch.sha256,
                'elapsed_seconds': elapsed, 'container_cleanup': case.cleanup, 'failure_layer': result.failure_layer,
                'detail': result.detail, 'cleanup': result.cleanup,
                'discovery': result.discovery and {'status': result.discovery.status, 'test_ids': result.discovery.test_ids},
@@ -144,6 +161,9 @@ def main():
             # A fresh directory per setup: copying into an existing tree would mix two commits' dependency closures.
             args.modules.mkdir(parents=True, exist_ok=False)
             code = setup(args.image, tree, args.modules.resolve(), args.evidence)
+            if code == 0:
+                identity = dict(setup_identity(args.image, tree, commit), exit=0)
+                (args.modules / RECEIPT).write_text(json.dumps(identity, indent=2))
             print(json.dumps({'phase': 'setup', 'commit': commit, 'exit': code}))
             raise SystemExit(code)
         summary = run(args.image, tree, args.modules.resolve(), commit, tuple(args.id), args.evidence,

@@ -21,7 +21,7 @@ Implement [SPEC-0057](../specs/SPEC-0057-jest-runner.md) on top of the Node 8 im
 - [x] Image-only real case: CVE-2020-7730 (bestzip) through `tests/qualification/node_image_case.py` at both commits.
 - [x] Image-only real case: CVE-2020-15123 (codecov-node) the same way.
 - [ ] Framework row `jest` with the image row.
-- [x] Harness guards as #74: an image config id, the checkout's HEAD blobs (`commit_tree`) rather than worktree bytes, and a fresh dependency directory per setup.
+- [x] Harness guards as #74: an image config id, the checkout's HEAD blobs (`commit_tree`) rather than worktree bytes, and a fresh dependency directory per setup; setup writes a receipt (commit, image, `package-lock.json` SHA-256, exit 0) beside `node_modules` and `run` refuses a directory whose receipt does not match its own commit, image and lockfile, recording the receipt in `run.json`.
 - [ ] Mocha and AVA runners; environment `jest` admission with its own eval.
 
 ## Validation and progress
@@ -38,6 +38,8 @@ After #74's guards were adopted (image config id, committed tree, fresh dependen
 ## Decisions and next action
 
 One file, identifier titles, never-matching-pattern listing (SPEC-0057). Next: the live gate, then the framework row.
+
+Review fixes at the same head: a non-string assertion `status` (for example `[]`) is refused as a malformed report instead of raising `TypeError`; the runner binary must be absolute. With the receipt, the codecov case was rerun in fresh directories (baseline control passed, security failed; fix both passed; cleanup confirmed), and running the fix commit against the baseline's dependency directory was refused before any container started.
 
 Consolidation (Al, 2026-10-13: generalize across languages and frameworks; one refactor PR after the runners merge, not per-PR rework). Parts of this PR that move into shared code:
 

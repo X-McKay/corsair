@@ -117,7 +117,7 @@ def test_two_files_are_refused_before_any_workspace(store):
 
 
 @pytest.mark.parametrize('command', [JEST + ('-t', 'x'), JEST + ('--testNamePattern=x',), JEST + ('test/x.test.js',),
-                                     JEST + ('--json',), JEST + ('--outputFile=/tmp/x',), JEST + ('--watch',), JEST[:1]])
+                                     JEST + ('--json',), JEST + ('--outputFile=/tmp/x',), JEST + ('--watch',), JEST[:1], ('node',) + JEST[1:]])
 def test_operator_prefix_cannot_select_or_report(command):
     with pytest.raises(ValueError):
         JestRunnerConfig(command, ROOT, REPORT)

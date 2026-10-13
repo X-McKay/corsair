@@ -45,6 +45,8 @@ class JestRunnerConfig:
         if (type(self.command) is not tuple or len(self.command) < 2
                 or any(type(t) is not str or not t or '\0' in t for t in self.command)):
             raise ValueError('Runner command must be a binary, the Jest script and options')
+        if not self.command[0].startswith('/'):
+            raise ValueError('Runner binary must be an absolute operator path')
         if any(token[0] != '-' or token.split('=', 1)[0] in RESERVED for token in self.command[2:]):
             raise ValueError('Jest prefix must hold non-selecting options only after the Jest script')
         if type(self.workspace_root) is not str or not self.workspace_root.startswith('/') or '\0' in self.workspace_root:

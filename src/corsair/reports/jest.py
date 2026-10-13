@@ -55,7 +55,8 @@ def _suite(report: dict, root: str, path: str) -> dict:
         raise JestError(f'Test suite failed to run: {message.strip()[:MAX_MESSAGE_CHARS]}')
     for test in tests:
         if (type(test) is not dict or type(test.get('title')) is not str or type(test.get('ancestorTitles')) is not list
-                or any(type(title) is not str for title in test['ancestorTitles']) or test.get('status') not in OUTCOMES
+                or any(type(title) is not str for title in test['ancestorTitles'])
+                or type(test.get('status')) is not str or test['status'] not in OUTCOMES
                 or type(test.get('failureMessages')) is not list):
             raise JestError('Malformed Jest assertion result')
     return suite

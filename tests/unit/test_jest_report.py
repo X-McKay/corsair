@@ -75,6 +75,9 @@ def mutate(name, change):
         {'ancestorTitles': [], 'title': 'extra', 'status': 'passed', 'failureMessages': []})),  # other test ran
     mutate('baseline-run', lambda d: d['testResults'][0]['assertionResults'][1].update(failureMessages=[])),
     mutate('baseline-run', lambda d: d['testResults'][0]['assertionResults'][1].update(status='weird')),
+    mutate('baseline-run', lambda d: d['testResults'][0]['assertionResults'][1].update(status=[])),   # unhashable
+    mutate('baseline-run', lambda d: d['testResults'][0]['assertionResults'][1].update(status={})),
+    mutate('baseline-run', lambda d: d['testResults'][0]['assertionResults'][1].update(status=None)),
     mutate('baseline-run', lambda d: d.update(numRuntimeErrorTestSuites=1)),
     report('baseline-run').replace(b'{"numFailedTestSuites":1,', b'{"numFailedTestSuites":1,"numFailedTestSuites":1,'),
     b'not json', b'', b'[]',
@@ -82,6 +85,12 @@ def mutate(name, change):
 def test_inexact_reports_are_refused(data):
     with pytest.raises(JestError):
         parse_jest(data, IDS, root=ROOT, test_paths=PATHS)
+
+
+@pytest.mark.parametrize('status', [[], {}, None, 1])
+def test_malformed_listing_status_is_not_a_listing(status):
+    data = mutate('baseline-listing', lambda d: d['testResults'][0]['assertionResults'][0].update(status=status))
+    assert listed(data, root=ROOT, path=PATH) is None
 
 
 def test_oversize_reports_are_refused():
