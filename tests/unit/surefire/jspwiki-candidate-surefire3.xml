@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="org.apache.wiki.BenchmarkWikiServletForwardingTest" time="0.756" tests="2" errors="0" skipped="0" failures="0" flakes="0">
+  <properties>
+  </properties>
+  <testcase name="inertWebRootResourceCannotSelectForwardTarget" classname="org.apache.wiki.BenchmarkWikiServletForwardingTest" time="0.681">
+    <system-out><![CDATA[MockServletContext:  Assigning new engine to 1768792843
+BENCHMARK_SECURITY_FORWARD_URL=/Wiki.jsp?page=templates%2F210%2Fimages%2FSilkIconSet-readme.txt&
+]]></system-out>
+    <system-err><![CDATA[log4j:WARN No appenders could be found for logger (org.apache.wiki.util.PropertyReader).
+log4j:WARN Please initialize the log4j system properly.
+log4j:WARN See http://logging.apache.org/log4j/1.2/faq.html#noconfig for more info.
+]]></system-err>
+  </testcase>
+  <testcase name="benignPageKeepsEncodedPageParameter" classname="org.apache.wiki.BenchmarkWikiServletForwardingTest" time="0.053">
+    <system-out><![CDATA[MockServletContext:  Assigning new engine to 2065730373
+BENCHMARK_CONTROL_FORWARD_URL=/Wiki.jsp?page=OrdinaryPage&
+]]></system-out>
+  </testcase>
+</testsuite>
