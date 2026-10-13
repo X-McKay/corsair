@@ -32,7 +32,8 @@ from corsair.agents.test_authoring.agent import (
 from corsair.agents.test_authoring.contracts import BlockedAuthoring, DevelopmentRun, TestAuthoringInput, TestPatch
 from corsair.agents.test_authoring.skills import SKILL_SHA256
 from corsair.agents.test_authoring.static import static_checks
-from corsair.agents.test_authoring.tools import RUN_TOOL, WRITE_TOOL, AuthoringBudget, AuthoringDependencies
+from corsair.agents.test_authoring.dependencies import AuthoringBudget, AuthoringDependencies
+from corsair.agents.test_authoring.tools import RUN_TOOL, TOOLSET_SHA256, WRITE_TOOL
 from corsair.ports.test_runner import (
     ApprovedPatch, Discovery, Execution, FailureDetail, NativeTestRun, TestCaseResult,
 )
@@ -245,6 +246,7 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, prov
                 "runner": "injected_observations_and_static_host_runner", "execution": "simulated_not_executed",
                 "weights_identity": "not_applicable" if scripted else "unknown", "provider": provider,
                 "prompt_version": PROMPT_VERSION, "config_version": CONFIG_VERSION, "skill_sha256": SKILL_SHA256,
+                "toolset_sha256": TOOLSET_SHA256,
                 "budget": budget.model_dump(), "task_retries": 0, "max_concurrency": 1,
                 "dataset_sha256": sha256((ROOT / "cases.yaml").read_bytes()).hexdigest(),
                 "output_contract": "TestPatch | BlockedAuthoring",

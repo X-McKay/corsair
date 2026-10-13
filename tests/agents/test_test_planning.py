@@ -12,7 +12,7 @@ from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import UsageLimits
 
 from corsair.agents.issue_analysis.tools import source_tools
-from corsair.agents.issue_analysis.tools.identification import identification_tools
+from corsair.agents.issue_identification.tools import identification_tools
 from corsair.agents.test_planning import (
     PlanningDependencies, ReadyTestPlan, ReadyTestPlanDraft, TestPlanningInput, UnsupportedTestPlan,
     UnsupportedTestPlanDraft, create_test_planning_agent, planning_prompt,
