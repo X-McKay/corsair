@@ -12,7 +12,7 @@ import re
 from corsair.agents.evidence_assessment.contracts import MAX_ITEM_CHARS, EvidenceItem
 from corsair.agents.issue_identification.contracts import IssueIdentification
 from corsair.agents.test_authoring.contracts import TestPatch
-from corsair.agents.test_planning.contracts import ReadyTestPlan
+from corsair.agents.test_planning.contracts import PlannedWitness, ReadyTestPlan
 from corsair.core.disposition import (ClassifiedFailure, EnvironmentIdentity, ExpectedFailure, ObservationPlan,
                                       ObservedOutcome, Revision, RunEvidence, SandboxEvent, Witness)
 from corsair.ports.execution import ExecutionReceipt
@@ -39,8 +39,14 @@ def observation_plan(plan: ReadyTestPlan, patch: TestPatch) -> ObservationPlan:
         frozen_patch_sha256=patch.patch_sha256)
 
 
-def witness_request(identification: IssueIdentification, envelope: WitnessRequest | None) -> WitnessRequest:
-    """The operator's approved envelope, used only when the admitted identification names exactly its target."""
+def witness_request(identification: IssueIdentification, envelope: WitnessRequest | None,
+                    planned: PlannedWitness) -> WitnessRequest:
+    """The operator's approved envelope, used only when the admitted identification names exactly its target
+    and the plan's security witness is the effect that envelope records.
+
+    Until SPEC-0040 binds the plan's subject at execution, a planned effect the probe does not record, or a
+    subject other than the envelope's file, is refused here so its gates stay inconclusive.
+    """
     if identification.status != 'ready' or identification.target is None:
         raise ValueError('a witness needs a ready identification target')
     if envelope is None:
@@ -48,6 +54,12 @@ def witness_request(identification: IssueIdentification, envelope: WitnessReques
     target = identification.target
     if (target.source.path, target.symbol) != (envelope.target_path, envelope.target_symbol):
         raise ValueError('the identified target is outside the operator witness envelope')
+    if planned.effect != 'file_open':
+        raise ValueError(f'the planned {planned.effect} witness is not recorded by the operator probe')
+    # The probe matches a plain file name, so only that exact subject is represented; a directory-prefixed
+    # subject names another path and is refused until execution binds the whole subject.
+    if planned.subject != envelope.effect_name:
+        raise ValueError('the planned witness subject is not the operator witness envelope effect')
     return envelope
 
 

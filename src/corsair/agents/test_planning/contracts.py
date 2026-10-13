@@ -1,6 +1,8 @@
 """Read-only two-test planning contracts; no model, workflow or execution SDK types."""
 
 from hashlib import sha256
+import re
+from pathlib import PurePosixPath
 from typing import Annotated, Any, Generic, Literal
 
 from pydantic import Field, ValidationInfo, field_validator, model_validator
@@ -17,6 +19,36 @@ Path = Annotated[str, Field(min_length=1, max_length=256)]
 # Same identifier shape the deterministic disposition gates (SPEC-0027) compare against.
 Identifier = Annotated[str, Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.:-]+$")]
 CommandTokens = Annotated[tuple[Token, ...], Field(min_length=1, max_length=32)]
+
+
+# SPEC-0040: effect kinds an operator facility can record; added only with a recorder for them.
+WitnessEffect = Literal["file_open", "process_start", "socket_connect"]
+Subject = Annotated[str, Field(min_length=1, max_length=256, pattern=r"^[A-Za-z0-9_.:/-]+$")]
+
+
+class WitnessFacility(Contract):
+    """An operator-owned recorder of one effect kind during a test's call."""
+    id: Identifier
+    kind: WitnessEffect
+    description: Fact
+
+
+class PlannedWitness(Contract):
+    """What a listed facility must record (occurs) or must not record (absent) for one subject during the call."""
+    facility: Identifier = Field(description="id of one listed witness facility")
+    effect: WitnessEffect = Field(description="The listed facility's kind")
+    subject: Subject = Field(description="For file_open, a path relative to the scratch location (the sentinel file); for process_start or socket_connect, a token that appears in the recorded arguments or address")
+    expectation: Literal["occurs", "absent"] = Field(description="occurs for the control, absent for the security test")
+
+
+def scratch_relative(subject: str) -> str:
+    path = PurePosixPath(subject)
+    if path.is_absolute() or ".." in path.parts or subject.startswith("~") or path == PurePosixPath("."):
+        raise ValueError(f"file_open subject {subject!r} must be a path inside the scratch location, relative to it")
+    # One spelling per file, so distinct subjects are distinct files ("./a", "a//b", "a/./b" and "a/" are refused).
+    if str(path) != subject:
+        raise ValueError(f"file_open subject {subject!r} must be written canonically as {str(path)!r}")
+    return subject
 
 
 class BaselineTest(Contract):
@@ -37,6 +69,14 @@ class EnvironmentEvidence(Contract):
     baseline_test: BaselineTest | None
     scratch_location: Fact
     observation_facilities: tuple[Fact, ...] = Field(max_length=8, description="Facilities the prepared environment offers for observing an effect")
+    witness_facilities: tuple[WitnessFacility, ...] = Field(default=(), max_length=8, description="Operator recorders a planned witness must name")
+
+    @field_validator("witness_facilities")
+    @classmethod
+    def unique_facility_ids(cls, value: tuple[WitnessFacility, ...]) -> tuple[WitnessFacility, ...]:
+        if len({facility.id for facility in value}) != len(value):
+            raise ValueError("duplicate witness facility id")
+        return value
 
     @field_validator("approved_test_paths")
     @classmethod
@@ -87,7 +127,8 @@ class TestSpecification(Contract, Generic[Citation]):
     implementation_call: Fact = Field(description="The real implementation call, naming the identified target")
     input: Fact
     required_behavior: Fact = Field(description="Specific required behavior; for security, a specific rejection or absence of effect, never an arbitrary exception")
-    observable_witness: Fact = Field(description="What an available facility observes, separating the application observation from any sandbox observation")
+    observable_witness: Fact = Field(description="Explanation of the witness, separating the application observation from any sandbox observation; never read by a gate")
+    witness: PlannedWitness
     source_references: tuple[Citation, ...] = Field(min_length=1, max_length=8)
 
     _path = field_validator("test_path")(confined_path)
@@ -121,12 +162,44 @@ class _ReadyPlan(Contract, Generic[Citation]):
             raise ValueError("control and security tests need distinct test ids")
         environment = _environment(info)
         if environment is not None:
+            # SPEC-0022 precondition, admitted in code: without an executed baseline no native test is known to run.
+            if environment.baseline_test is None:
+                raise ValueError("environment.baseline_test is null, so no native test is known to run: return unsupported")
             for spec in (self.control, self.security):
                 if spec.test_path not in environment.approved_test_paths:
                     raise ValueError(f"test path {spec.test_path} is not an approved test path")
             if self.discovery_command != environment.discovery_command:
                 raise ValueError("discovery command tokens must equal the supplied environment command")
+            planned_witnesses(self, environment)
         return self
+
+
+def planned_witnesses(plan: "_ReadyPlan", environment: EnvironmentEvidence) -> None:
+    """SPEC-0040 admission: typed witnesses against the operator's facilities, checked without reading prose."""
+    facilities = {facility.id: facility for facility in environment.witness_facilities}
+    for name, spec, expected in (("control", plan.control, "occurs"), ("security", plan.security, "absent")):
+        witness = spec.witness
+        facility = facilities.get(witness.facility)
+        if facility is None:
+            listed = ", ".join(facilities) or "none"
+            raise ValueError(f"{name} witness facility {witness.facility!r} is not listed (listed: {listed}); "
+                             "if no listed facility records the sensitive operation, return an unsupported plan")
+        if witness.effect != facility.kind:
+            raise ValueError(f"{name} witness effect {witness.effect} differs from facility {facility.id} kind {facility.kind}")
+        if witness.expectation != expected:
+            raise ValueError(f"the {name} witness expectation must be {expected}")
+        if witness.effect == "file_open":
+            scratch_relative(witness.subject)
+    control, security = plan.control.witness, plan.security.witness
+    if (control.effect, control.subject) == (security.effect, security.subject):
+        raise ValueError("control and security witnesses must name different subjects")
+    token = PurePosixPath(security.subject).name if security.effect == "file_open" else security.subject
+    if not any(token in text for text in (plan.security.input, *plan.security.fixture_setup)):
+        raise ValueError(f"the security input or fixture setup must name the witness subject {token!r} the adversarial input aims at")
+    safe = plan.security_expectation.safe_behavior
+    named = re.search(rf"(?<![A-Za-z0-9_.]){re.escape(safe)}(?![A-Za-z0-9_])", plan.security.required_behavior)
+    if safe != f"no_{security.effect}" and named is None:
+        raise ValueError(f"safe_behavior must be no_{security.effect} or an exception type named in the security required_behavior")
 
 
 class _UnsupportedPlan(Contract, Generic[Citation]):
