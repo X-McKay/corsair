@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="2" time="0.001" timestamp="2026-01-01T00:00:00.000000+00:00" hostname="runner"><testcase classname="test_documents" name="test_benign_control" time="0.001"><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+{"exception": null, "opens": ["/workspace/scratch/test_benign_control0/allowed/document.txt"], "returned_sha256": "f40c8d728e47452149f6b8afecfa91e4b3f517bc64ba3cc3a07a902d0c68cd3f", "source_sha256": "c1cb3fcbf58038ebfee89ab28d1d310f88e92b0fd4951151d98c99259ca4d40d", "test": "control"}
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="test_documents" name="test_security_rejects_outside_read" time="0.001"><failure message="AssertionError: security assertion: application opened the outside fixture&#10;assert '/workspace/scratch/test_security_rejects_outside_0/outside.txt' not in ['/workspace/scratch/test_security_rejects_outside_0/outside.txt']&#10; +  where '/workspace/scratch/test_security_rejects_outside_0/outside.txt' = str(PosixPath('/workspace/scratch/test_security_rejects_outside_0/outside.txt'))">Traceback (most recent call last):
+  File "/usr/lib/python3.12/site-packages/_pytest/runner.py", line 353, in from_call
+    result: TResult | None = func()
+                             ^^^^^^
+  File "/usr/lib/python3.12/site-packages/_pytest/runner.py", line 245, in &lt;lambda&gt;
+    lambda: runtest_hook(item=item, **kwds),
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/pluggy/_hooks.py", line 512, in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/pluggy/_manager.py", line 120, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/pluggy/_callers.py", line 167, in _multicall
+    raise exception
+  File "/usr/lib/python3.12/site-packages/pluggy/_callers.py", line 139, in _multicall
+    teardown.throw(exception)
+  File "/usr/lib/python3.12/site-packages/_pytest/logging.py", line 850, in pytest_runtest_call
+    yield
+  File "/usr/lib/python3.12/site-packages/pluggy/_callers.py", line 139, in _multicall
+    teardown.throw(exception)
+  File "/usr/lib/python3.12/site-packages/_pytest/capture.py", line 900, in pytest_runtest_call
+    return (yield)
+            ^^^^^
+  File "/usr/lib/python3.12/site-packages/pluggy/_callers.py", line 139, in _multicall
+    teardown.throw(exception)
+  File "/usr/lib/python3.12/site-packages/_pytest/skipping.py", line 268, in pytest_runtest_call
+    return (yield)
+            ^^^^^
+  File "/usr/lib/python3.12/site-packages/pluggy/_callers.py", line 121, in _multicall
+    res = hook_impl.function(*args)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/_pytest/runner.py", line 179, in pytest_runtest_call
+    item.runtest()
+  File "/usr/lib/python3.12/site-packages/_pytest/python.py", line 1720, in runtest
+    self.ihook.pytest_pyfunc_call(pyfuncitem=self)
+  File "/usr/lib/python3.12/site-packages/pluggy/_hooks.py", line 512, in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/pluggy/_manager.py", line 120, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/pluggy/_callers.py", line 167, in _multicall
+    raise exception
+  File "/usr/lib/python3.12/site-packages/pluggy/_callers.py", line 121, in _multicall
+    res = hook_impl.function(*args)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/site-packages/_pytest/python.py", line 166, in pytest_pyfunc_call
+    result = testfunction(**testargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/test_documents.py", line 64, in test_security_rejects_outside_read
+    assert str(outside) not in events, "security assertion: application opened the outside fixture"
+AssertionError: security assertion: application opened the outside fixture
+assert '/workspace/scratch/test_security_rejects_outside_0/outside.txt' not in ['/workspace/scratch/test_security_rejects_outside_0/outside.txt']
+ +  where '/workspace/scratch/test_security_rejects_outside_0/outside.txt' = str(PosixPath('/workspace/scratch/test_security_rejects_outside_0/outside.txt'))</failure><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+{"exception": null, "opens": ["/workspace/scratch/test_security_rejects_outside_0/outside.txt"], "returned_sha256": "fd9bbe8d7cfde96813f2269e4ccccb5f0d221487c952f9ba9c876e1260ee21ab", "source_sha256": "c1cb3fcbf58038ebfee89ab28d1d310f88e92b0fd4951151d98c99259ca4d40d", "test": "security"}
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase></testsuite></testsuites>
