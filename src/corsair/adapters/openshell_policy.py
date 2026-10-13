@@ -23,6 +23,19 @@ def policy_sha256(policy: dict) -> str:
     return hashlib.sha256(json.dumps(policy, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 
 
+# The fields of an OpenShell policy document, as the SPEC-0006 policy gate compares them.
+POLICY_FIELDS = frozenset({'version', 'landlock', 'filesystem_policy', 'process', 'network_policies'})
+
+
+def loads_requested(native: dict, requested: dict) -> bool:
+    """Whether the gateway's effective policy is the requested document: every field the document sets is equal,
+    an absent `network_policies` is empty, and the gateway adds nothing but its own `process` defaults."""
+    if not set(native) <= POLICY_FIELDS or not set(requested) <= POLICY_FIELDS:
+        return False
+    expected = {'network_policies': {}} | requested
+    return all(native.get(key, {} if key == 'network_policies' else None) == value for key, value in expected.items())
+
+
 class CliPolicy:
     def __init__(self, binary: Path, binary_sha256: str, *, gateway: str, env: dict[str, str],
                  timeout_seconds: int, receipts: Path):
@@ -45,7 +58,7 @@ class CliPolicy:
                                + done.stderr[-1024:].decode('utf-8', 'replace'))
         return done
 
-    def _observe(self, handle: SandboxHandle) -> tuple[int, str]:
+    def _observe(self, handle: SandboxHandle, policy: dict) -> tuple[int, str]:
         actual = json.loads(self._cli(handle, 'sandbox', 'get', handle.name, '-o', 'json').stdout)
         full = json.loads(self._cli(handle, 'policy', 'get', handle.name, '--full', '-o', 'json').stdout)
         revision = json.loads(self._cli(handle, 'policy', 'get', handle.name, '--rev', str(full['version']),
@@ -55,6 +68,8 @@ class CliPolicy:
                 or full['hash'] != admission['policy_hash'] or revision['status'] != 'loaded'
                 or revision['hash'] != full['hash']):
             raise ValueError('policy revision not observed loaded on the original sandbox')
+        if not (loads_requested(actual['policy'], policy) and loads_requested(full['policy'], policy)):
+            raise ValueError('loaded policy differs from the requested document')
         return int(full['version']), str(full['hash'])
 
     def apply(self, handle: SandboxHandle, policy: dict, phase: str, operation: UUID) -> PolicyReceipt:
@@ -77,7 +92,7 @@ class CliPolicy:
                 self._cli(handle, 'policy', 'set', handle.name, '--policy', str(path), '--wait',
                           '--timeout', str(self._timeout))
             receipt = replace(receipt, delivery='acknowledged')
-            version, native_hash = self._observe(handle)
+            version, native_hash = self._observe(handle, policy)
             receipt = replace(receipt, loaded=True, native_version=version, native_hash=native_hash)
         except Exception as error:
             failure = error

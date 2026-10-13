@@ -17,6 +17,9 @@ import (
 	"syscall"
 )
 
+// imode is Python's stat.S_IMODE: the permission bits with setuid, setgid and sticky, as the reference reports.
+func imode(mode uint32) uint32 { return mode & 0o7777 }
+
 func digest(r io.Reader, limit int64) (int64, string) {
 	h := sha256.New()
 	n, _ := io.Copy(h, io.LimitReader(r, limit))
@@ -54,7 +57,7 @@ func main() {
 	}
 	resolved, _ := filepath.EvalSymlinks(root)
 	stat := info.Sys().(*syscall.Stat_t)
-	out["root"] = []any{info.Mode().Perm(), stat.Uid, info.IsDir(), resolved == root}
+	out["root"] = []any{imode(stat.Mode), stat.Uid, info.IsDir(), resolved == root}
 	files, dirs, other, count, truncated := map[string]any{}, map[string]any{}, []string{}, 0, false
 	if info.IsDir() {
 		var walk func(dir string) bool
@@ -86,7 +89,7 @@ func main() {
 				sys := st.Sys().(*syscall.Stat_t)
 				switch {
 				case st.Mode().IsDir():
-					dirs[rel] = []any{st.Mode().Perm(), sys.Uid}
+					dirs[rel] = []any{imode(sys.Mode), sys.Uid}
 					subdirs = append(subdirs, path)
 				case st.Mode().IsRegular():
 					fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
@@ -106,7 +109,7 @@ func main() {
 					}
 					size, sum := digest(f, capBytes+1)
 					f.Close()
-					files[rel] = []any{os.FileMode(t.Mode).Perm(), t.Uid, t.Nlink, size, sum}
+					files[rel] = []any{imode(t.Mode), t.Uid, t.Nlink, size, sum}
 				default:
 					other = append(other, rel)
 				}

@@ -48,6 +48,11 @@ def tree(root: Path):
     (root / 'tool.sh').chmod(0o500)
     (root / 'link').symlink_to('tool.sh')
     os.mkfifo(root / 'pipe')
+    # Special bits are part of the mode both report: setuid on a file, setgid and sticky on directories.
+    (root / 'pkg' / 'app.py').chmod(0o4644)
+    (root / 'pkg' / 'deep').chmod(0o2755)
+    (root / 'shared').mkdir()
+    (root / 'shared').chmod(0o1777)
 
 
 @pytest.mark.parametrize('limit, cap', [(64, 1 << 20), (3, 1 << 20), (64, 100)])
