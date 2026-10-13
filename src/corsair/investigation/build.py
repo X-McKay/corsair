@@ -146,7 +146,10 @@ def _acquire(repository: str, commits: dict[str, str], work: Path, roots: tuple[
         present = subprocess.run(["git", "-C", str(clones[revision]), "cat-file", "-e", f"{commit}^{{commit}}"],
                                  capture_output=True, check=False)
         if present.returncode != 0:
-            raise Refused(f"{repository} does not hold the {revision} commit {commit}")
+            detail = present.stderr.decode(errors="replace").strip()
+            # Anything but git's missing-object message (ownership, corruption) is not "missing".
+            raise Refused(f"{repository} does not hold the {revision} commit {commit}" if "Not a valid object" in detail else
+                          f"{repository}: git could not read the {revision} commit {commit}: {detail}"[:2048])
         try:
             trees[revision] = commit_tree(clones[revision], work / revision, commit)
         except ValueError as error:

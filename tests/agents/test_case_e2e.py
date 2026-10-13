@@ -135,9 +135,7 @@ def test_the_runner_is_the_selected_framework_rows_entry_in_one_table():
     assert (row.name, harness(row.name, route=True).runner) == ("jest", JestRunner)
     # Every entry is keyed by a framework row the matrix declares.
     assert set(HARNESSES) <= {f.name for f in matrix.frameworks}
-    # pytest's entry serves the fixture and OpenShell routes; the image-only route is not built for it.
-    with pytest.raises(NoHarness, match="no image-only route for the pytest framework"):
-        harness("pytest", route=True)
+    assert harness("pytest", route=True).witness_facilities[0].id == "audit_open"
     with pytest.raises(NoHarness, match="no harness entry for the minitest framework"):
         harness("minitest")
     with pytest.raises(ValueError, match="admitted 0 framework rows"):

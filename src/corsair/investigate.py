@@ -1,4 +1,4 @@
-"""`corsair investigate --issue-json <file>`: one issue investigated end to end.
+"""`uv run corsair run --issue-json <file>`: one issue investigated end to end.
 
 The request (`corsair-issue-request/v1`) names the issue, the repository and its vulnerable and fixed commits; the
 system selects the runtime from the repository's own build files, prepares the environment, identifies, plans,
@@ -80,10 +80,11 @@ async def _chain(investigation: Investigation, evidence: Path, config: Inference
             "runtime_inputs": sorted(investigation.case.runtime.files), "timeout_seconds": timeout,
             "source": {"python": sys.version}}, indent=2))
         preparation = DockerPreparation({investigation.row: investigation.image}, investigation.trees["baseline"],
-                                        investigation.commits["baseline"], investigation.harness, timeout)
+                                        investigation.commits["baseline"], investigation.harness, timeout,
+                                        evidence / "overlays")
         with ExitStack() as containers, LocalArtifacts(evidence / "artifacts", max_bytes=8 * 1024 * 1024) as store:
             journal = Journal(DockerRunners(investigation.harness, investigation.image, revisions, store, timeout,
-                                            evidence / "runs", containers))
+                                            evidence / "runs", containers, preparation))
             try:
                 run = await run_direct(investigation.case, StageModels(**selected), journal, budget,
                                        catalog=investigation.catalog, preparation=preparation)
@@ -148,8 +149,8 @@ def investigate(request: IssueRequest, evidence: Path, images: dict[str, str], *
     return item
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="corsair investigate", description=__doc__,
+def main(argv: list[str] | None = None, prog: str = "corsair run") -> int:
+    parser = argparse.ArgumentParser(prog=prog, description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--issue-json", required=True, type=Path, help="A corsair-issue-request/v1 file")
     parser.add_argument("--provider-config", required=True, type=Path, help="Per-agent provider JSON")

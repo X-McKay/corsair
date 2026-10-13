@@ -14,7 +14,7 @@ from typing import Any
 
 from corsair.adapters.docker_image import WORK
 from corsair.adapters.jest_runner import JestRunner, JestRunnerConfig
-from corsair.adapters.pytest_runner import PytestRunner
+from corsair.adapters.pytest_runner import PytestRunner, PytestRunnerConfig
 from corsair.agents.test_planning.contracts import WitnessFacility
 
 
@@ -35,9 +35,31 @@ class Harness:
         return shlex.join(self.setup)
 
 
+# The project's Python dependencies, installed into the tree beside the code and constrained to the image's own
+# packages (its pinned pytest among them); a project without requirements.txt installs nothing.
+PIP_SETUP = ("if [ -f requirements.txt ]; then /usr/local/bin/python3 -m pip freeze > /tmp/corsair-image.txt; "
+             "/usr/local/bin/python3 -m pip install --no-input --disable-pip-version-check --no-compile "
+             "--target .corsair-deps -c /tmp/corsair-image.txt -r requirements.txt; fi; mkdir -p .corsair-deps")
+# Operator-owned pytest argv: no plugins, config or conftest from the workspace; installed dependencies after the code.
+PYTEST = ("/usr/bin/env", "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1", "PYTHONDONTWRITEBYTECODE=1", "PYTHONPATH=.:.corsair-deps",
+          "/usr/local/bin/python3", "-m", "pytest", "-c", "/dev/null", "--rootdir", ".", "--noconftest",
+          "--import-mode=importlib", "-p", "no:cacheprovider", "--basetemp", "/tmp/corsair-scratch")
+
 HARNESSES: dict[str, Harness] = {
-    # The fixture and the OpenShell route build their own pytest config (reviewed workspace, witness probe).
-    "pytest": Harness(runner=PytestRunner),
+    # The fixture and the OpenShell route build their own pytest config (reviewed workspace) from the same runner.
+    "pytest": Harness(
+        runner=PytestRunner,
+        config=PytestRunnerConfig(PYTEST, "/tmp/corsair-junit.xml", WORK, witness_record_path="/tmp/corsair-witness.json"),
+        setup=("/bin/sh", "-ec", PIP_SETUP), dependencies=".corsair-deps", lockfiles=("requirements.txt",),
+        registry_env=("HTTPS_PROXY", "https_proxy", "PIP_INDEX_URL", "PIP_CERT"),
+        scratch_location="The per-test pytest tmp_path directory; fixtures must not be created elsewhere",
+        observation_facilities=(
+            "Native JUnit XML outcomes, failure locations and captured stdout per test",
+            "Operator witness probe, not test code: calls, returns, raised exceptions and file opens attributed to "
+            "the identified target function during each test's call phase"),
+        witness_facilities=(WitnessFacility(
+            id="audit_open", kind="file_open",
+            description="Python sys.addaudithook 'open' events recording each path the test process opens during the call"),)),
     "jest": Harness(
         runner=JestRunner,
         config=JestRunnerConfig(command=("/usr/local/bin/node", "node_modules/jest/bin/jest.js", "--ci"),
