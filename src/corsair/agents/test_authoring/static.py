@@ -2,6 +2,10 @@
 
 import ast
 
+from corsair.ports.test_runner import RubyTestId
+
+from .ruby import ruby_assertion_lines
+
 SKIP_NAMES = {"skip", "skipif", "xfail", "importorskip"}
 MOCK_MODULES = {"mock", "unittest.mock", "pytest_mock"}
 
@@ -61,6 +65,15 @@ def _checks(tree: ast.Module, function: ast.FunctionDef | ast.AsyncFunctionDef) 
 
 def assertion_lines(content: str, test_id: str) -> tuple[int, ...]:
     """Lines where the named test can fail on its own check: assert statements and pytest.raises blocks it runs."""
+    try:
+        ruby = RubyTestId.parse(test_id)
+    except ValueError:
+        ruby = None
+    if ruby is not None:
+        lines = ruby_assertion_lines(content, ruby.class_name, ruby.method)
+        if not lines:
+            raise ValueError(f"{test_id} has no assertion")
+        return lines
     try:
         tree = ast.parse(content)
     except SyntaxError as exc:

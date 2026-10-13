@@ -26,7 +26,7 @@ def test_every_row_is_kept_and_the_jspwiki_manifest_is_joined():
     entries = load()
     assert [entry.inventory.case_id for entry in entries] == [case.case_id for case in load_inventory().cases]
     joined = {entry.inventory.case_id: entry for entry in entries if entry.manifest}
-    assert set(joined) == {"VUL4J-18"}
+    assert set(joined) == {"VUL4J-18", "CVE-2025-27610"}
     assert joined["VUL4J-18"].directory == JSPWIKI and joined["VUL4J-18"].admission == "not_admitted"
     assert {entry.inventory.language for entry in entries} == set(DEFAULT_BLOCKING)
 
@@ -93,11 +93,11 @@ def test_report_counts_cover_the_whole_denominator():
     for name in ("language", "build_system", "cwe", "manifest", "admission"):
         assert sum(report["by"][name].values()) == 50, name
     assert report["by"]["language"] == {"Java": 10, "JavaScript": 10, "Perl": 10, "Python": 10, "Ruby": 10}
-    assert report["by"]["manifest"] == {"absent": 49, "present": 1}
+    assert report["by"]["manifest"] == {"absent": 48, "present": 2}
     assert report["by"]["admission"] == {"not_admitted": 50}
     assert report["by"]["cwe"]["unrecorded"] == 40
     assert all(0 < count <= 50 for count in report["by"]["blocking"].values())
-    assert report["by"]["blocking"]["G2"] == 49  # the manifest meets G2 for JSPWiki only
+    assert report["by"]["blocking"]["G2"] == 48  # the manifests meet G2 for JSPWiki and rack only
     assert json.loads(json.dumps(report)) == report and "| language | Java | 10 |" in markdown(report)
 
 
