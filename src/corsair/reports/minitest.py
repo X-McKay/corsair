@@ -8,6 +8,7 @@ import json
 import re
 
 from corsair.ports.test_runner import FailureDetail, RubyTestId, TestCaseResult
+from corsair.reports.admission import admit_text, exactly, record
 from corsair.reports.junit import MAX_JUNIT_BYTES, MAX_MESSAGE_CHARS, JUnitError
 
 SCHEMA = 'corsair-minitest-v1'
@@ -63,11 +64,10 @@ def parse_minitest(data: bytes, test_ids: tuple[str, ...], *, root: str, test_pa
     keys = {(item.class_name, item.method): test_id for item, test_id in zip(parsed, test_ids)}
     if len(keys) != len(test_ids):
         raise MinitestReportError('Expected test ids are ambiguous in Minitest')
-    if type(data) is not bytes or not 1 <= len(data) <= max_bytes:
-        raise MinitestReportError('Minitest report outside the admitted byte envelope')
+    text = admit_text(data, max_bytes, 'Minitest report', MinitestReportError)
     try:
-        document = json.loads(data.decode('utf-8'), object_pairs_hook=_unique)
-    except (UnicodeError, ValueError, RecursionError) as error:
+        document = json.loads(text, object_pairs_hook=_unique)
+    except (ValueError, RecursionError) as error:
         raise MinitestReportError(f'Invalid Minitest report: {error}') from error
     if type(document) is not dict or set(document) != {'schema', 'tests'} or document['schema'] != SCHEMA \
             or type(document['tests']) is not list:
@@ -80,15 +80,11 @@ def parse_minitest(data: bytes, test_ids: tuple[str, ...], *, root: str, test_pa
         test_id = keys.get((item['class'], item['name']))
         if test_id is None:
             raise MinitestReportError(f'Unexpected result {item["class"]!r}#{item["name"]!r}')
-        if test_id in results:
-            raise MinitestReportError(f'Duplicate result {test_id}')
         outcome = item['outcome']
         if outcome not in OUTCOMES or (item['failure'] is None) != (outcome in ('passed', 'skipped')):
             raise MinitestReportError(f'Ambiguous outcome for {test_id}')
         failure = None if item['failure'] is None else _failure(item['failure'], root, test_paths)
         if failure is not None and failure.kind != ('error' if outcome == 'error' else 'failure'):
             raise MinitestReportError(f'Failure kind conflicts with outcome for {test_id}')
-        results[test_id] = TestCaseResult(test_id, outcome, failure, '')
-    if set(results) != set(test_ids):
-        raise MinitestReportError(f'Missing results: {sorted(set(test_ids) - set(results))}')
-    return tuple(results[test_id] for test_id in test_ids)
+        record(results, TestCaseResult(test_id, outcome, failure, ''), 'result', MinitestReportError)
+    return exactly(results, test_ids, 'results', MinitestReportError)
