@@ -98,6 +98,12 @@ func main() {
 					if err := syscall.Fstat(fd, &t); err != nil {
 						fail(err.Error())
 					}
+					if t.Mode&syscall.S_IFMT != syscall.S_IFREG {
+						// Replaced between the walk and the open: report what was opened, never read it as a file.
+						f.Close()
+						other = append(other, rel)
+						continue
+					}
 					size, sum := digest(f, capBytes+1)
 					f.Close()
 					files[rel] = []any{os.FileMode(t.Mode).Perm(), t.Uid, t.Nlink, size, sum}

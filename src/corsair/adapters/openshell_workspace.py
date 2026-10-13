@@ -68,7 +68,11 @@ def _canonical(path) -> bool:
 @dataclass(frozen=True)
 class UploadedVerifier:
     """The static operator verifier (`tools/workspace-verify`, SPEC-0070), uploaded into each sandbox before the
-    tree so no image needs an interpreter. It reports its own SHA-256; the host admits no other executable."""
+    tree so no image needs an interpreter. Each placement uploads it into a directory named for that operation.
+
+    It reports the SHA-256 of itself and the host refuses any other value. That is a consistency check, not
+    attestation: a process already running in the sandbox could replace it and print the pinned value. The trust
+    rests on the operator-pinned image, the only code that runs before the check."""
     binary: Path
     sha256: str
     remote_parent: str
@@ -82,9 +86,12 @@ class UploadedVerifier:
         if type(self.name) is not str or not self.name or '/' in self.name or self.name in ('.', '..'):
             raise ValueError('Single plain verifier directory name required')
 
-    @property
-    def remote_path(self) -> str:
-        return f'{self.remote_parent}/{self.name}/verify'
+    def directory(self, operation: UUID) -> str:
+        """The upload's directory name, unpredictable before the placement's operation exists."""
+        return f'{self.name}-{operation.hex}'
+
+    def remote_path(self, operation: UUID) -> str:
+        return f'{self.remote_parent}/{self.directory(operation)}/verify'
 
 
 @dataclass(frozen=True)
@@ -109,7 +116,8 @@ class WorkspaceConfig:
         for path in (self.remote_parent,) + ((self.python,) if self.python is not None else ()):
             if not _canonical(path):
                 raise ValueError('Canonical absolute operator paths required')
-        if self.verifier is not None and (self.verifier.remote_parent, self.verifier.name) == (self.remote_parent, self.root_name):
+        if (self.verifier is not None and self.verifier.remote_parent == self.remote_parent
+                and self.root_name.startswith(self.verifier.name + '-')):
             raise ValueError('Verifier and workspace root must differ')
         if type(self.root_name) is not str or not self.root_name or '/' in self.root_name or self.root_name in ('.', '..'):
             raise ValueError('Single plain workspace root name required')
@@ -284,10 +292,11 @@ class OpenShellTestWorkspace:
                 os.fsync(stream.fileno())
         return root
 
-    def _observe(self, handle: SandboxHandle, operation: UUID) -> tuple[dict, ExecutionReceipt]:
+    def _observe(self, handle: SandboxHandle, operation: UUID,
+                 placed: str | None = None) -> tuple[dict, ExecutionReceipt]:
         limits = (self._config.remote_root, str(self._config.max_files), str(MAX_FILE_BYTES))
         verifier = self._config.verifier
-        argv = ((verifier.remote_path,) + limits if verifier is not None
+        argv = ((placed,) + limits if verifier is not None
                 else (self._config.python, '-I', '-S', '-B', '-c', VERIFY) + limits)
         try:
             receipt = self._execution.execute(handle, argv, operation)
@@ -314,7 +323,7 @@ class OpenShellTestWorkspace:
         base = self._config.staging / f'{operation.hex}.verifier'
         base.mkdir(mode=0o700)
         try:
-            local = base / verifier.name
+            local = base / verifier.directory(operation)
             local.mkdir(mode=0o700)
             fd = os.open(local / 'verify', os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
             with os.fdopen(fd, 'wb') as stream:
@@ -360,7 +369,7 @@ class OpenShellTestWorkspace:
             base, root = self._stage(operation, added, parents)
         except Exception as error:
             raise WorkspaceError('staging', f'{type(error).__name__}: {error}', 'not_required') from error
-        handle, retain = None, False
+        handle, retain, placed = None, False, None
         try:
             try:
                 handle = self._lifecycle.create(uuid5(operation, 'create'))
@@ -370,10 +379,11 @@ class OpenShellTestWorkspace:
             if self._config.verifier is not None:
                 try:
                     self._deliver_verifier(handle, uuid5(operation, 'verifier'))
+                    placed = self._config.verifier.remote_path(uuid5(operation, 'verifier'))
                 except UploadError as error:
                     retain = error.descendants_unknown  # Reported as retained staging; the verifier's copy is kept
                     raise WorkspaceError('upload', f'verifier: {error} (delivery {error.delivery})', 'unconfirmed') from error
-            before, receipt = self._observe(handle, uuid5(operation, 'absent'))
+            before, receipt = self._observe(handle, uuid5(operation, 'absent'), placed)
             if before != dict(exists=False, euid=before.get('euid')):
                 raise WorkspaceError('admission', 'remote workspace root exists before upload', 'unconfirmed', receipt)
             try:
@@ -382,7 +392,7 @@ class OpenShellTestWorkspace:
                 retain = error.descendants_unknown
                 detail = f'{error} (delivery {error.delivery}' + (f'; receipt storage {error.storage_error})' if error.storage_error else ')')
                 raise WorkspaceError('upload', detail, 'unconfirmed') from error
-            observed, receipt = self._observe(handle, uuid5(operation, 'verify'))
+            observed, receipt = self._observe(handle, uuid5(operation, 'verify'), placed)
             try:
                 self._admit(observed, files, parents)
             except ValueError as error:

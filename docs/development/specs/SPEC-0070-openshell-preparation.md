@@ -19,7 +19,11 @@ Excluded: in-sandbox source fetch (SPEC-0025) for now, because the toolchain ima
 
 **Source.** The host capture (`GitSource`, by exact commit) is authoritative, and the qualified SPEC-0032 `OpenShellTestWorkspace` places it: fresh sandbox, empty-root check, pinned CLI upload, in-sandbox verification of every path, mode, size and SHA-256 against the capture. `prepare_source`/`release_source` are that route with no test files. In-sandbox fetch stays the target once the images carry a pinned `git` (decision card, 2026-10-13).
 
-**General across images (Al, 2026-10-13: nothing in an image beyond its language, framework and version).** The route assumes nothing in the image: the verifier is a static operator binary (`tools/workspace-verify`, Go, no cgo), uploaded into its own directory before the tree, never an interpreter the image happens to carry. It prints the same document as the Python `VERIFY` reference plus the SHA-256 of itself read through `/proc/self/exe`, and the host admits the inventory only when that equals the operator's pin of the file it uploaded. `WorkspaceConfig` takes exactly one route, `python` (the existing qualified runner workspaces) or `verifier` (`UploadedVerifier`); there is no fallback between them. `make workspace-verifier` builds it reproducibly for one Go version into `.state/tools/`.
+**General across images (Al, 2026-10-13: nothing in an image beyond its language, framework and version).** The route assumes nothing in the image: the verifier is a static operator binary (`tools/workspace-verify`, Go, no cgo), uploaded before the tree into a directory named for the placement's operation, never an interpreter the image happens to carry. It prints the same document as the Python `VERIFY` reference plus the SHA-256 of itself read through `/proc/self/exe`, and the host refuses any other value. `WorkspaceConfig` takes exactly one route, `python` (the existing qualified runner workspaces) or `verifier` (`UploadedVerifier`); there is no fallback between them.
+
+*What the digest shows (review of `dfd4a29`).* It is a consistency check, not attestation: the value is self-reported, so a process already running in the sandbox could replace the program and print the pinned digest over a decoy tree. Before the check, only the operator-pinned image (and anything it starts) has run, and the uploaded source is never executed during preparation, so the trust rests on that image, as it did for the Python route's interpreter. The per-operation directory name only makes the path unpredictable before the placement; the parent (`/tmp` in the gate) is still world-writable. A host-side read-back of the uploaded bytes is not built.
+
+*Pin.* The expected digest is committed (`tools/workspace-verify/workspace-verify.sha256`) with the Go toolchain in `go.mod`. `make workspace-verifier` builds with that toolchain (`GOTOOLCHAIN` fetches it if the host has another; `-trimpath -buildvcs=false -ldflags=-buildid=`, reproducible across checkout paths) and checks the build against the committed digest; the gate pins the committed value, and the workspace refuses a binary that differs before any sandbox.
 
 **Inventory file.** `PreparedSandbox.read_source` answers from the operator's store over the same capture, never from the sandbox, so the chain can add the agent's chosen baseline test file to the planning inventory (SPEC-0068).
 
@@ -33,9 +37,11 @@ Excluded: in-sandbox source fetch (SPEC-0025) for now, because the toolchain ima
 2. Place the source. A `WorkspaceError` keeps its layer and its own cleanup.
 3. Journal the handle, then load the dependency-setup policy. A failure here discards the sandbox and reports whether that was confirmed.
 
+**Journal.** The intent (operation, image) is written before any sandbox is created, the handle once placement returns, and a `released` note after every release or discard, so the sweep neither misses a sandbox a lost worker created nor deletes one twice.
+
 **Release** deletes by the original handle and is `confirmed` only on an observed native delete.
 
-**Leftovers (review of #103).** The durable activity is not heartbeated, so a start-to-close timeout does not cancel it and its `finally` still releases; a lost worker does not. `sweep()` deletes every journaled sandbox that has no confirmed release, by its original handle, under a fresh delete operation per pass. The operator runs it after a lost worker; the run has already recorded cleanup as unconfirmed.
+**Leftovers (review of #103).** The durable activity is not heartbeated, so a start-to-close timeout does not cancel it and its `finally` still releases; a lost worker does not. `sweep()` deletes every journaled sandbox that has no confirmed release, by its original handle, under a fresh delete operation per pass. An intent with no handle is reported unconfirmed and not deleted, because only the immutable id confirms a delete; the workspace lifecycle's receipts for its source operation name any sandbox it created. The operator runs it after a lost worker and only when no worker using that journal is live (it has no liveness check); the run has already recorded cleanup as unconfirmed. A cancelled `asyncio.to_thread(prepare)` finishes in its thread and leaves its sandbox to the sweep.
 
 ## Acceptance and validation
 
@@ -64,5 +70,6 @@ The rest of the chain runs on the operator's sandbox runners and is recorded, no
 
 - One adapter per case, so the `Preparation` port is unchanged; `PreparationRefused` carries the layer and what was left behind.
 - Upload before fetch (decision card 2026-10-13); the in-sandbox fetch nodes stay for when images carry `git`.
+- Accepted for now (review of `dfd4a29`): `CliPolicy`, like `CliUpload`, hashes the pinned CLI and then runs it by path; the adapter imports `PreparationRefused` from `composition.direct`, where the `Preparation` port itself lives.
 - The tree bounds stay the SPEC-0032 ones (512 entries, 4 MiB); real corpus repositories exceed them, so raising them from the operator's `WorkspaceBudget` is the next limit to lift, separately qualified.
 - Open: whether a later slice narrows to build-and-test inside the preparation sandbox once recipe phases are observed.

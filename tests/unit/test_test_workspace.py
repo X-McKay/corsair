@@ -79,7 +79,9 @@ class Verifier:
         if self.uploaded is not None:
             # The static binary's stand-in: the Python reference reports the same document, plus the SHA-256
             # of the executable the upload placed, as the binary reads it through /proc/self/exe.
-            assert command[0] == self.uploaded.remote_path and len(command) == 4
+            parent, directory, name = command[0].rsplit('/', 2)
+            assert (parent, name) == (self.uploaded.remote_parent, 'verify') and len(command) == 4
+            assert directory.startswith(self.uploaded.name + '-')
             done = subprocess.run([sys.executable, '-I', '-S', '-B', '-c', VERIFY, *command[1:]], capture_output=True,
                                   timeout=30, env={})
             placed = Path(command[0]).read_bytes()
@@ -352,22 +354,24 @@ def test_an_uploaded_verifier_needs_no_interpreter_in_the_image(store, tmp_path)
     adapter, (lifecycle, verifier, upload), config = uploaded_workspace(store, tmp_path)
     operation = uuid4()
     handle = adapter.prepare_source(operation)
+    delivered = uuid5(operation, 'verifier')
     assert [(c[0].name, c[1], c[2]) for c in upload.calls] == [
-        ('corsair-verifier', config.verifier.remote_parent, uuid5(operation, 'verifier')),
+        (f'corsair-verifier-{delivered.hex}', config.verifier.remote_parent, delivered),
         ('workspace', config.remote_parent, uuid5(operation, 'upload'))]
     assert verifier.calls == [uuid5(operation, 'absent'), uuid5(operation, 'verify')]
     assert modes(Path(config.remote_root)) == {'pkg': 0o700, 'pkg/app.py': 0o400, 'tool.sh': 0o500}
-    assert Path(config.verifier.remote_path).stat().st_mode & 0o777 == 0o500
+    assert Path(config.verifier.remote_path(delivered)).stat().st_mode & 0o777 == 0o500
     assert not any(config.staging.iterdir())
     assert adapter.release_source(handle, operation) == 'confirmed'
 
 
 def test_a_verifier_that_is_not_the_pinned_executable_is_refused(store, tmp_path):
+    """Only an honest substitute is caught: one that prints the pinned value is not (SPEC-0070, not attestation)."""
     def swap(placed):
         (placed / 'verify').chmod(0o700)
         (placed / 'verify').write_bytes(b'another program\n')
     upload = Upload()
-    upload.tamper = lambda placed: swap(placed) if placed.name == 'corsair-verifier' else None
+    upload.tamper = lambda placed: swap(placed) if placed.name.startswith('corsair-verifier-') else None
     adapter, (lifecycle, verifier, _), config = uploaded_workspace(store, tmp_path, upload=upload)
     with pytest.raises(WorkspaceError, match='verifier is not the pinned executable') as refused:
         adapter.prepare_source(uuid4())

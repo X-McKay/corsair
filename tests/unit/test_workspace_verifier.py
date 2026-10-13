@@ -23,9 +23,21 @@ def binary(tmp_path_factory):
     if GO is None:
         pytest.skip('no Go toolchain on this host')
     out = tmp_path_factory.mktemp('verifier') / 'verify'
-    subprocess.run([GO, 'build', '-trimpath', '-ldflags=-buildid=', '-o', str(out), '.'], cwd=SOURCE, check=True,
-                   env=os.environ | {'CGO_ENABLED': '0', 'GOFLAGS': '-mod=mod'}, timeout=300)
+    subprocess.run([GO, 'build', '-trimpath', '-buildvcs=false', '-ldflags=-buildid=', '-o', str(out), '.'],
+                   cwd=SOURCE, check=True, env=os.environ | {'CGO_ENABLED': '0', 'GOTOOLCHAIN': 'local'}, timeout=300)
     return out
+
+
+def test_the_pinned_toolchain_reproduces_the_committed_digest(binary):
+    """`make workspace-verifier` builds with the go.mod toolchain and checks this digest; the adapters pin it."""
+    pinned = next(line.split()[1] for line in (SOURCE / 'go.mod').read_text().splitlines()
+                  if line.startswith('toolchain '))
+    version = subprocess.run([GO, 'env', 'GOVERSION'], capture_output=True, text=True, check=True,
+                             env=os.environ | {'GOTOOLCHAIN': 'local'}).stdout.strip()
+    if version != pinned:
+        pytest.skip(f'host Go {version} is not the pinned {pinned}')
+    committed = (SOURCE / 'workspace-verify.sha256').read_text().split()[0]
+    assert hashlib.sha256(binary.read_bytes()).hexdigest() == committed
 
 
 def tree(root: Path):

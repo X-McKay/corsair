@@ -96,15 +96,19 @@ def test_prepare_places_the_source_then_loads_the_setup_policy_on_the_toolchain_
 
 @pytest.mark.parametrize('error, layer, cleanup', [
     (WorkspaceError('admission', 'remote workspace differs', 'confirmed'), 'admission', 'confirmed'),
+    (WorkspaceError('staging', 'disk full', 'not_required'), 'staging', 'not_required'),
     (WorkspaceError('upload', 'timed out', 'unconfirmed'), 'upload', 'unconfirmed'),
     (RuntimeError('gateway closed'), 'sandbox', 'unconfirmed'),
 ])
 def test_a_refused_placement_keeps_the_workspaces_layer_and_cleanup(make, error, layer, cleanup):
     adapter, log, _, _ = make(fail={'place': error})
+    operation = uuid4()
     with pytest.raises(PreparationRefused) as refused:
-        adapter.prepare(TOOLCHAIN, uuid4())
+        adapter.prepare(TOOLCHAIN, operation)
     assert (refused.value.layer, refused.value.cleanup) == (layer, cleanup)
-    assert [step[0] for step in log] == ['place'] and adapter.sweep() == {}
+    # Without a handle the sweep deletes nothing: it reports what may remain, by the journaled intent.
+    expected = {str(operation): 'unconfirmed'} if cleanup == 'unconfirmed' else {}
+    assert adapter.sweep() == expected and [step[0] for step in log] == ['place']
 
 
 def test_a_setup_policy_that_does_not_load_discards_the_sandbox(make):
@@ -114,6 +118,29 @@ def test_a_setup_policy_that_does_not_load_discards_the_sandbox(make):
         adapter.prepare(TOOLCHAIN, operation)
     assert (refused.value.layer, refused.value.cleanup) == ('policy', 'confirmed')
     assert log[-1] == ('release', 'sandbox-id', uuid5(operation, 'discard'))
+
+
+def test_a_sandbox_discarded_after_a_policy_failure_is_not_deleted_again(make):
+    """Review of dfd4a29: the discard is journaled as released, so the sweep leaves it alone."""
+    adapter, log, _, _ = make(policy_fail=True)
+    with pytest.raises(PreparationRefused):
+        adapter.prepare(TOOLCHAIN, uuid4())
+    assert adapter.sweep() == {} and [step[0] for step in log].count('release') == 1
+
+
+def test_the_intent_is_journaled_before_any_sandbox_is_created(make, tmp_path):
+    """Review of dfd4a29: a worker lost between create and the handle's journal entry still leaves a trace."""
+    adapter, log, workspaces, _ = make()
+    operation, seen = uuid4(), []
+
+    def lost(source_operation):
+        seen.extend(p.name for p in adapter._receipts.iterdir())
+        raise SystemExit('worker lost')
+    workspaces.prepare_source = lost
+    with pytest.raises(SystemExit):
+        adapter.prepare(TOOLCHAIN, operation)
+    assert seen == [f'{operation}.intent.json']
+    assert adapter.sweep() == {str(operation): 'unconfirmed'} and log == []
 
 
 def test_an_unconfirmed_discard_is_left_for_sweep(make):

@@ -65,20 +65,27 @@ class OpenShellPreparation:
         except WorkspaceBudgetRefused as error:
             raise PreparationRefused(error.layer, error.reason, 'not_required') from error
         workspace = self._workspace(toolchain.image)
+        # Intent before any sandbox exists, so a worker lost during creation still leaves a trace for `sweep`.
+        try:
+            self._journal.write(operation, 'intent', dict(image=toolchain.image,
+                                                          source_operation=str(uuid5(operation, 'source'))))
+        except Exception as error:
+            raise PreparationRefused('host', f'journal: {type(error).__name__}: {error}'[:2048], 'not_required') from error
         try:
             handle = workspace.prepare_source(uuid5(operation, 'source'))
         except WorkspaceError as error:
             # The workspace discarded its own sandbox and says whether that was confirmed.
+            self._record(operation, 'unconfirmed' if error.cleanup == 'unconfirmed' else 'confirmed')
             raise PreparationRefused(error.layer, error.detail, error.cleanup) from error
         except Exception as error:
             raise PreparationRefused('sandbox', f'{type(error).__name__}: {error}'[:2048], 'unconfirmed') from error
         try:
-            # Journaled before anything else, so `sweep` can find a sandbox a lost worker left.
             self._journal.write(operation, 'prepared', dict(handle=asdict(handle), image=toolchain.image))
             self._policy.apply(handle, dependency, 'dependency_setup', uuid5(operation, 'dependency-policy'))
         except Exception as error:
             layer = 'policy' if isinstance(error, PolicyError) else 'sandbox'
             cleanup = self._release(workspace, handle, uuid5(operation, 'discard'))
+            self._record(operation, cleanup)  # So `sweep` does not delete it a second time.
             raise PreparationRefused(layer, f'{type(error).__name__}: {error}'[:2048], cleanup) from error
         self._live[handle.id] = workspace
         return PreparedSandbox(self._execution, handle, self._scratch, self._read_source)
@@ -110,14 +117,21 @@ class OpenShellPreparation:
             pass  # The delete receipt is the lifecycle's; this note only lets `sweep` skip the sandbox.
 
     def sweep(self) -> dict[str, Cleanup]:
-        """Delete every journaled sandbox this adapter prepared and never saw released, by its original handle.
+        """For the operator after a lost worker, when no worker using this journal is live: delete every journaled
+        sandbox this adapter prepared and never saw released, by its original handle.
 
-        For the operator after a lost worker; the run already recorded its cleanup as unconfirmed."""
+        A placement journaled as intended but never as prepared has no handle, so it is reported unconfirmed and
+        not deleted (only the immutable id confirms a delete); the workspace's lifecycle receipts for its source
+        operation name any sandbox it created. The run already recorded its cleanup as unconfirmed."""
         outcome: dict[str, Cleanup] = {}
-        for prepared in sorted(self._receipts.glob('*.prepared.json')):
-            operation = UUID(prepared.name.split('.', 1)[0])
+        for intent in sorted(self._receipts.glob('*.intent.json')):
+            operation = UUID(intent.name.split('.', 1)[0])
             released = self._receipts / f'{operation}.released.json'
             if released.exists() and json.loads(released.read_text())['cleanup'] == 'confirmed':
+                continue
+            prepared = self._receipts / f'{operation}.prepared.json'
+            if not prepared.exists():
+                outcome[str(operation)] = 'unconfirmed'
                 continue
             record = json.loads(prepared.read_text())
             # A fresh delete operation per pass: the lifecycle journal refuses to reuse one.
