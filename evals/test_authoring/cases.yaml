@@ -1,4 +1,4 @@
-name: test-authoring-development-v3
+name: test-authoring-development-v4
 cases:
 - name: reference_realization
   inputs:
@@ -1100,5 +1100,127 @@ cases:
     status: patch
     runs: 2
     security_assertion_lines: *id002
+  expected_output: null
+  evaluators: []
+- name: absence_plan_realization
+  inputs:
+    fixture_id: absence_plan_realization-v1
+    inputs:
+      plan:
+        status: ready
+        scope: component
+        control:
+          test_id: test_documents.py::test_benign_control
+          test_path: test_documents.py
+          fixture_setup:
+          - Create tmp_path/allowed/ containing document.txt with a benign sentinel
+          - Create tmp_path/outside.txt, outside allowed/, containing a distinct outside sentinel
+          implementation_call: documents.read_document(allowed, 'document.txt')
+          input: filename 'document.txt' inside the allowed root
+          required_behavior: Returns exactly the benign sentinel content
+          observable_witness: An open audit event for tmp_path/allowed/document.txt is recorded during the call
+          witness:
+            facility: audit_open
+            effect: file_open
+            subject: allowed/document.txt
+            expectation: occurs
+          source_references:
+          - path: documents.py
+            start_line: 3
+            end_line: 4
+            quote: "def read_document(root: Path, filename: str) -> str:\n    return (root / filename).read_text()"
+        security:
+          test_id: test_documents.py::test_security_rejects_outside_read
+          test_path: test_documents.py
+          fixture_setup:
+          - Create tmp_path/allowed/ containing document.txt with a benign sentinel
+          - Create tmp_path/outside.txt, outside allowed/, containing a distinct outside sentinel
+          - Read tmp_path/outside.txt before the call to show the fixture exists and is readable
+          implementation_call: documents.read_document(allowed, '../outside.txt')
+          input: filename '../outside.txt', which resolves outside the allowed root
+          required_behavior: The call does not return the outside sentinel content; the outside file is never opened,
+            whether the call returns or raises
+          observable_witness: No open audit event for tmp_path/outside.txt is recorded during the call (application
+            observation); a sandbox or policy denial is recorded separately and is not a rejection
+          witness:
+            facility: audit_open
+            effect: file_open
+            subject: outside.txt
+            expectation: absent
+          source_references:
+          - path: documents.py
+            start_line: 3
+            end_line: 4
+            quote: "def read_document(root: Path, filename: str) -> str:\n    return (root / filename).read_text()"
+        security_expectation:
+          failure_type: AssertionError
+          safe_behavior: no_file_open
+        discovery_command:
+        - python
+        - -m
+        - pytest
+        - --collect-only
+        - -q
+        evidence_requirements:
+        - Native discovery finds exactly the two planned test ids
+        - Open audit events captured per test as a witness artifact
+        - Native JUnit outcome and failure location per test
+        citations:
+        - path: documents.py
+          start_line: 3
+          end_line: 4
+          quote: "def read_document(root: Path, filename: str) -> str:\n    return (root / filename).read_text()"
+        - path: test_existing.py
+          start_line: 1
+          end_line: 8
+          quote: "from pathlib import Path\n\nimport documents\n\n\ndef test_reads_existing_document(tmp_path: Path):\n\
+            \    (tmp_path / \"note.txt\").write_text(\"hello\")\n    assert documents.read_document(tmp_path, \"\
+            note.txt\") == \"hello\""
+        limitations:
+        - 'Component scope only: the plan does not show that application callers pass user-controlled filenames'
+        - Audit events observe Python-level opens in the test process only
+      source_files:
+      - path: documents.py
+        content: "from pathlib import Path\n\ndef read_document(root: Path, filename: str) -> str:\n    return (root\
+          \ / filename).read_text()\n"
+      - path: test_existing.py
+        content: "from pathlib import Path\n\nimport documents\n\n\ndef test_reads_existing_document(tmp_path: Path):\n\
+          \    (tmp_path / \"note.txt\").write_text(\"hello\")\n    assert documents.read_document(tmp_path, \"\
+          note.txt\") == \"hello\"\n"
+      environment:
+        language: Python
+        runtime: CPython 3.12
+        framework: pytest 9.0.2
+        discovery_command:
+        - python
+        - -m
+        - pytest
+        - --collect-only
+        - -q
+        approved_test_paths:
+        - test_documents.py
+        baseline_test:
+          test_id: test_existing.py::test_reads_existing_document
+          path: test_existing.py
+        scratch_location: The per-test pytest tmp_path directory; fixtures must not be created elsewhere
+        observation_facilities:
+        - Python sys.addaudithook 'open' audit events recording the file paths opened during a test
+        - Native JUnit XML outcomes and captured stdout per test
+        witness_facilities:
+        - id: audit_open
+          kind: file_open
+          description: Python sys.addaudithook 'open' events recording each path the test process opens during the call
+  metadata:
+    script:
+    - &abs_id001
+      write: absence
+    - run: true
+    runner_runs:
+    - &abs_id003
+      status: static
+    status: patch
+    runs: 1
+    security_assertion_lines: &abs_id002
+    - 24
   expected_output: null
   evaluators: []

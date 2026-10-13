@@ -1,20 +1,21 @@
 """Two-test authoring stage: confined writes, capped development runs, withheld security outcome."""
 
 from pydantic_ai import Agent
-from pydantic_ai.capabilities import Capability, Instrumentation
+from pydantic_ai.capabilities import Capability, Hooks, Instrumentation
 from pydantic_ai.durable_exec.temporal import TemporalDurability
 from pydantic_ai.models import Model
 from pydantic_ai.models.instrumented import InstrumentationSettings
 
 from ..budget import tool_budget
+from ..prompted_output import prompted_output
 from ..source.tools import TOOL_RETRIES
 from .contracts import AuthoringResult
 from .dependencies import AuthoringDependencies
 from .prompts import INSTRUCTIONS, PROMPT_VERSION, SKILL_ID, SKILL_SHA256, SKILL_TEXT, authoring_prompt
 from .tools import TOOLSET_SHA256, authoring_tools, source_tools
-from .validation import finalize_authoring
+from .validation import end_on_withdrawn_call, finalize_authoring
 
-CONFIG_VERSION = "test-authoring-config-v3"
+CONFIG_VERSION = "test-authoring-config-v5"
 
 # Re-exported for existing callers of corsair.agents.test_authoring.agent.
 __all__ = ["CONFIG_VERSION", "INSTRUCTIONS", "PROMPT_VERSION", "SKILL_ID", "SKILL_SHA256", "SKILL_TEXT", "TOOLSET_SHA256",
@@ -32,7 +33,7 @@ def create_test_authoring_agent(
         model, name="test_authoring", deps_type=AuthoringDependencies, output_type=finalize_authoring,
         instructions=INSTRUCTIONS, retries={"tools": TOOL_RETRIES, "output": output_retries},
         capabilities=[Capability(id=SKILL_ID, instructions=SKILL_TEXT, toolsets=[source_tools(), authoring_tools()]),
-                      tool_budget(),
+                      tool_budget(), prompted_output(), Hooks(node_run_error=end_on_withdrawn_call),
                       Instrumentation(settings=InstrumentationSettings(include_content=False, version=5)),
                       *([durability] if durability is not None else [])],
     )

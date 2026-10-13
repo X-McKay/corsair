@@ -1,6 +1,6 @@
 # Corsair results UI
 
-The Corsair UI reads saved evaluation reports, native Temporal investigation status and the operator runtime matrix. The System page checks actual source access and configured Temporal/OpenShell services. It does not launch work or change configuration. It adapts the InfoSec Harness UI patterns for Corsair's own evidence contracts; see [SPEC-0072](../development/specs/SPEC-0072-local-results-ui.md).
+The Corsair UI reads saved evaluation reports, native Temporal investigation status and the operator runtime matrix. The System page checks actual source access and configured Temporal/OpenShell services. It does not launch work or change configuration. It adapts the InfoSec Harness UI patterns for Corsair's own evidence contracts; see [SPEC-0077](../development/specs/SPEC-0077-local-results-ui.md).
 
 ## Start
 

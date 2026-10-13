@@ -1,17 +1,17 @@
 ---
-id: PLAN-0079
+id: PLAN-0091
 kind: plan
 title: Local Corsair results interface
 status: complete
 updated: 2026-10-13
-related: [SPEC-0072, SPEC-0044, IDEA-0009]
+related: [SPEC-0077, SPEC-0044, IDEA-0009]
 ---
 
 # Local Corsair results interface
 
 ## Objective and dependencies
 
-Implement SPEC-0072 in managed worktree corsair-ui on branch codex/corsair-ui, starting from main e760f05. User authorized parallel development and selected inspection of existing results. Reference source: infosec-harness UI at 52aa2ac. No existing Corsair web API; use a narrow local read-only projection over current evidence formats.
+Implement SPEC-0077 in managed worktree corsair-ui on branch codex/corsair-ui, starting from main e760f05. User authorized parallel development and selected inspection of existing results. Reference source: infosec-harness UI at 52aa2ac. No existing Corsair web API; use a narrow local read-only projection over current evidence formats.
 
 ## Steps
 
@@ -119,3 +119,5 @@ Main integration follow-up: UI CI38448821099 passed at67772c9, including product
 
 
 Combined-main validation: `make test-config`1917passed/1skipped in116.66s. The skip is an inherited Ruby smoke check because Ruby is not installed on this host (`tests/unit/test_environment_smoke.py`, separately verified22passed/1skipped). Browser checks64passed/8 deliberate duplicate-contrast skips in12.2s. New production image4e7d4236fe23e4eed4337d94696832f15687e1b7a3a4a0c25dc517f8cb45d6d5 built and passed the actual-report/distribution and missing-storage smoke; containersc536231517cf/1a15247272c3 removed with native-list absence confirmed. Record guards5passed; git diff --check passed. No new live qualification claims. Final PR description uses the renumbered UI records; current remote CI remains a head-specific gate.
+
+Second main integration (2026-10-13): merged main 23b548c into codex/corsair-ui. Main had meanwhile taken SPEC-0072 (run activity display), PLAN-0079 (case entry point) and HANDOFF-0102 (verdict gaps), and PR #116 claims HANDOFF-0100, so the UI records were renumbered to SPEC-0077, PLAN-0091, HANDOFF-0118 (was HANDOFF-0102) and HANDOFF-0119 (was HANDOFF-0100) with their owned references (CURRENT.md row, handoff links, Makefile comment, runbook). HANDOFF-0101 was unclaimed and keeps its id. The CURRENT.md conflict kept both rows. Feature code is unchanged by the merge.

@@ -6,7 +6,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
 
-from corsair.ports.test_runner import MAX_PATCH_FILE_BYTES, MAX_PATCH_FILES, MAX_TEST_ID, RUBY_TEST_ID, TEST_ID
+from corsair.ports.test_runner import MAX_PATCH_FILE_BYTES, MAX_PATCH_FILES, MAX_TEST_ID, RUBY_TEST_ID, TEST_ID, names_test_in
 
 from ..source.contracts import Contract, Fact, SourceFile, bounded_inventory, confined_path
 from ..test_planning.contracts import EnvironmentEvidence, ReadyTestPlan
@@ -21,6 +21,13 @@ ResultLayer = Layer | Literal["admission"]
 Excerpt = Annotated[str, Field(max_length=4096)]
 
 
+class DevelopmentWitness(Contract):
+    """The operator's approved witness envelope for development runs; never rendered to the model."""
+    target_path: str = Field(min_length=1, max_length=256)
+    target_symbol: str = Field(min_length=1, max_length=256)
+    effect_name: str = Field(min_length=1, max_length=128)
+
+
 class TestAuthoringInput(Contract):
     """A ready plan, the saved inventory it was planned over and the same environment evidence."""
     __test__ = False
@@ -28,6 +35,8 @@ class TestAuthoringInput(Contract):
     plan: ReadyTestPlan
     source_files: tuple[SourceFile, ...] = Field(max_length=16)
     environment: EnvironmentEvidence
+    # Set by the composition from the same envelope the frozen runs use; None runs development without a witness.
+    witness: DevelopmentWitness | None = None
 
     @model_validator(mode="after")
     def admitted_handoff(self) -> "TestAuthoringInput":
@@ -37,7 +46,7 @@ class TestAuthoringInput(Contract):
         for spec in (self.plan.control, self.plan.security):
             if spec.test_path not in self.environment.approved_test_paths:
                 raise ValueError(f"planned test path {spec.test_path} is not approved")
-            if not spec.test_id.startswith(spec.test_path + "::"):
+            if not names_test_in(spec.test_id, spec.test_path):
                 raise ValueError(f"planned test id {spec.test_id} must be a native node id in {spec.test_path}")
             if len(spec.test_id) > MAX_TEST_ID or not AUTHORED_TEST_ID.fullmatch(spec.test_id):
                 raise ValueError(f"planned test id {spec.test_id} is not a supported native node id")
@@ -107,6 +116,8 @@ class DevelopmentRun(Contract):
     errors: Excerpt
     control: DevelopmentOutcome | None
     security: DevelopmentOutcome | Literal["withheld"] | None
+    # The security test passed while the operator witness recorded the planned effect: it cannot detect it.
+    security_contradicts_witness: bool = False
     run_command: tuple[str, ...] = Field(max_length=64)
     cleanup: Literal["not_required", "confirmed", "unconfirmed"]
 

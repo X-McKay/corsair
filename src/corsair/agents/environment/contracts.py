@@ -24,7 +24,8 @@ Layer = Literal["dependency", "registry", "tls", "toolchain_version", "build", "
 class Toolchain(Contract):
     toolchain_id: Identifier
     image: str = Field(pattern=r"^[^@\s]+@sha256:[0-9a-f]{64}$", max_length=512)
-    language: Literal["python", "java", "javascript", "ruby", "perl"]
+    # A matrix row's language; the toolchain is built from the matrix row, so no language list is fixed here.
+    language: str = Field(min_length=1, max_length=32, pattern=r"^[a-z][a-z0-9+#-]*$")
     runtime: str = Field(min_length=1, max_length=128, description="Native runtime identity, e.g. CPython 3.12 or Temurin 17")
     tools: tuple[Annotated[str, Field(min_length=1, max_length=128)], ...] = Field(max_length=16)
 

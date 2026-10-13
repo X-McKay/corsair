@@ -4,7 +4,8 @@ from corsair.agents.test_authoring.tools import TOOLSET_SHA256, authoring_tools,
 from corsair.agents.toolset_identity import toolsets_sha256
 
 # Recorded from the pre-split tools.py (SPEC-0052); change only with a reviewed tool change.
-OFFERED_SHA256 = "6ffc0788bafce223e5ed44f6900fe8cdde7bfd25abd7625d370325cd0d181b57"
+# PLAN-0082: run_tests results carry security_contradicts_witness.
+OFFERED_SHA256 = "47cf3ee9e62986f9bb2c728ec8e1ae4a5d827c201c2c443f7e242762abf2e66a"
 
 
 def test_toolsets_offer_exactly_the_registered_tools():

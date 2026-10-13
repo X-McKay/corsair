@@ -9,8 +9,10 @@ from dataclasses import dataclass
 import errno
 from hashlib import sha256
 import json
-from pathlib import Path
+import posixpath
+from pathlib import Path, PurePosixPath
 import re
+from typing import NamedTuple
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -68,6 +70,8 @@ class _TestRecord(_Record):
     complete: bool
     # Planned-file opens off the target's stack during the call (other threads, or after the first entry); None when the record predates the count.
     offstack_planned: int | None = Field(default=None, ge=0)
+    # Planned-file opens the test function made itself after the first call (checking its own fixture); never the effect.
+    body_planned: int | None = Field(default=None, ge=0)
 
 
 class _Target(_Record):
@@ -102,12 +106,41 @@ def _refused(reason: str) -> WitnessEvidence:
 ABSENCE = 'no_file_open'
 
 
+class Calibration(NamedTuple):
+    """The plan's control: its test id and the scratch-relative file its call must open (SPEC-0040)."""
+    test_id: str
+    subject: str
+
+
+def _uncalibrated(record: 'ProbeRecord', control: Calibration | None) -> str | None:
+    """Why the control does not show the probe recording the target's opens in this run, or None when it does.
+
+    The control's call phase must be attributable (complete, paired, not truncated, the target entered) and hold
+    an open, on the target's stack, of a path ending in the control's subject."""
+    if control is None:
+        return 'no control calibration was requested'
+    test = record.tests.get(control.test_id)
+    if test is None or not test.complete:
+        return 'the control call phase was not observed to completion'
+    if not test.entered or test.truncated or test.entered != len(test.exits):
+        return 'the control call phase is not attributable to the target'
+    parts = PurePosixPath(control.subject).parts
+    if not any(o.path is not None and PurePosixPath(posixpath.normpath(o.path)).parts[-len(parts):] == parts
+               for o in test.opens):
+        return f'the control witness {control.subject!r} was not observed; the probe does not record this effect here'
+    return None
+
+
 def witness_evidence(capture: WitnessCapture | None, request: WitnessRequest,
-                     security_test_id: str, *, planned_safe_behavior: str | None = None) -> WitnessEvidence:
+                     security_test_id: str, *, planned_safe_behavior: str | None = None,
+                     control: Calibration | None = None) -> WitnessEvidence:
     """Map the probe record for the security test's call phase to the SPEC-0027 witness, or refuse it.
 
     When the plan's safe behavior is the absence identity ``no_file_open`` (SPEC-0040), an attributed call
-    phase without the planned open is that behavior, however the target exited.
+    phase without the planned open is that behavior, however the target exited, but only once ``control`` is
+    observed as planned in the same run: an absence the control does not calibrate refuses the witness, so a
+    facility or payload that never reaches the effect cannot pass as safe. An observed effect needs no
+    calibration; it is its own evidence that the probe records it.
     """
     if capture is None:
         return _refused('no witness was requested or captured for this run')
@@ -157,6 +190,8 @@ def witness_evidence(capture: WitnessCapture | None, request: WitnessRequest,
         safe = only if only is not None and TOKEN.fullmatch(only) else None
     if (planned_safe_behavior == ABSENCE and effect == 'absent' and test.offstack_planned == 0
             and test.entered and not test.truncated and test.entered == len(test.exits)):
+        if reason := _uncalibrated(record, control):
+            return _refused(f'absence not calibrated: {reason}')
         safe = ABSENCE
     witness = Witness(artifact_sha256=capture.artifact.sha256, path_reached=test.entered > 0 or bool(planned),
                       effect=effect, safe_behavior=safe)

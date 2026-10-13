@@ -12,7 +12,7 @@ import re
 from corsair.agents.evidence_assessment.contracts import MAX_ITEM_CHARS, EvidenceItem
 from corsair.agents.issue_identification.contracts import IssueIdentification
 from corsair.agents.test_authoring.contracts import TestPatch
-from corsair.agents.test_planning.contracts import PlannedWitness, ReadyTestPlan
+from corsair.agents.test_planning.contracts import PlannedWitness, ReadyTestPlan, WitnessFacility
 from corsair.core.disposition import (ClassifiedFailure, EnvironmentIdentity, ExpectedFailure, ObservationPlan,
                                       ObservedOutcome, Revision, RunEvidence, SandboxEvent, Witness)
 from corsair.ports.execution import ExecutionReceipt
@@ -39,19 +39,38 @@ def observation_plan(plan: ReadyTestPlan, patch: TestPatch) -> ObservationPlan:
         frozen_patch_sha256=patch.patch_sha256)
 
 
+# The effects the operator probe records (SPEC-0033); a recorder of any other kind cannot bind a request yet.
+PROBE_EFFECTS = frozenset({"file_open"})
+
+
 def witness_request(identification: IssueIdentification, envelope: WitnessRequest | None,
-                    planned: PlannedWitness) -> WitnessRequest:
+                    planned: PlannedWitness, recorders: tuple[WitnessFacility, ...] = ()) -> WitnessRequest:
     """The operator's approved envelope, used only when the admitted identification names exactly its target
     and the plan's security witness is the effect that envelope records.
+
+    Without an envelope, `recorders` (the operator's witness facilities for the selected framework, SPEC-0073)
+    bind the request instead: the admitted identification's target and the plan's subject, accepted only when the
+    planned facility is one of them, its effect is that recorder's kind and one the probe records, and the subject
+    is a plain file name. Nothing per case is approved; the rules are the framework table's.
 
     Until SPEC-0040 binds the plan's subject at execution, a planned effect the probe does not record, or a
     subject other than the envelope's file, is refused here so its gates stay inconclusive.
     """
     if identification.status != 'ready' or identification.target is None:
         raise ValueError('a witness needs a ready identification target')
-    if envelope is None:
-        raise ValueError('the operator approved no witness envelope for this case')
     target = identification.target
+    if envelope is None:
+        if not recorders:
+            raise ValueError('the operator approved no witness envelope for this case')
+        recorder = next((r for r in recorders if r.id == planned.facility), None)
+        if recorder is None or recorder.kind != planned.effect:
+            raise ValueError(f'the planned {planned.effect} witness names no operator recorder of that kind')
+        if planned.effect not in PROBE_EFFECTS:
+            raise ValueError(f'the planned {planned.effect} witness is not recorded by the operator probe')
+        # The probe matches a plain file name; a directory-prefixed subject names another path.
+        if '/' in planned.subject:
+            raise ValueError('the planned witness subject is not a plain file name the probe matches')
+        return WitnessRequest(target.source.path, target.symbol, planned.subject)
     if (target.source.path, target.symbol) != (envelope.target_path, envelope.target_symbol):
         raise ValueError('the identified target is outside the operator witness envelope')
     if planned.effect != 'file_open':

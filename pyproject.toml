@@ -4,6 +4,13 @@ version = "0.0.0"
 description = "Sandboxed security issue validation; initial platform qualification"
 requires-python = ">=3.12,<3.13"
 
+[project.scripts]
+corsair = "corsair.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.11.32,<0.12"]
+build-backend = "uv_build"
+
 [dependency-groups]
 ui = [
     "gunicorn==26.2.0",
@@ -15,16 +22,23 @@ ui = [
     "openshell @ https://github.com/NVIDIA/OpenShell/releases/download/v0.1.3/openshell-0.1.3-py3-none-any.whl",
 ]
 dev = [
+    "esprima==4.0.1",
     "pytest==9.0.3",
     "PyYAML==6.0.3",
     "openshell @ https://github.com/NVIDIA/OpenShell/releases/download/v0.1.3/openshell-0.1.3-py3-none-any.whl",
     "pydantic-ai-slim[openai,bedrock,temporal]==2.55.0",
     "pydantic-evals[logfire]==2.55.0",
+    "rich==15.0.0",
     "temporalio==1.34.0",
+    "pytest-xdist==3.8.0",
 ]
 
 [tool.uv]
-package = false
+package = true
+
+[tool.uv.build-backend]
+# src/corsair is a namespace package (no __init__.py).
+namespace = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

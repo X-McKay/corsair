@@ -1,10 +1,10 @@
 ---
-id: HANDOFF-0100
+id: HANDOFF-0119
 kind: handoff
 title: Local results UI and agent metrics
 status: recorded
 updated: 2026-10-13
-related: [SPEC-0072, PLAN-0079, SPEC-0044, IDEA-0009]
+related: [SPEC-0077, PLAN-0091, SPEC-0044, IDEA-0009]
 ---
 
 # Local results UI and agent metrics
@@ -19,7 +19,7 @@ Delivered: local loopback read-only server; overview, searchable evaluation list
 
 - Final make test-config:1791passed in106.93s, including37backendHTTP/filesystem/metrics tests. Earlier base integration1782passed in108.58s.
 - Frontend9unit tests, TypeScript production build and browser-test typecheck pass.
-- Playwright34passed,5skipped duplicate mobile contrast checks, desktop/dark/mobile against real local API and synthetic saved evidence. Final run3.6s. Contrast/first harness failures and fixes retained in PLAN-0079.
+- Playwright34passed,5skipped duplicate mobile contrast checks, desktop/dark/mobile against real local API and synthetic saved evidence. Final run3.6s. Contrast/first harness failures and fixes retained in PLAN-0091.
 - Scripted identification host eval16/16clean attempts generated local real report, verified in browser including16 native latency/token samples. No live model or sandbox qualification. Test fixtures remain distinct from this saved run.
 - Vite dev proxy GET/api/health passed. Screenshots inspected in light/dark/mobile; actual metrics screenshot stays outside Git. git diff --check passed.
 - Production preview runs at127.0.0.1:8765 for local inspection; Ctrl-C stops it. Ignored .runs and dist remain local. Browser test servers use temporary roots and stop after tests.
@@ -32,4 +32,4 @@ Implementation complete within accepted read-only scope. Review the PR and CI; n
 
 ## Continuation prompt
 
-Read AGENTS.md, CURRENT.md, SPEC-0072 and PLAN-0079, verify branch/source and PR status. Use make ui-install ui-build ui to inspect local saved evaluations. For changes run targeted API/frontend tests and make ui-test, preserve unknowns/evidence scopes, and avoid exposing raw reports or adding silent model/workload execution. Update records and retain failure history.
+Read AGENTS.md, CURRENT.md, SPEC-0077 and PLAN-0091, verify branch/source and PR status. Use make ui-install ui-build ui to inspect local saved evaluations. For changes run targeted API/frontend tests and make ui-test, preserve unknowns/evidence scopes, and avoid exposing raw reports or adding silent model/workload execution. Update records and retain failure history.
