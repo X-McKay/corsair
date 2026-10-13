@@ -1,15 +1,18 @@
 # Operator-owned runtime matrix (SPEC-0042). Each row is one sandbox image and the exact runtime, tools and test
-# frameworks it was qualified with. Selection reads this file only; agents and project files never edit it.
-# Adding a row: build the image from a digest-pinned upstream base with hash-pinned offline contents, run the
-# toolchain gate for that row on a fresh node, record the report, then add the row with that evidence. A row
-# without qualification evidence is refused by the loader. Rows are tried in order; the first that satisfies
-# every component of a requirement is selected. `selector` is reserved for an image carrying several runtimes
-# (the hybrid in SPEC-0042) and must stay empty until such an image is qualified.
-# `frameworks` lists the test framework versions a Corsair runner and report parser are qualified for; the
+# frameworks it was checked with. Selection reads this file only; agents and project files never edit it.
+# Adding a row: build the image from a digest-pinned upstream base with hash-pinned offline contents, check it, record
+# the evidence, then add the row in the same PR. `qualification.evidence` says which check the row rests on:
+# `image-only` (the image built, the gate body and one real case through the runner passed under plain Docker) or
+# `live` (the kind/OpenShell toolchain gate passed on a fresh node). While Corsair is in active development an
+# image-only row is selectable; only a live row counts as qualified in reports. The milestone gate batch upgrades
+# image-only rows to live. A row without evidence is refused by the loader. Rows are tried in order; the first that
+# satisfies every component of a requirement is selected. `selector` is reserved for an image carrying several
+# runtimes (the hybrid in SPEC-0042) and must stay empty until such an image is qualified.
+# `frameworks` lists the test framework versions a Corsair runner and report parser are checked for; the
 # framework itself is the project's own dependency, installed during setup, so a project version range must
-# overlap the qualified range and setup then pins a version inside the overlap. A framework row's required
-# `images` list names the image ids its range was qualified on, so a new image row has no framework support until
-# a range is qualified on it; one framework name may have several rows with different ranges, at most one per image.
+# overlap the checked range and setup then pins a version inside the overlap. A framework row's required
+# `images` list names the image ids its range was checked on, so a new image row has no framework support until
+# a range is checked on it; one framework name may have several rows with different ranges, at most one per image.
 schema_version: 1
 images:
   - id: cpython-3.12-pytest
@@ -20,6 +23,7 @@ images:
     tools: {}
     selector: {}
     qualification:
+      evidence: live
       records: [SPEC-0007, PLAN-0008]
       report: docs/qualification/openshell-toolchains.md
       note: Toolchain gate qualified CPython 3.12.15 with pytest 9.0.2; the image source pins pytest 9.0.3 since PR #30.
@@ -31,6 +35,7 @@ images:
     tools: {maven: 3.10.0}
     selector: {}
     qualification:
+      evidence: live
       records: [SPEC-0007, PLAN-0008]
       report: docs/qualification/openshell-toolchains.md
       note: Temurin 17.0.20.1, Maven 3.10.0 and JUnit Jupiter 5.14.4 under Surefire 3.6.0, offline closure in the image. The SPEC-0045 source (pinned JUnit console launcher, dependency plugin closure, second fixture method) passed the gate again on 2026-10-13 (PLAN-0049).
@@ -42,9 +47,22 @@ images:
     tools: {maven: 3.10.0}
     selector: {}
     qualification:
+      evidence: live
       records: [SPEC-0045, PLAN-0049]
       report: docs/qualification/openshell-toolchains.md
       note: Temurin 1.8.0_504-b01 and Maven 3.10.0 measured in the sandbox; JUnit 4.13.2 under Surefire 3.6.0 with the pinned JUnit Platform console launcher (Vintage engine), offline closure in the image.
+  - id: perl-5.26-make
+    language: perl
+    base_image: docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7
+    image_source: deploy/qualification/toolchains/perl526
+    runtime: {name: perl, version: 5.26.3}
+    tools: {make: 4.2.1}
+    selector: {}
+    qualification:
+      evidence: image-only
+      records: [SPEC-0056, PLAN-0061]
+      report: docs/development/plans/PLAN-0061-perl526-toolchain.md
+      note: Perl 5.26.3 and GNU Make 4.2.1 measured in the image with no network; gate body under plain Docker. Kind/OpenShell gate not yet run.
 frameworks:
   - name: pytest
     language: python
@@ -52,6 +70,7 @@ frameworks:
     runner: src/corsair/adapters/pytest_runner.py
     images: [cpython-3.12-pytest]
     qualification:
+      evidence: live
       records: [SPEC-0028, PLAN-0027, SPEC-0032, PLAN-0032]
       report: docs/qualification/openshell-test-workspace.md
       note: pytest runner and JUnit report parser exercised with pytest 9.0.x only (reviewed SPEC-0018 pair).
@@ -61,15 +80,27 @@ frameworks:
     runner: src/corsair/adapters/maven_runner.py
     images: [temurin-8-maven]
     qualification:
+      evidence: image-only
       records: [SPEC-0045, PLAN-0049]
       report: docs/qualification/openshell-toolchains.md
-      note: 4.13.2 by the toolchain gate fixture in the sandbox; 4.12 by VUL4J-6 (commons-compress, Surefire 2.19.1) on the same image outside OpenShell (image-only). Vintage needs 4.12 or later.
+      note: Image-only as a whole because one row carries both versions; 4.13.2 passed the toolchain gate fixture in the sandbox (live), 4.12 by VUL4J-6 (commons-compress, Surefire 2.19.1) on the same image outside OpenShell (image-only). Vintage needs 4.12 or later.
   - name: junit5
     language: java
     versions: ==5.14.4
     runner: src/corsair/adapters/maven_runner.py
     images: [temurin-17-maven]
     qualification:
+      evidence: live
       records: [SPEC-0041, SPEC-0045, PLAN-0049]
       report: docs/qualification/openshell-toolchains.md
       note: JUnit Jupiter 5.14.4 under Surefire 3.6.0 by the toolchain gate fixture, listed and run through the Maven runner's own argv in the sandbox.
+  - name: tap-harness
+    language: perl
+    versions: ==1.302073
+    runner: src/corsair/adapters/tap_runner.py
+    images: [perl-5.26-make]
+    qualification:
+      evidence: image-only
+      records: [SPEC-0061, PLAN-0066]
+      report: docs/development/plans/PLAN-0066-perl-tap-runner.md
+      note: Test::More 1.302073 (core in the image); CVE-2023-31486 through the TAP runner under plain Docker, security test fails at 7bdf71f and passes at 77f557e.

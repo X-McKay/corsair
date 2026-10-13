@@ -36,3 +36,4 @@ PR #75 merged as `a162733`. Al's review at `801e756` (posted just before the mer
 - Reuse searches only `.runs/qualify/*/` of this checkout (five newest); older manual runs are reused only when named.
 
 Next: Al reviews the allow rules once; the first RIG0 run qualifies the target.
+- 2026-10-13 13:55Z, Al chose the lighter path (SPEC-0062 last paragraph). Branch `claude/qualification-process-l4ofi4`: `evidence` on every matrix row (existing rows `live`), `perl-5.26-make` and `tap-harness` added as `image-only` from PLAN-0061/PLAN-0066's Docker runs, development guide and base-image skill rewritten for rows with the PR and a milestone gate batch. The first live `qualify-image` run moves to the first milestone batch.
