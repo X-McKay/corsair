@@ -1,0 +1,4 @@
+corsair-subtest	test_control
+ok 1 - outside
+corsair-subtest	test_security
+1..1
