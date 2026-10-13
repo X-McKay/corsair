@@ -35,7 +35,8 @@ from corsair.agents.test_authoring.contracts import AuthoringResult, TestAuthori
 from corsair.agents.test_authoring.tools import AuthoringBudget, AuthoringDependencies
 from corsair.agents.test_planning.contracts import ReadyTestPlan, TestPlan
 from corsair.composition.direct import (
-    AGENTS, AgentStage, CompositionBudget, DirectRun, FixtureCase, Purpose, RecordedFailure, Runners, Stage,
+    AGENTS, AgentStage, BudgetExhausted, CompositionBudget, DirectRun, FixtureCase, Purpose, RecordedFailure, Runners,
+    Stage, StageLimits, cap_reached,
 )
 from corsair.core.disposition import GateResult, ObservationPlan
 from corsair.nodes.witness import WitnessEvidence
@@ -112,6 +113,12 @@ class AttemptRecord:
     messages: tuple[ModelMessage, ...]
     elapsed_seconds: float
     failure: FailureRecord | None
+    limits: StageLimits | None = None
+    exhausted: BudgetExhausted | None = None
+
+    @property
+    def tool_cap_reached(self) -> bool:
+        return cap_reached(self.limits, self.usage)
 
 
 class ExecutionRecord(BaseModel):
@@ -159,8 +166,8 @@ def chain_result(run: DirectRun) -> ChainResult:
         return None if value is None else failure_record(value)
     return ChainResult(
         stopped_at=run.stopped_at, reason=run.reason,
-        attempts=tuple(AttemptRecord(a.stage, a.output, a.usage, a.messages, a.elapsed_seconds, failure(a.failure))
-                       for a in run.attempts),
+        attempts=tuple(AttemptRecord(a.stage, a.output, a.usage, a.messages, a.elapsed_seconds, failure(a.failure),
+                                     a.limits, a.exhausted) for a in run.attempts),
         identification=run.identification, plan=run.plan, patch=run.patch, observation_plan=run.observation_plan,
         executions=tuple(ExecutionRecord(revision=e.revision, operation=e.operation, observed=e.observed,
                                          failure=failure(e.failure)) for e in run.executions),
@@ -169,9 +176,11 @@ def chain_result(run: DirectRun) -> ChainResult:
 
 
 def within(budget: CompositionBudget, ceiling: CompositionBudget) -> bool:
-    """Every stage cap at most the operator's; output retries are fixed when the agents are built."""
-    caps = ("request_limit", "tool_calls_limit", "total_tokens_limit", "timeout_seconds")
+    """Every stage cap and derivation term at most the operator's; output retries are fixed when the agents are built."""
+    caps = ("request_limit", "tool_calls_limit", "total_tokens_limit", "timeout_seconds", "slack_tool_calls",
+            "tokens_per_request")
     return (isinstance(budget, CompositionBudget) and budget.dev_runs <= ceiling.dev_runs
+            and budget.admission_refusals <= ceiling.admission_refusals
             and budget.output_retries == ceiling.output_retries
             and all(getattr(getattr(budget, stage), cap) <= getattr(getattr(ceiling, stage), cap)
                     for stage in STAGES for cap in caps))

@@ -329,3 +329,88 @@ def test_security(tmp_path):
     found = witness_evidence(capture(record, request), request, SECURITY)
     assert [o['planned'] for o in json.loads(record)['tests'][SECURITY]['opens']] == [True]
     assert (found.witness.effect, found.witness.safe_behavior) == ('observed', 'ValueError')
+
+
+def test_absence_is_the_planned_safe_behavior_however_the_target_exits(record):
+    """SPEC-0040 `no_file_open`: a fix that returns normally, or rejects, without the planned open is safe."""
+    data = json.loads(record)
+    for exits in (['ValueError'], [None]):
+        data['tests'][SECURITY] |= {'entered': 1, 'exits': exits}
+        found = witness_evidence(capture(json.dumps(data).encode()), REQUEST, SECURITY, planned_safe_behavior='no_file_open')
+        assert (found.witness.effect, found.witness.safe_behavior) == ('absent', 'no_file_open')
+    unpaired = data | {'tests': {SECURITY: data['tests'][SECURITY] | {'entered': 1, 'exits': [], 'truncated': True}}}
+    found = witness_evidence(capture(json.dumps(unpaired).encode()), REQUEST, SECURITY, planned_safe_behavior='no_file_open')
+    assert found.witness is None or found.witness.safe_behavior is None
+
+
+THREADED = '''import os, threading
+
+def read(root, name):
+    worker = threading.Thread(target=lambda: open(os.path.join(root, name)).read())
+    worker.start()
+    worker.join()
+'''
+
+
+def test_an_open_moved_to_another_thread_is_never_an_absence(tmp_path):
+    """The planned file opened off the target's stack (a worker thread) makes the effect unknown, not absent."""
+    done, record = run_probe(tmp_path, '''
+def test_security(tmp_path):
+    (tmp_path / "outside.txt").write_text("sentinel")
+    assert (tmp_path / "outside.txt").read_text() == "sentinel"
+    target.read(tmp_path, "outside.txt")
+''', target=THREADED)
+    assert record, done.stdout.decode() + done.stderr.decode()
+    assert json.loads(record)['tests'][SECURITY]['offstack_planned'] >= 1
+    found = witness_evidence(capture(record), REQUEST, SECURITY, planned_safe_behavior='no_file_open')
+    assert (found.witness.path_reached, found.witness.effect, found.witness.safe_behavior) == (True, 'unknown', None)
+
+
+def test_the_test_bodys_own_reads_of_the_sentinel_are_not_counted_off_stack(tmp_path):
+    found, data = mapped(tmp_path, '''
+import pytest
+def test_security(tmp_path):
+    (tmp_path / "outside.txt").write_text("sentinel")
+    assert (tmp_path / "outside.txt").read_text() == "sentinel"
+    with pytest.raises(ValueError):
+        target.read(tmp_path, "../outside.txt", error="reject")
+''')
+    assert data['tests'][SECURITY]['offstack_planned'] == 0
+    assert (found.witness.effect, found.witness.safe_behavior) == ('absent', 'ValueError')
+def test_a_runtime_without_monitoring_runs_the_tests_and_records_itself_unsupported(tmp_path):
+    # CPython before 3.12 has no sys.monitoring: the run must proceed and the record must be refused by name.
+    (tmp_path / 'target.py').write_text(TARGET)
+    (tmp_path / 'test_case.py').write_text('import target\n\ndef test_security(tmp_path):\n    assert False\n')
+    argv = list(probe_argv(COMMAND, REQUEST, root=str(tmp_path), record_path='witness.json', nonce=NONCE))
+    argv[0], argv[2] = sys.executable, 'import sys; del sys.monitoring\n' + BOOTSTRAP
+    done = subprocess.run(argv, cwd=tmp_path, capture_output=True, timeout=60, env={'PYTHONPATH': '.'})
+    record = json.loads((tmp_path / 'witness.json').read_bytes())
+    assert done.returncode == 1 and b'1 failed' in done.stdout
+    assert (record['tool_registered'], record['intact']) == (False, False)
+    assert record['unsupported'].endswith('has no sys.monitoring (3.12+)')
+    assert record['tests'][SECURITY]['complete'] is True
+    found = witness_evidence(capture((tmp_path / 'witness.json').read_bytes()), REQUEST, SECURITY)
+    assert (found.witness, found.sandbox_events) == (None, None) and 'unsupported on this runtime' in found.reason
+
+
+DEFERRED = '''import asyncio, os
+
+async def read(root, name):
+    asyncio.get_running_loop().call_soon(lambda: open(os.path.join(root, name)).read())
+    await asyncio.sleep(0)
+'''
+
+
+def test_a_same_thread_open_deferred_by_the_target_is_never_an_absence(tmp_path):
+    """Codex on #44: an event-loop callback the target schedules runs on the test thread off the target's stack."""
+    done, record = run_probe(tmp_path, '''
+import asyncio
+def test_security(tmp_path):
+    (tmp_path / "outside.txt").write_text("sentinel")
+    assert (tmp_path / "outside.txt").read_text() == "sentinel"
+    asyncio.run(target.read(tmp_path, "outside.txt"))
+''', target=DEFERRED)
+    assert record, done.stdout.decode() + done.stderr.decode()
+    assert json.loads(record)['tests'][SECURITY]['offstack_planned'] >= 1
+    found = witness_evidence(capture(record), REQUEST, SECURITY, planned_safe_behavior='no_file_open')
+    assert found.witness.effect == 'unknown' and found.witness.safe_behavior != 'no_file_open'

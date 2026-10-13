@@ -57,8 +57,10 @@ def _surefire_passed(output: bytes) -> bool:
 FRAMEWORKS = {
     "pytest": Framework(_pytest_file, _pytest_targets,
                         lambda output: _PYTEST_SUMMARY.search(output) is not None),
-    # Maven Surefire with JUnit 5; ids are `fully.qualified.Class#method`, files end with the class path.
+    # Maven Surefire with JUnit 5 or JUnit 4 (same ids and Surefire summary); ids are `fully.qualified.Class#method`,
+    # files end with the class path.
     "junit5": Framework(_junit_file, _junit_targets, _surefire_passed),
+    "junit4": Framework(_junit_file, _junit_targets, _surefire_passed),
 }
 
 

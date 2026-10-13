@@ -1,9 +1,9 @@
 {
-  "baseline_repeat_lost_worker": "53d8a573e730487990365af146c69b1613cc28a57490f902c1b67bf743adcecd",
-  "both_revisions_reject": "da4a73f15c383f314fb0db7e09313fb2a19006f6edee27eb9e8f5012c3c47256",
-  "candidate_control_regression": "cd98b30f7b0bd8c470f41dc8efff959617272e9e707924a685fa7177a582dfbc",
-  "denied_candidate_with_reviewer_note": "c9bced2aaae40669c6cf6ca15214594a0fc17be99ddc7e686c216774918540df",
-  "disagreeing_candidate_repeats": "58100e11d9a67e5bb905ebaaee5d60d088d4b1fb25f405eadcc7ede2e6b46b79",
-  "precondition_assertion_failure": "2fcab794be5fe83672aa4b8242079ad426e523c6526a5095cc864546154ef289",
-  "reordered_report_true_pair": "d0bf4387c40e82b3e3fb9945fafdb2dc20f392287d034be0a1b0440ae66735d3"
+  "baseline_repeat_lost_worker": "68bff16a4a74b362c3917032ff933d38081d71f1eec2572579548368ee42a643",
+  "both_revisions_reject": "032be586993c4ef366ad965351e7418fe306020a70cd78df0430a86427bc0714",
+  "candidate_control_regression": "34f8a9bed14af126e259420c7d5e110831da2cca29b1be61fab01733b60394f6",
+  "denied_candidate_with_reviewer_note": "32d88a4928f338b36d050c2b61c2e1be2fa15fd2ec03b7a94833bf76dcb6f33c",
+  "disagreeing_candidate_repeats": "12177e0a85033378870d42b9e0a90fbe15b185fc3218518a9b88c2de37f3384a",
+  "precondition_assertion_failure": "a6f022adaa28c4b79b968ed520595ef2ef573e750ae57ebcb7ce8c18f762dda3",
+  "reordered_report_true_pair": "1b5bd25cd7db5f96092663ec33f6894d4e7a2a87bc12cd7fcfb5233ca4d49e91"
 }

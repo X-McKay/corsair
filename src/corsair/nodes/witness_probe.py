@@ -1,9 +1,13 @@
 """Operator witness probe for one pytest run; loaded by the runner's bootstrap, never by workload code.
 
 Standard library and pytest hooks only: the bytes travel to the test interpreter as an argument and must
-run on any admitted CPython 3.12+. Native ``sys.monitoring`` events attribute calls, returns and unwinds to
+load on any admitted CPython (3.7+) and pytest (old-style hook wrapper, no ``pytest.ExitCode``). Observation
+needs CPython 3.12+ (``sys.monitoring``; audit hooks are 3.8+ and ``co_qualname`` 3.11+): on an older runtime the
+probe registers nothing, lets the run proceed and writes a record naming the runtime as unsupported. Native ``sys.monitoring`` events attribute calls, returns and unwinds to
 the identified target function; native audit ``open`` events and raised ``OSError``s count only when the
-target is on the calling stack and only during a test's call phase. The record is written once, after the
+target is on the calling stack and only during a test's call phase. Opens of the planned file off the target's
+stack during the call phase, on another thread or after the target was first entered, are counted separately
+(``offstack_planned``), since they cannot be attributed to the target but may be its effect; child processes are not observed. The record is written once, after the
 session, to an operator path; the host maps it to the gate's witness. It runs inside the test interpreter,
 so it is tamper-evident (its own tool registration, events and the operator nonce are checked), not
 tamper-proof against hostile test code.
@@ -11,10 +15,11 @@ tamper-proof against hostile test code.
 import json
 import os
 import sys
+import threading
 
 import pytest
 
-SCHEMA = 'corsair-witness-v1'
+SCHEMA = 'corsair-witness-v2'
 TOOL_NAME = 'corsair-witness'
 MAX_OPENS = 32
 MAX_CALLS = 32
@@ -38,15 +43,19 @@ class Probe:
         self.record = {'schema': SCHEMA, 'nonce': config['nonce'], 'plugin_sha256': plugin_sha256,
                        'target': {'path': config['target_path'], 'symbol': self.symbol,
                                   'effect_name': self.effect_name},
-                       'tool_registered': False, 'intact': False, 'tests': {}}
+                       'tool_registered': False, 'intact': False, 'unsupported': None, 'tests': {}}
         self.active = None
+        self.test_thread = None
         # Keyed by identity with the code object kept alive: equal code objects from other files or
         # qualnames compare equal, so an equality-keyed cache would let a lookalike pass as the target.
         self.known = {}
         self.files = {}
         self.raised = []
-        monitoring = sys.monitoring
         self.tool = config['tool_id']
+        monitoring = getattr(sys, 'monitoring', None)
+        if monitoring is None:
+            self.record['unsupported'] = 'CPython {}.{}.{} has no sys.monitoring (3.12+)'.format(*sys.version_info[:3])
+            return
         events = monitoring.events
         self.events = events.PY_START | events.PY_RETURN | events.PY_UNWIND | events.RAISE
         try:
@@ -141,11 +150,18 @@ class Probe:
             return
         test = self._test()
         frame = sys._getframe(1)
-        if test is None or self._loader_frame(frame) or not self._on_stack(frame):
+        if test is None or self._loader_frame(frame):
             return
         path = args[0] if args else None
         if isinstance(path, bytes):
             path = path.decode('utf-8', 'replace')
+        if not self._on_stack(frame):
+            # Another thread's open of the planned file, or one on the test thread once the target has been
+            # entered, may be the target's effect moved off its stack (a worker, executor or event-loop callback).
+            # Only the test body's reads before the first call are not counted.
+            if self._planned(path) and (threading.get_ident() != self.test_thread or test['entered']):
+                test['offstack_planned'] += 1
+            return
         if len(test['opens']) < MAX_OPENS:
             test['opens'].append({'path': str(path)[:512] if isinstance(path, (str, int)) else None,
                                   'planned': self._planned(path)})
@@ -153,15 +169,17 @@ class Probe:
             test['truncated'] = True
 
     # pytest hook: only the call phase is observed, so fixtures and teardown never count.
-    @pytest.hookimpl(wrapper=True)
+    # Old-style wrapper: new-style ``wrapper=True`` needs pluggy 1.1+, which older pytest releases may not have.
+    @pytest.hookimpl(hookwrapper=True)
     def pytest_runtest_call(self, item):
         tests = self.record['tests']
         if item.nodeid not in tests and len(tests) < MAX_TESTS:
             tests[item.nodeid] = {'entered': 0, 'exits': [], 'opens': [], 'os_errors': [], 'truncated': False,
-                                  'complete': False}
+                                  'complete': False, 'offstack_planned': 0}
+        self.test_thread = threading.get_ident()
         self.active = item.nodeid if item.nodeid in tests else None
         try:
-            return (yield)
+            yield
         finally:
             if self.active is not None:
                 tests[self.active]['complete'] = True
@@ -170,11 +188,10 @@ class Probe:
 
     def pytest_sessionfinish(self, session, exitstatus):
         self.active = None
-        monitoring = sys.monitoring
-        self.record['intact'] = bool(self.record['tool_registered']
-                                     and monitoring.get_tool(self.tool) == TOOL_NAME
-                                     and monitoring.get_events(self.tool) == self.events)
         if self.record['tool_registered']:
+            monitoring = sys.monitoring
+            self.record['intact'] = (monitoring.get_tool(self.tool) == TOOL_NAME
+                                     and monitoring.get_events(self.tool) == self.events)
             monitoring.set_events(self.tool, 0)
         data = json.dumps(self.record, sort_keys=True).encode()
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0)
@@ -182,7 +199,7 @@ class Probe:
             descriptor = os.open(self.config['record_path'], flags, 0o600)
         except OSError:
             # Something else created the record path: the run itself fails rather than offering that file.
-            session.exitstatus = pytest.ExitCode.INTERNAL_ERROR
+            session.exitstatus = 3  # pytest's internal-error status; ``pytest.ExitCode`` is pytest 5+
             return
         with os.fdopen(descriptor, 'wb') as stream:
             stream.write(data)

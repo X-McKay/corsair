@@ -51,7 +51,8 @@ def sandbox_case(snapshots: dict[str, SourceSnapshot], image_manifest_digest: st
         discovery_command=DISCOVER, approved_test_paths=(REVIEWED_TEST,), baseline_test=base.environment.baseline_test,
         scratch_location="The per-test pytest tmp_path directory under the operator's --basetemp; "
                          "fixtures must not be created elsewhere",
-        observation_facilities=base.environment.observation_facilities)
+        observation_facilities=base.environment.observation_facilities,
+        witness_facilities=base.environment.witness_facilities)
     identity = EnvironmentIdentity(
         image_digest=image_manifest_digest.removeprefix("sha256:"), recipe_sha256=_digest(json.dumps(PREFIX).encode()),
         dependency_inventory_sha256=_digest((TOOLCHAIN / "wheels.json").read_bytes()),

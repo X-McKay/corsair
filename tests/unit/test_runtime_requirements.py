@@ -1,4 +1,6 @@
 """SPEC-0042: build metadata to runtime requirement, and selection against the runtime matrix (offline)."""
+from pathlib import Path
+
 import pytest
 
 from corsair.nodes.runtime.detect import MAX_FILE_BYTES, detect, is_build_file
@@ -201,13 +203,51 @@ def test_selection_supported_unsupported_conflict():
     assert select(conflict, matrix).status == 'undetermined'
     java17 = detect({'pom.xml': PARENT.replace(b'1.8', b'17').replace(b'junit</groupId><artifactId>junit',
                                                                          b'org.junit.jupiter</groupId><artifactId>junit-jupiter').replace(b'4.12', b'5.14.4')}, 'java')
-    selection = select(java17, matrix)
-    assert selection.status == 'unsupported' and [n.name for n in selection.needs] == ['junit5']  # no Maven runner row yet
-    with_runner = Matrix.model_validate({**matrix.model_dump(), 'frameworks': [*matrix.model_dump()['frameworks'], {
-        'name': 'junit5', 'language': 'java', 'versions': '>=5.13', 'runner': 'x', 'images': ['temurin-17-maven'],
-        'qualification': {'records': ['SPEC-0039'], 'report': 'x'}}]})
-    assert select(java17, with_runner).status == 'supported'
+    assert select(java17, matrix).image_id == 'temurin-17-maven'
+    # Framework rows are exact versions that ran (SPEC-0045): an unrun Jupiter release is unsupported.
+    unrun = select(detect({'pom.xml': PARENT.replace(b'1.8', b'17').replace(b'junit</groupId><artifactId>junit',
+                                                                          b'org.junit.jupiter</groupId><artifactId>junit-jupiter').replace(b'4.12', b'5.13.4')}, 'java'), matrix)
+    assert unrun.status == 'unsupported' and [n.name for n in unrun.needs] == ['junit5']
+    java8 = detect({'pom.xml': PARENT}, 'java')  # source 1.8 with JUnit 4.12
+    selection = select(java8, matrix)
+    assert selection.status == 'supported' and selection.image_id == 'temurin-8-maven'
+    # JUnit 4 before 4.12 has no Vintage discovery (SPEC-0041); the JDK alone is not enough.
+    old_junit = select(detect({'pom.xml': PARENT.replace(b'4.12', b'4.8.2')}, 'java'), matrix)
+    assert old_junit.status == 'unsupported' and [n.name for n in old_junit.needs] == ['junit4']
+    # The environment agent's `junit4` ready result is admitted by the JDK 8 selection, and only there.
+    from corsair.agents.environment.contracts import ReadyEnvironment
+    from corsair.nodes.runtime.environment import check_ready
+    prepared = {'temurin-8-maven': 'docker.io/library/corsair-java8@sha256:' + '0' * 64}
+    ready = lambda framework: ReadyEnvironment.model_construct(toolchain_id='temurin-8-maven',
+                                                               toolchain_image=prepared['temurin-8-maven'], framework=framework)
+    check_ready(ready('junit4'), selection, prepared)
+    with pytest.raises(ValueError, match='not one the selection admitted'):
+        check_ready(ready('junit5'), selection, prepared)
 
+
+# SPEC-0056 image row, staged here until its live gate passes; runtime and make are what the image measured.
+STAGED_PERL526 = {'id': 'perl-5.26-make', 'language': 'perl',
+                  'base_image': 'docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7',
+                  'image_source': 'deploy/qualification/toolchains/perl526', 'runtime': {'name': 'perl', 'version': '5.26.3'},
+                  'tools': {'make': '4.2.1'}, 'selector': {}, 'qualification': {'records': ['SPEC-0056'], 'report': 'x'}}
+
+
+def test_perl526_row_meets_runtime_and_make_and_waits_for_a_tap_runner():
+    fixture = Path(__file__).resolve().parents[2] / 'deploy/qualification/toolchains/perl526/Makefile.PL'
+    requirement = detect({'Makefile.PL': fixture.read_bytes()}, 'perl')
+    matrix = load().model_dump()
+    staged = Matrix.model_validate({**matrix, 'images': [*matrix['images'], STAGED_PERL526]})
+    # No Corsair runner and report parser for TAP yet, so no framework row: the image alone does not run a case.
+    selection = select(requirement, staged)
+    assert selection.status == 'unsupported' and [n.name for n in selection.needs] == ['tap-harness']
+    assert [check.name for check in selection.rejected[0].unmet] == ['tap-harness']
+    runner = {'name': 'tap-harness', 'language': 'perl', 'versions': '==3.38', 'runner': 'x', 'images': ['perl-5.26-make'],
+              'qualification': {'records': ['SPEC-0056'], 'report': 'x'}}
+    selection = select(requirement, Matrix.model_validate({**staged.model_dump(), 'frameworks': [*matrix['frameworks'], runner]}))
+    assert selection.status == 'supported' and selection.image_id == 'perl-5.26-make'
+    # A project that needs a newer Perl is not routed to 5.26.
+    newer = detect({'Makefile.PL': fixture.read_bytes().replace(b"'5.026'", b"'5.028'")}, 'perl')
+    assert select(newer, staged).status == 'unsupported' and 'perl' in [n.name for n in select(newer, staged).needs]
 
 def test_matrix_refuses_selector_rows_and_duplicates():
     data = load().model_dump()
@@ -449,7 +489,8 @@ def test_poetry_source_without_version_is_unread():
 def test_java_unread_pins_and_version_file_names():
     junit = ('<dependencies><dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId>'
              '<version>5.14.0</version></dependency></dependencies>')
-    matrix = Matrix.model_validate({**load().model_dump(), 'frameworks': [*load().model_dump()['frameworks'], {
+    others = [row for row in load().model_dump()['frameworks'] if row['name'] != 'junit5']
+    matrix = Matrix.model_validate({**load().model_dump(), 'frameworks': [*others, {
         'name': 'junit5', 'language': 'java', 'versions': '5.14.*', 'runner': 'x', 'images': ['temurin-17-maven'],
         'qualification': {'records': ['SPEC-0039'], 'report': 'x'}}]})
     base = '<properties><maven.compiler.release>17</maven.compiler.release></properties>'

@@ -66,6 +66,8 @@ class _TestRecord(_Record):
     os_errors: tuple[_OSError, ...] = Field(max_length=32)
     truncated: bool
     complete: bool
+    # Planned-file opens off the target's stack during the call (other threads, or after the first entry); None when the record predates the count.
+    offstack_planned: int | None = Field(default=None, ge=0)
 
 
 class _Target(_Record):
@@ -81,6 +83,7 @@ class ProbeRecord(_Record):
     target: _Target
     tool_registered: bool
     intact: bool
+    unsupported: str | None = Field(max_length=256)
     tests: dict[str, _TestRecord] = Field(max_length=16)
 
 
@@ -96,9 +99,16 @@ def _refused(reason: str) -> WitnessEvidence:
     return WitnessEvidence(None, None, reason)
 
 
+ABSENCE = 'no_file_open'
+
+
 def witness_evidence(capture: WitnessCapture | None, request: WitnessRequest,
-                     security_test_id: str) -> WitnessEvidence:
-    """Map the probe record for the security test's call phase to the SPEC-0027 witness, or refuse it."""
+                     security_test_id: str, *, planned_safe_behavior: str | None = None) -> WitnessEvidence:
+    """Map the probe record for the security test's call phase to the SPEC-0027 witness, or refuse it.
+
+    When the plan's safe behavior is the absence identity ``no_file_open`` (SPEC-0040), an attributed call
+    phase without the planned open is that behavior, however the target exited.
+    """
     if capture is None:
         return _refused('no witness was requested or captured for this run')
     if capture.status != 'captured' or capture.artifact is None:
@@ -111,11 +121,13 @@ def witness_evidence(capture: WitnessCapture | None, request: WitnessRequest,
         record = ProbeRecord.model_validate_json(capture.record)
     except ValidationError as error:
         return _refused(f'witness record invalid: {error.error_count()} errors')
-    if (record.schema_ != 'corsair-witness-v1' or record.nonce != capture.nonce
+    if (record.schema_ != 'corsair-witness-v2' or record.nonce != capture.nonce
             or record.plugin_sha256 != PROBE_SHA256
             or (record.target.path, record.target.symbol, record.target.effect_name)
             != (request.target_path, request.target_symbol, request.effect_name)):
         return _refused('witness record does not belong to this run, probe or target')
+    if record.unsupported is not None:
+        return _refused(f'witness probe unsupported on this runtime: {record.unsupported}')
     if not (record.tool_registered and record.intact):
         return _refused('witness probe was not registered or its monitoring changed during the run')
     test = record.tests.get(security_test_id)
@@ -128,7 +140,9 @@ def witness_evidence(capture: WitnessCapture | None, request: WitnessRequest,
     events = tuple(SandboxEvent(kind='policy_denial', phase='test', touches_witness_path=None) for _ in denials)
     # Only opens of the planned file are the effect; other files the target reads are recorded, not counted.
     planned = [o for o in test.opens if o.planned]
-    if planned and len(denials) < len(test.os_errors):
+    if test.offstack_planned:
+        effect = 'unknown'  # the planned file was opened off the target's stack; not attributable either way
+    elif planned and len(denials) < len(test.os_errors):
         effect = 'unknown'  # an attempted open failed for another reason; the effect is not established
     elif planned:
         effect = 'observed'
@@ -141,6 +155,9 @@ def witness_evidence(capture: WitnessCapture | None, request: WitnessRequest,
     if test.entered and not test.truncated and len(exits) == 1:
         (only,) = exits
         safe = only if only is not None and TOKEN.fullmatch(only) else None
+    if (planned_safe_behavior == ABSENCE and effect == 'absent' and test.offstack_planned == 0
+            and test.entered and not test.truncated and test.entered == len(test.exits)):
+        safe = ABSENCE
     witness = Witness(artifact_sha256=capture.artifact.sha256, path_reached=test.entered > 0 or bool(planned),
                       effect=effect, safe_behavior=safe)
     return WitnessEvidence(witness, events, 'admitted')

@@ -1,4 +1,5 @@
 """Offline native report rejection guards; no runtime or application claims."""
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -37,7 +38,7 @@ def test_version_or_exit_failure_cannot_substitute_for_successful_execution(resu
         expect_completed(result, 0, '1 passed')
 
 
-@pytest.mark.parametrize('detail', ['http.client.RemoteDisconnected: Remote end closed connection without response', 'TimeoutError: timed out'])
+@pytest.mark.parametrize('detail', ['http.client.RemoteDisconnected: Remote end closed connection without response', 'TimeoutError: timed out', 'socket.timeout: timed out'])
 @pytest.mark.parametrize('fault', ['no-event', 'old-event', 'other-sandbox', 'policy-denial', 'unrelated-error', 'wrong-destination', 'missing-event-id'])
 def test_transport_error_requires_fresh_original_native_upstream_failure(fault, detail):
     from tests.qualification.test_toolchains import expect_registry_unavailable
@@ -61,3 +62,27 @@ def test_transport_error_requires_fresh_original_native_upstream_failure(fault, 
         event['message'] = 'TLS or DNS failure'
     with pytest.raises(AssertionError):
         expect_registry_unavailable(result, events, before, 'owned')
+
+
+def jest_json(**changes):
+    report = {'success': True, 'numTotalTests': 2, 'numPassedTests': 2, 'numFailedTests': 0, 'numPendingTests': 0, 'numTodoTests': 0,
+              'testResults': [{'assertionResults': [{'fullName': 'nativeRoundtrip', 'status': 'passed'}, {'fullName': 'nativeRuntime', 'status': 'passed'}]}]}
+    report.update(changes)
+    return json.dumps(report)
+
+
+@pytest.mark.parametrize('changes', [
+    {'success': False}, {'numTotalTests': 3}, {'numPassedTests': 1, 'numFailedTests': 1}, {'numPendingTests': 1}, {'numTodoTests': 1},
+    {'testResults': [{'assertionResults': [{'fullName': 'nativeRoundtrip', 'status': 'passed'}, {'fullName': 'other', 'status': 'passed'}]}]},
+    {'testResults': [{'assertionResults': [{'fullName': 'nativeRoundtrip', 'status': 'passed'}, {'fullName': 'nativeRuntime', 'status': 'pending'}]}]},
+    {'testResults': []},
+], ids=['unsuccessful', 'count', 'failed', 'pending', 'todo', 'wrong-name', 'case-pending', 'no-suites'])
+def test_jest_report_rejects_nonexecuted_or_wrong_tests(changes):
+    from tests.qualification.prepare_toolchains import NODE_TESTS, jest_report
+    with pytest.raises(AssertionError):
+        jest_report(jest_json(**changes), NODE_TESTS)
+
+
+def test_jest_report_accepts_the_fixture_tests():
+    from tests.qualification.prepare_toolchains import NODE_TESTS, jest_report
+    assert jest_report(jest_json(), NODE_TESTS)['ids'] == ['nativeRoundtrip', 'nativeRuntime']

@@ -37,7 +37,7 @@ cases:
             function: test_security_rejects_outside_read
             line: 64
         witness:
-          artifact_sha256: fd6dc9938d27866f8d53e898c1459216fccbf4a78d2bec8c531ce40273158dd0
+          artifact_sha256: d960c5e696a873b9fe99be248e3bee7d64afd397e169ec04d0482dde74dfebe5
           path_reached: true
           effect: observed
           safe_behavior: null
@@ -64,7 +64,7 @@ cases:
           outcome: passed
           failure: null
         witness:
-          artifact_sha256: c31087b3428b202b206fe177e8833b27171a76f37529f9f7bae6832693755225
+          artifact_sha256: 4071a602bb6a2a55e7c73c66ed04ad9bfaf1eaf441e6873e6f36a8812c3a94b8
           path_reached: true
           effect: absent
           safe_behavior: ValueError
@@ -222,10 +222,10 @@ cases:
       kind: witness
       revision: baseline
       run: 0
-      sha256: c1d8df78ea908ed6ae119f3ee45e5f70975585c7620794b8a3a908dbc88986dd
+      sha256: 6284628822429403d83b45893a75e68a5d143546280ac1f49750b31ad18b0d08
       content: "{\n  \"intact\": true,\n  \"nonce\": \"eebccc69ee56540fb860006521bbeb45\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -237,8 +237,8 @@ cases:
         \        null\n      ],\n      \"opens\": [\n        {\n          \"path\"\
         : \"/workspace/scratch/test_security_rejects_outside_0/allowed/../outside.txt\"\
         ,\n          \"planned\": true\n        }\n      ],\n      \"os_errors\":\
-        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
     - item_id: candidate-0-receipt
       kind: receipt
       revision: candidate
@@ -293,10 +293,10 @@ cases:
       kind: witness
       revision: candidate
       run: 0
-      sha256: 4017a19d6ee5e2d81d5f6254a6de71997414f95a729333f2a19876b03a6fc8b2
+      sha256: e3ac119906e5abc7c7f752b8aa23ec4e7c4e468bac7dd0ba8a67694c448528f3
       content: "{\n  \"intact\": true,\n  \"nonce\": \"3feaec1b35b85428afbb78351b22c9ea\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -306,8 +306,8 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n\
         \        \"ValueError\"\n      ],\n      \"opens\": [],\n      \"os_errors\"\
-        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
   metadata:
     case_class: true_pair
     split: development
@@ -375,7 +375,7 @@ cases:
             function: test_security_rejects_outside_read
             line: 64
         witness:
-          artifact_sha256: 9d1121556160019583770d3047924a0d6c170d5d47c213232f784ae0b009f03b
+          artifact_sha256: d848b77af4bb84fa01cd070d467bdc4a039c7926071575cf354df493f5e2d85d
           path_reached: true
           effect: observed
           safe_behavior: null
@@ -402,7 +402,7 @@ cases:
           outcome: passed
           failure: null
         witness:
-          artifact_sha256: 0365f15854214de36bfacae3a26d909ef827ec2091c0810c0f35332246ee5a75
+          artifact_sha256: f2964debe8386f64b90af2fea0b00bac6aa197a534c8028fd6e570c05c98d2cc
           path_reached: true
           effect: absent
           safe_behavior: ValueError
@@ -598,10 +598,10 @@ cases:
       kind: witness
       revision: baseline
       run: 0
-      sha256: 2ec0bce7ce982f8dba8e62825bb277f596f152cf57dbaced33a0a58037e648b0
+      sha256: 0f80ba522cf27ce712002f45ef7efbd92e3670c35e30c720a872c708aaff2925
       content: "{\n  \"intact\": true,\n  \"nonce\": \"e506d34ebdab5cec9cb94fbb82adb308\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -613,8 +613,8 @@ cases:
         \        null\n      ],\n      \"opens\": [\n        {\n          \"path\"\
         : \"/workspace/scratch/test_security_rejects_outside_0/allowed/../outside.txt\"\
         ,\n          \"planned\": true\n        }\n      ],\n      \"os_errors\":\
-        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
     - item_id: candidate-0-receipt
       kind: receipt
       revision: candidate
@@ -669,10 +669,10 @@ cases:
       kind: witness
       revision: candidate
       run: 0
-      sha256: 88b37b529ebaa8ccd55a069addfc983583d8f7f668c308e8af0ab045c2da15cd
+      sha256: 7359f181a5395c99ec005942e1acd208e9492fbb41adc1996f44990ff86151ca
       content: "{\n  \"intact\": true,\n  \"nonce\": \"a6a3f7f1697850b7b6ad285e5d206dd5\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -682,8 +682,8 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n\
         \        \"ValueError\"\n      ],\n      \"opens\": [],\n      \"os_errors\"\
-        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
   metadata:
     case_class: failed_control
     split: development
@@ -743,7 +743,7 @@ cases:
           outcome: skipped
           failure: null
         witness:
-          artifact_sha256: 3be9f63d33e5ac034226c0a15b90c760f99a0f8e922a1f203762de9defe66495
+          artifact_sha256: f369dd6d85f97b02634154b01e10dfac21094c39b4e8928ad8c8b339a8142e12
           path_reached: false
           effect: absent
           safe_behavior: null
@@ -770,7 +770,7 @@ cases:
           outcome: passed
           failure: null
         witness:
-          artifact_sha256: b3bb92e6079951c9bfc6df92d7b63bf06c4bc3b3ad570e0c49e2eb513aab3e62
+          artifact_sha256: 0a108b47ce43aaa43f50fdcf315169b48a45f58c5f379de43b961809c228b339
           path_reached: true
           effect: absent
           safe_behavior: ValueError
@@ -891,10 +891,10 @@ cases:
       kind: witness
       revision: baseline
       run: 0
-      sha256: ca0049e6e1f35f6bbee1060fca1d7a510914bc102c4b746f84401e19df240a8e
+      sha256: ed8ce0d9a6af61fa167bee315f4bcad61d7a7d48d8dc4ca7e09a5e368acd2bd8
       content: "{\n  \"intact\": true,\n  \"nonce\": \"2968806218cf5955bf50a2d223f0b526\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -904,7 +904,7 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 0,\n      \"exits\": [],\n\
         \      \"opens\": [],\n      \"os_errors\": [],\n      \"truncated\": false\n\
-        \    }\n  },\n  \"tool_registered\": true\n}"
+        \    }\n  },\n  \"tool_registered\": true,\n  \"unsupported\": null\n}"
     - item_id: candidate-0-receipt
       kind: receipt
       revision: candidate
@@ -959,10 +959,10 @@ cases:
       kind: witness
       revision: candidate
       run: 0
-      sha256: 61f5d7b95f259d17caea73473d3a690ede040c02f9128346df3f4927f24bf98f
+      sha256: d77c0bda4b33a51520a112fc95fe3374132460744248bf776162677b5412531f
       content: "{\n  \"intact\": true,\n  \"nonce\": \"04f02793e4e45919849886c203ddb336\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -972,8 +972,8 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n\
         \        \"ValueError\"\n      ],\n      \"opens\": [],\n      \"os_errors\"\
-        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
   metadata:
     case_class: skipped_security_test
     split: development
@@ -1056,7 +1056,7 @@ cases:
           outcome: passed
           failure: null
         witness:
-          artifact_sha256: 38eb50769b5ed049c06e3a576da5a7677794481589ac3cc5e5c247b7494806d5
+          artifact_sha256: db905d1e56fdf17ac288066a27898687ae2a2aa2ac2f860318e641e6cacdb456
           path_reached: true
           effect: absent
           safe_behavior: ValueError
@@ -1253,10 +1253,10 @@ cases:
       kind: witness
       revision: candidate
       run: 0
-      sha256: d5be275514b9b10373ab2eabf0f29d85bbb5a286a2dc370e311b201389739ebe
+      sha256: 010944491a4e069eb43377889d71bde368ff714e3121bf348fb312cf711a371c
       content: "{\n  \"intact\": true,\n  \"nonce\": \"61ea4a25558657908faed7dca90ed37f\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -1266,8 +1266,8 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n\
         \        \"ValueError\"\n      ],\n      \"opens\": [],\n      \"os_errors\"\
-        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
   metadata:
     case_class: erroring_security_test
     split: development
@@ -1340,7 +1340,7 @@ cases:
           outcome: passed
           failure: null
         witness:
-          artifact_sha256: f9f54158dc5e73c70b52807b7e166fad3eea4a28ee8d959d8e66bb1baa0c16a9
+          artifact_sha256: 8b2c812bae092db83b5a7c3f5097ff568829eb4402f69e0f3d8d89130f3bdf40
           path_reached: true
           effect: absent
           safe_behavior: ValueError
@@ -1488,10 +1488,10 @@ cases:
       kind: witness
       revision: candidate
       run: 0
-      sha256: 1f082e90a79dc175f61e6dcd130daae7a05e8386b78d6538e7aa2b21f44c23a3
+      sha256: 7b1eefe4a3bb9a0e2b7374947e954ff44e4d934576270d4348e5994fcc72d26d
       content: "{\n  \"intact\": true,\n  \"nonce\": \"9a4ff46f96165f0997cd3409b47a72b7\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -1501,8 +1501,8 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n\
         \        \"ValueError\"\n      ],\n      \"opens\": [],\n      \"os_errors\"\
-        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
   metadata:
     case_class: discovery_error
     split: development
@@ -1578,7 +1578,7 @@ cases:
           outcome: passed
           failure: null
         witness:
-          artifact_sha256: 2ad6d5935554d4e66899fcd937a4eac91c23dfdf6194dbf60f60daaf7c9f5357
+          artifact_sha256: c5eda6c35c02aa20004562d68e381d70d2f40ad9422045ad1ee12c8887d79414
           path_reached: true
           effect: absent
           safe_behavior: ValueError
@@ -1715,10 +1715,10 @@ cases:
       kind: witness
       revision: candidate
       run: 0
-      sha256: 5a55a98c08712a0087d63448ee16af31399b23883800cf7408dc4129abdc11ca
+      sha256: 87929726b29a5364b0d69e22137e30e19c73aa3f08034ad1646a6a5704f76b6f
       content: "{\n  \"intact\": true,\n  \"nonce\": \"4f68183b38225d508ae1bfd1be9a1c36\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -1728,8 +1728,8 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n\
         \        \"ValueError\"\n      ],\n      \"opens\": [],\n      \"os_errors\"\
-        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
   metadata:
     case_class: unknown_delivery
     split: development
@@ -1791,7 +1791,7 @@ cases:
             function: test_security_rejects_outside_read
             line: 64
         witness:
-          artifact_sha256: f3180993f5198592e05c90f3cadc7f2573a19f062a3ef62df2542359d0153c27
+          artifact_sha256: 5505c258e499d64e52c81a555da6a7729347a63433c9ebfc904a481f86516ef7
           path_reached: true
           effect: observed
           safe_behavior: null
@@ -1966,10 +1966,10 @@ cases:
       kind: witness
       revision: baseline
       run: 0
-      sha256: f272b697275bdc309ae1d43fb3ac35e79850665f3177c6fe27702a0ab10cdec0
+      sha256: 271a2dd13ad4e131775e74fbb8790e4a80cf737a189948e3854478e69415a0c0
       content: "{\n  \"intact\": true,\n  \"nonce\": \"3b27fd884b8f5ed991789fa889d6744b\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -1981,8 +1981,8 @@ cases:
         \        null\n      ],\n      \"opens\": [\n        {\n          \"path\"\
         : \"/workspace/scratch/test_security_rejects_outside_0/allowed/../outside.txt\"\
         ,\n          \"planned\": true\n        }\n      ],\n      \"os_errors\":\
-        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
     - item_id: candidate-0-receipt
       kind: receipt
       revision: candidate
@@ -2059,7 +2059,7 @@ cases:
             function: test_security_rejects_outside_read
             line: 64
         witness:
-          artifact_sha256: a9b89046148bed3f5802e641a3b2ebbf7f2d1f07f9efb263153b3cfec8bd7558
+          artifact_sha256: 5a6f3457094e9965942d11224e6b593d9aeb56b7328e85147d9d0794030b2de0
           path_reached: true
           effect: observed
           safe_behavior: null
@@ -2086,7 +2086,7 @@ cases:
           outcome: passed
           failure: null
         witness:
-          artifact_sha256: e63c127cdad631e05a04ce47368f230a8cceb9e762bcec7c4912068ca0c4c39f
+          artifact_sha256: 0fdbc65f889f05eb506d17c66497fc1e145b0ddff512e7df1cfd684bfd4e2597
           path_reached: true
           effect: absent
           safe_behavior: ValueError
@@ -2247,10 +2247,10 @@ cases:
       kind: witness
       revision: baseline
       run: 0
-      sha256: 74e6d7f6615b9cb758f601067842f082cde15df324c8279d5b57f91f21239eb0
+      sha256: 6dd2aa64d9b6a29228daeb0bd323425e4614d68b3ac186245239b3feedd47fb9
       content: "{\n  \"intact\": true,\n  \"nonce\": \"0b41a77b420e5c2da63c96f32bbec0bb\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -2262,8 +2262,8 @@ cases:
         \        null\n      ],\n      \"opens\": [\n        {\n          \"path\"\
         : \"/workspace/scratch/test_security_rejects_outside_0/allowed/../outside.txt\"\
         ,\n          \"planned\": true\n        }\n      ],\n      \"os_errors\":\
-        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
     - item_id: candidate-0-receipt
       kind: receipt
       revision: candidate
@@ -2318,10 +2318,10 @@ cases:
       kind: witness
       revision: candidate
       run: 0
-      sha256: fa70ee6aa2273c564d2847a323c5c9b93d51dfb3a43d3898d05400710f0e50b6
+      sha256: f5166a1d93880c650f6fe854d76d6d3b947cc57a4cd3def3d360aadf874d7e55
       content: "{\n  \"intact\": true,\n  \"nonce\": \"311202a3085053659f5dd87d1f3405da\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -2331,8 +2331,8 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n\
         \        \"ValueError\"\n      ],\n      \"opens\": [],\n      \"os_errors\"\
-        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
     - item_id: candidate-0-sandbox
       kind: sandbox_log
       revision: candidate
@@ -2405,7 +2405,7 @@ cases:
             function: test_security_rejects_outside_read
             line: 57
         witness:
-          artifact_sha256: a5ff7f8b457b5d4f72365088a49ce61368a2da325f6e4b71aa59b731d60286fe
+          artifact_sha256: 75c65393eee5808661febcce62c69ecfbb537d328e3f1734ce2559b84a921155
           path_reached: true
           effect: observed
           safe_behavior: PermissionError
@@ -2435,7 +2435,7 @@ cases:
           outcome: passed
           failure: null
         witness:
-          artifact_sha256: 859519d64aa97fbad520a7e0354b4f6ea4d81561fff36d3ff62c7dc4ff148d43
+          artifact_sha256: 678ee142b73b213908c7cb7b3ff3f875b2278ed3f42392759b98761ec908a128
           path_reached: true
           effect: absent
           safe_behavior: ValueError
@@ -2589,10 +2589,10 @@ cases:
       kind: witness
       revision: baseline
       run: 0
-      sha256: c96dbfe256db7243f7f28ebaa25147920b75092374fa02e8c8ecba9e997a033e
+      sha256: 6abb772b72b7cb8b434f446ad36d906a641b32ee6daf5b18879a5b4e4ff2444b
       content: "{\n  \"intact\": true,\n  \"nonce\": \"f7a874c4266a59aa8e952acff8beb9b4\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -2606,7 +2606,7 @@ cases:
         ,\n          \"planned\": true\n        }\n      ],\n      \"os_errors\":\
         \ [\n        {\n          \"errno\": 13,\n          \"type\": \"PermissionError\"\
         \n        }\n      ],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\"\
-        : true\n}"
+        : true,\n  \"unsupported\": null\n}"
     - item_id: baseline-0-sandbox
       kind: sandbox_log
       revision: baseline
@@ -2669,10 +2669,10 @@ cases:
       kind: witness
       revision: candidate
       run: 0
-      sha256: f24b83f268e10820ae84aba2c2d1edfe1cfcf53c96c2b6e787807120eb703448
+      sha256: 2150a139cd8d41640e5d10856d4a95b64cd0cfcbf657694538e0ef32ef076827
       content: "{\n  \"intact\": true,\n  \"nonce\": \"a34b7ab9cda05ff5a9f1ede8ad5bb05e\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -2682,8 +2682,8 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n\
         \        \"ValueError\"\n      ],\n      \"opens\": [],\n      \"os_errors\"\
-        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
   metadata:
     case_class: sandbox_denial_baseline
     split: development
@@ -2748,7 +2748,7 @@ cases:
             function: test_security_rejects_outside_read
             line: 64
         witness:
-          artifact_sha256: 74c6718b03d1941b3e89d95ffd926b7b9550a6ae031b95dfc27dbdb2544880c3
+          artifact_sha256: 2b5eba3e1cb0cf627964093648d8a23c2275b0b088ede9a0f3d57c6c9b72785c
           path_reached: true
           effect: observed
           safe_behavior: null
@@ -2774,7 +2774,7 @@ cases:
           outcome: passed
           failure: null
         witness:
-          artifact_sha256: e93a2bb8952dacf3d93f34431902d4279e9c9deee6ae0bb3a2a58eb2e8f5ffe1
+          artifact_sha256: f7c0377b029f753bce7d1180a820f8e33fc15c7fad9c0f614fab8cf19088e2d5
           path_reached: true
           effect: absent
           safe_behavior: ValueError
@@ -2801,7 +2801,7 @@ cases:
           outcome: passed
           failure: null
         witness:
-          artifact_sha256: 7bd1a44cb1c2a06ba961399e45c88b8ffbada2301adc8eeed41ae24cf8824a77
+          artifact_sha256: f376b491b9ccc9db7116b1dd4ab51ce94b58a4447197792d42f9f94a86846c87
           path_reached: true
           effect: absent
           safe_behavior: ValueError
@@ -2959,10 +2959,10 @@ cases:
       kind: witness
       revision: baseline
       run: 0
-      sha256: 25cacb864b8431fa7e53e3bbb34418a781cabce7bfd30f1c676c18e83e95424e
+      sha256: 5b3d8251ebcd078882b187a9ddb0f3f22a71720e3eca6d6386d55e3797aec41f
       content: "{\n  \"intact\": true,\n  \"nonce\": \"3ce7aaf2d930530fb854cb69950d8a13\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -2974,8 +2974,8 @@ cases:
         \        null\n      ],\n      \"opens\": [\n        {\n          \"path\"\
         : \"/workspace/scratch/test_security_rejects_outside_0/allowed/../outside.txt\"\
         ,\n          \"planned\": true\n        }\n      ],\n      \"os_errors\":\
-        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
     - item_id: baseline-1-receipt
       kind: receipt
       revision: baseline
@@ -3030,10 +3030,10 @@ cases:
       kind: witness
       revision: baseline
       run: 1
-      sha256: 24838eaa5afe7c8db9a0faadd0bdd3c6256095c82f579a62af400b375d94a63b
+      sha256: 8adfd6d9d38d0dd4b85693ec6c90919db1529afbd02a416276698c9f009929d3
       content: "{\n  \"intact\": true,\n  \"nonce\": \"29e2c196f6915c08ae4e0c658712ce0c\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -3043,8 +3043,8 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n\
         \        \"ValueError\"\n      ],\n      \"opens\": [],\n      \"os_errors\"\
-        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
     - item_id: candidate-0-receipt
       kind: receipt
       revision: candidate
@@ -3099,10 +3099,10 @@ cases:
       kind: witness
       revision: candidate
       run: 0
-      sha256: a621a7e068e2203df101c68185e9535e204e8254c0806b651a8eb8c8c7faf99d
+      sha256: d450ec65499bb6d8e6e70d28654744d3cc6c019e4609162a30db152f1d29d7a4
       content: "{\n  \"intact\": true,\n  \"nonce\": \"ec5ddf82ef115cc3987e19b6b52aa995\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -3112,8 +3112,8 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n\
         \        \"ValueError\"\n      ],\n      \"opens\": [],\n      \"os_errors\"\
-        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
   metadata:
     case_class: contradictory_baseline_repeats
     split: development
@@ -3180,7 +3180,7 @@ cases:
             function: test_security_rejects_outside_read
             line: 57
         witness:
-          artifact_sha256: ed105277ee98d6f58181076ec33514325cc123bda91337107fa919e5226c5dad
+          artifact_sha256: b6e43fa236b823932e760de0b08e7760cf8e8c1a8c883ea31683722204e5dfab
           path_reached: true
           effect: unknown
           safe_behavior: IsADirectoryError
@@ -3207,7 +3207,7 @@ cases:
           outcome: passed
           failure: null
         witness:
-          artifact_sha256: 5e4ee0fbb29cb5f6b3118b445f800ee8bf71f26f01f7868b991b947f17d94472
+          artifact_sha256: 8e9e64aa167c4293f95b23e52988976c3e666c4c3dadcfdfee0e4fe39581379b
           path_reached: true
           effect: absent
           safe_behavior: ValueError
@@ -3361,10 +3361,10 @@ cases:
       kind: witness
       revision: baseline
       run: 0
-      sha256: 7a72f4eff408d9ae21b95a1cd3618a82b61a89be090cac76d37728f6dc96fa60
+      sha256: 1bcd604cb71e5ae11b5601e052bf5e9c106b8576a4b748100911874ef656ed6b
       content: "{\n  \"intact\": true,\n  \"nonce\": \"10be89afb076515c9d0f9a5ff4204395\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -3378,7 +3378,7 @@ cases:
         ,\n          \"planned\": true\n        }\n      ],\n      \"os_errors\":\
         \ [\n        {\n          \"errno\": 21,\n          \"type\": \"IsADirectoryError\"\
         \n        }\n      ],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\"\
-        : true\n}"
+        : true,\n  \"unsupported\": null\n}"
     - item_id: candidate-0-receipt
       kind: receipt
       revision: candidate
@@ -3433,10 +3433,10 @@ cases:
       kind: witness
       revision: candidate
       run: 0
-      sha256: ff575102bae1c5a50d204b955a53d844a1fe6b2f6e90e463b50d8d15360bdcab
+      sha256: b7b5bb637d0b098ac4b241c9cc5a851d74cc226844b6304594b6f56a0b54c061
       content: "{\n  \"intact\": true,\n  \"nonce\": \"f031d32a80835c8b9db8173fa9ee2dca\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -3446,8 +3446,8 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n\
         \        \"ValueError\"\n      ],\n      \"opens\": [],\n      \"os_errors\"\
-        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
   metadata:
     case_class: unrelated_baseline_exception
     split: development
@@ -3534,7 +3534,7 @@ cases:
           outcome: passed
           failure: null
         witness:
-          artifact_sha256: adcde703811f406094e45d8befed00b7beb9f6d153c8ad5bd676b20bac6dee87
+          artifact_sha256: b10340ec1dbcb247cd2a6eaa23ca3bd42d72f0083d4c02a3384f69609baf760f
           path_reached: true
           effect: absent
           safe_behavior: ValueError
@@ -3742,10 +3742,10 @@ cases:
       kind: witness
       revision: candidate
       run: 0
-      sha256: 72c8e1943a26126ebfc2f1611e6609745dbba1a96c909a87ee2fb446ed083717
+      sha256: e8cce9d42cad7d93c8939adc3aa4c6933ee09477bc2dc2c7f17a139ebaeaf4c8
       content: "{\n  \"intact\": true,\n  \"nonce\": \"bff68f084bea5ca98cdc617029d11b30\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -3755,8 +3755,8 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n\
         \        \"ValueError\"\n      ],\n      \"opens\": [],\n      \"os_errors\"\
-        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
   metadata:
     case_class: missing_baseline_witness
     split: development
@@ -3818,7 +3818,7 @@ cases:
             function: test_security_rejects_outside_read
             line: 64
         witness:
-          artifact_sha256: aeed46cc15fd21575d2f882fe50c53eac0cd1d491f08152fa4dfaba13245cf64
+          artifact_sha256: 10989c6cf0ecdedd77398c5e6ae0890b247768c8c421674cbe23f4272d02e93e
           path_reached: true
           effect: observed
           safe_behavior: null
@@ -3845,7 +3845,7 @@ cases:
           outcome: passed
           failure: null
         witness:
-          artifact_sha256: 887083a76be4246d0fccf8acdcf2b0cc1ad61deabc5eebaa459e2cd826c3a6f8
+          artifact_sha256: 948854b0c873a4acc014e2bf77137898c33fb1eedd40e49d5c58fa5949f58efb
           path_reached: true
           effect: absent
           safe_behavior: PermissionError
@@ -4003,10 +4003,10 @@ cases:
       kind: witness
       revision: baseline
       run: 0
-      sha256: 7d062f5c7d2ffc8bff29b11de670823f3c369388ae8821a7b67cea6187575762
+      sha256: 0208e108bd2bd6850597599e8ab049befe4cd557d0f0666aed806adab006826b
       content: "{\n  \"intact\": true,\n  \"nonce\": \"50b986f737715c3aa8b3d98a3e5d0cc5\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -4018,8 +4018,8 @@ cases:
         \        null\n      ],\n      \"opens\": [\n        {\n          \"path\"\
         : \"/workspace/scratch/test_security_rejects_outside_0/allowed/../outside.txt\"\
         ,\n          \"planned\": true\n        }\n      ],\n      \"os_errors\":\
-        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
     - item_id: candidate-0-receipt
       kind: receipt
       revision: candidate
@@ -4074,10 +4074,10 @@ cases:
       kind: witness
       revision: candidate
       run: 0
-      sha256: 48b1ff59de86c2c902beb3afa0ec342fa6476e817cbc8721cabf2871949a6c46
+      sha256: 407611fd79cf5617a2372afec351b566ef0243c0b32676a0535fa7b3c3b49e0e
       content: "{\n  \"intact\": true,\n  \"nonce\": \"f2e6e75f34305f7c889872b45f2a7a58\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -4087,8 +4087,8 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n\
         \        \"PermissionError\"\n      ],\n      \"opens\": [],\n      \"os_errors\"\
-        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
   metadata:
     case_class: candidate_safe_behavior_differs
     split: development
@@ -4152,7 +4152,7 @@ cases:
             function: test_security_rejects_outside_read
             line: 64
         witness:
-          artifact_sha256: c97e842ace366257d2b962f9b58ca32026d1f455327720c2f695c59008dae9d1
+          artifact_sha256: 2724c0bcbb78d608bb8d2ec55e4720d1297fe96f7f8bc4a2e4bf181b9cde46eb
           path_reached: true
           effect: observed
           safe_behavior: null
@@ -4179,7 +4179,7 @@ cases:
           outcome: passed
           failure: null
         witness:
-          artifact_sha256: 9635846dff7b3cd7592ca33e3253371cd2b4eec9a624cc26aa7fa16d93936674
+          artifact_sha256: aa33f4e8d2912287c4a03c0293099c42649df0c63b2ffc27416d351717f73fed
           path_reached: true
           effect: absent
           safe_behavior: ValueError
@@ -4327,10 +4327,10 @@ cases:
       kind: witness
       revision: baseline
       run: 0
-      sha256: a70a702383c2e7c43ab5ca1f6787f631752a7a8204252e4c01a84e3b7baf1c2c
+      sha256: 3a0d4e3d213297758a0496876ec8ca86a039c1a8605c606c1aa7971bd5f7fa50
       content: "{\n  \"intact\": true,\n  \"nonce\": \"06253cee78a95b2d9d91cffa51adeaaf\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -4342,8 +4342,8 @@ cases:
         \        null\n      ],\n      \"opens\": [\n        {\n          \"path\"\
         : \"/workspace/scratch/test_security_rejects_outside_0/allowed/../outside.txt\"\
         ,\n          \"planned\": true\n        }\n      ],\n      \"os_errors\":\
-        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
     - item_id: baseline-0-environment
       kind: environment
       revision: baseline
@@ -4408,10 +4408,10 @@ cases:
       kind: witness
       revision: candidate
       run: 0
-      sha256: fb1a75b1da9aee729a9a182d34598b6fb7fabd48bb6dff4c6220f451f21b968d
+      sha256: beadaafc0fb259c116ade44f315e4a14cb11f5c1daa71ae3ca2561193ed6de43
       content: "{\n  \"intact\": true,\n  \"nonce\": \"ac0f04b516255a87bb2e3555afd6ce52\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -4421,8 +4421,8 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n\
         \        \"ValueError\"\n      ],\n      \"opens\": [],\n      \"os_errors\"\
-        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
     - item_id: candidate-0-environment
       kind: environment
       revision: candidate
@@ -4498,7 +4498,7 @@ cases:
             function: test_security_rejects_outside_read
             line: 64
         witness:
-          artifact_sha256: 9cad17c5e11f1c9690ea31cd8c1bc4bc4882552c218cc3ead4bfa7a0457be861
+          artifact_sha256: 2802f7ac0d16ea0deb875f33bf912edecc70e7b4102a5d30f59a8071eec99704
           path_reached: true
           effect: observed
           safe_behavior: null
@@ -4525,7 +4525,7 @@ cases:
           outcome: passed
           failure: null
         witness:
-          artifact_sha256: 87fc4a93aabae38cf1710b5ca3cb93f03b1d78908a2add865e0e103cb34f6db6
+          artifact_sha256: 92f3fab919aab97a7becf18fdf7c0797ebb6eeee36c76409bc9a2b300a175d3d
           path_reached: true
           effect: absent
           safe_behavior: ValueError
@@ -4683,10 +4683,10 @@ cases:
       kind: witness
       revision: baseline
       run: 0
-      sha256: f85a0098f7396bd8b2433b6369532f27ce20f8775d53a170cb86edd92268fcb9
+      sha256: 40164799aaf1883d3e3fe36905a06bb5045bd88f4cb9ccea9b5ae0800fcb22be
       content: "{\n  \"intact\": true,\n  \"nonce\": \"aadbfcee858259639ad0f82e2a3f28fb\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -4698,8 +4698,8 @@ cases:
         \        null\n      ],\n      \"opens\": [\n        {\n          \"path\"\
         : \"/workspace/scratch/test_security_rejects_outside_0/allowed/../outside.txt\"\
         ,\n          \"planned\": true\n        }\n      ],\n      \"os_errors\":\
-        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
     - item_id: candidate-0-receipt
       kind: receipt
       revision: candidate
@@ -4754,10 +4754,10 @@ cases:
       kind: witness
       revision: candidate
       run: 0
-      sha256: 12060c79a0c8e813ac291708ded240c357c9369191e67144099682e564b148e5
+      sha256: f8213cdf7ec3c4e2a0c16c9518e4fbc7337f7151bff63a9f7559bc279592182d
       content: "{\n  \"intact\": true,\n  \"nonce\": \"2e4367d7f29454d6845229d946917949\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -4767,8 +4767,8 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n\
         \        \"ValueError\"\n      ],\n      \"opens\": [],\n      \"os_errors\"\
-        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
   metadata:
     case_class: patch_digest_mismatch
     split: development
@@ -4833,7 +4833,7 @@ cases:
             function: test_security_rejects_outside_read
             line: 64
         witness:
-          artifact_sha256: e2aaaca0e912f6851f695653a4861976ab687301b2b39b0ab269b004aee9076b
+          artifact_sha256: 9083a0f1a276ca298f5e80ad7fe887a746e8b16bed4b4cb09fa797755ac2d174
           path_reached: true
           effect: observed
           safe_behavior: null
@@ -4992,10 +4992,10 @@ cases:
       kind: witness
       revision: baseline
       run: 0
-      sha256: dc91b4731922492541453a1035c3df3d755613a071a0241f1992b64de7f9a542
+      sha256: ca97fbf36c63210dadf48530d03bf3d36f93d467796efaa66e2cbce1503fe284
       content: "{\n  \"intact\": true,\n  \"nonce\": \"efafaacff079596aad17c94221b1e5f2\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -5007,8 +5007,8 @@ cases:
         \        null\n      ],\n      \"opens\": [\n        {\n          \"path\"\
         : \"/workspace/scratch/test_security_rejects_outside_0/allowed/../outside.txt\"\
         ,\n          \"planned\": true\n        }\n      ],\n      \"os_errors\":\
-        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
   metadata:
     case_class: no_candidate_revision
     split: development
@@ -5068,7 +5068,7 @@ cases:
             function: test_security_rejects_outside_read
             line: 64
         witness:
-          artifact_sha256: 14e6cc3bb31c2dd9e45c2e7a384a8907e6401a20a1db4b2d3c6997f62943cdc9
+          artifact_sha256: 9b5acb7762a9c946c261f5b4e385ead558a49e24d7c7e38481387d71ddb6adb8
           path_reached: true
           effect: observed
           safe_behavior: null
@@ -5249,10 +5249,10 @@ cases:
       kind: witness
       revision: baseline
       run: 0
-      sha256: cb203c7aaf932d29cbe713a51d9fbe037fbce49fa535da3969b3ef6cddb89eb4
+      sha256: 7041726477a33286a05f204a7cf68893c12f715633e9c37553e0de41b3476180
       content: "{\n  \"intact\": true,\n  \"nonce\": \"5e2e58fe4dcb540d9084fbed9cf221bf\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -5264,8 +5264,8 @@ cases:
         \        null\n      ],\n      \"opens\": [\n        {\n          \"path\"\
         : \"/workspace/scratch/test_security_rejects_outside_0/allowed/../outside.txt\"\
         ,\n          \"planned\": true\n        }\n      ],\n      \"os_errors\":\
-        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
     - item_id: candidate-0-receipt
       kind: receipt
       revision: candidate
@@ -5383,7 +5383,7 @@ cases:
             function: test_security_rejects_outside_read
             line: 64
         witness:
-          artifact_sha256: 1acf3e3b2598611abe3d800f046d382281305d7f6fd4d663da201c12e891af0a
+          artifact_sha256: de4ff2dc8cdff1606ae8c847447fe0bf4360ddbea63158d389c7fbfa51ab18b3
           path_reached: true
           effect: observed
           safe_behavior: null
@@ -5410,7 +5410,7 @@ cases:
           outcome: passed
           failure: null
         witness:
-          artifact_sha256: 0612ac9235530332cc8b9899201f0e87a172aeca23d05ab5f4327efa065a5087
+          artifact_sha256: 64641e6072e9307de8e39663d9107cb4acd75de25ed28d8cd4719c0abd75d2ff
           path_reached: true
           effect: absent
           safe_behavior: ValueError
@@ -5567,10 +5567,10 @@ cases:
       kind: witness
       revision: baseline
       run: 0
-      sha256: fbdc869cf127c2c934cd161b0c78673f8002e2bc120bb0555df90c50a77247c0
+      sha256: e93919ac76b1361de0debebd52bad191be2ce2903ab61ec4fff94861e12f586f
       content: "{\n  \"intact\": true,\n  \"nonce\": \"ae44847e55aa5bd1b931d7166ca2ed6f\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -5582,8 +5582,8 @@ cases:
         \        null\n      ],\n      \"opens\": [\n        {\n          \"path\"\
         : \"/workspace/scratch/test_security_rejects_outside_0/allowed/../outside.txt\"\
         ,\n          \"planned\": true\n        }\n      ],\n      \"os_errors\":\
-        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
     - item_id: candidate-0-receipt
       kind: receipt
       revision: candidate
@@ -5638,10 +5638,10 @@ cases:
       kind: witness
       revision: candidate
       run: 0
-      sha256: e02cf10c0cccb7cd92fcb8bb804b31c2c9039987c2181296e897245a0fb4fe75
+      sha256: ebc68d88e1cb0fb7737ac85aedb0d1aa01c97126cb91c0bed6d5bc40978323d3
       content: "{\n  \"intact\": true,\n  \"nonce\": \"db474e573c53564291cbe07fdd7d8c63\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -5651,8 +5651,8 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n\
         \        \"ValueError\"\n      ],\n      \"opens\": [],\n      \"os_errors\"\
-        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
   metadata:
     case_class: true_pair
     split: held_out
@@ -5716,7 +5716,7 @@ cases:
             function: test_security_rejects_outside_read
             line: 52
         witness:
-          artifact_sha256: c72a4997445a7f05510678ed2a7b80375fb15eb95952f5ce7cd584eb1b0bd3a4
+          artifact_sha256: 5a0befc4351f8124f652e0594971f7b9b49cac11bd185db1976e9bf3a216e285
           path_reached: false
           effect: absent
           safe_behavior: null
@@ -5743,7 +5743,7 @@ cases:
           outcome: passed
           failure: null
         witness:
-          artifact_sha256: 35fcdd8ece66e08e071c6201657d9379bd43564539e443acef4aecc6c60e0890
+          artifact_sha256: 33ed3c03b53954bb353feb6589aa7f20ff9a08f07ba0be17188e7b689a2b230b
           path_reached: true
           effect: absent
           safe_behavior: ValueError
@@ -5890,10 +5890,10 @@ cases:
       kind: witness
       revision: baseline
       run: 0
-      sha256: e1c1b0f407416bfcbbfa51b75274313a804b2d2d9b999e9400e825cc44c134e8
+      sha256: ec277eb9abd4bb6b4dc6c91e053bc44cdc3049115b19e24da9320dd573c85755
       content: "{\n  \"intact\": true,\n  \"nonce\": \"75c69839ddbf57e0a8334698bcc3480a\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -5903,7 +5903,7 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 0,\n      \"exits\": [],\n\
         \      \"opens\": [],\n      \"os_errors\": [],\n      \"truncated\": false\n\
-        \    }\n  },\n  \"tool_registered\": true\n}"
+        \    }\n  },\n  \"tool_registered\": true,\n  \"unsupported\": null\n}"
     - item_id: candidate-0-receipt
       kind: receipt
       revision: candidate
@@ -5958,10 +5958,10 @@ cases:
       kind: witness
       revision: candidate
       run: 0
-      sha256: 436292e3a30f9cc90dadf1e434b4eec2498041349d19c4fafea4a14fc85a1eca
+      sha256: 8144222c4bd6e3a355f7f6af1643ecbaec865a1b1b1d8675b9f3d9a66e821200
       content: "{\n  \"intact\": true,\n  \"nonce\": \"24e0a699efca5d32a05c3ddee6460eec\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -5971,8 +5971,8 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n\
         \        \"ValueError\"\n      ],\n      \"opens\": [],\n      \"os_errors\"\
-        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
   metadata:
     case_class: unrelated_baseline_exception
     split: held_out
@@ -6036,7 +6036,7 @@ cases:
             function: test_security_rejects_outside_read
             line: 64
         witness:
-          artifact_sha256: 3a782c7b7d7ee900372b100ea6452b45ace67550bc0129f8e6b3866ba8c77aec
+          artifact_sha256: af814da616cc32abe88245b7b4d95e28a21590fb4012b362c140e8cf344e35f1
           path_reached: true
           effect: observed
           safe_behavior: null
@@ -6063,7 +6063,7 @@ cases:
           outcome: passed
           failure: null
         witness:
-          artifact_sha256: 551b7d4119f29255d2aeffea11f77598ec0beed80ab6b44a45d1a5e71f2558e2
+          artifact_sha256: 3dbd2dd2ed134b233f56b2cc4f8ecf0c541f30ffd88deba177a5738ae9c63920
           path_reached: true
           effect: absent
           safe_behavior: ValueError
@@ -6224,10 +6224,10 @@ cases:
       kind: witness
       revision: baseline
       run: 0
-      sha256: 386a5104aac8dc531cf7cad2b14c9e7cf9fa89f425b2ff52e8965ac9c16aee39
+      sha256: 753888a616d3d3210e3c8272dc1c850f99251192fc5920e9e840428ab07cc8b4
       content: "{\n  \"intact\": true,\n  \"nonce\": \"d49e4e185a42544aa7e635c32fe7d0d8\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -6239,8 +6239,8 @@ cases:
         \        null\n      ],\n      \"opens\": [\n        {\n          \"path\"\
         : \"/workspace/scratch/test_security_rejects_outside_0/allowed/../outside.txt\"\
         ,\n          \"planned\": true\n        }\n      ],\n      \"os_errors\":\
-        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
     - item_id: candidate-0-receipt
       kind: receipt
       revision: candidate
@@ -6299,10 +6299,10 @@ cases:
       kind: witness
       revision: candidate
       run: 0
-      sha256: 1ed8fec55778472318a9bd330db1ad0355e1b41127b5924b2ca2878f8b3edf41
+      sha256: 76ac51bd3e83873e5ce80366df0417a19a6962859c71a9a1b386d7e92a3aab74
       content: "{\n  \"intact\": true,\n  \"nonce\": \"7b4cc9522b875285bfb495aeea33c796\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -6312,8 +6312,8 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n\
         \        \"ValueError\"\n      ],\n      \"opens\": [],\n      \"os_errors\"\
-        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
     - item_id: candidate-0-sandbox
       kind: sandbox_log
       revision: candidate
@@ -6388,7 +6388,7 @@ cases:
             function: test_security_rejects_outside_read
             line: 64
         witness:
-          artifact_sha256: edb6122a8cabd5b76f70ff3f14ee1aa4f33f0d3aec938e3e6ef50e4088509dff
+          artifact_sha256: bd60a168d2adf32d4395cecf18365a94d6ea1027cef6ace87548379f13f9717b
           path_reached: true
           effect: observed
           safe_behavior: null
@@ -6418,7 +6418,7 @@ cases:
             function: test_security_rejects_outside_read
             line: 64
         witness:
-          artifact_sha256: a36f3bb1df214b9ee5bf4305d36fddf0b262d3babf271932e812743b096cab09
+          artifact_sha256: 9a73f2d1eb0afd28695f330d5d2cabf30e5ccb95abe4d7cc6bfd7b73228b44bd
           path_reached: true
           effect: observed
           safe_behavior: null
@@ -6445,7 +6445,7 @@ cases:
           outcome: passed
           failure: null
         witness:
-          artifact_sha256: 23b151d98b2b67f3d36f25621c1aed59fc87255bf913a2783bd496ec93d9e076
+          artifact_sha256: ab2625e150469275b7de167fc62352803f6e0a5c88bddd6eadc82fc20580a7f0
           path_reached: true
           effect: absent
           safe_behavior: ValueError
@@ -6475,7 +6475,7 @@ cases:
             function: test_security_rejects_outside_read
             line: 64
         witness:
-          artifact_sha256: 131c7292c64003375c07b20a3d93f06d601014ca56c3594536bb85e1d42ac2c8
+          artifact_sha256: 881dc513f476a72bac923eddb827b2e9dd2bb83ced59d206a5b358dd6b9d9b96
           path_reached: true
           effect: observed
           safe_behavior: null
@@ -6633,10 +6633,10 @@ cases:
       kind: witness
       revision: baseline
       run: 0
-      sha256: 2c5819f6380dbe6a54fc81aa7f534c9e9babd1be9663f304b1ca76d6834365f0
+      sha256: 830e394bb146f6ca4a4a3cdf4a720a141174a39ad6451cbb596f651a7916e4b7
       content: "{\n  \"intact\": true,\n  \"nonce\": \"89352be932065936994581f5f4ae1d60\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -6648,8 +6648,8 @@ cases:
         \        null\n      ],\n      \"opens\": [\n        {\n          \"path\"\
         : \"/workspace/scratch/test_security_rejects_outside_0/allowed/../outside.txt\"\
         ,\n          \"planned\": true\n        }\n      ],\n      \"os_errors\":\
-        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
     - item_id: baseline-1-receipt
       kind: receipt
       revision: baseline
@@ -6740,10 +6740,10 @@ cases:
       kind: witness
       revision: baseline
       run: 1
-      sha256: db493806fb165b2f7f08e88f8fe0c311177d6800c680586c4e9d2eecf7404eca
+      sha256: 8f8b84586d283ef98270a49e73f6e7ab5e16470e1fc44b15e91f899028c56667
       content: "{\n  \"intact\": true,\n  \"nonce\": \"b9969e5a82c054f59f591e7c7853f50f\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -6755,8 +6755,8 @@ cases:
         \        null\n      ],\n      \"opens\": [\n        {\n          \"path\"\
         : \"/workspace/scratch/test_security_rejects_outside_0/allowed/../outside.txt\"\
         ,\n          \"planned\": true\n        }\n      ],\n      \"os_errors\":\
-        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
     - item_id: candidate-0-receipt
       kind: receipt
       revision: candidate
@@ -6811,10 +6811,10 @@ cases:
       kind: witness
       revision: candidate
       run: 0
-      sha256: 4879fce8175714b1abd6db10236a1742d90cb4998389d03bdd5222a2efff9ce3
+      sha256: e28ed5a9c1a4d20574ccf55dc3349416423005add2f0382ff4dd6f45175375ec
       content: "{\n  \"intact\": true,\n  \"nonce\": \"80d5a92f3c995d6db1f287407e63ade7\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -6824,8 +6824,8 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n\
         \        \"ValueError\"\n      ],\n      \"opens\": [],\n      \"os_errors\"\
-        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
     - item_id: candidate-1-receipt
       kind: receipt
       revision: candidate
@@ -6916,10 +6916,10 @@ cases:
       kind: witness
       revision: candidate
       run: 1
-      sha256: 2dbf9f0ee9fb0c04e13892ae4959b84ad9675d41c0c9246ec78cd25fbc1b9647
+      sha256: c0ead45069de9e03c4ec4ecc2d349523cc22696bac612fda5cfbedf844d6dd95
       content: "{\n  \"intact\": true,\n  \"nonce\": \"a386e83ab22756f0949ec24dea789fc4\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -6931,8 +6931,8 @@ cases:
         \        null\n      ],\n      \"opens\": [\n        {\n          \"path\"\
         : \"/workspace/scratch/test_security_rejects_outside_0/allowed/../outside.txt\"\
         ,\n          \"planned\": true\n        }\n      ],\n      \"os_errors\":\
-        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
   metadata:
     case_class: contradictory_candidate_repeats
     split: held_out
@@ -7002,7 +7002,7 @@ cases:
             function: test_security_rejects_outside_read
             line: 64
         witness:
-          artifact_sha256: a59629e68e1f556372e00209658f059c3e7b56d58cba3f73675df79cd9c49a9d
+          artifact_sha256: a79b6c55d1f67b58c1720fdb725a26563d4d49d97812995350fa31df766a3107
           path_reached: true
           effect: observed
           safe_behavior: null
@@ -7045,7 +7045,7 @@ cases:
           outcome: passed
           failure: null
         witness:
-          artifact_sha256: f906da2b470fefbfbdb20f1ed21afa721fd8e83f34c4358c4df15c94ea74f1de
+          artifact_sha256: eb64de362d0601417ed7c55e1bad904294ce711c7a36d358a5c8a2f17ac4c4a2
           path_reached: true
           effect: absent
           safe_behavior: ValueError
@@ -7203,10 +7203,10 @@ cases:
       kind: witness
       revision: baseline
       run: 0
-      sha256: a6e01645ac36754a7eff0a29d7f06ac69f4f5f780ebee5d409e822cb8c356280
+      sha256: 503cfe492e45376ae36a612375794730efe9f78b3ee37bd97b44f79f563bf3b5
       content: "{\n  \"intact\": true,\n  \"nonce\": \"ee7522f369ad5cecae77b1bba088c318\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -7218,8 +7218,8 @@ cases:
         \        null\n      ],\n      \"opens\": [\n        {\n          \"path\"\
         : \"/workspace/scratch/test_security_rejects_outside_0/allowed/../outside.txt\"\
         ,\n          \"planned\": true\n        }\n      ],\n      \"os_errors\":\
-        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
     - item_id: baseline-1-receipt
       kind: receipt
       revision: baseline
@@ -7289,10 +7289,10 @@ cases:
       kind: witness
       revision: candidate
       run: 0
-      sha256: 2af6f55ca9ae57fc336ced46340f87e16a38ac633b0e74f684b740beaad622ca
+      sha256: a33800997393bb450ed57fba8d750146f9f0d722f52dcdc0a97a91351c9d06e6
       content: "{\n  \"intact\": true,\n  \"nonce\": \"2111d47dd4895169ad66d5ba79481c79\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -7302,8 +7302,8 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n\
         \        \"ValueError\"\n      ],\n      \"opens\": [],\n      \"os_errors\"\
-        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
   metadata:
     case_class: unknown_delivery
     split: held_out
@@ -7368,7 +7368,7 @@ cases:
             function: test_security_rejects_outside_read
             line: 64
         witness:
-          artifact_sha256: f60e6ddafb4334cb88e38bf034f6674170f3482a9e2d512766fae35479baf923
+          artifact_sha256: 9865c25f0f12a27c6b75943268a2019a290641fe60af615d2e9f85d80b41331e
           path_reached: true
           effect: observed
           safe_behavior: null
@@ -7399,7 +7399,7 @@ cases:
           outcome: passed
           failure: null
         witness:
-          artifact_sha256: c9f3074eebfdf3779b730b0b1627bffad9b6c52118930ca880478e9fd50135f9
+          artifact_sha256: 617823e5f2c5daf549dccde788e489ad266267478056378aec2daecd8ce9d7d3
           path_reached: true
           effect: absent
           safe_behavior: ValueError
@@ -7557,10 +7557,10 @@ cases:
       kind: witness
       revision: baseline
       run: 0
-      sha256: a7783fd063ed8f8104b02576e19531050b3a3f97e3cb6e31d43ac7b0b18bef7d
+      sha256: b65b18726d799cd496247b720f2e5ca0e01f9825894d6be6d8f3074e49d69022
       content: "{\n  \"intact\": true,\n  \"nonce\": \"beb7d7c0ebe45a2fa07b09202e300a40\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -7572,8 +7572,8 @@ cases:
         \        null\n      ],\n      \"opens\": [\n        {\n          \"path\"\
         : \"/workspace/scratch/test_security_rejects_outside_0/allowed/../outside.txt\"\
         ,\n          \"planned\": true\n        }\n      ],\n      \"os_errors\":\
-        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        \ [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
     - item_id: candidate-0-receipt
       kind: receipt
       revision: candidate
@@ -7653,10 +7653,10 @@ cases:
       kind: witness
       revision: candidate
       run: 0
-      sha256: 9aafaa5730abdcd878f1f5ce2955affe8bd6417f4984e96b66fca4a4d5a8d1c8
+      sha256: 34a83b2403cc320227e0aa73ee3ba62101cfd85e970116e77d868512919c4552
       content: "{\n  \"intact\": true,\n  \"nonce\": \"7afc005f99ee5bfa8b917db351955e38\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -7666,8 +7666,8 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n\
         \        \"ValueError\"\n      ],\n      \"opens\": [],\n      \"os_errors\"\
-        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
   metadata:
     case_class: failed_control
     split: held_out
@@ -7727,7 +7727,7 @@ cases:
           outcome: passed
           failure: null
         witness:
-          artifact_sha256: e80469c7dd1446ad0e17ffa11bd3889ead34d65aba8890f79b0e1a2a77cd439c
+          artifact_sha256: 214d16b567f3dbcaad76629e613a6a5b40a90f468855725d8c8ce3e40ca60f53
           path_reached: true
           effect: absent
           safe_behavior: ValueError
@@ -7754,7 +7754,7 @@ cases:
           outcome: passed
           failure: null
         witness:
-          artifact_sha256: ddb184437b5b696d5b286066ad6f76e8e10dbb03a18df1d4f63b8ccfc16cda1f
+          artifact_sha256: 38622da5b202f06f5c59484c6c4b17725929b597bcf878a08e964c77d1b6ca55
           path_reached: true
           effect: absent
           safe_behavior: ValueError
@@ -7876,10 +7876,10 @@ cases:
       kind: witness
       revision: baseline
       run: 0
-      sha256: b067b06252e4214c496dcb26f84bc2cafe5ff933596b026abd29cbe39b51bdf0
+      sha256: de1feb31712bae934b1b574ff32aa91f52c8a4d11441a971362ea2fe763a46b8
       content: "{\n  \"intact\": true,\n  \"nonce\": \"9b5e3d2c8e95514d8459d5d39c9ab194\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -7889,8 +7889,8 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n\
         \        \"ValueError\"\n      ],\n      \"opens\": [],\n      \"os_errors\"\
-        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
     - item_id: candidate-0-receipt
       kind: receipt
       revision: candidate
@@ -7945,10 +7945,10 @@ cases:
       kind: witness
       revision: candidate
       run: 0
-      sha256: cc3602a4cba555319a1dc3c7db9ba577fd643c0ffa32ca5a4b392b521f433e52
+      sha256: c91d6fd849edcb5840a9ce12bfc335e0ca0d96d17189f329b60bcc2036aa15bd
       content: "{\n  \"intact\": true,\n  \"nonce\": \"da0b851a25ee59aaa90addc44943e308\"\
-        ,\n  \"plugin_sha256\": \"698904226849c8bd8470b584fad29a6d9a41e31b7f48efceae1cc0f3d2f9034c\"\
-        ,\n  \"schema\": \"corsair-witness-v1\",\n  \"target\": {\n    \"effect_name\"\
+        ,\n  \"plugin_sha256\": \"64d21d9d942ef1e5b155f732f3ee9bb722ba59cef3bd29cf5695a029d1e055ef\"\
+        ,\n  \"schema\": \"corsair-witness-v2\",\n  \"target\": {\n    \"effect_name\"\
         : \"outside.txt\",\n    \"path\": \"documents.py\",\n    \"symbol\": \"read_document\"\
         \n  },\n  \"tests\": {\n    \"test_documents.py::test_benign_control\": {\n\
         \      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n  \
@@ -7958,8 +7958,8 @@ cases:
         \      \"truncated\": false\n    },\n    \"test_documents.py::test_security_rejects_outside_read\"\
         : {\n      \"complete\": true,\n      \"entered\": 1,\n      \"exits\": [\n\
         \        \"ValueError\"\n      ],\n      \"opens\": [],\n      \"os_errors\"\
-        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true\n\
-        }"
+        : [],\n      \"truncated\": false\n    }\n  },\n  \"tool_registered\": true,\n\
+        \  \"unsupported\": null\n}"
   metadata:
     case_class: baseline_not_reproduced
     split: held_out
