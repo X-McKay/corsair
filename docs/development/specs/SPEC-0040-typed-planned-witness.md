@@ -2,7 +2,7 @@
 id: SPEC-0040
 kind: spec
 title: Typed planned witness for the test planner
-status: draft
+status: accepted
 updated: 2026-10-13
 related: [SPEC-0022, SPEC-0027, SPEC-0033, PLAN-0038, PLAN-0044, SPEC-0023]
 ---
@@ -38,5 +38,7 @@ In scope: the planner contract, the operator's environment evidence, plan admiss
 Offline: contract tests for each refusal above; the development reference plans (and the authoring and fixture E2E plans built from them) carry typed witnesses and are still admitted; the two earlier held-out sets are retired, because their frozen environments list no typed facility; the composition builds the witness request from the plan and refuses a run whose control witness is absent. Evaluator: a `planned_witness` check comparing facility, effect and expectation with the oracle, replacing the substring `witness` markers for typed cases. Live: development set first; then a third held-out set written and reviewed by agents other than the prompt author and frozen by manifest before one run, under PLAN-0038's pre-registered criteria.
 
 ## Decisions and open questions
+
+Accepted by Al (decision card, 2026-10-13). Implemented under PLAN-0044 (PR #44): contract, admission (including canonical subjects and the interim envelope refusal), prompt v7 and evaluator; the plan-built witness request and control calibration are not implemented. Planner v7 not qualified on the third held-out set (PLAN-0044).
 
 Open: whether `subject` should also allow an argument token for future process or network effects; whether the control calibration should run in discovery before the frozen runs; whether a missing facility should be an admission refusal or a typed `unsupported` with the facility gap filled in automatically.
