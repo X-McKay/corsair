@@ -29,12 +29,14 @@ from pydantic_evals.evaluators import Evaluator, MaxModelRequests, MaxToolCalls
 
 from corsair.adapters.git_source import Executable, GitSource, SourceLimits
 from corsair.adapters.local_artifacts import LocalArtifacts
-from corsair.agents.issue_analysis.identification_contracts import IssueIdentification
+from corsair.agents.issue_identification.contracts import IssueIdentification
 from corsair.agents.issue_analysis.provider import LocalModelConfig, local_model
-from corsair.agents.issue_analysis.repository_identification import (
-    CONFIG_VERSION, PROMPT_VERSION, SKILL_SHA256, RepositoryDependencies, RepositoryIssueInput,
+from corsair.agents.issue_identification import (
+    REPOSITORY_CONFIG_VERSION as CONFIG_VERSION, REPOSITORY_PROMPT_VERSION as PROMPT_VERSION,
+    REPOSITORY_TOOLSET_SHA256 as TOOLSET_SHA256, RepositoryDependencies, RepositoryIssueInput,
     create_repository_identification_agent, repository_identification_prompt,
 )
+from corsair.agents.issue_identification.skills import REPOSITORY_SKILL_SHA256 as SKILL_SHA256
 from corsair.agents.source.repository import RepositoryLimits, SourceTree, UnreadableSource
 from corsair.agents.source.repository_tools import REPOSITORY_TOOLS
 from evals.issue_analysis.evaluate import describe_model, record_count
@@ -186,6 +188,7 @@ async def live(evidence: Path, tree: SourceTree, model, budget: LiveBudget, limi
     corpus = dataset()
     metadata = {"mode": "direct_local_provider", "model": describe_model(model), "weights_identity": "unknown",
                 "prompt_version": PROMPT_VERSION, "config_version": CONFIG_VERSION, "skill_sha256": SKILL_SHA256,
+                "toolset_sha256": TOOLSET_SHA256,
                 "budget": budget.model_dump(), "repository_limits": asdict(limits), "task_retries": 0, "max_concurrency": 1,
                 "dataset_sha256": sha256((ROOT / "cases.yaml").read_bytes()).hexdigest()}
     (evidence / "configuration.json").write_text(json.dumps(metadata, indent=2))
