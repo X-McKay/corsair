@@ -6,6 +6,7 @@ approved patch adds the fix commit's own tests/test_format.py under a new path (
 overlap captured source; upstream tests are read from the capture at run time, never committed here). The run qualifies discovery, execution, JUnit admission and probe behaviour on the 3.7
 image only; it is not a security disposition (the upstream test is functional and passes at both commits).
 """
+import ast
 import hashlib
 import json
 import os
@@ -54,6 +55,23 @@ SOURCES = ['tests/qualification/test_python37_case.py', 'src/corsair/adapters/op
            'policies/openshell/identity.yaml', 'deploy/runtime-lock.yaml', 'pyproject.toml', 'uv.lock']
 
 
+def two_tests(upstream: bytes) -> bytes:
+    """The upstream module's imports and the two planned TestFormat methods, each copied line for line.
+
+    The runner admits exactly the two planned tests, so the other upstream tests (some parametrized) stay out.
+    """
+    text = upstream.decode()
+    lines = text.splitlines(keepends=True)
+    tree = ast.parse(text)
+    cls = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == 'TestFormat')
+    names = [test_id.rsplit('::', 1)[1] for test_id in IDS]
+    methods = {node.name: node for node in cls.body if isinstance(node, ast.FunctionDef) and node.name in names}
+    assert sorted(methods) == sorted(names), sorted(methods)
+    header = ''.join(lines[:cls.lineno - 1])
+    body = ''.join(''.join(lines[methods[name].lineno - 1:methods[name].end_lineno]) for name in names)
+    return (header + 'class TestFormat:\n' + body).encode()
+
+
 @pytest.mark.python37_case
 def test_real_python37_case_runs_through_the_runner(kube, adapter_gateway):
     native = adapter_gateway
@@ -99,7 +117,7 @@ def test_real_python37_case_runs_through_the_runner(kube, adapter_gateway):
                 # The same bytes #42 captured: the manifest digest and size match the committed pins.
                 assert (snapshot.manifest.sha256, snapshot.manifest.size) == (manifest['sha256'], manifest['size'])
             upstream = next(f for f in snapshots['fix'].files if f.path == UPSTREAM_TEST)
-            patch = ApprovedPatch((PatchFile(TEST_FILE, store.get(upstream.artifact)),), (TEST_FILE,))
+            patch = ApprovedPatch((PatchFile(TEST_FILE, two_tests(store.get(upstream.artifact))),), (TEST_FILE,))
             summary['patch_sha256'] = patch.sha256
             for revision, snapshot in snapshots.items():
                 workspace = OpenShellTestWorkspace(lifecycle, verifier, upload, store, snapshot, config)
