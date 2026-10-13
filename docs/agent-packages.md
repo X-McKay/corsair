@@ -1,6 +1,6 @@
 # Agent package convention
 
-Every agent under `src/corsair/agents/<role>/` places the same responsibilities in the same files, so a reader, reviewer or new agent knows where each piece lives. Accepted under [IDEA-0006](development/ideas/IDEA-0006-agent-package-convention-and-scaffolding.md) and specified by [SPEC-0052](development/specs/SPEC-0052-environment-agent-package-convention.md). The environment agent is the reference package; evidence assessment, test authoring and issue identification follow it; planning moves next under [PLAN-0056](development/plans/PLAN-0056-agent-package-convention.md), preserving behaviour.
+Every agent under `src/corsair/agents/<role>/` places the same responsibilities in the same files, so a reader, reviewer or new agent knows where each piece lives. Accepted under [IDEA-0006](development/ideas/IDEA-0006-agent-package-convention-and-scaffolding.md) and specified by [SPEC-0052](development/specs/SPEC-0052-environment-agent-package-convention.md). The environment agent is the reference package; evidence assessment, test authoring, issue identification and test planning follow it; further agents follow it under [PLAN-0056](development/plans/PLAN-0056-agent-package-convention.md), preserving behaviour.
 
 This is a responsibility convention, not a file generator or base class. Create a file only when its responsibility exists: a tool-free agent has no `tools/`, and an agent with no stage-specific dependencies beyond its input has no `dependencies.py`.
 

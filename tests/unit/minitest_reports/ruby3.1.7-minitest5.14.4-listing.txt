@@ -1,0 +1,4 @@
+Widget::CorsairTest#test_control
+Widget::CorsairTest#test_error
+Widget::CorsairTest#test_security
+Widget::CorsairTest#test_skipped
