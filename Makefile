@@ -161,6 +161,13 @@ qualify-test-workspace:
 	mkdir -p "$(CORSAIR_QUAL_RUN)"
 	uv run --locked python -m pytest tests/qualification -m test_workspace --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
 
+# SPEC-0025 provider placeholder delivery with a random fake credential; egress substitution unqualified.
+.PHONY: qualify-credential-placeholder
+qualify-credential-placeholder:
+	test ! -e "$(CORSAIR_QUAL_RUN)"
+	mkdir -p "$(CORSAIR_QUAL_RUN)"
+	uv run --locked python -m pytest tests/qualification -m credential_placeholder --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
+
 # E2E-0 over OpenShellTestWorkspace: scripted control, then CORSAIR_E2E_RUNS live runs of CORSAIR_E2E_LIVE stages.
 CORSAIR_E2E_LIVE ?= identification,planning,authoring,assessment
 CORSAIR_E2E_RUNS ?= 1
