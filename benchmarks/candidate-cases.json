@@ -902,7 +902,7 @@
       "source_revision": "310f3b4750bfdf1ab64b3a26bb9a2928f34659e5",
       "source_record_url": "https://github.com/briandfoy/cpan-security-advisory/blob/310f3b4750bfdf1ab64b3a26bb9a2928f34659e5/cpansa/CPANSA-HTTP-Tiny.yml",
       "repository_url": "https://github.com/Perl-Toolchain-Gang/HTTP-Tiny",
-      "fixed_reference": "https://salsa.debian.org/perl-team/interpreter/perl/-/commit/1490431e40e22052f75a0b3449f1f53cbd27ba92.patch",
+      "fixed_reference": "https://github.com/Perl-Toolchain-Gang/HTTP-Tiny/commit/77f557ef84698efeb6eed04e4a9704eaf85b741d",
       "vulnerable_reference": null,
       "fixed_version_claim": [
         ">=0.083"
