@@ -126,6 +126,18 @@ def test_ready_is_admitted_from_observed_commands_with_trusted_fields():
 def test_prompt_lists_inventory_without_file_content():
     prompt = environment_prompt(inputs())
     assert "requirements.txt (saved-file inclusive lines 1..1)" in prompt and "evil.example" not in prompt
+    assert "No operator listing of the checkout was supplied." in prompt
+
+
+def test_prompt_shows_the_operator_checkout_listing_so_the_agent_need_not_probe():
+    """First corpus case (2026-10-13): without a listing the agent spent its budget probing absent paths."""
+    listing = ("app.py", "requirements.txt", "tests/.gitkeep", "tests/test_corsair_smoke.py")
+    prompt = environment_prompt(inputs(), listing)
+    assert "Checkout listing (operator, every file of the commit and any smoke test, 4 paths): " \
+           "app.py, requirements.txt, tests/.gitkeep, tests/test_corsair_smoke.py" in prompt
+    assert "a smoke test included, is answered absent" in prompt
+    many = tuple(f"src/m{n}.py" for n in range(450))
+    assert environment_prompt(inputs(), many).endswith("src/m399.py, and 50 more")
 
 
 @pytest.mark.parametrize("calls,outcomes,draft", [

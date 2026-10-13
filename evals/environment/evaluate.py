@@ -210,7 +210,7 @@ class EvaluationBudget(BaseModel):
     repeat: int = Field(default=2, ge=1, le=3, strict=True)
     request_limit: int = Field(default=16, ge=1, le=24, strict=True)
     tool_calls_limit: int = Field(default=20, ge=0, le=32, strict=True)
-    total_tokens_limit: int = Field(default=48000, ge=1, le=96000, strict=True)
+    total_tokens_limit: int = Field(default=128000, ge=1, le=131072, strict=True)
     task_seconds: int = Field(default=240, ge=1, le=300, strict=True)
     output_retries: int = Field(default=1, ge=0, le=1, strict=True)
 
@@ -282,6 +282,7 @@ async def evaluate(evidence, budget, model=None, provider=None):
             toolchain_id=c.get("toolchain_id", "python-3.12"),
             scratch_location="/sandbox/scratch",
             budget=SetupBudget(max_commands=c["max_commands"]),
+            checkout_paths=tuple(c["checkout_paths"]) if "checkout_paths" in c else None,
         )
         selected = model or scripted(c)
         agent = create_environment_agent(selected, output_retries=budget.output_retries)
@@ -297,7 +298,7 @@ async def evaluate(evidence, budget, model=None, provider=None):
             ):
                 result = await asyncio.wait_for(
                     agent.run(
-                        environment_prompt(inputs),
+                        environment_prompt(inputs, deps.checkout_paths),
                         deps=deps,
                         usage=usage,
                         usage_limits=UsageLimits(
