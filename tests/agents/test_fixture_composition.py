@@ -414,3 +414,18 @@ def test_an_attempt_records_reaching_its_tool_cap_whatever_ended_it(store, tmp_p
     (tmp_path / "work").mkdir()
     run = asyncio.run(run_direct(fixture_case(), stages(), reviewed_runners(store, tmp_path / "work"), budget))
     assert run.attempts[-1].tool_cap_reached and not run.attempts[0].tool_cap_reached
+
+
+def test_a_case_without_a_fix_runs_only_the_reported_revision_and_leaves_the_fix_not_applicable(store, tmp_path):
+    """Fix-free runs (Al, 2026-10-13): the baseline alone settles the finding; no fix is claimed either way."""
+    (tmp_path / "work").mkdir()
+    case = fixture_case()
+    case = replace(case, revision_sources={"baseline": case.revision_sources["baseline"]})
+    run = asyncio.run(run_direct(case, stages(assessment=scripted_assessment(finding="reproduced", fix="not_applicable")),
+                                 reviewed_runners(store, tmp_path / "work")))
+    assert [e.revision for e in run.executions] == ["baseline"] and len(run.witnesses) == 1
+    assert run.gate.permitted == Disposition(execution="completed", finding="reproduced", fix="not_applicable")
+    assert {(r.revision, r.classification) for r in run.gate.runs} == {("baseline", "reproduces")}
+    assert (run.stopped_at, run.reason) == (None, "complete")
+    assert run.assessment.admission.admitted and run.assessment.disposition == run.gate.permitted
+    assert not any("candidate-0" in prompt for prompt in prompts(run))

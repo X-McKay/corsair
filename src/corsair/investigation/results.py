@@ -141,7 +141,8 @@ def summary_line(item: dict) -> str:
     requests = sum(u["requests"] or 0 for u in item["usage"].values())
     head = item["issue"]
     if item["revisions"]:
-        head += f" @{item['revisions']['baseline'][:8]} (fix {item['revisions']['candidate'][:8]})"
+        fix = item["revisions"].get("candidate")
+        head += f" @{item['revisions']['baseline'][:8]} " + (f"(fix {fix[:8]})" if fix else "(no fix commit)")
     if item["stopped_at"] is None:
         gate = item["final"] or {}
         outcome = "; ".join(f"{revision} " + ", ".join(f"{test.rsplit(':', 1)[-1]} {result}" for test, result in cases)
