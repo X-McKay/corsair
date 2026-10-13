@@ -4,6 +4,7 @@ SPEC-0026 dependency provisioning reaches the sandbox; image evidence, not sandb
 """
 from contextlib import ExitStack
 import os
+import re
 from pathlib import Path
 from typing import Literal, Mapping
 
@@ -32,13 +33,29 @@ def write_overlay(files, tree: Path, destination: Path) -> Path:
     return destination
 
 
+# Setup containers (dependency install, the environment stage's sandbox) run on Docker's default bridge, never the
+# host's network: model-chosen setup commands must not reach the host's own services. The bridge has no egress
+# policy, so the setup network is recorded as unenforced (SETUP_NETWORK).
+SETUP_NETWORK = {"network": "bridge", "egress": "unenforced",
+                 "note": "Docker default bridge: internet reachable, host network never used, no egress policy"}
+CREDENTIALS = re.compile(r"://[^/@\s]*@")
+
+
 def registry_access(names: tuple[str, ...]) -> tuple[str, tuple[str, ...], tuple[tuple[str, str], ...]]:
-    """Network, environment and read-only mounts for registry access during setup: the host's network only when the
-    host itself reaches the registry through the variables `names` (a proxy, its CA file), else the bridge."""
-    env = tuple(f"{name}={os.environ[name]}" for name in names if os.environ.get(name))
+    """Network, environment and read-only mounts for registry access during setup: always the bridge, with the
+    operator's proxy and CA variables among `names` that are set. A value carrying credentials (`user:pass@`) is
+    refused rather than passed into a container the model drives."""
+    env = []
+    for name in names:
+        value = os.environ.get(name)
+        if not value:
+            continue
+        if CREDENTIALS.search(value):
+            raise ValueError(f"{name} carries credentials; setup containers never receive them")
+        env.append(f"{name}={value}")
     files = tuple((value, value) for name in names if (value := os.environ.get(name, "")).startswith("/")
                   and Path(value).is_file())
-    return ("host" if env else "bridge"), env, files
+    return SETUP_NETWORK["network"], tuple(env), files
 
 
 def setup_identity(harness: Harness, image: str, tree: Path, commit: str) -> dict:
@@ -52,7 +69,10 @@ def install(harness: Harness, image: str, tree: Path, commit: str, dependencies:
     fresh directory; the receipt binds them to this image, commit and lockfiles. Raises when setup fails."""
     dependencies.mkdir(parents=True, exist_ok=False)
     evidence.mkdir(parents=True, exist_ok=False)
-    network, env, mounts = registry_access(harness.registry_env)
+    try:
+        network, env, mounts = registry_access(harness.registry_env)
+    except ValueError as error:
+        raise RuntimeError(f"dependency setup refused: {error}") from error
     script = (f"cp -R /src {WORK}; cd {WORK}; {harness.setup_script}; "
               f"cp -R {WORK}/{harness.dependencies} {DEPENDENCIES}/")
     result = docker("run", "--rm", f"--network={network}", *HARDENED, "--user", user(), "-e", "HOME=/tmp",

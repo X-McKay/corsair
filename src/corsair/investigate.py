@@ -27,7 +27,7 @@ from corsair.composition.receipts import (AGENT_STAGES, VERSION_FIELDS, VERSIONS
 from corsair.inference.config import InferenceConfig, load_inference
 from corsair.inference.models import configured_model, preflight
 from corsair.investigation.build import Investigation, Refused, build
-from corsair.investigation.docker import DockerPreparation, DockerRunners, install
+from corsair.investigation.docker import SETUP_NETWORK, DockerPreparation, DockerRunners, install
 from corsair.investigation.request import IssueRequest
 from corsair.investigation.results import record, summary_line
 
@@ -69,7 +69,8 @@ async def _chain(investigation: Investigation, evidence: Path, config: Inference
         else:
             configs, selected = {}, {stage: models[stage]() for stage in AGENT_STAGES}
         (receipts / "configuration.json").write_text(json.dumps({
-            "mode": "direct", "route": "docker_image_only", "live_stages": list(configs),
+            "mode": "direct", "route": "docker_image_only", "setup_network": SETUP_NETWORK,
+            "test_network": "none", "live_stages": list(configs),
             "stage_providers": {stage: c.model_dump() for stage, c in configs.items()}, "stage_profiles": profiles,
             "budget": budget.model_dump(),
             "versions": {stage: dict(zip(VERSION_FIELDS, VERSIONS[stage])) for stage in AGENT_STAGES},

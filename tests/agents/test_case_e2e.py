@@ -237,3 +237,16 @@ def test_a_cohort_records_a_case_that_cannot_start_before_any_model(tmp_path, mo
     # The eval wrapper's summary and comparison read the native report like any other suite's.
     from evals.run import summarize
     assert summarize(tmp_path / "run")["identity"]["dataset"] == "jest" and summarize(tmp_path / "run")["attempts"] == 1
+
+
+def test_setup_containers_never_use_the_host_network_or_receive_proxy_credentials(monkeypatch):
+    from corsair.investigation.docker import SETUP_NETWORK, registry_access
+    monkeypatch.setenv("HTTPS_PROXY", "http://proxy.internal:3128")
+    monkeypatch.delenv("https_proxy", raising=False)
+    network, env, _ = registry_access(("HTTPS_PROXY", "https_proxy"))
+    assert network == "bridge" and env == ("HTTPS_PROXY=http://proxy.internal:3128",)
+    assert SETUP_NETWORK["egress"] == "unenforced"
+    monkeypatch.setenv("HTTPS_PROXY", "http://user:secret@proxy.internal:3128")
+    with pytest.raises(ValueError, match="carries credentials") as refused:
+        registry_access(("HTTPS_PROXY",))
+    assert "secret" not in str(refused.value)

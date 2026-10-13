@@ -8,6 +8,7 @@ from pathlib import Path
 from corsair.composition.direct import DirectRun
 
 from .build import Investigation
+from .docker import SETUP_NETWORK
 
 # "admission": refused before any model request (request, acquisition, runtime selection or framework table).
 STAGES = ("admission", "runtime", "environment", "identification", "planning", "authoring", "execution", "assessment",
@@ -44,6 +45,7 @@ def record(label: str, evidence: Path, *, investigation: Investigation | None = 
             "evidence": investigation.framework.qualification.evidence,
             "witness_recorders": [f.id for f in investigation.harness.witness_facilities]},
         "bases": None if investigation is None else investigation.bases,
+        "setup_network": None if investigation is None else SETUP_NETWORK,
         "environment_framework": getattr(environment, "framework", None),
         # Which test proved the environment: the project's own test or the operator smoke test (SPEC-0071); None
         # when no environment was admitted.
