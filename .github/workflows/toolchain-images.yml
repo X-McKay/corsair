@@ -52,3 +52,7 @@ jobs:
       - name: Receipts
         if: always() && steps.select.outputs.toolchains != ''
         run: for f in .cache/toolchains/*/build.json; do echo "== $f"; cat "$f"; done
+      # Real cases per image (tests/qualification/image_cases.py CASES); each image opts in with its own guarded step.
+      - name: Real case on the JDK 8 image (VUL4J-6)
+        if: contains(format(' {0} ', steps.select.outputs.toolchains), ' java8 ')
+        run: uv run --locked python -m tests.qualification.image_cases java8 --evidence .runs/ci/image-cases
