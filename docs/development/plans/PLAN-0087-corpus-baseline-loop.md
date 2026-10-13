@@ -22,7 +22,7 @@ The earlier unpublished campaign used PLAN-0085, which now identifies the merged
 - [x] Put the portable loop in a repository runbook with main-compatible links and explicit implementation status.
 - [x] Document the negative-run blocker, current index and fresh-session prompt.
 - [ ] Reconcile current product/campaign implementations and reproduce the approved-path and output-exhaustion boundaries.
-- [ ] Compare the narrow approved-path correction and candidate-free product support in isolated evaluations; preserve paired and missing-evidence behavior.
+- [ ] Compare the narrow approved-path correction (lane 2 implemented offline under [PLAN-0089](PLAN-0089-planned-test-file-contract.md): scripted evals identical, live comparison owed) and candidate-free product support in isolated evaluations; preserve paired and missing-evidence behavior.
 - [ ] Integrate a finite campaign entry through existing ports with planned-slot identity, split isolation and conservative delivery/cleanup accounting.
 - [ ] Obtain a full positive Python disposition, independent negative and development transfer result; retain all failures.
 - [ ] Freeze a candidate, review evaluator-owned oracles and progressively account for all 66 development configurations, including unsupported and unrun entries.
