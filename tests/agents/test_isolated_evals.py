@@ -110,14 +110,14 @@ def test_eval_command_files_runs_and_compares_with_the_previous_and_promoted_run
     assert eval_run.main(["authoring", "--results", str(tmp_path), "--note", "first"]) == 0
     first = json.loads((tmp_path / "authoring" / "index.jsonl").read_text().splitlines()[0])["run"]
     record = json.loads((tmp_path / "authoring" / first / "summary.json").read_text())
-    assert record["summary"]["clean_attempts"] == record["summary"]["attempts"] == 12
+    assert record["summary"]["clean_attempts"] == record["summary"]["attempts"] == 18
     assert record["summary"]["identity"]["prompt_version"] and record["command"]["note"] == "first"
     assert "nothing to compare" in (tmp_path / "authoring" / first / "comparison.md").read_text()
     eval_run.main(["authoring", "--results", str(tmp_path), "--promote", first])
     second = record | {"run": "second"}
     second["summary"] = record["summary"] | {"clean_attempts": 11}
     text = eval_run.compare(second, record | {"reference_kind": "baseline"}, first)
-    assert f"Compared with {first} (baseline)" in text and "clean attempts 12/12" in text
+    assert f"Compared with {first} (baseline)" in text and "clean attempts 18/18" in text
     assert eval_run.SUITES["environment"].module == "evals.environment.evaluate"
 
 

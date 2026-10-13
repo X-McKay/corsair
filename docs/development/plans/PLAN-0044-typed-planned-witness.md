@@ -63,4 +63,4 @@ Independent review of the 12 ready held-out plans and 5 unsupported results (by 
 
 Next: composition binding from the plan and control calibration (SPEC-0040), and the deterministic checks above, before another planner candidate.
 
-Merged unqualified on Al's decision (2026-10-13 12:16Z): the plan-based witness binding, the four text-defect checks and a fourth held-out set move to a follow-up; the planner on main stays unqualified at development 11/12 and held-out 17/18 (prompt v7). The merge with main makes the prompt `test-planning-v7-grounding-3` (config v5), checked offline only (HANDOFF-0062).
+Merged unqualified on Al's decision (2026-10-13 12:16Z): the plan-based witness binding, the four text-defect checks and a fourth held-out set move to a follow-up; the planner on main stays unqualified at development 11/12 and held-out 17/18 (prompt v7). The merge with main makes the prompt `test-planning-v7-grounding-3` (config v6), checked offline only (HANDOFF-0062).

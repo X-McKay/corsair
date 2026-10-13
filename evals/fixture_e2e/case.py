@@ -48,7 +48,6 @@ def fixture_case() -> FixtureCase:
         baseline_test=BaselineTest(test_id="test_existing.py::test_reads_existing_document", path="test_existing.py"),
         scratch_location="The per-test pytest tmp_path directory; fixtures must not be created elsewhere",
         observation_facilities=(
-            "Python sys.addaudithook 'open' audit events recorded by the test itself inside the test process",
             "Native JUnit XML outcomes, failure locations and captured stdout per test",
             "Operator witness probe, not test code: calls, returns, raised exceptions and file opens attributed to "
             "the identified target function during each test's call phase"),
