@@ -53,6 +53,10 @@ def selection_checks(inputs: IssueAnalysisInput, output: IssueIdentification, or
     checks["source_range"] = target is not None and bool(oracle.required_lines) and all(
         target.source.start_line <= line <= target.source.end_line for line in oracle.required_lines
     ) and target.source.end_line - target.source.start_line + 1 <= oracle.max_span
+    saved = next((item for item in inputs.source_files if target and item.path == target.source.path), None)
+    lines = saved.content.splitlines() if saved else []
+    checks["source_quote"] = bool(target and saved and 1 <= target.source.start_line <= target.source.end_line <= len(lines)
+                                  and target.source.quote == "\n".join(lines[target.source.start_line - 1:target.source.end_line]))
     return checks
 
 
