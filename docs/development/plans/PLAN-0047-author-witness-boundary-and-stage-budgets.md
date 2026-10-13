@@ -33,7 +33,7 @@ Cloud container, 2026-10-13, branch `claude/author-witness-boundary-el02vx`:
 - Scripted authoring dataset: 16/16 attempts (8 cases × 2), including the two new admission cases. After the read fix: 18/18 (9 cases × 2), the new read case answered one absent path typed and finished as a patch.
 - Scripted fixture E2E (`evals.fixture_e2e.run`): complete, gate completed / reproduced / verified with the reviewed bytes admitted by digest.
 
-All eval results above are scripted. No live isolated `make eval` baseline exists yet for any version this PR changes: authoring `test-authoring-v7`/config-v3, planning config-v3 (fixture tool cap 8 to 4), identification config-v4, repository identification config-v3, assessment config-v2. The host-only authoring v5 run on RIG0 (pre-2d1c476 head) shared the model server with the per-agent baselines from about 09:44Z and is not comparable.
+All eval results above are scripted. No live isolated `make eval` baseline exists yet for any version this PR changes: authoring `test-authoring-v7`/config-v3, planning `test-planning-config-v6` (with #54 grounding; fixture tool cap 8 to 4), identification `issue-identification-config-v4-grounding-3`, repository identification `issue-identification-repository-config-v3-grounding-3`, assessment config-v2. The host-only authoring v5 run on RIG0 (pre-2d1c476 head) shared the model server with the per-agent baselines from about 09:44Z and is not comparable.
 
 Before (PLAN-0039 v5 live rerun): authoring self-made audit hooks 2/3 (one vacuous inverted security test, one broken control); tool-call cap ended authoring 1/3 and assessment 1/3; admitted fully live verdict 1/3. After: pending the live rerun.
 
