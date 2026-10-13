@@ -23,7 +23,7 @@ In scope: a digest-pinned upstream `python:3.7-slim` image with hash-pinned offl
 
 **Probe.** Observation needs CPython 3.12+ (`sys.monitoring`; audit hooks are 3.8+ and `co_qualname` 3.11+). The probe used a new-style hook wrapper (pluggy 1.1+) and `pytest.ExitCode` (pytest 5+), so on 3.7 the bootstrap crashed before pytest ran and the test run itself was lost. Now the probe loads on any CPython 3.7+ and pytest 6+ (old-style `hookwrapper`, literal exit status 3); on a runtime without `sys.monitoring` it registers nothing, lets pytest run unchanged and writes a record whose new `unsupported` field names the runtime. The record schema becomes `corsair-witness-v2`; `witness_evidence` refuses such a record by name (`witness probe unsupported on this runtime: CPython 3.7.17 …`), so the gate treats the witness as absent and the verdict stays inconclusive or not verified by design. No weaker 3.7 observer (profile hooks plus wrapped `open`) is built: it would miss C-level opens and widen a claim the 3.12 probe makes.
 
-**Matrix.** The `cpython-3.7-pytest` row is added to `deploy/runtime-matrix.yaml` only after the live toolchain gate passes, with that report as its evidence; the pytest framework row's qualified set widens to the versions above. Until then selection is unchanged.
+**Matrix.** The `cpython-3.7-pytest` row is added to `deploy/runtime-matrix.yaml` only after the live toolchain gate passes, with that report as its evidence, together with a second pytest framework row `versions: ">=6.0,<8"`, `images: [cpython-3.7-pytest]` (per-image framework scoping, added to SPEC-0042 in #48 at dbbb980); the existing pytest row is scoped to `cpython-3.12-pytest` and widened only to what was checked on 3.12. Until then selection is unchanged.
 
 ## Acceptance and validation
 
@@ -33,4 +33,4 @@ Live, on a fresh kind node with OpenShell on RIG0: `make toolchain-images toolch
 
 ## Decisions and open questions
 
-Direction: the coordinator's brief for Al's goal of running every benchmark case and Al's rule of one digest-pinned upstream image per runtime version with no nearby-version fallback. Open: per-image framework ranges in the matrix (pytest 7.4 is the ceiling on 3.7, 9.0 runs only on 3.12; the matrix's framework rows are per language); a witness for 3.8 to 3.11 (audit hooks exist there, `sys.monitoring` does not); the case's own pinned pytest is installed by setup, which is not built yet. Plan: [PLAN-0050](../plans/PLAN-0050-cpython37-toolchain.md).
+Direction: the coordinator's brief for Al's goal of running every benchmark case and Al's rule of one digest-pinned upstream image per runtime version with no nearby-version fallback. Open: a witness for 3.8 to 3.11 (audit hooks exist there, `sys.monitoring` does not); the case's own pinned pytest is installed by setup, which is not built yet. Plan: [PLAN-0050](../plans/PLAN-0050-cpython37-toolchain.md).
