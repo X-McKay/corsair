@@ -26,7 +26,7 @@ def test_selected_row_is_the_only_toolchain():
 
 
 @pytest.mark.parametrize('requires, prepared, status, reason', [
-    ('>=3.7,<3.12', PREPARED, 'unsupported', 'runtime unsupported: cpython'),
+    ('>=3.8,<3.12', PREPARED, 'unsupported', 'runtime unsupported: cpython'),
     ('>=3.10', {}, 'not_prepared', 'has no prepared image'),
 ])
 def test_stop_replaces_the_agent_run(requires, prepared, status, reason):
@@ -44,7 +44,7 @@ def test_select_runtime_names_the_prepared_image_or_the_reason():
     supported = select_runtime(pyproject('>=3.10'), catalog)
     assert (supported.status, supported.image, supported.selection.image_id) == (
         'supported', PREPARED['cpython-3.12-pytest'], 'cpython-3.12-pytest')
-    assert select_runtime(pyproject('<3.8'), catalog).status == 'unsupported'
+    assert select_runtime(pyproject('<3.7'), catalog).status == 'unsupported'
     assert select_runtime(RuntimeInputs(files={'README.md': b'x'}), catalog).status == 'undetermined'
     undeclared = select_runtime(RuntimeInputs(files={'pytest.ini': b'[pytest]\n'}), catalog)
     assert undeclared.status == 'undetermined' and undeclared.requirement is not None
@@ -76,7 +76,7 @@ def test_ready_must_stay_on_the_selection():
 
 
 def test_runtime_stop_distinguishes_new_image_from_preparation_and_keeps_ranges():
-    requirement, selection = project(">=3.7,<3.12")
+    requirement, selection = project(">=3.8,<3.12")
     result = environment_input(requirement, selection, load(), PREPARED, **FIELDS)
     assert result.diagnostic.code == "image_unavailable"
     assert requirement.components[0].allowed in result.diagnostic.render()
