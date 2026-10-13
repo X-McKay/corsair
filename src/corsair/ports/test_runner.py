@@ -31,6 +31,9 @@ JAVA_TEST_ID = re.compile(r'^(?:(?P<module>[A-Za-z0-9_][A-Za-z0-9_.-]*(?:/[A-Za-
 # plain identifiers, so Jest's full name (ancestor titles and title joined by a space) maps back to one id.
 JS_TEST_ID = re.compile(r'^(?P<path>[A-Za-z0-9_./-]+\.(?:js|jsx|mjs|cjs))'
                         r'::(?:(?P<suite>[A-Za-z_][A-Za-z0-9_]*)::)?(?P<name>[A-Za-z_][A-Za-z0-9_]*)$')
+# TAP on Perl: `path/to/file.t#subtest`, a repository-relative test file and one of its top-level Test::More subtests.
+PERL_TEST_ID = re.compile(r'^(?P<path>[A-Za-z0-9_][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_][A-Za-z0-9_.-]*)*\.t)'
+                          r'#(?P<name>[A-Za-z_][A-Za-z0-9_]*)$')
 
 
 def approved_path(value: str) -> str:
@@ -89,6 +92,23 @@ class JsTestId:
 
     def __str__(self) -> str:
         return f'{self.path}::{self.suite + "::" if self.suite else ""}{self.name}'
+
+
+@dataclass(frozen=True)
+class PerlTestId:
+    """A top-level Test::More subtest of one `.t` file; TAP names it on its `# Subtest:` line."""
+    path: str
+    name: str
+
+    @classmethod
+    def parse(cls, value: str) -> 'PerlTestId':
+        match = PERL_TEST_ID.fullmatch(value) if type(value) is str and len(value) <= MAX_TEST_ID else None
+        if match is None or '..' in match['path'].split('/'):
+            raise ValueError('Expected `path/to/file.t#subtest`')
+        return cls(match['path'], match['name'])
+
+    def __str__(self) -> str:
+        return f'{self.path}#{self.name}'
 
 
 @dataclass(frozen=True)
