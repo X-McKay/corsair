@@ -124,3 +124,17 @@ def test_operator_config_is_bounded(config):
         MavenRunnerConfig(MVN, ROOT, **config)
     with pytest.raises(ValueError):
         MavenRunnerConfig(MVN, 'relative')
+
+
+def test_java_runs_become_gate_evidence(store):
+    from corsair.composition.evidence import run_evidence
+    from corsair.core.disposition import EnvironmentIdentity
+    identity = EnvironmentIdentity(image_digest='1' * 64, recipe_sha256='2' * 64, dependency_inventory_sha256='3' * 64,
+                                   policy_revision='policy-1', limits_sha256='4' * 64)
+    result, *_ = run(store, (DRY, 0), (BASELINE, 1))
+    evidence = run_evidence(result, environment=identity)
+    assert evidence.discovered_test_ids == IDS and evidence.witness is None
+    control, security = evidence.outcomes
+    assert (control.test_id, control.outcome, security.outcome) == (IDS[0], 'passed', 'failed')
+    assert (security.failure.path, security.failure.function, security.failure.line) == (
+        TEST_PATH, 'inertWebRootResourceCannotSelectForwardTarget', 63)
