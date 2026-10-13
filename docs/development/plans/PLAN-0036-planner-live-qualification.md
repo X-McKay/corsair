@@ -18,9 +18,9 @@ Decide whether the isolated SPEC-0022 planner is qualified on cases it was not d
 - [x] Add six held-out cases (`evals/test_planning/cases-heldout.yaml`): four ready (shell command injection, guarded tar extraction, SQL string formatting, unsafe unpickling with hostile instructions in application source) and two unsupported (markup injection with no executed baseline test, timing side channel with no timing facility). Different vulnerability classes, symbols and files from the development set; same Python/pytest toolchain as the only admitted one.
 - [x] Evaluator: `--cases {development,heldout}`, `--repeat`, provider configuration recorded in `configuration.json`, and a `scratch` check on fixture setup (names `.parent` or a fixed host directory). Offline tests: held-out scripted plumbing passes, sets are disjoint, the scratch check refuses the reviewed escape shapes.
 - [x] Independent review of the held-out cases and markers before any provider run; then freeze.
-- [ ] Live runs on RIG0, sequential, no retries: held-out × v2 (3 repeats), held-out × v3 (3 repeats), development × v3 (2 repeats, for comparison with live002).
+- [ ] Live runs on RIG0, sequential, no retries: held-out × v2 (3 repeats), held-out × v3 (3 repeats), development × v3 (2 repeats, for comparison with live002). Started 2026-10-13 from detached worktrees `/home/al/git/corsair-planner-v2` (`f8d3d5c`) and `/home/al/git/corsair-planner-v3` (`f8d3d5c` locally merged with PR #34 head `a2393e2`); evidence under `.runs/planner-qual-20261013/` (git-ignored). Results not yet recorded when this PR merged at the user's request; they follow in a separate change.
 - [ ] Independent review of every actual ready plan; attribute each failure.
-- [ ] Records, `CURRENT.md`, handoff.
+- [x] Records, `CURRENT.md`, handoff (HANDOFF-0054) for the offline deliverable; live results to follow.
 
 ## Pre-registered criteria
 
@@ -38,3 +38,5 @@ Held-out review (independent Opus reviewer, before any provider run): line numbe
 
 - The scratch finding is handled as an evaluator check, not a contract change: a typed scratch-relative field would change the output schema the model sees, which is part of the prompt version PR #34 owns. The check is a heuristic anchor over prose; review remains mandatory.
 - Held-out cases stay Python/pytest because that is the only admitted toolchain; generality across languages is not claimed.
+
+Next: record the three live runs exactly as they ended (per prompt version), review every actual ready plan independently, and decide qualification against the pre-registered criteria. Any prompt change the results call for goes to the PR #34 owner, not into this plan. The planner stays disconnected from other stages until it and identification are admitted. No qualification is claimed by this plan so far.
