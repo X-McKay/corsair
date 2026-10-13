@@ -135,6 +135,29 @@ class PerlTestId:
         return f'{self.path}#{self.name}'
 
 
+def _python_file(value: str) -> str:
+    if len(value) > MAX_TEST_ID or not TEST_ID.fullmatch(value):
+        raise ValueError('Expected `path/test_file.py::[Class::]name`')
+    return value.split('::', 1)[0]
+
+
+# Each runner's id grammar and the repository file it names; Java's is Maven's conventional class location.
+_ID_FILES = (_python_file, lambda v: RubyTestId.parse(v).path, lambda v: JsTestId.parse(v).path,
+             lambda v: PerlTestId.parse(v).path, lambda v: JavaTestId.parse(v).source_path())
+
+
+def names_test_in(test_id: str, path: str) -> bool:
+    """Whether a native test id, in some runner's grammar, names a test in exactly this repository file: the one
+    rule a planned test path and test id must agree on before a test is written there."""
+    for file_of in _ID_FILES:
+        try:
+            if file_of(test_id) == path:
+                return True
+        except ValueError:
+            continue
+    return False
+
+
 @dataclass(frozen=True)
 class PatchFile:
     path: str
