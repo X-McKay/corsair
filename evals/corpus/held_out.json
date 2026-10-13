@@ -1,0 +1,10 @@
+{
+  "ih-javascript-sessionfix": "945f3b8d86e8ae992044614c429a706faecb803d4a7eb2a0d82f9db1ff36dc84",
+  "ih-javascript-xss": "0f44cd499e1639950c2a8939c6156641dd4acc8227f23e65ab26b15b42331292",
+  "ih-perl-permissions": "0253b51dd8f1cfa2090868de57d3890b1903c77486a2721a40dd67cb82c592b0",
+  "ih-python-fileinclusion": "777dff3c10b45e6d40406495fd798509eb3a2caa6650b3cf86a349e23eba45e5",
+  "ih-python-formulainjection": "70deac9d43d35ae7c36304c84c3917a91ca0c4fc782682cfce5b9426ddb0f25d",
+  "ih-python-idor": "b3b0157db9d3c4783f3736ea239b0d3d2fceb9bf4fe35b53c5dd69e1a7f396ff",
+  "ih-python-sqli": "88ee4b25c631e6f993c238e7cc5c1e6f3e7f9d8686de295cfe2b8b6167309a89",
+  "ih-python-xss": "07c48a66dcd2d8eb8edd04913bd180d813971634f369e48f3f187fb5d76c4cc3"
+}

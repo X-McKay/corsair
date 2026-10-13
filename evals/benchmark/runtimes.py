@@ -3,7 +3,8 @@ are undetermined. Offline over captured build files, except the two explicit fet
 
     checkout  fetch only the build files of each pinned commit (blobless git, never executed) into a tree root
     parents   fetch the Maven parent POMs the trees name from Maven Central into a cache directory
-    report    detect and select for every inventory case; markdown on stdout, JSON with --json
+    report    detect and select for every inventory case and every in-repository corpus case (SPEC-0067); markdown on
+              stdout, JSON with --json. Held-out corpus cases are counted, never named.
 
 Trees are laid out as `<root>/<case dir>/<commit>/<path>`; `<case dir>` is the case id with '/' replaced by '_'.
 The pins file (`benchmarks/source-pins.json`, SPEC-0037) names each case's fix commit and baseline candidate.
@@ -17,13 +18,15 @@ import re
 import shutil
 import subprocess
 import sys
+from typing import get_args
 import urllib.request
 
-from corsair.nodes.runtime.contracts import RuntimeRequirement
+from corsair.nodes.runtime.contracts import Language, RuntimeRequirement
 from corsair.nodes.runtime.detect import detect, is_build_file
 from corsair.nodes.runtime.java import Pom
 from corsair.nodes.runtime.matrix import MATRIX, load, select
 from corsair.nodes.runtime.versions import parse_set, parse_version
+from evals.corpus import cases as corpus
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 INVENTORY = REPOSITORY / 'benchmarks/candidate-cases.json'
@@ -169,6 +172,30 @@ def evaluate(root: Path, pins: dict, inventory: list[dict], parents: dict[str, b
     return results
 
 
+def _select(files: dict[str, bytes], language: str, matrix, parents: dict[str, bytes] | None = None) -> dict:
+    if language not in get_args(Language):
+        return dict(status='undetermined', missing=[f'no {language} detector or matrix row (SPEC-0042 reads {", ".join(get_args(Language))})'])
+    requirement = detect(files, language, parents=parents)
+    if isinstance(requirement, str): return dict(status='undetermined', missing=[requirement])
+    return dict(requirement=requirement.model_dump(mode='json'), **select(requirement, matrix).model_dump(mode='json'))
+
+
+def evaluate_corpus(cases=None) -> list[dict]:
+    """Both variants of every corpus case, read from the in-repository copy; nothing is fetched or run."""
+    matrix = load()
+    results = []
+    for case in cases if cases is not None else corpus.load():
+        record = dict(case_id=case.case_id, language=case.language, split=case.split, revisions={})
+        for role, entry in (('baseline', case.baseline), ('candidate', case.candidate)):
+            if entry is None: continue
+            tree = {path: data for path, data in corpus.snapshot(corpus.CORPUS / str(entry.variant)).items() if is_build_file(path)}
+            record['revisions'][role] = _select(tree, case.language, matrix)
+        record['status'] = record['revisions']['baseline']['status']
+        record['revisions_agree'] = len({r['status'] for r in record['revisions'].values()}) == 1
+        results.append(record)
+    return results
+
+
 def _requirement(record: dict) -> RuntimeRequirement | None:
     revision = record.get('revisions', {}).get('baseline') or record.get('revisions', {}).get('fix') or {}
     return RuntimeRequirement.model_validate(revision['requirement']) if 'requirement' in revision else None
@@ -214,19 +241,39 @@ def _outcome(record: dict) -> str:
     return 'supported'
 
 
+def _row(record: dict, differs: str = 'fix') -> str:
+    revision = record.get('revisions', {}).get('baseline') or record.get('revisions', {}).get('fix') or {}
+    requirement = _requirement(record)
+    runtime = next((c for c in requirement.component('runtime')), None) if requirement else None
+    allowed = (runtime.allowed if runtime and runtime.declared else 'undeclared') if requirement else ''
+    if revision.get('status') == 'supported': detail = revision['image_id']
+    elif revision.get('status') == 'unsupported':
+        detail = '; '.join(f"{n['name']} {n['preferred'] or n['allowed']}" for n in revision['needs'])
+    else: detail = '; '.join(revision.get('missing', [record.get('detail', '')]))
+    agree = '' if record.get('revisions_agree', True) else f' ({differs} differs)'
+    return f"| {record['case_id']} | {record['language']} | {_outcome(record)}{agree} | {allowed.replace('|', '/')} | {detail.replace('|', '/')[:300]} |"
+
+
+def corpus_markdown(results: list[dict]) -> str:
+    """Development corpus cases by name; held-out ones only as counts per language and outcome."""
+    lines = ['| Case | Language | Outcome | Runtime allowed | Unmet or missing |', '| --- | --- | --- | --- | --- |']
+    lines += [_row(r, 'candidate') for r in results if r['split'] == 'development']
+    held_out = Counter((r['language'], _outcome(r)) for r in results if r['split'] == 'held_out')
+    counts = Counter(_outcome(r) for r in results)
+    lines += ['', 'Outcomes (all corpus cases): ' + ', '.join(f'{k} {v}' for k, v in sorted(counts.items())),
+              'Held-out cases, not named: ' + ', '.join(f'{language} {status} {n}' for (language, status), n in sorted(held_out.items()))]
+    return '\n'.join(lines) + '\n'
+
+
+def public(results: list[dict]) -> dict:
+    """Development corpus results by case; held-out ones only as counts, so their order cannot name them."""
+    held_out = Counter(f"{r['language']} {_outcome(r)}" for r in results if r['split'] == 'held_out')
+    return dict(development=[r for r in results if r['split'] == 'development'], held_out=dict(sorted(held_out.items())))
+
+
 def markdown(results: list[dict]) -> str:
     lines = ['| Case | Language | Outcome | Runtime allowed | Unmet or missing |', '| --- | --- | --- | --- | --- |']
-    for record in results:
-        revision = record.get('revisions', {}).get('baseline') or record.get('revisions', {}).get('fix') or {}
-        requirement = _requirement(record)
-        runtime = next((c for c in requirement.component('runtime')), None) if requirement else None
-        allowed = (runtime.allowed if runtime and runtime.declared else 'undeclared') if requirement else ''
-        if revision.get('status') == 'supported': detail = revision['image_id']
-        elif revision.get('status') == 'unsupported':
-            detail = '; '.join(f"{n['name']} {n['preferred'] or n['allowed']}" for n in revision['needs'])
-        else: detail = '; '.join(revision.get('missing', [record.get('detail', '')]))
-        agree = '' if record.get('revisions_agree', True) else ' (fix differs)'
-        lines.append(f"| {record['case_id']} | {record['language']} | {_outcome(record)}{agree} | {allowed.replace('|', '/')} | {detail.replace('|', '/')[:300]} |")
+    lines += [_row(record) for record in results]
     counts = Counter(_outcome(r) for r in results)
     lines += ['', 'Outcomes: ' + ', '.join(f'{k} {v}' for k, v in sorted(counts.items())), '',
               '| Language | Suggested runtime row | Cases whose runtime it satisfies |', '| --- | --- | --- |']
@@ -247,7 +294,7 @@ def inputs(pins: Path, parents: Path | None) -> dict:
     the parent POMs (by coordinate) that were supplied. The fetched trees are identified by the pinned commits."""
     detector = b''.join(f.name.encode() + b'\0' + f.read_bytes() for f in sorted((REPOSITORY / 'src/corsair/nodes/runtime').glob('*.py')))
     return dict(detector=_digest(detector), matrix=_digest(MATRIX.read_bytes()), pins=_digest(pins.read_bytes()),
-                inventory=_digest(INVENTORY.read_bytes()),
+                inventory=_digest(INVENTORY.read_bytes()), corpus='sha256:' + corpus.tree_digest(),
                 parents={key: _digest(data) for key, data in sorted(load_parents(parents).items())})
 
 
@@ -265,10 +312,12 @@ def main() -> None:
     if args.action == 'parents': return fetch_parents(args.trees, args.parents)
     inventory = json.loads(INVENTORY.read_text())['cases']
     results = evaluate(args.trees, pins, inventory, load_parents(args.parents))
+    corpus_results = evaluate_corpus()
     if args.json:
-        document = dict(schema_version=1, spec='SPEC-0042', inputs=inputs(args.pins, args.parents), results=results)
+        document = dict(schema_version=1, spec='SPEC-0042', inputs=inputs(args.pins, args.parents), results=results,
+                        corpus=public(corpus_results))
         args.json.write_text(json.dumps(document, indent=1) + '\n')
-    sys.stdout.write(markdown(results))
+    sys.stdout.write(markdown(results) + '\n## Corpus cases (SPEC-0067)\n\n' + corpus_markdown(corpus_results))
 
 
 if __name__ == '__main__':

@@ -30,6 +30,7 @@ from evals.fixture_e2e.case import (
 )
 from tests.agents.test_chain_environment_stage import (
     BASELINE, BUILD, OK, SETUP, Sandboxes, catalog, environment_model, pyproject, ready_draft,
+    without_baseline_file,
 )
 from evals.fixture_e2e.reviewed import DISCOVER
 from tests.temporal.support import EXECUTION_TIMEOUT, workflow_runner
@@ -309,6 +310,8 @@ def test_runtime_stage_stops_both_modes_before_any_child(temporal_address, reque
 
 ENVIRONMENT_CASES = {
     "ready": (OK, [BUILD, DISCOVER, BASELINE], ready_draft()),
+    # The saved inventory lacks the chosen baseline test file; the activity's record carries it from the capture.
+    "ready-from-capture": (OK, [BUILD, DISCOVER, BASELINE], ready_draft()),
     "blocked": (OK | {DISCOVER: (2, "ERROR: file or directory not found: tests\n")}, [BUILD, DISCOVER],
                 {"status": "blocked", "layer": "discovery", "evidence": "file or directory not found", "run_ids": [2],
                  "citations": []}),
@@ -324,7 +327,8 @@ def without_operations(result):
 def test_durable_environment_stage_matches_direct_mode(temporal_address, request, store, tmp_path, outcome):
     """PLAN-0075: the whole environment stage is one activity, scheduled once, and routes like direct mode."""
     observations, commands, draft = ENVIRONMENT_CASES[outcome]
-    case = replace(fixture_case(), runtime=pyproject(">=3.10"), setup=SETUP)
+    case = (without_baseline_file() if outcome == "ready-from-capture"
+            else replace(fixture_case(), runtime=pyproject(">=3.10"), setup=SETUP))
 
     async def check():
         client = await Client.connect(temporal_address, plugins=PLUGINS)
@@ -341,7 +345,10 @@ def test_durable_environment_stage_matches_direct_mode(temporal_address, request
         same_routing(direct, durable)
         # Equal but for each setup command's operation id, which is random in both modes.
         assert without_operations(durable.environment) == without_operations(direct.environment)
-        assert durable.environment.status == outcome
+        assert durable.environment.status == outcome.split("-")[0]
+        assert durable.attempts[0].baseline_source == direct.attempts[0].baseline_source
+        if outcome == "ready-from-capture":
+            assert durable.attempts[0].baseline_source.path == "test_existing.py" and durable.stopped_at is None
         assert durable.limitations == direct.limitations and durable.runtime == direct.runtime
         assert durable.attempts[0].cleanup == direct.attempts[0].cleanup == "confirmed"
         assert durable_sandboxes.commands == direct_sandboxes.commands == list(commands)
@@ -377,6 +384,9 @@ def test_durable_environment_stage_without_its_ports_stops_like_direct_mode(temp
                 workflow_runner=workflow_runner()), 60)
         same_routing(direct, durable)
         assert durable.reason.startswith("environment produced no output: PreparationMissing: ")
+        # Review of #103: no sandbox was ever made, so cleanup is not "unconfirmed" in either mode.
+        assert durable.attempts[0].cleanup is direct.attempts[0].cleanup is None
+        assert durable.limitations == direct.limitations
         saved = dict(await histories(client, identity, request.config.getoption("--temporal-evidence-dir")))
         names = [e.activity_task_scheduled_event_attributes.activity_type.name for e in scheduled(saved[identity])]
         assert names == ["corsair.chain.select_runtime"] + (["corsair.chain.prepare_environment"] if environment else [])
