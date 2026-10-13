@@ -60,7 +60,12 @@ cases:
     - 4
     - 8
     adversarial_markers:
-    - .html
+    - .htm
+    - .svg
+    - .js
+    - .php
+    - .exe
+    - .txt
     witness_effect: file_open
     witness_markers:
     - open
@@ -98,8 +103,8 @@ cases:
         - Confirm tmp_path/uploads/portrait.html does not exist before the call
         implementation_call: avatars.store_avatar(uploads, 'portrait.html', b'<p>sentinel</p>')
         input: filename 'portrait.html', a non-image type, with harmless sentinel markup
-        required_behavior: The call is rejected with ValueError for the disallowed file type and tmp_path/uploads/portrait.html
-          is never opened or created
+        required_behavior: 'The disallowed upload is not stored: tmp_path/uploads/portrait.html is never opened
+          or created'
         observable_witness: No open audit event for tmp_path/uploads/portrait.html is recorded during the call (application
           observation); a sandbox or policy denial is recorded separately and is not a rejection
         witness:
@@ -111,7 +116,7 @@ cases:
         - *id001
       security_expectation:
         failure_type: AssertionError
-        safe_behavior: ValueError
+        safe_behavior: no_file_open
       discovery_command: *id002
       evidence_requirements:
       - Native discovery finds exactly the two planned test ids
@@ -179,6 +184,8 @@ cases:
     - 8
     adversarial_markers:
     - .env
+    - .htaccess
+    - .git
     witness_effect: file_open
     witness_markers:
     - open
@@ -426,7 +433,9 @@ cases:
     adversarial_markers:
     - private=True
     - 'private: True'
-    - marked private
+    - private = True
+    - private=true
+    - 'private: true'
     witness_effect: file_open
     witness_markers:
     - open
