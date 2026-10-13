@@ -118,8 +118,7 @@ def test_eval_command_files_runs_and_compares_with_the_previous_and_promoted_run
     second["summary"] = record["summary"] | {"clean_attempts": 11}
     text = eval_run.compare(second, record | {"reference_kind": "baseline"}, first)
     assert f"Compared with {first} (baseline)" in text and "clean attempts 12/12" in text
-    with pytest.raises(SystemExit):
-        eval_run.main(["environment"])
+    assert eval_run.SUITES["environment"].module == "evals.environment.evaluate"
 
 
 def test_author_witness_hooks_are_counted_as_a_score():
