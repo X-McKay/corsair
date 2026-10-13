@@ -166,13 +166,16 @@ def _maven(c: Collector, parents: Mapping[str, bytes]) -> None:
                             _add(c, kind, name, 'image', 'constraint', 'unparsed', pom, f'<{rule}>', None, reason=f'enforcer version {raw!r} does not resolve')
             if artifact == 'maven-toolchains-plugin':
                 for element in plugin.findall('configuration/toolchains/jdk/version'):
-                    if element.text and (value := _resolve(element.text.strip(), properties)):
-                        try:
-                            _add(c, 'runtime', 'jdk', 'image', 'pinned', 'toolchains', pom, '<toolchains>',
-                                 maven(value, java_feature) if value.startswith(('[', '(')) else series(java_feature(parse_version(value))),
-                                 listed=java_feature(parse_version(value)) if not value.startswith(('[', '(')) else None)
-                        except VersionSyntaxError:
-                            pass
+                    raw = (element.text or '').strip()
+                    value = _resolve(raw, properties) if raw else None
+                    try:
+                        if not value: raise VersionSyntaxError(f'toolchains JDK version {raw!r} does not resolve')
+                        _add(c, 'runtime', 'jdk', 'image', 'pinned', 'toolchains', pom, '<toolchains>',
+                             maven(value, java_feature) if value.startswith(('[', '(')) else series(java_feature(parse_version(value))),
+                             listed=java_feature(parse_version(value)) if not value.startswith(('[', '(')) else None)
+                    except VersionSyntaxError as error:
+                        _add(c, 'runtime', 'jdk', 'image', 'pinned', 'unparsed', pom, '<toolchains>', None,
+                             reason=f'toolchains JDK version {raw!r} not read: {error}'[:240])
 
     # Test frameworks: the root POM and its ancestors decide (dependencyManagement included); only when they name
     # none do reactor modules count, as alternatives (modules may pin different versions). POMs under `src/`
@@ -208,6 +211,9 @@ def _maven(c: Collector, parents: Mapping[str, bytes]) -> None:
             for v in versions: union = union.union(series(v))
             _add(c, 'test_framework', family, 'registry', 'constraint', 'dependency', pom, f'<artifactId>{artifact}', union,
                  listed=max(versions, key=version_key))
+            for unread_pom, unread_artifact, unread_raw, _ in (i for i in items if i[2] and i[3] is None):
+                _add(c, 'test_framework', family, 'registry', 'constraint', 'unparsed', unread_pom, f'<artifactId>{unread_artifact}',
+                     None, reason=f'{unread_artifact} version {unread_raw!r} does not resolve')
         elif all(not r for _, _, r, _ in items):
             _add(c, 'test_framework', family, 'registry', 'constraint', 'dependency', pom, f'<artifactId>{artifact}', ANY)
         else:
@@ -292,11 +298,28 @@ def _ci(c: Collector) -> None:
             c.unparsed('runtime', 'jdk', 'image', 'Jenkinsfile', 'buildPlugin', 'buildPlugin() without jdkVersions uses the shared library default', strength='tested')
     for path in ('.java-version', '.sdkmanrc', '.tool-versions'):
         if (text := c.text(path)) is not None:
-            line = text if path == '.java-version' else '\n'.join(l for l in text.splitlines() if re.match(r'\s*java\s*[=\s]', l))
-            match = re.search(r'(?:^|java\s*[=\s]\s*)(?:[A-Za-z-]*?)(1\.\d+|\d+)(?:[.\d]*)', line.strip(), re.M)
-            if match:
-                feature = java_feature(parse_version(match[1]))[0]
-                c.add('runtime', 'jdk', 'image', 'pinned', 'version-file', path, match[0].strip(), series((feature,)), listed=(feature,))
+            if path == '.java-version':
+                values = [l.strip() for l in text.splitlines() if l.strip() and not l.startswith('#')][:1]
+            else:
+                values = [m[1].strip() for m in re.finditer(r'^\s*java\s*[=\s]\s*(\S+)', text, re.M)]
+            for value in values:
+                feature = _version_file_jdk(value)
+                if feature is None:
+                    c.unparsed('runtime', 'jdk', 'image', path, value, f'not a JDK release: {value[:40]!r}', strength='pinned')
+                else:
+                    c.add('runtime', 'jdk', 'image', 'pinned', 'version-file', path, value, series((feature,)), listed=(feature,))
+
+
+def _version_file_jdk(value: str) -> int | None:
+    """The JDK feature release in a jenv, SDKMAN or asdf name: `17`, `1.8`, `openjdk64-17.0.2`, `oracle64-1.8.0.292`,
+    `17.0.2-tem`, `temurin-17.0.2+8`. The version starts the value or follows `-`/`_`, so a `64` in a vendor name is not
+    read as the release; `system` and other names without one are unread."""
+    match = re.search(r'java(\d+)(?=\D|$)', value) or re.search(r'(?:^|[-_])(1\.\d+|\d+)(?=[.+_-]|$)', value)
+    if not match: return None
+    try:
+        return java_feature(parse_version(match[1]))[0]
+    except VersionSyntaxError:
+        return None
 
 
 def detect(c: Collector, parents: Mapping[str, bytes]) -> None:

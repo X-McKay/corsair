@@ -10,6 +10,7 @@ from corsair.nodes.runtime.contracts import (AxisCheck, Component, Language, Nee
                                              Selection, Supported, Undetermined, Unsupported, _Frozen)
 from corsair.nodes.runtime.versions import parse_set, parse_version
 
+MAX_TEXT = 240  # contracts.Text
 MATRIX = Path(__file__).resolve().parents[4] / 'deploy/runtime-matrix.yaml'
 Name = str
 VersionText = str
@@ -54,12 +55,12 @@ class FrameworkRow(_Frozen):
     language: Language
     versions: str = Field(description='Canonical version set the runner and report parser are qualified for')
     runner: str
-    images: tuple[str, ...] = Field(default=(), description='Image ids this range was qualified on; empty means every '
-                                                            'image of the language')
+    images: tuple[str, ...] = Field(min_length=1, description='Image ids this range was qualified on; a new image row has '
+                                                                'no framework support until its own range is qualified')
     qualification: Qualification
 
     def applies(self, row: 'ImageRow') -> bool:
-        return row.language == self.language and (not self.images or row.id in self.images)
+        return row.language == self.language and row.id in self.images
 
     @field_validator('versions')
     @classmethod
@@ -123,7 +124,7 @@ def _missing(requirement: RuntimeRequirement) -> list[str]:
     if not any(c.declared for c in requirement.component('test_framework')):
         reasons = '; '.join(f'{u.path}:{u.line} {u.reason}' for c in requirement.component('test_framework') for u in c.unparsed)[:200]
         missing.append('test framework not identified' + (f' ({reasons})' if reasons else ''))
-    return missing
+    return [m[:MAX_TEXT] for m in missing]
 
 
 def select(requirement: RuntimeRequirement, matrix: Matrix) -> Selection:
@@ -153,7 +154,7 @@ def select(requirement: RuntimeRequirement, matrix: Matrix) -> Selection:
         rejected.append(Rejection(image_id=row.id, unmet=tuple(unmet + ([] if any(f.satisfied for f in frameworks) else frameworks))))
     if runtime_fits and unread:
         return Undetermined(status='undetermined', missing=tuple(
-            f'{name} test framework declaration not understood: {reasons}' for name, reasons in unread.items())[:64])
+            f'{name} test framework declaration not understood: {reasons}'[:MAX_TEXT] for name, reasons in unread.items())[:64])
     unmet = {(c.kind, c.name) for c in min(rejected, key=lambda r: len(r.unmet)).unmet} if rejected else \
         {(c.kind, c.name) for c in wanted}
     needs = tuple(Need(kind=c.kind, name=c.name, allowed=c.allowed, preferred=c.preferred)

@@ -5,7 +5,7 @@ import json
 import re
 import tomllib
 
-from corsair.nodes.runtime.declarations import Collector, ci_versions
+from corsair.nodes.runtime.declarations import Collector, ci_versions, typed
 from corsair.nodes.runtime.versions import VersionSyntaxError, exactly, parse_version, pep440, poetry, series
 
 CLASSIFIER = re.compile(r'Programming Language :: Python :: (\d+\.\d+)$')
@@ -13,6 +13,10 @@ REQUIREMENT = re.compile(r'^\s*(pytest)\s*(?:\[[^\]]*\])?\s*([<>=!~][^;#]*)?(?:;
 TOX_ENV = re.compile(r'^py(\d)(\d+)$')
 CI_KEYS = ('python-version', 'python', 'python_version', 'py', 'python-versions')
 FRAMEWORK = ('test_framework', 'pytest', 'registry')
+RUNTIME = ('runtime', 'cpython', 'image')
+MAX_TOX_ENVS = 128
+# requirements.txt, requirements-dev.txt, test-requirements.txt, dev_requirements.in, ...
+REQUIREMENTS_FILE = r'([\w.]+[-_])?requirements([-_.][\w.-]*)?\.(txt|in)'
 
 
 def _runtime(c: Collector, strength, source, path, needle, text, listed_series=True):
@@ -42,6 +46,19 @@ def _pytest(c: Collector, path: str, needle: str, spec: str | None, source: str)
         c.unparsed(*FRAMEWORK, path, needle, str(error))
 
 
+def _spec(c: Collector, table: dict, path: str) -> str | None:
+    """The pytest requirement in a Pipfile or Poetry dependency table: a string, or a table's `version` string."""
+    value = typed(c, table, 'pytest', (str, dict), FRAMEWORK, path, 'pytest')
+    return typed(c, value, 'version', str, FRAMEWORK, path, 'pytest') if isinstance(value, dict) else value
+
+
+def _pipfile_python(c: Collector, path: str, requires: dict | None) -> None:
+    """Both `python_version` and `python_full_version` are pins; both are kept, so a full pin narrows the series."""
+    for key in ('python_version', 'python_full_version'):
+        if (version := typed(c, requires, key, str, RUNTIME, path, key, 'pinned')) is not None:
+            _runtime(c, 'pinned', 'pipfile', path, key, version, listed_series=False)
+
+
 def _classifiers(c: Collector, path: str, values):
     for value in values:
         if (match := CLASSIFIER.search(value.strip())):
@@ -61,26 +78,49 @@ def detect(c: Collector) -> None:
         except tomllib.TOMLDecodeError as error:
             c.unparsed('runtime', 'cpython', 'image', 'pyproject.toml', '', f'invalid TOML: {error}')
             data = {}
-        project = data.get('project') if isinstance(data.get('project'), dict) else {}
-        if isinstance(project.get('requires-python'), str):
-            _requires_python(c, 'pyproject.toml', 'requires-python', project['requires-python'])
-        _classifiers(c, 'pyproject.toml', [x for x in project.get('classifiers') or [] if isinstance(x, str)] if isinstance(project.get('classifiers'), list) else [])
-        optional = project.get('optional-dependencies') if isinstance(project.get('optional-dependencies'), dict) else {}
-        _requirement_lines(c, 'pyproject.toml', [r for group in optional.values() if isinstance(group, list) for r in group if isinstance(r, str)], 'extras')
-        tool = data.get('tool') if isinstance(data.get('tool'), dict) else {}
-        poetry_table = tool.get('poetry') if isinstance(tool.get('poetry'), dict) else {}
-        python = (poetry_table.get('dependencies') or {}).get('python') if isinstance(poetry_table.get('dependencies'), dict) else None
-        if isinstance(python, str):
+        here = 'pyproject.toml'
+        project = typed(c, data, 'project', dict, RUNTIME, here, '[project]') or {}
+        if (spec := typed(c, project, 'requires-python', str, RUNTIME, here)) is not None:
+            _requires_python(c, here, 'requires-python', spec)
+        _classifiers(c, here, [x for x in project.get('classifiers') or [] if isinstance(x, str)] if isinstance(project.get('classifiers'), list) else [])
+        optional = typed(c, project, 'optional-dependencies', dict, FRAMEWORK, here) or {}
+        for group in list(optional):
+            entries = typed(c, optional, group, list, FRAMEWORK, here) or []
+            if any(not isinstance(r, str) for r in entries):
+                c.unparsed(*FRAMEWORK, here, group, f'optional-dependencies {group!r} lists a non-string entry')
+            _requirement_lines(c, here, [r for r in entries if isinstance(r, str)], 'extras')
+        tool = typed(c, data, 'tool', dict, RUNTIME, here, '[tool') or {}
+        poetry_table = typed(c, tool, 'poetry', dict, RUNTIME, here, '[tool.poetry') or {}
+        dependencies = typed(c, poetry_table, 'dependencies', dict, RUNTIME, here, '[tool.poetry.dependencies') or {}
+        python = typed(c, dependencies, 'python', str, RUNTIME, here, 'python')
+        if python is not None:
             try:  # Poetry's caret/tilde/comma syntax maps onto npm-style ranges
                 c.add('runtime', 'cpython', 'image', 'constraint', 'requires-python', 'pyproject.toml', 'python',
                       poetry(python))
             except VersionSyntaxError as error:
                 c.unparsed('runtime', 'cpython', 'image', 'pyproject.toml', 'python', str(error))
-        for group in ('dev-dependencies',):
-            pytest = poetry_table.get(group).get('pytest') if isinstance(poetry_table.get(group), dict) else None
-            if isinstance(pytest, str):
-                try: c.add(*FRAMEWORK, 'constraint', 'poetry', 'pyproject.toml', 'pytest', poetry(pytest))
-                except VersionSyntaxError as error: c.unparsed(*FRAMEWORK, 'pyproject.toml', 'pytest', str(error))
+        # Poetry dependency tables: the main and legacy dev tables, and every Poetry >= 1.2 group.
+        tables = [dependencies, typed(c, poetry_table, 'dev-dependencies', dict, FRAMEWORK, here) or {}]
+        for name, group in (typed(c, poetry_table, 'group', dict, FRAMEWORK, here, '[tool.poetry.group') or {}).items():
+            group = typed(c, {name: group}, name, dict, FRAMEWORK, here, f'[tool.poetry.group.{name}') or {}
+            tables.append(typed(c, group, 'dependencies', dict, FRAMEWORK, here, f'[tool.poetry.group.{name}') or {})
+        for table in tables:
+            pytest = _spec(c, table, here)
+            if pytest is not None:
+                try: c.add(*FRAMEWORK, 'constraint', 'poetry', here, 'pytest', poetry(pytest))
+                except VersionSyntaxError as error: c.unparsed(*FRAMEWORK, here, 'pytest', str(error))
+        # PEP 735 dependency groups (string entries; include-group tables name other groups) and uv's dev list.
+        groups = typed(c, data, 'dependency-groups', dict, FRAMEWORK, here, '[dependency-groups]') or {}
+        for name in list(groups):
+            for entry in typed(c, groups, name, list, FRAMEWORK, here) or []:
+                if isinstance(entry, str): _requirement_lines(c, here, [entry], 'dependency-groups')
+                elif not (isinstance(entry, dict) and set(entry) == {'include-group'} and entry['include-group'] in groups):
+                    c.unparsed(*FRAMEWORK, here, name, f'dependency-groups {name!r} entry {str(entry)[:40]!r} is not a requirement or include-group')
+        uv = typed(c, tool, 'uv', dict, FRAMEWORK, here, '[tool.uv') or {}
+        uv_dev = typed(c, uv, 'dev-dependencies', list, FRAMEWORK, here) or []
+        _requirement_lines(c, here, [r for r in uv_dev if isinstance(r, str)], 'uv')
+        if any(not isinstance(r, str) for r in uv_dev):
+            c.unparsed(*FRAMEWORK, here, 'dev-dependencies', 'tool.uv dev-dependencies lists a non-string entry')
         if 'pytest' in tool:
             c.add(*FRAMEWORK, 'constraint', 'config', 'pyproject.toml', '[tool.pytest', pep440(''))
         backend = data['build-system'].get('build-backend') if isinstance(data.get('build-system'), dict) else None
@@ -123,7 +163,7 @@ def detect(c: Collector) -> None:
                     _pytest(c, 'setup.py', node.value, match[2], 'setup.py')
     for path in sorted(files):
         name = path.rsplit('/', 1)[-1]
-        if (path.count('/') == 0 and re.fullmatch(r'requirements.*\.(txt|in)', name)) or re.fullmatch(r'requirements/[^/]+\.(txt|in)', path):
+        if (path.count('/') == 0 and re.fullmatch(REQUIREMENTS_FILE, name)) or re.fullmatch(r'requirements/[^/]+\.(txt|in)', path):
             _requirement_lines(c, path, (c.text(path) or '').splitlines(), 'requirements')
     if (text := c.text('tox.ini')) is not None:
         parser = configparser.ConfigParser(interpolation=None, strict=False)
@@ -132,8 +172,12 @@ def detect(c: Collector) -> None:
         except configparser.Error as error:
             c.unparsed('runtime', 'cpython', 'image', 'tox.ini', '', f'invalid tox.ini: {error}')
         else:
-            if parser.has_option('tox', 'envlist'):
-                for env in _expand(parser.get('tox', 'envlist')):
+            envs = _expand(parser.get('tox', 'envlist')) if parser.has_option('tox', 'envlist') else []
+            if envs is None:
+                c.unparsed(*RUNTIME, 'tox.ini', 'envlist', f'envlist expands to more than {MAX_TOX_ENVS} environments')
+                envs = []
+            if envs:
+                for env in envs:
                     for factor in env.split('-'):
                         if (match := TOX_ENV.fullmatch(factor)):
                             _runtime(c, 'tested', 'tox', 'tox.ini', factor, f'{match[1]}.{match[2]}')
@@ -159,21 +203,10 @@ def detect(c: Collector) -> None:
         except tomllib.TOMLDecodeError as error:
             c.unparsed('runtime', 'cpython', 'image', 'Pipfile', '', f'invalid TOML: {error}')
             data = {}
-        requires = data.get('requires', {})
-        if not isinstance(requires, dict):
-            c.unparsed('runtime', 'cpython', 'image', 'Pipfile', 'requires', f'[requires] is a {type(requires).__name__}, not a table')
-            requires = {}
-        version = requires.get('python_version') or requires.get('python_full_version')
-        if isinstance(version, str) and version:
-            _runtime(c, 'pinned', 'pipfile', 'Pipfile', 'python_', version, listed_series=False)
-        elif version:
-            c.unparsed('runtime', 'cpython', 'image', 'Pipfile', 'python_', f'python version {version!r} is not a string', strength='pinned')
+        _pipfile_python(c, 'Pipfile', typed(c, data, 'requires', dict, RUNTIME, 'Pipfile', '[requires]', 'pinned'))
         for group in ('dev-packages', 'packages'):
-            table = data.get(group, {})
-            if not isinstance(table, dict):
-                c.unparsed(*FRAMEWORK, 'Pipfile', group, f'[{group}] is a {type(table).__name__}, not a table')
-            elif isinstance(table.get('pytest'), str):
-                _pytest(c, 'Pipfile', 'pytest', '' if table['pytest'] == '*' else table['pytest'], 'pipfile')
+            if (spec := _spec(c, typed(c, data, group, dict, FRAMEWORK, 'Pipfile', f'[{group}]') or {}, 'Pipfile')) is not None:
+                _pytest(c, 'Pipfile', 'pytest', '' if spec == '*' else spec, 'pipfile')
     for path, key in (('uv.lock', 'requires-python'), ('poetry.lock', 'python-versions')):
         if (text := c.text(path)) is None: continue
         # The project-wide range is uv's top-level `requires-python` or Poetry's `[metadata] python-versions`;
@@ -201,14 +234,20 @@ def detect(c: Collector) -> None:
         _runtime(c, 'tested', source, path, value, value)
     if (text := c.text('Pipfile.lock')) is not None:
         try:
-            version = ((json.loads(text).get('_meta') or {}).get('requires') or {}).get('python_version')
-            if version: _runtime(c, 'pinned', 'pipfile', 'Pipfile.lock', 'python_version', str(version), listed_series=False)
-        except (json.JSONDecodeError, AttributeError):
-            c.unparsed('runtime', 'cpython', 'image', 'Pipfile.lock', '', 'invalid JSON or not a Pipfile.lock structure')
+            data = json.loads(text)
+        except json.JSONDecodeError as error:
+            c.unparsed(*RUNTIME, 'Pipfile.lock', '', f'invalid JSON: {error}', strength='pinned')
+            data = {}
+        if not isinstance(data, dict):
+            c.unparsed(*RUNTIME, 'Pipfile.lock', '', 'not a JSON object', strength='pinned')
+            data = {}
+        meta = typed(c, data, '_meta', dict, RUNTIME, 'Pipfile.lock', '"_meta"', 'pinned') or {}
+        _pipfile_python(c, 'Pipfile.lock', typed(c, meta, 'requires', dict, RUNTIME, 'Pipfile.lock', '"requires"', 'pinned'))
 
 
-def _expand(envlist: str) -> list[str]:
-    """tox envlist entries with `{a,b}` factor groups expanded; comma or newline separated."""
+def _expand(envlist: str) -> list[str] | None:
+    """tox envlist entries with `{a,b}` factor groups expanded; comma or newline separated. None when the expansion
+    would exceed MAX_TOX_ENVS, checked before each product is materialised (eight groups already make 256)."""
     entries, depth, current = [], 0, ''
     for char in envlist:
         if char == ',' and depth == 0 or char == '\n':
@@ -227,5 +266,7 @@ def _expand(envlist: str) -> list[str]:
             if not match:
                 expanded.append(item)
                 continue
-            stack += [item[:match.start()] + option.strip() + item[match.end():] for option in match[1].split(',')]
+            options = match[1].split(',')
+            if len(expanded) + len(stack) + len(options) > MAX_TOX_ENVS: return None
+            stack += [item[:match.start()] + option.strip() + item[match.end():] for option in options]
     return expanded

@@ -16,6 +16,8 @@ from corsair.nodes.runtime.versions import ANY, Version, VersionSet, render, ver
 
 TESTED_RANK = ('ci', 'tox', 'classifier', 'derived')
 MAX_TEXT = 240
+# Component contract limits (contracts.py): longer values are bounded here, never left to fail validation.
+MAX_SET, MAX_NAME, MAX_PATH, MAX_VERSION = 512, 64, 512, 64
 
 
 @dataclass(frozen=True)
@@ -56,6 +58,19 @@ class Collector:
         self.add(kind, name, provider, strength, 'unparsed', path, needle, None, reason=reason, line=line)
 
 
+def typed(c: Collector, table, key: str, expected: type | tuple[type, ...], component: tuple[Kind, str, Provider],
+          path: str, needle: str | None = None, strength: Strength = 'constraint'):
+    """`table[key]` when present with the expected type, else None. A present value of another type is recorded as
+    unparsed against `component`, so a malformed declaration blocks selection instead of disappearing."""
+    if not isinstance(table, dict) or key not in table: return None
+    value = table[key]
+    if isinstance(value, expected) and not isinstance(value, bool): return value
+    names = ' or '.join(t.__name__ for t in (expected if isinstance(expected, tuple) else (expected,)))
+    c.unparsed(*component, path, needle or key, f'{key} is {type(value).__name__} {str(value)[:40]!r}, expected {names}',
+               strength=strength)
+    return None
+
+
 def line_of(text: str, needle: str) -> int:
     """1-based line of the first occurrence of `needle`; 1 when absent (the whole file is the citation)."""
     index = text.find(needle) if needle else -1
@@ -90,14 +105,21 @@ def combine(declarations: Iterable[Declaration]) -> tuple[Component, ...]:
         listed = sorted({d.listed for d in chosen if d.listed is not None and allowed.contains(d.listed)},
                         key=version_key)
         preferred = render(listed[-1]) if listed else (render(allowed.lowest) if allowed.lowest else None)
+        if preferred is not None and len(preferred) > MAX_VERSION: preferred = None
         used = {id(d) for d in parsed if d.strength == 'constraint'} | {id(d) for d in chosen}
+        unparsed = [Unparsed(path=d.path[:MAX_PATH], line=d.line, text=d.text, strength=d.strength, reason=d.reason[:MAX_TEXT])
+                    for d in items if d.versions is None]
+        if len(str(allowed)) > MAX_SET:  # too many disjoint ranges to carry: unread, never silently widened
+            first = parsed[0]
+            unparsed.insert(0, Unparsed(path=first.path[:MAX_PATH], line=first.line, text=first.text, strength='constraint',
+                                        reason=f'combined version set has {len(allowed.intervals)} ranges, over the {MAX_SET}-character limit'))
+            allowed, preferred, parsed, used = ANY, None, [], set()
         components.append(Component(
-            kind=kind, name=name, provider=items[0].provider, allowed=str(allowed), preferred=preferred,
+            kind=kind, name=name[:MAX_NAME], provider=items[0].provider, allowed=str(allowed), preferred=preferred,
             declared=bool(parsed), conflict=allowed.is_empty,
-            evidence=tuple(Evidence(path=d.path, line=d.line, text=d.text, strength=d.strength, source=d.source,
+            evidence=tuple(Evidence(path=d.path[:MAX_PATH], line=d.line, text=d.text, strength=d.strength, source=d.source,
                                     declares=str(d.versions)[:MAX_TEXT]) for d in parsed if id(d) in used)[:64],
-            unparsed=tuple(Unparsed(path=d.path, line=d.line, text=d.text, strength=d.strength, reason=d.reason[:MAX_TEXT])
-                           for d in items if d.versions is None)[:64]))
+            unparsed=tuple(unparsed[:64])))
     return tuple(components)
 
 

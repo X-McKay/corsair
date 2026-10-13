@@ -203,6 +203,10 @@ def test_selection_supported_unsupported_conflict():
                                                                          b'org.junit.jupiter</groupId><artifactId>junit-jupiter').replace(b'4.12', b'5.14.4')}, 'java')
     selection = select(java17, matrix)
     assert selection.status == 'unsupported' and [n.name for n in selection.needs] == ['junit5']  # no Maven runner row yet
+    with_runner = Matrix.model_validate({**matrix.model_dump(), 'frameworks': [*matrix.model_dump()['frameworks'], {
+        'name': 'junit5', 'language': 'java', 'versions': '>=5.13', 'runner': 'x', 'images': ['temurin-17-maven'],
+        'qualification': {'records': ['SPEC-0039'], 'report': 'x'}}]})
+    assert select(java17, with_runner).status == 'supported'
     # SPEC-0045 rows, staged here until the live gate passes (a row is added only with passing evidence).
     staged = Matrix.model_validate({**matrix.model_dump(), 'images': [*matrix.model_dump()['images'], STAGED_JDK8],
                                     'frameworks': [*matrix.model_dump()['frameworks'], *STAGED_JUNIT]})
@@ -345,6 +349,133 @@ def test_framework_rows_scoped_to_images():
     assert select(python_project('>=3.7,<3.8', '==6.2.5'), matrix).image_id == 'cpython-3.7-pytest'
     assert select(python_project('>=3.12', '==6.2.5'), matrix).status == 'unsupported'  # pytest 6 not qualified on 3.12
     with pytest.raises(ValueError, match='duplicate framework row'):
-        Matrix.model_validate({**data, 'images': [py312, py37], 'frameworks': [new, {**old, 'images': []}]})
+        Matrix.model_validate({**data, 'images': [py312, py37], 'frameworks': [new, {**old, 'images': [py312['id'], py37['id']]}]})
+    with pytest.raises(ValueError, match='at least 1'):
+        Matrix.model_validate({**data, 'frameworks': [{**new, 'images': []}]})
+    # Al's re-review of dbbb980: a new image row without its own framework row gets no framework support.
+    unscoped = Matrix.model_validate({**data, 'images': [py312, py37, *data['images'][1:]]})
+    probe = detect({'pyproject.toml': b'[project]\nrequires-python = ">=3.7,<3.8"\n[tool.pytest.ini_options]\n'}, 'python')
+    assert select(probe, unscoped).status == 'unsupported'
     with pytest.raises(ValueError, match='not a python row'):
         Matrix.model_validate({**data, 'frameworks': [{**old, 'images': ['temurin-17-maven']}]})
+
+
+def test_pipfile_full_version_narrows_the_series():
+    # Al's re-review of dbbb980: python_full_version was dropped when python_version was also present.
+    pipfile = b'[requires]\npython_version = "3.12"\npython_full_version = "3.12.14"\n[dev-packages]\npytest = ">=9,<10"\n'
+    runtime = component(detect({'Pipfile': pipfile}, 'python'), 'runtime', 'cpython')
+    assert runtime.allowed == '==3.12.14'
+    assert select(detect({'Pipfile': pipfile}, 'python'), load()).status == 'unsupported'  # the image is 3.12.15
+    pinned = detect({'Pipfile': pipfile, '.python-version': b'3.12.15\n'}, 'python')
+    assert select(pinned, load()).status == 'undetermined'  # conflicting pins
+    malformed = detect({'Pipfile': pipfile.replace(b'"3.12.14"', b'3'), '.python-version': b'3.12.15\n'}, 'python')
+    assert select(malformed, load()).status == 'undetermined'
+
+
+def test_present_malformed_values_block_instead_of_disappearing():
+    # Al's re-review: a non-string requires-python was dropped and selection reported supported.
+    files = {'pyproject.toml': b'[project]\nrequires-python = 313\n', '.python-version': b'3.12.15\n',
+             'requirements.txt': b'pytest>=9,<10\n'}
+    selection = select(detect(files, 'python'), load())
+    assert selection.status == 'undetermined' and 'requires-python is int' in selection.missing[0]
+    # Al's re-review: non-object dependencies raised TypeError; they are now recorded against the framework.
+    for dependencies in (b'["mocha"]', b'"mocha"'):
+        package = b'{"dependencies": %s, "scripts": {"test": "mocha"}, "engines": {"node": ">=8"}}' % dependencies
+        requirement = detect({'package.json': package}, 'javascript')
+        assert any('dependencies is' in u.reason for c in requirement.components for u in c.unparsed)
+    # A non-string framework version is unread, not "any version".
+    jest = detect({'package.json': b'{"devDependencies": {"jest": 24}, "scripts": {"test": "jest"}}'}, 'javascript')
+    assert not component(jest, 'test_framework', 'jest').declared
+    # Poetry's table form of a dependency is read; Perl META structure is checked.
+    poetry_table = b'[tool.poetry.dependencies]\npython = ">=3.9"\n[tool.poetry.dev-dependencies]\npytest = {version = "^9.0"}\n'
+    assert component(detect({'pyproject.toml': poetry_table}, 'python'), 'test_framework', 'pytest').allowed == '>=9.0,<10'
+    meta = detect({'Makefile.PL': b'', 'META.json': b'{"prereqs": {"runtime": [1]}}'}, 'perl')
+    assert component(meta, 'runtime', 'perl').unparsed
+
+
+def test_structurally_malformed_metadata_never_raises():
+    # Seeded sweep of valid TOML/JSON/YAML with wrong shapes through detect and select (Al's re-review asked for
+    # malformed-structure cases, not only syntax errors). A raise here would abort a whole benchmark batch.
+    import json, random
+    rng, matrix = random.Random(7), load()
+    keys = ['project', 'requires', 'packages', 'dev-packages', 'metadata', 'requires-python', 'python-versions', 'tool', 'poetry',
+            'build-system', '_meta', 'engines', 'scripts', 'dependencies', 'devDependencies', 'dev-dependencies', 'packageManager',
+            'prereqs', 'runtime', 'jobs', 'matrix', 'strategy', 'include', 'steps', 'with', 'python', 'python-version', 'node_js',
+            'perl', 'test', 'pytest', 'jest', 'version', 'python_version', 'python_full_version', 'optional-dependencies', 'node']
+    leaves = [1, 1.5, True, [], ['x'], [1, {}], 'x', '>=3', '3.12']
+
+    def value(depth):
+        r = rng.random()
+        if depth > 3 or r < 0.35: return rng.choice(leaves)
+        if r < 0.45: return [value(depth + 1) for _ in range(rng.randint(1, 2))]
+        return {rng.choice(keys): value(depth + 1) for _ in range(rng.randint(1, 3))}
+
+    def toml(v):
+        if isinstance(v, bool): return 'true' if v else 'false'
+        if isinstance(v, (int, float)): return str(v)
+        if isinstance(v, str): return json.dumps(v)
+        if isinstance(v, list): return '[' + ', '.join(toml(x) for x in v) + ']'
+        return '{' + ', '.join(f'{json.dumps(k)} = {toml(x)}' for k, x in v.items()) + '}'
+
+    targets = [('python', 'setup.py', f) for f in ('pyproject.toml', 'Pipfile', 'poetry.lock', 'uv.lock', 'Pipfile.lock', '.travis.yml',
+                                                     '.github/workflows/ci.yml')]
+    targets += [('javascript', 'package.json', f) for f in ('package.json', 'appveyor.yml')]
+    targets += [('perl', 'Makefile.PL', f) for f in ('META.json', 'META.yml')]
+    for _ in range(300):
+        doc = {rng.choice(keys): value(1) for _ in range(rng.randint(1, 3))}
+        for language, marker, path in targets:
+            body = '\n'.join(f'{json.dumps(k)} = {toml(v)}' for k, v in doc.items()) if path in ('pyproject.toml', 'Pipfile', 'poetry.lock', 'uv.lock') \
+                else json.dumps(doc)
+            requirement = detect({marker: b'{}' if marker == 'package.json' else b'', path: body.encode()}, language)
+            if not isinstance(requirement, str): select(requirement, matrix)
+
+
+def test_tox_expansion_and_oversized_sets_are_bounded():
+    # Al's re-review: eight {1,2} groups made 256 versions and raised Component.allowed's length check.
+    tox = b'[tox]\nenvlist = py' + b'{1,2}' * 8 + b'\n[testenv]\ncommands = pytest\n'
+    selection = select(detect({'tox.ini': tox}, 'python'), load())
+    assert selection.status == 'undetermined' and 'envlist expands to more than' in selection.missing[0]
+    many = '\n'.join(f'          - "3.{n}"' for n in range(200)).encode()
+    ci = b'jobs:\n  test:\n    strategy:\n      matrix:\n        python:\n' + many + b'\n    steps:\n      - run: pytest\n'
+    runtime = component(detect({'setup.py': b'', '.github/workflows/t.yml': ci}, 'python'), 'runtime', 'cpython')
+    assert not runtime.declared and 'over the 512-character limit' in runtime.unparsed[0].reason
+
+
+@pytest.mark.parametrize('files', [
+    {'pyproject.toml': b'[tool.poetry.dependencies]\npython = "^3.12"\n[tool.poetry.group.dev.dependencies]\npytest = "^7.4"\n[tool.pytest.ini_options]\n'},
+    {'pyproject.toml': b'[project]\nrequires-python = ">=3.12"\n[dependency-groups]\ntest = ["pytest>=7,<8"]\ndev = [{include-group = "test"}]\n'},
+    {'pyproject.toml': b'[project]\nrequires-python = ">=3.12"\n[tool.uv]\ndev-dependencies = ["pytest>=7,<8"]\n'},
+    {'setup.py': b'', '.python-version': b'3.12.15\n', 'test-requirements.txt': b'pytest>=7,<8\n'},
+    {'setup.py': b'', '.python-version': b'3.12.15\n', 'dev_requirements.txt': b'pytest>=7,<8\n'},
+])
+def test_modern_pytest_constraints_are_read(files):
+    # Al's re-review: Poetry groups, PEP 735 groups, uv dev lists and *-requirements.txt were missed, so a <8 project
+    # was reported supported on the pytest 9 runner.
+    assert all(is_build_file(path) for path in files)
+    requirement = detect(files, 'python')
+    assert parse_set(component(requirement, 'test_framework', 'pytest').allowed).contains(v('7.4'))
+    assert select(requirement, load()).status == 'unsupported'
+
+
+def test_java_unread_pins_and_version_file_names():
+    junit = ('<dependencies><dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId>'
+             '<version>5.14.0</version></dependency></dependencies>')
+    matrix = Matrix.model_validate({**load().model_dump(), 'frameworks': [*load().model_dump()['frameworks'], {
+        'name': 'junit5', 'language': 'java', 'versions': '5.14.*', 'runner': 'x', 'images': ['temurin-17-maven'],
+        'qualification': {'records': ['SPEC-0039'], 'report': 'x'}}]})
+    base = '<properties><maven.compiler.release>17</maven.compiler.release></properties>'
+    assert select(detect({'pom.xml': pom(base + junit)}, 'java'), matrix).status == 'supported'
+    # Al's re-review: an unreadable or undefined toolchains JDK pin was dropped and 17 was selected.
+    for version in ('21-ea', '${tc.jdk}'):
+        toolchain = (f'<build><plugins><plugin><artifactId>maven-toolchains-plugin</artifactId><configuration><toolchains>'
+                     f'<jdk><version>{version}</version></jdk></toolchains></configuration></plugin></plugins></build>')
+        assert select(detect({'pom.xml': pom(base + toolchain + junit)}, 'java'), matrix).status == 'undetermined'
+    # A family with one readable and one unresolved version counts as unread.
+    engine = junit.replace('</dependencies>', '<dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter-engine'
+                           '</artifactId><version>${engine}</version></dependency></dependencies>')
+    assert select(detect({'pom.xml': pom(base + engine)}, 'java'), matrix).status == 'undetermined'
+    # jenv names: the 64 in a vendor name is not the release; `system` is an unread pin.
+    for name, allowed in ((b'openjdk64-17.0.2\n', '17.*'), (b'oracle64-1.8.0.292\n', '8.*')):
+        assert component(detect({'pom.xml': pom(''), '.java-version': name}, 'java'), 'runtime', 'jdk').allowed == allowed
+    system = component(detect({'pom.xml': pom(''), '.java-version': b'system\n'}, 'java'), 'runtime', 'jdk')
+    assert not system.declared and system.unparsed[0].strength == 'pinned'

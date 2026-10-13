@@ -7,9 +7,9 @@
 # (the hybrid in SPEC-0042) and must stay empty until such an image is qualified.
 # `frameworks` lists the test framework versions a Corsair runner and report parser are qualified for; the
 # framework itself is the project's own dependency, installed during setup, so a project version range must
-# overlap the qualified range and setup then pins a version inside the overlap. A framework row's optional
-# `images` list scopes it to the image ids its range was qualified on (empty: every image of that language); one
-# framework name may then have several rows with different ranges, at most one per image.
+# overlap the qualified range and setup then pins a version inside the overlap. A framework row's required
+# `images` list names the image ids its range was qualified on, so a new image row has no framework support until
+# a range is qualified on it; one framework name may have several rows with different ranges, at most one per image.
 schema_version: 1
 images:
   - id: cpython-3.12-pytest
@@ -39,6 +39,7 @@ frameworks:
     language: python
     versions: 9.0.*
     runner: src/corsair/adapters/pytest_runner.py
+    images: [cpython-3.12-pytest]
     qualification:
       records: [SPEC-0028, PLAN-0027, SPEC-0032, PLAN-0032]
       report: docs/qualification/openshell-test-workspace.md

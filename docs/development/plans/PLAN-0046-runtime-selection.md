@@ -26,7 +26,7 @@ Implement [SPEC-0042](../specs/SPEC-0042-runtime-selection.md) offline: detect e
 
 ## Validation and progress
 
-Offline: `make test-config` passed 892 checks on the original base (853 plus 37 runtime unit checks, 4 of them for the hand-off, and 2 matrix guards), 999 after merging main at `c8f3964` (with #41, #45 and #46), 1004 after the review fixes (5 more checks), 1024 after merging main at `8c29e16` (with #42), 1036 after merging `6be1b5f` (with #47), 1084 after merging `42a7273` (with #39), and 1085 with image-scoped framework rows.
+Offline: `make test-config` passed 892 checks on the original base (853 plus 37 runtime unit checks, 4 of them for the hand-off, and 2 matrix guards), 999 after merging main at `c8f3964` (with #41, #45 and #46), 1004 after the review fixes (5 more checks), 1024 after merging main at `8c29e16` (with #42), 1036 after merging `6be1b5f` (with #47), 1084 after merging `42a7273` (with #39), 1085 with image-scoped framework rows, 1088 after the second review's first three fixes, 1093 after merging `f6a87d6` (#58), and 1100 after the remaining seven threads.
 
 Report run in the cloud container on 2026-10-13, against the pins file from PR #42's branch `claude/benchmark-repo-fetch-g6cnts` (head `4167369`):
 
@@ -105,7 +105,24 @@ Al's GitHub review of `eac99a2` found three P2 issues, each reproduced and fixed
 - `poetry.lock`'s first `[[package]]` `python-versions` was read as the project range. Both lockfiles are now parsed as TOML: `[metadata] python-versions` for Poetry, top-level `requires-python` for uv;
 - a valid TOML Pipfile with `requires = "3.12"` raised `AttributeError`. Pipfile tables are type-checked and recorded as unparsed. A wider sweep of 10 build-file names per language against structurally wrong but valid TOML, JSON and YAML found no other crash.
 
-The CPython 3.7 image thread pointed out that per-language framework rows would let a 3.7 image claim pytest 9 (qualified only on 3.12) and the reverse. Framework rows now take an optional `images` scope, with a selection check over two scoped pytest rows and loader refusals for overlap and foreign image ids; both toolchain threads were told by cross-session message.
+Al's re-review of `dbbb980` found three more bounded parser cases, each reproduced and fixed with a check through `detect`/`select` that fails on the old code:
+- Pipfile `python_version` hid `python_full_version`; both are now pins, so `3.12` plus `3.12.14` allows only 3.12.14 and a `.python-version` of 3.12.15 conflicts;
+- a present but non-string `requires-python` (`313`) was silently dropped and selection reported supported;
+- a non-object `dependencies` in package.json raised `TypeError`.
+
+The root cause was one pattern: `isinstance` guards that treated a present value of the wrong type as absent. A shared `typed()` accessor now records such a value as unparsed against the component it would have declared (runtime, image tool or framework). It is applied to every requirement-bearing field in pyproject, Pipfile, Pipfile.lock, Poetry/uv locks, package.json and Perl META; CI shapes stay tested alternatives. A non-string framework version in package.json is now unread instead of "any version", and Poetry/Pipfile table forms (`pytest = {version = "^9.0"}`) are read. A seeded sweep of 52,000 wrong-shape TOML/JSON/YAML documents through `detect` and `select` found one further crash (an `undetermined` reason over the 240-character contract limit), now truncated; a 300-document version of that sweep is a unit check. The report did not change.
+
+The same re-review (posted from Al's account) added seven threads, all fixed with checks that fail on the old code:
+- framework `images` is required, and the pytest row is scoped to `cpython-3.12-pytest`, so a new image row gets no framework support by default (blocking);
+- pytest constraints in Poetry groups, PEP 735 `dependency-groups`, `tool.uv` dev dependencies and root `test-requirements.txt`-style files are read (blocking). Re-fetching the benchmark trees added three such files (CVE-2022-24065, CVE-2022-24439) and changed no outcome;
+- an unreadable or undefined toolchains JDK pin is recorded as an unread pin (blocking);
+- tox envlist expansion is capped before materialising, and an oversized combined set becomes an unread constraint;
+- jenv names (`openjdk64-17.0.2`) no longer read the `64` as the release, and `system` is an unread pin;
+- one unresolved version among a framework family's dependencies makes that family unread;
+- SPEC-0042's benchmark counts and the CURRENT.md row now match the report and say the hand-off is not yet called.
+The package.json `dependencies` thread repeated the earlier finding fixed in `20d34b6`.
+
+The CPython 3.7 image thread pointed out that per-language framework rows would let a 3.7 image claim pytest 9 (qualified only on 3.12) and the reverse. Framework rows took an `images` scope, with a selection check over two scoped pytest rows and loader refusals for overlap and foreign image ids; both toolchain threads were told by cross-session message.
 
 The report rerun after these fixes changed no outcome; the JSON gains each unread line's strength. PR #42 has since merged; main's `benchmarks/source-pins.json` differs from the pins used here only in CVE-2023-31486's URL and note, a case this container cannot fetch, so the report stands.
 
