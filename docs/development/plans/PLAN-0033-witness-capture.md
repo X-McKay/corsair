@@ -2,7 +2,7 @@
 id: PLAN-0033
 kind: plan
 title: Execution-node witness capture
-status: in_progress
+status: complete
 updated: 2026-10-13
 related: [SPEC-0033, SPEC-0027, SPEC-0031, SPEC-0032, PLAN-0031, PLAN-0032]
 ---
@@ -22,7 +22,7 @@ Implement [SPEC-0033](../specs/SPEC-0033-witness-capture.md): the execution node
 - [x] Offline tests: real probe subprocesses, runner orchestration, composition reaching `reproduced`/`verified`.
 - [x] Live gate authored: `make qualify-witness` (marker `witness`) on the SPEC-0032 recipe with the gates over the four runs.
 - [x] Independent adversarial review; findings fixed (below).
-- [ ] Live qualification on a fresh RIG0 kind node; results here.
+- [x] Live qualification on RIG0; run and recorded under [PLAN-0039](PLAN-0039-live-witness-and-full-chain.md).
 - [x] Review, CURRENT.md row and [HANDOFF-0051](../handoffs/HANDOFF-0051-witness-capture.md).
 
 ## Validation and progress
@@ -35,7 +35,7 @@ Implement [SPEC-0033](../specs/SPEC-0033-witness-capture.md): the execution node
 
 2026-10-13, Al's review of `391682e` (two P1, both reproduced with the real probe and gates): a target reading only a benign config file supported `reproduced` because any open counted as the effect, and an application read executed by a module body during an import was hidden because any importlib ancestor frame excluded the open, letting a candidate reach `verified`. Fixed: witnesses are requested only inside an operator-approved envelope (target plus planned effect file name) matching the identification target, and only opens of that file are the effect; only opens and `OSError`s issued directly by importlib loader frames are excluded. Both counterexamples are now real subprocess regressions, plus envelope refusal in the composition. `make test-config`: 820 passed.
 
-Live: not run.
+Live, first attempt from this thread: not run.
 - The fully live E2E thread then handed over its fresh RIG0 node: network 3/3 and admission 1/1 today, toolchain images loaded, gateway installed.
 - The qualification fixtures only accept kind state and evidence inside the running worktree.
 - Al approved hardlinking the kind kubeconfig into `/home/al/git/corsair-witness`, but RIG0's auto-mode safety check denied all three staging attempts.
@@ -43,7 +43,7 @@ Live: not run.
 
 ## Decisions and next action
 
-The design fork (in-interpreter operator probe versus an out-of-process kernel observer) was put to the user as a decision card; work continued on the recommended probe. The probe travels as an execution argument instead of a file, so the SPEC-0032 tree admission and the toolchain image are unchanged. Next: run the live gate interactively on RIG0, then record the result here. Command sequence:
+The design fork (in-interpreter operator probe versus an out-of-process kernel observer) was put to the user as a decision card; work continued on the recommended probe. The probe travels as an execution argument instead of a file, so the SPEC-0032 tree admission and the toolchain image are unchanged. The live gate has run once and passed under PLAN-0039 (above); do not rerun it from this plan. Remaining follow-ups: a typed planned effect from the planner instead of the operator envelope, a layered out-of-process cross-check, and keeping model-authored tests from installing their own audit hooks (see SPEC-0033 open questions and PLAN-0039). Historical only, the staging sequence this plan proposed before PLAN-0039 ran the gate:
 
 ```
 cd /home/al/git/corsair-witness
@@ -57,3 +57,5 @@ CORSAIR_NETWORK_RUN=.runs/reused-live-e2e-20261013/network CORSAIR_QUAL_RUN=.run
 rm .state/kind/kubeconfig
 cd ../corsair-live-e2e && make openshell-install CORSAIR_ADMISSION_RUN=.runs/live-e2e-20261013/admission
 ```
+
+2026-10-13, live gate run by the PLAN-0039 thread on RIG0 from `334aa03` (`.runs/witness-20261013T042451`, merged in #43): `make qualify-witness` 1 passed; gate completed / reproduced / verified with no limitations; all four witnesses admitted with a fresh nonce and no sandbox events; vulnerable (path reached, `outside.txt` observed) ×2, fixed (path reached, absent, `ValueError`) ×2. Details and cleanup are in [PLAN-0039](PLAN-0039-live-witness-and-full-chain.md). This qualifies capture for the reviewed SPEC-0018 fixture only; tamper-evident, not tamper-proof.
