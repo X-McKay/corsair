@@ -75,13 +75,13 @@ class Journal:
         journal = self
 
         class Recorded:
-            def run(self, patch, *, control_test_id, security_test_id, discovery_command, operation):
+            def run(self, patch, *, control_test_id, security_test_id, discovery_command, operation, witness=None):
                 entry = {"purpose": purpose, "operation": str(operation), "patch_sha256": patch.sha256,
-                         "observed": None, "failure": None}
+                         "witness_request": encode(witness), "observed": None, "failure": None}
                 journal.entries.append(entry)
                 try:
                     observed = inner.run(patch, control_test_id=control_test_id, security_test_id=security_test_id,
-                                         discovery_command=discovery_command, operation=operation)
+                                         discovery_command=discovery_command, operation=operation, witness=witness)
                 except BaseException as exc:
                     entry["failure"] = encode(exc)
                     raise
@@ -109,6 +109,8 @@ def result_record(run: DirectRun) -> dict:
     return {"stopped_at": run.stopped_at, "reason": run.reason, "identification": _dump(run.identification),
             "plan": _dump(run.plan), "patch": _dump(run.patch), "observation_plan": _dump(run.observation_plan),
             "executions": executions, "gate": _dump(run.gate), "assessment": _dump(run.assessment),
+            "witnesses": [{"witness": _dump(w.witness), "sandbox_events": None if w.sandbox_events is None else
+                           [_dump(e) for e in w.sandbox_events], "reason": w.reason} for w in run.witnesses],
             "limitations": list(run.limitations)}
 
 
@@ -136,7 +138,7 @@ async def main_async(evidence: Path, live: tuple[str, ...], config: LocalModelCo
             "models": {stage: describe_model(selected[stage]) for stage in STAGES},
             "versions": {stage: dict(zip(("prompt_version", "config_version", "skill_sha256"), VERSIONS[stage]))
                          for stage in STAGES},
-            "runner": "reviewed_host_workspace", "witness_capture": "none",
+            "runner": "reviewed_host_workspace", "witness_capture": "operator_probe",
             "source": {"python": sys.version}}, indent=2))
         store = stack.enter_context(LocalArtifacts(evidence / "artifacts", max_bytes=4 * 1024 * 1024))
         journal = Journal(reviewed_runners(store, evidence / "work"))

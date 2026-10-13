@@ -33,4 +33,4 @@ A live run on the local provider measures stage behavior on this one fixture; it
 
 ## Decisions and open questions
 
-The environment agent stays out (IDEA-0004 default); the declared environment identity is the operator's statement for both revisions. Witness capture (owned by the execution node, likely OpenShell policy or sandbox telemetry) decides when a reproduced or verified disposition can exist and is the next design question. The composition lives outside `workflows/` because no durable stage is connected. Plan: [PLAN-0031](../plans/PLAN-0031-fixture-direct-composition.md).
+The environment agent stays out (IDEA-0004 default); the declared environment identity is the operator's statement for both revisions. Witness capture (owned by the execution node, likely OpenShell policy or sandbox telemetry) decides when a reproduced or verified disposition can exist and is the next design question; [SPEC-0033](SPEC-0033-witness-capture.md) now supplies it through an operator probe in the execution node. The composition lives outside `workflows/` because no durable stage is connected. Plan: [PLAN-0031](../plans/PLAN-0031-fixture-direct-composition.md).
