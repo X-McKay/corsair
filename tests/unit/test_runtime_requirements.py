@@ -603,3 +603,23 @@ def test_ruby31_rows_select_the_four_minitest_cases_and_not_the_rspec_ones():
         elif case in ('CVE-2020-10187', 'CVE-2017-0889'):
             # These need Ruby 2.4-2.7 and RSpec; 3.1 is never substituted.
             assert select(requirement, both).status == 'unsupported', (case, name)
+
+
+def test_perl_selection_admits_a_tap_harness_ready_result():
+    # The environment agent's `tap-harness` ready result is admitted by a Perl selection that admitted the TAP row.
+    from corsair.agents.environment.contracts import ReadyEnvironment
+    from corsair.nodes.runtime.environment import check_ready
+    fixture = Path(__file__).resolve().parents[2] / 'deploy/qualification/toolchains/perl526/Makefile.PL'
+    matrix = load().model_dump()
+    runner = {'name': 'tap-harness', 'language': 'perl', 'versions': '==1.302073', 'runner': 'src/corsair/adapters/tap_runner.py',
+              'images': ['perl-5.26-make'], 'qualification': {'records': ['SPEC-0056', 'SPEC-0061'], 'report': 'x'}}
+    images = [*(i for i in matrix['images'] if i['id'] != 'perl-5.26-make'), STAGED_PERL526]
+    frameworks = [*(f for f in matrix['frameworks'] if f['name'] != 'tap-harness'), runner]
+    selection = select(detect({'Makefile.PL': fixture.read_bytes()}, 'perl'),
+                       Matrix.model_validate({**matrix, 'images': images, 'frameworks': frameworks}))
+    prepared = {'perl-5.26-make': 'docker.io/library/corsair-perl526@sha256:' + '0' * 64}
+    ready = lambda framework: ReadyEnvironment.model_construct(toolchain_id='perl-5.26-make',
+                                                               toolchain_image=prepared['perl-5.26-make'], framework=framework)
+    check_ready(ready('tap-harness'), selection, prepared)
+    with pytest.raises(ValueError, match='not one the selection admitted'):
+        check_ready(ready('pytest'), selection, prepared)
