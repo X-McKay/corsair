@@ -82,7 +82,7 @@ The run thread's variance table (18:20Z):
 | live-005 | Docker | reproduced/not_verified | yes | result isn't "outside" | 57 / 64 |
 | live-006 | Docker | stopped at authoring | – | file unchanged | 70 / – |
 
-The Docker route gave 3 of 6 right and all fixture runs gave 3 of 7. Identification (4 to 9 s) and planning (23 to 30 s) were stable, no stage hit a tool limit, and both witnesses were admitted in every run that executed tests. Two things decide the rest: which security test the author chooses, and the assessment's over-claim.
+Live Docker runs reached the right verdict 3 times out of 6 (live-001 to live-006). Counting run 2, it was 3 of the 7 fully live fixture runs that reached a verdict stage. Run 1 stopped at authoring on the host route and scripted-001 is a control, so neither counts. Identification (4 to 9 s) and planning (23 to 30 s) were stable and no stage hit a tool limit. Both witnesses were admitted in every Docker run that executed tests. Run 2 on OpenShell did not get that: its baseline witness scored `witness_missing` (gap 7). Two things decide the rest: which security test the author chooses, and the assessment's over-claim.
 
 ### Gap list
 
@@ -103,6 +103,7 @@ The Docker route gave 3 of 6 right and all fixture runs gave 3 of 7. Identificat
 | C1 | The environment agent is not shown the file inventory or where the operator's smoke test is, so it probes for absent files | corpus case | Chain thread (thread report) |
 | C2 | The environment token cap derived from "1 read window" (48,000) is too small, at about 4.8k input tokens per request | corpus case | Not yet assigned |
 | C3 | A model stage that stops on its budget is labelled ERROR. The coordinator asked for INCONCLUSIVE, per Al's table. | corpus case | #109 (asked of the Node thread at 18:26Z) |
+| C4 | Under Docker, the file list the environment agent needs for #115's smoke check (a whole-repository test listing) is not handed over from the Docker preparation | corpus case, #115 review | #109, as a Docker file-list hand-over commit (thread report) |
 
 The gap numbers follow the chat. Gaps 6 to 11 are described in detail in HANDOFF-0102 on #117.
 
@@ -111,11 +112,11 @@ The gap numbers follow the chat. Gaps 6 to 11 are described in detail in HANDOFF
 | PR | Head | State |
 | --- | --- | --- |
 | Merged since the 14:26 direction | — | #92, #95, #96, #73, #94, #98, #100, #102, #101, #91, #76, #99, #104, #103, #105, #108, #110, #106, #97 (`184e609`, current main) |
-| #111 withdrawn-tool, CLI and runbook fixes | `1161e59` | Reported ready for Al's "merge" at `bceb544`. Main was merged in since for a `CURRENT.md` conflict (thread report), so recheck CI before merging. |
+| #111 withdrawn-tool, CLI and runbook fixes | `1161e59` | Ready for Al's "merge". The main merge since `bceb544` resolved only `CURRENT.md` rows (thread report). |
 | #112 terminal progress display | `df727c1` | Reported ready for Al's "merge" at `15b7e21` (review clean, CI green, no conflicts; thread report, 18:20). The head has moved since. |
-| #109 issue entry, `corsair run`, labels, witness binding, relative paths | `0b6de48` | One item left: a budget stop must be labelled INCONCLUSIVE (C3). A commit is also coming that hands the file list to the environment agent under Docker. Both are thread reports. Al's 18:07 merge word applies once the review is clean and CI is green. |
-| #113 Docker route, recorded unqualified | `bf923bd` | Review clean at `07cf90a`. The head has moved since. Merges right after #109 (Al said "merge" in its thread). |
-| #115 runtime inference, smoke test, corpus-python cohort | `6295bdc` | Reported ready once CI finishes (thread report). All 17 cohort repositories are minimal: `app.py`, `requirements.txt` and an empty tests folder. |
+| #109 issue entry, `corsair run`, labels, witness binding, relative paths | `0b6de48` | One review item left: a budget stop must be labelled INCONCLUSIVE (C3). The Docker file-list hand-over commit (C4) is also coming. Both are thread reports. Al's 18:07 merge word applies once the review is clean and CI is green. |
+| #113 Docker route, recorded unqualified | `bf923bd` | Ready. Review was clean at `07cf90a` and only docs changed since (thread report). Merges right after #109 (Al said "merge" in its thread). |
+| #115 runtime inference, smoke test, corpus-python cohort | `6295bdc` | Ready once CI finishes, no longer in rework (thread report). All 17 cohort repositories are minimal: `app.py`, `requirements.txt` and an empty tests folder. |
 | #116 OpenShell preparation adapter (draft) | `81f6039` | Review clean. Waits on the live gate `make qualify-environment-preparation CORSAIR_NETWORK_RUN=<dir>` on RIG0 (Go 1.21+), after the Docker batch, on Al's word |
 | #117 verdict gaps (draft) | `ab3b3d5` | Review clean (thread report). Gaps 6 to 9 are fixed; 10 and 11 are still open. Offline suite 1798 passed and scripted evals are clean (thread report). Live evals were not run, and the new probe digest is unqualified until `make qualify-witness`. |
 | Coming | — | The `--id` path as its own PR (Node thread, local `f3824b8`). The not-exploitable fixture variant, corpus negative cases and commands (thread "Reproducing not-exploitable verdicts", branch `claude/not-exploitable-verdicts`): the scripted host run admits not_reproduced (thread report). |
@@ -131,7 +132,7 @@ Al asked (18:27Z) for the record to stress two needs. Accuracy must be validated
 - A wrong LIKELY_NOT_EXPLOITABLE tells an analyst to drop a real vulnerability. Corsair can make no worse error.
 - No live run has produced a not_reproduced finding yet. Every live finding so far is reproduced or inconclusive.
 - The assessment agent has already over-claimed not_reproduced twice (run 2 and live-002). Each time, only the deterministic gate refused it.
-- The fixture batch tested only the exploitable direction. Today's 3 of 6 says nothing about negatives.
+- The fixture batch tested only the exploitable direction. Today's 3 of 6 Docker runs says nothing about negatives.
 
 ### What the corpus can test today
 
@@ -185,13 +186,13 @@ Each corpus case's `expected.json` holds an oracle: `stopped_at`, the gate's thr
 | False fix verification | fix `verified` where the expected fix is `not_verified` | Zero |
 | Exact match | All of stopped_at, gate and assessment_admitted equal the oracle (#97's match rule) | Reported alongside |
 
-Report negatives and positives as separate rates, because a 3 of 6 rate on exploitable cases hides a 0 of 0 rate on negatives. Each case runs once with a fresh run id and no retries. A diagnosed run that ran no test may run once more as its own attempt.
+Report negatives and positives as separate rates, because 3 of 6 on the exploitable fixture hides 0 negative cases run. Each case runs once with a fresh run id and no retries. A diagnosed run that ran no test may run once more as its own attempt.
 
 ### Proposed validation plan
 
 These steps follow the existing approach (stage order, runner core, required witness, matrix rows). Each step's runs go in the run ledger with evidence paths.
 
-1. **Prerequisites.** Land #117, including items 10 and 11. Fix C1 and C2 in the environment stage. Land #109 with C3, then #113 and #115. Settle the fixed-revision conflict above.
+1. **Prerequisites.** Land #117, including items 10 and 11. Fix C1 and C2 in the environment stage, and land C4. Land #109 with C3, then #113 and #115. Settle the fixed-revision conflict above.
 2. **Negative fixture.** The thread "Reproducing not-exploitable verdicts" is building a not-exploitable fixture variant. Its scripted host run admits not_reproduced (thread report). Run it fully live on the Docker route five times, interleaved with five runs of the exploitable fixture, so the same agent versions face both. Bar: 5 of 5 LIKELY_NOT_EXPLOITABLE admitted and zero LIKELY_EXPLOITABLE on the negative, with no regression on the positive.
 3. **Python negatives as they stand.** `ih-python-healthcheck` and `ih-python-queryhelper`, once the fixed-revision question is settled.
 4. **Reverse mapping for Python.** Generate the 15 development Python pairs reversed, with the not-exploitable variant as the baseline and an expected not_reproduced outcome. The corpus thread does this as an extension of SPEC-0067 with its own frozen `expected.json` files. Run them alongside the 15 forward pairs, which give the exploitable direction and fix verification. That makes 32 Python development cases: about 17 negative and 15 positive.
