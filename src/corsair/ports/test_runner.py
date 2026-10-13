@@ -124,6 +124,33 @@ class Execution:
 
 
 @dataclass(frozen=True)
+class WitnessRequest:
+    """Operator-derived from the admitted identification target; never model text or test output."""
+    target_path: str
+    target_symbol: str
+
+    def __post_init__(self):
+        approved_path(self.target_path)
+        if (type(self.target_symbol) is not str
+                or not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*', self.target_symbol)
+                or len(self.target_symbol) > 256):
+            raise ValueError('Witness target needs a plain qualified symbol')
+
+
+@dataclass(frozen=True)
+class WitnessCapture:
+    """The operator probe's record, read back by a separate fixed command after execution."""
+    status: Literal['captured', 'unavailable']
+    request: WitnessRequest
+    nonce: str
+    probe_sha256: str
+    record: bytes
+    artifact: ArtifactRef | None
+    detail: str
+    receipt: ExecutionReceipt | None
+
+
+@dataclass(frozen=True)
 class NativeTestRun:
     """One fresh workspace: discovery, then execution only if exactly the expected tests were found."""
     operation: str
@@ -134,10 +161,12 @@ class NativeTestRun:
     cleanup: Literal['not_required', 'confirmed', 'unconfirmed']
     failure_layer: Literal['workspace', 'discovery', 'execution', 'report'] | None
     detail: str
+    witness: WitnessCapture | None = None
 
 
 class TestRunner(Protocol):
     __test__ = False
 
     def run(self, patch: ApprovedPatch, *, control_test_id: str, security_test_id: str,
-            discovery_command: tuple[str, ...], operation: UUID) -> NativeTestRun: ...
+            discovery_command: tuple[str, ...], operation: UUID,
+            witness: WitnessRequest | None = None) -> NativeTestRun: ...

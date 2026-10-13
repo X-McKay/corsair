@@ -6,10 +6,11 @@ from uuid import uuid4, uuid5
 import pytest
 
 from corsair.adapters.local_artifacts import LocalArtifacts
-from corsair.adapters.pytest_runner import WRAPPER, PytestRunner, PytestRunnerConfig
+from corsair.adapters.pytest_runner import WITNESS_READ, WRAPPER, PytestRunner, PytestRunnerConfig
+from corsair.nodes.witness import MAX_RECORD_BYTES, PROBE_SHA256, probe_argv
 from corsair.ports.execution import ExecutionError, ExecutionReceipt
 from corsair.ports.sandbox import SandboxHandle
-from corsair.ports.test_runner import ApprovedPatch, PatchFile, PreparedWorkspace
+from corsair.ports.test_runner import ApprovedPatch, PatchFile, PreparedWorkspace, WitnessRequest
 from evals.fixture_e2e.reviewed import DISCOVER, FIXTURE, PREFIX, ReviewedLocalExecution, ReviewedWorkspace
 
 IDS = ('tests/test_a.py::test_control', 'tests/test_a.py::test_security')
@@ -212,3 +213,59 @@ def test_reviewed_spec0018_fixture_through_real_pytest(store, tmp_path, variant)
         assert witnesses[1]['exception'] == 'ValueError' and witnesses[1]['opens'] == []
     assert result.execution.claims.claims.security.outcome == ('failed' if variant == 'vulnerable' else 'passed')
     assert store.get(result.execution.junit) == result.execution.receipt.stdout
+
+
+REQUEST = WitnessRequest('src/target.py', 'read')
+
+
+def run_witnessed(store, *steps, record='/tmp/corsair-witness.json'):
+    execution = Scripted(*steps)
+    runner = PytestRunner(Workspace(store, '/work'), execution, store,
+                          PytestRunnerConfig(PREFIX, '.corsair-junit.xml', '/work', witness_record_path=record))
+    operation = uuid4()
+    result = runner.run(PATCH, control_test_id=IDS[0], security_test_id=IDS[1], discovery_command=DISCOVER,
+                        operation=operation, witness=REQUEST)
+    return result, execution, operation
+
+
+def test_witness_runs_the_probe_then_reads_its_record_once(store):
+    result, execution, operation = run_witnessed(store, (COLLECTED, 0), (FAILED, 1), (b'{"record": 1}', 0))
+    (_, _), (argv, second), (read, third) = execution.calls
+    nonce = str(uuid5(operation, 'witness-nonce'))
+    assert argv[5:] == probe_argv(PREFIX, REQUEST, root='/work', record_path='/tmp/corsair-witness.json',
+                                  nonce=nonce) + ('--tb=native',) + IDS
+    assert read == ('/bin/sh', '-c', WITNESS_READ, 'corsair-witness', '/tmp/corsair-witness.json')
+    assert third == uuid5(operation, 'witness') and result.execution.status == 'completed'
+    captured = result.witness
+    assert (captured.status, captured.nonce, captured.probe_sha256, captured.request) == (
+        'captured', nonce, PROBE_SHA256, REQUEST)
+    assert store.get(captured.artifact) == captured.record == b'{"record": 1}'
+
+
+@pytest.mark.parametrize('step, detail', [
+    ((b'', 1), 'read: exit 1, 0 bytes'), ((b'x' * (MAX_RECORD_BYTES + 1), 0), f'{MAX_RECORD_BYTES + 1} bytes'),
+    ((b'{}', 0, dict(completion='unknown')), 'incomplete execution'),
+    (lambda planned: ExecutionError(replace(planned, delivery='unknown')), 'read: ExecutionError')])
+def test_an_unreadable_record_is_unavailable_and_never_retried(store, step, detail):
+    result, execution, _ = run_witnessed(store, (COLLECTED, 0), (FAILED, 1), step)
+    assert len(execution.calls) == 3 and result.execution.status == 'completed'
+    assert result.witness.status == 'unavailable' and result.witness.artifact is None
+    assert detail in result.witness.detail
+
+
+def test_no_record_is_read_after_a_failed_execution(store):
+    result, execution, _ = run_witnessed(store, (COLLECTED, 0), (FAILED, 3))
+    assert len(execution.calls) == 2 and result.witness.status == 'unavailable'
+    assert 'record not read' in result.witness.detail
+
+
+def test_witness_needs_an_operator_record_path_distinct_from_runner_paths(store):
+    runner = PytestRunner(Workspace(store, '/work'), Scripted(), store, PytestRunnerConfig(PREFIX, 'j.xml', '/work'))
+    with pytest.raises(ValueError, match='record path'):
+        runner.run(PATCH, control_test_id=IDS[0], security_test_id=IDS[1], discovery_command=DISCOVER,
+                   operation=uuid4(), witness=REQUEST)
+    for record in ('j.xml', '-x', ''):
+        with pytest.raises(ValueError, match='Witness record path'):
+            PytestRunnerConfig(PREFIX, 'j.xml', '/work', witness_record_path=record)
+    with pytest.raises(ValueError, match='conflict'):
+        run_witnessed(store, record='tests/test_a.py')

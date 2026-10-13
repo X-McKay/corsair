@@ -1,0 +1,150 @@
+"""Operator witness probe for one pytest run; loaded by the runner's bootstrap, never by workload code.
+
+Standard library and pytest hooks only: the bytes travel to the test interpreter as an argument and must
+run on any admitted CPython 3.12+. Native ``sys.monitoring`` events attribute calls, returns and unwinds to
+the identified target function; native audit ``open`` events and raised ``OSError``s count only when the
+target is on the calling stack and only during a test's call phase. The record is written once, after the
+session, to an operator path; the host maps it to the gate's witness. It runs inside the test interpreter,
+so it is tamper-evident (its own tool registration, events and the operator nonce are checked), not
+tamper-proof against hostile test code.
+"""
+import json
+import os
+import sys
+
+import pytest
+
+SCHEMA = 'corsair-witness-v1'
+TOOL_NAME = 'corsair-witness'
+MAX_OPENS = 32
+MAX_CALLS = 32
+MAX_TESTS = 16
+
+
+def _name(value):
+    return type(value).__name__ if isinstance(value, BaseException) else None
+
+
+class Probe:
+    def __init__(self, plugin_sha256, config):
+        self.config = config
+        self.target_file = os.path.realpath(os.path.join(config['root'], config['target_path']))
+        self.symbol = config['target_symbol']
+        self.record = {'schema': SCHEMA, 'nonce': config['nonce'], 'plugin_sha256': plugin_sha256,
+                       'target': {'path': config['target_path'], 'symbol': self.symbol},
+                       'tool_registered': False, 'intact': False, 'tests': {}}
+        self.active = None
+        self.known = {}
+        monitoring = sys.monitoring
+        self.tool = config['tool_id']
+        events = monitoring.events
+        self.events = events.PY_START | events.PY_RETURN | events.PY_UNWIND | events.RAISE
+        try:
+            monitoring.use_tool_id(self.tool, TOOL_NAME)
+        except ValueError:
+            return
+        self.record['tool_registered'] = True
+        for event, callback in ((events.PY_START, self._start), (events.PY_RETURN, self._return),
+                                (events.PY_UNWIND, self._unwind), (events.RAISE, self._raise)):
+            monitoring.register_callback(self.tool, event, callback)
+        monitoring.set_events(self.tool, self.events)
+        sys.addaudithook(self._audit)
+
+    def _target(self, code):
+        known = self.known.get(code)
+        if known is None:
+            known = (code.co_qualname == self.symbol
+                     and os.path.realpath(code.co_filename) == self.target_file)
+            self.known[code] = known
+        return known
+
+    def _on_stack(self, frame):
+        while frame is not None:
+            if self._target(frame.f_code):
+                return True
+            frame = frame.f_back
+        return False
+
+    def _test(self):
+        return self.record['tests'].get(self.active) if self.active is not None else None
+
+    def _start(self, code, offset):
+        if not self._target(code):
+            return sys.monitoring.DISABLE
+        test = self._test()
+        if test is not None:
+            test['entered'] += 1
+        return None
+
+    def _end(self, code, outcome):
+        test = self._test()
+        if test is not None and self._target(code):
+            if len(test['exits']) < MAX_CALLS:
+                test['exits'].append(outcome)
+            else:
+                test['truncated'] = True
+
+    def _return(self, code, offset, value):
+        if not self._target(code):
+            return sys.monitoring.DISABLE
+        self._end(code, None)
+        return None
+
+    def _unwind(self, code, offset, exception):
+        self._end(code, _name(exception))
+
+    def _raise(self, code, offset, exception):
+        test = self._test()
+        if test is not None and isinstance(exception, OSError) and self._on_stack(sys._getframe(1)):
+            if len(test['os_errors']) < MAX_OPENS:
+                test['os_errors'].append({'type': _name(exception), 'errno': exception.errno})
+            else:
+                test['truncated'] = True
+
+    def _audit(self, event, args):
+        if event != 'open' or self.active is None:
+            return
+        test = self._test()
+        if test is None or not self._on_stack(sys._getframe(1)):
+            return
+        path = args[0] if args else None
+        if isinstance(path, bytes):
+            path = path.decode('utf-8', 'replace')
+        if len(test['opens']) < MAX_OPENS:
+            test['opens'].append(str(path)[:512] if isinstance(path, (str, int)) else None)
+        else:
+            test['truncated'] = True
+
+    # pytest hook: only the call phase is observed, so fixtures and teardown never count.
+    @pytest.hookimpl(wrapper=True)
+    def pytest_runtest_call(self, item):
+        tests = self.record['tests']
+        if item.nodeid not in tests and len(tests) < MAX_TESTS:
+            tests[item.nodeid] = {'entered': 0, 'exits': [], 'opens': [], 'os_errors': [], 'truncated': False,
+                                  'complete': False}
+        self.active = item.nodeid if item.nodeid in tests else None
+        try:
+            return (yield)
+        finally:
+            if self.active is not None:
+                tests[self.active]['complete'] = True
+            self.active = None
+
+    def pytest_sessionfinish(self, session, exitstatus):
+        self.active = None
+        monitoring = sys.monitoring
+        self.record['intact'] = bool(self.record['tool_registered']
+                                     and monitoring.get_tool(self.tool) == TOOL_NAME
+                                     and monitoring.get_events(self.tool) == self.events)
+        if self.record['tool_registered']:
+            monitoring.set_events(self.tool, 0)
+        data = json.dumps(self.record, sort_keys=True).encode()
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0)
+        try:
+            descriptor = os.open(self.config['record_path'], flags, 0o600)
+        except OSError:
+            # Something else created the record path: the run itself fails rather than offering that file.
+            session.exitstatus = pytest.ExitCode.INTERNAL_ERROR
+            return
+        with os.fdopen(descriptor, 'wb') as stream:
+            stream.write(data)

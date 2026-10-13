@@ -6,8 +6,9 @@ from uuid import UUID, uuid5
 from corsair.ports.artifacts import ArtifactStore
 from corsair.ports.execution import ExecutionReceipt, SandboxExecution
 from corsair.ports.sandbox import SandboxHandle
+from corsair.nodes.witness import MAX_RECORD_BYTES, PROBE_SHA256, probe_argv
 from corsair.ports.test_runner import (MAX_TEST_ID, TEST_ID, ApprovedPatch, Discovery, Execution, NativeTestRun,
-                                       PreparedWorkspace, TestWorkspace)
+                                       PreparedWorkspace, TestWorkspace, WitnessCapture, WitnessRequest)
 from corsair.reports.junit import MAX_JUNIT_BYTES, JUnitError, parse_junit
 from corsair.reports.test_observations import AdmittedTestClaims, TestClaim, WorkloadTestReport
 
@@ -20,6 +21,8 @@ WRAPPER = ('junit="$1"; shift; rm -f -- "$junit"; '
 # Native tracebacks give parseable `File "...", line N, in function` frames for failure classification.
 RUN_OPTIONS = ('--tb=native',)
 CLAIM = {'passed': 'passed', 'failed': 'failed', 'error': 'failed', 'skipped': 'skipped'}
+# Fixed read-back of the probe record after execution; the path arrives only as a positional argument.
+WITNESS_READ = 'cat -- "$1"'
 
 
 @dataclass(frozen=True)
@@ -30,6 +33,7 @@ class PytestRunnerConfig:
     workspace_root: str
     max_junit_bytes: int = MAX_JUNIT_BYTES
     max_excerpt_chars: int = 4096
+    witness_record_path: str | None = None
 
     def __post_init__(self):
         if (type(self.command) is not tuple or not self.command
@@ -42,6 +46,10 @@ class PytestRunnerConfig:
         if not (type(self.max_junit_bytes) is int and 1 <= self.max_junit_bytes <= MAX_JUNIT_BYTES
                 and type(self.max_excerpt_chars) is int and 1 <= self.max_excerpt_chars <= 65536):
             raise ValueError('Runner bounds outside the admitted range')
+        record = self.witness_record_path
+        if record is not None and (type(record) is not str or not record or '\0' in record or record[0] == '-'
+                                   or record == self.junit_path):
+            raise ValueError('Witness record path must be a plain operator path distinct from the JUnit path')
 
 
 def _error(error: BaseException) -> str:
@@ -75,15 +83,19 @@ class PytestRunner:
         self._workspace, self._execution, self._store, self._config = workspace, execution, store, config
 
     def run(self, patch: ApprovedPatch, *, control_test_id: str, security_test_id: str,
-            discovery_command: tuple[str, ...], operation: UUID) -> NativeTestRun:
+            discovery_command: tuple[str, ...], operation: UUID,
+            witness: WitnessRequest | None = None) -> NativeTestRun:
         if not isinstance(operation, UUID) or not isinstance(patch, ApprovedPatch):
             raise ValueError('Operator operation and approved patch required')
+        if witness is not None and (not isinstance(witness, WitnessRequest) or self._config.witness_record_path is None):
+            raise ValueError('Witness capture needs a typed request and an operator record path')
         ids = (control_test_id, security_test_id)
         paths = {item.path for item in patch.files}
         if (any(type(i) is not str or not TEST_ID.fullmatch(i) or len(i) > MAX_TEST_ID or i[0] == '-'
                 or i.split('::')[0] not in paths for i in ids) or len(set(ids)) != 2):
             raise ValueError('Two distinct plain node ids inside the patch are required')
-        if any(path[0] == '-' for path in paths) or self._config.junit_path in paths:
+        if (any(path[0] == '-' for path in paths) or self._config.junit_path in paths
+                or self._config.witness_record_path in paths):
             raise ValueError('Patch paths conflict with runner arguments')
         if type(discovery_command) is not tuple or not discovery_command or any(type(t) is not str for t in discovery_command):
             raise ValueError('Discovery command must be string tokens')
@@ -95,20 +107,21 @@ class PytestRunner:
             return NativeTestRun(**base, workspace=None, discovery=None, execution=None, cleanup='unconfirmed',
                                  failure_layer='workspace', detail=f'prepare: {_error(error)}')
         cleanup: Literal['confirmed', 'unconfirmed'] = 'unconfirmed'
-        released = ''
+        released, captured = '', None
         try:
             if prepared.patch_sha256 != patch.sha256:
                 discovery = execution = None
                 layer, detail = 'workspace', 'prepared workspace does not hold this patch'
             else:
-                discovery, execution, layer, detail = self._stages(prepared, ids, discovery_command, sorted(paths), operation)
+                discovery, execution, layer, detail, captured = self._stages(
+                    prepared, ids, discovery_command, sorted(paths), operation, witness)
         finally:
             try:
                 cleanup = 'confirmed' if self._workspace.release(prepared, operation) == 'confirmed' else 'unconfirmed'
             except Exception as error:
                 released = f'; release: {_error(error)}'
         return NativeTestRun(**base, workspace=prepared, discovery=discovery, execution=execution, cleanup=cleanup,
-                             failure_layer=layer, detail=detail+released)
+                             failure_layer=layer, detail=detail+released, witness=captured)
 
     def _execute(self, handle: SandboxHandle, argv: tuple[str, ...], operation: UUID) -> tuple[ExecutionReceipt | None, str | None]:
         try:
@@ -125,23 +138,53 @@ class PytestRunner:
         return (f'exit={receipt.native_exit}\nstdout:\n{receipt.stdout[:limit*4].decode("utf-8", "replace")[:limit]}'
                 f'\nstderr:\n{receipt.stderr[:limit*4].decode("utf-8", "replace")[:limit]}')
 
-    def _stages(self, prepared, ids, discovery_command, paths, operation):
+    def _stages(self, prepared, ids, discovery_command, paths, operation, witness):
         handle = prepared.handle
         command = discovery_command + tuple(paths)
         receipt, problem = self._execute(handle, command, uuid5(operation, 'discovery'))
         if problem:
             discovery = Discovery('execution_failure', (), self._excerpt(receipt), command, receipt)
-            return discovery, None, 'discovery', f'discovery: {problem}'
+            return discovery, None, 'discovery', f'discovery: {problem}', None
         found = collected(receipt.stdout)
         if receipt.native_exit != 0 or found is None or len(found) != len(set(found)) or set(found) != set(ids):
             discovery = Discovery('collection_error', found or (), self._excerpt(receipt), command, receipt)
-            return discovery, None, 'discovery', f'discovery: exit {receipt.native_exit}, found {list(found or ())}'
+            return (discovery, None, 'discovery', f'discovery: exit {receipt.native_exit}, found {list(found or ())}',
+                    None)
         discovery = Discovery('discovered', found, '', command, receipt)
-        execution, layer = self._run_once(prepared, ids, frozenset(paths), uuid5(operation, 'execution'))
-        return discovery, execution, layer, execution.detail
+        nonce = str(uuid5(operation, 'witness-nonce')) if witness is not None else None
+        execution, layer = self._run_once(prepared, ids, frozenset(paths), uuid5(operation, 'execution'), witness, nonce)
+        captured = None
+        if witness is not None:
+            captured = (self._read_witness(prepared, witness, nonce, uuid5(operation, 'witness'))
+                        if execution.status == 'completed' else
+                        WitnessCapture('unavailable', witness, nonce, PROBE_SHA256, b'', None,
+                                       f'execution {execution.status}; record not read', None))
+        return discovery, execution, layer, execution.detail, captured
 
-    def _run_once(self, prepared: PreparedWorkspace, ids: tuple[str, str], test_paths: frozenset[str], operation: UUID):
-        argv = ('/bin/sh', '-c', WRAPPER, 'corsair-pytest', self._config.junit_path, *self._config.command, *RUN_OPTIONS, *ids)
+    def _read_witness(self, prepared: PreparedWorkspace, request: WitnessRequest, nonce: str,
+                      operation: UUID) -> WitnessCapture:
+        """One fixed read of the probe record; never retried, and a missing or oversized record is unavailable."""
+        argv = ('/bin/sh', '-c', WITNESS_READ, 'corsair-witness', self._config.witness_record_path)
+        unavailable = lambda detail, receipt=None: WitnessCapture('unavailable', request, nonce, PROBE_SHA256, b'',
+                                                                  None, detail[:2048], receipt)
+        receipt, problem = self._execute(prepared.handle, argv, operation)
+        if problem:
+            return unavailable(f'read: {problem}', receipt)
+        if receipt.native_exit != 0 or not receipt.stdout or len(receipt.stdout) > MAX_RECORD_BYTES:
+            return unavailable(f'read: exit {receipt.native_exit}, {len(receipt.stdout)} bytes', receipt)
+        try:
+            artifact = self._store.put(receipt.stdout)
+        except Exception as error:
+            return unavailable(f'record storage: {_error(error)}', receipt)
+        return WitnessCapture('captured', request, nonce, PROBE_SHA256, receipt.stdout, artifact, '', receipt)
+
+    def _run_once(self, prepared: PreparedWorkspace, ids: tuple[str, str], test_paths: frozenset[str], operation: UUID,
+                  witness: WitnessRequest | None = None, nonce: str | None = None):
+        command = self._config.command
+        if witness is not None:
+            command = probe_argv(command, witness, root=self._config.workspace_root,
+                                 record_path=self._config.witness_record_path, nonce=nonce)
+        argv = ('/bin/sh', '-c', WRAPPER, 'corsair-pytest', self._config.junit_path, *command, *RUN_OPTIONS, *ids)
         receipt, problem = self._execute(prepared.handle, argv, operation)
         failure = lambda layer, detail, junit=None, status='execution_failure': (
             Execution(status, (), junit, None, detail, argv, receipt), layer)

@@ -1,8 +1,8 @@
 """Deterministic handoffs into the SPEC-0027 gates: plan and patch to expectations, native runs to evidence.
 
 Trusted code only: nothing here reads model text beyond the typed plan and patch fields, and
-nothing invents an observation. No component captures the planned witness outside the test
-process yet, so every run carries ``witness=None`` unless an execution node supplies one.
+nothing invents an observation. A run carries a witness only when the execution node's probe
+record for that run is admitted (SPEC-0033); otherwise ``witness=None``.
 """
 
 from hashlib import sha256
@@ -10,12 +10,13 @@ import json
 import re
 
 from corsair.agents.evidence_assessment.contracts import MAX_ITEM_CHARS, EvidenceItem
+from corsair.agents.issue_analysis.identification_contracts import IssueIdentification
 from corsair.agents.test_authoring.contracts import TestPatch
 from corsair.agents.test_planning.contracts import ReadyTestPlan
 from corsair.core.disposition import (ClassifiedFailure, EnvironmentIdentity, ExpectedFailure, ObservationPlan,
                                       ObservedOutcome, Revision, RunEvidence, SandboxEvent, Witness)
 from corsair.ports.execution import ExecutionReceipt
-from corsair.ports.test_runner import ApprovedPatch, NativeTestRun, PatchFile, TestCaseResult
+from corsair.ports.test_runner import ApprovedPatch, NativeTestRun, PatchFile, TestCaseResult, WitnessRequest
 
 TOKEN = re.compile(r'^[A-Za-z0-9_.:-]{1,128}$')
 
@@ -36,6 +37,14 @@ def observation_plan(plan: ReadyTestPlan, patch: TestPatch) -> ObservationPlan:
                                          assertion_lines=patch.security_assertion_lines),
         expected_safe_behavior=plan.security_expectation.safe_behavior,
         frozen_patch_sha256=patch.patch_sha256)
+
+
+def witness_request(identification: IssueIdentification) -> WitnessRequest:
+    """The probe target is the admitted identification target, never the plan's prose or the test's code."""
+    if identification.status != 'ready' or identification.target is None:
+        raise ValueError('a witness needs a ready identification target')
+    target = identification.target
+    return WitnessRequest(target_path=target.source.path, target_symbol=target.symbol)
 
 
 def freeze(patch: TestPatch, approved_paths: tuple[str, ...]) -> ApprovedPatch:
@@ -139,4 +148,9 @@ def evidence_items(plan: ObservationPlan, patch: TestPatch, environment: Environ
                                    execution.receipt.stdout.decode('utf-8', 'replace'), revision, index))
             elif observed.discovery is not None and observed.discovery.errors:
                 items.append(_item(f'{prefix}-stdout', 'stdout', observed.discovery.errors, revision, index))
+            captured = observed.witness
+            if captured is not None and captured.status == 'captured':
+                # The operator probe's record, not test output; the gate decides what it supports.
+                record = json.dumps(json.loads(captured.record), indent=2, sort_keys=True)
+                items.append(_item(f'{prefix}-witness', 'witness', record, revision, index))
     return tuple(items)

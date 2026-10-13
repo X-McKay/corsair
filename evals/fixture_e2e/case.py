@@ -48,7 +48,9 @@ def fixture_case() -> FixtureCase:
         scratch_location="The per-test pytest tmp_path directory; fixtures must not be created elsewhere",
         observation_facilities=(
             "Python sys.addaudithook 'open' audit events recorded by the test itself inside the test process",
-            "Native JUnit XML outcomes, failure locations and captured stdout per test"))
+            "Native JUnit XML outcomes, failure locations and captured stdout per test",
+            "Operator witness probe, not test code: calls, returns, raised exceptions and file opens attributed to "
+            "the identified target function during each test's call phase"))
     # A declaration of what both revisions share, not an observed image or inventory digest.
     identity = EnvironmentIdentity(
         image_digest=_digest(f"{sys.executable}\n{sys.version}"), recipe_sha256=_digest(json.dumps(PREFIX)),
@@ -66,7 +68,8 @@ def reviewed_runners(store, root: Path):
     def runner(purpose):
         workspace = root / purpose
         return PytestRunner(ReviewedWorkspace(store, workspace, VARIANTS[purpose]), ReviewedLocalExecution(workspace),
-                            store, PytestRunnerConfig(PREFIX, ".corsair-junit.xml", str(workspace)))
+                            store, PytestRunnerConfig(PREFIX, ".corsair-junit.xml", str(workspace),
+                                                      witness_record_path=".corsair-witness.json"))
     return runner
 
 
