@@ -94,6 +94,12 @@ def summarize(evidence: Path) -> dict:
             and not isinstance(value, bool)
         }
         for key, value in (observed | case["metrics"]).items():
+            # RunUsage defaults to zero and can contain partial response totals.
+            # Neither is a complete token measurement when provider coverage failed.
+            if (case.get("attributes", {}).get("provider_usage_present") is False
+                    and key in {"observed_input_tokens", "observed_output_tokens",
+                                "input_tokens", "output_tokens"}):
+                continue
             metrics.setdefault(key, []).append(value)
         for key, item in case["scores"].items():
             metrics.setdefault("score_" + key, []).append(item["value"])

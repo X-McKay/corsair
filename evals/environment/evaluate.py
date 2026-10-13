@@ -91,14 +91,18 @@ class RecordedExecution:
     def __init__(self, case):
         self.case = case
         self.calls = []
+        self.unrecorded_commands = []
 
     def execute(self, handle, command, operation):
         self.calls.append(tuple(command))
         pairs = list(zip(self.case["commands"], self.case["observations"]))
         observation = next(
             (o for c, o in pairs if tuple(c) == tuple(command)),
-            {"exit": 126, "stdout": "command outside recorded operator policy"},
+            None,
         )
+        if observation is None:
+            self.unrecorded_commands.append(tuple(command))
+            observation = {"exit": 126, "stdout": "synthetic fixture refusal: unrecorded command"}
         unknown = observation.get("unknown", False)
         receipt = ExecutionReceipt(
             operation=str(operation),
@@ -350,6 +354,7 @@ async def evaluate(evidence, budget, model=None, provider=None):
                 if scripted_mode
                 else bool(responses) and all(m.usage.has_values() for m in responses),
                 "commands": execution.calls,
+                "unrecorded_commands": execution.unrecorded_commands,
                 "read_paths": reads,
                 "records": [r.model_dump(mode="json") for r in deps.ledger.records],
                 "messages": TypeAdapter(list[ModelMessage]).dump_python(

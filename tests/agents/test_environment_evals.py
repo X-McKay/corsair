@@ -14,7 +14,8 @@ def test_unknown_command_fails_closed_without_executing_it():
         HANDLE, ("sh", "-c", "touch /tmp/no-host-execution"), uuid4()
     )
     assert receipt.native_exit == 126
-    assert receipt.stdout == b"command outside recorded operator policy"
+    assert receipt.stdout == b"synthetic fixture refusal: unrecorded command"
+    assert execution.unrecorded_commands == [("sh", "-c", "touch /tmp/no-host-execution")]
 
 
 def test_missing_report_has_unknown_counts_and_no_false_comparison():
@@ -213,3 +214,28 @@ def test_budget_block_requires_the_observed_prefix_without_commands_after_the_ca
     assert not EnvironmentChecks().evaluate(ctx)["required_commands"]
     ctx.attributes["commands"] = ctx.metadata["commands"][:2]
     assert not EnvironmentChecks().evaluate(ctx)["command_budget"]
+
+
+def test_missing_or_partial_provider_tokens_are_unknown_but_counters_keep_zero(tmp_path):
+    from evals.run import summarize
+
+    cases = []
+    token_keys = ('observed_input_tokens', 'observed_output_tokens', 'input_tokens', 'output_tokens')
+    for index, (present, tokens) in enumerate(((False, 0), (False, 50), (True, 0), (None, 10))):
+        cases.append({'name': str(index), 'assertions': {'ok': {'value': True}},
+                      'evaluator_failures': [], 'scores': {}, 'task_duration': 1,
+                      'attributes': {'provider_usage_present': present, 'observed_commands': 0,
+                                     'observed_input_tokens': tokens, 'observed_output_tokens': tokens},
+                      'metrics': dict.fromkeys(token_keys, tokens)})
+    (tmp_path / 'report.json').write_text(json.dumps({'cases': cases, 'failures': []}))
+    result = summarize(tmp_path)
+    for key in token_keys:
+        assert result['efficiency_samples'][key] == {'observed': 2, 'attempts': 4}
+        assert result['efficiency_mean'][key] == 5
+    assert result['efficiency_samples']['observed_commands'] == {'observed': 4, 'attempts': 4}
+    assert result['efficiency_mean']['observed_commands'] == 0
+
+    (tmp_path / 'report.json').write_text(json.dumps({'cases': cases[:2], 'failures': []}))
+    unknown = summarize(tmp_path)
+    assert not set(token_keys) & unknown['efficiency_mean'].keys()
+    assert not set(token_keys) & unknown['efficiency_samples'].keys()

@@ -12,7 +12,7 @@ related: [SPEC-0029, SPEC-0044, PLAN-0048]
 ## Objective and dependencies
 
 Review SPEC-0029 implementation and fill PLAN-0048 environment gap under SPEC-0048.
-Base6be1b5f55224cbf97dc03a89f8c8a29d79f19df4; branch codex/agent-environment-improvements.
+Base 6be1b5f55224cbf97dc03a89f8c8a29d79f19df4; branch codex/agent-environment-improvements.
 
 ## Steps
 
@@ -75,7 +75,7 @@ frozen unsupported case, requiring Python3.13 as required and3.12 as prepared. N
 keeps the correct source citation and reads while inverting the authored requirement, and confirms
 only the semantic assertion fails. This bounded wording check does not establish arbitrary-language
 understanding. Manifest deliberately renewed; prior dataset results remain incomparable. Follow-up
-Make run16/16 clean with15 assertions each; focused71 checks passed (one SDK warning). Root reports
+Make run16/16 clean with 15 assertions each; focused 71 checks passed (one SDK warning). Root reports
 full suite at prior6f35dd3 passed997 tests; follow-up changes only evaluator/fixtures/regression records.
 
 Root final review: label shared metric means as per observed sample and label the suite synthetic in command metadata. Full offline suite at6f35dd3 passed997 checks; follow-up unsupported-requirement regression and affected checks passed71. No further provider dispatch was attempted after automatic approval review blocked external fixture transfer in the planning lane.
@@ -104,3 +104,18 @@ output corrections0.0 with16/16 coverage (previously absent). Requests5.25, tool
 input/output token estimates1016.25/162.25 unchanged. No provider or infrastructure action.
 `make test-config`:1050 passed, one existing SDK warning, 50.33 seconds. Updated workflow guards5 passed; `git diff --check` passed. Broad `ruff check` found existing shared-runner F401 (unused field import) and E731 (comparison lambda), both outside this fix; evaluator/regression files lint passed. Final review retains synthetic-runtime limits
 and no model prompt/config/skill or dataset change.
+
+
+Provider-coverage review follow-up (2026-10-13): a new regression reproduced missing and
+partial provider token totals being counted as complete samples. The shared summary now
+excludes native and observed input/output token metrics when provider_usage_present is false,
+while preserving genuine zero counters, known token observations and scripted estimates.
+The regression failed before the fix and passes after it; 23 affected checks passed.
+Unrecorded fixture commands now identify their exit 126 response as synthetic and appear in
+the attempt receipt under unrecorded_commands. The README explicitly limits live scores to
+curated argv adherence. No provider or infrastructure was invoked. The first attribution
+edit missed the fallback insertion and failed one test; corrected before the passing suite.
+Main f6a87d6 (PR58) merged cleanly. Frozen host-only Make remains 16/16.
+Full offline make test-config: 1056 passed, one existing SDK warning (52.48 seconds).
+Independent read-only follow-up: four targeted regressions passed, no blocker found.
+Scripted evidence: .runs/evals/environment/20261013T102019Z-development-scripted.
