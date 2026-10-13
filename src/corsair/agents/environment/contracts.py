@@ -10,6 +10,8 @@ from typing import Annotated, Generic, Literal, Union
 
 from pydantic import Field, field_validator, model_validator
 
+from corsair.core.blockers import Blocker
+
 from corsair.agents.issue_analysis.contracts import (Citation, Contract, Fact, SourceExcerpt, SourceFile,
                                                      SourceReference, confined_path)
 
@@ -125,6 +127,7 @@ class ReadyEnvironment(_Ready[SourceExcerpt]):
 
 
 class BlockedEnvironment(_Blocked[SourceExcerpt]):
+    diagnostics: tuple[Blocker, ...] = ()
     receipts: tuple[CommandRecord, ...]
 
 
