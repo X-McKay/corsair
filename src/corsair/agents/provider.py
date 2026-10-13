@@ -42,11 +42,12 @@ class LocalModelConfig(BaseModel):
     base_url: str
     model_name: str = Field(min_length=1, max_length=256)
     api_key_env: Literal["CORSAIR_LOCAL_MODEL_API_KEY"] | None = None
-    # A full 16384-token response took ~126 s on the local server (PLAN-0030), so 120 s cannot hold it.
-    timeout_seconds: float = Field(default=60, gt=0, le=240)
+    # A full 16384-token response took ~126 s on the local server (PLAN-0030), so 120 s cannot hold it;
+    # a full 32768-token response took 234.8 s (PLAN-0048), so that cap needs about 300 s.
+    timeout_seconds: float = Field(default=60, gt=0, le=300)
     # Per-request cap covering reasoning and answer tokens; each caller selects its own.
     # Thinking budgets stay a separate control below.
-    response_token_limit: Literal[2048, 4096, 8192, 16384] = 2048
+    response_token_limit: Literal[2048, 4096, 8192, 16384, 24576, 32768] = 2048
     thinking_mode: Literal["server_default", "disabled"] = "server_default"
     thinking_token_budget: int | None = Field(default=None, ge=1, le=2048, strict=True)
 
