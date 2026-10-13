@@ -32,11 +32,12 @@ from pydantic_evals.evaluators import (
 from corsair.agents.environment.agent import (
     PROMPT_VERSION,
     SKILL_SHA256,
+    TOOLSET_SHA256,
     create_environment_agent,
     environment_prompt,
 )
 from corsair.agents.environment.contracts import EnvironmentInput, EnvironmentDraft
-from corsair.agents.environment.tools import EnvironmentDependencies, SetupBudget
+from corsair.agents.environment.dependencies import EnvironmentDependencies, SetupBudget
 from corsair.agents.provider import LocalModelConfig, local_model
 from corsair.ports.execution import ExecutionReceipt, ExecutionError
 from corsair.ports.sandbox import SandboxHandle
@@ -231,6 +232,7 @@ async def evaluate(evidence, budget, model=None, provider=None):
         "prompt_version": PROMPT_VERSION,
         "config_version": "environment-eval-v1",
         "skill_sha256": SKILL_SHA256,
+        "toolset_sha256": TOOLSET_SHA256,
         "dataset": "development",
         "dataset_sha256": sha256((ROOT / "cases.json").read_bytes()).hexdigest(),
         "model": describe_model(model or scripted(cases[0])),
