@@ -35,12 +35,15 @@ from evals.issue_analysis.live import NoUnknownToolAttempts, ProviderUsageCovera
 
 ROOT = Path(__file__).parent
 # Development cases shaped prompts v1-v5; each held-out set was frozen before any provider saw it
-# (heldout was exposed to v2/v3 in PLAN-0036; heldout2 was written and reviewed apart from the v4/v5 prompt author).
-DATASETS = {"development": "cases.yaml", "heldout": "cases-heldout.yaml", "heldout2": "cases-heldout-2.yaml"}
+# (heldout was exposed to v2/v3 in PLAN-0036; heldout2 was written and reviewed apart from the v4/v5 prompt author;
+# heldout3 carries SPEC-0040 typed facilities and witnesses and was written apart from the prompt author).
+DATASETS = {"development": "cases.yaml", "heldout": "cases-heldout.yaml", "heldout2": "cases-heldout-2.yaml",
+            "heldout3": "cases-heldout-3.yaml"}
 # Held-out sets written before SPEC-0040 typed witnesses: frozen, exposed and no longer runnable.
 RETIRED = frozenset({"heldout", "heldout2"})
 # SPEC-0023: a manifest of case name and content hash beside each held-out dataset.
-MANIFESTS = {"heldout": "cases-heldout.manifest.json", "heldout2": "cases-heldout-2.manifest.json"}
+MANIFESTS = {"heldout": "cases-heldout.manifest.json", "heldout2": "cases-heldout-2.manifest.json",
+             "heldout3": "cases-heldout-3.manifest.json"}
 # Fixture setup reaching the parent of the scratch location or a fixed host directory (PLAN-0025 review finding).
 OUTSIDE_SCRATCH = re.compile(r"\.parent\b|(?<![\w.])/(?:tmp|var|etc|home|root)\b|(?<![\w.])~/", re.IGNORECASE)
 PlanOutput = ReadyTestPlan | UnsupportedTestPlan

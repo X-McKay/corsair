@@ -18,7 +18,9 @@ from corsair.agents.test_planning import (
     UnsupportedTestPlanDraft, create_test_planning_agent, planning_prompt,
 )
 from corsair.agents.test_planning.skills import SKILL_TEXT
-from evals.test_planning.evaluate import RETIRED, EvaluationBudget, dataset, evaluate, passed, plan_checks
+from evals.test_planning.evaluate import (
+    DATASETS, MANIFESTS, RETIRED, EvaluationBudget, dataset, evaluate, passed, plan_checks,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -288,14 +290,18 @@ def test_scratch_check_rejects_fixtures_outside_the_scratch_location():
     assert "../" in plan.security.input
 
 
-@pytest.mark.parametrize("name", sorted(RETIRED))
-def test_retired_heldout_cases_stay_disjoint_and_cannot_run_again(tmp_path, name):
-    development, heldout = dataset("development"), dataset(name)
+@pytest.mark.parametrize("name", sorted(MANIFESTS))
+def test_heldout_cases_stay_disjoint_and_retired_sets_cannot_run_again(tmp_path, name):
+    heldout = dataset(name)
     assert len(heldout.cases) == 6 and {c.metadata.status for c in heldout.cases} == {"ready", "unsupported"}
-    shown = {source.content for c in development.cases for source in c.inputs.source_files}
-    assert not shown & {source.content for c in heldout.cases for source in c.inputs.source_files}
-    assert not {c.inputs.identification.target.symbol for c in development.cases} & {
-        c.inputs.identification.target.symbol for c in heldout.cases}
+    for other in (dataset(n) for n in DATASETS if n != name):
+        shown = {source.content for c in other.cases for source in c.inputs.source_files}
+        assert not shown & {source.content for c in heldout.cases for source in c.inputs.source_files}
+        assert not {c.inputs.identification.target.symbol for c in other.cases} & {
+            c.inputs.identification.target.symbol for c in heldout.cases}
+    if name not in RETIRED:
+        assert all(c.inputs.environment.witness_facilities for c in heldout.cases)
+        return
     with pytest.raises(ValueError, match="retired"):
         asyncio.run(evaluate(tmp_path / name, EvaluationBudget(), cases=name))
     assert not (tmp_path / name).exists()
