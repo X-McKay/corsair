@@ -27,7 +27,7 @@ Implement [SPEC-0035](../specs/SPEC-0035-assessment-evals-and-durable-chain.md) 
 
 Durable chain (branch `durable-chain`), scripted stage models and reviewed host runners only; no provider, OpenShell or live qualification:
 
-- `make test-config`: 785 passed, 1 failed. The failure is pre-existing at `8332872`: SPEC-0035 cites SPEC-0033, which lands with PR #35.
+- `make test-config`: 785 passed, 1 failed: SPEC-0035 listed SPEC-0033 (not yet on main) as related; removed from `related` until PR #35 lands.
 - Native service: pinned Temporal CLI 1.9.1 (binary sha256 verified against `deploy/temporal/runtime-lock.yaml`) on loopback; `pytest tests/temporal --temporal-address … --temporal-evidence-dir …`: 45 passed (12 new chain checks, 33 existing), none skipped.
 - Direct and durable runs agree on stop stage, reason, gate result, assessment admission, stage sequence, per-stage requests and tool calls for the true pair, an identification abstention, a raising candidate runner (one activity attempt, recorded, chain stops at execution) and an over-budget identification. A timed-out stage stops both modes at the same stage with kind `TimeoutError`; the reason text differs (durable `Timed out` from the child's execution timeout, direct an empty `asyncio` timeout message) and durable usage is `None` (unobserved). Parent admission refusals fail the workflow before any child or activity.
 - 17 retained histories (parents and children) replayed with the native `Replayer`.
