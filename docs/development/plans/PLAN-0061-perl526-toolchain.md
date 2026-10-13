@@ -21,7 +21,7 @@ Implement [SPEC-0056](../specs/SPEC-0056-perl526-toolchain.md) on branch `claude
 - [x] Merge on offline review and CI (process change approved by Al 2026-10-13 11:59Z; Al's word to merge after #51, 12:20Z).
 - [ ] RIG0: build, load and gate on a fresh kind node, in the batch run before rows land.
 - [ ] Evidence-only follow-up PR: the `perl-5.26-make` matrix row and the qualification report entry from the gate evidence.
-- [ ] Next PR: TAP runner and report parser (SPEC-0061, next PR), `tap-harness` framework row on this image, a real case at both commits under Docker.
+- [x] Next PR: TAP runner and report parser ([SPEC-0061](../specs/SPEC-0061-perl-tap-runner.md)), `tap-harness` framework row on this image, a real case at both commits under Docker.
 
 ## Validation and progress
 

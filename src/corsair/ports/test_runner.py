@@ -32,6 +32,10 @@ JAVA_TEST_ID = re.compile(r'^(?:(?P<module>[A-Za-z0-9_][A-Za-z0-9_.-]*(?:/[A-Za-
 RUBY_TEST_ID = re.compile(r'^(?P<path>[A-Za-z0-9_./-]+\.rb)::(?P<class_name>(?:[A-Z][A-Za-z0-9_]*::)*[A-Z][A-Za-z0-9_]*)'
                           r'#(?P<method>test_[A-Za-z0-9_]*)$')
 
+# TAP on Perl: `path/to/file.t#subtest`, a repository-relative test file and one of its top-level Test::More subtests.
+PERL_TEST_ID = re.compile(r'^(?P<path>[A-Za-z0-9_][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_][A-Za-z0-9_.-]*)*\.t)'
+                          r'#(?P<name>[A-Za-z_][A-Za-z0-9_]*)$')
+
 
 def approved_path(value: str) -> str:
     path = PurePosixPath(value)
@@ -81,6 +85,23 @@ class RubyTestId:
 
     def __str__(self) -> str:
         return f'{self.path}::{self.class_name}#{self.method}'
+
+
+@dataclass(frozen=True)
+class PerlTestId:
+    """A top-level Test::More subtest of one `.t` file; TAP names it on its `# Subtest:` line."""
+    path: str
+    name: str
+
+    @classmethod
+    def parse(cls, value: str) -> 'PerlTestId':
+        match = PERL_TEST_ID.fullmatch(value) if type(value) is str and len(value) <= MAX_TEST_ID else None
+        if match is None or '..' in match['path'].split('/'):
+            raise ValueError('Expected `path/to/file.t#subtest`')
+        return cls(match['path'], match['name'])
+
+    def __str__(self) -> str:
+        return f'{self.path}#{self.name}'
 
 
 @dataclass(frozen=True)

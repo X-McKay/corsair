@@ -243,8 +243,9 @@ def test_perl526_row_meets_runtime_and_make_and_waits_for_a_tap_runner():
     selection = select(requirement, staged)
     assert selection.status == 'unsupported' and [n.name for n in selection.needs] == ['tap-harness']
     assert [check.name for check in selection.rejected[0].unmet] == ['tap-harness']
-    runner = {'name': 'tap-harness', 'language': 'perl', 'versions': '==3.38', 'runner': 'x', 'images': ['perl-5.26-make'],
-              'qualification': {'records': ['SPEC-0056'], 'report': 'x'}}
+    # The SPEC-0061 row: Test::More 1.302073 (core in the image) writes the TAP that `tap_runner.py` admits.
+    runner = {'name': 'tap-harness', 'language': 'perl', 'versions': '==1.302073', 'runner': 'src/corsair/adapters/tap_runner.py',
+              'images': ['perl-5.26-make'], 'qualification': {'records': ['SPEC-0056', 'SPEC-0061'], 'report': 'x'}}
     selection = select(requirement, Matrix.model_validate({**staged.model_dump(), 'frameworks': [*matrix['frameworks'], runner]}))
     assert selection.status == 'supported' and selection.image_id == 'perl-5.26-make'
     # A project that needs a newer Perl is not routed to 5.26.
