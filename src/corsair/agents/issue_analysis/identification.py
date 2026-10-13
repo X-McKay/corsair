@@ -2,6 +2,7 @@
 
 from hashlib import sha256
 from pathlib import Path
+from typing import Literal, Protocol
 
 from pydantic_ai import Agent, ModelRetry, RunContext
 from pydantic_ai.capabilities import Capability, Instrumentation
@@ -11,7 +12,7 @@ from pydantic_ai.models import Model
 from pydantic_ai.models.instrumented import InstrumentationSettings
 
 from ..budget import tool_budget
-from .contracts import IssueAnalysisInput, SourceRead
+from .contracts import IssueAnalysisInput, SourceExcerpt, SourceRead
 from .identification_contracts import IssueIdentification, IssueIdentificationDraft
 from .tools import READ_SOURCE_TOOL, TOOL_RETRIES, FixtureDependencies
 from .tools.identification import identification_tools
@@ -27,10 +28,48 @@ Return a source location; trusted code preserves the original issue. Do not rewr
 Use only read_source and the supplied structured output contract."""
 
 
+class _IdentificationInputs(Protocol):
+    @property
+    def issue(self) -> str: ...
+
+    @property
+    def scope(self) -> Literal["component", "application_path"]: ...
+
+
+class IdentificationDependencies(Protocol):
+    @property
+    def inputs(self) -> _IdentificationInputs: ...
+
+    def read_source(self, path: str, start_line: int, end_line: int) -> SourceExcerpt: ...
+
+
 def identification_prompt(inputs: IssueAnalysisInput) -> str:
     return inputs.model_dump_json(exclude={"source_files", "fixture_id"}) + "\nSaved source inventory: " + ", ".join(
         f"{source.path} (saved-file inclusive lines 1..{len(source.content.splitlines())})" for source in inputs.source_files
     )
+
+
+def finalize_draft(deps: IdentificationDependencies, draft: IssueIdentificationDraft,
+                   reads: list[SourceRead]) -> IssueIdentification:
+    """Shared by inline and repository modes: scope, run-local read coverage, symbol and quotation."""
+    if draft.scope != deps.inputs.scope:
+        raise ModelRetry("identification scope must equal the authorized input scope")
+    if draft.status != "ready":
+        return IssueIdentification.model_validate(draft.model_dump() | {"reported_issue": deps.inputs.issue})
+    reference = draft.target.source
+    if not any(read.path == reference.path and read.start_line <= reference.start_line
+               and reference.end_line <= read.end_line for read in reads):
+        raise ModelRetry("target source must be fully covered by a successful read_source in this run")
+    try:
+        source = deps.read_source(reference.path, reference.start_line, reference.end_line)
+    except ValueError as exc:
+        raise ModelRetry(str(exc)) from exc
+    if draft.target.symbol not in source.quote:
+        raise ModelRetry("target symbol must occur in the selected source excerpt")
+    return IssueIdentification.model_validate(draft.model_dump() | {
+        "reported_issue": deps.inputs.issue,
+        "target": {"symbol": draft.target.symbol, "source": source.model_dump()},
+    })
 
 
 def create_issue_identification_agent(
@@ -42,28 +81,11 @@ def create_issue_identification_agent(
         raise TypeError("an explicit PydanticAI Model instance is required")
 
     async def finalize_identification(ctx: RunContext[FixtureDependencies], draft: IssueIdentificationDraft) -> IssueIdentification:
-        if draft.scope != ctx.deps.inputs.scope:
-            raise ModelRetry("identification scope must equal the authorized input scope")
-        if draft.status != "ready":
-            return IssueIdentification.model_validate(draft.model_dump() | {"reported_issue": ctx.deps.inputs.issue})
-        reference = draft.target.source
         reads = [SourceRead.model_validate(part.content)
                  for message in ctx.messages if isinstance(message, ModelRequest) and message.run_id == ctx.run_id
                  for part in message.parts if isinstance(part, ToolReturnPart)
                  and part.tool_name == READ_SOURCE_TOOL and part.outcome == "success"]
-        if not any(read.path == reference.path and read.start_line <= reference.start_line
-                   and reference.end_line <= read.end_line for read in reads):
-            raise ModelRetry("target source must be fully covered by a successful read_source in this run")
-        try:
-            source = ctx.deps.read_source(reference.path, reference.start_line, reference.end_line)
-        except ValueError as exc:
-            raise ModelRetry(str(exc)) from exc
-        if draft.target.symbol not in source.quote:
-            raise ModelRetry("target symbol must occur in the selected source excerpt")
-        return IssueIdentification.model_validate(draft.model_dump() | {
-            "reported_issue": ctx.deps.inputs.issue,
-            "target": {"symbol": draft.target.symbol, "source": source.model_dump()},
-        })
+        return finalize_draft(ctx.deps, draft, reads)
 
     return Agent[FixtureDependencies, IssueIdentification](
         model, name="issue_identification", deps_type=FixtureDependencies, output_type=finalize_identification,
