@@ -49,6 +49,7 @@ from corsair.nodes.runtime.contracts import RuntimeInputs, RuntimeOutcome
 from corsair.nodes.runtime.environment import RuntimeCatalog, check_ready, ready_evidence, select_runtime
 from corsair.nodes.witness import Calibration, WitnessEvidence, witness_evidence
 from corsair.ports.execution import SandboxExecution
+from corsair.ports.preparation import Preparation, PreparationRefused, PreparedSandbox
 from corsair.ports.sandbox import SandboxHandle
 from corsair.ports.test_runner import ApprovedPatch, NativeTestRun, PatchFile, TestRunner, WitnessRequest
 
@@ -217,29 +218,6 @@ class SetupSource(Contract):
 
 
 @dataclass(frozen=True)
-class PreparedSandbox:
-    """A sandbox of one prepared toolchain image, live until the preparation port releases it.
-
-    ``read_source`` returns a file's bytes from the operator's capture of the revision placed in the sandbox
-    (never from the sandbox), or None when the capture has no such file; ``source_paths`` lists every file of that
-    capture (SPEC-0071: without it a smoke baseline is refused)."""
-    execution: SandboxExecution
-    handle: SandboxHandle
-    scratch_location: str
-    read_source: Callable[[str], bytes | None]
-    source_paths: Callable[[], tuple[str, ...]] | None = None
-
-
-class Preparation(Protocol):
-    """Operator-owned sandbox lifecycle for the environment stage; adapters are chosen outside the chain."""
-    def prepare(self, toolchain: Toolchain, operation: UUID, *, overlay: tuple[PatchFile, ...] = ()) -> PreparedSandbox:
-        """`overlay`: operator files (SPEC-0071 smoke tests) written beside the captured commit; an overlay path the
-        capture already has is refused before any sandbox is created."""
-        ...
-    def release(self, sandbox: PreparedSandbox, operation: UUID) -> Literal["confirmed", "unconfirmed"]: ...
-
-
-@dataclass(frozen=True)
 class FixtureCase:
     """Operator inputs: the issue over the baseline revision's saved source, and hand-supplied environment facts."""
     issue: IssueAnalysisInput
@@ -402,7 +380,9 @@ async def prepare_environment(inputs: EnvironmentInput, model: Model | None, pre
         sandbox = await asyncio.to_thread(partial(preparation.prepare, overlay=overlay), selected, operation)
     except Exception as exc:
         # Nothing was handed back to release; whether a sandbox exists is the adapter's to report.
-        return StageAttempt("environment", None, None, (), perf_counter() - started, exc, limits, cleanup="unconfirmed")
+        left = exc.cleanup if isinstance(exc, PreparationRefused) else "unconfirmed"
+        return StageAttempt("environment", None, None, (), perf_counter() - started, exc, limits,
+                            cleanup=None if left == "not_required" else left)
     try:
         agent = AGENTS["environment"](model, output_retries=budget.output_retries)
         deps = EnvironmentDependencies(inputs=inputs, execution=sandbox.execution, handle=sandbox.handle,
