@@ -20,11 +20,13 @@ Implement [SPEC-0037](../specs/SPEC-0037-host-source-acquisition.md): a host ste
 - [x] Smoke: two cases (JSPWiki, dot-prop) end to end, including `GitSource` capture of fix and parent.
 - [x] Network run of all resolved cases; commit `benchmarks/source-pins.json`.
 - [x] Format-only fsck downgrade (`fsck_warn`) after the first run refused six repositories; rerun of those cases.
-- [x] Review, CURRENT.md row, handoff ([HANDOFF-0059](../handoffs/HANDOFF-0059-host-source-acquisition.md)), draft PR.
+- [x] Review, CURRENT.md row, handoff ([HANDOFF-0059](../handoffs/HANDOFF-0059-host-source-acquisition.md)), draft PR #42.
+- [x] `GitSource`: opt-in format-only fsck ignore, opt-in recorded skip of symlinks/submodules, sizes from the tree listing, raised ceilings; tests in `tests/unit/test_artifacts.py`.
+- [x] Second full run with capture under the new options; CVE-2023-31486 fetched on RIG0.
 
 ## Validation and progress
 
-Offline: `uv run --locked python -m pytest tests/unit/test_git_acquire.py` 11 passed; `make test-config` 866 passed (853 on main plus 13 new). The first draft failed three of its own tests, each a real finding fixed in the adapter or test: `git init` copied sample hooks larger than a small file-size limit (now `--template=`), a file-size kill surfaces as `index-pack died of signal 25` with fetch exit 128 rather than a signal exit (now classified `budget`), and a test fixture's `\0100` octal escape.
+Offline: `uv run --locked python -m pytest tests/unit/test_git_acquire.py` 11 passed; `make test-config` 866 passed (853 on main plus 13 new) at the first PR head; after the capture changes see the second-run paragraph. The first draft failed three of its own tests, each a real finding fixed in the adapter or test: `git init` copied sample hooks larger than a small file-size limit (now `--template=`), a file-size kill surfaces as `index-pack died of signal 25` with fetch exit 128 rather than a signal exit (now classified `budget`), and a test fixture's `\0100` octal escape.
 
 Smoke (2026-10-13, cloud container through its egress proxy, `.runs/acquire-smoke/`): JSPWiki fix `88d89d65` acquired with complete ancestry in 7.4 s, 54,258,721 repository bytes, 1,724 files / 14,132,441 bytes; single parent `f140a2a4`, matching the hand acquisition recorded in PLAN-0021 (54,258,800 bytes then; this smoke still copied Git's sample hooks, and the template-free full run measured 54,232,587); `GitSource` captured both at the largest admitted ceilings (1,724 and 1,723 files). dot-prop 89,558 bytes, 15 files.
 
@@ -39,3 +41,16 @@ Result, all in `benchmarks/source-pins.json`: 39 of 40 resolvable cases acquired
 ## Decisions and next action
 
 Complete ancestry by default, not shallow, because the qualified `GitSource` capture refuses shallow repositories; `--depth` stays available as an explicit measure-only mode. Fetch from the repository named in the fix reference and flag disagreement with the inventory's `repository_url`, rather than guessing. The runner deletes fetched repositories and captured objects after recording unless `--keep`; receipts stay. Downgrading format-only fsck messages is opt-in and limited to three ids; `GitSource` keeps refusing them, so capturing those six cases needs a separate decision on SPEC-0012 (the same downgrade there, or a capture that does not walk ancestry). Next: repository-scale source access (IDEA-0005 G2b) for the cases over the capture ceilings, and the SPEC-0025 sandbox fetch once the storage quota is qualified.
+
+## Second run with capture changes
+
+Second full run (`.runs/acquire-20261013-run2/`, default strict fsck, capture with symlink/submodule skipping at 16,384 files / 128 MiB / 300 s): 33 acquired, the same six refused at `source_admission` (now classified correctly) and salsa at `host_network`. The six were then acquired and captured with `--fsck-warn badTimezone missingSpaceBeforeEmail zeroPaddedFilemode` (`.runs/acquire-20261013-run2-fsck-warn/`). CVE-2023-31486 was fetched by a Remote Control session on RIG0 (direct egress, worktree `/home/al/git/corsair-pr42` at `826ca49`, run `.runs/acquire-cve-2023-31486/` there): acquired on the first attempt, 60,790,508 bytes, 7,409 files, both commits captured. Its record in the pins file is marked with the host it came from. The full-ancestry size is small for perl, consistent with Debian's packaging repository rather than upstream perl history; the commit identity is verified either way.
+
+Result: all 40 resolvable cases acquired with verified commits, and `GitSource` captured every fix commit (40/40) and every single parent (34/34). Skipped and listed: five documentation symlinks in cookiecutter, the `git/ext/gitdb` submodule in GitPython, one fixture symlink in rails. Largest captures: perl packaging 7,409 files, tomee 6,733 files in 36 s, rails 4,413 files in 45 s.
+
+Needs case review (for Al, not decided here):
+
+- No fix reference, nothing to fetch (10): CVE-2017-18214, CVE-2020-28464, CVE-2024-54133, CVE-2023-28120, CVE-2018-3760 (also no repository); CPANSA-YAML-2017-01, CVE-2012-5526, CPANSA-Plack-2014-0801, CVE-2014-0477, CVE-2019-16892.
+- Fix is a merge commit, so no single-parent baseline (6): CVE-2018-7753 (bleach), CVE-2022-24065 (cookiecutter), CVE-2023-23934 and CVE-2023-25577 (werkzeug), @vivaxy/here-3.1.0, CVE-2023-36823 (sanitize).
+- Fix repository differs from the inventory's (2): VUL4J-2 (apache/xmlgraphics-batik, inventory says apache/batik); CVE-2023-31486 (Debian perl packaging, inventory says HTTP-Tiny).
+- Skipped content that a build may need: GitPython's `gitdb` submodule (CVE-2022-24439).

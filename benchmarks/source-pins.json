@@ -10,6 +10,7 @@
    "via": "commit",
    "repository_matches_inventory": false,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "660ef628d637af636ea113243fe73f170ac43958",
@@ -40,9 +41,10 @@
    },
    "shallow": false,
    "repository_bytes": 151658955,
-   "fetched_at": "2026-10-13T04:52:22.023423+00:00",
-   "elapsed_seconds": 10.611,
+   "fetched_at": "2026-10-13T05:10:03.810330+00:00",
+   "elapsed_seconds": 9.322,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "efb98a96b9b64a557a1caf030e2c16c3902b9712",
    "capture": {
     "commit": {
@@ -51,7 +53,9 @@
      "manifest": {
       "sha256": "ef68a5c6ba8bfb61d989c11398b25f83984c1ea96326f4bb7e98ac4ca5138fef",
       "size": 867458
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -59,7 +63,9 @@
      "manifest": {
       "sha256": "f41b8e8fbd035c916e679c7b908ed66e7c829048a6746e4281a6c270d4dfc41c",
       "size": 867458
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -70,6 +76,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "2a2f1dc48e22a34ddb72321a4db211da91aa933b",
@@ -99,10 +106,11 @@
     "noncanonical_paths": 0
    },
    "shallow": false,
-   "repository_bytes": 14454261,
-   "fetched_at": "2026-10-13T04:53:39.471817+00:00",
-   "elapsed_seconds": 2.734,
+   "repository_bytes": 14453902,
+   "fetched_at": "2026-10-13T05:10:52.223599+00:00",
+   "elapsed_seconds": 2.232,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "dcb0486fb4cb2b6592c04d6ec2edbd3f690df5f2",
    "capture": {
     "commit": {
@@ -111,7 +119,9 @@
      "manifest": {
       "sha256": "76627c0a23085d7188c3f3668789ea7d8ae49930938efe1e76da6288c4398588",
       "size": 140211
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -119,7 +129,9 @@
      "manifest": {
       "sha256": "81a5f2d8118ab2a38714740a0a4190d69ac24a312571278ffde86d3387f45ec3",
       "size": 140211
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -130,6 +142,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "88d89d6523802c044cfcb7930cba40d8eeb21da2",
@@ -160,9 +173,10 @@
    },
    "shallow": false,
    "repository_bytes": 54232587,
-   "fetched_at": "2026-10-13T04:53:53.706431+00:00",
-   "elapsed_seconds": 8.51,
+   "fetched_at": "2026-10-13T05:11:01.985956+00:00",
+   "elapsed_seconds": 7.071,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "f140a2a4371735ad24d04a1d78c6e1d9ceaed76f",
    "capture": {
     "commit": {
@@ -171,7 +185,9 @@
      "manifest": {
       "sha256": "e9e89a5a082a415db0044d1f3a4a591e28ee8504fce9fcd0c80d837d736ec64f",
       "size": 429420
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -179,7 +195,9 @@
      "manifest": {
       "sha256": "ddb4639c7558b8b8cbf7b4fa78e06a523fb7917540a341749d27dd982f947774",
       "size": 429174
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -190,6 +208,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "b15ab927709ca18ea4a02538be01919a19ab65af",
@@ -219,10 +238,11 @@
     "noncanonical_paths": 0
    },
    "shallow": false,
-   "repository_bytes": 23374487,
-   "fetched_at": "2026-10-13T04:54:36.072264+00:00",
-   "elapsed_seconds": 2.576,
+   "repository_bytes": 23374486,
+   "fetched_at": "2026-10-13T05:11:31.249222+00:00",
+   "elapsed_seconds": 2.611,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "d41afcc6e722ec112918c2cc56a386dd6267a1d5",
    "capture": {
     "commit": {
@@ -231,7 +251,9 @@
      "manifest": {
       "sha256": "54d66892f64c533e2dbc3c8e8293a8fbd04828bd423f665dec1d7d42c9c7bfbf",
       "size": 207963
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -239,7 +261,9 @@
      "manifest": {
       "sha256": "31496a13fb5708828887822936b672d1264041eda5327107576296e8f09e226e",
       "size": 207715
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -250,6 +274,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "f238cf4f1091be19fbcfd086b042c86a1bcaa7fc",
@@ -279,21 +304,32 @@
     "noncanonical_paths": 0
    },
    "shallow": false,
-   "repository_bytes": 73719891,
-   "fetched_at": "2026-10-13T04:54:53.266400+00:00",
-   "elapsed_seconds": 8.154,
+   "repository_bytes": 73720965,
+   "fetched_at": "2026-10-13T05:11:42.596440+00:00",
+   "elapsed_seconds": 6.522,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "016b8eedd5ca47fce95e2a16069e640e3842906d",
    "capture": {
     "commit": {
-     "outcome": "refused",
-     "layer": "source_admission",
-     "detail": "Source file count exceeded"
+     "outcome": "completed",
+     "files": 4133,
+     "manifest": {
+      "sha256": "5c25eb9f7b08883c429f4af0c4a0f194853bc7b94fb3a6888cc9088fb1fecc71",
+      "size": 1110859
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
-     "outcome": "refused",
-     "layer": "source_admission",
-     "detail": "Source file count exceeded"
+     "outcome": "completed",
+     "files": 4133,
+     "manifest": {
+      "sha256": "2dc6c7563eaef81b5f6d768802455e16bc3524fb65c3d14dd6e80052ec686277",
+      "size": 1110859
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -304,6 +340,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "1f301038a751bf16e525607c3db513db835b2999",
@@ -333,21 +370,32 @@
     "noncanonical_paths": 0
    },
    "shallow": false,
-   "repository_bytes": 66527745,
-   "fetched_at": "2026-10-13T04:55:07.392636+00:00",
-   "elapsed_seconds": 6.418,
+   "repository_bytes": 66528814,
+   "fetched_at": "2026-10-13T05:12:32.788525+00:00",
+   "elapsed_seconds": 6.24,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "e1025a207ddfa1b8971ec6261ea2c09da2af157f",
    "capture": {
     "commit": {
-     "outcome": "refused",
-     "layer": "source_admission",
-     "detail": "Source file count exceeded"
+     "outcome": "completed",
+     "files": 4721,
+     "manifest": {
+      "sha256": "c12000abac87095057affc598d62d137f020179ff4a254030113a6d395e6d159",
+      "size": 1248665
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
-     "outcome": "refused",
-     "layer": "source_admission",
-     "detail": "Source file count exceeded"
+     "outcome": "completed",
+     "files": 4721,
+     "manifest": {
+      "sha256": "3292f60674f9abd40eb7fc56d308f387271d439ad7034fa5309f88724c27f5d1",
+      "size": 1248665
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -358,6 +406,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "58cdbbef9c77ab2b44870f9d606593b49cde76d9",
@@ -387,21 +436,32 @@
     "noncanonical_paths": 0
    },
    "shallow": false,
-   "repository_bytes": 46377524,
-   "fetched_at": "2026-10-13T04:55:18.844446+00:00",
-   "elapsed_seconds": 11.22,
+   "repository_bytes": 46377859,
+   "fetched_at": "2026-10-13T05:13:26.437583+00:00",
+   "elapsed_seconds": 11.493,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "5689b25ac70a243c4d838962e068856f889ea87f",
    "capture": {
     "commit": {
-     "outcome": "refused",
-     "layer": "source_admission",
-     "detail": "Source file count exceeded"
+     "outcome": "completed",
+     "files": 6733,
+     "manifest": {
+      "sha256": "19c46f4f9d75914974fb394ac328abea971ece095800165334bdf307467797c7",
+      "size": 1814915
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
-     "outcome": "refused",
-     "layer": "source_admission",
-     "detail": "Source file count exceeded"
+     "outcome": "completed",
+     "files": 6733,
+     "manifest": {
+      "sha256": "3057c09ca85b473833e0a7a68734d05a95d9df090294407c022028e915305c0f",
+      "size": 1814915
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -412,6 +472,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "b38a1b3a4352303e4312b2bb601a0d7ec6e28f41",
@@ -442,9 +503,10 @@
    },
    "shallow": false,
    "repository_bytes": 1573687,
-   "fetched_at": "2026-10-13T04:55:39.062117+00:00",
-   "elapsed_seconds": 1.073,
+   "fetched_at": "2026-10-13T05:14:50.450605+00:00",
+   "elapsed_seconds": 1.047,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "86c37983bb2bd92b1df43fe73f321ffbfa155070",
    "capture": {
     "commit": {
@@ -453,7 +515,9 @@
      "manifest": {
       "sha256": "febb930b97d73d7277fa2b5d191967c423792fd787f19207c539e2c89de67a48",
       "size": 38357
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -461,7 +525,9 @@
      "manifest": {
       "sha256": "e6fb3c07cc5ba2cacb3bd4d17fa97581e3db47e551a1feea5b1293cc879cd3b6",
       "size": 38357
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -472,6 +538,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "066cb43b4413b3490d822ec8b8a32072ebd213ca",
@@ -502,9 +569,10 @@
    },
    "shallow": false,
    "repository_bytes": 301655,
-   "fetched_at": "2026-10-13T04:55:42.714650+00:00",
-   "elapsed_seconds": 0.663,
+   "fetched_at": "2026-10-13T05:14:53.350475+00:00",
+   "elapsed_seconds": 0.623,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "fed6ee7435429b7f6a4576acb823a84277c669fc",
    "capture": {
     "commit": {
@@ -513,7 +581,9 @@
      "manifest": {
       "sha256": "b2742183cc381fe8ec7f952a54ae39a23a3839a56d738000fb5fb0c9fd217314",
       "size": 18294
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -521,7 +591,9 @@
      "manifest": {
       "sha256": "a5896ad7d4132db494f9b0ca9ca499fef0adaf71506a81ca0280935f5cdc600e",
       "size": 17588
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -532,6 +604,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "3dfefdec1f7b2a4ee0ef8902afdea720b1572cb3",
@@ -562,9 +635,10 @@
    },
    "shallow": false,
    "repository_bytes": 379808,
-   "fetched_at": "2026-10-13T04:55:44.546293+00:00",
-   "elapsed_seconds": 0.58,
+   "fetched_at": "2026-10-13T05:14:54.809829+00:00",
+   "elapsed_seconds": 0.717,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "c82f48fb270ec96a3f6a84d6ad61ae214f572fe4",
    "capture": {
     "commit": {
@@ -573,7 +647,9 @@
      "manifest": {
       "sha256": "ea6ba2f4de887411a93180962bdae9b479d83ef1da7452aeb0dec343a5d5e114",
       "size": 5952
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -581,7 +657,9 @@
      "manifest": {
       "sha256": "e8ded56a210b333500106d70b1fe56d73d3046ca8fd3ff12fce9c2f045901704",
       "size": 5952
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -592,6 +670,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "c5df5789ec3471a31311f42c2d19fc2cf21b35ef",
@@ -623,9 +702,10 @@
    },
    "shallow": false,
    "repository_bytes": 621315,
-   "fetched_at": "2026-10-13T04:55:45.531954+00:00",
-   "elapsed_seconds": 0.663,
+   "fetched_at": "2026-10-13T05:14:55.869840+00:00",
+   "elapsed_seconds": 0.77,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": null,
    "capture": {
     "commit": {
@@ -634,7 +714,9 @@
      "manifest": {
       "sha256": "d0e1e51ef3839314d8121f65e2086609bf8cc30f5e5966ae2989951cb3dc49dc",
       "size": 11475
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -645,6 +727,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "71b707758851e4b622f87d9a73266e06f60aeab4",
@@ -675,9 +758,10 @@
    },
    "shallow": false,
    "repository_bytes": 1434197,
-   "fetched_at": "2026-10-13T04:55:46.705577+00:00",
-   "elapsed_seconds": 0.764,
+   "fetched_at": "2026-10-13T05:14:56.986305+00:00",
+   "elapsed_seconds": 0.769,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "cf1aee77980b295e2d632dbedea1cb3abf661c9a",
    "capture": {
     "commit": {
@@ -686,7 +770,9 @@
      "manifest": {
       "sha256": "29473f41132fb6de0530a07fd5a85be5e21248a399e7d82c8f2e55b2a1fb4458",
       "size": 20453
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -694,7 +780,9 @@
      "manifest": {
       "sha256": "05da489fbc611dfdefef612acdfc5d634d664361c7ef625bbbbaab9f25467334",
       "size": 19784
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -705,6 +793,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "8238a9e450ed1524e40cb3a8b0b3c00606903aeb",
@@ -734,10 +823,11 @@
     "noncanonical_paths": 0
    },
    "shallow": false,
-   "repository_bytes": 1565515,
-   "fetched_at": "2026-10-13T04:55:49.105528+00:00",
-   "elapsed_seconds": 0.857,
+   "repository_bytes": 1565516,
+   "fetched_at": "2026-10-13T05:14:58.939442+00:00",
+   "elapsed_seconds": 0.821,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "e66046785b816e5c2d22f101f36faefd19c4a771",
    "capture": {
     "commit": {
@@ -746,7 +836,9 @@
      "manifest": {
       "sha256": "7fd373a08eb42216d02e9e6895ef81dc1496c4a15af391127e82da938975d50c",
       "size": 15002
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -754,7 +846,9 @@
      "manifest": {
       "sha256": "213cf84b78060384bc0454574a89e11247566e221cf835b9dcdc0b0e3a5b1e24",
       "size": 15002
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -765,6 +859,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "fdffddb31fd2b46344dfa317531ff155e7999f77",
@@ -795,16 +890,28 @@
     "noncanonical_paths": 0
    },
    "shallow": false,
-   "repository_bytes": 3155051,
-   "fetched_at": "2026-10-13T04:55:51.326635+00:00",
-   "elapsed_seconds": 1.129,
+   "repository_bytes": 3156649,
+   "fetched_at": "2026-10-13T05:15:00.759844+00:00",
+   "elapsed_seconds": 1.186,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": null,
    "capture": {
     "commit": {
-     "outcome": "refused",
-     "layer": "source_admission",
-     "detail": "Only regular source blobs admitted; symlinks/submodules refused"
+     "outcome": "completed",
+     "files": 238,
+     "manifest": {
+      "sha256": "253310952850e8d98395e3baa105894518c46544dcaf64b202f6c6af8430ca32",
+      "size": 54198
+     },
+     "skipped": [
+      "symlink docs/AUTHORS.md",
+      "symlink docs/CODE_OF_CONDUCT.md",
+      "symlink docs/CONTRIBUTING.md",
+      "symlink docs/HISTORY.md",
+      "symlink docs/README.md"
+     ],
+     "fsck_ignore": []
     }
    }
   },
@@ -815,6 +922,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "2625ed9fc074091c531c27ffcba7902771130261",
@@ -844,21 +952,36 @@
     "noncanonical_paths": 0
    },
    "shallow": false,
-   "repository_bytes": 9237374,
-   "fetched_at": "2026-10-13T04:55:52.753510+00:00",
-   "elapsed_seconds": 1.923,
+   "repository_bytes": 9331949,
+   "fetched_at": "2026-10-13T05:15:03.632057+00:00",
+   "elapsed_seconds": 2.614,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "787359d80d80225095567340aa5e7ec01847fa9a",
    "capture": {
     "commit": {
-     "outcome": "refused",
-     "layer": "source_admission",
-     "detail": "Only regular source blobs admitted; symlinks/submodules refused"
+     "outcome": "completed",
+     "files": 176,
+     "manifest": {
+      "sha256": "4bcc6bfa7f9a6787540bf5a3e6efa5752e38f37ac2a6d5647148592daac7ce43",
+      "size": 36440
+     },
+     "skipped": [
+      "submodule git/ext/gitdb"
+     ],
+     "fsck_ignore": []
     },
     "first_parent": {
-     "outcome": "refused",
-     "layer": "source_admission",
-     "detail": "Only regular source blobs admitted; symlinks/submodules refused"
+     "outcome": "completed",
+     "files": 176,
+     "manifest": {
+      "sha256": "a18a734c0f657ad0b2417132a09173347aef23269c2e51e7c76a40ab227e6bc6",
+      "size": 36440
+     },
+     "skipped": [
+      "submodule git/ext/gitdb"
+     ],
+     "fsck_ignore": []
     }
    }
   },
@@ -869,6 +992,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "9c528670c455b8d948aff95ed50e22940d1ad3fc",
@@ -899,9 +1023,10 @@
    },
    "shallow": false,
    "repository_bytes": 929915,
-   "fetched_at": "2026-10-13T04:55:56.180896+00:00",
-   "elapsed_seconds": 0.739,
+   "fetched_at": "2026-10-13T05:15:09.697371+00:00",
+   "elapsed_seconds": 0.752,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "24b29adfebcb4f057a3cef5aaf35653bc0c1c8cc",
    "capture": {
     "commit": {
@@ -910,7 +1035,9 @@
      "manifest": {
       "sha256": "a791689d3b46de57365987b84c187b3007b63cb31818dc22045df243bd9e1bd2",
       "size": 15823
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -918,7 +1045,9 @@
      "manifest": {
       "sha256": "0c6a3d3bb4ae9d10d6b76592472b403617d2f59dc345593e875e30ac9fb5846a",
       "size": 15618
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -964,9 +1093,9 @@
     "noncanonical_paths": 0
    },
    "shallow": false,
-   "repository_bytes": 15765437,
-   "fetched_at": "2026-10-13T04:59:47.828591+00:00",
-   "elapsed_seconds": 3.079,
+   "repository_bytes": 15774931,
+   "fetched_at": "2026-10-13T05:16:45.834317+00:00",
+   "elapsed_seconds": 3.22,
    "git_version": "git version 2.43.0",
    "fsck_warnings": [
     "missingSpaceBeforeEmail"
@@ -974,9 +1103,18 @@
    "baseline_candidate": null,
    "capture": {
     "commit": {
-     "outcome": "refused",
-     "layer": "native_source",
-     "detail": "Native Git exit 4"
+     "outcome": "completed",
+     "files": 295,
+     "manifest": {
+      "sha256": "8064a6f927fa5fd05edafccbb3a644246d8c719b5d1fe486fc344d80f7a815d9",
+      "size": 62440
+     },
+     "skipped": [],
+     "fsck_ignore": [
+      "badTimezone",
+      "missingSpaceBeforeEmail",
+      "zeroPaddedFilemode"
+     ]
     }
    }
   },
@@ -1022,9 +1160,9 @@
     "noncanonical_paths": 0
    },
    "shallow": false,
-   "repository_bytes": 15779957,
-   "fetched_at": "2026-10-13T04:59:52.239855+00:00",
-   "elapsed_seconds": 3.022,
+   "repository_bytes": 15789628,
+   "fetched_at": "2026-10-13T05:16:51.958871+00:00",
+   "elapsed_seconds": 3.349,
    "git_version": "git version 2.43.0",
    "fsck_warnings": [
     "missingSpaceBeforeEmail"
@@ -1032,9 +1170,18 @@
    "baseline_candidate": null,
    "capture": {
     "commit": {
-     "outcome": "refused",
-     "layer": "native_source",
-     "detail": "Native Git exit 4"
+     "outcome": "completed",
+     "files": 295,
+     "manifest": {
+      "sha256": "e2990ce78b544234dbd2ea6ad303df6613a157033bd2aa85095208e38737c171",
+      "size": 62441
+     },
+     "skipped": [],
+     "fsck_ignore": [
+      "badTimezone",
+      "missingSpaceBeforeEmail",
+      "zeroPaddedFilemode"
+     ]
     }
    }
   },
@@ -1079,9 +1226,9 @@
     "noncanonical_paths": 0
    },
    "shallow": false,
-   "repository_bytes": 13403881,
-   "fetched_at": "2026-10-13T04:59:56.666180+00:00",
-   "elapsed_seconds": 2.153,
+   "repository_bytes": 13359056,
+   "fetched_at": "2026-10-13T05:16:58.363912+00:00",
+   "elapsed_seconds": 2.127,
    "git_version": "git version 2.43.0",
    "fsck_warnings": [
     "badTimezone"
@@ -1089,14 +1236,32 @@
    "baseline_candidate": "302225334678490ec66b3614a9dddb8a02c5f4fe",
    "capture": {
     "commit": {
-     "outcome": "refused",
-     "layer": "native_source",
-     "detail": "Native Git exit 4"
+     "outcome": "completed",
+     "files": 100,
+     "manifest": {
+      "sha256": "ba326d7541ad8e657d19d009809d2bb5385a6b8ac2cc361c20d9bf0e26a8b984",
+      "size": 20467
+     },
+     "skipped": [],
+     "fsck_ignore": [
+      "badTimezone",
+      "missingSpaceBeforeEmail",
+      "zeroPaddedFilemode"
+     ]
     },
     "first_parent": {
-     "outcome": "refused",
-     "layer": "native_source",
-     "detail": "Native Git exit 4"
+     "outcome": "completed",
+     "files": 100,
+     "manifest": {
+      "sha256": "7adf731d002680edd7a46f09b48a0fcff7c2ea9c8f6a1cd90599ac8756601e74",
+      "size": 20467
+     },
+     "skipped": [],
+     "fsck_ignore": [
+      "badTimezone",
+      "missingSpaceBeforeEmail",
+      "zeroPaddedFilemode"
+     ]
     }
    }
   },
@@ -1107,6 +1272,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "d57c4a269bba3b9a0c5bfa20292955b849006d9e",
@@ -1137,9 +1303,10 @@
    },
    "shallow": false,
    "repository_bytes": 790606,
-   "fetched_at": "2026-10-13T04:56:00.327624+00:00",
-   "elapsed_seconds": 0.716,
+   "fetched_at": "2026-10-13T05:15:13.379424+00:00",
+   "elapsed_seconds": 0.677,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "b9c8a0c48e44d70b9128a8e0befa3a50df0e4b58",
    "capture": {
     "commit": {
@@ -1148,7 +1315,9 @@
      "manifest": {
       "sha256": "cb8aeb590b5b1ffbfa8c580e75c0e5b455ade5529b5d3e4b2b3f723a247c2bad",
       "size": 9455
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -1156,7 +1325,9 @@
      "manifest": {
       "sha256": "7effd27a7392f816640104dd3a17c6c9266a3018499cea64ce182dc63a751465",
       "size": 9455
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -1167,6 +1338,7 @@
    "via": "pull_request",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "c3fd203b3be87a8177f7f00824033c95f981f984",
@@ -1197,9 +1369,10 @@
    },
    "shallow": false,
    "repository_bytes": 221149,
-   "fetched_at": "2026-10-13T04:56:01.993473+00:00",
-   "elapsed_seconds": 0.613,
+   "fetched_at": "2026-10-13T05:15:14.636972+00:00",
+   "elapsed_seconds": 0.538,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "a6214449f29dc9cfc63e26172e6c70dd5ed082b4",
    "capture": {
     "commit": {
@@ -1208,7 +1381,9 @@
      "manifest": {
       "sha256": "b09c3387bbbad2b792c03c341ab1be6388c3fbdb7038b62f548ed4ce01f54d9e",
       "size": 1669
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -1216,7 +1391,9 @@
      "manifest": {
       "sha256": "1bcd795ee5d02f2e8bafef7f16bd832b13098cc52459b529d220239c39bd6854",
       "size": 1669
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -1227,6 +1404,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "3039c8c07f6fdaa8b595ec869ae0895686a7a0f2",
@@ -1257,9 +1435,10 @@
    },
    "shallow": false,
    "repository_bytes": 63424,
-   "fetched_at": "2026-10-13T04:56:02.827419+00:00",
-   "elapsed_seconds": 0.521,
+   "fetched_at": "2026-10-13T05:15:15.366849+00:00",
+   "elapsed_seconds": 0.498,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "e0f8abf71164321caf1b20109000b08be506f227",
    "capture": {
     "commit": {
@@ -1268,7 +1447,9 @@
      "manifest": {
       "sha256": "e95200e6f184ed1990b4e8e6f17afd7f1ec15253f03d946afa93c33f5ff58e6b",
       "size": 3026
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -1276,7 +1457,9 @@
      "manifest": {
       "sha256": "67de87badbff35bf7dde5f5d22cee37ecf082bb864a76e4268e986342f09ec85",
       "size": 3026
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -1287,6 +1470,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "c0711c656686e902af2cd92d6aecc8074de4d83d",
@@ -1317,9 +1501,10 @@
    },
    "shallow": false,
    "repository_bytes": 646444,
-   "fetched_at": "2026-10-13T04:56:03.672363+00:00",
-   "elapsed_seconds": 0.712,
+   "fetched_at": "2026-10-13T05:15:16.093815+00:00",
+   "elapsed_seconds": 0.672,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "5f6cc62d4f83bf3a75c973868259798814cd231e",
    "capture": {
     "commit": {
@@ -1328,7 +1513,9 @@
      "manifest": {
       "sha256": "aa070d3d5899c19ddf840a0648f71722d65550ad2dbee936ed29d2c207d581ce",
       "size": 13378
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -1336,7 +1523,9 @@
      "manifest": {
       "sha256": "ba01baa1530d12e7e30eb7ebc02503d5670486820ab61baf372f01d9c7b0e930",
       "size": 13180
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -1347,6 +1536,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "45d4a901478c6a8f396c8b959dd6cf8fd3f955b6",
@@ -1377,9 +1567,10 @@
    },
    "shallow": false,
    "repository_bytes": 306307,
-   "fetched_at": "2026-10-13T04:56:05.516791+00:00",
-   "elapsed_seconds": 0.652,
+   "fetched_at": "2026-10-13T05:15:17.546986+00:00",
+   "elapsed_seconds": 0.637,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "fcea252e52b6078eff6caf5531bd32c53fccb59f",
    "capture": {
     "commit": {
@@ -1388,7 +1579,9 @@
      "manifest": {
       "sha256": "ca6f8ca454b67b188e20c1de2d0eb58950731782b028999c1c0aabad881debe9",
       "size": 4504
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -1396,7 +1589,9 @@
      "manifest": {
       "sha256": "c0ed43b9214c809262132e9baf1efd5707f2ec580818214dcef8657ab8e9f110",
       "size": 4504
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -1407,6 +1602,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "8bafc9577161469f5dea01e0b98ea9c525d063e9",
@@ -1437,9 +1633,10 @@
    },
    "shallow": false,
    "repository_bytes": 147031,
-   "fetched_at": "2026-10-13T04:56:06.680326+00:00",
-   "elapsed_seconds": 0.526,
+   "fetched_at": "2026-10-13T05:15:18.566574+00:00",
+   "elapsed_seconds": 0.538,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "d171a771a92e4685b24fb77cb894a7b7b8024c5c",
    "capture": {
     "commit": {
@@ -1448,7 +1645,9 @@
      "manifest": {
       "sha256": "12815b8d0013f37b68b80519b48b07bf2784da4a8d12b5ecdc309b69cb4822ed",
       "size": 1894
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -1456,7 +1655,9 @@
      "manifest": {
       "sha256": "194e749be2a7a2d9bfb778a0332c6612fcf5d447aebcd8c188d2086d5c5faa03",
       "size": 1894
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -1467,6 +1668,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "298dbab41344dfb7f95f66b1fa7b5cfb436bd4a2",
@@ -1498,9 +1700,10 @@
    },
    "shallow": false,
    "repository_bytes": 1007188,
-   "fetched_at": "2026-10-13T04:56:07.421673+00:00",
-   "elapsed_seconds": 0.61,
+   "fetched_at": "2026-10-13T05:15:19.258772+00:00",
+   "elapsed_seconds": 0.645,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": null,
    "capture": {
     "commit": {
@@ -1509,7 +1712,9 @@
      "manifest": {
       "sha256": "b292b867810002e6779047ed0fda1bdc9c555b5ea0a8ff8dc517bbb5421c4240",
       "size": 9752
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -1520,6 +1725,7 @@
    "via": "pull_request",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "e18afbf1edcafb7add2c4c7b22abc8d6ebc2fa61",
@@ -1550,9 +1756,10 @@
    },
    "shallow": false,
    "repository_bytes": 3895746,
-   "fetched_at": "2026-10-13T04:56:08.483942+00:00",
-   "elapsed_seconds": 1.157,
+   "fetched_at": "2026-10-13T05:15:20.211384+00:00",
+   "elapsed_seconds": 1.117,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "9d4ce5e2895365c943d2bdf7e7c8ac1be3ec51a3",
    "capture": {
     "commit": {
@@ -1561,7 +1768,9 @@
      "manifest": {
       "sha256": "29d2bbe364de3c9c3e6433fcfa7759adf8398656c2a5901d7fcd91583235911b",
       "size": 156481
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -1569,7 +1778,9 @@
      "manifest": {
       "sha256": "784b3ad80d192281e975ae9d658150cd3e21d7cd6249a75380e5a3bd153fb3fb",
       "size": 155451
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -1580,6 +1791,7 @@
    "via": "pull_request",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "b13381281cead487cbdbfd6a69fb097ea5e456c3",
@@ -1610,9 +1822,10 @@
    },
    "shallow": false,
    "repository_bytes": 53174,
-   "fetched_at": "2026-10-13T04:56:21.591265+00:00",
-   "elapsed_seconds": 0.671,
+   "fetched_at": "2026-10-13T05:15:28.961987+00:00",
+   "elapsed_seconds": 0.561,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "265f6cd6586383eebebbfc3c45da2eaa153d9e63",
    "capture": {
     "commit": {
@@ -1621,7 +1834,9 @@
      "manifest": {
       "sha256": "1d6d3ec8ce079971c174fa2bb9c7f24de55ac0dd6bf4dda08f3957518cae600a",
       "size": 4062
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -1629,7 +1844,9 @@
      "manifest": {
       "sha256": "6d6c61d799508395c422f943513dee90221653dd2d68e2fc5224964d770624be",
       "size": 4062
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -1640,6 +1857,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "ae65651eab053fc6dc4590dbb863a268215c1fc5",
@@ -1670,9 +1888,10 @@
    },
    "shallow": false,
    "repository_bytes": 342395,
-   "fetched_at": "2026-10-13T04:56:22.680391+00:00",
+   "fetched_at": "2026-10-13T05:15:29.801519+00:00",
    "elapsed_seconds": 0.641,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "2c5ec581d26907a58345ce3b8fdd99e905156121",
    "capture": {
     "commit": {
@@ -1681,7 +1900,9 @@
      "manifest": {
       "sha256": "3eea9e5540b46298c07b5ecc4f8234d8fb1f8c204ea8cd238d6c0c07d7e3f0f8",
       "size": 6493
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -1689,7 +1910,9 @@
      "manifest": {
       "sha256": "8a579db692833f59fd3b4ac7dbc73212533711c54ef36cb564603b02d4159188",
       "size": 6493
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -1700,6 +1923,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "c16a56a9d6575ddc53d15e76d58f0ebcb0eeb149",
@@ -1730,9 +1954,10 @@
    },
    "shallow": false,
    "repository_bytes": 27838431,
-   "fetched_at": "2026-10-13T04:56:24.023539+00:00",
-   "elapsed_seconds": 8.849,
+   "fetched_at": "2026-10-13T05:15:30.941631+00:00",
+   "elapsed_seconds": 9.176,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "74e4900142ff074df8a3979289f7e29c06b20d4f",
    "capture": {
     "commit": {
@@ -1741,7 +1966,9 @@
      "manifest": {
       "sha256": "0f27118b74d14e4a2224aa28e335137c3886db8558b45cf48ab22ea19656bfd9",
       "size": 75548
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -1749,7 +1976,9 @@
      "manifest": {
       "sha256": "a08739d8a6328c345a64ad9c7ec3d0834679705d1d02a31c44df5bb63e8d4319",
       "size": 75548
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -1760,6 +1989,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "3580f5d0874a9abf5483528f73bda9a7fd9ec7f1",
@@ -1790,9 +2020,10 @@
    },
    "shallow": false,
    "repository_bytes": 6022301,
-   "fetched_at": "2026-10-13T04:56:47.534417+00:00",
-   "elapsed_seconds": 2.037,
+   "fetched_at": "2026-10-13T05:15:53.246909+00:00",
+   "elapsed_seconds": 1.903,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "0e540029e2fa43ba857f3c71b8d3b58ccbbf313c",
    "capture": {
     "commit": {
@@ -1801,7 +2032,9 @@
      "manifest": {
       "sha256": "cbb1407845387d8f07560d8510edc146172efb0c238b0cbd6481e6459d0f4409",
       "size": 79070
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -1809,7 +2042,9 @@
      "manifest": {
       "sha256": "bd49110439ca44e996abecf097cb5126dc61feb5000ebda229cd4d72b909a9cd",
       "size": 79070
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -1820,6 +2055,7 @@
    "via": "patch",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "945d35141d94490f749640bd4390acd6a2193995",
@@ -1849,10 +2085,11 @@
     "noncanonical_paths": 0
    },
    "shallow": false,
-   "repository_bytes": 2811579,
-   "fetched_at": "2026-10-13T04:56:56.242784+00:00",
-   "elapsed_seconds": 1.28,
+   "repository_bytes": 2811640,
+   "fetched_at": "2026-10-13T05:15:59.869833+00:00",
+   "elapsed_seconds": 1.296,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "6bef13437a21a73d06ad713b300a7a184c2bbeec",
    "capture": {
     "commit": {
@@ -1861,7 +2098,9 @@
      "manifest": {
       "sha256": "b548d8dd92d3d5dd8a4de33079101b2398aaf69a4cc4900fa2dbbaa13590d4bd",
       "size": 4484
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -1869,7 +2108,9 @@
      "manifest": {
       "sha256": "639e4cd54975cedce552e3677c932c1d33067cabc430016c0b255a4c08f7bfeb",
       "size": 4484
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -1880,16 +2121,66 @@
    "via": "patch",
    "repository_matches_inventory": false,
    "depth": null,
-   "fsck_warn": [
-    "badTimezone",
-    "missingSpaceBeforeEmail",
-    "zeroPaddedFilemode"
+   "fsck_warn": [],
+   "outcome": "acquired",
+   "tree": {
+    "commit": "1490431e40e22052f75a0b3449f1f53cbd27ba92",
+    "tree": "89efb62609a7a2431bda836f17dcb315b69b77d5",
+    "entries": 7409,
+    "regular_files": 7409,
+    "regular_bytes": 87386910,
+    "largest_file_bytes": 4114121,
+    "executables": 130,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "parents": [
+    "0372847c4b0aa916347c0977a90ebacd8479b3e2"
    ],
-   "outcome": "refused",
-   "layer": "host_network",
-   "detail": "host_network: Native Git exit 128",
-   "stderr": "fatal: unable to access 'https://salsa.debian.org/perl-team/interpreter/perl/': CONNECT tunnel failed, response 403\n",
-   "elapsed_seconds": 0.112
+   "first_parent": {
+    "commit": "0372847c4b0aa916347c0977a90ebacd8479b3e2",
+    "tree": "6ad4ba0cf182b8476003e7c81732f388b3fe7343",
+    "entries": 7409,
+    "regular_files": 7409,
+    "regular_bytes": 87387040,
+    "largest_file_bytes": 4114121,
+    "executables": 130,
+    "symlinks": 0,
+    "submodules": 0,
+    "noncanonical_paths": 0
+   },
+   "shallow": false,
+   "repository_bytes": 60790508,
+   "fetched_at": "2026-10-13T05:11:15.141300+00:00",
+   "elapsed_seconds": 7.164,
+   "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
+   "baseline_candidate": "0372847c4b0aa916347c0977a90ebacd8479b3e2",
+   "capture": {
+    "commit": {
+     "outcome": "completed",
+     "files": 7409,
+     "manifest": {
+      "sha256": "e2f369e5d265148d5c2b80d0bfe01c8989b19e70160081e81cd0a2235b916985",
+      "size": 1575194
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    },
+    "first_parent": {
+     "outcome": "completed",
+     "files": 7409,
+     "manifest": {
+      "sha256": "f1164315cb381398081c093c54c00ce2c87716bc4998891c15f0198c20578fba",
+      "size": 1575194
+     },
+     "skipped": [],
+     "fsck_ignore": []
+    }
+   },
+   "acquired_on": "operator workstation RIG0 (direct egress); this cloud container is refused by its egress proxy",
+   "note": "Fix lives in Debian perl packaging history, not the inventory repository (HTTP-Tiny); needs case review."
   },
   "CVE-2026-15043": {
    "case_id": "CVE-2026-15043",
@@ -1898,6 +2189,7 @@
    "via": "patch",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "e9742ef85a75867cbd696860e3bf3e32b681f98d",
@@ -1928,9 +2220,10 @@
    },
    "shallow": false,
    "repository_bytes": 8330104,
-   "fetched_at": "2026-10-13T04:56:58.656884+00:00",
-   "elapsed_seconds": 3.344,
+   "fetched_at": "2026-10-13T05:16:02.234328+00:00",
+   "elapsed_seconds": 4.046,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "a930b1a9ddda3ada136ac9d32a0c3c961e0b4f4c",
    "capture": {
     "commit": {
@@ -1939,7 +2232,9 @@
      "manifest": {
       "sha256": "264701c944fb59e50520d7a0c0da22557a130b09a4e365bf367ac395e181e12c",
       "size": 92601
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -1947,7 +2242,9 @@
      "manifest": {
       "sha256": "875270ecb8bd67afca42a19393268d97c5089029131ba52ddf7efdafaf89fc3c",
       "size": 92601
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -1993,8 +2290,8 @@
    },
    "shallow": false,
    "repository_bytes": 209172851,
-   "fetched_at": "2026-10-13T05:00:00.494761+00:00",
-   "elapsed_seconds": 46.459,
+   "fetched_at": "2026-10-13T05:17:03.112621+00:00",
+   "elapsed_seconds": 46.191,
    "git_version": "git version 2.43.0",
    "fsck_warnings": [
     "badTimezone",
@@ -2003,14 +2300,36 @@
    "baseline_candidate": "8d82687f3b04b2803320b64f985308239a8c3d2f",
    "capture": {
     "commit": {
-     "outcome": "refused",
-     "layer": "native_source",
-     "detail": "stderr byte budget exceeded; remainder unknown"
+     "outcome": "completed",
+     "files": 4413,
+     "manifest": {
+      "sha256": "8f72829329e3cfce419de21e1ae07848784fa370e625dda83159eb6d3dd1b485",
+      "size": 1033551
+     },
+     "skipped": [
+      "symlink activerecord/test/fixtures/all/admin"
+     ],
+     "fsck_ignore": [
+      "badTimezone",
+      "missingSpaceBeforeEmail",
+      "zeroPaddedFilemode"
+     ]
     },
     "first_parent": {
-     "outcome": "refused",
-     "layer": "native_source",
-     "detail": "stderr byte budget exceeded; remainder unknown"
+     "outcome": "completed",
+     "files": 4413,
+     "manifest": {
+      "sha256": "65d51fec04258fee9e525d53a15d43009f34f1dc0550b54dee5f11f87921a044",
+      "size": 1033551
+     },
+     "skipped": [
+      "symlink activerecord/test/fixtures/all/admin"
+     ],
+     "fsck_ignore": [
+      "badTimezone",
+      "missingSpaceBeforeEmail",
+      "zeroPaddedFilemode"
+     ]
     }
    }
   },
@@ -2021,6 +2340,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "25d038022c2fcad45af5b73f9d003cf38ff491f6",
@@ -2051,9 +2371,10 @@
    },
    "shallow": false,
    "repository_bytes": 4056859,
-   "fetched_at": "2026-10-13T04:57:14.565333+00:00",
-   "elapsed_seconds": 1.439,
+   "fetched_at": "2026-10-13T05:16:16.153164+00:00",
+   "elapsed_seconds": 1.5,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "ca3b6441f039a8e4cdb5de5c2b3dd85822bc25bf",
    "capture": {
     "commit": {
@@ -2062,7 +2383,9 @@
      "manifest": {
       "sha256": "87f5a72d211c640bf0677e47d71e311a1a92124573b8476b13c70d1724cf29e4",
       "size": 67272
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -2070,7 +2393,9 @@
      "manifest": {
       "sha256": "c0371f9db03db411a74dc2653ce47915ffb49dd7e5496bb58a585d97f2732c4c",
       "size": 67272
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -2081,6 +2406,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "4ebedfbd11d20d03ed03a1274ed281eee62715d4",
@@ -2110,10 +2436,11 @@
     "noncanonical_paths": 0
    },
    "shallow": false,
-   "repository_bytes": 3651042,
-   "fetched_at": "2026-10-13T04:57:21.081904+00:00",
-   "elapsed_seconds": 1.172,
+   "repository_bytes": 3666936,
+   "fetched_at": "2026-10-13T05:16:21.005933+00:00",
+   "elapsed_seconds": 1.189,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "80847b44f1965d20a2ed6e98a3fa4bf4c1194515",
    "capture": {
     "commit": {
@@ -2122,7 +2449,9 @@
      "manifest": {
       "sha256": "bc5badbbda0275187c32491e9d66d4c9d4431c122bbb15b0d843daca72b46c30",
       "size": 40780
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -2130,7 +2459,9 @@
      "manifest": {
       "sha256": "b67b24f5eedb3d989c4d5231a21e5de030cb436b8ce6b7b558cfe14b8237f089",
       "size": 40780
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -2141,6 +2472,7 @@
    "via": "commit",
    "repository_matches_inventory": true,
    "depth": null,
+   "fsck_warn": [],
    "outcome": "acquired",
    "tree": {
     "commit": "50caab74fa01ee8f5dbdee7bb2782126d20c6583",
@@ -2170,10 +2502,11 @@
     "noncanonical_paths": 0
    },
    "shallow": false,
-   "repository_bytes": 10040947,
-   "fetched_at": "2026-10-13T04:57:25.707197+00:00",
-   "elapsed_seconds": 1.699,
+   "repository_bytes": 10019387,
+   "fetched_at": "2026-10-13T05:16:24.695428+00:00",
+   "elapsed_seconds": 1.955,
    "git_version": "git version 2.43.0",
+   "fsck_warnings": [],
    "baseline_candidate": "2db5cfb37479af9d503ee85500e5bfb1f3f3ddd4",
    "capture": {
     "commit": {
@@ -2182,7 +2515,9 @@
      "manifest": {
       "sha256": "51be2cc8209c35d826e7d6cf765a35836d15e801b3c4a1230a9517b25a91f9db",
       "size": 37308
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     },
     "first_parent": {
      "outcome": "completed",
@@ -2190,7 +2525,9 @@
      "manifest": {
       "sha256": "47baa6b57d0c38e95e1591545df4ac9b11ccab21344e26268ac9a78164c11b89",
       "size": 37308
-     }
+     },
+     "skipped": [],
+     "fsck_ignore": []
     }
    }
   },
@@ -2236,9 +2573,9 @@
     "noncanonical_paths": 0
    },
    "shallow": false,
-   "repository_bytes": 2012079,
-   "fetched_at": "2026-10-13T05:01:21.622883+00:00",
-   "elapsed_seconds": 1.02,
+   "repository_bytes": 2012224,
+   "fetched_at": "2026-10-13T05:19:19.607120+00:00",
+   "elapsed_seconds": 1.05,
    "git_version": "git version 2.43.0",
    "fsck_warnings": [
     "zeroPaddedFilemode"
@@ -2246,9 +2583,18 @@
    "baseline_candidate": null,
    "capture": {
     "commit": {
-     "outcome": "refused",
-     "layer": "native_source",
-     "detail": "Native Git exit 4"
+     "outcome": "completed",
+     "files": 42,
+     "manifest": {
+      "sha256": "26e331bc23c6aadde250b30e27a8163c10af7eb6a77795d7fc1de84356df7146",
+      "size": 8812
+     },
+     "skipped": [],
+     "fsck_ignore": [
+      "badTimezone",
+      "missingSpaceBeforeEmail",
+      "zeroPaddedFilemode"
+     ]
     }
    }
   },
@@ -2293,9 +2639,9 @@
     "noncanonical_paths": 0
    },
    "shallow": false,
-   "repository_bytes": 8053262,
-   "fetched_at": "2026-10-13T05:01:22.767010+00:00",
-   "elapsed_seconds": 2.376,
+   "repository_bytes": 8050159,
+   "fetched_at": "2026-10-13T05:19:21.082078+00:00",
+   "elapsed_seconds": 2.395,
    "git_version": "git version 2.43.0",
    "fsck_warnings": [
     "zeroPaddedFilemode"
@@ -2303,14 +2649,32 @@
    "baseline_candidate": "8c4cd0ba05af0ef5902c53608daab094825d1e96",
    "capture": {
     "commit": {
-     "outcome": "refused",
-     "layer": "native_source",
-     "detail": "Native Git exit 4"
+     "outcome": "completed",
+     "files": 292,
+     "manifest": {
+      "sha256": "5227279595f6419f2a16f4114d5ddaa52a557313412c8326dd2afda051495364",
+      "size": 63710
+     },
+     "skipped": [],
+     "fsck_ignore": [
+      "badTimezone",
+      "missingSpaceBeforeEmail",
+      "zeroPaddedFilemode"
+     ]
     },
     "first_parent": {
-     "outcome": "refused",
-     "layer": "native_source",
-     "detail": "Native Git exit 4"
+     "outcome": "completed",
+     "files": 289,
+     "manifest": {
+      "sha256": "bb3c7b0355186b5f94853bf36cdd5bb14e45ed0208c7f5d00d76b4a969d6be1b",
+      "size": 63005
+     },
+     "skipped": [],
+     "fsck_ignore": [
+      "badTimezone",
+      "missingSpaceBeforeEmail",
+      "zeroPaddedFilemode"
+     ]
     }
    }
   }

@@ -3,8 +3,8 @@ id: SPEC-0012
 kind: spec
 title: Immutable local source and artifacts
 status: accepted
-updated: 2026-10-11
-related: [PLAN-0014, SPEC-0011]
+updated: 2026-10-13
+related: [PLAN-0014, SPEC-0011, SPEC-0037]
 ---
 
 # Immutable local source and artifacts
@@ -26,3 +26,5 @@ Small offline contracts before live host-native qualification: conflict/digest m
 ## Decisions and open questions
 
 User continuation authorizes independent storage when native transfer admission is blocked. No native library already exposes this application-specific artifact/manifest contract; minimal standard storage/digest bookkeeping serves the concrete consumer. Budgets are operator resource controls, not SLOs. Git SHA256 repositories, invalid UTF8 paths, partial clones, source checkout/materialization, storage power-loss/concurrency and remote backend remain unsupported/unqualified.
+
+2026-10-13: [SPEC-0037](SPEC-0037-host-source-acquisition.md) extends `GitSource` with two default-off operator options (ignore three format-only fsck message ids; skip and list symlinks and submodule links) and raises the source ceilings for real benchmark trees. The original qualification covers the default path at the original ceilings only; the new options and ceilings have offline tests and benchmark capture evidence, not a renewed qualification run.
