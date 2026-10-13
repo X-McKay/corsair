@@ -3,7 +3,9 @@
 Standard library and pytest hooks only: the bytes travel to the test interpreter as an argument and must
 run on any admitted CPython 3.12+. Native ``sys.monitoring`` events attribute calls, returns and unwinds to
 the identified target function; native audit ``open`` events and raised ``OSError``s count only when the
-target is on the calling stack and only during a test's call phase. The record is written once, after the
+target is on the calling stack and only during a test's call phase. Opens of the planned file on another
+thread during the call phase are counted separately (``offstack_planned``), since they cannot be attributed
+to the target but may be its effect; child processes are not observed. The record is written once, after the
 session, to an operator path; the host maps it to the gate's witness. It runs inside the test interpreter,
 so it is tamper-evident (its own tool registration, events and the operator nonce are checked), not
 tamper-proof against hostile test code.
@@ -11,6 +13,7 @@ tamper-proof against hostile test code.
 import json
 import os
 import sys
+import threading
 
 import pytest
 
@@ -40,6 +43,7 @@ class Probe:
                                   'effect_name': self.effect_name},
                        'tool_registered': False, 'intact': False, 'tests': {}}
         self.active = None
+        self.test_thread = None
         # Keyed by identity with the code object kept alive: equal code objects from other files or
         # qualnames compare equal, so an equality-keyed cache would let a lookalike pass as the target.
         self.known = {}
@@ -141,11 +145,17 @@ class Probe:
             return
         test = self._test()
         frame = sys._getframe(1)
-        if test is None or self._loader_frame(frame) or not self._on_stack(frame):
+        if test is None or self._loader_frame(frame):
             return
         path = args[0] if args else None
         if isinstance(path, bytes):
             path = path.decode('utf-8', 'replace')
+        if not self._on_stack(frame):
+            # The test body's own reads run on the test thread; another thread's open of the planned file
+            # may be the target's effect moved off its stack (a worker or executor).
+            if threading.get_ident() != self.test_thread and self._planned(path):
+                test['offstack_planned'] += 1
+            return
         if len(test['opens']) < MAX_OPENS:
             test['opens'].append({'path': str(path)[:512] if isinstance(path, (str, int)) else None,
                                   'planned': self._planned(path)})
@@ -158,7 +168,8 @@ class Probe:
         tests = self.record['tests']
         if item.nodeid not in tests and len(tests) < MAX_TESTS:
             tests[item.nodeid] = {'entered': 0, 'exits': [], 'opens': [], 'os_errors': [], 'truncated': False,
-                                  'complete': False}
+                                  'complete': False, 'offstack_planned': 0}
+        self.test_thread = threading.get_ident()
         self.active = item.nodeid if item.nodeid in tests else None
         try:
             return (yield)

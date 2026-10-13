@@ -341,3 +341,39 @@ def test_absence_is_the_planned_safe_behavior_however_the_target_exits(record):
     unpaired = data | {'tests': {SECURITY: data['tests'][SECURITY] | {'entered': 1, 'exits': [], 'truncated': True}}}
     found = witness_evidence(capture(json.dumps(unpaired).encode()), REQUEST, SECURITY, planned_safe_behavior='no_file_open')
     assert found.witness is None or found.witness.safe_behavior is None
+
+
+THREADED = '''import os, threading
+
+def read(root, name):
+    worker = threading.Thread(target=lambda: open(os.path.join(root, name)).read())
+    worker.start()
+    worker.join()
+'''
+
+
+def test_an_open_moved_to_another_thread_is_never_an_absence(tmp_path):
+    """The planned file opened off the target's stack (a worker thread) makes the effect unknown, not absent."""
+    done, record = run_probe(tmp_path, '''
+def test_security(tmp_path):
+    (tmp_path / "outside.txt").write_text("sentinel")
+    assert (tmp_path / "outside.txt").read_text() == "sentinel"
+    target.read(tmp_path, "outside.txt")
+''', target=THREADED)
+    assert record, done.stdout.decode() + done.stderr.decode()
+    assert json.loads(record)['tests'][SECURITY]['offstack_planned'] >= 1
+    found = witness_evidence(capture(record), REQUEST, SECURITY, planned_safe_behavior='no_file_open')
+    assert (found.witness.path_reached, found.witness.effect, found.witness.safe_behavior) == (True, 'unknown', None)
+
+
+def test_the_test_bodys_own_reads_of_the_sentinel_are_not_counted_off_stack(tmp_path):
+    found, data = mapped(tmp_path, '''
+import pytest
+def test_security(tmp_path):
+    (tmp_path / "outside.txt").write_text("sentinel")
+    assert (tmp_path / "outside.txt").read_text() == "sentinel"
+    with pytest.raises(ValueError):
+        target.read(tmp_path, "../outside.txt", error="reject")
+''')
+    assert data['tests'][SECURITY]['offstack_planned'] == 0
+    assert (found.witness.effect, found.witness.safe_behavior) == ('absent', 'ValueError')

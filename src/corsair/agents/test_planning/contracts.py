@@ -1,6 +1,7 @@
 """Read-only two-test planning contracts; no model, workflow or execution SDK types."""
 
 from hashlib import sha256
+import re
 from pathlib import PurePosixPath
 from typing import Annotated, Any, Generic, Literal
 
@@ -196,7 +197,8 @@ def planned_witnesses(plan: "_ReadyPlan", environment: EnvironmentEvidence) -> N
     if not any(token in text for text in (plan.security.input, *plan.security.fixture_setup)):
         raise ValueError(f"the security input or fixture setup must name the witness subject {token!r} the adversarial input aims at")
     safe = plan.security_expectation.safe_behavior
-    if safe != f"no_{security.effect}" and safe not in plan.security.required_behavior:
+    named = re.search(rf"(?<![A-Za-z0-9_.]){re.escape(safe)}(?![A-Za-z0-9_])", plan.security.required_behavior)
+    if safe != f"no_{security.effect}" and named is None:
         raise ValueError(f"safe_behavior must be no_{security.effect} or an exception type named in the security required_behavior")
 
 
