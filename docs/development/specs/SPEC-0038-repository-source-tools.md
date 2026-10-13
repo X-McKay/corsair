@@ -27,7 +27,7 @@ Out of scope: adopting the tools in test planning, authoring, environment or ass
 | --- | --- | --- | --- |
 | `list_source` | `directory=''`, optional glob `pattern` | immediate entries with nested file counts and bytes; with a pattern, matching files at any depth (glob against the full path or the file name) | `list_entries` (200); `total` and `truncated` report the rest |
 | `search_source` | literal `text` (one line), `directory`, optional `pattern`, `ignore_case` | matches in path order with repository line numbers and trimmed line text, plus total matches, files with matches, files searched and files skipped | `search_matches` (40), `search_line_chars` (240), `query_chars` (200) |
-| `read_source` | `path`, `start_line=1` | `SourceRead` of up to 80 numbered lines, ended by the tool at 80 lines, `read_bytes` (16 KiB) or end of file; or `RepeatedRead` when this run already returned the whole window | as listed |
+| `read_source` | `path`, `start_line=1` | `SourceRead` of up to 80 numbered lines, ended by the tool at 80 lines, `read_bytes` (16 KiB) or end of file, never exceeding `read_bytes` (a line that alone exceeds it is refused as unreadable at that start); or `RepeatedRead` when this run already returned the whole window | as listed |
 
 Search is literal substring matching, never a regular expression, so a model-supplied query cannot cause backtracking cost; glob matching uses `fnmatchcase`. Only `read_source` results authorize citations (SPEC-0020): a search match is a location, and the identification finalizer still requires the selected range to be covered by a successful read in the same run and re-reads it from the tree for the quotation.
 

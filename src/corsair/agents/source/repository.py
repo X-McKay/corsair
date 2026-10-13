@@ -136,7 +136,9 @@ class SourceTree:
         end, spent = start_line, 0
         while end <= len(lines) and end - start_line < READ_LINE_LIMIT:
             spent += len(lines[end - 1].encode("utf-8")) + 1
-            if spent > limits.read_bytes and end > start_line:
+            if spent > limits.read_bytes:
+                if end == start_line:
+                    raise UnreadableSource(f"line {end} alone exceeds the {limits.read_bytes}-byte read cap")
                 break
             end += 1
         return end - 1

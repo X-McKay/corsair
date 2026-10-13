@@ -137,7 +137,8 @@ def test_windows_stop_at_eighty_lines_byte_cap_or_end_of_file():
     capped = source.window_end("big.py", 1, RepositoryLimits(read_bytes=1000))
     assert capped == 9  # 101 bytes per line
     one_line = tree({"wide.py": "y" * 3000 + "\n"})
-    assert one_line.window_end("wide.py", 1, RepositoryLimits(read_bytes=1000)) == 1
+    with pytest.raises(UnreadableSource, match="line 1 alone exceeds the 1000-byte read cap"):
+        one_line.window_end("wide.py", 1, RepositoryLimits(read_bytes=1000))
     with pytest.raises(ValueError, match="within 1..300"):
         source.window_end("big.py", 301, RepositoryLimits())
 
@@ -341,3 +342,23 @@ def test_inline_handoff_keeps_exact_text():
 def test_search_refuses_an_absent_directory():
     with pytest.raises(ValueError, match="absent"):
         search_tree(tree(), RepositoryLimits(), "doGet", directory="invented")
+
+
+def test_a_single_line_never_exceeds_the_read_cap():
+    small = tree({"a.py": "x" * 1000 + "\nok\n"})
+    with pytest.raises(UnreadableSource, match="read cap"):
+        small.window_end("a.py", 1, RepositoryLimits(read_bytes=10, run_bytes=10))
+    assert small.window_end("a.py", 2, RepositoryLimits(read_bytes=10, run_bytes=10)) == 2
+    # 8,000 characters under the 16,384-character line bound, 24,000 UTF-8 bytes over the default cap.
+    wide = raw({"u.py": "\u20ac" * 8000 + "\n"})
+    assert len(wide.lines("u.py", RepositoryLimits())[0]) == 8000
+    with pytest.raises(UnreadableSource, match="16384-byte read cap"):
+        wide.window_end("u.py", 1, RepositoryLimits())
+
+
+def test_read_tool_refuses_an_oversized_line_instead_of_returning_it():
+    deps = RepositoryDependencies(inputs(), tree(FILES | {"big.py": "x" * 1000 + "\n"}),
+                                  RepositoryLimits(read_bytes=100))
+    model, _ = scripted([("read_source", {"path": "big.py"})], ready())
+    with pytest.raises(UnexpectedModelBehavior, match="read_source"):
+        run(model, deps)

@@ -24,7 +24,7 @@ from .identification import finalize_draft
 from .identification_contracts import IssueIdentification, IssueIdentificationDraft
 
 PROMPT_VERSION = "issue-identification-repository-v1"
-CONFIG_VERSION = "issue-identification-repository-config-v1"
+CONFIG_VERSION = "issue-identification-repository-config-v2"
 TOOLSET_ID = "issue_identification_repository_source"
 SKILL_ID = "identify-issue-repository"
 SKILL_TEXT = (Path(__file__).parent / "skills" / SKILL_ID / "SKILL.md").read_text()
