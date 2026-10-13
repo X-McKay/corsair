@@ -53,8 +53,8 @@ def setup(image, checkout, m2, evidence):
 class DockerCase:
     """One offline container; each prepare is a fresh copy of the read-only checkout plus the patch."""
 
-    def __init__(self, image, checkout, m2, commit):
-        self.image, self.checkout, self.m2, self.commit = image, checkout, m2, commit
+    def __init__(self, image, checkout, m2, commit, timeout):
+        self.image, self.checkout, self.m2, self.commit, self.timeout = image, checkout, m2, commit, timeout
         self.container = None
 
     def __enter__(self):
@@ -88,7 +88,9 @@ class DockerCase:
 
     def execute(self, handle, argv, operation):
         started, clock = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), time.monotonic()
-        result = docker('exec', '-w', WORK, self.container, *argv)
+        # A hang (for example a vulnerable infinite loop) is a terminal-unknown failure, never retried; the
+        # container is removed with everything in it on exit.
+        result = docker('exec', '-w', WORK, self.container, *argv, timeout=self.timeout)
         return ExecutionReceipt(operation=str(operation), handle=handle, started_at=started,
                                 elapsed_seconds=round(time.monotonic() - clock, 3), delivery='acknowledged',
                                 completion='terminal_observed', reason='terminal', stdout=result.stdout,
@@ -110,18 +112,19 @@ def plain(value):
     return value
 
 
-def run(image, checkout, m2, commit, ids, evidence):
+def run(image, checkout, m2, commit, ids, evidence, tests_from, timeout):
     item = JavaTestId.parse(ids[0])
     path = item.source_path()
-    patch = ApprovedPatch((PatchFile(path, (Path(checkout) / path).read_bytes()),), (path,))
+    # The test file comes from `tests_from` (for example the fix revision's PoV test applied to the vulnerable one).
+    patch = ApprovedPatch((PatchFile(path, (Path(tests_from) / path).read_bytes()),), (path,))
     config = MavenRunnerConfig(command=(MVN, '-B', '-ntp', '-o', f'-Dmaven.repo.local={M2}', f'--file={WORK}/pom.xml'),
                                workspace_root=WORK, java='/opt/java/openjdk/bin/java', console_jar=LAUNCHER)
-    with DockerCase(image, checkout, m2, commit) as case, LocalArtifacts(evidence / 'objects', max_bytes=8 << 20) as store:
+    with DockerCase(image, checkout, m2, commit, timeout) as case, LocalArtifacts(evidence / 'objects', max_bytes=8 << 20) as store:
         clock = time.monotonic()
         result = MavenRunner(case, case, store, config).run(patch, control_test_id=ids[0], security_test_id=ids[1],
                                                              discovery_command=config.command, operation=uuid4())
         elapsed = round(time.monotonic() - clock, 3)
-    summary = {'image': image, 'commit': commit, 'ids': ids, 'elapsed_seconds': elapsed, 'container_cleanup': case.cleanup,
+    summary = {'image': image, 'commit': commit, 'ids': ids, 'tests_from': str(tests_from), 'patch_sha256': patch.sha256, 'elapsed_seconds': elapsed, 'container_cleanup': case.cleanup,
                'failure_layer': result.failure_layer, 'detail': result.detail, 'cleanup': result.cleanup,
                'discovery': result.discovery and {'status': result.discovery.status, 'test_ids': result.discovery.test_ids},
                'cases': result.execution and [(c.test_id, c.outcome) for c in result.execution.cases],
@@ -137,6 +140,8 @@ def main():
     parser.add_argument('--checkout', required=True, type=Path, help='Clean checkout of the case at one commit')
     parser.add_argument('--m2', required=True, type=Path, help='Case Maven repository filled by setup')
     parser.add_argument('--evidence', required=True, type=Path)
+    parser.add_argument('--tests-from', type=Path, help='Checkout supplying the test file (default: --checkout)')
+    parser.add_argument('--timeout', type=int, default=900, help='Seconds per runner command')
     parser.add_argument('--id', action='append', default=[], help='Control then security `[module/]pkg.Class#method`')
     args = parser.parse_args()
     args.evidence.mkdir(parents=True, exist_ok=False)
@@ -147,7 +152,8 @@ def main():
         code = setup(args.image, args.checkout.resolve(), args.m2.resolve(), args.evidence)
         print(json.dumps({'phase': 'setup', 'commit': commit, 'exit': code}))
         raise SystemExit(code)
-    summary = run(args.image, args.checkout.resolve(), args.m2.resolve(), commit, tuple(args.id), args.evidence)
+    summary = run(args.image, args.checkout.resolve(), args.m2.resolve(), commit, tuple(args.id), args.evidence,
+                  (args.tests_from or args.checkout).resolve(), args.timeout)
     print(json.dumps({k: v for k, v in summary.items() if k != 'run'}, indent=2, default=str))
 
 
