@@ -34,3 +34,11 @@ Read AGENTS.md and docs/development/CURRENT.md, SPEC-0047, PLAN-0051 and this ha
 - Planning native tests: 40 passed before the extra Java/JavaScript dollar-boundary regression; final targeted planner/configuration result: 142 passed, one native event-loop deprecation warning.
 - make test-config: 999 passed before new records/dollar-boundary case, one native event-loop deprecation warning. Final records/source rerun: 1000 passed, one native event-loop deprecation warning.
 - git diff --check: passed.
+
+## Current-head review correction
+
+Independent review confirmed that Python regex \w excludes valid Unicode identifier continuation marks: a suffixed combining accent was admitted as an exact target. Literal matches now inspect adjacent characters using Python's identifier-continuation check plus Java/JavaScript $. Negative native stage tests cover combining and spacing marks; exact Unicode spellings and existing punctuation/dollar cases remain supported. This lexical rule remains conservative and is not semantic source proof. Prompt/config identity advanced to grounding-2 (planning config v4). No dataset/held-out changes or live provider calls. Earlier broad review-test attempts were interrupted after they stalled in the restricted worktree; subsequent focused checks and scripted comparisons are recorded below.
+
+Focused target/anchor checks:10 passed; development scripted12/12 versus12/12, `.runs/evals/planning/20261013T100740Z-development-scripted`, unchanged estimated requests/tools/tokens.
+
+Final affected planning and documentation/dataset guards:52 passed, one existing event-loop deprecation warning. git diff --check passed. Live candidate rerun and full-suite repeat unrun; prior full-suite source remains separately recorded.

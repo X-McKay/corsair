@@ -26,3 +26,5 @@ Both valid fixture plans and unsupported branches continue to work. Native Funct
 ## Decisions and open questions
 
 Do not duplicate pending PR44 no-baseline refusal or typed witness changes. Reconcile prompt/config identities when those changes are merged. No held-out answers are used to design this guard; the authority comes from the identification input and existing grounding requirements.
+
+Review correction: identifier continuations now include Unicode combining/spacing marks through an adjacent-character identifier check, plus $. Literal occurrence remains a structural boundary check. Existing corpus and tool authority are unchanged.

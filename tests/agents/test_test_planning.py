@@ -309,7 +309,7 @@ def test_ready_plan_requires_identified_target_anchor_for_each_test(name, refere
         run(create_test_planning_agent(responding(plan), output_retries=0), case().inputs)
 
 
-@pytest.mark.parametrize("call", ["fake_read_document(root, name)", "read_document_stub(root, name)", "read_document$stub(root, name)"])
+@pytest.mark.parametrize("call", ["fake_read_document(root, name)", "read_document_stub(root, name)", "read_document$stub(root, name)", "read_document\u0301(root, name)", "read_document\u093e(root, name)"])
 def test_target_name_substrings_do_not_authorize_an_implementation_call(call):
     with pytest.raises(UnexpectedModelBehavior):
         run(create_test_planning_agent(responding(edit(("security", "implementation_call"), call)),

@@ -44,3 +44,11 @@ Evidence and actual final command results are recorded in HANDOFF-0071. An initi
 No shared eval runner or Makefile change, custom evaluator framework or extra tools. Preserve this independent PR's scope; root may run the bounded live comparison and record failures without tuning on exposed held-out answers. Source grounding is admitted offline only; semantic/provider qualification remains blocked. Review and handoff use the repository skills.
 
 Root integration follow-up: merged current main42a7273 into this PR branch, preserving both CURRENT entries after a documentation-only conflict. Further live planning evaluation was rejected before dispatch by automatic approval review because it interpreted host-only authorization as excluding transfer of synthetic fixtures to the configured external model endpoint. No workaround or provider retry; offline results stand.
+
+## Current-head review correction
+
+Independent review confirmed that Python regex \w excludes valid Unicode identifier continuation marks: a suffixed combining accent was admitted as an exact target. Literal matches now inspect adjacent characters using Python's identifier-continuation check plus Java/JavaScript $. Negative native stage tests cover combining and spacing marks; exact Unicode spellings and existing punctuation/dollar cases remain supported. This lexical rule remains conservative and is not semantic source proof. Prompt/config identity advanced to grounding-2 (planning config v4). No dataset/held-out changes or live provider calls. Earlier broad review-test attempts were interrupted after they stalled in the restricted worktree; subsequent focused checks and scripted comparisons are recorded below.
+
+Focused target/anchor checks:10 passed; development scripted12/12 versus12/12, `.runs/evals/planning/20261013T100740Z-development-scripted`, unchanged estimated requests/tools/tokens.
+
+Final affected planning and documentation/dataset guards:52 passed, one existing event-loop deprecation warning. git diff --check passed. Live candidate rerun and full-suite repeat unrun; prior full-suite source remains separately recorded.
