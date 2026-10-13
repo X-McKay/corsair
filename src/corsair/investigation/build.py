@@ -170,6 +170,10 @@ def build(request: IssueRequest, work: Path, images: dict[str, str], *, roots: t
           default_scope: str = "component", checkout: Path = CHECKOUT) -> Investigation:
     """Chain input for one request; `images` maps matrix row ids to the operator's local image config ids, `roots`
     are the allowed local repository roots and `acquisition` a `GitAcquisition` for https repositories."""
+    try:
+        issue_text = request.issue_text()
+    except ValueError as error:
+        raise Refused(f"the issue text does not fit the identification input: {error}"[:2048]) from error
     repository, repository_basis = repository_of(request)
     if request.revision is None:
         raise Refused("the request names no revision (resolving a branch to a commit is not built yet)")
@@ -193,7 +197,7 @@ def build(request: IssueRequest, work: Path, images: dict[str, str], *, roots: t
     setup = setup_files(baseline, paths)
     if not setup:
         raise Refused("no build or CI file of the revision fits the environment stage's setup source")
-    sources = named_files(request.issue_text(), baseline, paths)
+    sources = named_files(issue_text, baseline, paths)
     if not sources:
         raise Refused("the issue names no file of the revision; repository-scale identification (SPEC-0038) is not "
                       "in the chain yet")
@@ -212,7 +216,7 @@ def build(request: IssueRequest, work: Path, images: dict[str, str], *, roots: t
         dependency_inventory_sha256=_digest(json.dumps(installed, sort_keys=True)), policy_revision=TEST_POLICY,
         limits_sha256=_digest(json.dumps({"network": "none", "timeout_seconds": timeout}, sort_keys=True)))
     scope = request.scope or default_scope
-    issue = IssueAnalysisInput(fixture_id=request.label[:128], issue=request.issue_text(), scope=scope,
+    issue = IssueAnalysisInput(fixture_id=request.label[:128], issue=issue_text, scope=scope,
                                source_files=sources)
     case = FixtureCase(
         issue=issue, environment=environment, environment_identity=identity,

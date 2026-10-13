@@ -70,6 +70,8 @@ class _TestRecord(_Record):
     complete: bool
     # Planned-file opens off the target's stack during the call (other threads, or after the first entry); None when the record predates the count.
     offstack_planned: int | None = Field(default=None, ge=0)
+    # Planned-file opens the test function made itself after the first call (checking its own fixture); never the effect.
+    body_planned: int | None = Field(default=None, ge=0)
 
 
 class _Target(_Record):

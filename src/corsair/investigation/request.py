@@ -82,10 +82,14 @@ class IssueRequest(_Frozen):
         return value
 
     def issue_text(self) -> str:
-        """Untrusted issue content for identification: the ticket's text and any PoV description."""
+        """Untrusted issue content for identification: the ticket's text, then any PoV description and files, within
+        the identification input's 8192 characters. Raises ValueError when the ticket's own text exceeds it."""
         text = self.issue.issue_text()
-        if self.pov and self.pov.description:
-            text = f"{text}\n\nProof of concept (untrusted, not executed):\n{self.pov.description}"
+        if self.pov:
+            parts = [self.pov.description] if self.pov.description else []
+            parts += [f"File {item.path}:\n{item.content}" for item in self.pov.files]
+            if parts:
+                text = f"{text}\n\nProof of concept (untrusted, not executed):\n" + "\n\n".join(parts)
         return text[:8192]
 
     @property

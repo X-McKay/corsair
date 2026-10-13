@@ -285,6 +285,8 @@ def test_the_sandbox_reads_the_baseline_file_from_the_capture_never_the_sandbox(
     ("environment", None, {"failed": True}, "ERROR"),
     ("planning", None, {}, "INCONCLUSIVE"),
     ("authoring", None, {"failed": True}, "ERROR"),
+    ("environment", None, {"failed": True, "exhausted": True}, "INCONCLUSIVE"),
+    ("authoring", None, {"failed": True, "exhausted": True}, "INCONCLUSIVE"),
     ("execution", None, {}, "ERROR"),
     ("admission", None, {"error": True}, "ERROR"),
 ])
@@ -293,11 +295,44 @@ def test_the_headline_label_tells_each_kind_of_outcome_apart(stopped_at, gate, f
     assert headline(stopped_at, gate, **flags) == expected
 
 
-def test_a_crashed_run_is_recorded_as_error_with_its_reason(tmp_path):
-    from corsair.investigation.results import record, summary_line
-    crashed = record("manual:abc", tmp_path, error="DockerError: daemon not reachable")
-    assert (crashed["label"], crashed["reason"]) == ("ERROR", "DockerError: daemon not reachable")
-    assert summary_line(crashed).startswith("manual:abc: ERROR; stopped at admission: DockerError")
+def test_a_crashed_run_is_recorded_as_error_where_it_crashed_with_its_traceback(clone, tmp_path, monkeypatch):
+    import corsair.investigate as entry
+    repo, baseline, candidate, _ = clone
+
+    def crash(*args, **kwargs):
+        raise OSError("docker daemon not reachable")
+    monkeypatch.setattr(entry, "install", crash)
+    stop = lambda: (_ for _ in ()).throw(AssertionError("no model may be built"))
+    item = entry.investigate(request(repo, baseline, candidate), tmp_path / "ev", {NODE: CONFIG},
+                             roots=(tmp_path / "sources",), models={stage: stop for stage in AGENT_STAGES})
+    assert (item["label"], item["stopped_at"], item["crashed"]) == ("ERROR", "dependency setup", True)
+    assert item["reason"] == "OSError: docker daemon not reachable"
+    assert "Traceback" in (tmp_path / "ev/error.txt").read_text() and item["traceback"].endswith("error.txt")
+    assert ": ERROR; crashed in dependency setup: OSError" in item["summary"]
+
+
+def test_the_label_follows_the_assessments_standing_disposition(tmp_path):
+    from types import SimpleNamespace
+    from corsair.composition.direct import DirectRun
+    from corsair.core.disposition import Disposition
+    from corsair.investigation.results import record
+    reproduced = Disposition(execution="completed", finding="reproduced", fix="verified")
+    lowered = Disposition(execution="completed", finding="inconclusive", fix="not_verified")
+
+    def run(proposal, admitted):
+        assessment = SimpleNamespace(disposition=proposal if admitted else reproduced,
+                                     admission=SimpleNamespace(admitted=admitted))
+        return DirectRun(stopped_at=None, reason="complete", attempts=(),
+                         gate=SimpleNamespace(permitted=reproduced), assessment=assessment)
+    # The gate permits reproduced; the admitted assessment lowers it to inconclusive: the label follows the assessment.
+    item = record("manual:x", tmp_path, run=run(lowered, True))
+    assert (item["label"], item["label_basis"], item["gate"]["finding"]) == ("INCONCLUSIVE", "assessment_admitted",
+                                                                              "reproduced")
+    rejected = record("manual:x", tmp_path, run=run(lowered, False))
+    assert (rejected["label"], rejected["label_basis"]) == ("LIKELY_EXPLOITABLE", "gate_assessment_rejected")
+    gate_only = record("manual:x", tmp_path, run=DirectRun(stopped_at="assessment", reason="x", attempts=(),
+                                                         gate=SimpleNamespace(permitted=reproduced)))
+    assert (gate_only["label"], gate_only["label_basis"]) == ("INCONCLUSIVE", "gate")
 
 
 def test_a_repository_committed_in_the_checkout_is_named_relative_to_it(clone, tmp_path):
@@ -318,3 +353,61 @@ def test_a_repository_committed_in_the_checkout_is_named_relative_to_it(clone, t
     with pytest.raises(Refused, match="names no fixed revision") as refused:
         build(request(repo, baseline, None, repository="clone"), tmp_path / "nofix", {NODE: CONFIG}, checkout=checkout)
     assert record("manual:x", tmp_path, refused=str(refused.value))["label"] == "UNABLE_TO_RUN"
+
+
+def test_an_agent_stage_that_stops_on_its_budget_or_never_answers_is_inconclusive(tmp_path):
+    from corsair.composition.direct import DirectRun, StageAttempt
+    from corsair.investigation.results import record
+    from pydantic_ai.exceptions import UsageLimitExceeded
+    attempt = StageAttempt("environment", None, None, (), 1.0, UsageLimitExceeded("total_tokens_limit 48000"))
+    item = record("manual:x", tmp_path, run=DirectRun(stopped_at="environment", attempts=(attempt,),
+                                                      reason="environment budget exhausted: total_tokens_limit 48000"))
+    assert (item["label"], item["stopped_at"]) == ("INCONCLUSIVE", "environment")
+    from corsair.composition.direct import BudgetExhausted, StageLimits
+    limits = StageLimits.model_construct()
+    timed_out = StageAttempt("environment", None, None, (), 240.0, TimeoutError("stage timed out"), limits,
+                             BudgetExhausted.model_construct(stage="environment", limit="timeout_seconds", cap=240,
+                                                             limits=limits))
+    assert record("manual:x", tmp_path, run=DirectRun(stopped_at="environment", attempts=(timed_out,),
+                                                      reason="x"))["label"] == "ERROR"
+    # A stage whose answer never validated ran and did not answer: INCONCLUSIVE, the last refusal beneath.
+    from pydantic_ai.exceptions import UnexpectedModelBehavior
+    unanswered = UnexpectedModelBehavior("Exceeded maximum output retries (1)")
+    unanswered.__cause__ = ValueError("planning answer was thinking only, no JSON")
+    item = record("manual:x", tmp_path, run=DirectRun(stopped_at="planning", attempts=(
+        StageAttempt("planning", None, None, (), 1.0, unanswered),), reason="planning failed"))
+    assert (item["label"], item["last_refusal"]) == ("INCONCLUSIVE", "planning answer was thinking only, no JSON")
+    malformed = StageAttempt("planning", None, None, (), 1.0, UnexpectedModelBehavior("Received empty model response"))
+    assert record("manual:x", tmp_path, run=DirectRun(stopped_at="planning", attempts=(malformed,),
+                                                      reason="x"))["label"] == "ERROR"
+    crashed = StageAttempt("environment", None, None, (), 1.0, ConnectionError("provider unreachable"))
+    assert record("manual:x", tmp_path, run=DirectRun(stopped_at="environment", attempts=(crashed,),
+                                                      reason="x"))["label"] == "ERROR"
+
+
+def test_the_sandbox_lists_the_captured_commits_files_for_the_smoke_rule(clone, tmp_path):
+    from corsair.investigation.docker import captured_paths
+    repo, baseline, candidate, _ = clone
+    built = build(request(repo, baseline, candidate), tmp_path / "trees", {NODE: CONFIG}, roots=(tmp_path / "sources",))
+    assert captured_paths(built.trees["baseline"]) == (".travis.yml", "lib/run.js", "package.json")
+    (built.trees["baseline"] / "link.js").symlink_to("lib/run.js")
+    assert "link.js" in captured_paths(built.trees["baseline"])
+    import corsair.investigation.docker as route
+    route.MAX_CAPTURED_PATHS, saved = 2, route.MAX_CAPTURED_PATHS
+    try:
+        assert captured_paths(built.trees["baseline"]) is None  # never a partial list
+    finally:
+        route.MAX_CAPTURED_PATHS = saved
+
+
+def test_pov_files_reach_identification_and_an_oversized_ticket_is_refused(clone, tmp_path):
+    repo, baseline, candidate, _ = clone
+    pov = {"description": "Call run with a crafted name", "files": [{"path": "poc.sh", "content": "node -e 'x'"}]}
+    text = request(repo, baseline, candidate, pov=pov).issue_text()
+    assert "Proof of concept (untrusted, not executed)" in text and "File poc.sh:\nnode -e 'x'" in text
+    ticket = {"provider": "github", "source": "acme/files", "id": "42", "url": "https://github.com/acme/files/issues/42",
+              "revision": "1", "title": "lib/run.js", "body": "x" * 9000, "format": "markdown", "state": "open",
+              "updated_at": "2026-10-13T00:00:00Z", "observed_at": "2026-10-13T00:00:00Z", "comments": []}
+    with pytest.raises(Refused, match="does not fit the identification input"):
+        build(request(repo, baseline, candidate, issue=ticket), tmp_path / "big", {NODE: CONFIG},
+              roots=(tmp_path / "sources",))

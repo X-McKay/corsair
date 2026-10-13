@@ -59,6 +59,11 @@ environment stage and Docker revision runners. This plan reuses them; it adds no
 
 ## Decisions and next action
 
+- Timeout cleanup (Codex P1, 07cf90a): after a timed-out exec, `kill -9 -1` in the container, then `docker top` must
+  list only PID 1. Reviewer note (`--init` so orphans are reaped) checked against real Docker and not taken: with
+  `--init`, `sleep infinity` is PID 2, so the kill stops the container and breaks its reuse; without it, a test that
+  forked a grandchild left only PID 1 after the kill (cleanup `confirmed`).
+
 - Plain Docker is not the sandbox the project qualifies: no OpenShell policy, gateway, admission or egress
   enforcement stands behind it, and the container runs as the operator's uid. Its results are development evidence
   only and say so in every record; the OpenShell route remains the one that qualifies a result.

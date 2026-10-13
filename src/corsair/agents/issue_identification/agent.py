@@ -12,6 +12,7 @@ from pydantic_ai.models import Model
 from pydantic_ai.models.instrumented import InstrumentationSettings
 
 from ..budget import tool_budget
+from ..prompted_output import prompted_output
 from .contracts import IssueIdentification
 from .dependencies import FixtureDependencies, RepositoryDependencies
 from .prompts import (
@@ -22,8 +23,8 @@ from .prompts import (
 from .tools import REPOSITORY_TOOLSET_SHA256, TOOL_RETRIES, TOOLSET_SHA256, identification_tools, repository_tools
 from .validation import finalize_identification, finalize_repository_identification
 
-CONFIG_VERSION = "issue-identification-config-v4-grounding-3"
-REPOSITORY_CONFIG_VERSION = "issue-identification-repository-config-v3-grounding-3"
+CONFIG_VERSION = "issue-identification-config-v5-grounding-3"
+REPOSITORY_CONFIG_VERSION = "issue-identification-repository-config-v4-grounding-3"
 
 
 def create_issue_identification_agent(
@@ -37,7 +38,7 @@ def create_issue_identification_agent(
         model, name="issue_identification", deps_type=FixtureDependencies, output_type=finalize_identification,
         instructions=INSTRUCTIONS, retries={"tools": TOOL_RETRIES, "output": output_retries},
         capabilities=[Capability(id=SKILL_ID, instructions=SKILL_TEXT, toolsets=[identification_tools()]),
-                      tool_budget(),
+                      tool_budget(), prompted_output(),
                       Instrumentation(settings=InstrumentationSettings(include_content=False, version=5)),
                       *([durability] if durability is not None else [])],
     )
@@ -54,7 +55,7 @@ def create_repository_identification_agent(
         output_type=finalize_repository_identification, instructions=REPOSITORY_INSTRUCTIONS,
         retries={"tools": TOOL_RETRIES, "output": output_retries},
         capabilities=[Capability(id=REPOSITORY_SKILL_ID, instructions=REPOSITORY_SKILL_TEXT, toolsets=[repository_tools()]),
-                      tool_budget(),
+                      tool_budget(), prompted_output(),
                       Instrumentation(settings=InstrumentationSettings(include_content=False, version=5))],
     )
 

@@ -4,6 +4,7 @@ Run only on the dedicated owned Linux amd64 cluster, with fixed immutable 1E Pyt
 
 ```shell
 UV_OFFLINE=true make test-config
+make toolchain-images
 make kind-up
 make admission-install
 make toolchain-images-load
