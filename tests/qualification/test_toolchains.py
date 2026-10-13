@@ -12,7 +12,7 @@ import pytest
 import yaml
 
 from tests.qualification.support import ROOT, NetworkFixture
-from tests.qualification.gateway import gateway
+from tests.qualification.gateway import native_gateway
 from tests.qualification.test_lifecycle import SdkReceipts
 from tests.qualification.test_policy import require_network, owned_sandbox, observe_policy, global_policy_observation, wait_logging_activation
 from tests.qualification.prepare_toolchains import JAVA_TESTS, LAUNCHER, SOURCE, image_receipt, source_hashes
@@ -21,19 +21,22 @@ from corsair.reports.junit_listing import listed
 
 
 @pytest.fixture
-def kube(kube, request):
-    """Per-image evidence: each gate (and its gateway fixture) writes under `<evidence>/<test name>/`, so one run
-    of all toolchain gates keeps every image's receipts apart."""
+def image_kube(kube, request):
+    """Per-image evidence: each gate writes under `<evidence>/<test name>/`, so one run of all toolchain gates keeps
+    every image's receipts apart."""
     view = copy.copy(kube)
     view.evidence = kube.evidence / request.node.name
     view.evidence.mkdir(mode=0o700)
     return view
 
 
-@pytest.fixture
+@pytest.fixture(scope='module')
 def toolchain_gateway(kube, request):
+    """One installed gateway for every selected image: its teardown uninstalls it, so a per-test gateway would leave
+    the second gate without one. Its controls and cleanup receipts are at the run's top level."""
     require_network(kube, request.config.getoption('--network-evidence'))
-    return request.getfixturevalue('gateway')
+    with native_gateway(kube) as value:
+        yield value
 
 
 def toolchain_policy(language):
@@ -248,8 +251,8 @@ def python_dependencies(kube, cli, sdk, name, remote, record, endpoint, pair):
 
 
 def toolchain_gate(kube, gateway, language):
-    """One image's gate, into its own evidence subdirectory; `-k test_native_<dir>_toolchain` selects one image."""
-    assert not (kube.evidence / 'toolchain.json').exists(), 'Another toolchain gate already wrote this evidence; run one image per run'
+    """One image's gate, into its own evidence subdirectory; select one image by its test node id."""
+    assert not (kube.evidence / 'toolchain.json').exists(), 'Another toolchain gate already wrote this evidence directory'
     sources = ['tests/qualification/test_toolchains.py', 'tests/qualification/prepare_toolchains.py', 'tests/qualification/test_policy.py', 'tests/qualification/test_lifecycle.py', 'tests/qualification/gateway.py', 'tests/qualification/support.py', 'src/corsair/adapters/maven_runner.py', 'src/corsair/reports/junit_listing.py', 'policies/openshell/identity.yaml', 'deploy/runtime-lock.yaml', 'pyproject.toml', 'uv.lock']
     (kube.evidence / 'toolchain-source-hashes.json').write_text(json.dumps(dict(source_hashes(), **{p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest() for p in sources}), indent=2))
     summary = {'outcome': 'failed', 'sandboxes': [], 'internal_retry_counts': 'unknown'}
@@ -285,15 +288,15 @@ def toolchain_gate(kube, gateway, language):
 
 
 @pytest.mark.toolchain('java8')
-def test_native_java8_toolchain(kube, toolchain_gateway):
-    toolchain_gate(kube, toolchain_gateway, 'java8')
+def test_native_java8_toolchain(image_kube, toolchain_gateway):
+    toolchain_gate(image_kube, toolchain_gateway, 'java8')
 
 
 @pytest.mark.toolchain('java')
-def test_native_java_toolchain(kube, toolchain_gateway):
-    toolchain_gate(kube, toolchain_gateway, 'java')
+def test_native_java_toolchain(image_kube, toolchain_gateway):
+    toolchain_gate(image_kube, toolchain_gateway, 'java')
 
 
 @pytest.mark.toolchain('python')
-def test_native_python_toolchain(kube, toolchain_gateway):
-    toolchain_gate(kube, toolchain_gateway, 'python')
+def test_native_python_toolchain(image_kube, toolchain_gateway):
+    toolchain_gate(image_kube, toolchain_gateway, 'python')
