@@ -48,8 +48,8 @@ SUITES: dict[str, Suite] = {
     "environment": Suite("evals.environment.evaluate", {"development": ()}, note="synthetic observations; setup commands never execute on the host"),
     "identification": Suite("evals.issue_identification.evaluate", {"development": ()}, repeat=False),
     "planning": Suite("evals.test_planning.evaluate", {
-        "development": ("--cases", "development"), "heldout": ("--cases", "heldout"),
-        "heldout2": ("--cases", "heldout2"), "heldout3": ("--cases", "heldout3")}),
+        # heldout and heldout2 are retired (SPEC-0040); the suite refuses them, so they are not offered here.
+        "development": ("--cases", "development"), "heldout3": ("--cases", "heldout3")}),
     "authoring": Suite("evals.test_authoring.evaluate", {"development": ()},
                        note="runs answered by injected observations or the static host runner; tests are not executed"),
     "assessment": Suite("evals.evidence_assessment.evaluate", {
