@@ -36,6 +36,8 @@ class Unparsed(_Frozen):
     path: str = Field(max_length=512)
     line: int = Field(ge=1)
     text: Text
+    strength: Strength = Field(description="What the line would have declared; a 'tested' alternative (a CI PyPy or dev entry) "
+                                           "can be ignored, a constraint or pin cannot")
     reason: Text
 
 

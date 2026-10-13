@@ -3975,6 +3975,7 @@
           "path": "Jenkinsfile",
           "line": 1,
           "text": "buildPlugin(jenkinsVersions: [null, '2.32.3'])",
+          "strength": "tested",
           "reason": "buildPlugin() without jdkVersions uses the shared library default"
          }
         ]
@@ -4128,6 +4129,7 @@
           "path": "Jenkinsfile",
           "line": 1,
           "text": "buildPlugin(jenkinsVersions: [null, '2.32.3'])",
+          "strength": "tested",
           "reason": "buildPlugin() without jdkVersions uses the shared library default"
          }
         ]
@@ -4321,6 +4323,7 @@
           "path": ".travis.yml",
           "line": 12,
           "text": "- \"pypy\"",
+          "strength": "tested",
           "reason": "not a CPython release: 'pypy'"
          }
         ]
@@ -4733,18 +4736,21 @@
           "path": ".travis.yml",
           "line": 7,
           "text": "- \"3.9-dev\"",
+          "strength": "tested",
           "reason": "not a CPython release: '3.9-dev'"
          },
          {
           "path": ".travis.yml",
           "line": 8,
           "text": "- \"nightly\"",
+          "strength": "tested",
           "reason": "not a CPython release: 'nightly'"
          },
          {
           "path": ".travis.yml",
           "line": 9,
           "text": "- \"pypy3\"",
+          "strength": "tested",
           "reason": "not a CPython release: 'pypy3'"
          }
         ]
@@ -4887,18 +4893,21 @@
           "path": ".travis.yml",
           "line": 7,
           "text": "- \"3.9-dev\"",
+          "strength": "tested",
           "reason": "not a CPython release: '3.9-dev'"
          },
          {
           "path": ".travis.yml",
           "line": 8,
           "text": "- \"nightly\"",
+          "strength": "tested",
           "reason": "not a CPython release: 'nightly'"
          },
          {
           "path": ".travis.yml",
           "line": 9,
           "text": "- \"pypy3\"",
+          "strength": "tested",
           "reason": "not a CPython release: 'pypy3'"
          }
         ]
@@ -5952,12 +5961,14 @@
           "path": ".github/workflows/tests.yaml",
           "line": 30,
           "text": "- {name: '3.12-dev', python: '3.12-dev', os: ubuntu-latest, tox: py312}",
+          "strength": "tested",
           "reason": "not a CPython release: '3.12-dev'"
          },
          {
           "path": ".github/workflows/tests.yaml",
           "line": 35,
           "text": "- {name: 'PyPy', python: 'pypy-3.9', os: ubuntu-latest, tox: pypy39}",
+          "strength": "tested",
           "reason": "not a CPython release: 'pypy-3.9'"
          }
         ]
@@ -6165,12 +6176,14 @@
           "path": ".github/workflows/tests.yaml",
           "line": 30,
           "text": "- {name: '3.12-dev', python: '3.12-dev', os: ubuntu-latest, tox: py312}",
+          "strength": "tested",
           "reason": "not a CPython release: '3.12-dev'"
          },
          {
           "path": ".github/workflows/tests.yaml",
           "line": 35,
           "text": "- {name: 'PyPy', python: 'pypy-3.9', os: ubuntu-latest, tox: pypy39}",
+          "strength": "tested",
           "reason": "not a CPython release: 'pypy-3.9'"
          }
         ]
@@ -6398,24 +6411,28 @@
           "path": ".github/workflows/run-tests.yml",
           "line": 15,
           "text": "python-version: [\"3.7\", \"3.8\", \"3.9\", \"3.10\", \"3.11\", \"3.12-dev\", \"pypy-3.8\", \"pypy-3.9\"]",
+          "strength": "tested",
           "reason": "not a CPython release: '3.12-dev'"
          },
          {
           "path": ".github/workflows/run-tests.yml",
           "line": 15,
           "text": "python-version: [\"3.7\", \"3.8\", \"3.9\", \"3.10\", \"3.11\", \"3.12-dev\", \"pypy-3.8\", \"pypy-3.9\"]",
+          "strength": "tested",
           "reason": "not a CPython release: 'pypy-3.8'"
          },
          {
           "path": ".github/workflows/run-tests.yml",
           "line": 15,
           "text": "python-version: [\"3.7\", \"3.8\", \"3.9\", \"3.10\", \"3.11\", \"3.12-dev\", \"pypy-3.8\", \"pypy-3.9\"]",
+          "strength": "tested",
           "reason": "not a CPython release: 'pypy-3.9'"
          },
          {
           "path": ".github/workflows/run-tests.yml",
           "line": 18,
           "text": "# pypy-3.7 on Windows and Mac OS currently fails trying to compile",
+          "strength": "tested",
           "reason": "not a CPython release: 'pypy-3.7'"
          }
         ]
@@ -6584,24 +6601,28 @@
           "path": ".github/workflows/run-tests.yml",
           "line": 15,
           "text": "python-version: [\"3.7\", \"3.8\", \"3.9\", \"3.10\", \"3.11\", \"3.12-dev\", \"pypy-3.8\", \"pypy-3.9\"]",
+          "strength": "tested",
           "reason": "not a CPython release: '3.12-dev'"
          },
          {
           "path": ".github/workflows/run-tests.yml",
           "line": 15,
           "text": "python-version: [\"3.7\", \"3.8\", \"3.9\", \"3.10\", \"3.11\", \"3.12-dev\", \"pypy-3.8\", \"pypy-3.9\"]",
+          "strength": "tested",
           "reason": "not a CPython release: 'pypy-3.8'"
          },
          {
           "path": ".github/workflows/run-tests.yml",
           "line": 15,
           "text": "python-version: [\"3.7\", \"3.8\", \"3.9\", \"3.10\", \"3.11\", \"3.12-dev\", \"pypy-3.8\", \"pypy-3.9\"]",
+          "strength": "tested",
           "reason": "not a CPython release: 'pypy-3.9'"
          },
          {
           "path": ".github/workflows/run-tests.yml",
           "line": 18,
           "text": "# pypy-3.7 on Windows and Mac OS currently fails trying to compile",
+          "strength": "tested",
           "reason": "not a CPython release: 'pypy-3.7'"
          }
         ]
@@ -6770,6 +6791,7 @@
           "path": ".github/workflows/python-package.yml",
           "line": 21,
           "text": "python-version: [\"3.6\", \"3.7\", \"3.8\", \"3.9\", \"3.10\", \"3.11\", \"pypy3.8\"]",
+          "strength": "tested",
           "reason": "not a CPython release: 'pypy3.8'"
          }
         ]
@@ -6914,6 +6936,7 @@
           "path": ".github/workflows/python-package.yml",
           "line": 21,
           "text": "python-version: [\"3.6\", \"3.7\", \"3.8\", \"3.9\", \"3.10\", \"3.11\", \"pypy3.8\"]",
+          "strength": "tested",
           "reason": "not a CPython release: 'pypy3.8'"
          }
         ]
@@ -7001,6 +7024,7 @@
           "path": "package.json",
           "line": 9,
           "text": "\"test\": \"echo 'For tests, see https://github.com/lodash/lodash/tree/3.10.1/test.' && echo 'But still, running a quick sanity check...' && node test.js\"",
+          "strength": "tested",
           "reason": "test script names no known framework"
          }
         ]
@@ -7057,6 +7081,7 @@
           "path": "package.json",
           "line": 9,
           "text": "\"test\": \"echo 'For tests, see https://github.com/lodash/lodash/tree/3.10.1/test.' && echo 'But still, running a quick sanity check...' && node test.js\"",
+          "strength": "tested",
           "reason": "test script names no known framework"
          }
         ]
@@ -7484,6 +7509,7 @@
           "path": ".travis.yml",
           "line": 1,
           "text": "language: node_js",
+          "strength": "tested",
           "reason": "not a Node.js release: 'node'"
          }
         ]
@@ -7710,6 +7736,7 @@
           "path": ".travis.yml",
           "line": 1,
           "text": "language: node_js",
+          "strength": "tested",
           "reason": "not a Node.js release: 'node'"
          }
         ]
@@ -7844,18 +7871,21 @@
           "path": ".travis.yml",
           "line": 4,
           "text": "- lts/*",
+          "strength": "tested",
           "reason": "not a Node.js release: 'lts/*'"
          },
          {
           "path": ".travis.yml",
           "line": 1,
           "text": "language: node_js",
+          "strength": "tested",
           "reason": "not a Node.js release: 'node'"
          },
          {
           "path": ".travis.yml",
           "line": 1,
           "text": "language: node_js",
+          "strength": "tested",
           "reason": "not a Node.js release: 'node'"
          }
         ]
@@ -7960,18 +7990,21 @@
           "path": ".travis.yml",
           "line": 4,
           "text": "- lts/*",
+          "strength": "tested",
           "reason": "not a Node.js release: 'lts/*'"
          },
          {
           "path": ".travis.yml",
           "line": 1,
           "text": "language: node_js",
+          "strength": "tested",
           "reason": "not a Node.js release: 'node'"
          },
          {
           "path": ".travis.yml",
           "line": 1,
           "text": "language: node_js",
+          "strength": "tested",
           "reason": "not a Node.js release: 'node'"
          }
         ]
@@ -8095,6 +8128,7 @@
           "path": "package.json",
           "line": 16,
           "text": "\"test\": \"echo \\\"Error: no test specified\\\" && exit 1\"",
+          "strength": "tested",
           "reason": "test script names no known framework"
          }
         ]
@@ -8171,6 +8205,7 @@
           "path": "package.json",
           "line": 16,
           "text": "\"test\": \"echo \\\"Error: no test specified\\\" && exit 1\"",
+          "strength": "tested",
           "reason": "test script names no known framework"
          }
         ]
@@ -11205,6 +11240,7 @@
           "path": ".travis.yml",
           "line": 9,
           "text": "- ruby-head",
+          "strength": "tested",
           "reason": "not an MRI release: 'head'"
          }
         ]
@@ -11366,6 +11402,7 @@
           "path": ".travis.yml",
           "line": 9,
           "text": "- ruby-head",
+          "strength": "tested",
           "reason": "not an MRI release: 'head'"
          }
         ]
@@ -11881,12 +11918,14 @@
           "path": ".github/workflows/test.yaml",
           "line": 25,
           "text": "- jruby-head",
+          "strength": "tested",
           "reason": "not an MRI release: 'jruby-head'"
          },
          {
           "path": ".github/workflows/test.yaml",
           "line": 26,
           "text": "- truffleruby-head",
+          "strength": "tested",
           "reason": "not an MRI release: 'truffleruby-head'"
          }
         ]
@@ -12097,12 +12136,14 @@
           "path": ".github/workflows/test.yaml",
           "line": 25,
           "text": "- jruby-head",
+          "strength": "tested",
           "reason": "not an MRI release: 'jruby-head'"
          },
          {
           "path": ".github/workflows/test.yaml",
           "line": 26,
           "text": "- truffleruby-head",
+          "strength": "tested",
           "reason": "not an MRI release: 'truffleruby-head'"
          }
         ]
@@ -12263,18 +12304,21 @@
           "path": ".github/workflows/tests.yml",
           "line": 9,
           "text": "ruby:",
+          "strength": "tested",
           "reason": "not an MRI release: 'ruby'"
          },
          {
           "path": ".github/workflows/tests.yml",
           "line": 16,
           "text": "- ruby-head",
+          "strength": "tested",
           "reason": "not an MRI release: 'head'"
          },
          {
           "path": ".github/workflows/tests.yml",
           "line": 17,
           "text": "- truffleruby-head",
+          "strength": "tested",
           "reason": "not an MRI release: 'truffleruby-head'"
          }
         ]
@@ -12531,54 +12575,63 @@
           "path": ".github/workflows/release.yml",
           "line": 17,
           "text": "- uses: ruby/setup-ruby@v1",
+          "strength": "tested",
           "reason": "not an MRI release: 'ruby'"
          },
          {
           "path": ".github/workflows/test.yml",
           "line": 28,
           "text": "- \"jruby\"",
+          "strength": "tested",
           "reason": "not an MRI release: 'jruby'"
          },
          {
           "path": ".github/workflows/test.yml",
           "line": 29,
           "text": "- \"truffleruby\"",
+          "strength": "tested",
           "reason": "not an MRI release: 'truffleruby'"
          },
          {
           "path": ".github/workflows/test.yml",
           "line": 35,
           "text": "- { ruby: ruby-head, rack: stable, allow-failure: true }",
+          "strength": "tested",
           "reason": "not an MRI release: 'head'"
          },
          {
           "path": ".github/workflows/test.yml",
           "line": 28,
           "text": "- \"jruby\"",
+          "strength": "tested",
           "reason": "not an MRI release: 'jruby'"
          },
          {
           "path": ".github/workflows/test.yml",
           "line": 35,
           "text": "- { ruby: ruby-head, rack: stable, allow-failure: true }",
+          "strength": "tested",
           "reason": "not an MRI release: 'head'"
          },
          {
           "path": ".github/workflows/test.yml",
           "line": 107,
           "text": "- { ruby: jruby-head,       rubyopt: \"\", rack: stable, puma: stable, tilt: stable, rack_session: stable, zeitwerk: stable, allow-failure: true }",
+          "strength": "tested",
           "reason": "not an MRI release: 'jruby-head'"
          },
          {
           "path": ".github/workflows/test.yml",
           "line": 108,
           "text": "- { ruby: truffleruby-head, rack: stable, puma: stable, tilt: stable, rack_session: stable, zeitwerk: stable, allow-failure: true }",
+          "strength": "tested",
           "reason": "not an MRI release: 'truffleruby-head'"
          },
          {
           "path": ".github/workflows/test.yml",
           "line": 29,
           "text": "- \"truffleruby\"",
+          "strength": "tested",
           "reason": "not an MRI release: 'truffleruby'"
          }
         ]
@@ -12830,54 +12883,63 @@
           "path": ".github/workflows/release.yml",
           "line": 17,
           "text": "- uses: ruby/setup-ruby@v1",
+          "strength": "tested",
           "reason": "not an MRI release: 'ruby'"
          },
          {
           "path": ".github/workflows/test.yml",
           "line": 28,
           "text": "- \"jruby\"",
+          "strength": "tested",
           "reason": "not an MRI release: 'jruby'"
          },
          {
           "path": ".github/workflows/test.yml",
           "line": 29,
           "text": "- \"truffleruby\"",
+          "strength": "tested",
           "reason": "not an MRI release: 'truffleruby'"
          },
          {
           "path": ".github/workflows/test.yml",
           "line": 35,
           "text": "- { ruby: ruby-head, rack: stable, allow-failure: true }",
+          "strength": "tested",
           "reason": "not an MRI release: 'head'"
          },
          {
           "path": ".github/workflows/test.yml",
           "line": 28,
           "text": "- \"jruby\"",
+          "strength": "tested",
           "reason": "not an MRI release: 'jruby'"
          },
          {
           "path": ".github/workflows/test.yml",
           "line": 35,
           "text": "- { ruby: ruby-head, rack: stable, allow-failure: true }",
+          "strength": "tested",
           "reason": "not an MRI release: 'head'"
          },
          {
           "path": ".github/workflows/test.yml",
           "line": 107,
           "text": "- { ruby: jruby-head,       rubyopt: \"\", rack: stable, puma: stable, tilt: stable, rack_session: stable, zeitwerk: stable, allow-failure: true }",
+          "strength": "tested",
           "reason": "not an MRI release: 'jruby-head'"
          },
          {
           "path": ".github/workflows/test.yml",
           "line": 108,
           "text": "- { ruby: truffleruby-head, rack: stable, puma: stable, tilt: stable, rack_session: stable, zeitwerk: stable, allow-failure: true }",
+          "strength": "tested",
           "reason": "not an MRI release: 'truffleruby-head'"
          },
          {
           "path": ".github/workflows/test.yml",
           "line": 29,
           "text": "- \"truffleruby\"",
+          "strength": "tested",
           "reason": "not an MRI release: 'truffleruby'"
          }
         ]

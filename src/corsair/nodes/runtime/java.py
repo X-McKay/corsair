@@ -277,7 +277,7 @@ def _ci(c: Collector) -> None:
     for path, value, source in ci_versions(c, CI_KEYS, ('jdk',)):
         feature = _jdk_value(value)
         if feature is None:
-            c.unparsed('runtime', 'jdk', 'image', path, value, f'not a JDK release: {value!r}')
+            c.unparsed('runtime', 'jdk', 'image', path, value, f'not a JDK release: {value!r}', strength='tested')
         else:
             c.add('runtime', 'jdk', 'image', 'tested', source, path, value, series((feature,)), listed=(feature,))
     if (text := c.text('Jenkinsfile')) is not None:
@@ -289,7 +289,7 @@ def _ci(c: Collector) -> None:
                     c.add('runtime', 'jdk', 'image', 'tested', 'ci', 'Jenkinsfile', match[0], series((feature,)), listed=(feature,))
                     found = True
         if not found and 'buildPlugin' in text:
-            c.unparsed('runtime', 'jdk', 'image', 'Jenkinsfile', 'buildPlugin', 'buildPlugin() without jdkVersions uses the shared library default')
+            c.unparsed('runtime', 'jdk', 'image', 'Jenkinsfile', 'buildPlugin', 'buildPlugin() without jdkVersions uses the shared library default', strength='tested')
     for path in ('.java-version', '.sdkmanrc', '.tool-versions'):
         if (text := c.text(path)) is not None:
             line = text if path == '.java-version' else '\n'.join(l for l in text.splitlines() if re.match(r'\s*java\s*[=\s]', l))

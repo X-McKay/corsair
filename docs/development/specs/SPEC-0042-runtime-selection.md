@@ -26,7 +26,7 @@ It also adds the hand-off from a selection to the environment agent's input. Exc
 **Detector** (`src/corsair/nodes/runtime/`).
 - `is_build_file(path)` selects the build files from a snapshot listing. `detect(files, language, parents=)` reads only those bytes and returns a `RuntimeRequirement` (or a reason string when no single language applies).
 - One module per ecosystem reads its formats as data:
-  - Python: `pyproject.toml` (requires-python, classifiers, Poetry, extras, build backend), `setup.cfg`, `setup.py` through `ast` (never executed), requirements files, `tox.ini` envlists, `Pipfile`/`Pipfile.lock`, `uv.lock`/`poetry.lock`, `.python-version`, `runtime.txt`.
+  - Python: `pyproject.toml` (requires-python, classifiers, Poetry, extras, build backend), `setup.cfg`, `setup.py` through `ast` (never executed), requirements files, `tox.ini` envlists, `Pipfile`/`Pipfile.lock`, `uv.lock` top-level `requires-python` and `poetry.lock` `[metadata]` (per-package ranges are never project constraints), `.python-version`, `runtime.txt`.
   - Java: Maven POMs with in-tree modules and supplied parent POMs. It reads properties, compiler release/target/source, enforcer `requireJavaVersion`/`requireMavenVersion`, the toolchains plugin, Surefire and JUnit 3/4/5 and TestNG dependencies. It also reads Gradle compatibility, toolchain and dependency lines, Maven and Gradle wrappers, `.java-version`/`.sdkmanrc`/`.tool-versions` and `Jenkinsfile` JDK declarations.
   - JavaScript: `package.json` engines, `packageManager`, the test script (following `npm run`) and dev dependencies; `.nvmrc`/`.node-version`; lockfile versions.
   - Ruby: gemspec `required_ruby_version` and dependencies (literal strings only), Gemfile `ruby`, `Gemfile.lock` RUBY VERSION, BUNDLED WITH and framework specs, `.ruby-version`.
@@ -67,7 +67,9 @@ Only test frameworks among registry components are matched, against runner suppo
 **Selection** (`matrix.select`) returns a typed union:
 - `supported` names the first row in which every runtime and image tool contains the required version and at least one declared test framework overlaps a qualified runner range. Setup must then pin the framework inside that overlap.
 - `unsupported` lists the components no row provides, with their allowed sets and preferred versions, plus each rejected row's unmet checks.
-- `undetermined` names what is missing: an undeclared runtime version, conflicting declarations, an unidentified test framework, or unresolved inputs.
+- `undetermined` names what is missing: an undeclared runtime version, conflicting declarations, an unidentified test framework, unresolved inputs, or a constraint or pin the detector saw but could not read.
+
+Each unread line keeps the strength it would have had. An unread constraint or pin on the runtime or an image tool makes the result undetermined, because it could exclude the row (`requires-python = ">=3.13rc1"` beside a 3.12 pin). An unread framework constraint cannot count as the qualified runner; if the runtime fits a row and no readable framework does, the result is undetermined. Unread `tested` entries, such as CI PyPy or dev jobs and a Jenkins `buildPlugin()` default, are alternatives and do not block.
 
 There is no fallback row and no "close enough" version.
 

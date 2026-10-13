@@ -19,7 +19,7 @@ def _ruby(c: Collector, strength: str, source: str, path: str, needle: str, raw:
     try:
         version = parse_version(re.sub(r'p\d+$', '', raw))
     except VersionSyntaxError:
-        c.unparsed('runtime', 'ruby', 'image', path, needle or raw, f'not an MRI release: {raw!r}')
+        c.unparsed('runtime', 'ruby', 'image', path, needle or raw, f'not an MRI release: {raw!r}', strength=strength)
         return
     c.add('runtime', 'ruby', 'image', strength, source, path, needle or raw,
           series(version) if strength == 'tested' or len(version) < 3 else exactly(version), listed=version)

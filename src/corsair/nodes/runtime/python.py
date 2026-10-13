@@ -21,7 +21,7 @@ def _runtime(c: Collector, strength, source, path, needle, text, listed_series=T
     try:
         version = parse_version(raw)
     except VersionSyntaxError:
-        c.unparsed('runtime', 'cpython', 'image', path, needle or raw, f'not a CPython release: {raw!r}')
+        c.unparsed('runtime', 'cpython', 'image', path, needle or raw, f'not a CPython release: {raw!r}', strength=strength)
         return
     c.add('runtime', 'cpython', 'image', strength, source, path, needle or raw,
           series(version) if listed_series or len(version) < 3 else exactly(version),
@@ -156,20 +156,47 @@ def detect(c: Collector) -> None:
     if (text := c.text('Pipfile')) is not None:
         try:
             data = tomllib.loads(text)
-            version = (data.get('requires') or {}).get('python_version') or (data.get('requires') or {}).get('python_full_version')
-            if version: _runtime(c, 'pinned', 'pipfile', 'Pipfile', 'python_', str(version), listed_series=False)
-            for group in ('dev-packages', 'packages'):
-                if isinstance((data.get(group) or {}).get('pytest'), str):
-                    _pytest(c, 'Pipfile', 'pytest', '' if data[group]['pytest'] == '*' else data[group]['pytest'], 'pipfile')
         except tomllib.TOMLDecodeError as error:
             c.unparsed('runtime', 'cpython', 'image', 'Pipfile', '', f'invalid TOML: {error}')
-    for path, needle in (('uv.lock', 'requires-python'), ('poetry.lock', 'python-versions')):
-        if (text := c.text(path)) is not None and (match := re.search(rf'^{needle}\s*=\s*"([^"]+)"', text, re.M)):
-            try:
-                versions = pep440(match[1]) if path == 'uv.lock' else poetry(match[1])
-                c.add('runtime', 'cpython', 'image', 'constraint', 'lockfile', path, match[0], versions)
-            except VersionSyntaxError as error:
-                c.unparsed('runtime', 'cpython', 'image', path, match[0], str(error))
+            data = {}
+        requires = data.get('requires', {})
+        if not isinstance(requires, dict):
+            c.unparsed('runtime', 'cpython', 'image', 'Pipfile', 'requires', f'[requires] is a {type(requires).__name__}, not a table')
+            requires = {}
+        version = requires.get('python_version') or requires.get('python_full_version')
+        if isinstance(version, str) and version:
+            _runtime(c, 'pinned', 'pipfile', 'Pipfile', 'python_', version, listed_series=False)
+        elif version:
+            c.unparsed('runtime', 'cpython', 'image', 'Pipfile', 'python_', f'python version {version!r} is not a string', strength='pinned')
+        for group in ('dev-packages', 'packages'):
+            table = data.get(group, {})
+            if not isinstance(table, dict):
+                c.unparsed(*FRAMEWORK, 'Pipfile', group, f'[{group}] is a {type(table).__name__}, not a table')
+            elif isinstance(table.get('pytest'), str):
+                _pytest(c, 'Pipfile', 'pytest', '' if table['pytest'] == '*' else table['pytest'], 'pipfile')
+    for path, key in (('uv.lock', 'requires-python'), ('poetry.lock', 'python-versions')):
+        if (text := c.text(path)) is None: continue
+        # The project-wide range is uv's top-level `requires-python` or Poetry's `[metadata] python-versions`;
+        # ranges inside `[[package]]` entries are per dependency and never project constraints.
+        try:
+            data = tomllib.loads(text)
+        except tomllib.TOMLDecodeError as error:
+            c.unparsed('runtime', 'cpython', 'image', path, '', f'invalid TOML: {error}')
+            continue
+        table = data if path == 'uv.lock' else data.get('metadata')
+        value = table.get(key) if isinstance(table, dict) else None
+        if value is None: continue
+        start = text.find('[metadata]') if path == 'poetry.lock' else 0
+        line = text.count('\n', 0, max(text.find(key, max(start, 0)), 0)) + 1
+        needle = key
+        if not isinstance(value, str):
+            c.unparsed('runtime', 'cpython', 'image', path, needle, f'{key} {value!r} is not a string', line=line)
+            continue
+        try:
+            versions = pep440(value) if path == 'uv.lock' else poetry(value)
+            c.add('runtime', 'cpython', 'image', 'constraint', 'lockfile', path, needle, versions, line=line)
+        except VersionSyntaxError as error:
+            c.unparsed('runtime', 'cpython', 'image', path, needle, str(error), line=line)
     for path, value, source in ci_versions(c, CI_KEYS, ('python',)):
         _runtime(c, 'tested', source, path, value, value)
     if (text := c.text('Pipfile.lock')) is not None:
@@ -177,7 +204,7 @@ def detect(c: Collector) -> None:
             version = ((json.loads(text).get('_meta') or {}).get('requires') or {}).get('python_version')
             if version: _runtime(c, 'pinned', 'pipfile', 'Pipfile.lock', 'python_version', str(version), listed_series=False)
         except (json.JSONDecodeError, AttributeError):
-            c.unparsed('runtime', 'cpython', 'image', 'Pipfile.lock', '', 'invalid JSON')
+            c.unparsed('runtime', 'cpython', 'image', 'Pipfile.lock', '', 'invalid JSON or not a Pipfile.lock structure')
 
 
 def _expand(envlist: str) -> list[str]:

@@ -59,4 +59,4 @@ def detect(c: Collector) -> None:
             version = parse_version(raw)
             c.add('runtime', 'perl', 'image', 'tested', source, path, value, series(version[:2]), listed=version[:2])
         except VersionSyntaxError:
-            c.unparsed('runtime', 'perl', 'image', path, value, f'not a perl release: {raw!r}')
+            c.unparsed('runtime', 'perl', 'image', path, value, f'not a perl release: {raw!r}', strength='tested')

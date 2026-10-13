@@ -269,3 +269,38 @@ def test_review_findings_versions():
                      'test_framework', 'pytest').allowed == '==7.4.0'
     ci = b'jobs:\n  t:\n    strategy:\n      matrix:\n        node-version: [16.x, 18.x]\n    steps:\n      - run: npm test\n'
     assert component(detect({'package.json': b'{}', '.github/workflows/t.yml': ci}, 'javascript'), 'runtime', 'node').allowed == '16.* || 18.*'
+
+
+def test_unread_hard_constraint_is_undetermined_not_supported():
+    # Al's review of eac99a2: requires-python '>=3.13rc1' is unread, yet a 3.12.15 pin used to select CPython 3.12.15.
+    files = {'pyproject.toml': b'[project]\nrequires-python = ">=3.13rc1"\noptional-dependencies = {test = ["pytest>=9,<10"]}\n',
+             '.python-version': b'3.12.15\n'}
+    selection = select(detect(files, 'python'), load())
+    assert selection.status == 'undetermined' and 'pyproject.toml' in selection.missing[0]
+    # An unread tested alternative (a CI PyPy or dev job) does not block.
+    ci = b'jobs:\n  test:\n    strategy:\n      matrix:\n        python: ["3.12", "pypy-3.10", "3.13-dev"]\n    steps:\n      - run: pytest\n'
+    tested = detect({'pyproject.toml': b'[project]\noptional-dependencies = {test = ["pytest>=9,<10"]}\n',
+                     '.github/workflows/t.yml': ci}, 'python')
+    assert component(tested, 'runtime', 'cpython').unparsed and select(tested, load()).status == 'supported'
+    # An unread framework constraint cannot be the qualified runner when the runtime fits.
+    framework = {'pyproject.toml': b'[project]\nrequires-python = ">=3.9"\noptional-dependencies = {test = ["pytest>=9.0rc1"]}\n',
+                 'pytest.ini': b''}
+    selection = select(detect(framework, 'python'), load())
+    assert selection.status == 'undetermined' and selection.missing[0].startswith('pytest test framework declaration not understood')
+
+
+def test_poetry_lock_reads_project_metadata_not_first_package():
+    lock = (b'[[package]]\nname = "backports.zoneinfo"\nversion = "0.2.1"\npython-versions = ">=3.6,<3.10"\n\n'
+            b'[metadata]\nlock-version = "2.0"\npython-versions = ">=3.8"\ncontent-hash = "x"\n')
+    project = b'[tool.poetry.dependencies]\npython = ">=3.8"\n[tool.poetry.dev-dependencies]\npytest = "^9.0"\n'
+    requirement = detect({'pyproject.toml': project, 'poetry.lock': lock}, 'python')
+    runtime = component(requirement, 'runtime', 'cpython')
+    assert runtime.allowed == '>=3.8' and {e.line for e in runtime.evidence if e.path == 'poetry.lock'} == {8}
+    assert select(requirement, load()).status == 'supported'
+
+
+@pytest.mark.parametrize('pipfile', [b'requires = "3.12"\n', b'packages = ["pytest"]\n', b'[requires]\npython_version = 3.12\n'])
+def test_malformed_pipfile_structure_is_recorded_not_raised(pipfile):
+    requirement = detect({'Pipfile': pipfile, 'pytest.ini': b''}, 'python')
+    assert any(u.path == 'Pipfile' for c in requirement.components for u in c.unparsed)
+    assert select(requirement, load()).status == 'undetermined'

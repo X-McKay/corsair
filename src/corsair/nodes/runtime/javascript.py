@@ -15,7 +15,7 @@ def _node(c: Collector, strength: str, source: str, path: str, needle: str, raw:
     try:
         version = parse_version(raw)
     except VersionSyntaxError:
-        c.unparsed('runtime', 'node', 'image', path, needle or raw, f'not a Node.js release: {raw!r}')
+        c.unparsed('runtime', 'node', 'image', path, needle or raw, f'not a Node.js release: {raw!r}', strength=strength)
         return
     c.add('runtime', 'node', 'image', strength, source, path, needle or raw,
           series(version), listed=version)
@@ -82,7 +82,8 @@ def _framework(c: Collector, package: dict) -> None:
         if len(named) != 1:
             if scripts.get('test') is not None:
                 c.unparsed('test_framework', 'unknown', 'registry', 'package.json', '"test"',
-                           'test script names no known framework' + (f'; devDependencies list {", ".join(named)}' if named else ''))
+                           'test script names no known framework' + (f'; devDependencies list {", ".join(named)}' if named else ''),
+                           strength='tested')
             return
     for framework in named:
         spec = dev.get(framework)
