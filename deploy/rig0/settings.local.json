@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /home/al/git/corsair fetch origin *)",
+      "Bash(git -C /home/al/git/corsair worktree add .worktrees/*)",
+      "Bash(git -C /home/al/git/corsair/.worktrees/* checkout --detach origin/*)",
+      "Bash(git -C /home/al/git/corsair/.worktrees/* status *)",
+      "Bash(git -C /home/al/git/corsair/.worktrees/* rev-parse *)",
+      "Bash(make -C /home/al/git/corsair/.worktrees/* qualify-image *)",
+      "Bash(make -C /home/al/git/corsair/.worktrees/* cluster-status)",
+      "Bash(make -C /home/al/git/corsair/.worktrees/* archive-runs)",
+      "Bash(make -C /home/al/git/corsair/.worktrees/* kind-down)",
+      "Bash(make -C /home/al/git/corsair/.worktrees/* test-config)",
+      "Bash(docker ps *)",
+      "Bash(docker inspect *)",
+      "Bash(docker image ls *)",
+      "Bash(cat /home/al/git/corsair/.worktrees/*/.runs/qualify/*/SUMMARY.md)"
+    ],
+    "deny": [
+      "Bash(*mkfs*)",
+      "Bash(*dd if=*)",
+      "Bash(*delete namespace*)",
+      "Bash(*delete --all*)",
+      "Bash(*rm -rf /*)",
+      "Bash(* workspace-storage*)",
+      "Bash(make *--eval*)",
+      "Bash(make * -f*)",
+      "Bash(make *--file*)",
+      "Bash(make *--makefile*)",
+      "Bash(make * -I*)",
+      "Bash(make *--include-dir*)",
+      "Bash(make * -e*)",
+      "Bash(make *--environment-overrides*)"
+    ]
+  }
+}
