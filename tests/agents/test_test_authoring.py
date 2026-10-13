@@ -291,8 +291,8 @@ def test_pytest_raises_bindings_are_assertions():
 def test_native_evals_repeat_and_preserve_receipts(tmp_path):
     evidence = tmp_path / "attempt"
     report = asyncio.run(evaluate(evidence, EvaluationBudget()))
-    assert passed(report) and len(report.cases) == 16 and len(report.case_groups()) == 8
-    assert len(list(evidence.glob("attempt-*.json"))) == 16
+    assert passed(report) and len(report.cases) == 18 and len(report.case_groups()) == 9
+    assert len(list(evidence.glob("attempt-*.json"))) == 18
     assert all(c.attributes["security_revealed"] == 0 for c in report.cases)
     assert report.experiment_metadata["runner"] == "injected_observations_and_static_host_runner"
     with pytest.raises(FileExistsError):
@@ -375,6 +375,23 @@ def test_refused_write_keeps_previous_content_and_the_author_can_act_once():
                    if isinstance(p, ToolReturnPart) and p.tool_name == "write_test_file")
     assert refusal.status == "refused" and refusal.refusals_left == 1 and "line 4: sys.addaudithook" in refusal.reason
     assert offered[1:4] == [ALL_TOOLS] * 3
+
+
+def test_the_author_reads_its_own_latest_admitted_write_and_absent_paths_are_typed_not_fatal():
+    read = lambda path, start=1: ToolCallPart("read_source", {"path": path, "start_line": start})
+    steps = [read("test_documents.py"), write(), write(HOOKED), read("test_documents.py"), read("test_documents.py", 999),
+             read("conftest.py"), read("../outside.txt"), RUN]
+    result, fake = run(create_test_authoring_agent(responding(steps)), case().inputs.inputs)
+    assert isinstance(result.output, TestPatch) and len(fake.calls) == 1
+    reads = [p.content for m in result.all_messages() for p in m.parts
+             if isinstance(p, ToolReturnPart) and p.tool_name == "read_source"]
+    unwritten, own, past, absent, outside = reads
+    assert unwritten.status == "not_in_source" and "not written yet" in unwritten.reason
+    # The refused write left the reference in place, and that is what the author reads back.
+    assert "\n".join(line.text for line in own.lines) == "\n".join(REFERENCE.splitlines()[:80]) and own.start_line == 1
+    assert past.status == "past_end" and f"has {len(REFERENCE.splitlines())} lines" in past.reason
+    assert absent.status == outside.status == "not_in_source" and "test_documents.py" in absent.reason
+    assert "write it again in full" in absent.reason
 
 
 def test_second_refusal_ends_blocked_at_admission():

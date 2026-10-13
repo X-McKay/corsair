@@ -77,6 +77,13 @@ class RefusedWrite(Contract):
     refusals_left: int = Field(ge=0)
 
 
+class UnreadSource(Contract):
+    """A read_source call the stage cannot serve; nothing changed and the stage continues."""
+    status: Literal["not_in_source", "past_end"]
+    path: str = Field(max_length=256)
+    reason: Excerpt
+
+
 class DevelopmentOutcome(Contract):
     outcome: Literal["passed", "failed", "error", "skipped"]
     failure_type: str | None = Field(default=None, max_length=256)
