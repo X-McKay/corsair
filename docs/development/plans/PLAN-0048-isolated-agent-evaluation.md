@@ -4,7 +4,7 @@ kind: plan
 title: Isolated per-agent evaluation on the host
 status: in_progress
 updated: 2026-10-13
-related: [SPEC-0044, SPEC-0023, SPEC-0028, SPEC-0029, SPEC-0035, PLAN-0038, PLAN-0039]
+related: [SPEC-0044, HANDOFF-0066, SPEC-0023, SPEC-0028, SPEC-0029, SPEC-0035, PLAN-0038, PLAN-0039]
 ---
 
 # Isolated per-agent evaluation on the host
