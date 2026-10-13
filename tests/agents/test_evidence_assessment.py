@@ -259,3 +259,35 @@ def test_contracts_refuse_ambiguous_inputs_and_extra_verdicts():
         ProposedDispositionDraft.model_validate(draft(limitations=[]))
     with pytest.raises(ValidationError):
         ProposedDispositionDraft.model_validate(draft(interpretation={'statement': 'x', 'citations': []}))
+
+
+@pytest.mark.parametrize('revision', ['baseline', 'candidate'])
+def test_conclusive_repeat_requires_a_witness_citation_for_each_observed_run(revision):
+    data = inputs()
+    runs = getattr(data.evidence, revision)
+    repeated = tuple(i.model_copy(update={'item_id': i.item_id.replace('-0-', '-1-'), 'run': 1})
+                     for i in data.items if i.revision == revision)
+    data = data.model_copy(update={
+        'evidence': data.evidence.model_copy(update={revision: runs + runs}),
+        'items': data.items + repeated})
+    reads = READS + tuple(i.item_id for i in repeated)
+    agent = create_evidence_assessment_agent(scripted(draft(), reads=reads), output_retries=0)
+    with pytest.raises(UnexpectedModelBehavior):
+        agent.run_sync(assessment_prompt(data), deps=AssessmentDependencies(data),
+                       usage_limits=UsageLimits(request_limit=10, tool_calls_limit=8))
+    grounded = draft(interpretation=observation('Both repeats support the conclusion',
+        ('baseline-0-witness', 1, 1), ('candidate-0-witness', 1, 1), (f'{revision}-1-witness', 1, 1)))
+    agent = create_evidence_assessment_agent(scripted(grounded, reads=reads), output_retries=0)
+    result = agent.run_sync(assessment_prompt(data), deps=AssessmentDependencies(data),
+                            usage_limits=UsageLimits(request_limit=10, tool_calls_limit=8)).output
+    assert result.admission.admitted and result.fix == 'verified'
+
+
+def test_incomplete_baseline_repeat_preserves_cited_reproduction():
+    data = inputs()
+    incomplete = run('failed').model_copy(update={'delivery': 'unknown', 'witness': None})
+    data = data.model_copy(update={'evidence': data.evidence.model_copy(
+        update={'baseline': data.evidence.baseline + (incomplete,)})})
+    result = assess_with(scripted(draft(execution='unknown', fix='not_verified')), data).output
+    assert result.admission.admitted and result.finding == 'reproduced'
+    assert 'incomplete_repeats' in {limitation.code for limitation in result.gate_limitations}

@@ -18,7 +18,7 @@ from .tools import READ_EVIDENCE_TOOL, TOOL_RETRIES, AssessmentDependencies, evi
 
 # PROMPT_VERSION covers everything the model sees (instructions, skill, rendered prompt,
 # tool and output schema text); CONFIG_VERSION covers retry budgets and instrumentation.
-PROMPT_VERSION = "evidence-assessment-v4"
+PROMPT_VERSION = "evidence-assessment-v5"
 CONFIG_VERSION = "evidence-assessment-config-v2"
 SKILL_ID = "assess-evidence"
 SKILL_BYTES = (Path(__file__).parent / "skills" / SKILL_ID / "SKILL.md").read_bytes()
@@ -45,8 +45,16 @@ def _witnesses(inputs: AssessmentInput, revision: str) -> int:
 
 def _witness_problem(inputs: AssessmentInput, cited: set[str], revision: str, claim: str, weaker: str) -> str | None:
     """Only a witness item grounds a conclusion; test-process output (JUnit, stdout, receipts) is a claim."""
-    if any(item.item_id in cited and item.kind == "witness" and item.revision == revision for item in inputs.items):
+    runs = getattr(inputs.evidence, revision)
+    required = {index for index, run in enumerate(runs) if run.witness is not None}
+    covered = {item.run for item in inputs.items
+               if item.item_id in cited and item.kind == "witness" and item.revision == revision}
+    if required and required <= covered:
         return None
+    if missing := required - covered:
+        if len(runs) > 1:
+            return (f"{claim} must cite a {revision} item of kind witness for each observed run; "
+                    f"missing run indexes {sorted(missing)}; test reports and output are claims")
     if not _witnesses(inputs, revision):
         return (f"the inventory has no witness item for the {revision} revision, so {claim} is unsupported; "
                 f"propose {weaker} and record the missing witness in limitations")

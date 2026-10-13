@@ -88,11 +88,20 @@ class ScoredAssessment(Evaluator[AssessmentInput, EvidenceAssessment, Assessment
         result = assess(ctx.inputs.evidence)
         proposal = Disposition(execution=output.execution, finding=output.finding, fix=output.fix)
         witnesses, cited = oracle.witness_items, _cited(output)
+
+        def covered(revision):
+            required = {index for index, run in enumerate(getattr(ctx.inputs.evidence, revision))
+                        if run.witness is not None}
+            observed = {item.run for item in ctx.inputs.items
+                        if item.item_id in cited and item.item_id in witnesses.get(revision, ())
+                        and item.kind == "witness" and item.revision == revision}
+            return bool(required) and required <= observed
+
         grounded = True
         if output.finding in ("reproduced", "not_reproduced"):
-            grounded = bool(cited & set(witnesses.get("baseline", ())))
+            grounded = covered("baseline")
         if output.fix == "verified":
-            grounded = grounded and all(cited & set(witnesses.get(r, ())) for r in ("baseline", "candidate"))
+            grounded = grounded and all(covered(r) for r in ("baseline", "candidate"))
         # Model-authored text only; trusted quotations of hostile items cannot count against the proposal.
         authored = output.model_dump_json(include={"application_observations", "sandbox_observations",
                                                    "interpretation", "limitations"},
