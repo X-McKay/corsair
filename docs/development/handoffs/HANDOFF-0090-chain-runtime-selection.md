@@ -29,6 +29,7 @@ See [PLAN-0065](../plans/PLAN-0065-chain-runtime-selection.md#validation-and-pro
 - Defaults (SPEC-0060): baseline build files only; `not_prepared` separate from `unsupported`; declared identity must name the selected image.
 - Next bounded action: the environment stage in the chain (G12). For a supported outcome, build the agent input with `environment_input`, run the environment agent in a preparation sandbox of the selected prepared image, check it with `check_ready`, and map `ReadyEnvironment` to `EnvironmentEvidence` and an observed `EnvironmentIdentity`.
 - A chain eval case with build files (supported and unsupported) belongs with that stage, as a new set version.
+- Payload headroom: the 1,401,456-byte bound was measured with the fixture case. A real case's saved source and issue travel in the same workflow-start payload, so a large source snapshot plus a near-full 1 MiB of build files could approach Temporal's 2 MB limit; measure it when real cases enter durable mode (re-review of `39c128d`). Any omitted build file stops the run as `undetermined`, even one in an unrelated subproject.
 
 ## Continuation prompt
 
