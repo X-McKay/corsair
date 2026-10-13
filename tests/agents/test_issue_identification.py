@@ -218,3 +218,44 @@ def test_window_reader_refuses_unavailable_source_and_start(args):
         return ModelResponse(parts=[ToolCallPart('read_source',args)])
     with pytest.raises(UnexpectedModelBehavior):
         run(create_issue_identification_agent(FunctionModel(respond)),c.inputs)
+
+
+@pytest.mark.parametrize('symbol', ['read_doc', 'document', ' ', ' read_document', 'read_document\n'])
+def test_partial_or_whitespace_symbols_cannot_become_ready(symbol):
+    c = case()
+    draft = ready_draft(c.inputs)
+    draft['target']['symbol'] = symbol
+    with pytest.raises(UnexpectedModelBehavior):
+        run(create_issue_identification_agent(responding(draft), output_retries=0), c.inputs)
+
+
+@pytest.mark.parametrize('declared,selected,accepted', [
+    ('prefix_read_document', 'read_document', False),
+    ('read_document_suffix', 'read_document', False),
+    ('αread_document', 'read_document', False),
+    ('$read_document', 'read_document', False),
+    ('read_document$', 'read_document', False),
+    ('read_document', 'read_document', True),
+    ('$read_document', '$read_document', True),
+    ('read_document?', 'read_document?', True),
+])
+def test_symbol_occurrence_is_literal_and_has_identifier_boundaries(declared, selected, accepted):
+    c = case()
+    inputs = IssueAnalysisInput.model_validate(c.inputs.model_dump() | {'source_files': [{
+        'path': 'documents.py', 'content': f'def {declared}(root, filename):\n    return filename\n'}]})
+    draft = {'status': 'ready', 'scope': inputs.scope, 'target': {
+        'symbol': selected, 'source': {'path': 'documents.py', 'start_line': 1, 'end_line': 2}}, 'reason': None}
+    agent = create_issue_identification_agent(responding(draft), output_retries=0)
+    if accepted:
+        assert run(agent, inputs).output.target.symbol == selected
+    else:
+        with pytest.raises(UnexpectedModelBehavior):
+            run(agent, inputs)
+
+
+def test_curated_evaluator_rejects_fabricated_quote_with_correct_coordinates():
+    c = case()
+    output = run(create_issue_identification_agent(responding(ready_draft(c.inputs))), c.inputs).output
+    fabricated = output.model_copy(update={'target': output.target.model_copy(update={
+        'source': output.target.source.model_copy(update={'quote': 'fabricated source'})})})
+    assert not selection_checks(c.inputs, fabricated, c.metadata)['source_quote']
