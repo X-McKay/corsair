@@ -27,6 +27,11 @@ JAVA_TEST_ID = re.compile(r'^(?:(?P<module>[A-Za-z0-9_][A-Za-z0-9_.-]*(?:/[A-Za-
                           r'(?P<class_name>(?:[A-Za-z_][A-Za-z0-9_]*\.)*[A-Za-z_][A-Za-z0-9_]*)'
                           r'#(?P<method>[A-Za-z_][A-Za-z0-9_]*)$')
 
+# Minitest: `path/to/file_test.rb::Module::Class#test_method`, the repository-relative file that defines the class
+# and a classic `Minitest::Test` method (spec-style `it` names hold spaces and are not admitted).
+RUBY_TEST_ID = re.compile(r'^(?P<path>[A-Za-z0-9_./-]+\.rb)::(?P<class_name>(?:[A-Z][A-Za-z0-9_]*::)*[A-Z][A-Za-z0-9_]*)'
+                          r'#(?P<method>test_[A-Za-z0-9_]*)$')
+
 
 def approved_path(value: str) -> str:
     path = PurePosixPath(value)
@@ -57,6 +62,25 @@ class JavaTestId:
 
     def __str__(self) -> str:
         return f'{self.module + "/" if self.module else ""}{self.class_name}#{self.method}'
+
+
+@dataclass(frozen=True)
+class RubyTestId:
+    """A Minitest method; the file is loaded and the class named by its constant path."""
+    path: str
+    class_name: str
+    method: str
+
+    @classmethod
+    def parse(cls, value: str) -> 'RubyTestId':
+        match = RUBY_TEST_ID.fullmatch(value) if type(value) is str and len(value) <= MAX_TEST_ID else None
+        if match is None or match['path'][0] == '-':
+            raise ValueError('Expected `path/file.rb::Class#test_method`')
+        approved_path(match['path'])
+        return cls(match['path'], match['class_name'], match['method'])
+
+    def __str__(self) -> str:
+        return f'{self.path}::{self.class_name}#{self.method}'
 
 
 @dataclass(frozen=True)
