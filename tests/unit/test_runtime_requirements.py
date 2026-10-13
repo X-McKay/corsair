@@ -244,6 +244,23 @@ def test_perl526_rows_select_the_fixture_and_need_the_tap_runner():
     assert select(newer, matrix).status == 'unsupported' and 'perl' in [n.name for n in select(newer, matrix).needs]
 
 
+def test_node8_rows_select_the_jest_fixture_and_only_checked_jest_versions():
+    fixture = Path(__file__).resolve().parents[2] / 'deploy/qualification/toolchains/node8'
+    # The fixture declares no Node version, so the engines field a real case carries is added.
+    files = {name: (fixture / name).read_bytes() for name in ('package.json', 'package-lock.json')}
+    files['package.json'] = files['package.json'].replace(b'"devDependencies"', b'"engines": {"node": ">=8"},\n  "devDependencies"')
+    matrix = load()
+    selection = select(detect(files, 'javascript'), matrix)
+    assert selection.status == 'supported' and selection.image_id == 'node-8.17.0-npm' and selection.evidence == 'image-only'
+    # Without the jest framework row the image alone does not run a case.
+    bare = Matrix.model_validate({**matrix.model_dump(), 'frameworks': [f for f in matrix.model_dump()['frameworks'] if f['name'] != 'jest']})
+    selection = select(detect(files, 'javascript'), bare)
+    assert selection.status == 'unsupported' and [n.name for n in selection.needs] == ['jest']
+    # Only the Jest versions the two cases ran are admitted; a Jest 25 project is not routed here.
+    newer = {**files, 'package.json': files['package.json'].replace(b'"24.8.0"', b'"25.1.0"')}
+    assert 'jest' in [n.name for n in select(detect(newer, 'javascript'), matrix).needs]
+
+
 def test_selection_carries_the_weakest_row_evidence():
     fixture = Path(__file__).resolve().parents[2] / 'deploy/qualification/toolchains/perl526/Makefile.PL'
     requirement = detect({'Makefile.PL': fixture.read_bytes()}, 'perl')
