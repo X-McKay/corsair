@@ -345,6 +345,8 @@ HOOKED = "import sys\nimport documents\n\nsys.addaudithook(lambda e, a: None)\n\
      "monkeypatch.setattr(open)"),
     ("from unittest import mock\n", "import unittest.mock"),
     ("import ctypes\n", "import ctypes"),
+    ("import sys\n\ndef test_x(monkeypatch):\n    monkeypatch.setitem(sys.modules, 'documents', None)\n",
+     "monkeypatch.setitem(sys.modules)"),
 ])
 def test_self_observation_is_found_by_line(content, facility):
     findings = self_observation(content)
@@ -352,10 +354,12 @@ def test_self_observation_is_found_by_line(content, facility):
 
 
 def test_plain_tests_and_reviewed_bytes_are_admitted():
-    plain = ("import os\nfrom pathlib import Path\n\nimport documents\n\n\ndef test_x(tmp_path: Path, monkeypatch):\n"
-             "    monkeypatch.setenv('HOME', str(tmp_path))\n    (tmp_path / 'a').write_text('s')\n"
+    plain = ("import os\nimport sys\nfrom pathlib import Path\n\nimport documents\n\n\ndef test_x(tmp_path: Path, monkeypatch):\n"
+             "    monkeypatch.setenv('HOME', str(tmp_path))\n    monkeypatch.setitem(os.environ, 'LANG', 'C')\n"
+             "    monkeypatch.setattr(sys, 'argv', ['tool'])\n    (tmp_path / 'a').write_text('s')\n"
              "    with open(tmp_path / 'a') as f:\n        assert f.read() == 's'\n    assert os.path.exists(tmp_path)\n")
     assert self_observation(plain) == () and self_observation("def broken(:\n") == ()
+    assert self_observation("LABEL = 'monitoring dashboard'\n") == ()
     # The SPEC-0018 pair predates the witness and observes opens itself; it is admitted by its reviewed digest only.
     assert sha256(REFERENCE.encode()).hexdigest() in REVIEWED_SELF_OBSERVING and self_observation(REFERENCE) == ()
     assert self_observation(REFERENCE + "\n")

@@ -20,11 +20,14 @@ THREADING_FACILITIES = {"settrace", "setprofile", "settrace_all_threads", "setpr
 MODULES = {"ctypes", "_testcapi", "_testinternalcapi", "tracemalloc", "trace", "bdb", "pdb", "unittest.mock", "mock",
            "pytest_mock", "builtins", "_io"}
 # Facilities a patch would replace under the witness: file, process, network and import machinery.
-PATCHED = {"builtins", "io", "_io", "os", "posix", "pathlib", "shutil", "subprocess", "socket", "sys", "importlib",
-           "open"}
+PATCHED = {"builtins", "io", "_io", "os", "posix", "pathlib", "shutil", "subprocess", "socket", "importlib", "open"}
+# Patch targets inside those roots that change inputs, not observation, and stay allowed; and sys.modules, whose
+# patching swaps the imported target itself.
+UNOBSERVED_TARGETS = {"os.environ"}
+PATCHED_EXACT = {"sys.modules"}
 PATCH_CALLS = {"setattr", "delattr", "setitem", "delitem", "patch"}
 # Names whose string form is only useful to reach the facilities above dynamically.
-NAMES = SYS_FACILITIES - {"audit"} | {"settrace_all_threads", "setprofile_all_threads", "__builtins__"}
+NAMES = SYS_FACILITIES - {"audit", "monitoring"} | {"settrace_all_threads", "setprofile_all_threads", "__builtins__"}
 
 # Operator-reviewed test bytes admitted as written: the SPEC-0018 pair observes opens itself because it
 # predates the operator witness; it is the scripted control, never model output.
@@ -106,7 +109,8 @@ def self_observation(content: str) -> tuple[AdmissionFinding, ...]:
                 for argument in node.args[:2]:
                     patched = argument.value if isinstance(argument, ast.Constant) and isinstance(
                         argument.value, str) else _dotted(argument)
-                    if patched and patched.split(".")[0] in PATCHED:
+                    if patched and patched not in UNOBSERVED_TARGETS and (
+                            patched.split(".")[0] in PATCHED or patched in PATCHED_EXACT):
                         refuse(node, f"{func}({patched})")
                         break
     return tuple(AdmissionFinding(line=line, facility=construct[:128]) for line, construct in sorted(found))
