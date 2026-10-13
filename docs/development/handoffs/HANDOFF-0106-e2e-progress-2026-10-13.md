@@ -20,7 +20,7 @@ A cross-thread snapshot taken at about 18:30Z. Each PR's own HANDOFF carries its
 
 ## Verified state
 
-Main is `184e609` (merge of #97). This record changes only documentation.
+Main was `184e609` (merge of #97) when this record began; #115 merged as `5890a31` at 18:35Z. This record changes only documentation.
 
 ### Al's directions today, in order
 
@@ -116,10 +116,10 @@ The gap numbers follow the chat. Gaps 6 to 11 are described in detail in HANDOFF
 | #112 terminal progress display | `df727c1` | Reported ready for Al's "merge" at `15b7e21` (review clean, CI green, no conflicts; thread report, 18:20). The head has moved since. |
 | #109 issue entry, `corsair run`, labels, witness binding, relative paths | `0b6de48` | One review item left: a budget stop must be labelled INCONCLUSIVE (C3). The Docker file-list hand-over commit (C4) is also coming. Both are thread reports. Al's 18:07 merge word applies once the review is clean and CI is green. |
 | #113 Docker route, recorded unqualified | `bf923bd` | Ready. Review was clean at `07cf90a` and only docs changed since (thread report). Merges right after #109 (Al said "merge" in its thread). |
-| #115 runtime inference, smoke test, corpus-python cohort | `6295bdc` | Ready once CI finishes, no longer in rework (thread report). All 17 cohort repositories are minimal: `app.py`, `requirements.txt` and an empty tests folder. |
+| #115 runtime inference, smoke test, corpus-python cohort | merged | Merged to main as `5890a31` at 18:35Z on Al's "Merge 115". All 17 cohort repositories are minimal: `app.py`, `requirements.txt` and an empty tests folder. |
 | #116 OpenShell preparation adapter (draft) | `81f6039` | Review clean. Waits on the live gate `make qualify-environment-preparation CORSAIR_NETWORK_RUN=<dir>` on RIG0 (Go 1.21+), after the Docker batch, on Al's word |
 | #117 verdict gaps (draft) | `ab3b3d5` | Review clean (thread report). Gaps 6 to 9 are fixed; 10 and 11 are still open. Offline suite 1798 passed and scripted evals are clean (thread report). Live evals were not run, and the new probe digest is unqualified until `make qualify-witness`. |
-| Coming | — | The `--id` path as its own PR (Node thread, local `f3824b8`). The not-exploitable fixture variant, corpus negative cases and commands (thread "Reproducing not-exploitable verdicts", branch `claude/not-exploitable-verdicts`): the scripted host run admits not_reproduced (thread report). |
+| Coming | — | The `--id` path as its own PR (Node thread, local `f3824b8`). The not-exploitable fixture variant, corpus negative cases and commands (thread "Reproducing not-exploitable verdicts", branch `claude/not-exploitable-verdicts`): the scripted host run and the scripted Docker control both admit not_reproduced, and the first live run is in progress (thread reports). Fix-free runs (no fixed revision gives fix `not_applicable`; Node thread). |
 | #118 this record | — | Merges on Al's 18:27 word once CI is green. |
 | Outside today's e2e | — | #107 (Codex local results UI). Dependabot #71, #72, #78 to #81 and #114. |
 
@@ -150,11 +150,7 @@ The corpus (SPEC-0067, from infosec-harness `52aa2ac`) has 42 topics and 82 vari
 
 Only two cases expect `completed / not_reproduced / not_applicable` in their `expected.json`. Both are unpaired development cases in the Python cohort: `ih-python-healthcheck` (unreachable) and `ih-python-queryhelper` (unknown). SPEC-0067 leaves the reverse mapping (the not-exploitable variant as its own baseline) as "possible later".
 
-**Conflict to settle.** Neither unpaired case has a fixed revision. #109 refuses a request without `fixed_revision` at admission as UNABLE_TO_RUN (Node thread report). So the only two negative cases would end UNABLE_TO_RUN against an expected not_reproduced. Before any negative corpus result can count, either:
-- `corsair run` accepts a request with no fixed revision and reports fix `not_applicable`, or
-- these cases gain a candidate revision.
-
-Al decides this, because it changes the issue request contract.
+**Fixed-revision conflict, settled at 18:34Z.** Neither unpaired case has a fixed revision, and #109 refused such a request at admission as UNABLE_TO_RUN. On the decision card, Al chose "Allow fix-free runs". A request with no fixed revision now runs the reported revision alone and reports fix `not_applicable`. The Node thread is pushing this as its own PR. Until that PR lands, the two negative cases would still end UNABLE_TO_RUN.
 
 ### When a negative verdict is admitted
 
@@ -192,9 +188,9 @@ Report negatives and positives as separate rates, because 3 of 6 on the exploita
 
 These steps follow the existing approach (stage order, runner core, required witness, matrix rows). Each step's runs go in the run ledger with evidence paths.
 
-1. **Prerequisites.** Land #117, including items 10 and 11. Fix C1 and C2 in the environment stage, and land C4. Land #109 with C3, then #113 and #115. Settle the fixed-revision conflict above.
-2. **Negative fixture.** The thread "Reproducing not-exploitable verdicts" is building a not-exploitable fixture variant. Its scripted host run admits not_reproduced (thread report). Run it fully live on the Docker route five times, interleaved with five runs of the exploitable fixture, so the same agent versions face both. Bar: 5 of 5 LIKELY_NOT_EXPLOITABLE admitted and zero LIKELY_EXPLOITABLE on the negative, with no regression on the positive.
-3. **Python negatives as they stand.** `ih-python-healthcheck` and `ih-python-queryhelper`, once the fixed-revision question is settled.
+1. **Prerequisites.** Land #117, including items 10 and 11. Fix C1 and C2 in the environment stage, and land C4. Land #109 with C3, then #113 and #115. Land the fix-free runs PR (Al's 18:34Z choice).
+2. **Negative fixture.** The thread "Reproducing not-exploitable verdicts" is building a not-exploitable fixture variant. Its scripted host run and its scripted Docker control both admit not_reproduced, and the first live run was in progress at 18:35Z (thread reports). Run it fully live on the Docker route five times, interleaved with five runs of the exploitable fixture, so the same agent versions face both. Bar: 5 of 5 LIKELY_NOT_EXPLOITABLE admitted and zero LIKELY_EXPLOITABLE on the negative, with no regression on the positive.
+3. **Python negatives as they stand.** `ih-python-healthcheck` and `ih-python-queryhelper`, once the fix-free runs PR lands.
 4. **Reverse mapping for Python.** Generate the 15 development Python pairs reversed, with the not-exploitable variant as the baseline and an expected not_reproduced outcome. The corpus thread does this as an extension of SPEC-0067 with its own frozen `expected.json` files. Run them alongside the 15 forward pairs, which give the exploitable direction and fix verification. That makes 32 Python development cases: about 17 negative and 15 positive.
 5. **Other languages, as runners and rows exist.** JavaScript (7 development topics), then Perl (5), Java (3) and C (2), forward and reversed.
 6. **Held-out cases (8).** Run these only at a milestone on Al's call, never for tuning. Their ids stay out of `docs/development/`.
@@ -205,7 +201,7 @@ These steps follow the existing approach (stage order, runner core, required wit
 - This record was not checked by any command beyond `git` and the GitHub reads above. The run results are thread reports, backed by the tarballs where cited. The corpus case evidence exists only on RIG0.
 - Every Docker run is **unqualified (risk accepted)**. No `evidence: live` qualification follows from them.
 - Blockers: #109's owed fixes come before its merge and #113's. #117's items 10 and 11 gate the verdict rate. C1 and C2 stop every corpus case at environment until they are fixed.
-- Corpus accuracy has not been measured: 1 of 42 cases ran, and it ended ERROR at environment. Negative accuracy has not been measured at all: no live not_reproduced so far, and the current mapping has only two negative cases, both of which #109 would refuse as UNABLE_TO_RUN. See the section above.
+- Corpus accuracy has not been measured: 1 of 42 cases ran, and it ended ERROR at environment. Negative accuracy has not been measured at all: no live not_reproduced so far, and the current mapping has only two negative cases, both of which need the fix-free runs PR (Al chose it at 18:34Z). See the section above.
 
 ## Decisions and next steps
 
@@ -270,7 +266,6 @@ The full corpus plan is in [Validating accuracy across the corpus](#validating-a
 - The word for #116's live gate.
 - "close them" for the Dependabot PRs.
 - Whether to keep the UNABLE_TO_RUN name.
-- Whether a request with no fixed revision runs with fix `not_applicable` or is refused. This decides whether the two unpaired negative cases can be scored.
 - Whether to add the reverse mapping (the not-exploitable variant as baseline) to the corpus cases.
 
 ## Continuation prompt
