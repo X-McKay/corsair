@@ -26,7 +26,7 @@ Implement [SPEC-0042](../specs/SPEC-0042-runtime-selection.md) offline: detect e
 
 ## Validation and progress
 
-Offline: `make test-config` passed 892 checks on the original base (853 plus 37 runtime unit checks, 4 of them for the hand-off, and 2 matrix guards), 999 after merging main at `c8f3964` (with #41, #45 and #46), 1004 after the review fixes (5 more checks), 1024 after merging main at `8c29e16` (with #42), 1036 after merging `6be1b5f` (with #47), 1084 after merging `42a7273` (with #39), 1085 with image-scoped framework rows, 1088 after the second review's first three fixes, 1093 after merging `f6a87d6` (#58), 1100 after the remaining seven threads, 1174 after merging `8606068` (#57), and 1179 after the include-group fix and the Poetry source nit.
+Offline: `make test-config` passed 892 checks on the original base (853 plus 37 runtime unit checks, 4 of them for the hand-off, and 2 matrix guards), 999 after merging main at `c8f3964` (with #41, #45 and #46), 1004 after the review fixes (5 more checks), 1024 after merging main at `8c29e16` (with #42), 1036 after merging `6be1b5f` (with #47), 1084 after merging `42a7273` (with #39), 1085 with image-scoped framework rows, 1088 after the second review's first three fixes, 1093 after merging `f6a87d6` (#58), 1100 after the remaining seven threads, 1174 after merging `8606068` (#57), 1179 after the include-group fix and the Poetry source nit, and 1227 after merging `9a6f78c` (#52, #54, #59).
 
 Report run in the cloud container on 2026-10-13, against the pins file from PR #42's branch `claude/benchmark-repo-fetch-g6cnts` (head `4167369`):
 
