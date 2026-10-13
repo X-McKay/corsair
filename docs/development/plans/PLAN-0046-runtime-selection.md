@@ -53,9 +53,8 @@ Outcome over the 50 inventory rows ([table](../../../benchmarks/runtime-requirem
 | Outcome | Cases |
 | --- | --- |
 | supported on an existing image | 0 |
-| unsupported (requirement fully named) | 37 |
+| unsupported (requirement fully named) | 38 |
 | undetermined | 2: CVE-2019-10744 and GHSA-4rvg-955w-h68q (no test framework at all) |
-| not fetched | 1: CVE-2023-31486 here; undetermined on RIG0 (above) |
 | not acquired (no fix commit, SPEC-0037) | 10 |
 
 Baseline and fix revisions agreed in every fetched case.
@@ -71,7 +70,7 @@ Suggested new runtime rows, chosen greedily over the unsupported cases:
 | JDK 8 + Maven | 10 Java cases |
 | CPython 3.7 | 9 Python cases; 3.10 alone would cover 7 |
 | Node 8 | 5 JavaScript cases |
-| Perl 5.26 | 5 Perl cases |
+| Perl 5.26 | 6 Perl cases |
 | Ruby 3.1 | 4 Ruby cases |
 | Ruby 2.4 | 2 Ruby cases |
 
@@ -132,6 +131,19 @@ The CPython 3.7 image thread pointed out that per-language framework rows would 
 The report rerun after these fixes changed no outcome; the JSON gains each unread line's strength. PR #42 has since merged; main's `benchmarks/source-pins.json` differs from the pins used here only in CVE-2023-31486's URL and note, a case this container cannot fetch, so the report stands.
 
 Limits: this is metadata, not admission (PLAN-0021). A suggested row satisfies a case's runtime declarations, not its dependency closure or tests.
+
+## Follow-up after merge (#48 merged as `a9ba2b0`)
+
+- CVE-2023-31486: Al first chose `cpan/HTTP-Tiny` inside Debian's perl repository as the project root, but that directory has no build file there (RIG0's fetch), so he then chose (decision card, 11:10Z) to point the case at the upstream repository, which is also the inventory's `repository_url`. The fix reference is now Perl-Toolchain-Gang/HTTP-Tiny `77f557e` ("Change verify_SSL default to 1", released in 0.083; single parent `7bdf71f`), acquired here with `evals.benchmark.sources fetch` under the #42 rules (canonical GitHub URL, no redirects; 119 files, one symlink skipped). The report now reads `Makefile.PL`, `dist.ini` and `.travis.yml`: unsupported on the existing images, needing perl in 5.8 to 5.26 (CI-tested up to 5.26), make and the TAP harness, so the suggested Perl 5.26 row covers 6 cases. No project-root field was needed, so none was added.
+- Codex's review of `028d724` (completed after the merge) found three P2s, each fixed with a check that fails on the old code: a PEP 508 direct reference (`pytest @ git+...`) is an unread pytest constraint instead of vanishing; every unresolved reason is cut to the 240-character contract limit; and an explicit `python` language accepts requirement-only trees (`requirements-dev.txt`, `requirements/*.txt`, `pytest.ini`, `.python-version`, lockfiles are Python markers).
+- The report rerun over the stored trees changed no other case; the detector, inventory and pins digests changed.
+- Codex's review of `7b42d2e` (#61): `requirements/test/dev.txt` was selected as a build file but only one level under `requirements/` was parsed, so a nested `pytest<8` vanished. Every selected file under `requirements/` is now read, at any depth; `test_nested_requirements_files_are_read` fails on the old code. Report results unchanged.
+- Al's review of `7b42d2e` noted a pre-existing gap for the next detector slice: `[project] dependencies` is not read, so `pytest<8` there plus `[tool.pytest]` selects the pytest 9 image.
+- `make test-config`: 1236 passed on main `0ad9900` plus this follow-up.
+
+## Project dependencies (after #61, merged as `a459ced`)
+
+Al's review of #61 found that PEP 621 `[project] dependencies` was never read, so `dependencies = ["pytest<8"]` with `[tool.pytest.ini_options]` selected the pytest 9 image. Those entries now go through the same requirement parser as extras, so a versioned pin, a direct reference and an unparseable spec behave as elsewhere; a non-string entry or a non-list value is unread and gives undetermined. `setup.cfg` `[options] install_requires` had the same gap and is read the same way (`setup.py` already read any requirement string). `test_project_dependencies_are_read` (seven inputs; the five defect cases fail on the old code, the two controls pass on both) and `test_setup_cfg_install_requires_is_read` cover it. The report rerun gives identical results; only the detector digest changed. The seeded 52,000-document sweep raised nothing. `make test-config`: 1246 passed on main `a459ced` plus this change.
 
 ## Decisions and next action
 

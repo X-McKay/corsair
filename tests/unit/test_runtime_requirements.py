@@ -1,7 +1,7 @@
 """SPEC-0042: build metadata to runtime requirement, and selection against the runtime matrix (offline)."""
 import pytest
 
-from corsair.nodes.runtime.detect import detect, is_build_file
+from corsair.nodes.runtime.detect import MAX_FILE_BYTES, detect, is_build_file
 from corsair.nodes.runtime.matrix import Matrix, load, select
 from corsair.nodes.runtime.versions import (gem, maven, npm, parse_set, parse_version, pep440, perl, java_feature,
                                             VersionSyntaxError)
@@ -468,3 +468,61 @@ def test_java_unread_pins_and_version_file_names():
         assert component(detect({'pom.xml': pom(''), '.java-version': name}, 'java'), 'runtime', 'jdk').allowed == allowed
     system = component(detect({'pom.xml': pom(''), '.java-version': b'system\n'}, 'java'), 'runtime', 'jdk')
     assert not system.declared and system.unparsed[0].strength == 'pinned'
+
+
+@pytest.mark.parametrize('line', ['pytest @ git+https://example.invalid/pytest.git', 'pytest@https://example.invalid/p.whl'])
+def test_pytest_direct_reference_is_unread(line):
+    # Codex on 028d724: a direct reference matched no range and vanished, so [tool.pytest] made pytest `*` and supported.
+    files = {'pyproject.toml': f'[project]\nrequires-python = ">=3.12"\noptional-dependencies = {{test = ["{line}", "pytest-cov>=4"]}}\n'
+                               '[tool.pytest.ini_options]\n'.encode()}
+    requirement = detect(files, 'python')
+    assert 'names no version range' in component(requirement, 'test_framework', 'pytest').unparsed[0].reason
+    assert select(requirement, load()).status == 'undetermined'
+
+
+def test_long_unresolved_reasons_are_bounded():
+    # Codex on 028d724: an oversized build file at a long path made an unresolved reason over 240 characters.
+    deep = '/'.join(['d' * 60] * 6) + '/pom.xml'
+    requirement = detect({'pom.xml': b'<project/>', deep: b' ' * (MAX_FILE_BYTES + 1)}, 'java')
+    assert requirement.unresolved and all(len(r) <= 240 for r in requirement.unresolved)
+
+
+@pytest.mark.parametrize('files', [
+    {'requirements-dev.txt': b'pytest>=9,<10\n', '.python-version': b'3.12.15\n'},
+    {'requirements/test.txt': b'pytest>=9,<10\n', '.python-version': b'3.12.15\n'},
+])
+def test_requirement_only_python_trees_are_detected(files):
+    # Codex on 028d724: an explicit python language was refused because no file was in the marker list.
+    assert select(detect(files, 'python'), load()).status == 'supported'
+
+
+def test_nested_requirements_files_are_read():
+    # Codex on 7b42d2e: requirements/test/dev.txt was selected as a build file but never parsed, so pytest<8 vanished.
+    files = {'requirements/test/dev.txt': b'pytest<8\n', '.python-version': b'3.12.15\n', 'pytest.ini': b'[pytest]\n'}
+    assert all(is_build_file(path) for path in files)
+    requirement = detect(files, 'python')
+    assert component(requirement, 'test_framework', 'pytest').allowed == '<8'
+    assert select(requirement, load()).status == 'unsupported'
+
+
+PROJECT = '[project]\nrequires-python = ">=3.12"\n{}\n[tool.pytest.ini_options]\n'
+
+
+@pytest.mark.parametrize('dependencies, status', [
+    ('dependencies = ["pytest<8"]', 'unsupported'),
+    ('dependencies = ["requests>=2", "pytest>=9,<10"]', 'supported'),
+    ('dependencies = ["pytest @ git+https://example.invalid/pytest.git"]', 'undetermined'),
+    ('dependencies = ["pytest<<8"]', 'undetermined'),
+    ('dependencies = [8, "requests"]', 'undetermined'),
+    ('dependencies = "pytest<8"', 'undetermined'),
+    ('dependencies = ["requests>=2"]', 'supported'),
+])
+def test_project_dependencies_are_read(dependencies, status):
+    # Al's review of #61: [project] dependencies was never read, so pytest<8 there selected the pytest 9 image.
+    requirement = detect({'pyproject.toml': PROJECT.format(dependencies).encode()}, 'python')
+    assert select(requirement, load()).status == status
+
+
+def test_setup_cfg_install_requires_is_read():
+    files = {'setup.cfg': b'[options]\npython_requires = >=3.12\ninstall_requires =\n    pytest<8\n[tool:pytest]\n'}
+    assert select(detect(files, 'python'), load()).status == 'unsupported'

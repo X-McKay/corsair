@@ -25,8 +25,8 @@ The hand-off is not yet called from the chain or durable workflow (G12). No new 
 ## Validation and blockers
 
 - `make test-config`: 1227 passed after merging current main (9a6f78c) and fixing all of Al's review findings through the f61e948 re-review (892 on the original base).
-- Report: 39 of the 40 acquired cases fetched; 37 unsupported with the requirement named, 2 undetermined (no test framework), 0 supported on the existing images. Details, commands and the suggested rows are in PLAN-0046.
-- The Jenkins parents are closed: RIG0 fetched them from repo.jenkins-ci.org, and the committed report uses the same POMs from the jenkinsci GitHub tags with identical rows. CVE-2023-31486 is `not_fetched` in the committed report (container egress) and undetermined on RIG0: its pin is Debian's whole perl repository, a case-definition question recorded in SPEC-0042.
+- Report: all 40 acquired cases fetched; 38 unsupported with the requirement named, 2 undetermined (no test framework), 0 supported on the existing images. Details, commands and the suggested rows are in PLAN-0046.
+- The Jenkins parents are closed: RIG0 fetched them from repo.jenkins-ci.org, and the committed report uses the same POMs from the jenkinsci GitHub tags with identical rows. CVE-2023-31486 now pins the upstream HTTP-Tiny fix (Al, 2026-10-13) and is unsupported, needing Perl 5.26 or older.
 - No live check was run, and none applies to this offline component.
 
 ## Decisions and next steps
@@ -39,7 +39,7 @@ Settled in SPEC-0042:
 
 Next bounded actions:
 1. Prepare and qualify a JDK 8 + Maven row with a JUnit 4 fixture, and a CPython row with an older pytest range, through one toolchain gate each on a fresh node, then add them to the matrix.
-2. Decide CVE-2023-31486's project root (`cpan/HTTP-Tiny/` or perl core as its own runtime).
+2. CVE-2023-31486 is settled: upstream HTTP-Tiny `77f557e`, unsupported until a Perl 5.26 row exists.
 3. As part of G12, call `environment_input` from the chain and durable workflow, and `check_ready` on the agent's result.
 
 Al reviews the draft PR and says "merge".

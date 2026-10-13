@@ -19,10 +19,14 @@ def test_every_inventory_case_resolves_or_names_its_gap():
     assert (resolved['CVE-2026-8450'].via, resolved['CVE-2026-8450'].target.url) == \
         ('patch', 'https://github.com/libwww-perl/HTTP-Daemon')
     # A fix hosted outside the inventory's repository is resolved where the commit is, and flagged.
-    assert not resolved['CVE-2023-31486'].repository_matches_inventory
-    # Acquisition follows no redirects, so a GitLab commit reference resolves to the canonical `.git` URL.
-    assert resolved['CVE-2023-31486'].target.url == 'https://salsa.debian.org/perl-team/interpreter/perl.git'
+    assert not resolved['VUL4J-2'].repository_matches_inventory
+    # CVE-2023-31486 now pins the upstream HTTP-Tiny fix (Al, 2026-10-13), not Debian's perl repository.
+    assert resolved['CVE-2023-31486'].repository_matches_inventory
     assert resolved['VUL4J-18'].repository_matches_inventory
+    # Acquisition follows no redirects, so a GitLab commit reference resolves to the canonical `.git` URL.
+    gitlab = resolve({'case_id': 'X', 'repository_url': None,
+                      'fixed_reference': 'https://salsa.debian.org/perl-team/interpreter/perl/-/commit/' + '1' * 40 + '.patch'})
+    assert gitlab.target.url == 'https://salsa.debian.org/perl-team/interpreter/perl.git'
 
 
 def test_committed_pins_match_the_resolver():

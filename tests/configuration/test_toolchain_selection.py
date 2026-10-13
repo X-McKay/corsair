@@ -1,0 +1,36 @@
+"""TOOLCHAINS gate selection: collection only, no cluster. A gate runs only when every image it uses is named."""
+from pathlib import Path
+import subprocess
+import sys
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[2]
+GATES = 'tests/qualification/test_toolchains.py::'
+
+
+def collect(*names):
+    argv = [sys.executable, '-m', 'pytest', '--collect-only', '-q', '-p', 'no:cacheprovider', 'tests/qualification',
+            '-m', 'toolchain', *[arg for name in names for arg in ('--toolchain', name)]]
+    done = subprocess.run(argv, cwd=ROOT, capture_output=True, text=True, timeout=120)
+    return done.returncode, [line for line in done.stdout.splitlines() if line.startswith(GATES)], done.stdout + done.stderr
+
+
+@pytest.mark.parametrize('names, gates', [
+    (('python37',), ['test_native_python37_toolchain']),
+    (('java', 'python'), ['test_native_python_and_java_toolchains']),
+    (('python', 'java', 'python37'), ['test_native_python_and_java_toolchains', 'test_native_python37_toolchain']),
+])
+def test_named_images_select_exactly_the_gates_they_cover(names, gates):
+    code, found, output = collect(*names)
+    assert code == 0, output
+    assert found == [GATES + gate for gate in gates]
+
+
+@pytest.mark.parametrize('names, message', [
+    (('python',), 'No toolchain gate covers exactly'),
+    (('bogus',), 'Unknown toolchain image directories'),
+])
+def test_a_list_no_gate_covers_is_a_usage_error(names, message):
+    code, found, output = collect(*names)
+    assert code == 4 and message in output
