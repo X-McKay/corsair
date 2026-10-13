@@ -19,7 +19,8 @@ Implement SPEC-0064 for the `java` and `java8` images. Based on main after PR #5
 - [x] Generate both lists from clean fetches; `make maven-hashes` to refresh.
 - [x] Offline guard in `make test-config`; base-image skill rule updated.
 - [x] Compare with #51's retained RIG0 inventories (same artifacts and hashes).
-- [ ] RIG0 image-only run: build both images from the checked-in files, VUL4J-6 on `java8`.
+- [x] `tests/qualification/image_cases.py`: per-image real-case table for CI (VUL4J-6 on `java8`), offline guard.
+- [ ] CI (Al, 2026-10-13: "Lets run it in CI", replacing the RIG0 paste): #92's image-only job builds both images from the checked-in files; a `java8`-scoped step runs `image_cases.py java8` (VUL4J-6 fix and vulnerable through `java_image_case`).
 
 ## Validation and progress
 
@@ -33,5 +34,8 @@ Implement SPEC-0064 for the `java` and `java8` images. Based on main after PR #5
 - Not run here: VUL4J-6. The image-case harness's setup phase needs Central from a bridge-network container; running it on the host network to reach the proxy was refused by this session's safety check. It goes to RIG0 with the image build.
 
 ## Decisions and next action
+
+Al chose CI over the RIG0 paste and over host networking in the cloud container (2026-10-13). The VUL4J-6 overlay is rebuilt from upstream in CI and reproduces #51's RIG0 overlay byte for byte (sha256 `18a406a5d65d…`): the Vul4J PoV at 45ddad15 unchanged, one blank line, then `ZipShortTest#testToBytes` from the fix commit renamed `testBenignZipShortToBytes`; the vulnerable revision is the fix's parent dcb0486 with the fix's test file. The overlay commit uses a fixed author and date, so it is the same object (92b75dbd) on every run.
+
 
 Next: the RIG0 paste in the PR (worktree `/home/al/git/corsair/.worktrees/claude/maven-hash-list-b66ecq`): `make toolchain-images TOOLCHAINS="java java8"`, then VUL4J-6 image-only on the new `java8` config. The images' gate receipts change with this source, so #51's live gate evidence names the old source; per the process rule this toolchain-only change needs the image-only tier, not a new kind gate.
