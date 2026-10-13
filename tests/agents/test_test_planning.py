@@ -296,3 +296,31 @@ def test_heldout_evaluation_refuses_a_changed_case(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="frozen manifest"):
         asyncio.run(evaluate(tmp_path / "refused", EvaluationBudget(), cases="heldout"))
     assert not (tmp_path / "refused").exists()
+
+
+@pytest.mark.parametrize("name", ["control", "security"])
+@pytest.mark.parametrize("references", [
+    [{"path": "test_existing.py", "start_line": 1, "end_line": 2}],
+    [{"path": "documents.py", "start_line": 1, "end_line": 2}],
+])
+def test_ready_plan_requires_identified_target_anchor_for_each_test(name, references):
+    plan = edit((name, "source_references"), references)
+    with pytest.raises(UnexpectedModelBehavior):
+        run(create_test_planning_agent(responding(plan), output_retries=0), case().inputs)
+
+
+@pytest.mark.parametrize("call", ["fake_read_document(root, name)", "read_document_stub(root, name)", "read_document$stub(root, name)"])
+def test_target_name_substrings_do_not_authorize_an_implementation_call(call):
+    with pytest.raises(UnexpectedModelBehavior):
+        run(create_test_planning_agent(responding(edit(("security", "implementation_call"), call)),
+                                       output_retries=0), case().inputs)
+
+
+def test_adjacent_cited_ranges_can_jointly_cover_identified_anchor():
+    plan = reference()
+    for name in ("control", "security"):
+        plan[name]["source_references"] = [
+            {"path": "documents.py", "start_line": 1, "end_line": 2},
+            {"path": "documents.py", "start_line": 3, "end_line": 4},
+        ]
+    assert isinstance(run(create_test_planning_agent(responding(plan)), case().inputs).output, ReadyTestPlan)
