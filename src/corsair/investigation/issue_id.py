@@ -1,6 +1,7 @@
 """An issue id (`github:owner/repo#N`, `azure:org/project#N`) captured into the ticket snapshot an issue request
-carries, through the existing read-only ticket readers (`corsair.tickets`). Tokens come from the operator's
-configured source and never enter the snapshot or the request.
+carries, through the existing read-only ticket readers (`corsair.tickets`). The operator's configured tickets source
+is the allowlist: an id naming any other source is refused before any request. Tokens come from that source and never
+enter the snapshot or the request.
 """
 import re
 
@@ -23,15 +24,12 @@ def parse(text: str) -> tuple[str, str, int]:
 
 
 def source_config(provider: str, source: str, configured=None):
-    """The configured source when it names this one (its token and limits); otherwise a public GitHub repository
-    without a token. Azure DevOps always needs the operator's configured source and token."""
+    """The operator's configured source (its token and limits) when it names this one; any other is refused."""
     if provider == "github":
         if isinstance(configured, GitHubConfig) and configured.repository.lower() == source.lower():
             return configured
-        try:
-            return GitHubConfig(provider="github", repository=source)
-        except ValueError as error:
-            raise IssueIdRefused(f"github:{source}: expected owner/repo") from error
+        raise IssueIdRefused(f"github:{source} is not the configured tickets source; add it as `tickets` in the "
+                             "provider configuration")
     organization, _, project = source.partition("/")
     if isinstance(configured, AzureConfig) and (configured.organization, configured.project) == (organization, project):
         return configured

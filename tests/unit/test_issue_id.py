@@ -32,10 +32,11 @@ def test_issue_ids_parse_and_refuse_anything_else():
 def test_a_source_uses_the_operators_configuration_when_it_names_it():
     configured = GitHubConfig(provider="github", repository="acme/files", token_env="GH_TOKEN")
     assert source_config("github", "acme/files", configured) is configured
-    public = source_config("github", "other/repo", configured)
-    assert (public.repository, public.token_env) == ("other/repo", None)
-    with pytest.raises(IssueIdRefused, match="expected owner/repo"):
-        source_config("github", "acme", None)
+    assert source_config("github", "ACME/Files", configured) is configured
+    # The configured source is the allowlist: another repository, or none configured, is refused.
+    for source, given in (("other/repo", configured), ("acme/files", None)):
+        with pytest.raises(IssueIdRefused, match="not the configured tickets source"):
+            source_config("github", source, given)
     azure = AzureConfig(provider="azure_devops", organization="contoso", project="Payments", token_env="ADO_PAT")
     assert source_config("azure", "contoso/Payments", azure) is azure
     with pytest.raises(IssueIdRefused, match="configured organization, project and token"):
@@ -43,16 +44,19 @@ def test_a_source_uses_the_operators_configuration_when_it_names_it():
 
 
 def test_a_github_issue_id_becomes_an_issue_request_with_its_own_repository(tmp_path, monkeypatch):
-    snapshot = asyncio.run(capture("github:acme/files#42", transport=MockTransport(github)))
+    configured = GitHubConfig(provider="github", repository="acme/files")
+    snapshot = asyncio.run(capture("github:acme/files#42", configured, transport=MockTransport(github)))
     assert (snapshot.provider, snapshot.source, snapshot.id, snapshot.title) == (
         "github", "acme/files", "42", "Command injection in lib/run.js")
 
     async def captured(text, configured):
-        assert configured is None
+        assert isinstance(configured, GitHubConfig) and configured.repository == "acme/files"
         return await capture(text, configured, transport=MockTransport(github))
     monkeypatch.setattr("corsair.investigate.capture_issue", captured)
     config = tmp_path / "provider.json"
-    config.write_text(json.dumps({"base_url": "http://127.0.0.1:1/v1", "model": "m"}))
+    config.write_text(json.dumps({"inference": {"models": {"m": {"provider": "vllm", "base_url": "https://model.example/v1",
+                                                                 "model_name": "m"}}, "default": "m"},
+                                  "tickets": {"provider": "github", "repository": "acme/files"}}))
     request = asyncio.run(request_for_id("github:acme/files#42", config, repository=None, revision="a" * 40,
                                          fixed_revision="b" * 40, scope=None))
     assert request.label == "github:acme/files#42" and "Command injection in lib/run.js" in request.issue_text()

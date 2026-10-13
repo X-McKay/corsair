@@ -185,7 +185,8 @@ def main(argv: list[str] | None = None, prog: str = "corsair run") -> int:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     issue = parser.add_mutually_exclusive_group(required=True)
     issue.add_argument("--issue-json", type=Path, help="A corsair-issue-request/v1 file")
-    issue.add_argument("--id", dest="issue", help="github:owner/repo#N or azure:org/project#N, captured read-only")
+    issue.add_argument("--id", dest="issue", help="github:owner/repo#N or azure:org/project#N; only the provider "
+                       "configuration's tickets source, captured read-only")
     parser.add_argument("--repository", help="With --id: https repository (default: a GitHub issue's own)")
     parser.add_argument("--revision", help="With --id: the vulnerable commit (40 hex)")
     parser.add_argument("--fixed-revision", help="With --id: the fix's commit (40 hex)")
