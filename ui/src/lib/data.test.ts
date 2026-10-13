@@ -13,6 +13,7 @@ const run: Evaluation = {
   run: "2026-run",
   mode: "scripted",
   set: "development",
+  command: { exit_code: 0 },
   summary: {
     identity: { model: "fixture" },
     attempts: 2,
@@ -69,4 +70,16 @@ test("zero or absent assertion observations never imply a pass", () => {
   assert.equal(assertionResult({ passed: 1, total: 0 }).tone, "neutral");
   assert.equal(assertionResult({ passed: 0, total: 2 }).tone, "warning");
   assert.equal(assertionResult({ passed: 2, total: 2 }).tone, "success");
+});
+
+
+test("clean requires a recorded zero command exit, while known failures remain visible", () => {
+  assert.equal(runStatus({ ...run, command: undefined }), "Incomplete");
+  assert.equal(runStatus({ ...run, command: {} }), "Incomplete");
+  assert.equal(runStatus({ ...run, command: { exit_code: 0 } }), "Clean");
+  assert.equal(runStatus({ ...run, command: { exit_code: 2 } }), "Needs attention");
+  assert.equal(runStatus({ ...run, command: undefined,
+    summary: { ...run.summary, clean_attempts: 1 } }), "Needs attention");
+  assert.equal(matches({ ...run, command: {} }, "", "", "", "Clean"), false);
+  assert.equal(matches({ ...run, command: {} }, "", "", "", "Incomplete"), true);
 });

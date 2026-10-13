@@ -30,3 +30,11 @@ jobs:
       - run: npx playwright install --with-deps chromium
         working-directory: ui
       - run: make ui-test
+      - name: Retain browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ui-browser-failures
+          path: ui/test-results/
+          if-no-files-found: ignore
+          retention-days: 7

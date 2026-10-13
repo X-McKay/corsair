@@ -71,9 +71,9 @@ export function runStatus(run: Evaluation): RunStatus {
     s.task_failures == null
   )
     return "Incomplete";
-  return s.clean_attempts === s.attempts && s.task_failures === 0
-    ? "Clean"
-    : "Needs attention";
+  if (s.clean_attempts !== s.attempts || s.task_failures !== 0)
+    return "Needs attention";
+  return run.command?.exit_code === 0 ? "Clean" : "Incomplete";
 }
 export function matches(
   run: Evaluation,
