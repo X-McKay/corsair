@@ -246,6 +246,7 @@ class FixtureCase:
     environment: EnvironmentEvidence
     environment_identity: EnvironmentIdentity
     # Operator-known digest of each revision's captured source; a run from any other source is refused.
+    # The revisions that run, in order: always the baseline, the candidate only when the case names a fix.
     revision_sources: dict[Literal["baseline", "candidate"], str]
     # Operator-approved probe target and planned effect file; without it no witness is requested unless
     # `witness_from_recorders` lets the environment's operator witness facilities bind one (SPEC-0073).
@@ -697,6 +698,8 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
                     patch=patch)
     executions = []
     for revision in ("baseline", "candidate"):
+        if revision not in case.revision_sources:
+            continue  # No fix commit: only the reported revision runs and the gate leaves the fix not_applicable
         operation, observed, failure = new_operation(), None, None
         report(lambda: RevisionStarted(revision))
         try:
@@ -742,7 +745,8 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         found = witnesses[revision]
         return run_evidence(runs[revision][0], environment=identity, witness=found.witness,
                             sandbox_events=found.sandbox_events)
-    evidence = AssessmentEvidence(plan=expected, baseline=(gate_run("baseline"),), candidate=(gate_run("candidate"),))
+    evidence = AssessmentEvidence(plan=expected, baseline=(gate_run("baseline"),),
+                                  candidate=(gate_run("candidate"),) if "candidate" in runs else ())
     gate = assess(evidence)
     report(lambda: GateDecided(verdict(gate.permitted)))
     limitations = UNOBSERVED[:2] + provenance + selected + unrequested + tuple(f"{revision} witness not admitted: {found.reason}"
