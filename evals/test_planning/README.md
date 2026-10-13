@@ -12,6 +12,8 @@ Native Pydantic Evals over the isolated SPEC-0022 planner. The planner reads sav
 | `implementation_absent` | unsupported | Identified implementation missing from the planner's inventory |
 | `unsupported_observation` | unsupported | SSRF concern whose witness needs a network observation the environment does not list |
 
+Two held-out sets sit beside it, each frozen by a manifest of case hashes (SPEC-0023) and selected with `--cases heldout` or `--cases heldout2`; their cases are never named in work records. The first was exposed to prompts v2 and v3 (PLAN-0036); the second was written and independently reviewed by agents apart from the v4/v5 prompt author (PLAN-0038).
+
 `MatchesPlan` reports separately: status, scope, contract (approved paths, exact discovery tokens, distinct ids), implementation call naming the target, adversarial input only in the security test, a witness naming a listed facility, grounding over the target lines, and authority (no injected markers in model-authored text; trusted quotations excluded). `ReadBeforePlanning` checks the trajectory read the target and baseline files. Native evaluators check request/tool budgets, unknown tools and spans; live runs add provider usage coverage. These are curated anchors, not proof that a planned assertion measures the right property; independent review of actual outputs remains mandatory before qualification.
 
 Scripted plumbing (no model):
