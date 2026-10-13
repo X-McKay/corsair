@@ -22,11 +22,14 @@ from corsair.agents.test_authoring.tools import AuthoringBudget, AuthoringDepend
 from corsair.agents.test_planning.contracts import TestPlan
 from corsair.composition.direct import CompositionBudget, RecordedFailure, StageModels, run_direct
 from corsair.composition.evidence import freeze
+from corsair.nodes.runtime.contracts import RuntimeInputs, RuntimeOutcome
+from corsair.nodes.runtime.environment import RuntimeCatalog
+from corsair.nodes.runtime.matrix import load
 from corsair.ports.test_runner import ApprovedPatch, PatchFile
 from corsair.workflows.chain import _admit, run_durable
 from corsair.workflows.chain_runtime import (
     AuthoringPayload, AuthoringRunContext, ChainRequest, ChainResult, RevisionRequest, StageKeys, StageRecord,
-    WorkerRunner, chain_result, configure_chain, failure_record, serving, within,
+    WorkerRunner, chain_result, configure_chain, failure_record, select_runtime, serving, within,
 )
 from evals.fixture_e2e.case import (
     fixture_case, reviewed_runners, scripted_assessment, scripted_authoring, scripted_identification,
@@ -85,6 +88,30 @@ def test_revision_payloads_keep_non_utf8_bytes(direct):
         assert await roundtrip(request, RevisionRequest) == request
         raw = ApprovedPatch((PatchFile("test_x.py", b"\xff\x00"),), ("test_x.py",))
         assert (await roundtrip(request.model_copy(update={"patch": raw}), RevisionRequest)).patch == raw
+    asyncio.run(check())
+
+
+def test_runtime_stage_payloads_and_worker_activity(tmp_path):
+    """SPEC-0060: build-file bytes and the outcome cross the payload boundary; the worker's catalog answers."""
+    inputs = RuntimeInputs(files={"pyproject.toml": b'[project]\nrequires-python = ">=3.10"\n[tool.pytest.ini_options]\n',
+                                  "documents.py": b"\xff\x00"})
+    catalog = RuntimeCatalog(load(), {"cpython-3.12-pytest": "corsair-python@sha256:" + "a" * 64})
+
+    async def check():
+        request = ChainRequest(replace(fixture_case(), runtime=inputs), StageKeys("a", "b", "c", "d"), CompositionBudget())
+        assert await roundtrip(request, ChainRequest) == request
+        configure_chain({"scripted": scripted_identification()}, reviewed_runners(None, tmp_path),
+                        activity_config=ACTIVITY_CONFIG)
+        with pytest.raises(ApplicationError) as missing:
+            await select_runtime(inputs)
+        assert (missing.value.type, missing.value.non_retryable) == ("RuntimeCatalogMissing", True)
+        configure_chain({"scripted": scripted_identification()}, reviewed_runners(None, tmp_path),
+                        activity_config=ACTIVITY_CONFIG, catalog=catalog)
+        outcome = await select_runtime(inputs)
+        assert (outcome.status, outcome.image) == ("supported", catalog.prepared["cpython-3.12-pytest"])
+        assert await roundtrip(outcome, RuntimeOutcome) == outcome
+        result = ChainResult(stopped_at="runtime", reason=outcome.reason, attempts=(), runtime=outcome)
+        assert await roundtrip(result, ChainResult) == result
     asyncio.run(check())
 
 

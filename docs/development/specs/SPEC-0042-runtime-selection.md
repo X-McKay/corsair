@@ -89,7 +89,7 @@ The consumer is the existing environment agent (SPEC-0029). The selected row bec
 - It returns a `RuntimeStop` with the reason instead when there is no requirement, the selection is `unsupported` or `undetermined`, or the selected row has no prepared image on this node.
 - `check_ready` refuses a `ReadyEnvironment` that names another toolchain or image, or a framework the selection did not admit.
 
-Calling it from the chain and the durable workflow is part of G12 and is not built here.
+Calling it from the chain and the durable workflow is part of G12 and is not built here. [SPEC-0060](SPEC-0060-chain-runtime-selection.md) makes selection the chain's first stage; running the environment agent in the chain remains G12.
 
 **Report** (`evals/benchmark/runtimes.py`):
 - `checkout` makes a blobless shallow fetch of each pinned commit (from SPEC-0037's pins file) and writes only the blobs `is_build_file` selects.

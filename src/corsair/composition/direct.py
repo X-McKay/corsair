@@ -1,8 +1,10 @@
-"""E2E-0 composition: identification, planning, authoring, frozen execution, assessment, gates.
+"""E2E-0 composition: runtime selection, identification, planning, authoring, frozen execution, assessment, gates.
 
 Each stage reuses its own factory and typed contract; routing is a total match on the previous
 stage's status, every abstention stops the run with its reason, and nothing loops between
-stages. Environment evidence is operator-supplied (IDEA-0004). The gate verdict is computed
+stages. Runtime selection (SPEC-0060) runs first when the case carries build files and ends the run
+before any model request unless a prepared matrix row supports the project; environment evidence is
+still operator-supplied (IDEA-0004) and must name the selected image. The gate verdict is computed
 from the frozen evidence whether or not the assessment agent completes. ``run_chain`` holds the
 routing for every mode over injected stage and revision ports; ``run_direct`` binds them in-process
 and the durable chain (``corsair.workflows.chain``) binds child workflows and activities.
@@ -34,12 +36,14 @@ from corsair.agents.test_authoring.tools import AuthoringBudget, AuthoringDepend
 from corsair.agents.test_planning.agent import PlanningDependencies, create_test_planning_agent, planning_prompt
 from corsair.agents.test_planning.contracts import EnvironmentEvidence, ReadyTestPlan, TestPlanningInput
 from corsair.core.disposition import AssessmentEvidence, EnvironmentIdentity, GateResult, ObservationPlan, assess
+from corsair.nodes.runtime.contracts import RuntimeInputs, RuntimeOutcome
+from corsair.nodes.runtime.environment import RuntimeCatalog, select_runtime
 from corsair.nodes.witness import WitnessEvidence, witness_evidence
 from corsair.ports.test_runner import ApprovedPatch, NativeTestRun, TestRunner, WitnessRequest
 
 from .evidence import evidence_items, freeze, observation_plan, run_evidence, witness_request
 
-Stage = Literal["identification", "planning", "authoring", "execution", "assessment"]
+Stage = Literal["runtime", "identification", "planning", "authoring", "execution", "assessment"]
 AgentStage = Literal["identification", "planning", "authoring", "assessment"]
 Purpose = Literal["development", "baseline", "candidate"]
 
@@ -93,6 +97,8 @@ class FixtureCase:
     revision_sources: dict[Literal["baseline", "candidate"], str]
     # Operator-approved probe target and planned effect file; without it no witness is requested.
     witness_envelope: WitnessRequest | None = None
+    # The baseline revision's build files (SPEC-0060); without them the runtime is the operator's declaration.
+    runtime: RuntimeInputs | None = None
 
 
 @dataclass(frozen=True)
@@ -128,6 +134,7 @@ class DirectRun:
     assessment: EvidenceAssessment | None = None
     witnesses: tuple[WitnessEvidence, ...] = ()
     limitations: tuple[str, ...] = field(default=())
+    runtime: RuntimeOutcome | None = None
 
 
 class RecordedFailure(Exception):
@@ -140,6 +147,13 @@ class RecordedFailure(Exception):
 # Mode ports: a stage invoker returns the attempt it made; a revision executor runs one frozen revision
 # once and raises if nothing was observed. Neither retries.
 StageInvoker = Callable[[AgentStage, Any], Awaitable[StageAttempt]]
+# Answers the runtime stage once from the operator's catalog; raises when it cannot select at all.
+RuntimeSelector = Callable[[RuntimeInputs], Awaitable[RuntimeOutcome]]
+NO_CATALOG = "The case carries build files but no runtime catalog is configured"
+
+
+class RuntimeCatalogMissing(ValueError):
+    """The same failure kind in every mode: the durable activity raises it as an ApplicationError type."""
 
 
 class RevisionExecutor(Protocol):
@@ -184,11 +198,14 @@ UNOBSERVED = ("The witness probe runs inside the test interpreter: it is operato
               "events elsewhere are not observed.",
               "Environment identity is the operator's declaration for both revisions, not an observed image or "
               "dependency digest.")
+UNSELECTED = "Runtime not selected from build files: the runtime is the operator's declaration."
 
 
 async def run_direct(case: FixtureCase, models: StageModels, runners: Runners,
-                     budget: CompositionBudget = CompositionBudget()) -> DirectRun:
-    """One E2E-0 investigation over a baseline and candidate revision; never retries a stage."""
+                     budget: CompositionBudget = CompositionBudget(), *, catalog: RuntimeCatalog | None = None) -> DirectRun:
+    """One E2E-0 investigation over a baseline and candidate revision; never retries a stage.
+
+    ``catalog`` is the operator's runtime matrix and prepared images; a case with build files needs it."""
     async def invoke(stage: AgentStage, inputs: Any) -> StageAttempt:
         agent = AGENTS[stage](getattr(models, stage), output_retries=budget.output_retries)
         prompt, deps = stage_call(stage, inputs, budget, runners("development") if stage == "authoring" else None)
@@ -196,26 +213,56 @@ async def run_direct(case: FixtureCase, models: StageModels, runners: Runners,
 
     async def execute(revision, patch, **request) -> NativeTestRun:
         return runners(revision).run(patch, **request)
-    return await run_chain(case, invoke, execute, new_operation=uuid4)
+
+    async def select(inputs: RuntimeInputs) -> RuntimeOutcome:
+        if catalog is None:
+            raise RuntimeCatalogMissing(NO_CATALOG)
+        return select_runtime(inputs, catalog)
+    return await run_chain(case, invoke, execute, select, new_operation=uuid4)
 
 
-async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionExecutor, *,
+def declared_mismatch(case: FixtureCase, outcome: RuntimeOutcome) -> str | None:
+    """Why the operator's declared environment is not the selected row's prepared image, if it is not."""
+    digest = outcome.image.rsplit("@sha256:", 1)[1]
+    language = outcome.requirement.language
+    if case.environment_identity.image_digest != digest:
+        return (f"declared environment image {case.environment_identity.image_digest} is not the selected "
+                f"{outcome.selection.image_id} image {outcome.image}")
+    if case.environment.language.casefold() != language:
+        return f"declared environment language {case.environment.language} is not the selected {language}"
+    return None
+
+
+async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionExecutor, select: RuntimeSelector, *,
                     new_operation: Callable[[], UUID]) -> DirectRun:
     """Mode-independent routing: each stage at most once, revisions once each, gates over frozen evidence."""
     attempts: list[StageAttempt] = []
     issue, environment = case.issue, case.environment
+    runtime, selected = None, (UNSELECTED,)
 
     async def _stage(stage: AgentStage, inputs: Any) -> Any:
         attempts.append(await invoke(stage, inputs))
         return attempts[-1].output
 
     def stop(stage: Stage, reason: str, **values) -> DirectRun:
-        return DirectRun(stopped_at=stage, reason=reason, attempts=tuple(attempts), **values)
+        return DirectRun(stopped_at=stage, reason=reason, attempts=tuple(attempts), runtime=runtime, **values)
 
     def failure_of(stage: Stage) -> str:
         failed = attempts[-1].failure
         kind = failed.kind if isinstance(failed, RecordedFailure) else type(failed).__name__
         return f"{stage} produced no output: {kind}: {failed}"[:2048]
+
+    if case.runtime is not None:
+        try:
+            runtime = await select(case.runtime)
+        except Exception as exc:
+            kind = exc.kind if isinstance(exc, RecordedFailure) else type(exc).__name__
+            return stop("runtime", f"runtime selection failed: {kind}: {exc}"[:2048])
+        if runtime.status != "supported":
+            return stop("runtime", runtime.reason)
+        if (mismatch := declared_mismatch(case, runtime)):
+            return stop("runtime", mismatch[:2048])
+        selected = ("Runtime selected from the baseline revision's build files; the candidate's were not read.",)
 
     identification = await _stage("identification", issue)
     if not isinstance(identification, IssueIdentification):
@@ -296,7 +343,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
                             sandbox_events=found.sandbox_events)
     evidence = AssessmentEvidence(plan=expected, baseline=(gate_run("baseline"),), candidate=(gate_run("candidate"),))
     gate = assess(evidence)
-    limitations = UNOBSERVED + unrequested + tuple(f"{revision} witness not admitted: {found.reason}"
+    limitations = UNOBSERVED + selected + unrequested + tuple(f"{revision} witness not admitted: {found.reason}"
                                      for revision, found in witnesses.items() if found.witness is None) + tuple(
         f"{e.revision} workspace cleanup {e.observed.cleanup}" for e in executions if e.observed.cleanup != "confirmed")
     try:
@@ -311,4 +358,4 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
     if not isinstance(assessment, EvidenceAssessment):
         return stop("assessment", failure_of("assessment"), gate=gate, limitations=limitations, **done)
     return DirectRun(stopped_at=None, reason="complete", attempts=tuple(attempts), gate=gate, assessment=assessment,
-                     limitations=limitations, **done)
+                     limitations=limitations, runtime=runtime, **done)

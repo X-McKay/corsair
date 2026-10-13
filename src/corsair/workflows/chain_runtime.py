@@ -35,9 +35,12 @@ from corsair.agents.test_authoring.contracts import AuthoringResult, TestAuthori
 from corsair.agents.test_authoring.tools import AuthoringBudget, AuthoringDependencies
 from corsair.agents.test_planning.contracts import ReadyTestPlan, TestPlan
 from corsair.composition.direct import (
-    AGENTS, AgentStage, CompositionBudget, DirectRun, FixtureCase, Purpose, RecordedFailure, Runners, Stage,
+    AGENTS, NO_CATALOG, AgentStage, CompositionBudget, DirectRun, FixtureCase, Purpose, RecordedFailure, Runners,
+    RuntimeCatalogMissing, Stage,
 )
 from corsair.core.disposition import GateResult, ObservationPlan
+from corsair.nodes.runtime.contracts import RuntimeInputs, RuntimeOutcome
+from corsair.nodes.runtime.environment import RuntimeCatalog, select_runtime as select_from_catalog
 from corsair.nodes.witness import WitnessEvidence
 from corsair.ports.test_runner import ApprovedPatch, NativeTestRun, WitnessRequest
 
@@ -137,6 +140,7 @@ class ChainResult:
     assessment: EvidenceAssessment | None = None
     witnesses: tuple[WitnessEvidence, ...] = ()
     limitations: tuple[str, ...] = ()
+    runtime: RuntimeOutcome | None = None
 
 
 def failure_record(failure: BaseException) -> FailureRecord:
@@ -165,7 +169,7 @@ def chain_result(run: DirectRun) -> ChainResult:
         executions=tuple(ExecutionRecord(revision=e.revision, operation=e.operation, observed=e.observed,
                                          failure=failure(e.failure)) for e in run.executions),
         gate=run.gate, assessment=run.assessment, witnesses=run.witnesses,
-        limitations=run.limitations)
+        limitations=run.limitations, runtime=run.runtime)
 
 
 def within(budget: CompositionBudget, ceiling: CompositionBudget) -> bool:
@@ -221,6 +225,7 @@ class ChainRuntime:
     model_keys: frozenset[str]
     runners: Runners
     ceiling: CompositionBudget
+    catalog: RuntimeCatalog | None = None
 
 
 _runtime: ChainRuntime | None = None
@@ -250,8 +255,11 @@ def _unselected(messages: list[ModelMessage], info: Any) -> ModelResponse:
 
 
 def configure_chain(models: Mapping[str, Model], runners: Runners, *, activity_config: ActivityConfig,
-                    ceiling: CompositionBudget = CompositionBudget()) -> ChainRuntime:
-    """Build each stage's agent once with native durability over the operator's models, keyed for requests."""
+                    ceiling: CompositionBudget = CompositionBudget(),
+                    catalog: RuntimeCatalog | None = None) -> ChainRuntime:
+    """Build each stage's agent once with native durability over the operator's models, keyed for requests.
+
+    ``catalog`` (runtime matrix and prepared images) answers the runtime stage of cases that carry build files."""
     global _runtime
     if _serving:
         raise RuntimeError("the chain configuration is held by a serving worker; it cannot be replaced")
@@ -266,7 +274,7 @@ def configure_chain(models: Mapping[str, Model], runners: Runners, *, activity_c
     # The default model only answers a request that named no key, which admission never lets through.
     agents = {stage: AGENTS[stage](FunctionModel(_unselected), output_retries=ceiling.output_retries,
                                    durability=durability(stage)) for stage in STAGES}
-    _runtime = ChainRuntime(agents, frozenset(models), runners, ceiling)
+    _runtime = ChainRuntime(agents, frozenset(models), runners, ceiling, catalog)
     return _runtime
 
 
@@ -283,3 +291,12 @@ async def execute_revision(request: RevisionRequest) -> RevisionRun:
         security_test_id=request.security_test_id, discovery_command=request.discovery_command,
         operation=request.operation, witness=request.witness)
     return RevisionRun(observed=observed)
+
+
+@activity.defn(name="corsair.chain.select_runtime")
+async def select_runtime(inputs: RuntimeInputs) -> RuntimeOutcome:
+    """SPEC-0060 runtime stage from the worker's catalog; deterministic, scheduled once."""
+    runtime = configured()
+    if runtime is None or runtime.catalog is None:
+        raise ApplicationError(NO_CATALOG, type=RuntimeCatalogMissing.__name__, non_retryable=True)
+    return select_from_catalog(inputs, runtime.catalog)

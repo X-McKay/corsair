@@ -7,7 +7,7 @@ admitted image, an unsupported requirement naming what is missing, or an undeter
 """
 from typing import Annotated, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Language = Literal['python', 'java', 'javascript', 'ruby', 'perl']
 Kind = Literal['runtime', 'build_tool', 'test_framework']
@@ -103,3 +103,32 @@ class Undetermined(_Frozen):
 
 
 Selection = Annotated[Union[Supported, Unsupported, Undetermined], Field(discriminator='status')]
+
+
+class RuntimeInputs(_Frozen):
+    """SPEC-0060 operator input: the baseline revision's build files, never shown to an agent. Bytes cross a
+    Temporal payload as base64 so non-UTF-8 content survives."""
+    model_config = ConfigDict(extra='forbid', frozen=True, ser_json_bytes='base64', val_json_bytes='base64')
+    files: dict[str, bytes] = Field(description='Project-relative path to bytes from the captured snapshot')
+    language: Language | None = None
+    parents: dict[str, bytes] = Field(default_factory=dict, description='Operator-supplied Maven parent POMs')
+    root: str = Field(default='.', max_length=512)
+
+
+class RuntimeOutcome(_Frozen):
+    """SPEC-0060: the chain's runtime stage. Only `supported` continues; every other status ends the run."""
+    status: Literal['supported', 'unsupported', 'undetermined', 'not_prepared']
+    requirement: RuntimeRequirement | None
+    detection: Text | None = Field(description='Why no requirement was derived, when none was')
+    selection: Selection | None
+    image: str | None = Field(pattern=r'^[^@\s]+@sha256:[0-9a-f]{64}$', max_length=512,
+                              description="The selected row's prepared image on this node")
+    reason: str = Field(max_length=2048)
+
+    @model_validator(mode='after')
+    def consistent(self) -> 'RuntimeOutcome':
+        supported = isinstance(self.selection, Supported)
+        if (self.status == 'supported') != (self.image is not None) or \
+                (self.status in ('supported', 'not_prepared')) != supported or (self.requirement is None) == (self.detection is None):
+            raise ValueError('runtime outcome fields disagree with its status')
+        return self
