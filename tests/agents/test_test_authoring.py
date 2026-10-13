@@ -286,6 +286,17 @@ def test_input_admits_minitest_ids_the_authoring_checks_read():
         TestAuthoringInput.model_validate(data)
 
 
+def test_input_admits_test_more_subtest_ids_the_authoring_checks_read():
+    data = case().inputs.inputs.model_dump()
+    data["environment"]["approved_test_paths"] = ["t/corsair.t"]
+    for name in ("control", "security"):
+        data["plan"][name].update(test_path="t/corsair.t", test_id=f"t/corsair.t#test_{name}")
+    TestAuthoringInput.model_validate(data)
+    data["plan"]["security"].update(test_id="t/other.t#test_security")
+    with pytest.raises(ValidationError):
+        TestAuthoringInput.model_validate(data)
+
+
 @pytest.mark.parametrize("edit,check", [
     (lambda s: s.replace("import pytest", "import pytest\nfrom unittest import mock"), "no_mock"),
     (lambda s: s.replace("def test_security", "@pytest.mark.skip\ndef test_security"), "no_skip"),

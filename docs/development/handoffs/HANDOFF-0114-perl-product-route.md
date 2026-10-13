@@ -11,7 +11,7 @@ related: [SPEC-0074, PLAN-0088, PLAN-0087, ISSUE-0008]
 
 ## Verified state
 
-- **Branch and base.** Branch `claude/non-python-path-bp9gj6`, from main `1815f75` (PR #125). It is lane 4 of
+- **Branch and base.** Branch `claude/non-python-path-bp9gj6`, from main `1815f75` (PR #125), with main `bfc4e52` merged in. It is lane 4 of
   PLAN-0087: one complete non-Python path. Resolve this document's commit from git.
 - **Language and mechanism.** Perl was chosen. On main, `corsair run` refused every Perl request with
   `no harness entry for the tap-harness framework yet`. Behind that, three more generic gaps would have stopped it:
@@ -84,7 +84,8 @@ related: [SPEC-0074, PLAN-0088, PLAN-0087, ISSUE-0008]
 - **Next capability.** A process-start recorder, specified once for Perl and Python: shell-string versus argv, with
   the subject a command the shell would start. With it, cmdi-like topics can be decided. Query, header and
   credential effects need separate designs and are not planned.
-- **Blockers that do not stop this lane.** Lane 2's #126 owns the planning and authoring id-path rule. ISSUE-0008
+- **Dependencies.** Main `bfc4e52` (#126, `names_test_in`) is merged in; authoring admits Perl ids on that rule. The
+  environment skill already names `prove --dry` for listing, so nothing new is added for it. ISSUE-0008
   owns candidate-free runs.
 
 ## Continuation prompt

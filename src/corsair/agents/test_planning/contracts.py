@@ -7,6 +7,8 @@ from typing import Annotated, Any, Generic, Literal
 
 from pydantic import Field, ValidationInfo, field_validator, model_validator
 
+from corsair.ports.test_runner import names_test_in
+
 from ..issue_identification.contracts import IssueIdentification
 from ..source.contracts import (
     Citation, Contract, Fact, SourceExcerpt, SourceFile, SourceReference, bounded_inventory, confined_path,
@@ -168,6 +170,9 @@ class _ReadyPlan(Contract, Generic[Citation]):
             for spec in (self.control, self.security):
                 if spec.test_path not in environment.approved_test_paths:
                     raise ValueError(f"test path {spec.test_path} is not an approved test path")
+                # The author writes each test into its planned file; an id naming another file cannot be run there.
+                if not names_test_in(spec.test_id, spec.test_path):
+                    raise ValueError(f"test id {spec.test_id} does not name a test in its test path {spec.test_path}")
             if self.discovery_command != environment.discovery_command:
                 raise ValueError("discovery command tokens must equal the supplied environment command")
             planned_witnesses(self, environment)

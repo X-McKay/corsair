@@ -61,7 +61,8 @@ Excluded: process-start, socket and other effect kinds (the same gap exists for 
   start lines of `ok`, `is`, `isnt`, `like`, `unlike`, `is_deeply`, `cmp_ok`, `can_ok`, `isa_ok`, `new_ok` and
   `fail` calls outside nested subs. Perl 5.26.3 reports a multi-line call at its first line. The reader refuses POD,
   `__END__`/`__DATA__`, heredocs, `format`, assertion-name definitions or aliases, and a missing or duplicated
-  subtest, each with a reason.
+  subtest, each with a reason. Authoring's input contract now admits `path.t#subtest` ids alongside pytest and
+  Minitest. Main's `names_test_in` rule still ties each id to its approved file.
 - **Shared code.** The witness record read-back moved from the pytest runner to `NativeRunner._read_witness`,
   because the TAP runner is its second consumer. Behaviour is unchanged.
 - **`./` in locations.** `do` names the file `./t/x.t`, so `reports/tap.py` drops a leading `./` before matching a

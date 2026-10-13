@@ -17,9 +17,9 @@ JavaScript for two reasons. Its image, TAP runner and environment admission were
 development topics are small `lib/*.pm` projects that run on core Test::More. JavaScript would also need dependency
 capture for lockless projects and an effect recorder before reaching the same point. Design: [SPEC-0074](../specs/SPEC-0074-perl-product-route.md).
 
-No dependency on ISSUE-0008: every request here is paired. Lane 2's PR #126 (`names_test_in`, planning and authoring
-id-path rule covering TAP) is independent. This change adds the TAP assertion reader that rule leaves missing and does
-not add a second id-path check.
+No dependency on ISSUE-0008: every request here is paired. Lane 2's `names_test_in` rule (PR #126, merged as
+`bfc4e52`) is merged into this branch. Authoring now admits a Test::More `path.t#subtest` id that the rule ties to
+its approved file, read by the TAP assertion reader added here. No second id-path check is added.
 
 ## Steps
 
@@ -33,7 +33,8 @@ not add a second id-path check.
   operator prefix `perl -Ilib`, witness record path.
 - [x] Perl witness probe (`file_open`, same record and gate), shared record read-back in `NativeRunner`.
 - [x] TAP failure type `not_ok`. `./` dropped from failure locations.
-- [x] Authoring reader `perl.py` wired into `assertion_lines`.
+- [x] Authoring reader `perl.py` wired into `assertion_lines`. Authoring's input admits `path.t#subtest` ids, on main's
+  `names_test_in` rule.
 - [x] Docker proof through product ports with operator tests (`evals/case_e2e/operator_tests.py`, committed cases).
 - [x] Compare frozen scripted evaluations against main.
 - [ ] Live: the same corpus topics through `corsair run` with the local model (RIG0), once lane ordering allows.
