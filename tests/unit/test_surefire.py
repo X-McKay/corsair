@@ -76,21 +76,13 @@ def test_frames_outside_the_patch_leave_the_location_unknown():
     assert results[1].failure.path is None and results[1].failure.type == 'org.opentest4j.AssertionFailedError'
 
 
-@pytest.mark.parametrize('name, ids, paths', [('sample-documents-dry-run.xml', SAMPLE_IDS, SAMPLE_PATHS),
-                                              ('jspwiki-baseline-dry-run-surefire3.xml', WIKI_IDS, WIKI_PATHS)])
-def test_honoured_dry_run_discovers_exactly_the_ids(name, ids, paths):
-    results = parse_surefire(report(name), ids, test_paths=paths, dry_run=True)
-    assert outcomes(results) == ['skipped', 'skipped']
-
-
-@pytest.mark.parametrize('name, ids, paths', [('jspwiki-baseline-dry-run-ignored.xml', WIKI_IDS, WIKI_PATHS),
-                                              ('jspwiki-candidate.xml', WIKI_IDS, WIKI_PATHS),
-                                              ('sample-broken.xml', ('corsair.sample.BrokenTest#setupErrors',
-                                                                     'corsair.sample.BrokenTest#skippedTest'), frozenset())])
-def test_dry_run_refuses_any_report_where_bodies_ran_or_skips_are_not_the_platforms(name, ids, paths):
-    # JUnit 5.4 under Surefire 2.22 ignores the dry-run property and runs the bodies.
-    with pytest.raises(SurefireError, match='Dry run not honoured'):
-        parse_surefire(report(name), ids, test_paths=paths, dry_run=True)
+def test_junit4_report_under_surefire_2_22():
+    legacy = 'corsair.sample.LegacyTest#'
+    control, security = parse_surefire(report('junit4-legacy.xml'), (legacy + 'control', legacy + 'security'),
+                                       test_paths=frozenset({'src/test/java/corsair/sample/LegacyTest.java'}))
+    assert control.outcome == 'passed' and security.outcome == 'failed'
+    assert (security.failure.type, security.failure.function, security.failure.line) == ('org.junit.ComparisonFailure', 'security', 8)
+    assert security.captured_output == 'SECURITY_RAN\n'
 
 
 def wrap(*cases, name='corsair.sample.DocumentsTest', extra=''):

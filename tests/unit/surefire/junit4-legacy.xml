@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" name="corsair.sample.LegacyTest" time="0.065" tests="2" errors="0" skipped="0" failures="1">
+  <properties>
+  </properties>
+  <testcase name="security" classname="corsair.sample.LegacyTest" time="0.015">
+    <failure message="expected:&lt;[x]&gt; but was:&lt;[y]&gt;" type="org.junit.ComparisonFailure"><![CDATA[org.junit.ComparisonFailure: expected:<[x]> but was:<[y]>
+	at corsair.sample.LegacyTest.security(LegacyTest.java:8)
+]]></failure>
+    <system-out><![CDATA[SECURITY_RAN
+]]></system-out>
+  </testcase>
+  <testcase name="control" classname="corsair.sample.LegacyTest" time="0.001"/>
+</testsuite>
