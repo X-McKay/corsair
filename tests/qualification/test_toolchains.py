@@ -236,9 +236,10 @@ def python_dependencies(kube, cli, sdk, name, remote, record, endpoint, pair):
 
 
 
-@pytest.mark.toolchain
-def test_native_python_and_java_toolchains(kube, toolchain_gateway):
-    gateway = toolchain_gateway
+def toolchain_gate(kube, gateway, language):
+    """One image's gate: run alone per evidence directory (`-k test_native_<dir>_toolchain`), since the gateway
+    fixture and SDK receipts write fixed names into the run's evidence."""
+    assert not (kube.evidence / 'toolchain.json').exists(), 'Another toolchain gate already wrote this evidence; run one image per run'
     sources = ['tests/qualification/test_toolchains.py', 'tests/qualification/prepare_toolchains.py', 'tests/qualification/test_policy.py', 'tests/qualification/test_lifecycle.py', 'tests/qualification/gateway.py', 'tests/qualification/support.py', 'src/corsair/adapters/maven_runner.py', 'src/corsair/reports/junit_listing.py', 'policies/openshell/identity.yaml', 'deploy/runtime-lock.yaml', 'pyproject.toml', 'uv.lock']
     (kube.evidence / 'toolchain-source-hashes.json').write_text(json.dumps(dict(source_hashes(), **{p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest() for p in sources}), indent=2))
     summary = {'outcome': 'failed', 'sandboxes': [], 'internal_retry_counts': 'unknown'}
@@ -247,21 +248,21 @@ def test_native_python_and_java_toolchains(kube, toolchain_gateway):
     mtls = gateway['mtls']
     with SandboxClient(gateway['endpoint'], tls=TlsConfig(ca_path=mtls / 'ca.crt', cert_path=mtls / 'tls.crt', key_path=mtls / 'tls.key'), timeout=60) as client:
         sdk = SdkReceipts(client, kube.evidence)
+        summary['image'] = language
         try:
             summary['global_policy'] = global_policy_observation(gateway['cli']('policy', 'get', '--global', '--full', '-o', 'json', check=False))
             attempted = True
             endpoint.setup()
-            for language in ('java8', 'java', 'python'):
-                image = image_receipt(language)
-                record = {'language': language, 'artifact': image}
-                summary['sandboxes'].append(record)
-                with owned_sandbox(kube, gateway['cli'], sdk, image, toolchain_policy(language), record) as (name, pair):
-                    remote = stage_project(kube, gateway['cli'], sdk, name, language, record)
-                    if language == 'python':
-                        python_offline(sdk, name, remote, record)
-                        python_dependencies(kube, gateway['cli'], sdk, name, remote, record, endpoint, pair)
-                    else:
-                        java_offline(sdk, name, remote, record, language)
+            image = image_receipt(language)
+            record = {'language': language, 'artifact': image}
+            summary['sandboxes'].append(record)
+            with owned_sandbox(kube, gateway['cli'], sdk, image, toolchain_policy(language), record) as (name, pair):
+                remote = stage_project(kube, gateway['cli'], sdk, name, language, record)
+                if language == 'python':
+                    python_offline(sdk, name, remote, record)
+                    python_dependencies(kube, gateway['cli'], sdk, name, remote, record, endpoint, pair)
+                else:
+                    java_offline(sdk, name, remote, record, language)
             assert all(r['outcome'] == 'passed' and r['cleanup_confirmed'] for r in summary['sandboxes'])
             summary['outcome'] = 'passed'
         finally:
@@ -271,3 +272,18 @@ def test_native_python_and_java_toolchains(kube, toolchain_gateway):
                     endpoint.cleanup()
             finally:
                 (kube.evidence / 'toolchain.json').write_text(json.dumps(summary, indent=2))
+
+
+@pytest.mark.toolchain('java8')
+def test_native_java8_toolchain(kube, toolchain_gateway):
+    toolchain_gate(kube, toolchain_gateway, 'java8')
+
+
+@pytest.mark.toolchain('java')
+def test_native_java_toolchain(kube, toolchain_gateway):
+    toolchain_gate(kube, toolchain_gateway, 'java')
+
+
+@pytest.mark.toolchain('python')
+def test_native_python_toolchain(kube, toolchain_gateway):
+    toolchain_gate(kube, toolchain_gateway, 'python')

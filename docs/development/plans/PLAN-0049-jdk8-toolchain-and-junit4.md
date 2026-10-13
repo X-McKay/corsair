@@ -28,6 +28,8 @@ Implement [SPEC-0045](../specs/SPEC-0045-jdk8-toolchain-and-junit4.md). Branch `
 
 2026-10-13, RIG0, worktree `.worktrees/claude-toolchain-jdk8-junit4-x5k2l4` at ed57d13: `prepare_toolchains build` once per image, all controls passed. java8 `corsair-java8:81777d352ab28226` config `sha256:b48b9086…`, Temurin 1.8.0_504-b01, Maven 3.10.0; java `corsair-java:c7e6b24f0068035d` config `sha256:e23aaf05…`; python `corsair-python:61a3e8db1afb1726` config `sha256:68f08d0e…`. VUL4J-6: the fix commit adds no test; the PoV is Vul4J's `Test_CVE_2018_1324` (branch VUL4J-6 head 45ddad15), single method. First setup (ed57d13) cached no Surefire 2.19.1 JUnit provider, because Surefire resolves it only when a test runs; setup now fetches the project's own providers without running a body and fails if none resolves (acc1844).
 
+Gate convention (#53): one test per image, `test_native_<dir>_toolchain` with `@pytest.mark.toolchain('<dir>')`; each runs alone into its own evidence directory and refuses a directory another gate already wrote. Until #55's `TOOLCHAINS=` selection lands, run each with the `qualify-toolchain` pytest line plus `-k test_native_<dir>_toolchain`.
+
 ## Decisions and next action
 
 Next: RIG0 session; build, load, gate; then the real case.
