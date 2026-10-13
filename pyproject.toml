@@ -21,6 +21,7 @@ dev = [
     "pydantic-evals[logfire]==2.55.0",
     "rich==15.0.0",
     "temporalio==1.34.0",
+    "pytest-xdist==3.8.0",
 ]
 
 [tool.uv]
