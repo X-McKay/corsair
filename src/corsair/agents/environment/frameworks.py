@@ -56,14 +56,17 @@ def _surefire_passed(output: bytes) -> bool:
 
 def _tap_file(test_id: str) -> str | None:
     # The baseline unit for TAP is one test file, as `prove --dry` prints it; subtest ids belong to the runner.
-    return test_id if re.fullmatch(r"(?!-)[\w.+-]+(?:/[\w.+-]+)*\.t", test_id) else None
+    parts = test_id.split("/")
+    plain = all(re.fullmatch(r"(?!-)[\w.+-]+", part) and part not in (".", "..") for part in parts)
+    return test_id if plain and test_id.endswith(".t") else None
 
 
-# prove options whose value is the next token, and options that would list, replay or reinterpret instead of
-# running exactly the named file.
-_PROVE_VALUES = ("-I", "-P", "-M", "-j", "--jobs", "--source", "--rules", "--ext", "--state", "--exec", "-e",
-                 "--rc", "--harness", "--formatter", "-a", "--archive")
-_PROVE_REFUSED = ("--dry", "--state", "--exec", "-e", "--ext", "--rules", "--harness", "--formatter", "-a", "--archive")
+# prove options whose value is the next token, and options that would list, replay, reinterpret or load code that
+# could rewrite the output instead of running exactly the named file. `--norc` is required: prove otherwise reads
+# the project's `.proverc`, which can add any of these unseen.
+_PROVE_VALUES = ("-I", "-j", "--jobs")
+_PROVE_REFUSED = ("--dry", "--state", "--exec", "-e", "--ext", "--rules", "--harness", "--formatter", "-a", "--archive",
+                  "--rc", "--source", "--plugin", "--module", "-P", "-M")
 
 
 def _tap_targets(command: tuple[str, ...], test_id: str) -> bool:
@@ -77,13 +80,14 @@ def _tap_targets(command: tuple[str, ...], test_id: str) -> bool:
             skip = False
             continue
         name = token.split("=", 1)[0]
-        if name in _PROVE_REFUSED or (token[:1] == "-" and token[:2] != "--" and "D" in token[1:]):
+        if name in _PROVE_REFUSED or (token[:1] == "-" and token[:2] != "--" and re.search(r"[DPMae]", token[1:].split("=")[0])
+                                      and not token.startswith("-I")):
             return False
         if token in _PROVE_VALUES:
             skip = True
         elif token[:1] != "-":
             files.append(token)
-    return files == [test_id] and not skip
+    return files == [test_id] and not skip and "--norc" in arguments
 
 
 def _tap_passed(output: bytes) -> bool:
