@@ -39,7 +39,10 @@ environment stage and Docker revision runners. This plan reuses them; it adds no
 - [x] Never the host network for the setup container and the environment stage's sandbox: landed on #109 (3d1ba4b,
   bridge only, setup egress recorded unenforced), merged here.
 - [x] Python on the `corsair run` Docker route: #109's pytest entry (2548980) with pip setup and the witness probe.
-- [ ] First live proof on RIG0 (fixture case, all stages live, Docker), when the model is free.
+- [x] First live proof on RIG0 (fixture case, all stages live, Docker) at da0667f: complete, gate reproduced / verified
+  ([HANDOFF-0104](../handoffs/HANDOFF-0104-docker-e2e-route-live-pass.md)).
+- [x] Review notes: explicit failures instead of `assert` on the container path; container removal written to
+  `docker/containers.json` and the printed summary.
 
 ## Validation and progress
 

@@ -81,15 +81,22 @@ def docker_runners(image: str, root: Path, store, stack: ExitStack, timeout: int
         (tree / "documents.py").write_bytes((FIXTURE / variant / "documents.py").read_bytes())
         trees[variant] = tree.resolve()
     config = PytestRunnerConfig(PREFIX, JUNIT, WORK, witness_record_path=WITNESS_RECORD)
-    calls = []
+    cases = []
 
     def runner(purpose):
-        calls.append(purpose)
-        logs = root / "runs" / f"{len(calls)}-{purpose}"
+        logs = root / "runs" / f"{len(cases) + 1}-{purpose}"
         logs.mkdir(parents=True)
         variant = VARIANTS[purpose]
-        case = stack.enter_context(DockerCase(image, trees[variant], source_label(variant), timeout,
-                                              kind="fixture-e2e", docker=docker, evidence=logs,
-                                              scratch=(SCRATCH, JUNIT, WITNESS_RECORD)))
+        case = DockerCase(image, trees[variant], source_label(variant), timeout, kind="fixture-e2e", docker=docker,
+                          evidence=logs, scratch=(SCRATCH, JUNIT, WITNESS_RECORD))
+        cases.append((purpose, case))
+        stack.enter_context(case)
         return harness("pytest").runner(case, case, store, config)
+
+    def write_cleanup():
+        """Each container's removal as observed after `stack` closed: removed, then absent on inspect."""
+        (root / "containers.json").write_text(json.dumps(
+            [{"purpose": purpose, "container": case.container, "cleanup": case.cleanup} for purpose, case in cases],
+            indent=2))
+    stack.callback(write_cleanup)  # Runs last, after every container's removal
     return runner

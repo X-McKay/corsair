@@ -51,7 +51,8 @@ def commit_tree(checkout, destination, commit='HEAD'):
     for mode, _, sha, path in entries:
         header_end = batch.index(b'\n', offset)
         name, _, size = batch[offset:header_end].split(b' ')
-        assert name == sha, f'cat-file returned {name!r} for {sha!r}'
+        if name != sha:
+            raise RuntimeError(f'cat-file returned {name!r} for {sha!r}')
         start = header_end + 1
         data, offset = batch[start:start + int(size)], start + int(size) + 1
         target = destination / path
@@ -110,7 +111,8 @@ class DockerCase:
         environment = [arg for pair in self.env for arg in ('-e', pair)]
         result = self.docker('run', '-d', f'--network={self.network}', *HARDENED, '--user', user(), *environment, *volumes,
                              self.image, '/bin/sleep', 'infinity')
-        assert result.returncode == 0, result.stderr
+        if result.returncode != 0:
+            raise RuntimeError(f'docker run failed: {result.stderr[-2000:]!r}')
         self.container = result.stdout.decode().strip()
         return self
 
@@ -129,11 +131,13 @@ class DockerCase:
         built = self.docker('exec', self.container, '/bin/sh', '-ec', script)
         if self.evidence is not None:
             (self.evidence / f'prepare-{operation}.log').write_bytes(built.stdout + built.stderr)
-        assert built.returncode == 0, built.stderr[-2000:]
+        if built.returncode != 0:
+            raise RuntimeError(f'workspace preparation failed: {built.stderr[-2000:]!r}')
         for item in patch.files:
             written = self.docker('exec', '-i', self.container, '/bin/sh', '-ec', 'mkdir -p "$(dirname "$1")"; cat > "$1"',
                                   'write', f'{WORK}/{item.path}', stdin=item.content)
-            assert written.returncode == 0, written.stderr
+            if written.returncode != 0:
+                raise RuntimeError(f'patch write failed for {item.path}: {written.stderr[-2000:]!r}')
         digest = lambda text: ArtifactRef(hashlib.sha256(text.encode()).hexdigest(), len(text))
         return PreparedWorkspace(self.handle(operation), digest(self.commit), digest(patch.sha256), patch.sha256)
 

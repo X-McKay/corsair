@@ -174,7 +174,10 @@ def main():
     else:
         run = asyncio.run(main_async(args.evidence, live, config, profiles))
     route = json.loads((args.evidence / "configuration.json").read_text())["runner"]
+    containers = args.evidence / "docker" / "containers.json"
+    removed = ([c["cleanup"] for c in json.loads(containers.read_text())] if containers.exists() else None)
     print(json.dumps(summary(run) | {"route": route["route"], "qualification": route.get("qualification"),
+                                     "container_cleanup": removed,
         "config_sha256": sha256((args.evidence / "configuration.json").read_bytes()).hexdigest()}, indent=2))
 
 

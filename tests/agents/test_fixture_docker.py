@@ -105,6 +105,9 @@ def test_the_docker_route_runs_every_stage_and_records_itself_unqualified(tmp_pa
     assert [w.reason for w in result.witnesses] == ["admitted", "admitted"]
     assert len(fake.runs) == 3 and all("--network=none" in flags for flags in fake.runs)
     assert sorted(fake.removed) == ["c0", "c1", "c2"]
+    containers = json.loads((evidence / "docker" / "containers.json").read_text())
+    assert [(c["purpose"], c["cleanup"]) for c in containers] == [
+        ("development", "confirmed"), ("baseline", "confirmed"), ("candidate", "confirmed")]
     configuration = json.loads((evidence / "configuration.json").read_text())
     recorded = json.loads((evidence / "result.json").read_text())
     for runner in (configuration["runner"], recorded["runner"]):
