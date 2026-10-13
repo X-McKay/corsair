@@ -10,7 +10,7 @@ from pathlib import Path
 import re
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 import yaml
 
 from corsair.agents.issue_analysis.contracts import IssueAnalysisInput
@@ -27,9 +27,10 @@ COMMIT = re.compile(r"[0-9a-f]{40}")
 ADVISORY = re.compile(r"\bCVE-\d{4}-\d{4,}\b|\bGHSA(?:-[0-9a-z]{4}){3}\b", re.IGNORECASE)
 
 # Operator-owned defaults for rows without a manifest, from the IDEA-0005 "Blocks" column by language. G7 applies
-# until a reviewed manifest shows the effect is a file open; G13 is unknown until a build is measured; G9 blocks none;
-# G15 applies until runtime and framework versions are resolved from the case's own build files.
-_COMMON = ("G2", "G2b", "G2c", "G3", "G4", "G7", "G10", "G11", "G12", "G15")
+# until a reviewed manifest shows the effect is a file open; G13 applies until a build is measured, so unmeasured
+# limits stay visible rather than counting as zero; G9 blocks none; G15 applies until runtime and framework versions
+# are resolved from the case's own build files.
+_COMMON = ("G2", "G2b", "G2c", "G3", "G4", "G7", "G10", "G11", "G12", "G13", "G15")
 DEFAULT_BLOCKING: dict[str, tuple[Gap, ...]] = {
     "Java": (*_COMMON, "G5", "G6", "G8"),
     "Python": (*_COMMON, "G14"),  # Vul4Py tests cannot be copied without a license
@@ -128,6 +129,15 @@ class EvaluatorPart(_Frozen):
     split: Literal["development", "held_out"] | None
     admission: Admission
     blocking: tuple[Gap, ...]
+
+    @model_validator(mode="after")
+    def admitted_needs_evidence(self):
+        if self.admission == "admitted" and not (
+                self.issue_reviewed and self.reference_test and self.split and "G10" not in self.blocking
+                and self.expected and self.expected.basis == "observed" and self.expected.chain is not None):
+            raise ValueError("admitted requires a reviewed issue, reference test, split, observed expectations "
+                             "with a chain oracle, and no G10")
+        return self
 
 
 class CaseManifest(_Frozen):

@@ -65,6 +65,7 @@ def _set(part, key, value):
     (_set("evaluator", "reference_test", {"path": "../README.md", "sha256": "0" * 64}), "confined"),
     (_set("evaluator", "blocking", ["G99"]), "blocking"),
     (_set("agent", "baseline", "main"), "baseline"),
+    (_set("evaluator", "admission", "admitted"), "admitted requires"),
 ])
 def test_inconsistent_manifests_are_refused(tmp_path, change, message):
     with pytest.raises(ValueError, match=message):
@@ -110,3 +111,8 @@ def test_commit_fields_require_exactly_forty_hex_characters(commit):
     for field in ("baseline", "candidate"):
         with pytest.raises(ValidationError):
             AgentPart(**good | {field: commit})
+
+
+def test_unmeasured_execution_limits_stay_visible_in_the_report():
+    blocked = counts(load())["by"]["blocking"]
+    assert blocked["G13"] == 50
