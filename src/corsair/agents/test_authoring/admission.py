@@ -4,8 +4,10 @@ The operator witness (SPEC-0033) installs its own audit hook and ``sys.monitorin
 identified target, so a test that installs hooks, traces, forges audit events or patches the observed
 facility re-implements or interferes with the oracle (PLAN-0039: a self-made hook made one security test
 vacuous and broke another run's control). This is a deterministic Python AST check of what the file says,
-not proof of behaviour: dynamic construction it cannot see stays possible, and the witness stays
-tamper-evident, not tamper-proof.
+not proof of behaviour. The usual dynamic routes are refused outright (getattr, vars, eval, exec, compile,
+__import__, attrgetter, methodcaller, importlib); the authoring eval imports DYNAMIC_CALLS and this check
+(evals/test_authoring/admission.py), so a patch the stage admits is scored with the same rule. Constructions
+beyond those stay possible, so the witness stays tamper-evident, not tamper-proof.
 """
 
 import ast
@@ -18,7 +20,13 @@ SYS_FACILITIES = {"addaudithook", "audit", "monitoring", "settrace", "setprofile
 THREADING_FACILITIES = {"settrace", "setprofile", "settrace_all_threads", "setprofile_all_threads"}
 # Modules whose import replaces, traces or reaches below the observed facilities.
 MODULES = {"ctypes", "_testcapi", "_testinternalcapi", "tracemalloc", "trace", "bdb", "pdb", "unittest.mock", "mock",
-           "pytest_mock", "builtins", "_io"}
+           "pytest_mock", "builtins", "_io", "importlib"}
+# Calls that reach a facility by computed name or code string, refused whatever their arguments.
+# Builtins count only as bare names (re.compile stays allowed); the module functions count in any spelling.
+DYNAMIC_CALLS = frozenset({"__import__", "eval", "exec", "compile", "getattr", "vars"})
+DYNAMIC_FUNCTIONS = frozenset({"attrgetter", "methodcaller", "import_module"})
+# Modules whose members a star import would bind under bare names the attribute rules cannot see.
+STAR_REFUSED = {"sys", "threading"}
 # Facilities a patch would replace under the witness: file, process, network and import machinery.
 PATCHED = {"builtins", "io", "_io", "os", "posix", "pathlib", "shutil", "subprocess", "socket", "importlib", "open"}
 # Patch targets inside those roots that change inputs, not observation, and stay allowed; and sys.modules, whose
@@ -26,6 +34,8 @@ PATCHED = {"builtins", "io", "_io", "os", "posix", "pathlib", "shutil", "subproc
 UNOBSERVED_TARGETS = {"os.environ"}
 PATCHED_EXACT = {"sys.modules"}
 PATCH_CALLS = {"setattr", "delattr", "setitem", "delitem", "patch"}
+# Keyword spellings of a patch call's target and name: monkeypatch.setattr(target=os, name="system", value=f).
+PATCH_KEYWORDS = {"target", "name", "obj", "dic"}
 # Names whose string form is only useful to reach the facilities above dynamically.
 NAMES = SYS_FACILITIES - {"audit", "monitoring"} | {"settrace_all_threads", "setprofile_all_threads", "__builtins__"}
 
@@ -77,7 +87,11 @@ def _resolved(node: ast.AST, aliases: dict[str, str]) -> str | None:
 
 
 def _unobserved(target: str | None) -> bool:
-    return bool(target) and any(target == allowed or target.startswith(allowed + ".") for allowed in UNOBSERVED_TARGETS)
+    """os.environ at any depth (app.os.environ is the same mapping) changes inputs, not observation."""
+    if not target:
+        return False
+    padded = f".{target}."
+    return any(f".{allowed}." in padded for allowed in UNOBSERVED_TARGETS)
 
 
 def _protected(target: str | None) -> bool:
@@ -131,12 +145,18 @@ def self_observation(content: str) -> tuple[AdmissionFinding, ...]:
 
     for node in ast.walk(tree):
         if isinstance(node, (ast.Import, ast.ImportFrom)):
+            if isinstance(node, ast.ImportFrom) and not node.level and any(a.name == "*" for a in node.names) and (
+                    node.module in STAR_REFUSED or node.module in PATCHED):
+                refuse(node, f"import {node.module}.*")
             for name in _imported(node):
                 if name in MODULES or name.split(".")[0] in MODULES - {"unittest.mock"}:
                     refuse(node, f"import {name}")
                 if name in {f"sys.{facility}" for facility in SYS_FACILITIES} | {
                         f"threading.{facility}" for facility in THREADING_FACILITIES}:
                     refuse(node, f"import {name}")
+        elif isinstance(node, ast.Attribute) and node.attr in {"__import__", "__dict__"} and (
+                node.attr == "__import__" or _resolved(node.value, aliases) in STAR_REFUSED | PATCHED):
+            refuse(node, f"{_resolved(node.value, aliases) or '?'}.{node.attr}")
         elif isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
             if node.value.id in sys_modules and node.attr in SYS_FACILITIES:
                 refuse(node, f"sys.{node.attr}")
@@ -167,10 +187,12 @@ def self_observation(content: str) -> tuple[AdmissionFinding, ...]:
         if isinstance(node, ast.Call):
             func = _dotted(node.func)
             name = func.rsplit(".", 1)[-1] if func else None
+            if (isinstance(node.func, ast.Name) and name in DYNAMIC_CALLS) or name in DYNAMIC_FUNCTIONS:
+                refuse(node, f"{func}()")
             if name in PATCH_CALLS:
-                # monkeypatch.setattr(os, "open", f), setattr(builtins, ...), monkeypatch.setattr("builtins.open", f)
-                # and a patch of any module's own "open" name.
-                for argument in node.args[:2]:
+                # monkeypatch.setattr(os, "open", f), setattr(builtins, ...), monkeypatch.setattr("builtins.open", f),
+                # a patch of any module's own "open" name, and the same in keyword form.
+                for argument in [*node.args[:2], *(k.value for k in node.keywords if k.arg in PATCH_KEYWORDS)]:
                     patched = argument.value if isinstance(argument, ast.Constant) and isinstance(
                         argument.value, str) else _resolved(argument, aliases)
                     if _protected(patched):
@@ -179,4 +201,4 @@ def self_observation(content: str) -> tuple[AdmissionFinding, ...]:
     return tuple(AdmissionFinding(line=line, facility=construct[:128]) for line, construct in sorted(found))
 
 
-__all__ = ["REVIEWED_SELF_OBSERVING", "self_observation"]
+__all__ = ["DYNAMIC_CALLS", "REVIEWED_SELF_OBSERVING", "self_observation"]

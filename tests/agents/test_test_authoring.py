@@ -442,6 +442,25 @@ def test_tools_are_withdrawn_at_the_tool_call_cap_and_the_author_returns_its_out
     ("import documents\ndocuments.subprocess.run = print\n", "assign documents.subprocess.run"),
     ("import documents\n\ndef test_x(monkeypatch):\n    monkeypatch.setattr(documents.os, 'open', print)\n",
      "monkeypatch.setattr(documents.os)"),
+    # Claude review on 236bdab: string targets, references through the target module, keyword arguments.
+    ("def test_x(monkeypatch):\n    monkeypatch.setattr('app.mod.subprocess.run', print)\n",
+     "monkeypatch.setattr(app.mod.subprocess.run)"),
+    ("def test_x(monkeypatch):\n    monkeypatch.setattr('app.mod.open', print)\n", "monkeypatch.setattr(app.mod.open)"),
+    ("import app.mod as m\nm.subprocess.run = print\n", "assign app.mod.subprocess.run"),
+    ("from app.mod import os as aos\naos.system = print\n", "assign app.mod.os.system"),
+    ("def test_x(monkeypatch):\n    monkeypatch.setattr(target='os.system', value=print)\n",
+     "monkeypatch.setattr(os.system)"),
+    ("import os\n\ndef test_x(monkeypatch):\n    monkeypatch.setattr(target=os, name='system', value=print)\n",
+     "monkeypatch.setattr(os)"),
+    # Forged events and monitoring by computed name, star import or dynamic import.
+    ("import sys\ngetattr(sys, 'audit')('open', '/x', 'r')\n", "getattr()"),
+    ("import sys\ngetattr(sys, 'monitoring').use_tool_id(3, 'x')\n", "getattr()"),
+    ("import sys\nsys.__dict__['audit']('open', '/x', 'r')\n", "sys.__dict__"),
+    ("import operator\nimport sys\noperator.attrgetter('audit')(sys)\n", "operator.attrgetter()"),
+    ("from sys import *\naddaudithook(print)\n", "import sys.*"),
+    ("import importlib\nimportlib.import_module('ctypes')\n", "importlib.import_module()"),
+    ("import importlib\nimportlib.__import__('ctypes')\n", "importlib.__import__"),
+    ("import os\nvars(os)['system'] = print\n", "vars()"),
 ])
 def test_aliased_and_direct_patches_of_observed_facilities_are_found(content, facility):
     """Review on #49: aliases of protected modules and plain assignments must not bypass admission."""
@@ -451,3 +470,4 @@ def test_aliased_and_direct_patches_of_observed_facilities_are_found(content, fa
 def test_rebinding_a_local_name_or_setting_the_environment_is_not_a_patch():
     assert self_observation("import os\nos.environ['LANG'] = 'C'\nopen_count = 0\n") == ()
     assert self_observation("import documents\ndocuments.CONFIG = {}\ndocuments.os_name = 'x'\n") == ()
+    assert self_observation("import re\nimport app.mod as m\nPATTERN = re.compile('x')\nm.os.environ['LANG'] = 'C'\n") == ()

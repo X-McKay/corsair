@@ -11,7 +11,7 @@ related: [SPEC-0043, PLAN-0039, HANDOFF-0057, SPEC-0033, SPEC-0035, SPEC-0038]
 
 ## Objective and dependencies
 
-Implement SPEC-0043 on main `edaea39` (after #38, #43, #41, #40): authoring prompt v6 and a deterministic authored-test admission check, and per-stage tool budgets derived from the task with typed exhaustion. Then rerun the profiled three-run fully live chain on RIG0 with the operator witness, as PLAN-0039 did, and compare. The live run needs the kind cluster, held by the "Path to running all benchmarks" thread; it is requested by cross-session handover.
+Implement SPEC-0043 on main `edaea39` (after #38, #43, #41, #40): authoring prompt v6 (v7 after review) and a deterministic authored-test admission check, and per-stage tool budgets derived from the task with typed exhaustion. Then rerun the profiled three-run fully live chain on RIG0 with the operator witness, as PLAN-0039 did, and compare. The live run needs the kind cluster, held by the "Path to running all benchmarks" thread; it is requested by cross-session handover.
 
 ## Steps
 
@@ -26,12 +26,14 @@ Implement SPEC-0043 on main `edaea39` (after #38, #43, #41, #40): authoring prom
 
 Cloud container, 2026-10-13, branch `claude/author-witness-boundary-el02vx`:
 
-- `make test-config`: 854 passed on main `b5f5faf` before the change; 965 passed after merging `edaea39` with the change.
+- `make test-config`: 854 passed on main `b5f5faf` before the change; 965 passed after merging `edaea39` with the change; 1009 after merging main at `8c29e16` (2d1c476); 1070 at 236bdab; 1076 at 23d2ee4; see the latest entry below.
 - Native Temporal (pinned CLI 1.9.1 dev server on loopback, archive and binary hashes checked against `deploy/temporal/runtime-lock.yaml`): `pytest tests/temporal --temporal-address 127.0.0.1:7233` 47 passed; the over-budget and timed-out stage now closes as the same typed exhaustion in both modes.
 - Scripted chain dataset (`evals.fixture_chain.evaluate`), direct and durable: 5/5 cases pass in each; derived caps per stage identification 4 tools / 7 requests, planning 4/7, authoring 14/17, assessment 11/14 (slack 2 at that point; slack 3 gives 12/15); scripted usage 1, 2, 4 and 9 tool calls.
 - Scripted assessment dataset (`evals.evidence_assessment.evaluate`, development split): 51/51 attempts pass all evaluators with per-case derived caps.
 - Scripted authoring dataset: 16/16 attempts (8 cases × 2), including the two new admission cases. After the read fix: 18/18 (9 cases × 2), the new read case answered one absent path typed and finished as a patch.
 - Scripted fixture E2E (`evals.fixture_e2e.run`): complete, gate completed / reproduced / verified with the reviewed bytes admitted by digest.
+
+All eval results above are scripted. No live isolated `make eval` baseline exists yet for any version this PR changes: authoring `test-authoring-v7`/config-v3, planning config-v3 (fixture tool cap 8 to 4), identification config-v4, repository identification config-v3, assessment config-v2. The host-only authoring v5 run on RIG0 (pre-2d1c476 head) shared the model server with the per-agent baselines from about 09:44Z and is not comparable.
 
 Before (PLAN-0039 v5 live rerun): authoring self-made audit hooks 2/3 (one vacuous inverted security test, one broken control); tool-call cap ended authoring 1/3 and assessment 1/3; admitted fully live verdict 1/3. After: pending the live rerun.
 
