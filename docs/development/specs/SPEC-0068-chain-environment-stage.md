@@ -4,7 +4,7 @@ kind: spec
 title: The environment agent as a chain stage
 status: draft
 updated: 2026-10-13
-related: [SPEC-0060, SPEC-0042, SPEC-0029, SPEC-0053, SPEC-0035, IDEA-0005, PLAN-0074]
+related: [SPEC-0060, SPEC-0042, SPEC-0029, SPEC-0053, SPEC-0035, IDEA-0005, PLAN-0074, PLAN-0075]
 ---
 
 # The environment agent as a chain stage
@@ -17,7 +17,7 @@ SPEC-0060 made runtime selection the chain's first stage, but the environment th
 - for a supported runtime, the chain builds `EnvironmentInput` with the selected row as the only toolchain (`environment_input`), prepares a sandbox of that row's prepared image through an operator port, and runs the environment agent there;
 - a ready result is checked against the selection (`check_ready`) and mapped onto the `EnvironmentEvidence` and `EnvironmentIdentity` the later stages and gates read; blocked, unsupported, a refused ready result or a failed run end the run at stage `environment` with the reason and the agent's diagnostics.
 
-Excluded: the durable mode of the stage (a following slice; until then a durable request whose case carries setup source stops at `environment` with a typed reason, never silently using the declaration), running the frozen revisions on the prepared sandbox or its recipe (the revision runners stay operator-owned), the dependency inventory node (SPEC-0026), changes to the environment agent's prompt, skill or tools, matrix rows and live runs.
+Excluded: running the frozen revisions on the prepared sandbox or its recipe (the revision runners stay operator-owned), the dependency inventory node (SPEC-0026), changes to the environment agent's prompt, skill or tools, matrix rows and live runs.
 
 ## Boundaries and design
 
@@ -31,7 +31,7 @@ Excluded: the durable mode of the stage (a following slice; until then a durable
 
 - `check_ready(result, selection, prepared)` must pass: the selected row's id and prepared image, and a framework the selection admitted.
 - `EnvironmentEvidence` from the ready result: `language`, `runtime`, `framework`, `discovery_command`, `approved_test_paths` and `baseline_test` (id and path) are observed; `observation_facilities` and `witness_facilities` stay the operator's (they name operator recorders, not anything the agent prepares), and so does `scratch_location`: the result's is the preparation sandbox's, which is released when the stage ends, while the revisions run in the operator's runners' own scratch, where planning places fixtures and witness `file_open` subjects (review of `6ec2632`).
-- Trust: `discovery_command` and `approved_test_paths` are now agent-proposed. The agent's discovery command is admitted only as having succeeded and printed the baseline id in the preparation sandbox; planning must echo it exactly, and each revision runner admits what it executes (the Maven, TAP, Jest and Minitest runners accept only the operator's prefix; the pytest runner runs the command in its own workspace). `approved_test_paths` may not name a saved setup file.
+- Trust: `discovery_command` and `approved_test_paths` are now agent-proposed. The agent's discovery command is admitted only as having succeeded and printed the baseline id in the preparation sandbox; planning must echo it exactly, and each revision runner admits what it executes (since #104 the Maven, TAP, Jest and Minitest runners accept it without running it and build their own listing; the pytest runner runs the command in its own workspace). `approved_test_paths` may not name a saved setup file.
 - `EnvironmentIdentity`: `image_digest` is the digest of the ready result's `toolchain_image` and `recipe_sha256` the SHA-256 of the canonical JSON of the admitted recipe, build command, discovery command and baseline command. `dependency_inventory_sha256`, `policy_revision` and `limits_sha256` stay the operator's declaration until the inventory node and policy receipts exist, and the run records that limitation.
 
 The mapped evidence replaces the declaration for planning, authoring, freezing, the gates and assessment. The SPEC-0060 declared-identity check is skipped when the stage ran, since the identity is now observed.
@@ -40,6 +40,14 @@ The mapped evidence replaces the declaration for planning, authoring, freezing, 
 
 **Why bespoke.** The mapping is a field copy plus one digest; the port is the existing `SandboxExecution`/`SandboxHandle` pair with a lifecycle around it. PydanticAI runs the agent as everywhere else.
 
+## Durable mode (PLAN-0075)
+
+The durable chain runs the whole stage as one Temporal activity, `corsair.chain.prepare_environment` (a frozen name), scheduled once with no retry on the worker that holds the operator's `Preparation` and the environment model. The activity prepares the sandbox, runs the same agent factory with the same dependencies as direct mode, releases the sandbox and returns a typed record: the result, usage, messages, elapsed time, failure kind, limits and cleanup. Direct mode and the activity share one function, so their routing and stops match.
+
+Why one activity and not a `TemporalAgent` with per-call activities: the agent's trusted setup ledger (records, full command output for the finalizer's discovery and baseline checks, halt and correction state) and the live sandbox handle must persist across tool calls, and PydanticAI discards dependency mutations made inside a tool activity by design. Rebuilding the ledger from messages would lose the full output the finalizer reads, and a sandbox cannot be resumed after a worker loss anyway: the stage is not retried because setup commands have side effects. Model requests therefore run inside the activity rather than as their own activities; a worker loss during the stage is a recorded activity failure that ends the run at `environment`.
+
+Worker configuration: `configure_chain(..., preparation=)` and `run_durable(..., preparation=)`, the environment model under its own key (`StageKeys.environment`, admitted like the others), and the activity's start-to-close timeout is the stage's `timeout_seconds` plus a fixed margin for sandbox preparation and release. `ChainResult.environment` and `AttemptRecord.cleanup` carry what `DirectRun` carries.
+
 ## Acceptance and validation
 
 Offline, with a scripted environment model and a host double for the preparation port:
@@ -47,13 +55,13 @@ Offline, with a scripted environment model and a host double for the preparation
 - ready continues: planning receives the mapped `EnvironmentEvidence`, the gate's runs carry the observed `image_digest` and `recipe_sha256`, and the limitations name the declared dependency, policy and limit fields;
 - blocked, unsupported, a ready result on another toolchain or with an unadmitted framework, and a failed agent run stop at `environment` before identification, with no revision run;
 - no preparation port stops with `PreparationMissing`; no setup source keeps the declared path and its limitation; unconfirmed cleanup is recorded;
-- durable mode stops at `environment` with a typed reason for a case with setup source and is otherwise unchanged;
+- durable mode (PLAN-0075) gives the same routing, result and limitations as direct mode for a ready case and a blocked case, with exactly one `prepare_environment` activity scheduled at one attempt; a worker without a preparation port or environment model stops with `PreparationMissing`;
 - `make test-config`, `make eval AGENT=chain` and `make eval AGENT=environment` unchanged (no frozen eval case carries setup source yet).
 
 ## Decisions and open questions
 
-- Direct mode first; the durable stage needs the sandbox lifecycle as activities and the setup ledger rebuilt per tool activity, and follows in its own slice.
+- Direct mode landed first (PLAN-0074, PR #100); the durable stage is one activity (PLAN-0075).
 - The revision runners still choose their own image. Binding them to the prepared sandbox's image (or recipe) is a later decision; until then the runs' identity names the selected image, which the operator's runner configuration must match.
 - A chain eval case with setup source and a recorded preparation double is the next eval addition.
 
-The plan is [PLAN-0074](../plans/PLAN-0074-chain-environment-stage.md).
+The plans are [PLAN-0074](../plans/PLAN-0074-chain-environment-stage.md) (direct mode) and [PLAN-0075](../plans/PLAN-0075-durable-environment-stage.md) (durable mode).

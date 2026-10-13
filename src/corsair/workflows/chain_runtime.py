@@ -13,7 +13,7 @@ Activity names are frozen replay contracts.
 import asyncio
 from contextlib import contextmanager
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Generic, Literal, TypeVar
 from uuid import UUID
 
@@ -29,14 +29,18 @@ from temporalio import activity
 from temporalio.exceptions import ActivityError, ApplicationError, ChildWorkflowError, FailureError
 from temporalio.workflow import ActivityConfig
 
+from corsair.agents.environment.contracts import (
+    BlockedEnvironment, EnvironmentInput, ReadyEnvironment, UnsupportedEnvironment,
+)
 from corsair.agents.evidence_assessment.contracts import EvidenceAssessment
 from corsair.agents.issue_identification.contracts import IssueIdentification
 from corsair.agents.test_authoring.contracts import AuthoringResult, TestAuthoringInput, TestPatch
 from corsair.agents.test_authoring.dependencies import AuthoringBudget, AuthoringDependencies
 from corsair.agents.test_planning.contracts import ReadyTestPlan, TestPlan
 from corsair.composition.direct import (
-    AGENTS, NO_CATALOG, AgentStage, BudgetExhausted, CompositionBudget, DirectRun, FixtureCase, Purpose,
-    RecordedFailure, Runners, RuntimeCatalogMissing, Stage, StageLimits, cap_reached,
+    AGENTS, NO_CATALOG, NO_PREPARATION, AgentStage, BudgetExhausted, CompositionBudget, DirectRun, FixtureCase,
+    Preparation, PreparationMissing, Purpose, RecordedFailure, Runners, RuntimeCatalogMissing, Stage, StageLimits,
+    cap_reached, prepare_environment,
 )
 from corsair.core.disposition import GateResult, ObservationPlan
 from corsair.nodes.runtime.contracts import RuntimeInputs, RuntimeOutcome
@@ -64,6 +68,8 @@ class StageKeys:
     planning: str
     authoring: str
     assessment: str
+    # Only a case with setup source needs it; without it that case stops at `environment` (SPEC-0068).
+    environment: str | None = None
 
 
 @dataclass(frozen=True)
@@ -104,7 +110,27 @@ class ChainRequest:
     budget: CompositionBudget
 
 
-StageOutput = IssueIdentification | TestPlan | AuthoringResult | EvidenceAssessment
+StageOutput = (ReadyEnvironment | BlockedEnvironment | UnsupportedEnvironment | IssueIdentification | TestPlan
+               | AuthoringResult | EvidenceAssessment)
+
+
+@dataclass(frozen=True)
+class EnvironmentRequest:
+    inputs: EnvironmentInput
+    model_key: str
+    budget: CompositionBudget
+
+
+@dataclass(frozen=True)
+class EnvironmentRecord:
+    """What the environment activity observed; limits are derived again in the workflow from the same inputs."""
+    output: ReadyEnvironment | BlockedEnvironment | UnsupportedEnvironment | None
+    usage: RunUsage | None
+    messages: tuple[ModelMessage, ...]
+    elapsed_seconds: float
+    failure: FailureRecord | None
+    exhausted: BudgetExhausted | None
+    cleanup: Literal["confirmed", "unconfirmed"] | None
 
 
 @dataclass(frozen=True)
@@ -117,6 +143,7 @@ class AttemptRecord:
     failure: FailureRecord | None
     limits: StageLimits | None = None
     exhausted: BudgetExhausted | None = None
+    cleanup: Literal["confirmed", "unconfirmed"] | None = None
 
     @property
     def tool_cap_reached(self) -> bool:
@@ -147,6 +174,7 @@ class ChainResult:
     witnesses: tuple[WitnessEvidence, ...] = ()
     limitations: tuple[str, ...] = ()
     runtime: RuntimeOutcome | None = None
+    environment: ReadyEnvironment | BlockedEnvironment | UnsupportedEnvironment | None = None
 
 
 def failure_record(failure: BaseException) -> FailureRecord:
@@ -170,12 +198,12 @@ def chain_result(run: DirectRun) -> ChainResult:
     return ChainResult(
         stopped_at=run.stopped_at, reason=run.reason,
         attempts=tuple(AttemptRecord(a.stage, a.output, a.usage, a.messages, a.elapsed_seconds, failure(a.failure),
-                                     a.limits, a.exhausted) for a in run.attempts),
+                                     a.limits, a.exhausted, a.cleanup) for a in run.attempts),
         identification=run.identification, plan=run.plan, patch=run.patch, observation_plan=run.observation_plan,
         executions=tuple(ExecutionRecord(revision=e.revision, operation=e.operation, observed=e.observed,
                                          failure=failure(e.failure)) for e in run.executions),
         gate=run.gate, assessment=run.assessment, witnesses=run.witnesses,
-        limitations=run.limitations, runtime=run.runtime)
+        limitations=run.limitations, runtime=run.runtime, environment=run.environment)
 
 
 def within(budget: CompositionBudget, ceiling: CompositionBudget) -> bool:
@@ -184,9 +212,10 @@ def within(budget: CompositionBudget, ceiling: CompositionBudget) -> bool:
             "tokens_per_request")
     return (isinstance(budget, CompositionBudget) and budget.dev_runs <= ceiling.dev_runs
             and budget.admission_refusals <= ceiling.admission_refusals
+            and budget.setup_commands <= ceiling.setup_commands
             and budget.output_retries == ceiling.output_retries
             and all(getattr(getattr(budget, stage), cap) <= getattr(getattr(ceiling, stage), cap)
-                    for stage in STAGES for cap in caps))
+                    for stage in STAGES + ("environment",) for cap in caps))
 
 
 @dataclass(frozen=True)
@@ -234,6 +263,9 @@ class ChainRuntime:
     runners: Runners
     ceiling: CompositionBudget
     catalog: RuntimeCatalog | None = None
+    # The environment stage runs its agent inside one activity, so its model is resolved here by key.
+    models: Mapping[str, Model] = field(default_factory=dict)
+    preparation: Preparation | None = None
 
 
 _runtime: ChainRuntime | None = None
@@ -264,10 +296,11 @@ def _unselected(messages: list[ModelMessage], info: Any) -> ModelResponse:
 
 def configure_chain(models: Mapping[str, Model], runners: Runners, *, activity_config: ActivityConfig,
                     ceiling: CompositionBudget = CompositionBudget(),
-                    catalog: RuntimeCatalog | None = None) -> ChainRuntime:
+                    catalog: RuntimeCatalog | None = None, preparation: Preparation | None = None) -> ChainRuntime:
     """Build each stage's agent once with native durability over the operator's models, keyed for requests.
 
-    ``catalog`` (runtime matrix and prepared images) answers the runtime stage of cases that carry build files."""
+    ``catalog`` (runtime matrix and prepared images) answers the runtime stage of cases that carry build files;
+    ``preparation`` prepares the environment stage's sandbox for cases that carry setup source."""
     global _runtime
     if _serving:
         raise RuntimeError("the chain configuration is held by a serving worker; it cannot be replaced")
@@ -282,7 +315,7 @@ def configure_chain(models: Mapping[str, Model], runners: Runners, *, activity_c
     # The default model only answers a request that named no key, which admission never lets through.
     agents = {stage: AGENTS[stage](FunctionModel(_unselected), output_retries=ceiling.output_retries,
                                    durability=durability(stage)) for stage in STAGES}
-    _runtime = ChainRuntime(agents, frozenset(models), runners, ceiling, catalog)
+    _runtime = ChainRuntime(agents, frozenset(models), runners, ceiling, catalog, dict(models), preparation)
     return _runtime
 
 
@@ -308,3 +341,18 @@ async def select_runtime(inputs: RuntimeInputs) -> RuntimeOutcome:
     if runtime is None or runtime.catalog is None:
         raise ApplicationError(NO_CATALOG, type=RuntimeCatalogMissing.__name__, non_retryable=True)
     return select_from_catalog(inputs, runtime.catalog)
+
+
+@activity.defn(name="corsair.chain.prepare_environment")
+async def run_environment(request: EnvironmentRequest) -> EnvironmentRecord:
+    """SPEC-0068 environment stage, whole, on the worker that holds the sandbox preparation; scheduled once.
+
+    The agent's setup ledger and the live sandbox stay in this one call (PLAN-0075); its model requests and tool
+    calls are not activities of their own."""
+    runtime = configured()
+    model = runtime and runtime.models.get(request.model_key)
+    if runtime is None or runtime.preparation is None or model is None:
+        raise ApplicationError(NO_PREPARATION, type=PreparationMissing.__name__, non_retryable=True)
+    attempt = await prepare_environment(request.inputs, model, runtime.preparation, request.budget)
+    return EnvironmentRecord(attempt.output, attempt.usage, attempt.messages, attempt.elapsed_seconds,
+                             attempt.failure and failure_record(attempt.failure), attempt.exhausted, attempt.cleanup)
