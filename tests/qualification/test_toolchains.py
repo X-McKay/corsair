@@ -218,7 +218,7 @@ def node_dependencies(kube, cli, sdk, name, remote, record, language):
     write = f"const fs=require('fs'); fs.mkdirSync('/tmp/cold'); fs.writeFileSync('/tmp/cold/package.json', {json.dumps(json.dumps(package))}); fs.writeFileSync('/tmp/cold/package-lock.json', {json.dumps(json.dumps(lock))});"
     result = execute(sdk, name, [NPM[0], '-e', write], remote)
     expect_completed(result, 0, '')
-    npm = [*NPM, '--cache', '/tmp/npm-cold', '--fetch-retries=0', '--fetch-timeout=10000']
+    npm = [*NPM, '--cache', '/tmp/npm-cold', '--fetch-retries=0']
     result = execute(sdk, name, [*npm, 'ci'], '/tmp/cold', timeout=120)
     expect_completed(result, 0, 'added 1 packages')
     result = execute(sdk, name, [NPM[0], '-e', "const p=require('/tmp/cold/node_modules/is-number/package.json'); console.log(p.version); console.log(require.resolve('is-number', {paths: ['/tmp/cold']}))"], remote)
