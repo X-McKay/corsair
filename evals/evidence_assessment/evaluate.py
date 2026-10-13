@@ -217,7 +217,8 @@ class EvaluationBudget(BaseModel):
     request_limit: int = Field(default=ASSESSMENT.request_limit, ge=1, le=64, strict=True)
     tool_calls_limit: int = Field(default=ASSESSMENT.tool_calls_limit, ge=0, le=48, strict=True)
     total_tokens_limit: int = Field(default=ASSESSMENT.total_tokens_limit, ge=1, le=262144, strict=True)
-    task_seconds: int = Field(default=600, ge=1, le=1800, strict=True)
+    # Room for full 32768-token responses (~235 s each on the local server) within one attempt.
+    task_seconds: int = Field(default=1200, ge=1, le=1800, strict=True)
     output_retries: int = Field(default=1, ge=0, le=1, strict=True)
 
     def limits(self, inputs: AssessmentInput) -> StageLimits:
