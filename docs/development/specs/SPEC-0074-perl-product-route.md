@@ -103,6 +103,25 @@ Excluded: process-start, socket and other effect kinds (the same gap exists for 
 
 ## Decisions and open questions
 
+- **Generic layers and language drivers** (audit, 2026-10-13). Selection, setup, the gate and the witness record
+  stay generic. Each piece of Perl code is a driver behind an existing contract, and each is Perl-specific for a
+  stated reason.
+  - *Selection and setup.* The matrix row picks the framework. The framework picks its one table entry, which holds
+    only data: runner, setup command, dependency location, lockfiles, `env` and facilities. No chain, build or gate
+    code tests for Perl. `Harness.env` and its use in `docker.workspace` are generic.
+  - *Assertion reader.* `perl.py` is one entry in authoring's existing `LANGUAGES` table behind the single
+    `assertion_lines(content, test_id)` contract, chosen by the id grammar as the JavaScript and Ruby readers are.
+    It is language-specific because the lines where a test can fail are a fact of its source syntax.
+  - *Failure type.* `not_ok` is set by the TAP report driver (`reports/tap.py`). The gate compares it with the
+    planned `exception_type` exactly as it compares a Python exception name, and has no Perl branch. It is
+    TAP-specific because a failed TAP assertion raises nothing and `not ok` is TAP's own result word.
+  - *Witness recorder.* The probe implements the shared `corsair-witness-v2` record. It is admitted by
+    `witness_evidence` through the generic digest set `PROBES`, and calibration and the gate are shared. Recorder
+    selection follows the table: the TAP runner, which the row's framework names, is the only code that starts the
+    Perl probe, as the pytest runner starts the Python one. Only the hook is Perl, because a file open can be seen
+    from inside an interpreter only through that language's own override point (`CORE::GLOBAL::open`, like
+    Python's audit hooks).
+  - Nothing found could be made generic with a smaller change, so no code changed in this audit.
 - `file_open` is the Perl recorder's only kind, matching Python. In the Docker runs, all three corpus Perl
   development topics needed no CPAN download and ran cleanly. Their tests told the revisions apart, but their effects
   have no recorder in any language: process start (cmdi), a credential check (adminpw) and a header string
