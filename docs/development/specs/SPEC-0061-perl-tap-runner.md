@@ -13,7 +13,7 @@ related: [SPEC-0056, SPEC-0042, SPEC-0007, SPEC-0045, PLAN-0066]
 
 [SPEC-0056](SPEC-0056-perl526-toolchain.md) adds the `perl526` image; the six Perl cases it covers still select nothing, because SPEC-0042 needs a `tap-harness` framework row and a framework row needs a Corsair runner. This spec adds that runner: a native Test::More runner beside `adapters/pytest_runner.py` and `adapters/maven_runner.py`, its report parser, and the staged framework row scoped to the `perl526` image row.
 
-Not in scope: the environment agent admitting `tap-harness` (its framework list and setup skill change behaviour that needs its own eval baseline, a follow-up); CPAN dependency installation through OpenShell policy; Dist::Zilla projects with no `Makefile.PL` (CPANSA-Dancer2-2018-01 and CVE-2026-8450 keep only `dist.ini`, so they need `dzil build` or the CPAN release tarball, decided in a follow-up); Module::Build; witnesses (no Perl probe exists, so a witness request is reported `unavailable` and nothing runs); the matrix rows, which land after the live gate batch.
+Not in scope here, done afterwards: the environment agent admitting `tap-harness` (one `.t` file run by `prove -v` as its baseline; PLAN-0066 records it and its eval). Not in scope: CPAN dependency installation through OpenShell policy; Dist::Zilla projects with no `Makefile.PL` (CPANSA-Dancer2-2018-01 and CVE-2026-8450 keep only `dist.ini`, so they need `dzil build` or the CPAN release tarball, decided in a follow-up); Module::Build; witnesses (no Perl probe exists, so a witness request is reported `unavailable` and nothing runs); the matrix rows, which land after the live gate batch.
 
 ## Boundaries and design
 
@@ -33,4 +33,4 @@ Offline: unit tests over real Perl 5.26.3 output captured in the image (`tests/u
 
 ## Decisions and open questions
 
-The parser derives from the stream, not prove's summary, because prove passes skips, todos and empty runs. Environment-agent admission and Dist::Zilla handling are follow-ups named above. Al's answer on the discovery card may change the discovery section. Plan: [PLAN-0066](../plans/PLAN-0066-perl-tap-runner.md).
+The parser derives from the stream, not prove's summary, because prove passes skips, todos and empty runs. Dist::Zilla handling is a follow-up named above. Al's answer on the discovery card may change the discovery section. Plan: [PLAN-0066](../plans/PLAN-0066-perl-tap-runner.md).

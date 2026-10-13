@@ -23,7 +23,8 @@ Implement [SPEC-0061](../specs/SPEC-0061-perl-tap-runner.md). It needs the `perl
 - [ ] Al's answer on the discovery decision card (listing preload recommended and implemented).
 - [x] #65 merged (main c31997c); branch restarted from main with the runner commit.
 - [x] Draft PR #77; CI green; review ready with two optional notes (they ride the next code push).
-- [ ] Follow-ups: environment-agent admission of `tap-harness` with its eval baseline; Dist::Zilla cases; the remaining three `Makefile.PL` cases under Docker; matrix rows after the kind gate batch.
+- [x] Environment-agent admission of `tap-harness` (framework entry, skill line, prompt `environment-v5-tap-harness`, selection mapping); scripted eval 16/16; live eval waits for the model server.
+- [ ] Follow-ups: Dist::Zilla cases; the remaining three `Makefile.PL` cases under Docker; matrix rows after the kind gate batch.
 
 ## Validation and progress
 
@@ -33,6 +34,10 @@ CVE-2023-31486 through `perl_image_case.py` with HTTP-Tiny from upstream (setup:
 
 `pytest tests/unit/test_tap_runner.py`: 27 passed. `make test-config`: 1305 passed on the #65 branch head 9fa9a7a plus this change; 1314 on main c31997c.
 
+2026-10-13, environment-agent admission (branch restarted from main 164a556 after #89): the agent's framework table gains `tap-harness`. Its baseline unit is one repository-relative `.t` file, as `prove --dry` prints it (the runner's `file.t#subtest` ids stay runner-only). The baseline command must run `prove --norc` on exactly that file (`--norc` keeps a project `.proverc` from adding options unseen), with no dry run, saved state, `--exec`, archive, rules, other harness, plugin (`-P`) or module (`-M`), and the id refuses `.`/`..` segments (review of 511c4dc); admission needs verbose output (`ok N` lines), `Files=1, Tests=N>0`, `Result: PASS`, and no skip, todo, skip-all, `1..0` or `not ok` line, because prove's own summary passes all of those. Checked against prove 3.38 output captured in the `perl526` image (passing, skipped, todo, nested skip-all, skip-all file) and against HTTP-Tiny `77f557e` built offline in the image: `prove --dry -b t/` lists `t/000_load.t`, and `prove --norc -bv t/000_load.t` is admitted. `nodes/runtime/environment.py` maps the `tap-harness` row to it, so a Perl selection admits a `tap-harness` ready result and nothing else. `make eval AGENT=environment` (scripted, development set): 16/16 clean, no earlier scripted run to compare. The frozen set has no Perl case, and the live eval against the model server was not run here (one live user at a time); it is the remaining measurement for this prompt change.
+
+End to end, a Perl case also needs #73's chain framework-name check to accept `tap-harness`; that check refuses hyphenated names, and the chain thread's environment-stage PR owns the fix.
+
 ## Decisions and next action
 
-Listing preload is implemented as recommended on the decision card; if Al picks another option, discovery changes and the parser and execution stay. The environment agent's framework list is untouched, because changing it moves that agent's baseline. Next: the draft PR and CI; the image-case harness takes the same clean-checkout and config-id checks as #74 does for the Java harness.
+Listing preload is implemented as recommended on the decision card; if Al picks another option, discovery changes and the parser and execution stay. The environment agent's framework list now includes `tap-harness`; the prompt identity moved so its live baseline is compared, not mixed. Next: the draft PR and CI; the image-case harness takes the same clean-checkout and config-id checks as #74 does for the Java harness.
