@@ -24,7 +24,7 @@ from corsair.agents.test_planning.contracts import TestPlan
 from corsair.composition.direct import CompositionBudget, RecordedFailure, StageModels, run_direct
 from corsair.composition.evidence import freeze
 from corsair.nodes.runtime.contracts import MAX_INPUT_BYTES, RuntimeInputs, RuntimeOutcome
-from corsair.nodes.runtime.environment import RuntimeCatalog
+from corsair.nodes.runtime.environment import RuntimeCatalog, runtime_inputs
 from corsair.nodes.runtime.matrix import load
 from corsair.ports.test_runner import ApprovedPatch, PatchFile
 from corsair.workflows.chain import _admit, run_durable
@@ -113,10 +113,14 @@ def test_runtime_stage_payloads_and_worker_activity(tmp_path):
         assert await roundtrip(outcome, RuntimeOutcome) == outcome
         result = ChainResult(stopped_at="runtime", reason=outcome.reason, attempts=(), runtime=outcome)
         assert await roundtrip(result, ChainResult) == result
-        # The largest admitted build-file set still fits Temporal's default 2 MB payload limit with the case around it.
-        full = RuntimeInputs(files={"poetry.lock": os.urandom(MAX_INPUT_BYTES)})
-        (payload,) = await CONVERTER.encode([replace(request, case=replace(request.case, runtime=full))])
-        assert len(payload.SerializeToString()) < 2_000_000
+        # The largest inputs `runtime_inputs` admits (one big lockfile, or thousands of long paths) still fit
+        # Temporal's default 2 MB payload limit with the case around them.
+        many = {f"pkg{i:05d}/{'x' * 900}/pom.xml": b"" for i in range(3000)}
+        for files in ({"poetry.lock": os.urandom(MAX_INPUT_BYTES)}, many, {**many, "poetry.lock": os.urandom(700_000)}):
+            full = runtime_inputs(files)
+            assert (full.files or full.omitted) and len(full.__pydantic_serializer__.to_json(full)) <= MAX_INPUT_BYTES
+            (payload,) = await CONVERTER.encode([replace(request, case=replace(request.case, runtime=full))])
+            assert len(payload.SerializeToString()) < 2_000_000
     asyncio.run(check())
 
 

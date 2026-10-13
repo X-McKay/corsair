@@ -107,15 +107,15 @@ class Undetermined(_Frozen):
 Selection = Annotated[Union[Supported, Unsupported, Undetermined], Field(discriminator='status')]
 
 
-# Raw bytes of build files and parent POMs one case may carry. Base64 makes that about 1.4 MB, which leaves the
-# rest of the chain request well inside Temporal's default 2 MB payload limit; larger inputs are omitted by name.
+# Bound on the encoded JSON of `RuntimeInputs` (paths, keys and base64 bytes included), not on raw content: the
+# whole chain request must stay under Temporal's default 2 MB payload limit.
 MAX_INPUT_BYTES = 1 << 20
 
 
 class RuntimeInputs(_Frozen):
     """SPEC-0060 operator input: the baseline revision's build files, never shown to an agent. Bytes cross a
-    Temporal payload as base64 so non-UTF-8 content survives; `omitted` names build files left out to stay within
-    `MAX_INPUT_BYTES`, which selection reports as unresolved (so undetermined) in every mode."""
+    Temporal payload as base64 so non-UTF-8 content survives; `omitted` names build files left out to keep the encoded
+    inputs within `MAX_INPUT_BYTES`, which selection reports as unresolved (so undetermined) in every mode."""
     model_config = ConfigDict(extra='forbid', frozen=True, ser_json_bytes='base64', val_json_bytes='base64')
     files: dict[str, bytes] = Field(description='Project-relative path to bytes from the captured snapshot')
     language: Language | None = None
@@ -125,8 +125,8 @@ class RuntimeInputs(_Frozen):
 
     @model_validator(mode='after')
     def bounded(self) -> 'RuntimeInputs':
-        if sum(len(v) for v in (*self.files.values(), *self.parents.values())) > MAX_INPUT_BYTES:
-            raise ValueError(f'runtime inputs exceed {MAX_INPUT_BYTES} bytes; omit the largest build files by name')
+        if len(self.__pydantic_serializer__.to_json(self)) > MAX_INPUT_BYTES:
+            raise ValueError(f'runtime inputs encode to over {MAX_INPUT_BYTES} bytes; omit the largest build files by name')
         return self
 
 

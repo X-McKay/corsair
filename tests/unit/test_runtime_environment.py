@@ -111,3 +111,16 @@ def test_inputs_over_the_payload_bound_are_omitted_by_name_and_leave_selection_u
     with pytest.raises(ValueError):
         RuntimeInputs(files={'pyproject.toml': pyproject, 'poetry.lock': lock})
     assert select_runtime(runtime_inputs({'pyproject.toml': pyproject}), RuntimeCatalog(load(), PREPARED)).diagnostic is None
+
+
+def test_payload_bound_counts_paths_and_encoding_not_only_content():
+    """Empty files with long paths carry no content but still grow the payload (merge review of #73)."""
+    many = {f'pkg{i:06d}/{"x" * 200}/pom.xml': b'' for i in range(20000)}
+    with pytest.raises(ValueError):
+        RuntimeInputs(files=many)
+    inputs = runtime_inputs(many)
+    assert inputs.files and len(inputs.omitted) == 64
+    assert len(inputs.__pydantic_serializer__.to_json(inputs)) <= MAX_INPUT_BYTES
+    assert select_runtime(inputs, RuntimeCatalog(load(), PREPARED)).status == 'undetermined'
+    with pytest.raises(ValueError):
+        RuntimeInputs(files={'poetry.lock': b'#' * (MAX_INPUT_BYTES * 3 // 4)})

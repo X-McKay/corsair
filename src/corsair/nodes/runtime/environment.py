@@ -7,6 +7,7 @@ types.
 image receipt (`tests/qualification/prepare_toolchains.py`); a selected row without a prepared image stops too.
 """
 from dataclasses import dataclass
+import json
 import re
 from typing import Mapping
 
@@ -35,20 +36,30 @@ class RuntimeCatalog:
                 raise ValueError(f'prepared image for {row!r} is not a digest-pinned image of a matrix row')
 
 
+def _encoded(path: str, data: bytes) -> int:
+    """Bytes one `files`/`parents` entry adds to the encoded inputs: JSON-quoted path (ASCII-escaped, so never
+    under its UTF-8 size), colon, quoted base64 value, comma."""
+    return len(json.dumps(path)) + 4 + 4 * -(-len(data) // 3)
+
+
 def runtime_inputs(files: Mapping[str, bytes], language: Language | None = None, *,
                    parents: Mapping[str, bytes] | None = None, root: str = '.') -> RuntimeInputs:
-    """The case's runtime inputs from a snapshot's files: build files only, smallest first within
-    `MAX_INPUT_BYTES` after the parent POMs; anything left out is named in `omitted`, deterministically."""
+    """The case's runtime inputs from a snapshot's files: build files only, smallest first, while the encoded inputs
+    (paths and base64 included) stay within `MAX_INPUT_BYTES`; anything left out is named in `omitted`,
+    deterministically. Space is reserved for the `omitted` list itself (at most 64 names of up to 1024 bytes)."""
     parents = dict(parents or {})
-    budget = MAX_INPUT_BYTES - sum(len(v) for v in parents.values())
+    base = RuntimeInputs.model_construct(files={}, language=language, parents={}, root=root, omitted=())
+    budget = MAX_INPUT_BYTES - len(base.__pydantic_serializer__.to_json(base)) - sum(_encoded(p, v) for p, v in parents.items()) \
+        - 64 * (len(json.dumps('x' * 1024)) + 1)
     if budget < 0:
-        raise ValueError(f'parent POMs alone exceed {MAX_INPUT_BYTES} bytes')
+        raise ValueError(f'parent POMs alone exceed {MAX_INPUT_BYTES} encoded bytes')
     kept, omitted = {}, []
-    for path in sorted((p for p in files if is_build_file(p)), key=lambda p: (len(files[p]), p)):
-        if len(files[path]) <= budget:
-            kept[path], budget = files[path], budget - len(files[path])
+    for path in sorted((p for p in files if is_build_file(p)), key=lambda p: (_encoded(p, files[p]), p)):
+        cost = _encoded(path, files[path])
+        if cost <= budget and len(path) <= 1024:
+            kept[path], budget = files[path], budget - cost
         else:
-            omitted.append(path)
+            omitted.append(path[:1024])
     return RuntimeInputs(files=kept, language=language, parents=parents, root=root, omitted=tuple(sorted(omitted))[:64])
 
 
@@ -110,7 +121,7 @@ def select_runtime(inputs: RuntimeInputs, catalog: RuntimeCatalog) -> RuntimeOut
     case omitted for size is an unresolved input, so the selection is undetermined rather than guessed."""
     requirement = detect(inputs.files, inputs.language, root=inputs.root, parents=inputs.parents)
     if inputs.omitted:
-        unread = tuple(f'{path} omitted from the chain inputs (over {MAX_INPUT_BYTES} bytes in total), not read'[:240]
+        unread = tuple(f'{path} omitted from the chain inputs (over {MAX_INPUT_BYTES} encoded bytes in total), not read'[:240]
                        for path in inputs.omitted)
         requirement = f'{requirement}; {unread[0]}'[:240] if isinstance(requirement, str) else \
             requirement.model_copy(update={'unresolved': (requirement.unresolved + unread)[:64]})
