@@ -17,9 +17,11 @@ def collect(*names):
 
 
 @pytest.mark.parametrize('names, gates', [
+    (('python',), ['test_native_python_toolchain']),  # not python37: selection is by marker, never by substring
     (('python37',), ['test_native_python37_toolchain']),
-    (('java', 'python'), ['test_native_python_and_java_toolchains']),
-    (('python', 'java', 'python37'), ['test_native_python_and_java_toolchains', 'test_native_python37_toolchain']),
+    (('java8',), ['test_native_java8_toolchain']),
+    (('java', 'python'), ['test_native_java_toolchain', 'test_native_python_toolchain']),
+    (('python', 'java', 'python37'), ['test_native_java_toolchain', 'test_native_python_toolchain', 'test_native_python37_toolchain']),
 ])
 def test_named_images_select_exactly_the_gates_they_cover(names, gates):
     code, found, output = collect(*names)
@@ -28,9 +30,8 @@ def test_named_images_select_exactly_the_gates_they_cover(names, gates):
 
 
 @pytest.mark.parametrize('names, message', [
-    (('python',), 'No toolchain gate covers exactly'),
     (('bogus',), 'Unknown toolchain image directories'),
 ])
-def test_a_list_no_gate_covers_is_a_usage_error(names, message):
+def test_an_unknown_image_is_a_usage_error(names, message):
     code, found, output = collect(*names)
     assert code == 4 and message in output
