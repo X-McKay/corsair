@@ -14,8 +14,8 @@ import yaml
 from tests.qualification.support import ROOT, NetworkFixture
 from tests.qualification.gateway import native_gateway
 from tests.qualification.test_lifecycle import SdkReceipts
-from tests.qualification.test_policy import require_network, owned_sandbox, observe_policy, global_policy_observation, wait_logging_activation
-from tests.qualification.prepare_toolchains import JAVA_TESTS, JEST, LAUNCHER, NODE_TESTS, NODES, NPM, PERLS, PYTHONS, SOURCE, TAP_TESTS, image_receipt, jest_report, source_hashes, tap_report
+from tests.qualification.test_policy import require_network, owned_sandbox, observe_policy, global_policy_observation, wait_logging_activation, expect_permission_denied
+from tests.qualification.prepare_toolchains import JAVA_TESTS, JEST, LAUNCHER, NODE_TESTS, NODES, NPM, PERLS, PYTHONS, RUBY_RUN, RUBY_SUMMARY, RUBY_TESTS, SOURCE, TAP_TESTS, image_receipt, jest_report, source_hashes, tap_report
 from corsair.adapters.maven_runner import WRAPPER, MavenRunner, MavenRunnerConfig, selection
 from corsair.reports.junit_listing import listed
 
@@ -45,7 +45,8 @@ def toolchain_gateway(kube, request):
 
 def toolchain_policy(language):
     policy = yaml.safe_load((ROOT / 'policies/openshell/identity.yaml').read_text())
-    policy['filesystem_policy']['read_only'] += ['/opt/corsair-fixture'] + ([] if language in PYTHONS or language in PERLS else
+    # Perl, Ruby, Bundler and the bundled gems live under /usr/local, already read-only.
+    policy['filesystem_policy']['read_only'] += ['/opt/corsair-fixture'] + ([] if language in PYTHONS or language in PERLS or language == 'ruby31' else
         # Node 8's Debian buster base is not merged-/usr: its loader is under /lib64; Yarn is unpacked under /opt.
         ['/lib64', '/opt/corsair-npm', '/opt/yarn-v1.21.1'] if language in NODES else
         ['/opt/java/openjdk', '/opt/corsair-m2', '/opt/corsair-m2.sha256', '/opt/corsair-junit', '/opt/corsair-junit.sha256'])
@@ -75,6 +76,10 @@ def stage_project(kube, cli, sdk, name, language, record):
     project.mkdir()
     if language in PYTHONS:
         shutil.copyfile(SOURCE / language / 'test_native.py', project / 'test_native.py')
+    elif language == 'ruby31':
+        for path in ('Gemfile', 'Gemfile.lock'):
+            shutil.copyfile(SOURCE / language / path, project / path)
+        shutil.copytree(SOURCE / language / 'test', project / 'test')
     elif language in NODES:
         for file in ('package.json', 'package-lock.json', 'native.test.js'):
             shutil.copyfile(SOURCE / language / file, project / file)
@@ -299,6 +304,49 @@ def java_runner_commands(sdk, name, remote, record, engine):
     record['runner_commands'] = {'listing': found, 'listing_sha256': hashlib.sha256(listing.stdout.encode()).hexdigest(), 'engine': engine}
 
 
+def minitest_report(text, expected, summary):
+    """Minitest's verbose run is its only native report: every expected test passed once, nothing else ran."""
+    lines = [line for line in text.splitlines() if ' = ' in line and '#' in line.split(' = ', 1)[0]]
+    assert sorted(line.split(' = ', 1)[0] for line in lines) == sorted(expected)
+    assert all(line.endswith(' = .') for line in lines)
+    assert text.rstrip().endswith(summary)
+    return {'tests': len(lines), 'ids': sorted(expected), 'summary': summary, 'sha256': hashlib.sha256(text.encode()).hexdigest()}
+
+
+RUBY_DIAGNOSTICS = {
+    'missing': 'gem "corsair-qualification-absent-gem", "0.0.0"',
+    'syntax': 'require "minitest/autorun"\nclass SyntaxTest < Minitest::Test\n  def test_syntax(\nend\n',
+    'assertion': 'require "minitest/autorun"\nclass AssertionTest < Minitest::Test\n  def test_deliberate_failure\n    assert_equal 1, 2\n  end\nend\n',
+}
+
+
+def ruby_offline(sdk, name, remote, record):
+    bundle = ['/usr/bin/env', 'BUNDLE_FROZEN=true', '/usr/local/bin/bundle', 'exec', '/usr/local/bin/ruby', '-Itest']
+    result = execute(sdk, name, ['/bin/sh', '-ec', '/usr/local/bin/ruby -v; /usr/local/bin/bundle -v; BUNDLE_FROZEN=true /usr/local/bin/bundle exec /usr/local/bin/ruby -e "require %q(minitest); puts Minitest::VERSION"'], remote)
+    expect_completed(result, 0, 'ruby 3.1.7')
+    assert 'Bundler version 2.3.27' in result.stdout and result.stdout.endswith('5.15.0\n')
+    record['versions'] = result.stdout
+    result = execute(sdk, name, RUBY_RUN, remote)
+    expect_completed(result, 0, RUBY_SUMMARY)
+    record.setdefault('native_reports', []).append(minitest_report(result.stdout, ['NativeTest#' + n for n in RUBY_TESTS], RUBY_SUMMARY))
+    # Gems the project needs cannot land in the image's GEM_HOME: setup installs them under the workspace.
+    expect_permission_denied(execute(sdk, name, ['/usr/bin/touch', '/usr/local/bundle/corsair-probe'], remote))
+    setup = execute(sdk, name, ['/bin/sh', '-ec', 'cp -R . /tmp/ruby-missing; printf "%s\\n" "$1" >> /tmp/ruby-missing/Gemfile; printf "%s" "$2" > /tmp/syntax_test.rb; printf "%s" "$3" > /tmp/assertion_test.rb',
+                                'corsair-setup', RUBY_DIAGNOSTICS['missing'], RUBY_DIAGNOSTICS['syntax'], RUBY_DIAGNOSTICS['assertion']], remote)
+    expect_completed(setup, 0, '')
+    result = execute(sdk, name, ['/usr/local/bin/bundle', 'install', '--local'], '/tmp/ruby-missing')
+    expect_completed(result, 7, "Could not find gem 'corsair-qualification-absent-gem (= 0.0.0)' in cached gems")
+    # Minitest exits 0 when nothing matches; only its summary shows that no test ran.
+    result = execute(sdk, name, bundle + ['test/native_test.rb', '-n', 'test_absent'], remote)
+    expect_completed(result, 0, '0 runs, 0 assertions, 0 failures, 0 errors, 0 skips')
+    result = execute(sdk, name, bundle + ['/tmp/syntax_test.rb'], remote)
+    expect_completed(result, 1, "syntax error, unexpected `end'")
+    result = execute(sdk, name, bundle + ['/tmp/assertion_test.rb'], remote)
+    expect_completed(result, 1, '1 runs, 1 assertions, 1 failures, 0 errors, 0 skips')
+    assert 'AssertionTest#test_deliberate_failure' in result.stdout and 'Expected: 1\n  Actual: 2' in result.stdout
+    record['offline_diagnostics'] = ['read-only-GEM_HOME', 'missing-gem/bundler-local-resolution', 'no-discovery (exit 0, 0 runs)', 'syntax', 'assertion']
+
+
 def native_events(logs):
     return [json.loads(line.split('OCSF-JSON ', 1)[1]) for line in logs.splitlines() if 'OCSF-JSON ' in line]
 
@@ -409,6 +457,8 @@ def toolchain_gate(kube, gateway, language):
                 if language in PYTHONS:
                     python_offline(sdk, name, remote, record, language)
                     python_dependencies(kube, gateway['cli'], sdk, name, remote, record, endpoint, pair, language)
+                elif language == 'ruby31':
+                    ruby_offline(sdk, name, remote, record)
                 elif language in NODES:
                     node_offline(sdk, name, remote, record, language)
                     node_dependencies(kube, gateway['cli'], sdk, name, remote, record, language)
@@ -456,3 +506,8 @@ def test_native_python37_toolchain(image_kube, toolchain_gateway):
 @pytest.mark.toolchain('perl526')
 def test_native_perl526_toolchain(image_kube, toolchain_gateway):
     toolchain_gate(image_kube, toolchain_gateway, 'perl526')
+
+
+@pytest.mark.toolchain('ruby31')
+def test_native_ruby31_toolchain(image_kube, toolchain_gateway):
+    toolchain_gate(image_kube, toolchain_gateway, 'ruby31')
