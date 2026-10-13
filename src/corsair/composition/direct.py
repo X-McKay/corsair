@@ -285,7 +285,8 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
 
     identity = case.environment_identity
     runs = {e.revision: (e.observed,) for e in executions}
-    witnesses = {e.revision: (witness_evidence(e.observed.witness, request, plan.security.test_id) if request else
+    witnesses = {e.revision: (witness_evidence(e.observed.witness, request, plan.security.test_id,
+                                                    planned_safe_behavior=plan.security_expectation.safe_behavior) if request else
                               WitnessEvidence(None, None, "no witness was requested or captured for this run"))
                  for e in executions}
     done["witnesses"] = tuple(witnesses.values())

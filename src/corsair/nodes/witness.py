@@ -96,9 +96,16 @@ def _refused(reason: str) -> WitnessEvidence:
     return WitnessEvidence(None, None, reason)
 
 
+ABSENCE = 'no_file_open'
+
+
 def witness_evidence(capture: WitnessCapture | None, request: WitnessRequest,
-                     security_test_id: str) -> WitnessEvidence:
-    """Map the probe record for the security test's call phase to the SPEC-0027 witness, or refuse it."""
+                     security_test_id: str, *, planned_safe_behavior: str | None = None) -> WitnessEvidence:
+    """Map the probe record for the security test's call phase to the SPEC-0027 witness, or refuse it.
+
+    When the plan's safe behavior is the absence identity ``no_file_open`` (SPEC-0040), an attributed call
+    phase without the planned open is that behavior, however the target exited.
+    """
     if capture is None:
         return _refused('no witness was requested or captured for this run')
     if capture.status != 'captured' or capture.artifact is None:
@@ -141,6 +148,9 @@ def witness_evidence(capture: WitnessCapture | None, request: WitnessRequest,
     if test.entered and not test.truncated and len(exits) == 1:
         (only,) = exits
         safe = only if only is not None and TOKEN.fullmatch(only) else None
+    if (planned_safe_behavior == ABSENCE and effect == 'absent' and test.entered and not test.truncated
+            and test.entered == len(test.exits)):
+        safe = ABSENCE
     witness = Witness(artifact_sha256=capture.artifact.sha256, path_reached=test.entered > 0 or bool(planned),
                       effect=effect, safe_behavior=safe)
     return WitnessEvidence(witness, events, 'admitted')

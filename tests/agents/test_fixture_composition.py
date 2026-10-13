@@ -310,3 +310,15 @@ def test_a_planned_witness_the_envelope_does_not_record_runs_without_a_witness(s
         assert run.stopped_at is None and all(e.observed.witness is None for e in run.executions)
         assert run.gate.permitted == Disposition(execution="completed", finding="inconclusive", fix="not_verified")
         assert f"no witness requested: {reason}" in run.limitations
+
+
+def test_a_planned_absence_is_verified_when_the_fix_never_opens_the_sentinel(store, tmp_path):
+    """SPEC-0040 `no_file_open` safe behavior: the fixed revision's rejection without the open is safe."""
+    from evals.fixture_e2e.case import DISCOVER, _reads_then, reference_plan
+    plan = reference_plan(DISCOVER)
+    plan["security_expectation"] = plan["security_expectation"] | {"safe_behavior": "no_file_open"}
+    planning = _reads_then(["documents.py", "test_existing.py"], lambda info: {"plan": plan})
+    (tmp_path / "work").mkdir()
+    run = asyncio.run(run_direct(fixture_case(), stages(planning=planning), reviewed_runners(store, tmp_path / "work")))
+    assert run.observation_plan.expected_safe_behavior == "no_file_open"
+    assert run.gate.permitted == Disposition(execution="completed", finding="reproduced", fix="verified")

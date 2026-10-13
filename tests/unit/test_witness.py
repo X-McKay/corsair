@@ -329,3 +329,15 @@ def test_security(tmp_path):
     found = witness_evidence(capture(record, request), request, SECURITY)
     assert [o['planned'] for o in json.loads(record)['tests'][SECURITY]['opens']] == [True]
     assert (found.witness.effect, found.witness.safe_behavior) == ('observed', 'ValueError')
+
+
+def test_absence_is_the_planned_safe_behavior_however_the_target_exits(record):
+    """SPEC-0040 `no_file_open`: a fix that returns normally, or rejects, without the planned open is safe."""
+    data = json.loads(record)
+    for exits in (['ValueError'], [None]):
+        data['tests'][SECURITY] |= {'entered': 1, 'exits': exits}
+        found = witness_evidence(capture(json.dumps(data).encode()), REQUEST, SECURITY, planned_safe_behavior='no_file_open')
+        assert (found.witness.effect, found.witness.safe_behavior) == ('absent', 'no_file_open')
+    unpaired = data | {'tests': {SECURITY: data['tests'][SECURITY] | {'entered': 1, 'exits': [], 'truncated': True}}}
+    found = witness_evidence(capture(json.dumps(unpaired).encode()), REQUEST, SECURITY, planned_safe_behavior='no_file_open')
+    assert found.witness is None or found.witness.safe_behavior is None
