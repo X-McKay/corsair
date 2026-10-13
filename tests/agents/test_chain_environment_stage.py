@@ -148,6 +148,18 @@ def test_a_project_without_tests_runs_on_the_operator_smoke_test(run):
     assert smoke.path not in str(next(a for a in result.attempts if a.stage == 'identification').messages)
 
 
+def test_the_smoke_test_is_refused_when_discovery_lists_a_project_test(run):
+    smoke = SMOKE_TESTS['pytest']
+    baseline = PREFIX + ('-q', smoke.test_id)
+    observations = {BUILD: (0, ''), DISCOVER: (0, f'{BASELINE_ID}\n{smoke.test_id}\n2 tests collected\n'),
+                    baseline: (0, '1 passed in 0.01s\n')}
+    draft = ready_draft(baseline_test_id=smoke.test_id, baseline_test_path=smoke.path, baseline_test_command=list(baseline))
+    result = run(case(), environment_model([BUILD, DISCOVER, baseline], draft), catalog=catalog(),
+                 preparation=Sandboxes(observations))
+    _stopped_before_identification(result)
+    assert 'discovery listed project tests' in str(result.attempts[0].messages)
+
+
 def test_a_baseline_on_the_smoke_path_must_be_the_smoke_test(run):
     smoke = SMOKE_TESTS['pytest']
     other = smoke.path + '::test_something_else'

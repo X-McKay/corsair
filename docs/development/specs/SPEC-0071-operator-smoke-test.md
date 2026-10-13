@@ -21,7 +21,7 @@ Out of scope: a smoke test that imports the project's code (the environment stag
 
 **Offer.** Runtime selection returns the template of each framework row it admitted on the selected image (`RuntimeOutcome.smoke_tests`, built by `nodes/runtime/environment.py` `smoke_tests`); two admitted frameworks sharing a path (JUnit 4 and 5) offer neither. `EnvironmentInput.smoke_tests` carries it to the agent, and the `Preparation` port writes it beside the captured commit (`prepare(..., overlay=)`, `PatchFile`s; the OpenShell adapter refuses an overlay path the capture already has before creating a sandbox). With nothing offered, behaviour is unchanged.
 
-**Admission.** The skill tells the agent to prefer a project test and use the smoke test only when none is discovered and passes, with its id and path exactly. Trusted finalization refuses a baseline on a smoke path whose framework or id differs, and approved test paths that name the smoke file. Every other ready rule (recipe, build, discovery listing the id, exactly one passed test) is unchanged. `ReadyEnvironment.baseline_basis` is set by trusted code: `project_test` or `operator_smoke`.
+**Admission.** The skill tells the agent to prefer a project test and use the smoke test only when none is discovered and passes, with its id and path exactly. Trusted finalization refuses a baseline on a smoke path whose framework or id differs, a smoke baseline when the run's own discovery output names any other test (`frameworks.py` `project_tests`, using each framework's id grammar; Jest's absolute `--listTests` paths compared by their repository suffix), and approved test paths that name the smoke file. Every other ready rule (recipe, build, discovery listing the id, exactly one passed test) is unchanged. `ReadyEnvironment.baseline_basis` is set by trusted code: `project_test` or `operator_smoke`.
 
 **Recording.** With `operator_smoke`, the smoke file joins the planning and authoring inventory through the same baseline-file path #106 added for a project baseline (its saved source is the operator template, since the capture does not hold it), never identification's, and adds the limitation that the baseline shows the runtime, framework and discovery work after setup, not that the project's code loads. The smoke file is never part of the frozen two-test patch.
 
@@ -29,7 +29,7 @@ Out of scope: a smoke test that imports the project's code (the environment stag
 
 - Every admitted framework has a template its own baseline rule accepts; the Python, Perl and Ruby templates pass under their native runners on the host.
 - A chain run with no project test reaches the gates on the smoke baseline, records `operator_smoke` and the limitation, and shows the smoke file to planning only.
-- A baseline on the smoke path with another id is refused; a project baseline records `project_test`.
+- A smoke baseline is refused when discovery lists a project test, and a baseline on the smoke path with another id is refused; a project baseline records `project_test`.
 - `make eval AGENT=environment` scripted stays 16/16; the live environment eval reruns against its baseline when the model is free.
 
 ## Decisions and open questions

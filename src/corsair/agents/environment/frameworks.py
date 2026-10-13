@@ -9,7 +9,10 @@ replaces it with JUnit XML. A framework without an entry cannot be admitted read
 import json
 import re
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .contracts import SmokeTest
 
 
 @dataclass(frozen=True)
@@ -190,3 +193,18 @@ def file_matches(framework: str, test_id: str, path: str) -> bool:
         return False
     # pytest and file-unit ids are repository-relative paths; Java ids name the class path under a source root.
     return path.endswith("/" + expected) if framework in ("junit5", "junit4") else path == expected
+
+
+def project_tests(framework: str, smoke: "SmokeTest", discovery: bytes) -> list[str]:
+    """SPEC-0071: test references in a discovery output other than the smoke test, so a smoke baseline is admitted only
+    when the run's own discovery found no project test. A token is a test reference when the framework's id grammar
+    names a file for it; absolute paths (Jest's `--listTests`) are compared by their trailing repository path."""
+    file_of, smoke_file = FRAMEWORKS[framework].file_of, FRAMEWORKS[framework].file_of(smoke.test_id)
+    others = []
+    for token in dict.fromkeys(discovery.decode("utf-8", "replace").split()):
+        relative = token.lstrip("/")
+        named = file_of(token) or (file_of(relative) if token.startswith("/") else None)
+        if named is None or token == smoke.test_id or named == smoke_file or relative.endswith("/" + smoke.path):
+            continue
+        others.append(token)
+    return others

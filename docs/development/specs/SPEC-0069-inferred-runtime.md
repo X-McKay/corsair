@@ -13,7 +13,7 @@ related: [SPEC-0042, SPEC-0067, SPEC-0060, PLAN-0076]
 
 SPEC-0042 makes a project that declares no runtime version undetermined. That stops 35 of the 42 SPEC-0067 corpus cases, and many real repositories are in the same state: a bare `requirements.txt` naming `pytest`, or a `package.json` naming only `jest`. Al chose to generalise Corsair rather than edit the corpus (decision card, 2026-10-13 15:51Z), and agreed to this refinement (15:52Z): use the declared version when there is one; otherwise infer a range from the declared dependencies and take the newest qualified image inside it; record that the runtime was inferred and from what; stay undetermined when nothing gives a range.
 
-In scope: inference from the declared test framework. Out of scope: inference from other dependencies or from language syntax, a framework for projects that name none (Node's built-in runner is still unidentified), and the operator smoke test for projects with no tests (next component).
+In scope: inference from the declared test framework. Al's 15:52Z wording also allowed a range from language syntax; that is not implemented here, so such a project stays undetermined. Out of scope: inference from other dependencies or from language syntax, a framework for projects that name none (Node's built-in runner is still unidentified), and the operator smoke test for projects with no tests (next component).
 
 ## Boundaries and design
 

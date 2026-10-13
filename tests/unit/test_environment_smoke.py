@@ -61,3 +61,21 @@ def test_the_ruby_smoke_test_passes_under_minitest(tmp_path):
     if b'cannot load such file -- minitest' in run.stderr:
         pytest.skip('minitest gem not installed on this host')
     assert run.returncode == 0 and FRAMEWORKS['minitest'].passed(run.stdout)
+
+
+@pytest.mark.parametrize('framework, discovery, others', [
+    ('pytest', b'tests/test_corsair_smoke.py::test_environment_runs\n\n1 test collected in 0.01s\n', []),
+    ('pytest', b'tests/test_app.py::test_reads\ntests/test_corsair_smoke.py::test_environment_runs\n2 tests collected\n',
+     ['tests/test_app.py::test_reads']),
+    ('tap-harness', b't/basic.t\nt/corsair_smoke.t\n', ['t/basic.t']),
+    ('jest', b'/sandbox/repo/__tests__/corsair_smoke.test.js\n', []),
+    ('jest', b'/sandbox/repo/__tests__/corsair_smoke.test.js\n/sandbox/repo/src/app.test.js\n', ['/sandbox/repo/src/app.test.js']),
+    ('minitest', b'test/corsair_smoke_test.rb\ntest/app_test.rb\n', ['test/app_test.rb']),
+    ('junit5', b'CorsairSmokeTest#environmentRuns\ncom.example.AppTest#reads\n', ['com.example.AppTest#reads']),
+])
+def test_a_smoke_baseline_is_refused_when_discovery_lists_a_project_test(framework, discovery, others):
+    from corsair.agents.environment.contracts import SmokeTest
+    from corsair.agents.environment.frameworks import project_tests
+    row = SMOKE_TESTS[framework]
+    smoke = SmokeTest(framework=framework, path=row.path, test_id=row.test_id, content=row.content)
+    assert project_tests(framework, smoke, discovery) == others
