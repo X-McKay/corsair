@@ -211,7 +211,7 @@ def python_dependencies(kube, cli, sdk, name, remote, record, endpoint, pair, la
 
 
 
-@pytest.mark.toolchain
+@pytest.mark.toolchain('java', 'python')
 def test_native_python_and_java_toolchains(kube, toolchain_gateway):
     gateway = toolchain_gateway
     sources = ['tests/qualification/test_toolchains.py', 'tests/qualification/prepare_toolchains.py', 'tests/qualification/test_policy.py', 'tests/qualification/test_lifecycle.py', 'tests/qualification/gateway.py', 'tests/qualification/support.py', 'policies/openshell/identity.yaml', 'deploy/runtime-lock.yaml', 'pyproject.toml', 'uv.lock']
@@ -248,7 +248,7 @@ def test_native_python_and_java_toolchains(kube, toolchain_gateway):
                 (kube.evidence / 'toolchain.json').write_text(json.dumps(summary, indent=2))
 
 
-@pytest.mark.toolchain
+@pytest.mark.toolchain('python37')
 def test_native_python37_toolchain(kube, toolchain_gateway):
     """The CPython 3.7 image through the same offline, diagnostic and dependency checks as the 3.12 image."""
     gateway = toolchain_gateway

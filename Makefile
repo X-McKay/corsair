@@ -73,7 +73,8 @@ qualify-policy:
 	uv run --locked python -m pytest tests/qualification -m policy --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
 
 .PHONY: toolchain-images toolchain-images-load qualify-toolchain
-# TOOLCHAINS limits preparation and the gate to named toolchain directories, e.g. TOOLCHAINS=python37.
+# TOOLCHAINS limits preparation to the named image directories and the gate to the gates whose images are all
+# named, e.g. TOOLCHAINS=python37 or TOOLCHAINS="java python"; a list no gate covers is a usage error.
 toolchain-images:
 	uv run --locked python -m tests.qualification.prepare_toolchains build $(foreach language,$(TOOLCHAINS),--language $(language))
 
@@ -83,7 +84,7 @@ toolchain-images-load:
 qualify-toolchain:
 	test ! -e "$(CORSAIR_QUAL_RUN)"
 	mkdir -p "$(CORSAIR_QUAL_RUN)"
-	uv run --locked python -m pytest tests/qualification -m toolchain $(if $(TOOLCHAINS),-k "$(TOOLCHAINS)") --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
+	uv run --locked python -m pytest tests/qualification -m toolchain $(foreach language,$(TOOLCHAINS),--toolchain $(language)) --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
 
 .PHONY: qualify-recovery
 qualify-recovery:

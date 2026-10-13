@@ -31,6 +31,8 @@ Image: `docker build --network=none` of the python37 context from `python@sha256
 
 `make test-config`: 997 passed on 6be1b5f before the gate files; 1064 passed after merging main 42a7273 with everything above.
 
+Al's review of 72b6861 (P2): `TOOLCHAINS` reached pytest as a `-k` substring, so `TOOLCHAINS=python` also selected the 3.7 gate and `"python java"` was an invalid expression (exit 4). Fixed with exact `--toolchain` selection from marker arguments; collection-only regressions in `tests/configuration/test_toolchain_selection.py`.
+
 ## Decisions and next action
 
 Qualified floor pytest 6.0 (importlib mode); witness on 3.7 refused by name rather than a weaker observer; matrix row only after the live gate. Next: ask for the kind cluster, then run the live steps on RIG0 under `/home/al/git/corsair/.worktrees/claude/toolchain-python37-drklks` with evidence under `/home/al/git/corsair/.runs`.
