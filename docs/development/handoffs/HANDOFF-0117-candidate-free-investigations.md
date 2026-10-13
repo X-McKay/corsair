@@ -32,6 +32,14 @@ Why it is generic: the absence of a candidate is expressed only by which revisio
 
 The live assessment prompt shows only baseline items in the evidence inventory, and the skill already says to use `not_applicable` without a candidate. If a live assessor still claims `not_verified`, it is rejected and the gate's triple stands (tested). How often that happens is a separate live hypothesis. Measure it before changing any prompt.
 
+Live Docker attempts at `8679af4` on RIG0 (2026-10-13, run by the campaign's live owner; model not shared; each run once with a fresh evidence path; cleanup confirmed; evidence under the branch worktree's `.runs` on RIG0, not committed):
+
+| Attempt | Result |
+| --- | --- |
+| B1 fixture `not-exploitable-absent --without-fix` | admitted `completed / not_reproduced / not_applicable`, LIKELY_NOT_EXPLOITABLE (`fixture-e2e-docker/absent-without-fix-001`) |
+| B2 fixture `exploitable --without-fix` | admitted `completed / reproduced / not_applicable`, LIKELY_EXPLOITABLE (`fixture-e2e-docker/exploitable-without-fix-001`) |
+| B3 corpus `ih-python-healthcheck`, attempt 1 | ERROR at environment with 0 model requests: the provider returned 502 `upstream_unreachable` (infrastructure; the endpoint answered again minutes later). Preserved; one diagnosed rerun (attempt 2) recorded as its own attempt |
+
 ## Decisions and next steps
 
 Next bounded action, for the one live Docker/model owner, from a worktree at this branch's head after `uv sync --locked` (provider and image files as in the run kit):
