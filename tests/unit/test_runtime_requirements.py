@@ -1,7 +1,7 @@
 """SPEC-0042: build metadata to runtime requirement, and selection against the runtime matrix (offline)."""
 import pytest
 
-from corsair.nodes.runtime.detect import detect, is_build_file
+from corsair.nodes.runtime.detect import MAX_FILE_BYTES, detect, is_build_file
 from corsair.nodes.runtime.matrix import Matrix, load, select
 from corsair.nodes.runtime.versions import (gem, maven, npm, parse_set, parse_version, pep440, perl, java_feature,
                                             VersionSyntaxError)
@@ -201,21 +201,16 @@ def test_selection_supported_unsupported_conflict():
     assert select(conflict, matrix).status == 'undetermined'
     java17 = detect({'pom.xml': PARENT.replace(b'1.8', b'17').replace(b'junit</groupId><artifactId>junit',
                                                                          b'org.junit.jupiter</groupId><artifactId>junit-jupiter').replace(b'4.12', b'5.14.4')}, 'java')
-    selection = select(java17, matrix)
-    assert selection.status == 'unsupported' and [n.name for n in selection.needs] == ['junit5']  # no Maven runner row yet
-    with_runner = Matrix.model_validate({**matrix.model_dump(), 'frameworks': [*matrix.model_dump()['frameworks'], {
-        'name': 'junit5', 'language': 'java', 'versions': '>=5.13', 'runner': 'x', 'images': ['temurin-17-maven'],
-        'qualification': {'records': ['SPEC-0039'], 'report': 'x'}}]})
-    assert select(java17, with_runner).status == 'supported'
-    # SPEC-0045 rows, staged here until the live gate passes (a row is added only with passing evidence).
-    staged = Matrix.model_validate({**matrix.model_dump(), 'images': [*matrix.model_dump()['images'], STAGED_JDK8],
-                                    'frameworks': [*matrix.model_dump()['frameworks'], *STAGED_JUNIT]})
-    assert select(java17, staged).image_id == 'temurin-17-maven'
+    assert select(java17, matrix).image_id == 'temurin-17-maven'
+    # Framework rows are exact versions that ran (SPEC-0045): an unrun Jupiter release is unsupported.
+    unrun = select(detect({'pom.xml': PARENT.replace(b'1.8', b'17').replace(b'junit</groupId><artifactId>junit',
+                                                                          b'org.junit.jupiter</groupId><artifactId>junit-jupiter').replace(b'4.12', b'5.13.4')}, 'java'), matrix)
+    assert unrun.status == 'unsupported' and [n.name for n in unrun.needs] == ['junit5']
     java8 = detect({'pom.xml': PARENT}, 'java')  # source 1.8 with JUnit 4.12
-    selection = select(java8, staged)
+    selection = select(java8, matrix)
     assert selection.status == 'supported' and selection.image_id == 'temurin-8-maven'
     # JUnit 4 before 4.12 has no Vintage discovery (SPEC-0041); the JDK alone is not enough.
-    old_junit = select(detect({'pom.xml': PARENT.replace(b'4.12', b'4.8.2')}, 'java'), staged)
+    old_junit = select(detect({'pom.xml': PARENT.replace(b'4.12', b'4.8.2')}, 'java'), matrix)
     assert old_junit.status == 'unsupported' and [n.name for n in old_junit.needs] == ['junit4']
     # The environment agent's `junit4` ready result is admitted by the JDK 8 selection, and only there.
     from corsair.agents.environment.contracts import ReadyEnvironment
@@ -226,16 +221,6 @@ def test_selection_supported_unsupported_conflict():
     check_ready(ready('junit4'), selection, prepared)
     with pytest.raises(ValueError, match='not one the selection admitted'):
         check_ready(ready('junit5'), selection, prepared)
-
-
-STAGED_JDK8 = {'id': 'temurin-8-maven', 'language': 'java',
-               'base_image': 'docker.io/library/maven@sha256:f2cb52730ea0bde9dc8ba20e5e539d000dcdd7ab9e498d70c301fe04fbddb656',
-               'image_source': 'deploy/qualification/toolchains/java8', 'runtime': {'name': 'jdk', 'version': '8.0.504'},
-               'tools': {'maven': '3.10.0'}, 'selector': {}, 'qualification': {'records': ['SPEC-0045'], 'report': 'x'}}
-STAGED_JUNIT = [{'name': 'junit4', 'language': 'java', 'versions': '==4.13.2 || ==4.12', 'runner': 'x', 'images': ['temurin-8-maven'],
-                 'qualification': {'records': ['SPEC-0045'], 'report': 'x'}},
-                {'name': 'junit5', 'language': 'java', 'versions': '==5.14.4', 'runner': 'x', 'images': ['temurin-17-maven'],
-                 'qualification': {'records': ['SPEC-0045'], 'report': 'x'}}]
 
 
 def test_matrix_refuses_selector_rows_and_duplicates():
@@ -478,7 +463,8 @@ def test_poetry_source_without_version_is_unread():
 def test_java_unread_pins_and_version_file_names():
     junit = ('<dependencies><dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId>'
              '<version>5.14.0</version></dependency></dependencies>')
-    matrix = Matrix.model_validate({**load().model_dump(), 'frameworks': [*load().model_dump()['frameworks'], {
+    others = [row for row in load().model_dump()['frameworks'] if row['name'] != 'junit5']
+    matrix = Matrix.model_validate({**load().model_dump(), 'frameworks': [*others, {
         'name': 'junit5', 'language': 'java', 'versions': '5.14.*', 'runner': 'x', 'images': ['temurin-17-maven'],
         'qualification': {'records': ['SPEC-0039'], 'report': 'x'}}]})
     base = '<properties><maven.compiler.release>17</maven.compiler.release></properties>'
@@ -497,3 +483,61 @@ def test_java_unread_pins_and_version_file_names():
         assert component(detect({'pom.xml': pom(''), '.java-version': name}, 'java'), 'runtime', 'jdk').allowed == allowed
     system = component(detect({'pom.xml': pom(''), '.java-version': b'system\n'}, 'java'), 'runtime', 'jdk')
     assert not system.declared and system.unparsed[0].strength == 'pinned'
+
+
+@pytest.mark.parametrize('line', ['pytest @ git+https://example.invalid/pytest.git', 'pytest@https://example.invalid/p.whl'])
+def test_pytest_direct_reference_is_unread(line):
+    # Codex on 028d724: a direct reference matched no range and vanished, so [tool.pytest] made pytest `*` and supported.
+    files = {'pyproject.toml': f'[project]\nrequires-python = ">=3.12"\noptional-dependencies = {{test = ["{line}", "pytest-cov>=4"]}}\n'
+                               '[tool.pytest.ini_options]\n'.encode()}
+    requirement = detect(files, 'python')
+    assert 'names no version range' in component(requirement, 'test_framework', 'pytest').unparsed[0].reason
+    assert select(requirement, load()).status == 'undetermined'
+
+
+def test_long_unresolved_reasons_are_bounded():
+    # Codex on 028d724: an oversized build file at a long path made an unresolved reason over 240 characters.
+    deep = '/'.join(['d' * 60] * 6) + '/pom.xml'
+    requirement = detect({'pom.xml': b'<project/>', deep: b' ' * (MAX_FILE_BYTES + 1)}, 'java')
+    assert requirement.unresolved and all(len(r) <= 240 for r in requirement.unresolved)
+
+
+@pytest.mark.parametrize('files', [
+    {'requirements-dev.txt': b'pytest>=9,<10\n', '.python-version': b'3.12.15\n'},
+    {'requirements/test.txt': b'pytest>=9,<10\n', '.python-version': b'3.12.15\n'},
+])
+def test_requirement_only_python_trees_are_detected(files):
+    # Codex on 028d724: an explicit python language was refused because no file was in the marker list.
+    assert select(detect(files, 'python'), load()).status == 'supported'
+
+
+def test_nested_requirements_files_are_read():
+    # Codex on 7b42d2e: requirements/test/dev.txt was selected as a build file but never parsed, so pytest<8 vanished.
+    files = {'requirements/test/dev.txt': b'pytest<8\n', '.python-version': b'3.12.15\n', 'pytest.ini': b'[pytest]\n'}
+    assert all(is_build_file(path) for path in files)
+    requirement = detect(files, 'python')
+    assert component(requirement, 'test_framework', 'pytest').allowed == '<8'
+    assert select(requirement, load()).status == 'unsupported'
+
+
+PROJECT = '[project]\nrequires-python = ">=3.12"\n{}\n[tool.pytest.ini_options]\n'
+
+
+@pytest.mark.parametrize('dependencies, status', [
+    ('dependencies = ["pytest<8"]', 'unsupported'),
+    ('dependencies = ["requests>=2", "pytest>=9,<10"]', 'supported'),
+    ('dependencies = ["pytest @ git+https://example.invalid/pytest.git"]', 'undetermined'),
+    ('dependencies = ["pytest<<8"]', 'undetermined'),
+    ('dependencies = [8, "requests"]', 'undetermined'),
+    ('dependencies = "pytest<8"', 'undetermined'),
+    ('dependencies = ["requests>=2"]', 'supported'),
+])
+def test_project_dependencies_are_read(dependencies, status):
+    # Al's review of #61: [project] dependencies was never read, so pytest<8 there selected the pytest 9 image.
+    requirement = detect({'pyproject.toml': PROJECT.format(dependencies).encode()}, 'python')
+    assert select(requirement, load()).status == status
+
+
+def test_setup_cfg_install_requires_is_read():
+    files = {'setup.cfg': b'[options]\npython_requires = >=3.12\ninstall_requires =\n    pytest<8\n[tool:pytest]\n'}
+    assert select(detect(files, 'python'), load()).status == 'unsupported'

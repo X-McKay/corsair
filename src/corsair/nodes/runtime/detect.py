@@ -26,7 +26,9 @@ ROOT = ('pyproject.toml', 'setup.py', 'setup.cfg', 'requirements*.txt', 'require
 # Root-only names whose leading `*` must not cross directories (test-requirements.txt, dev_requirements.in).
 TOP = ('*-requirements*.txt', '*_requirements*.txt', '*-requirements*.in', '*_requirements*.in')
 MARKERS: dict[Language, tuple[str, ...]] = {
-    'python': ('pyproject.toml', 'setup.py', 'setup.cfg', 'Pipfile', 'requirements.txt', 'tox.ini'),
+    'python': ('pyproject.toml', 'setup.py', 'setup.cfg', 'Pipfile', 'Pipfile.lock', 'poetry.lock', 'uv.lock', 'tox.ini',
+               'pytest.ini', '.python-version', 'runtime.txt', 'requirements*.txt', 'requirements*.in', *TOP,
+               'requirements/*.txt', 'requirements/*.in'),
     'java': ('pom.xml', 'build.gradle', 'build.gradle.kts'),
     'javascript': ('package.json',),
     'ruby': ('Gemfile', '*.gemspec'),
@@ -43,7 +45,7 @@ def is_build_file(path: str) -> bool:
 
 
 def languages(paths) -> tuple[Language, ...]:
-    names = {p for p in paths if '/' not in p}
+    names = {p for p in paths if '/' not in p or p.startswith('requirements/')}
     return tuple(language for language, markers in MARKERS.items()
                  if any(fnmatchcase(n, m) for n in names for m in markers))
 
@@ -75,4 +77,4 @@ def detect(files: Mapping[str, bytes], language: Language | None = None, *, root
     {'python': python.detect, 'javascript': javascript.detect, 'ruby': ruby.detect, 'perl': perl.detect,
      'java': lambda c: java.detect(c, parents or {})}[language](collector)
     return RuntimeRequirement(language=language, root=root, components=combine(collector.declarations),
-                              files=tuple(selected), unresolved=tuple(dict.fromkeys(collector.unresolved))[:64])
+                              files=tuple(selected), unresolved=tuple(dict.fromkeys(r[:240] for r in collector.unresolved))[:64])

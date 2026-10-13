@@ -19,11 +19,11 @@ BASES = {
     'python37': 'docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b',
     'ruby31': 'docker.io/library/ruby@sha256:91627f55e8969006aab67d15c92fb930500ff73948803da1330b8a853fecebb5',
 }
+# Interpreter each Python toolchain directory is built for; its wheels are fetched hash-checked before an offline build.
+PYTHONS = {'python': 'python3.12', 'python37': 'python3.7'}
 # Both Java images hold the pinned JUnit Platform console launcher for SPEC-0041 discovery.
 LAUNCHER = '/opt/corsair-junit/junit-platform-console-standalone-1.14.4.jar'
 JAVA_TESTS = ('nativeRoundtrip', 'nativeRuntime')
-# Interpreter each Python toolchain directory is built for; its wheels are fetched hash-checked before an offline build.
-PYTHONS = {'python': 'python3.12', 'python37': 'python3.7'}
 # Minitest has no native XML report; its verbose run lists each test and ends with this summary line.
 RUBY_TESTS = ('test_native_roundtrip', 'test_native_runtime')
 RUBY_SUMMARY = '2 runs, 4 assertions, 0 failures, 0 errors, 0 skips'
