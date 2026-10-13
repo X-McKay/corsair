@@ -62,8 +62,10 @@ def environment_model(commands, draft):
 
 class Sandboxes:
     """Host double for the operator's preparation port: recorded observations per exact command; no shell runs."""
-    def __init__(self, observations, *, cleanup='confirmed', refuse=False):
+    def __init__(self, observations, *, cleanup='confirmed', refuse=False, capture=None):
         self.observations, self.cleanup, self.refuse = observations, cleanup, refuse
+        # The operator's capture of the revision placed in the sandbox; by default the fixture's saved source.
+        self.capture = {f.path: f.content.encode() for f in fixture_case().issue.source_files} if capture is None else capture
         self.prepared, self.released, self.commands = [], [], []
 
     def prepare(self, toolchain, operation):
@@ -71,7 +73,8 @@ class Sandboxes:
             raise RuntimeError('sandbox admission refused')
         self.prepared.append(toolchain)
         return PreparedSandbox(self, SandboxHandle(id='prep', name='prep', workspace='corsair', owner='test',
-                                                   creation_operation=str(operation)), '/sandbox/scratch')
+                                                   creation_operation=str(operation)), '/sandbox/scratch',
+                               self.capture.get)
 
     def release(self, sandbox, operation):
         self.released.append(sandbox.handle)
@@ -200,3 +203,32 @@ def test_a_later_stop_keeps_what_the_environment_stage_could_not_confirm(run):
                  catalog=catalog(), preparation=Sandboxes(OK, cleanup='unconfirmed'))
     assert result.stopped_at == 'identification'
     assert result.limitations == ('environment sandbox cleanup unconfirmed',)
+
+
+def without_baseline_file():
+    """The case's saved inventory lacks the baseline test file the environment agent goes on to choose."""
+    kase = case()
+    files = tuple(f for f in kase.issue.source_files if f.path != 'test_existing.py')
+    return replace(kase, issue=kase.issue.model_copy(update={'source_files': files}))
+
+
+def test_the_chosen_baseline_test_file_joins_the_inventory_from_the_capture(run):
+    """A real case's environment stage picks its baseline test at run time; planning and authoring then need the
+    file, which comes from the operator's capture of the revision, never from the sandbox."""
+    result = run(without_baseline_file(), environment_model([BUILD, DISCOVER, BASELINE], ready_draft()),
+                 catalog=catalog(), preparation=Sandboxes(OK))
+    assert (result.stopped_at, result.reason) == (None, 'complete')
+    assert result.attempts[0].baseline_source.path == 'test_existing.py'
+    saved = next(f for f in case().issue.source_files if f.path == 'test_existing.py')
+    planned = str(next(a for a in result.attempts if a.stage == 'planning').messages)
+    captured = result.attempts[0].baseline_source
+    assert (captured.path, captured.content) == (saved.path, saved.content) and 'def test_reads_existing_document' in planned
+
+
+@pytest.mark.parametrize('capture', [{}, {'test_existing.py': b'\xff\xfe not utf-8'}])
+def test_a_baseline_test_file_the_capture_cannot_supply_ends_the_run(run, capture):
+    result = run(without_baseline_file(), environment_model([BUILD, DISCOVER, BASELINE], ready_draft()),
+                 catalog=catalog(), preparation=Sandboxes(OK, capture=capture))
+    _stopped_before_identification(result)
+    assert result.reason == ('ready environment refused: baseline test file test_existing.py is not text in the '
+                             'captured revision')

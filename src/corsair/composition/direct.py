@@ -204,10 +204,14 @@ class SetupSource(Contract):
 
 @dataclass(frozen=True)
 class PreparedSandbox:
-    """A sandbox of one prepared toolchain image, live until the preparation port releases it."""
+    """A sandbox of one prepared toolchain image, live until the preparation port releases it.
+
+    ``read_source`` returns a file's bytes from the operator's capture of the revision placed in the sandbox
+    (never from the sandbox), or None when the capture has no such file."""
     execution: SandboxExecution
     handle: SandboxHandle
     scratch_location: str
+    read_source: Callable[[str], bytes | None]
 
 
 class Preparation(Protocol):
@@ -244,6 +248,8 @@ class StageAttempt:
     exhausted: BudgetExhausted | None = None
     cleanup: Literal["confirmed", "unconfirmed"] | None = None  # The environment stage's sandbox; None elsewhere
     messages_omitted: bool = False  # Durable environment stage: its record would not fit the activity payload
+    # The ready environment's baseline test file from the operator's capture; planning and authoring need it.
+    baseline_source: SourceFile | None = None
 
     @property
     def tool_cap_reached(self) -> bool:
@@ -363,6 +369,8 @@ async def prepare_environment(inputs: EnvironmentInput, model: Model | None, pre
                                        toolchain_id=selected.toolchain_id, scratch_location=sandbox.scratch_location,
                                        budget=SetupBudget(max_commands=budget.setup_commands), new_operation=uuid4)
         attempt = await _invoke("environment", agent, environment_prompt(inputs), deps, limits)
+        if isinstance(attempt.output, ReadyEnvironment):
+            attempt = replace(attempt, baseline_source=captured(sandbox, attempt.output.baseline_test_path))
     except Exception as exc:
         attempt = StageAttempt("environment", None, None, (), perf_counter() - started, exc, limits)
     finally:
@@ -371,6 +379,15 @@ async def prepare_environment(inputs: EnvironmentInput, model: Model | None, pre
         except Exception:
             cleanup = "unconfirmed"
     return replace(attempt, cleanup="confirmed" if cleanup == "confirmed" else "unconfirmed")
+
+
+def captured(sandbox: PreparedSandbox, path: str) -> SourceFile | None:
+    """One file of the captured revision as saved source, or None when the capture lacks it or it is not text."""
+    try:
+        data = sandbox.read_source(path)
+        return None if data is None else SourceFile(path=path, content=data.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return None
 
 
 # Recorded on every run that reaches the gates, because nothing below observes them.
@@ -450,6 +467,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
     """Mode-independent routing: each stage at most once, revisions once each, gates over frozen evidence."""
     attempts: list[StageAttempt] = []
     issue, environment, identity = case.issue, case.environment, case.environment_identity
+    source_files = issue.source_files
     runtime, selected, prepared, provenance = None, (UNSELECTED,), None, UNOBSERVED[2:]
     # What the environment stage could not confirm or keep; every later stop carries it.
     stage_notes: tuple[str, ...] = ()
@@ -511,6 +529,13 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         except ValueError as exc:
             return stop("environment", f"ready environment refused: {exc}"[:2048], limitations=unconfirmed)
         provenance, stage_notes = OBSERVED_IDENTITY + unconfirmed, unconfirmed
+        # The agent chose the baseline test while the case ran; its file joins the saved inventory from the capture.
+        if result.baseline_test_path not in {source.path for source in source_files}:
+            baseline = attempts[-1].baseline_source
+            if baseline is None or baseline.path != result.baseline_test_path:
+                return stop("environment", f"ready environment refused: baseline test file "
+                                           f"{result.baseline_test_path} is not text in the captured revision"[:2048])
+            source_files += (baseline,)
 
     identification = await _stage("identification", issue)
     if not isinstance(identification, IssueIdentification):
@@ -521,7 +546,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
 
     try:
         planning_input = TestPlanningInput(scope=issue.scope, identification=identification,
-                                           source_files=issue.source_files, environment=environment)
+                                           source_files=source_files, environment=environment)
     except ValueError as exc:
         return stop("planning", f"planning input refused: {exc}"[:2048], identification=identification)
     plan = await _stage("planning", planning_input)
@@ -531,7 +556,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         return stop("planning", f"plan unsupported: {plan.missing_capability}", identification=identification)
 
     try:
-        authoring_input = TestAuthoringInput(plan=plan, source_files=issue.source_files, environment=environment)
+        authoring_input = TestAuthoringInput(plan=plan, source_files=source_files, environment=environment)
     except ValueError as exc:
         return stop("authoring", f"authoring input refused: {exc}"[:2048], identification=identification, plan=plan)
     patch = await _stage("authoring", authoring_input)

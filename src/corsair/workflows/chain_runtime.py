@@ -33,6 +33,7 @@ from corsair.agents.environment.contracts import (
     BlockedEnvironment, EnvironmentInput, ReadyEnvironment, UnsupportedEnvironment,
 )
 from corsair.agents.evidence_assessment.contracts import EvidenceAssessment
+from corsair.agents.issue_analysis.contracts import SourceFile
 from corsair.agents.issue_identification.contracts import IssueIdentification
 from corsair.agents.test_authoring.contracts import AuthoringResult, TestAuthoringInput, TestPatch
 from corsair.agents.test_authoring.dependencies import AuthoringBudget, AuthoringDependencies
@@ -132,6 +133,7 @@ class EnvironmentRecord:
     exhausted: BudgetExhausted | None
     cleanup: Literal["confirmed", "unconfirmed"] | None
     messages_omitted: bool = False
+    baseline_source: SourceFile | None = None
 
 
 @dataclass(frozen=True)
@@ -146,6 +148,7 @@ class AttemptRecord:
     exhausted: BudgetExhausted | None = None
     cleanup: Literal["confirmed", "unconfirmed"] | None = None
     messages_omitted: bool = False
+    baseline_source: SourceFile | None = None
 
     @property
     def tool_cap_reached(self) -> bool:
@@ -200,7 +203,8 @@ def chain_result(run: DirectRun) -> ChainResult:
     return ChainResult(
         stopped_at=run.stopped_at, reason=run.reason,
         attempts=tuple(AttemptRecord(a.stage, a.output, a.usage, a.messages, a.elapsed_seconds, failure(a.failure),
-                                     a.limits, a.exhausted, a.cleanup, a.messages_omitted) for a in run.attempts),
+                                     a.limits, a.exhausted, a.cleanup, a.messages_omitted,
+                                     a.baseline_source) for a in run.attempts),
         identification=run.identification, plan=run.plan, patch=run.patch, observation_plan=run.observation_plan,
         executions=tuple(ExecutionRecord(revision=e.revision, operation=e.operation, observed=e.observed,
                                          failure=failure(e.failure)) for e in run.executions),
@@ -362,7 +366,8 @@ async def run_environment(request: EnvironmentRequest) -> EnvironmentRecord:
         raise ApplicationError(NO_PREPARATION, type=PreparationMissing.__name__, non_retryable=True)
     attempt = await prepare_environment(request.inputs, model, runtime.preparation, request.budget)
     record = EnvironmentRecord(attempt.output, attempt.usage, attempt.messages, attempt.elapsed_seconds,
-                               attempt.failure and failure_record(attempt.failure), attempt.exhausted, attempt.cleanup)
+                               attempt.failure and failure_record(attempt.failure), attempt.exhausted, attempt.cleanup,
+                               baseline_source=attempt.baseline_source)
     # Model output is bounded by usage, not bytes: the messages give way before the result crosses the payload limit.
     if len(ENVIRONMENT_RECORD.dump_json(record)) > MAX_RECORD_BYTES:
         record = replace(record, messages=(), messages_omitted=True)
