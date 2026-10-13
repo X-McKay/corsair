@@ -104,7 +104,7 @@ Live Docker runs reached the right verdict 3 times out of 6 (live-001 to live-00
 | C1 | The environment agent is not shown the file inventory or where the operator's smoke test is, so it probes for absent files | corpus case | Chain thread (thread report) |
 | C2 | The environment token cap derived from "1 read window" (48,000) is too small, at about 4.8k input tokens per request | corpus case | Not yet assigned |
 | C3 | A model stage that stops on its budget is labelled ERROR. The coordinator asked for INCONCLUSIVE, per Al's table. | corpus case | #109 (asked of the Node thread at 18:26Z) |
-| C4 | Under Docker, the file list the environment agent needs for #115's smoke check (a whole-repository test listing) is not handed over from the Docker preparation | corpus case, #115 review | #109, as a Docker file-list hand-over commit (thread report) |
+| C4 | #115 enforces the smoke-test rule over the operator's checkout listing (`source_paths`) and refuses a missing listing. No production adapter supplies that listing yet, so with #109 and #115 both on main, every smoke baseline on the Docker route is refused. | #115 review on #118 | #109, as the Docker file-list hand-over commit (thread report) |
 
 The gap numbers follow the chat. Gaps 6 to 11 are described in detail in HANDOFF-0102 on #117.
 
@@ -201,7 +201,7 @@ These steps follow the existing approach (stage order, runner core, required wit
 
 - This record was not checked by any command beyond `git` and the GitHub reads above. The run results are thread reports, backed by the tarballs where cited. The corpus case evidence exists only on RIG0.
 - Every Docker run is **unqualified (risk accepted)**. No `evidence: live` qualification follows from them.
-- Blockers: #109's owed fixes come before its merge and #113's. #117's items 10 and 11 gate the verdict rate. C1 and C2 stop every corpus case at environment until they are fixed.
+- Blockers: #109's owed fixes come before its merge and #113's. #117's items 10 and 11 gate the verdict rate. C1 and C2 stopped the one corpus case run so far at environment. Whether they stop the other 41 is unknown until those cases run. C4 is structural: no production adapter supplies the checkout listing yet, so every smoke baseline on the Docker route would be refused (review on #118).
 - Corpus accuracy has not been measured: 1 of 42 cases ran, and it ended ERROR at environment. Negative accuracy rests on one live fixture run (not_reproduced, admitted, 18:36Z), and the current mapping has only two negative cases, both of which need the fix-free runs PR (Al chose it at 18:34Z). See the section above.
 
 ## Decisions and next steps
