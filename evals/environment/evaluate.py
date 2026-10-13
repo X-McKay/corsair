@@ -146,6 +146,13 @@ class EnvironmentChecks(Evaluator):
         output = ctx.output
         calls = ctx.attributes.get("commands", [])
         reads = ctx.attributes.get("read_paths", [])
+        # Every curated outcome requires its observed trajectory, including blocked
+        # cases. Stop the expected prefix at unknown delivery or the operator budget.
+        stop = min(len(c["commands"]), c["max_commands"])
+        unknown = next((i for i, o in enumerate(c["observations"]) if o.get("unknown")), None)
+        if unknown is not None:
+            stop = min(stop, unknown + 1)
+        expected_commands = c["commands"][:stop]
         citations = (
             [step.source for step in output.recipe]
             if output.status == "ready"
@@ -188,8 +195,7 @@ class EnvironmentChecks(Evaluator):
             <= next(i + 1 for i, o in enumerate(c["observations"]) if o.get("unknown")),
             "contract": [r.model_dump(mode="json") for r in output.receipts]
             == ctx.attributes.get("records", []),
-            "required_commands": output.status != "ready"
-            or [list(cmd) for cmd in calls] == c["commands"],
+            "required_commands": [list(cmd) for cmd in calls] == expected_commands,
         }
 
 

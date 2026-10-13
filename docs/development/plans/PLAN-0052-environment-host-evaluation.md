@@ -79,3 +79,28 @@ Make run16/16 clean with15 assertions each; focused71 checks passed (one SDK war
 full suite at prior6f35dd3 passed997 tests; follow-up changes only evaluator/fixtures/regression records.
 
 Root final review: label shared metric means as per observed sample and label the suite synthetic in command metadata. Full offline suite at6f35dd3 passed997 checks; follow-up unsupported-requirement regression and affected checks passed71. No further provider dispatch was attempted after automatic approval review blocked external fixture transfer in the planning lane.
+
+
+PR57 follow-up review corrections (2026-10-13, base `a1d44c3`): independently reproduced
+that a compile-only build-blocked trajectory scored `required_commands=True` and a measured
+zero `observed_commands` attribute disappeared from the shared summary. The evaluator now
+requires the curated exact command prefix for every status, shortened only at the first
+unknown-delivery observation or the operator command cap. Regression cases reject omitted
+dependency setup, reversed commands, skipping the unknown command, commands after unknown
+delivery, skipping the budget prefix and commands after the cap. The shared summary merges
+explicit numeric `observed_*` attributes with native metrics once per attempt; metric entries
+win when both exist, measured zero contributes to means/coverage, and absent values stay
+unknown. The regression distinguishes a measured zero, a duplicate metric/attribute pair
+and genuinely missing telemetry. CURRENT's old environment-eval-pending phrase is corrected.
+
+Affected tests: `tests/agents/test_environment_evals.py`, `test_environment.py`,
+`test_isolated_evals.py`:70 passed, one existing SDK warning. Same frozen set
+`f6185b41494111fecd4178cc81874120b2bd2ba97c98f37df921ab9faa3fd939`,
+`make eval AGENT=environment`:16/16 at
+`.runs/evals/environment/20261013T100728Z-development-scripted`, compared with
+`20261013T100037Z-development-scripted`16/16. Corrected measured command mean1.75
+(previous summary2.0 excluded the two unsupported attempts' measured zeros); observed
+output corrections0.0 with16/16 coverage (previously absent). Requests5.25, tool calls3.75,
+input/output token estimates1016.25/162.25 unchanged. No provider or infrastructure action.
+`make test-config`:1050 passed, one existing SDK warning, 50.33 seconds. Updated workflow guards5 passed; `git diff --check` passed. Broad `ruff check` found existing shared-runner F401 (unused field import) and E731 (comparison lambda), both outside this fix; evaluator/regression files lint passed. Final review retains synthetic-runtime limits
+and no model prompt/config/skill or dataset change.

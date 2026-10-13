@@ -142,3 +142,74 @@ def test_unsupported_requirement_rejects_inverted_runtime_claim_with_valid_citat
     checks = EnvironmentChecks().evaluate(ctx)
     assert checks["grounding"] and checks["status"]
     assert not checks["unsupported_requirement"]
+
+
+def test_measured_zero_attributes_contribute_once_and_missing_values_stay_unknown(tmp_path):
+    from evals.run import summarize
+
+    base = {"name": "one", "assertions": {"ok": {"value": True}},
+            "evaluator_failures": [], "scores": {}, "task_duration": 1}
+    cases = [dict(base, metrics={}, attributes={"observed_output_corrections": 0,
+                                                "unrelated": 99}),
+             dict(base, name="two", metrics={"observed_output_corrections": 2},
+                  attributes={"observed_output_corrections": 2}),
+             dict(base, name="three", metrics={}, attributes={})]
+    (tmp_path / "report.json").write_text(json.dumps({"cases": cases, "failures": []}))
+    result = summarize(tmp_path)
+    assert result["efficiency_mean"]["observed_output_corrections"] == 1
+    assert result["efficiency_samples"]["observed_output_corrections"] == {"observed": 2, "attempts": 3}
+    assert "unrelated" not in result["efficiency_mean"]
+
+
+def environment_context(name):
+    from types import SimpleNamespace
+    from corsair.agents.environment.contracts import EnvironmentInput
+
+    case = next(c for c in json.loads((ROOT / "cases.json").read_text()) if c["name"] == name)
+    draft = dict(case["draft"])
+    draft["citations"] = [SimpleNamespace(**c) for c in draft.get("citations", [])]
+    return SimpleNamespace(metadata=case, output=SimpleNamespace(**draft, receipts=[]),
+                           inputs=SimpleNamespace(inputs=EnvironmentInput.model_validate(case["inputs"])),
+                           attributes={"read_paths": case["required_reads"], "commands": [], "records": []})
+
+
+def test_blocked_build_requires_dependencies_before_the_failed_compile():
+    from evals.environment.evaluate import EnvironmentChecks
+
+    ctx = environment_context("build")
+    ctx.attributes["commands"] = ctx.metadata["commands"]
+    assert all(EnvironmentChecks().evaluate(ctx).values())
+    ctx.attributes["commands"] = ctx.metadata["commands"][1:]
+    facts = EnvironmentChecks().evaluate(ctx)
+    assert facts["status"] and facts["layer"] and facts["command_policy"]
+    assert not facts["required_commands"]
+    ctx.attributes["commands"] = list(reversed(ctx.metadata["commands"]))
+    assert not EnvironmentChecks().evaluate(ctx)["required_commands"]
+
+
+def test_unknown_delivery_requires_the_observed_prefix_and_halts():
+    from evals.environment.evaluate import EnvironmentChecks
+
+    ctx = environment_context("unknown-delivery")
+    ctx.attributes["commands"] = ctx.metadata["commands"][:1]
+    assert all(EnvironmentChecks().evaluate(ctx).values())
+    ctx.attributes["commands"] = []
+    assert not EnvironmentChecks().evaluate(ctx)["required_commands"]
+    ctx.attributes["commands"] = ctx.metadata["commands"][1:]
+    assert not EnvironmentChecks().evaluate(ctx)["required_commands"]
+    ctx.attributes["commands"] = ctx.metadata["commands"]
+    assert not EnvironmentChecks().evaluate(ctx)["unknown_halt"]
+
+
+def test_budget_block_requires_the_observed_prefix_without_commands_after_the_cap():
+    from evals.environment.evaluate import EnvironmentChecks
+
+    ctx = environment_context("command-budget")
+    ctx.attributes["commands"] = ctx.metadata["commands"][:1]
+    assert all(EnvironmentChecks().evaluate(ctx).values())
+    ctx.attributes["commands"] = []
+    assert not EnvironmentChecks().evaluate(ctx)["required_commands"]
+    ctx.attributes["commands"] = ctx.metadata["commands"][1:2]
+    assert not EnvironmentChecks().evaluate(ctx)["required_commands"]
+    ctx.attributes["commands"] = ctx.metadata["commands"][:2]
+    assert not EnvironmentChecks().evaluate(ctx)["command_budget"]

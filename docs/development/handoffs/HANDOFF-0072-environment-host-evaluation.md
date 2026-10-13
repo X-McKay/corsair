@@ -44,3 +44,16 @@ post-correction16/16 passed, final focused65 passed. Live requests remain unrun.
 Follow-up cross-review closes inverted unsupported-runtime eval false positive using curated
 oracle-only wording patterns. Fresh manifest, Make16/16 with15 assertions and focused71 passed.
 Root full suite997 passed at preceding6f35dd3. Semantic wording coverage is deliberately bounded.
+
+
+PR57 review follow-up, base `a1d44c3`: PLAN-0052 records reproduced metric/trajectory
+false positives and their corrections. Blocked outputs must carry the curated command prefix
+through their failure, unknown-delivery halt or operator cap. Shared summaries retain explicit
+measured-zero attributes once while preserving absent telemetry as unknown. Four new regression
+tests include blocked-build omission/reordering, unknown halt and budget halt negatives.
+Affected suite70 passed; unchanged frozen host set16/16 at
+`.runs/evals/environment/20261013T100728Z-development-scripted`, compared with prior
+16/16. Command mean is now correctly1.75 with16/16 samples, output corrections0.0 with
+16/16 samples. Current authorization permits updating/pushing this existing PR57 branch;
+root owns review publication. `make test-config`:1050 passed; workflow guards5 passed; existing shared-runner lint findings are retained in PLAN-0052. No live requests,
+setup execution or infrastructure calls. Resolve final source via Git rather than this snapshot.

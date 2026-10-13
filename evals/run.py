@@ -86,7 +86,14 @@ def summarize(evidence: Path) -> dict:
             assertions[key][1] += 1
             if not value:
                 entry["failed_assertions"][key] = entry["failed_assertions"].get(key, 0) + 1
-        for key, value in case["metrics"].items():
+        # record_count keeps measured zeros in attributes because native Evals drops
+        # zero increments. Use that fallback once per metric, without filling missing data.
+        observed = {
+            key: value for key, value in case.get("attributes", {}).items()
+            if key.startswith("observed_") and isinstance(value, (int, float))
+            and not isinstance(value, bool)
+        }
+        for key, value in (observed | case["metrics"]).items():
             metrics.setdefault(key, []).append(value)
         for key, item in case["scores"].items():
             metrics.setdefault("score_" + key, []).append(item["value"])
