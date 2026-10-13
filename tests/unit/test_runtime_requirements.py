@@ -202,11 +202,16 @@ def test_selection_supported_unsupported_conflict():
     java17 = detect({'pom.xml': PARENT.replace(b'1.8', b'17').replace(b'junit</groupId><artifactId>junit',
                                                                          b'org.junit.jupiter</groupId><artifactId>junit-jupiter').replace(b'4.12', b'5.14.4')}, 'java')
     selection = select(java17, matrix)
-    assert selection.status == 'unsupported' and [n.name for n in selection.needs] == ['junit5']  # no Maven runner row yet
-    with_runner = Matrix.model_validate({**matrix.model_dump(), 'frameworks': [*matrix.model_dump()['frameworks'], {
-        'name': 'junit5', 'language': 'java', 'versions': '>=5.13', 'runner': 'x',
-        'qualification': {'records': ['SPEC-0039'], 'report': 'x'}}]})
-    assert select(java17, with_runner).status == 'supported'
+    assert selection.status == 'supported' and selection.image_id == 'temurin-17-maven'
+    java8 = detect({'pom.xml': PARENT}, 'java')  # source 1.8 with JUnit 4.12
+    selection = select(java8, matrix)
+    assert selection.status == 'supported' and selection.image_id == 'temurin-8-maven'
+    # JUnit 4 before 4.12 has no Vintage discovery (SPEC-0041); the JDK alone is not enough.
+    old_junit = select(detect({'pom.xml': PARENT.replace(b'4.12', b'4.8.2')}, 'java'), matrix)
+    assert old_junit.status == 'unsupported' and [n.name for n in old_junit.needs] == ['junit4']
+    without_runner = Matrix.model_validate({**matrix.model_dump(), 'frameworks': [
+        f for f in matrix.model_dump()['frameworks'] if f['language'] != 'java']})
+    assert [n.name for n in select(java17, without_runner).needs] == ['junit5']
 
 
 def test_matrix_refuses_selector_rows_and_duplicates():

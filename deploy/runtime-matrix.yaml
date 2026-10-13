@@ -32,6 +32,17 @@ images:
       records: [SPEC-0007, PLAN-0008]
       report: docs/qualification/openshell-toolchains.md
       note: Temurin 17.0.20.1, Maven 3.10.0 and JUnit Jupiter 5.14.4 under Surefire 3.6.0, offline closure in the image.
+  - id: temurin-8-maven
+    language: java
+    base_image: docker.io/library/maven@sha256:f2cb52730ea0bde9dc8ba20e5e539d000dcdd7ab9e498d70c301fe04fbddb656
+    image_source: deploy/qualification/toolchains/java8
+    runtime: {name: jdk, version: 8.0.0}
+    tools: {maven: 3.10.0}
+    selector: {}
+    qualification:
+      records: [SPEC-0045, PLAN-0049]
+      report: docs/qualification/openshell-toolchains.md
+      note: PENDING live gate.
 frameworks:
   - name: pytest
     language: python
@@ -41,3 +52,19 @@ frameworks:
       records: [SPEC-0028, PLAN-0027, SPEC-0032, PLAN-0032]
       report: docs/qualification/openshell-test-workspace.md
       note: pytest runner and JUnit report parser exercised with pytest 9.0.x only (reviewed SPEC-0018 pair).
+  - name: junit4
+    language: java
+    versions: '>=4.12,<4.14'
+    runner: src/corsair/adapters/maven_runner.py
+    qualification:
+      records: [SPEC-0041, SPEC-0045, PLAN-0049]
+      report: docs/qualification/openshell-toolchains.md
+      note: PENDING live gate.
+  - name: junit5
+    language: java
+    versions: 5.14.*
+    runner: src/corsair/adapters/maven_runner.py
+    qualification:
+      records: [SPEC-0041, SPEC-0045, PLAN-0049]
+      report: docs/qualification/openshell-toolchains.md
+      note: PENDING live gate.

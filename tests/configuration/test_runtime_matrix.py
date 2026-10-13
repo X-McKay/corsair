@@ -11,7 +11,8 @@ RECORDS = {p.name.split('-', 2)[0] + '-' + p.name.split('-', 2)[1]
 
 def test_rows_are_the_prepared_toolchain_images():
     matrix = load()
-    assert {(row.language, row.base_image) for row in matrix.images} == set(BASES.items())
+    assert {(Path(row.image_source).name, row.base_image) for row in matrix.images} == set(BASES.items())
+    assert all(row.image_source == f'deploy/qualification/toolchains/{Path(row.image_source).name}' for row in matrix.images)
     for row in matrix.images:
         assert (ROOT / row.image_source / 'Dockerfile').read_text().startswith('FROM ' + row.base_image)
 
