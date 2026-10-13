@@ -11,7 +11,8 @@ from corsair.ports.test_runner import (MAX_TEST_ID, TEST_ID, ApprovedPatch, Disc
 from corsair.reports.junit import MAX_JUNIT_BYTES, JUnitError, parse_junit
 from corsair.reports.test_observations import AdmittedTestClaims, TestClaim, WorkloadTestReport
 
-# Fixed operator script: stdout is exactly the JUnit file, exit status is pytest's.
+# Fixed operator script run by absolute /bin/sh (sandbox exec promises no PATH lookup): stdout is exactly
+# the JUnit file, exit status is pytest's.
 # Paths and test ids arrive only as positional arguments, never inside the script text.
 WRAPPER = ('junit="$1"; shift; rm -f -- "$junit"; '
            '"$@" --junitxml "$junit" -o junit_logging=all -o junit_log_passing_tests=true >/dev/null 2>&1; '
@@ -140,7 +141,7 @@ class PytestRunner:
         return discovery, execution, layer, execution.detail
 
     def _run_once(self, prepared: PreparedWorkspace, ids: tuple[str, str], test_paths: frozenset[str], operation: UUID):
-        argv = ('sh', '-c', WRAPPER, 'corsair-pytest', self._config.junit_path, *self._config.command, *RUN_OPTIONS, *ids)
+        argv = ('/bin/sh', '-c', WRAPPER, 'corsair-pytest', self._config.junit_path, *self._config.command, *RUN_OPTIONS, *ids)
         receipt, problem = self._execute(prepared.handle, argv, operation)
         failure = lambda layer, detail, junit=None, status='execution_failure': (
             Execution(status, (), junit, None, detail, argv, receipt), layer)

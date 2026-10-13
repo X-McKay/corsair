@@ -153,3 +153,10 @@ qualify-temporal-fixture:
 	test ! -e "$(CORSAIR_QUAL_RUN)"
 	mkdir -m 700 -p "$(CORSAIR_QUAL_RUN)"
 	uv run --locked python -m pytest tests/temporal/test_fixture_native.py --temporal-address "$(CORSAIR_TEMPORAL_ADDRESS)" --temporal-evidence-dir "$(CORSAIR_QUAL_RUN)/histories" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
+
+# Reviewed SPEC-0018 pair through OpenShellTestWorkspace and the native pytest runner; fixture source only.
+.PHONY: qualify-test-workspace
+qualify-test-workspace:
+	test ! -e "$(CORSAIR_QUAL_RUN)"
+	mkdir -p "$(CORSAIR_QUAL_RUN)"
+	uv run --locked python -m pytest tests/qualification -m test_workspace --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
