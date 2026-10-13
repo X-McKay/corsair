@@ -13,7 +13,7 @@ related: [IDEA-0004, SPEC-0010, SPEC-0012, SPEC-0019, SPEC-0020, SPEC-0022, SPEC
 
 [IDEA-0004](../ideas/IDEA-0004-end-to-end-agent-plan.md) (accepted) needs an environment stage for the first real case: a repeatable setup for one repository commit that installs dependencies, builds, discovers tests and runs one existing test, producing the environment evidence the planner ([SPEC-0022](SPEC-0022-test-planning-agent.md)) consumes. This spec fixes the agent's isolated contract, skill and tools so they can be built and tested deterministically now. It also records how the offline parts of [SPEC-0025](SPEC-0025-sandbox-source-fetch.md) and [SPEC-0026](SPEC-0026-sandbox-dependency-fetch.md) are implemented as deterministic nodes.
 
-Excluded: any live provider, OpenShell or Temporal run; connecting the stage to a workflow; the setup-replay node; and any relaxation of the no-workload-credential rule. Live use stays blocked until SPEC-0025 and SPEC-0026 qualify, which needs a qualified quota-enforcing storage volume, and, for private repositories, confirmation of the OpenShell 0.1.3 credential placeholder behavior.
+Excluded: any live provider, OpenShell or Temporal run; connecting the stage to a workflow; the setup-replay node; and any relaxation of the no-workload-credential rule. Live use stays blocked until SPEC-0025 and SPEC-0026 qualify (the storage quota precondition was replaced on 2026-10-13 by SPEC-0025's pre-flight workspace budget, quota recorded unqualified), and, for private repositories, confirmation of the OpenShell 0.1.3 credential placeholder behavior.
 
 ## Boundaries and design
 
