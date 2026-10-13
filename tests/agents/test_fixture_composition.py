@@ -108,13 +108,14 @@ def test_stages_compose_to_a_gate_verdict_that_stays_inconclusive_without_a_witn
     assert not any(label in prompt for prompt in prompts(run) for label in ("vulnerable", "fixed"))
 
 
-def test_an_over_claim_is_rejected_and_the_gate_verdict_stands(store, tmp_path):
+def test_an_over_claim_without_a_witness_item_is_refused_and_the_gate_verdict_stands(store, tmp_path):
     run = compose(store, tmp_path, witnessed=False,
                   assessment=scripted_assessment(finding="reproduced", fix="verified"))
-    admission = run.assessment.admission
-    assert not admission.admitted and admission.disposition == run.gate.permitted
-    assert admission.rejections == ("finding reproduced exceeds permitted inconclusive",
-                                    "fix verified exceeds permitted not_verified")
+    assert (run.stopped_at, run.assessment) == ("assessment", None)
+    assert run.gate.permitted == Disposition(execution="completed", finding="inconclusive", fix="not_verified")
+    retries = [part.content for message in run.attempts[-1].messages for part in message.parts
+               if part.part_kind == "retry-prompt"]
+    assert retries and all("no witness item for the baseline revision" in retry for retry in retries)
 
 
 def test_the_probe_witness_lets_the_gate_reach_reproduced_and_verified(store, tmp_path):
@@ -234,6 +235,27 @@ def test_journal_keeps_a_refused_development_run(store, tmp_path):
     observed = entry["observed"]
     assert observed["failure_layer"] == "workspace" and observed["cleanup"] == "unconfirmed"
     assert "reviewed SPEC-0018" in observed["detail"]
+
+
+def test_checked_in_stage_profiles_admit_per_stage_reasoning_budgets():
+    """The operator profile is admitted by LocalModelConfig and only changes the named request controls."""
+    from pathlib import Path
+    from evals.fixture_e2e import run as cli
+    from corsair.agents.provider import LocalModelConfig, model_settings
+    base = LocalModelConfig(server="vllm", base_url="https://llm.example/v1", model_name="explicit-model",
+                            timeout_seconds=180, response_token_limit=16384)
+    profiles = json.loads((Path(cli.__file__).parent / "stage-profiles.json").read_text())
+    configs = cli.stage_configs(base, profiles)
+    assert {stage: (c.response_token_limit, c.thinking_token_budget) for stage, c in configs.items()} == {
+        "identification": (8192, None), "planning": (8192, 2048), "authoring": (8192, 2048),
+        "assessment": (16384, 2048)}
+    assert all(c.model_dump(exclude=cli.PROFILE_FIELDS) == base.model_dump(exclude=cli.PROFILE_FIELDS)
+               for c in configs.values())
+    assert model_settings(configs["planning"])["extra_body"] == {"thinking_token_budget": 2048}
+    for bad in ({"planning": {"base_url": "https://other.example/v1"}}, {"review": {}},
+                {"planning": {"thinking_token_budget": 4096}}):
+        with pytest.raises(ValueError):
+            cli.stage_configs(base, bad)
 
 
 @pytest.mark.parametrize("envelope, reason", [

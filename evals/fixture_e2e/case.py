@@ -127,7 +127,8 @@ INVENTORY = re.compile(r"(?P<item>[a-z0-9][a-z0-9_.-]*) \(kind (?P<kind>\w+), (?
 
 
 def scripted_assessment(execution="completed", finding="inconclusive", fix="not_verified") -> FunctionModel:
-    """Reads every inventory item once and proposes the given triple, citing each revision's first item line."""
+    """Reads every inventory item once and proposes the given triple, citing each revision's witness item when
+    one is listed (the assessor's grounding rule), else its first item, at line 1."""
     async def respond(messages, info):
         prompt = next(part.content for message in messages for part in message.parts if part.part_kind == "user-prompt")
         items = [match.groupdict() for match in INVENTORY.finditer(prompt)]
@@ -137,7 +138,8 @@ def scripted_assessment(execution="completed", finding="inconclusive", fix="not_
                                                      tool_call_id=f"evidence-{done}")])
 
         def cite(revision):
-            item = next(i for i in items if i["revision"] == revision)
+            ordered = sorted((i for i in items if i["revision"] == revision), key=lambda i: i["kind"] != "witness")
+            item = ordered[0]
             return {"item_id": item["item"], "start_line": 1, "end_line": 1}
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {
             "execution": execution, "finding": finding, "fix": fix,

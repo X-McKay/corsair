@@ -1,13 +1,13 @@
 ---
 id: HANDOFF-0054
 kind: handoff
-title: Planner held-out cases and live runs started
+title: Planner held-out cases and live results
 status: recorded
 updated: 2026-10-13
 related: [PLAN-0036, PLAN-0025, SPEC-0022]
 ---
 
-# Planner held-out cases and live runs started
+# Planner held-out cases and live results
 
 ## Verified state
 
@@ -15,14 +15,14 @@ Branch `claude/planner-live-qualification-ktcy7w` from main `0d9bb5a` (PR #36); 
 
 ## Validation and blockers
 
-`make test-config`: 785 passed (one existing deprecation warning), including the SPEC-0023 held-out manifest guard. Scripted held-out plumbing: 12/12 attempts pass every check. Live runs (held-out × prompt v2 and v3, three repeats each; development × v3, two repeats) were started on RIG0 against llm.almckay.io with an 8192 response cap and 2048 thinking budget; results were not available when this PR was prepared for merge at the user's request. No Temporal or OpenShell check ran; the kind cluster was not used.
+`make test-config`: 785 passed (one existing deprecation warning), including the SPEC-0023 held-out manifest guard. Scripted held-out plumbing: 12/12 attempts pass every check. Live runs on RIG0 against llm.almckay.io (8192 response cap, 2048 thinking budget), each once: held-out v2 12/18 and v3 12/18 passed every check; development v3 4/12, with every completed ready plan writing a fixture to `tmp_path.parent`. Failures are attributed in PLAN-0036: re-read budget exhaustion, reads of the planned test path, scratch escapes, wrong ready status on unobservable concerns, and semantic defects review found in passing plans. Not qualified under either prompt. No Temporal or OpenShell check ran; the kind cluster was not used.
 
 ## Decisions and next steps
 
-The scratch finding stays an evaluator check because a typed field would change the prompt version that PR #34 owns. Next: record the runs per prompt version without rerunning failures, review every ready plan, apply the PLAN-0036 criteria, and relay any prompt change to the #34 owner.
+The scratch finding stays an evaluator check because a typed field would change the prompt version that PR #34 owns. Next: the planning prompt owner addresses the PLAN-0036 prompt findings (unreadable planned test paths, scratch example, consistent `safe_behavior`, abstention under v3); measure on the development set, then on this held-out set once, then on fresh held-out cases before claiming qualification.
 
 ## Continuation prompt
 
 ```text
-Read AGENTS.md, docs/development/CURRENT.md, PLAN-0036 and this handoff. On RIG0, read .runs/planner-qual-20261013/ (summary-*.json, report-*.json; worktrees /home/al/git/corsair-planner-v2 and -v3). Record each run's results in PLAN-0036 against its prompt version, review every ready plan independently, and apply the pre-registered criteria; do not rerun failed attempts. Do not edit the planning prompt; relay prompt findings to its owner. Run make test-config, update CURRENT.md and write a new handoff.
+Read AGENTS.md, docs/development/CURRENT.md, PLAN-0036 and this handoff. Address the PLAN-0036 prompt findings in the planning skill (new prompt version), run the development set on RIG0 with --cases development, then --cases heldout once; retain every attempt and review every plan. Freeze fresh held-out cases before any qualification claim. Run make test-config, update CURRENT.md and write a new handoff.
 ```

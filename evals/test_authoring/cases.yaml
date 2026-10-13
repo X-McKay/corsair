@@ -538,7 +538,6 @@ cases:
     - run: true
     - run: true
     - run: true
-    - run: true
     runner_runs:
     - &id004
       status: collection_error
