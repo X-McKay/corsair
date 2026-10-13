@@ -22,6 +22,7 @@ from pydantic_ai.messages import ModelMessage
 from pydantic_ai.usage import RunUsage
 
 from corsair.adapters.local_artifacts import LocalArtifacts
+from corsair.agents.environment import agent as environment
 from corsair.agents.evidence_assessment import agent as assessment
 from corsair.agents.issue_identification import agent as identification
 from corsair.agents.provider import LocalModelConfig
@@ -31,18 +32,23 @@ from corsair.agents.test_authoring import agent as authoring
 from corsair.agents.test_authoring.skills import SKILL_SHA256 as AUTHORING_SKILL
 from corsair.agents.test_planning import agent as planning
 from corsair.agents.test_planning.skills import SKILL_SHA256 as PLANNING_SKILL
-from corsair.composition.direct import CompositionBudget, DirectRun, FixtureCase, StageModels, run_direct
+from corsair.composition.direct import (CompositionBudget, DirectRun, FixtureCase, Preparation, StageModels,
+                                        run_direct)
+from corsair.nodes.runtime.environment import RuntimeCatalog
 from evals.issue_analysis.evaluate import describe_model
 
 from .case import (fixture_case, reviewed_runners, scripted_assessment, scripted_authoring, scripted_identification,
                    scripted_planning)
 
 STAGES = ("identification", "planning", "authoring", "assessment")
+# A case that carries setup source runs the environment stage first (SPEC-0068); the fixture carries none.
+AGENT_STAGES = ("environment",) + STAGES
 SCRIPTED = {"identification": scripted_identification, "planning": scripted_planning,
             "authoring": scripted_authoring, "assessment": scripted_assessment}
 # Per-stage identity as each stage's own eval reports it (SPEC-0044, SPEC-0052).
 VERSION_FIELDS = ("prompt_version", "config_version", "skill_sha256", "toolset_sha256")
 VERSIONS = {
+    "environment": (environment.PROMPT_VERSION, None, environment.SKILL_SHA256, environment.TOOLSET_SHA256),
     "identification": (identification.PROMPT_VERSION, identification.CONFIG_VERSION, identification.SKILL_SHA256,
                        identification.TOOLSET_SHA256),
     "planning": (planning.PROMPT_VERSION, planning.CONFIG_VERSION, PLANNING_SKILL, planning.TOOLSET_SHA256),
@@ -56,9 +62,9 @@ PROFILE_FIELDS = {"response_token_limit", "thinking_mode", "thinking_token_budge
 
 def stage_configs(base: LocalModelConfig | InferenceConfig, profiles: dict, stages=STAGES) -> dict:
     """Each stage's provider configuration: the base with that stage's profile fields, revalidated."""
-    if not isinstance(profiles, dict) or set(profiles) - set(STAGES) or any(
+    if not isinstance(profiles, dict) or set(profiles) - set(AGENT_STAGES) or any(
             not isinstance(fields, dict) or set(fields) - PROFILE_FIELDS for fields in profiles.values()):
-        raise ValueError(f"stage profiles map stages {STAGES} to fields {sorted(PROFILE_FIELDS)}")
+        raise ValueError(f"stage profiles map stages {AGENT_STAGES} to fields {sorted(PROFILE_FIELDS)}")
     resolved = ({stage: base for stage in stages} if isinstance(base, LocalModelConfig)
                 else {stage: inference_config(base).resolve(stage) for stage in stages})
     return {stage: type(profile).model_validate(profile.model_dump() | profiles.get(stage, {}))
@@ -163,11 +169,16 @@ def attempt_record(attempt) -> dict:
 
 
 async def record_run(evidence: Path, live: tuple[str, ...], config: LocalModelConfig | InferenceConfig | None, case: FixtureCase,
-                     runners, runner: dict, profiles: dict | None = None, drain_seconds: float = 900) -> DirectRun:
+                     runners, runner: dict, profiles: dict | None = None, drain_seconds: float = 900, *,
+                     stages: tuple[str, ...] = STAGES, scripted: dict | None = None,
+                     catalog: RuntimeCatalog | None = None, preparation: Preparation | None = None) -> DirectRun:
     """Run one composition into an existing private evidence directory and keep every receipt.
 
     ``runner`` describes the operator's execution route for configuration.json; ``profiles`` are the
-    optional per-stage provider overrides (``stage_configs``).
+    optional per-stage provider overrides (``stage_configs``). ``stages`` are the agent stages the case
+    reaches; each is live or has a ``scripted`` model factory (the fixture's by default). ``catalog`` and
+    ``preparation`` are the runtime and environment stages' operator ports for a case with build files
+    and setup source.
     """
     logfire.configure(send_to_logfire=False, console=False)
     async with AsyncExitStack() as stack:
@@ -178,23 +189,29 @@ async def record_run(evidence: Path, live: tuple[str, ...], config: LocalModelCo
         for stage in live:
             if configs[stage] not in models:
                 models[configs[stage]] = await stack.enter_async_context(configured_model(configs[stage]))
-        scripted = SCRIPTED | {"planning": lambda: scripted_planning(case.environment.discovery_command)}
-        selected = {stage: models[configs[stage]] if stage in live else scripted[stage]() for stage in STAGES}
+        if scripted is None:
+            scripted = SCRIPTED | {"planning": lambda: scripted_planning(case.environment.discovery_command)}
+        if missing := [stage for stage in stages if stage not in live and stage not in scripted]:
+            raise ValueError(f"stages {missing} are neither live nor scripted")
+        selected = {stage: models[configs[stage]] if stage in live else scripted[stage]() for stage in stages}
         budget = CompositionBudget()
         (evidence / "configuration.json").write_text(json.dumps({
             "mode": "direct", "live_stages": list(live), "budget": budget.model_dump(),
             "provider": config.model_dump() if config else None, "stage_profiles": profiles,
             "stage_providers": {stage: configs[stage].model_dump() for stage in live},
-            "models": {stage: describe_model(selected[stage]) for stage in STAGES},
+            "models": {stage: describe_model(selected[stage]) for stage in stages},
             "versions": {stage: dict(zip(VERSION_FIELDS, VERSIONS[stage]))
-                         for stage in STAGES},
+                         for stage in stages},
+            "prepared_images": dict(catalog.prepared) if catalog else None, "setup": _dump(case.setup),
+            "runtime_inputs": sorted(case.runtime.files) if case.runtime else None,
             "runner": runner, "witness_capture": "operator_probe" if case.witness_envelope else "none",
             "witness_envelope": encode(case.witness_envelope),
             "environment": _dump(case.environment), "environment_identity": _dump(case.environment_identity),
             "revision_sources": case.revision_sources, "source": {"python": sys.version}}, indent=2))
         journal = Journal(runners)
         try:
-            run = await run_direct(case, StageModels(**selected), journal, budget)
+            run = await run_direct(case, StageModels(**selected), journal, budget, catalog=catalog,
+                                   preparation=preparation)
         finally:
             # A timed-out stage leaves its runner call finishing in a worker thread; keep its observation.
             drained = await asyncio.to_thread(journal.drain, drain_seconds)

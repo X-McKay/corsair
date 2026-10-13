@@ -90,6 +90,17 @@ class AgentPart(_Frozen):
     candidate: str = Field(pattern=rf"^{COMMIT.pattern}$")
     language: str
     build_system: str
+    # Baseline-revision files the issue stages read (G2b: repository-scale source is not mapped yet) and the
+    # environment stage's setup source (SPEC-0068); the case command needs both, other loaders ignore them.
+    source_paths: tuple[str, ...] = Field(default=(), max_length=16)
+    setup_paths: tuple[str, ...] = Field(default=(), max_length=32)
+
+    @field_validator("source_paths", "setup_paths")
+    @classmethod
+    def confined(cls, paths: tuple[str, ...]) -> tuple[str, ...]:
+        if len(set(paths)) != len(paths):
+            raise ValueError("duplicate path")
+        return tuple(confined_path(path) for path in paths)
 
     @field_validator("issue")
     @classmethod

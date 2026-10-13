@@ -19,7 +19,7 @@ from corsair.core.disposition import EnvironmentIdentity
 from corsair.nodes.runtime.contracts import (MAX_INPUT_BYTES, Language, RuntimeInputs, RuntimeOutcome,
                                              RuntimeRequirement, Selection, Supported)
 from corsair.nodes.runtime.detect import detect, is_build_file
-from corsair.nodes.runtime.matrix import Matrix, select
+from corsair.nodes.runtime.matrix import FrameworkRow, Matrix, select
 
 # Environment agent framework table names (agents/environment/frameworks.py) per runner-table framework name.
 AGENT_FRAMEWORK = {'pytest': 'pytest', 'junit5': 'junit5', 'junit4': 'junit4', 'tap-harness': 'tap-harness', 'jest': 'jest',
@@ -148,6 +148,19 @@ def toolchain(selection: Supported, matrix: Matrix, prepared: Mapping[str, str])
     return Toolchain(toolchain_id=row.id, image=prepared[row.id], language=row.language,
                      runtime=f'{row.runtime.name} {row.runtime.version}',
                      tools=tuple(f'{name} {version}' for name, version in sorted(row.tools.items())))
+
+
+def framework_row(selection: Supported, matrix: Matrix) -> FrameworkRow:
+    """The framework row whose runner runs the case's tests: the one row the selection admitted on its image.
+
+    Callers choose the runner adapter from its `runner` path, so every language's case reaches its own runner rather
+    than pytest's. A selection that admitted several framework rows names no single runner and is refused."""
+    admitted = {c.name for c in selection.checks if c.kind == 'test_framework' and c.satisfied}
+    rows = [f for f in matrix.frameworks if f.name in admitted and selection.image_id in f.images]
+    if len(rows) != 1:
+        raise ValueError(f'selection on {selection.image_id} admitted {len(rows)} framework rows '
+                         f'({", ".join(sorted(admitted)) or "none"}); the runner must be exactly one')
+    return rows[0]
 
 
 def environment_input(requirement: RuntimeRequirement | str, selection: Selection | None, matrix: Matrix,

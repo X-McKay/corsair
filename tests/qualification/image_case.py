@@ -40,14 +40,14 @@ def head(checkout) -> str:
                           check=True).stdout.strip()
 
 
-def commit_tree(checkout, destination):
-    """Write HEAD's blobs exactly as committed (regular files, executables, symlinks) into `destination`.
+def commit_tree(checkout, destination, commit='HEAD'):
+    """Write `commit`'s blobs exactly as committed (regular files, executables, symlinks) into `destination`.
 
     The receipt names a commit, so the container gets that commit's blobs, never the worktree's bytes (which local
     edits, untracked files or checkout filters such as EOL conversion and `ident` can change).
     """
     git = ['git', '-C', str(checkout)]
-    listing = subprocess.run([*git, 'ls-tree', '-r', '-z', 'HEAD'], capture_output=True, check=True).stdout
+    listing = subprocess.run([*git, 'ls-tree', '-r', '-z', commit], capture_output=True, check=True).stdout
     entries = [line.split(b'\t', 1) for line in listing.split(b'\0') if line]
     entries = [(*meta.split(b' '), os.fsdecode(path)) for meta, path in entries]
     unsupported = [path for mode, kind, _, path in entries if kind != b'blob']
@@ -108,19 +108,21 @@ class DockerCase:
 
     `mounts` are (host, container) read-only pairs besides the checkout at /src; `build` is the language's offline
     build script run in the copy before the patch lands (setup, not a test); `scratch` are container paths `prepare`
-    recreates and `release` removes besides the workspace.
+    recreates and `release` removes besides the workspace. `network` is `none` for every test run; only a setup
+    sandbox (the environment stage's) is given registry access.
     """
 
     def __init__(self, image, checkout, commit, timeout, *, kind, docker, mounts=(), env=(), build='', copies='',
-                 scratch=(), evidence=None):
+                 scratch=(), evidence=None, network='none'):
         self.image, self.checkout, self.commit, self.timeout, self.kind = image, checkout, commit, timeout, kind
+        self.network = network
         self.docker, self.mounts, self.env, self.build, self.copies = docker, mounts, env, build, copies
         self.scratch, self.evidence, self.container, self.cleanup = scratch, evidence, None, 'unconfirmed'
 
     def __enter__(self):
         volumes = [arg for host, target in ((self.checkout, '/src'), *self.mounts) for arg in ('-v', f'{host}:{target}:ro')]
         environment = [arg for pair in self.env for arg in ('-e', pair)]
-        result = self.docker('run', '-d', '--network=none', *HARDENED, '--user', user(), *environment, *volumes,
+        result = self.docker('run', '-d', f'--network={self.network}', *HARDENED, '--user', user(), *environment, *volumes,
                              self.image, '/bin/sleep', 'infinity')
         assert result.returncode == 0, result.stderr
         self.container = result.stdout.decode().strip()
