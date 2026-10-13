@@ -312,23 +312,47 @@ def test_a_stage_ending_on_its_cap_is_a_typed_budget_exhaustion(store, tmp_path)
     assert isinstance(authoring.exhausted, BudgetExhausted)
     assert (authoring.exhausted.limit, authoring.exhausted.cap) == ("request_limit", 2)
     assert run.reason.startswith("authoring budget exhausted: request_limit 2 (derived from 2 read windows")
-    assert exhaustion("planning", authoring.limits, None, ValueError("x")) is None
-    assert exhaustion("planning", authoring.limits, None, RecordedFailure("TimeoutError", "late")).limit == \
+    assert exhaustion("planning", authoring.limits, ValueError("x")) is None
+    assert exhaustion("planning", authoring.limits, RecordedFailure("TimeoutError", "late")).limit == \
         "timeout_seconds"
 
 
 def test_an_unrelated_failure_after_the_tool_cap_keeps_its_own_classification(store, tmp_path):
-    """Review on #49: reaching the cap is recorded, but only a limit or withdrawn-tool failure is exhaustion."""
-    from pydantic_ai.exceptions import UnexpectedModelBehavior
-    from pydantic_ai.usage import RunUsage
+    """Review on #49: reaching the cap is recorded, but only a native limit error is exhaustion.
+
+    A call to a tool withdrawn at the cap is refused natively as UsageLimitExceeded; UnexpectedModelBehavior is
+    also what providers raise for malformed responses, so it never establishes the cap, at or past it.
+    """
+    from pydantic_ai.exceptions import UnexpectedModelBehavior, UsageLimitExceeded
     limits = CompositionBudget().planning.limits(2, 0, 1)
-    spent = RunUsage(requests=4, tool_calls=limits.tool_calls_limit)
-    assert exhaustion("planning", limits, spent, ValueError("provider response was invalid")) is None
-    assert exhaustion("planning", limits, spent, RecordedFailure("ModelAPIError", "500")) is None
-    assert exhaustion("planning", limits, RunUsage(tool_calls=1), UnexpectedModelBehavior("bad output")) is None
-    for failure in (UnexpectedModelBehavior("Exceeded maximum output retries"),
-                    RecordedFailure("UnexpectedModelBehavior", "Tool 'read_source' not found")):
-        assert exhaustion("planning", limits, spent, failure).limit == "tool_calls_limit"
+    for failure in (ValueError("provider response was invalid"), RecordedFailure("ModelAPIError", "500"),
+                    UnexpectedModelBehavior("Exceeded maximum output retries (1)"),
+                    UnexpectedModelBehavior("Received empty model response"),
+                    RecordedFailure("UnexpectedModelBehavior", "Invalid response from provider")):
+        assert exhaustion("planning", limits, failure) is None
+    for failure in (UsageLimitExceeded("The next tool call(s) would exceed the tool_calls_limit of 4 (tool_calls=5)"),
+                    RecordedFailure("UsageLimitExceeded", "would exceed the tool_calls_limit of 4")):
+        assert exhaustion("planning", limits, failure).limit == "tool_calls_limit"
+
+
+def test_a_call_to_a_withdrawn_tool_is_refused_natively_as_the_tool_call_limit():
+    from pydantic_ai import Agent
+    from pydantic_ai.exceptions import UsageLimitExceeded
+    from pydantic_ai.usage import UsageLimits
+    from corsair.agents.budget import tool_budget
+
+    async def respond(messages, info):
+        return ModelResponse(parts=[ToolCallPart("probe", {})])
+    agent = Agent(FunctionModel(respond), output_type=int, capabilities=[tool_budget()],
+                  retries={"tools": 0, "output": 1})
+
+    @agent.tool_plain
+    def probe() -> int:
+        return 1
+    limits = CompositionBudget().planning.limits(0, 0, 1)
+    with pytest.raises(UsageLimitExceeded) as failed:
+        agent.run_sync("x", usage_limits=UsageLimits(tool_calls_limit=1, request_limit=10))
+    assert exhaustion("planning", limits, failed.value).limit == "tool_calls_limit"
 
 
 def test_an_attempt_records_reaching_its_tool_cap_whatever_ended_it(store, tmp_path):

@@ -76,12 +76,24 @@ def _resolved(node: ast.AST, aliases: dict[str, str]) -> str | None:
     return ".".join(filter(None, (aliases.get(head, head), rest)))
 
 
+def _unobserved(target: str | None) -> bool:
+    return bool(target) and any(target == allowed or target.startswith(allowed + ".") for allowed in UNOBSERVED_TARGETS)
+
+
 def _protected(target: str | None) -> bool:
     """A file, process, network or import facility, or sys.modules; environment inputs stay writable."""
-    if not target or any(target == allowed or target.startswith(allowed + ".") for allowed in UNOBSERVED_TARGETS):
+    if not target or _unobserved(target):
         return False
-    return target.split(".")[0] in PATCHED or any(target == exact or target.startswith(exact + ".")
+    # Any component: documents.open and documents.subprocess.run reach the same facilities through the application.
+    return any(part in PATCHED for part in target.split(".")) or any(target == exact or target.startswith(exact + ".")
                                                   for exact in PATCHED_EXACT)
+
+
+def _key(target: ast.AST) -> str | None:
+    """The constant name a subscript write rebinds: ``documents.__dict__['open'] = f`` rebinds open."""
+    if isinstance(target, ast.Subscript) and isinstance(target.slice, ast.Constant) and isinstance(target.slice.value, str):
+        return target.slice.value
+    return None
 
 
 def _written(target: ast.AST) -> ast.AST | None:
@@ -147,8 +159,11 @@ def self_observation(content: str) -> tuple[AdmissionFinding, ...]:
                 for element in (target.elts if isinstance(target, (ast.Tuple, ast.List)) else [target]):
                     written = _written(element)
                     resolved = _resolved(written, aliases) if written is not None else None
-                    if _protected(resolved):
-                        refuse(node, f"{verb} {resolved}")
+                    # As for patch calls, a module's own binding of a protected name is protected too:
+                    # documents.open = f replaces the application's observed open as surely as builtins.open.
+                    key = _key(element)
+                    if _protected(resolved) or (key in PATCHED and not _unobserved(resolved)):
+                        refuse(node, f"{verb} {resolved or key}")
         if isinstance(node, ast.Call):
             func = _dotted(node.func)
             name = func.rsplit(".", 1)[-1] if func else None

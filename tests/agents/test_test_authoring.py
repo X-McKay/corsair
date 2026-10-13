@@ -435,6 +435,13 @@ def test_tools_are_withdrawn_at_the_tool_call_cap_and_the_author_returns_its_out
     ("import builtins as b\nb.__dict__['open'] = print\n", "import builtins"),
     ("import sys\nsys.modules['documents'] = None\n", "assign sys.modules"),
     ("import subprocess as sp\nsp.run += print\n", "assign subprocess.run"),
+    # Re-review on #49: the application's own bindings of protected names, written directly.
+    ("import documents\ndocuments.open = lambda *a, **k: None\n", "assign documents.open"),
+    ("import documents as d\ndel d.open\n", "delete documents.open"),
+    ("import documents\ndocuments.__dict__['open'] = print\n", "assign documents.__dict__"),
+    ("import documents\ndocuments.subprocess.run = print\n", "assign documents.subprocess.run"),
+    ("import documents\n\ndef test_x(monkeypatch):\n    monkeypatch.setattr(documents.os, 'open', print)\n",
+     "monkeypatch.setattr(documents.os)"),
 ])
 def test_aliased_and_direct_patches_of_observed_facilities_are_found(content, facility):
     """Review on #49: aliases of protected modules and plain assignments must not bypass admission."""
@@ -443,3 +450,4 @@ def test_aliased_and_direct_patches_of_observed_facilities_are_found(content, fa
 
 def test_rebinding_a_local_name_or_setting_the_environment_is_not_a_patch():
     assert self_observation("import os\nos.environ['LANG'] = 'C'\nopen_count = 0\n") == ()
+    assert self_observation("import documents\ndocuments.CONFIG = {}\ndocuments.os_name = 'x'\n") == ()

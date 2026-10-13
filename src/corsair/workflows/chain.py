@@ -145,10 +145,10 @@ class ChainInvestigation:
                 # Timed out or failed without returning: usage and messages were not observed here.
                 failure = recorded(exc)
                 return StageAttempt(stage, None, None, (), workflow.time() - started, failure, limits,
-                                    exhaustion(stage, limits, None, failure))
+                                    exhaustion(stage, limits, failure))
             failure = record.failure and RecordedFailure(record.failure.kind, record.failure.message)
             return StageAttempt(stage, record.output, record.usage, record.messages, workflow.time() - started,
-                                failure, limits, exhaustion(stage, limits, record.usage, failure))
+                                failure, limits, exhaustion(stage, limits, failure))
 
         async def execute(revision, patch, **run):
             try:
