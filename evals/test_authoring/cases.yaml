@@ -858,7 +858,9 @@ cases:
     script:
     - write: self_observing
     - write: self_observing
-    runner_runs: []
+    # The scripted author never runs; a live author that writes admissible code is answered statically.
+    runner_runs:
+    - status: static
     status: blocked
     runs: 0
     layer: admission

@@ -92,6 +92,8 @@ class ScriptedRunner:
     def run(self, patch: ApprovedPatch, *, control_test_id: str, security_test_id: str,
             discovery_command: tuple[str, ...], operation: UUID, witness=None) -> NativeTestRun:
         self.calls.append(patch.sha256)
+        if not self.runs:
+            raise ValueError("the case scripts no development run; give it a runner_runs entry for live authors")
         scripted = self.runs[min(len(self.calls), len(self.runs)) - 1]
         self.sources.append("static_simulated" if scripted.status == "static" else "injected")
         if scripted.status == "static":
