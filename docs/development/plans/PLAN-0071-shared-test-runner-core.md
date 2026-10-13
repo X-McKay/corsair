@@ -22,7 +22,8 @@ Implement [SPEC-0065](../specs/SPEC-0065-shared-test-runner-core.md) on branch `
 - [x] Draft PR #89; CI green on d826b25.
 - [x] Exit agreement moved into `_completed` (review finding on #89); TAP keeps its own rule as an override.
 - [x] Jest driver after #83 merged (main 86b37ce); its 71 capture tests unchanged; `node_image_case.py` on `image_case.py`.
-- [ ] Minitest driver once #84 is on main; its captures and Docker case.
+- [x] Minitest driver after #84 merged (main e090d27); its capture tests unchanged; `ruby_image_case.py` on `image_case.py`; CVE-2025-27610 under Docker.
+- [x] Shared id rule (`check_ids`) for Maven, TAP, Jest and Minitest; shared setup receipt for Node and Ruby.
 
 ## Validation and progress
 
@@ -35,8 +36,15 @@ CVE-2023-31486 through `perl_image_case.py` on the shared harness (image `sha256
 
 These match the runs before the refactor.
 
-Jest fold-in (main 86b37ce merged): Jest unit suite 71 passed unchanged; harness smoke tests 33 passed; `make test-config` 1567 passed. A Jest Docker rerun needs the Node case checkouts, which this container does not hold; the smoke test covers the harness wiring. The Java harness was checked by its smoke test only: a VUL4J rerun needs the Maven setup, which the next live batch repeats.
+Jest fold-in (main 86b37ce merged): Jest unit suite 71 passed unchanged; harness smoke tests 33 passed; `make test-config` 1567 passed. A Jest Docker rerun needs the Node case checkouts, which this container does not hold; the smoke test covers the harness wiring.
+
+Minitest fold-in (main e090d27 merged): runner unit suites 190 passed unchanged; `make test-config` 1618 passed. CVE-2025-27610 through `ruby_image_case.py` on the shared harness (image built from the `ruby31` source through mirror.gcr.io, config id `sha256:d2eef063…`; setup resolved the same lock `8c8e9bc6…` at both commits):
+- vulnerable `2db5cfb`: control passed, security failed (`Minitest::Assertion` at `test/corsair_static_test.rb:27`), 1.25 s;
+- fixed `50caab7`: both passed, 1.17 s;
+- cleanup confirmed for both; a bundle whose `Gemfile.lock` was changed after setup was refused before any container started.
+
+These match PLAN-0068's runs. The Java harness was checked by its smoke test only: a VUL4J rerun needs the Maven setup, which the next live batch repeats.
 
 ## Decisions and next action
 
-The per-framework checks after a run (empty report, wrapper exit 125, allowed exits) stay in each driver, because they are what genuinely differs. Exit agreement is not one of them: it moved into the core so a new driver cannot skip it. Next: Minitest after #84 merges; then the environment agent's tap-harness admission as a separate PR.
+The per-framework checks after a run (empty report, wrapper exit 125, allowed exits) stay in each driver, because they are what genuinely differs. Exit agreement is not one of them: it moved into the core so a new driver cannot skip it. Next: review and Al's merge word; then the environment agent's tap-harness admission as a separate PR from main.

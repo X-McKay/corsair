@@ -11,12 +11,10 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from uuid import UUID, uuid5
 
-from corsair.adapters.native_runner import NativeRunner, error_text
-from corsair.ports.test_runner import (ApprovedPatch, Discovery, Execution, PreparedWorkspace, RubyTestId,
-                                       WitnessCapture, WitnessRequest)
+from corsair.adapters.native_runner import NativeRunner, check_bounds, check_command, check_ids, check_root
+from corsair.ports.test_runner import ApprovedPatch, PreparedWorkspace, RubyTestId, WitnessRequest
 from corsair.reports.junit import MAX_JUNIT_BYTES, JUnitError
 from corsair.reports.minitest import SCHEMA, parse_minitest
-from corsair.reports.test_observations import AdmittedTestClaims, TestClaim, WorkloadTestReport
 
 # Fixed shell step: run the operator's Ruby prefix in the workspace root. Root and argv are positional.
 CHDIR = 'cd -- "$1" || exit 125; shift; exec "$@"'
@@ -71,7 +69,6 @@ out.write(JSON.generate({"schema" => "''' + SCHEMA + '''", "tests" => tests}))
 out.flush
 exit(passed ? 0 : 1)
 '''
-CLAIM = {'passed': 'passed', 'failed': 'failed', 'error': 'failed', 'skipped': 'skipped'}
 
 
 @dataclass(frozen=True)
@@ -87,20 +84,15 @@ class MinitestRunnerConfig:
     max_excerpt_chars: int = 4096
 
     def __post_init__(self):
-        if (type(self.command) is not tuple or not self.command
-                or any(type(t) is not str or not t or '\0' in t for t in self.command)):
-            raise ValueError('Runner command must be nonempty string tokens')
+        check_command(self.command)
         rubies = [i for i, token in enumerate(self.command) if PurePosixPath(token).name == 'ruby']
         if not rubies or not self.command[rubies[0]].startswith('/'):
             raise ValueError('Ruby prefix must name the ruby binary by absolute path')
         options = self.command[rubies[0] + 1:]
         if any(token[0] != '-' or token in ('-e', '-E', '-x', '--') or token.startswith(('-e', '-x')) for token in options):
             raise ValueError('Ruby prefix must end in options only (`-I...`), never a script or program text')
-        if type(self.workspace_root) is not str or not self.workspace_root.startswith('/') or '\0' in self.workspace_root:
-            raise ValueError('Workspace root must be an absolute operator path')
-        if not (type(self.max_report_bytes) is int and 1 <= self.max_report_bytes <= MAX_JUNIT_BYTES
-                and type(self.max_excerpt_chars) is int and 1 <= self.max_excerpt_chars <= 65536):
-            raise ValueError('Runner bounds outside the admitted range')
+        check_root(self.workspace_root)
+        check_bounds(self.max_report_bytes, self.max_excerpt_chars, MAX_JUNIT_BYTES)
 
 
 def listed(stdout: bytes) -> tuple[tuple[str, str], ...] | None:
@@ -121,29 +113,16 @@ def listed(stdout: bytes) -> tuple[tuple[str, str], ...] | None:
 
 
 class MinitestRunner(NativeRunner):
-    def run(self, patch, *, control_test_id, security_test_id, discovery_command, operation, witness=None):
-        # The admitted discovery command must be exactly the operator's prefix: a command that names a test
-        # file or program would run test bodies before the listing.
-        if discovery_command != self._config.command:
-            raise ValueError('Minitest discovery command must equal the operator\'s Ruby prefix')
-        return super().run(patch, control_test_id=control_test_id, security_test_id=security_test_id,
-                           discovery_command=discovery_command, operation=operation, witness=witness)
+    # The admitted discovery command must be exactly the operator's prefix: a command that names a test
+    # file or program would run test bodies before the listing.
+    exact_discovery = 'Minitest discovery command must equal the operator\'s Ruby prefix'
+    tool, report_format = 'ruby', 'Minitest'
 
     def _validate(self, patch: ApprovedPatch, ids: tuple[str, str], witness: WitnessRequest | None) -> None:
-        if witness is not None and not isinstance(witness, WitnessRequest):
-            raise ValueError('Witness capture needs a typed request')
-        try:
-            parsed = [RubyTestId.parse(i) for i in ids]
-        except ValueError as error:
-            raise ValueError('Two distinct `path.rb::Class#test_method` ids are required') from error
-        paths = {item.path for item in patch.files}
-        if len(set(ids)) != 2 or any(item.path not in paths for item in parsed):
-            raise ValueError('Two distinct test ids declared in patch files are required')
         # One file and class: the runner loads one file and keeps only that class's tests.
-        if len({(item.path, item.class_name) for item in parsed}) != 1:
-            raise ValueError('Control and security tests must be methods of one class in one file')
-        if any(path[0] == '-' for path in paths):
-            raise ValueError('Patch paths conflict with runner arguments')
+        check_ids(patch, ids, witness, RubyTestId.parse, '`path.rb::Class#test_method`',
+                  unit=lambda item: (item.path, item.class_name),
+                  together='Control and security tests must be methods of one class in one file')
 
     def _argv(self, script: str, ids: tuple[str, ...]) -> tuple[str, ...]:
         parsed = [RubyTestId.parse(i) for i in ids]
@@ -157,42 +136,31 @@ class MinitestRunner(NativeRunner):
         return self._argv(RUN, ids)
 
     def _stages(self, prepared, ids, discovery_command, paths, operation, witness):
-        handle = prepared.handle
-        command = self._discovery_argv(ids)
-        receipt, problem = self._execute(handle, command, uuid5(operation, 'discovery'))
-        if problem:
-            discovery = Discovery('execution_failure', (), self._excerpt(receipt), command, receipt)
-            return discovery, None, 'discovery', f'discovery: {problem}', None
         path = RubyTestId.parse(ids[0]).path
-        names = listed(receipt.stdout)
-        found = None if names is None else tuple(f'{path}::{class_name}#{method}' for class_name, method in names)
-        if receipt.native_exit != 0 or found is None or len(found) != len(set(found)) or set(found) != set(ids):
-            discovery = Discovery('collection_error', found or (), self._excerpt(receipt), command, receipt)
-            return (discovery, None, 'discovery', f'discovery: exit {receipt.native_exit}, found {list(found or ())}',
-                    None)
-        discovery = Discovery('discovered', found, '', command, receipt)
+
+        def read(stdout):
+            names = listed(stdout)
+            return None if names is None else tuple(f'{path}::{class_name}#{method}' for class_name, method in names)
+
+        discovery, stopped = self._discover(prepared.handle, self._discovery_argv(ids), ids, operation, read)
+        if stopped:
+            return stopped
         execution, layer = self._run_once(prepared, ids, frozenset(paths), uuid5(operation, 'execution'))
-        captured = None
-        if witness is not None:
-            # No Ruby witness probe exists (SPEC-0063); nothing is run, so the gates see an absent witness.
-            captured = WitnessCapture('unavailable', witness, str(uuid5(operation, 'witness-nonce')), '', b'', None,
-                                      'no Ruby witness probe; see SPEC-0063', None)
-        return discovery, execution, layer, execution.detail, captured
+        return (discovery, execution, layer, execution.detail,
+                self._no_witness(witness, operation, 'no Ruby witness probe; see SPEC-0063'))
 
     def _run_once(self, prepared: PreparedWorkspace, ids: tuple[str, str], test_paths: frozenset[str], operation: UUID):
         argv = self._execution_argv(ids)
         receipt, problem = self._execute(prepared.handle, argv, operation)
-        failure = lambda layer, detail, report=None, status='execution_failure': (
-            Execution(status, (), report, None, detail, argv, receipt), layer)
+        failure = lambda *args: self._failure(argv, receipt, *args)
         if problem:
             return failure('execution', f'execution: {problem}')
         if not receipt.stdout:
             # Ruby failed before the report was written (load, dependency or Bundler failure).
             return failure('execution', f'execution: ruby exit {receipt.native_exit} without a report')
-        try:
-            report = self._store.put(receipt.stdout)
-        except Exception as error:
-            return failure('report', f'report storage: {error_text(error)}')
+        report, stored = self._store_report(receipt.stdout)
+        if stored:
+            return failure('report', f'report storage: {stored}')
         if receipt.native_exit not in (0, 1):
             return failure('execution', f'execution: ruby exit {receipt.native_exit}', report)
         try:
@@ -200,13 +168,4 @@ class MinitestRunner(NativeRunner):
                                    max_bytes=self._config.max_report_bytes)
         except JUnitError as error:
             return failure('report', f'report: {error}', report, 'invalid_report')
-        if receipt.native_exit != int(any(case.outcome in ('failed', 'error') for case in cases)):
-            return failure('report', f'report: ruby exit {receipt.native_exit} conflicts with Minitest outcomes',
-                           report, 'invalid_report')
-        control, security = (TestClaim(test_id=case.test_id, outcome=CLAIM[case.outcome]) for case in cases)
-        claims_report = WorkloadTestReport(schema_version='test-observations-v1', operation=str(operation),
-                                           source_sha256=prepared.source.sha256, tests_sha256=prepared.tests.sha256,
-                                           control=control, security=security)
-        claims = AdmittedTestClaims(str(operation), prepared.handle, prepared.source, prepared.tests, report,
-                                    receipt.native_exit, claims_report)
-        return Execution('completed', cases, report, claims, '', argv, receipt), None
+        return self._completed(prepared, argv, receipt, cases, report, operation)

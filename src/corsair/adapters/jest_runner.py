@@ -8,8 +8,8 @@ then selects exactly the two tests by their anchored full names.
 from dataclasses import dataclass
 from uuid import UUID, uuid5
 
-from corsair.adapters.native_runner import NativeRunner, check_bounds, check_command, check_root
-from corsair.ports.test_runner import MAX_TEST_ID, ApprovedPatch, JsTestId, PreparedWorkspace, WitnessRequest
+from corsair.adapters.native_runner import NativeRunner, check_bounds, check_command, check_ids, check_root
+from corsair.ports.test_runner import ApprovedPatch, JsTestId, PreparedWorkspace, WitnessRequest
 from corsair.reports.jest import MAX_JEST_BYTES, JestError, listed, parse_jest
 
 # Fixed operator script run by absolute /bin/sh: Jest's console goes to stderr, stdout is exactly Jest's
@@ -64,21 +64,11 @@ class JestRunner(NativeRunner):
     tool, report_format = 'jest', 'Jest'
 
     def _validate(self, patch: ApprovedPatch, ids: tuple[str, str], witness: WitnessRequest | None) -> None:
-        if witness is not None and not isinstance(witness, WitnessRequest):
-            raise ValueError('Witness capture needs a typed request')
-        try:
-            parsed = [JsTestId.parse(i) for i in ids]
-        except ValueError as error:
-            raise ValueError('Two distinct `path/file.test.js::[suite::]name` ids are required') from error
-        paths = {item.path for item in patch.files}
-        if (len(set(ids)) != 2 or len({item.titles for item in parsed}) != 2
-                or any(len(i) > MAX_TEST_ID or item.path not in paths for i, item in zip(ids, parsed))):
-            raise ValueError('Two distinct test ids declared in patch files are required')
         # One Jest test result per file; both tests in one file keeps exactly one result to admit.
-        if len({item.path for item in parsed}) != 1:
-            raise ValueError('Control and security tests must be in one file')
-        if any(path[0] == '-' for path in paths):
-            raise ValueError('Patch paths conflict with runner arguments')
+        parsed = check_ids(patch, ids, witness, JsTestId.parse, '`path/file.test.js::[suite::]name`',
+                           unit=lambda item: item.path, together='Control and security tests must be in one file')
+        if len({item.titles for item in parsed}) != 2:
+            raise ValueError('Two distinct test ids declared in patch files are required')
 
     def _argv(self, ids: tuple[str, ...], pattern: str | None = None) -> tuple[str, ...]:
         file, selected = selection(ids)[:2], selection(ids)[2:]

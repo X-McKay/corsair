@@ -28,10 +28,11 @@ Not in scope: changing any runner's commands, ids, refusals or outcomes; the env
 - exit agreement and the control and security claims (`_completed`): every runner passes through it, so none can skip the check; the default rule is exit 1 exactly when a test failed or errored, and TAP overrides `_exit_agrees` with Test::More's failed count or 255 for a died file;
 - the absent-witness answer for frameworks without a probe (`_no_witness`);
 - the operator-prefix rule (`exact_discovery`);
+- the id rule (`check_ids`): a typed witness request, two distinct ids in the driver's grammar, each naming a file the patch itself carries, both in one report unit (file or class), and no patch path that reads as an option;
 - the shared configuration checks (`check_command`, `check_root`, `check_bounds`).
 
 A framework driver supplies:
-- `_validate`: its id grammar and the one-file or one-class rule;
+- `_validate`: its id grammar, the file an id names and its report unit, passed to `check_ids` (pytest keeps its own node-id rule);
 - a listing argv and a reader from listing stdout to ids;
 - a run argv;
 - its own short sequence of exit and report checks, which really differ, for example Maven's empty report and the TAP wrapper's exit 125;
@@ -63,10 +64,12 @@ Behaviour is preserved:
 - The fixed Perl programs are byte-identical.
 - CVE-2023-31486 under Docker through the consolidated harness and runner gives the same outcomes at both revisions.
 
-Jest moved onto the core after #83 merged: its capture suite (71 tests) passes unchanged and `node_image_case.py` uses the shared harness. Minitest moves when #84 is on main, on the same terms.
+Jest moved onto the core after #83 merged and Minitest after #84: their capture suites pass unchanged, and `node_image_case.py` and `ruby_image_case.py` use the shared harness. CVE-2025-27610 (rack) reproduces through it.
+
+The shared harness also owns the setup receipt (`write_setup`, `require_setup`): a language's setup phase records the image, commit and lockfile digest it installed for, and `run` recomputes them and refuses any mismatch before a container starts. Node checks the project's `package-lock.json`, Ruby the lockfile setup installed.
 
 ## Decisions and open questions
 
-The checks after a run that really differ by framework stay in each driver: Maven's missing report, the TAP wrapper's exit 125 and each framework's allowed exit codes. A table of flags would hide them. A shared "exactly the planned ids" rule also catches a patch that brings a whole upstream test file: the CPython 3.7 sqlparse case listed 60 tests and stopped at discovery (fixed by #88).
+The checks after a run that really differ by framework stay in each driver: Maven's missing report, the TAP wrapper's exit 125 and each framework's allowed exit codes. A table of flags would hide them. Minitest's rule that a listed method must be defined in the patch file itself stays in its Ruby listing script: only Ruby can see where a method was defined, and the shared rule already requires each id to name a patch file. A shared "exactly the planned ids" rule also catches a patch that brings a whole upstream test file: the CPython 3.7 sqlparse case listed 60 tests and stopped at discovery (fixed by #88).
 
 Plan: [PLAN-0071](../plans/PLAN-0071-shared-test-runner-core.md).

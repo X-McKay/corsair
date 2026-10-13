@@ -11,8 +11,8 @@ from uuid import UUID, uuid5
 from corsair.ports.artifacts import ArtifactRef, ArtifactStore
 from corsair.ports.execution import ExecutionReceipt, SandboxExecution
 from corsair.ports.sandbox import SandboxHandle
-from corsair.ports.test_runner import (ApprovedPatch, Discovery, Execution, NativeTestRun, PreparedWorkspace,
-                                       TestCaseResult, TestWorkspace, WitnessCapture, WitnessRequest)
+from corsair.ports.test_runner import (MAX_TEST_ID, ApprovedPatch, Discovery, Execution, NativeTestRun,
+                                       PreparedWorkspace, TestCaseResult, TestWorkspace, WitnessCapture, WitnessRequest)
 from corsair.reports.admission import failed_count
 from corsair.reports.test_observations import AdmittedTestClaims, TestClaim, WorkloadTestReport
 
@@ -51,6 +51,28 @@ def check_bounds(max_report_bytes: int, max_excerpt_chars: int, report_limit: in
     if not (type(max_report_bytes) is int and 1 <= max_report_bytes <= report_limit
             and type(max_excerpt_chars) is int and 1 <= max_excerpt_chars <= 65536):
         raise ValueError('Runner bounds outside the admitted range')
+
+
+def check_ids(patch: ApprovedPatch, ids: tuple[str, str], witness: WitnessRequest | None, parse, grammar: str, *,
+              unit, together: str, file=lambda item: item.path) -> list:
+    """The id rule every listed-discovery framework shares, checked before any workspace exists: a typed witness
+    request, two distinct ids in the framework's grammar, each naming a file the patch itself carries, both in
+    one report unit (file or class) so exactly one report is admitted, and no patch path that reads as an option.
+    Returns the parsed ids."""
+    if witness is not None and not isinstance(witness, WitnessRequest):
+        raise ValueError('Witness capture needs a typed request')
+    try:
+        parsed = [parse(i) for i in ids]
+    except ValueError as error:
+        raise ValueError(f'Two distinct {grammar} ids are required') from error
+    paths = {item.path for item in patch.files}
+    if len(set(ids)) != 2 or any(len(i) > MAX_TEST_ID or file(item) not in paths for i, item in zip(ids, parsed)):
+        raise ValueError('Two distinct test ids declared in patch files are required')
+    if len({unit(item) for item in parsed}) != 1:
+        raise ValueError(together)
+    if any(path[0] == '-' for path in paths):
+        raise ValueError('Patch paths conflict with runner arguments')
+    return parsed
 
 
 class NativeRunner:

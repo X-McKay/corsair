@@ -7,7 +7,6 @@ listing and execution exactly as SPEC-0057 builds them. This is image evidence f
 sandbox qualification.
 """
 import argparse
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -16,7 +15,7 @@ import tempfile
 from corsair.adapters.jest_runner import JestRunner, JestRunnerConfig
 from corsair.ports.test_runner import JsTestId
 from tests.qualification.image_case import (HARDENED, WORK, DockerCase, commit_tree, docker, drive, head, print_summary,
-                                            require_image_id, tests_patch, user)
+                                            require_image_id, require_setup, sha256, tests_patch, user, write_setup)
 from tests.qualification.prepare_toolchains import NPM
 
 JEST = ('/usr/local/bin/node', 'node_modules/jest/bin/jest.js', '--ci')
@@ -37,24 +36,14 @@ def setup(image, checkout, modules, evidence):
     return result.returncode
 
 
-RECEIPT = 'corsair-setup.json'
-
-
 def setup_identity(image, checkout, commit):
     """What a dependency directory was installed for: the commit, the image and the lockfile it installed."""
-    lock = checkout / 'package-lock.json'
-    return {'commit': commit, 'image': image,
-            'package_lock_sha256': hashlib.sha256(lock.read_bytes()).hexdigest() if lock.is_file() else None}
+    return {'commit': commit, 'image': image, 'package_lock_sha256': sha256(checkout / 'package-lock.json')}
 
 
 def run(image, checkout, modules, commit, ids, evidence, test_file, timeout):
     # The dependencies must be the ones setup installed for this commit's lockfile in this image, never another's.
-    try:
-        receipt = json.loads((modules / RECEIPT).read_text())
-    except (OSError, ValueError) as error:
-        raise SystemExit(f'{modules}: no successful setup receipt ({error})')
-    if receipt != dict(setup_identity(image, checkout, commit), exit=0):
-        raise SystemExit(f'{modules}: set up for {receipt}, not for this commit, image and lockfile')
+    receipt = require_setup(modules, setup_identity(image, checkout, commit))
     path = JsTestId.parse(ids[0]).path
     staged = evidence / 'patch'
     (staged / path).parent.mkdir(parents=True)
@@ -87,8 +76,7 @@ def main():
             args.modules.mkdir(parents=True, exist_ok=False)
             code = setup(args.image, tree, args.modules.resolve(), args.evidence)
             if code == 0:
-                identity = dict(setup_identity(args.image, tree, commit), exit=0)
-                (args.modules / RECEIPT).write_text(json.dumps(identity, indent=2))
+                write_setup(args.modules, dict(setup_identity(args.image, tree, commit), exit=0))
             print(json.dumps({'phase': 'setup', 'commit': commit, 'exit': code}))
             raise SystemExit(code)
         summary = run(args.image, tree, args.modules.resolve(), commit, tuple(args.id), args.evidence,

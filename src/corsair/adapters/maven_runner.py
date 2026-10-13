@@ -9,8 +9,8 @@ from dataclasses import dataclass
 import re
 from uuid import UUID, uuid5
 
-from corsair.adapters.native_runner import NativeRunner, check_bounds, check_command, check_root
-from corsair.ports.test_runner import (MAX_TEST_ID, ApprovedPatch, JavaTestId, PreparedWorkspace, WitnessRequest,
+from corsair.adapters.native_runner import NativeRunner, check_bounds, check_command, check_ids, check_root
+from corsair.ports.test_runner import (ApprovedPatch, JavaTestId, PreparedWorkspace, WitnessRequest,
                                        approved_path)
 from corsair.reports.junit import MAX_JUNIT_BYTES, JUnitError
 from corsair.reports.junit_listing import listed
@@ -82,21 +82,11 @@ class MavenRunner(NativeRunner):
     tool, report_format = 'maven', 'Surefire'
 
     def _validate(self, patch: ApprovedPatch, ids: tuple[str, str], witness: WitnessRequest | None) -> None:
-        if witness is not None and not isinstance(witness, WitnessRequest):
-            raise ValueError('Witness capture needs a typed request')
-        try:
-            parsed = [JavaTestId.parse(i) for i in ids]
-        except ValueError as error:
-            raise ValueError('Two distinct `[module/]package.Class#method` ids are required') from error
-        paths = {item.path for item in patch.files}
-        if len(set(ids)) != 2 or any(len(i) > MAX_TEST_ID or item.source_path(self._config.test_root) not in paths
-                                     for i, item in zip(ids, parsed)):
-            raise ValueError('Two distinct test ids declared in patch files are required')
         # One Surefire report per class; both tests in one class keeps exactly one report to admit.
-        if len({(item.module, item.class_name) for item in parsed}) != 1:
-            raise ValueError('Control and security tests must be methods of one class')
-        if any(path[0] == '-' for path in paths):
-            raise ValueError('Patch paths conflict with runner arguments')
+        check_ids(patch, ids, witness, JavaTestId.parse, '`[module/]package.Class#method`',
+                  file=lambda item: item.source_path(self._config.test_root),
+                  unit=lambda item: (item.module, item.class_name),
+                  together='Control and security tests must be methods of one class')
 
     def _module_dir(self, ids: tuple[str, ...]) -> str:
         item = JavaTestId.parse(ids[0])

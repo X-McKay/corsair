@@ -10,8 +10,8 @@ from dataclasses import dataclass
 import re
 from uuid import uuid5
 
-from corsair.adapters.native_runner import NativeRunner, check_bounds, check_command, check_root
-from corsair.ports.test_runner import MAX_TEST_ID, ApprovedPatch, PerlTestId, WitnessRequest, approved_path
+from corsair.adapters.native_runner import NativeRunner, check_bounds, check_command, check_ids, check_root
+from corsair.ports.test_runner import ApprovedPatch, PerlTestId, WitnessRequest, approved_path
 from corsair.reports.junit import MAX_JUNIT_BYTES
 from corsair.reports.admission import failed_count
 from corsair.reports.tap import RESULT, TapError, parse_tap
@@ -79,20 +79,9 @@ class TapRunner(NativeRunner):
         return native_exit == failed_count(cases)
 
     def _validate(self, patch: ApprovedPatch, ids: tuple[str, str], witness: WitnessRequest | None) -> None:
-        if witness is not None and not isinstance(witness, WitnessRequest):
-            raise ValueError('Witness capture needs a typed request')
-        try:
-            parsed = [PerlTestId.parse(i) for i in ids]
-        except ValueError as error:
-            raise ValueError('Two distinct `path/to/file.t#subtest` ids are required') from error
-        paths = {item.path for item in patch.files}
-        if len(set(ids)) != 2 or any(len(i) > MAX_TEST_ID or item.path not in paths for i, item in zip(ids, parsed)):
-            raise ValueError('Two distinct test ids declared in patch files are required')
         # One TAP stream per file; both subtests in one file keep exactly one stream to admit.
-        if len({item.path for item in parsed}) != 1:
-            raise ValueError('Control and security tests must be subtests of one file')
-        if any(path[0] == '-' for path in paths):
-            raise ValueError('Patch paths conflict with runner arguments')
+        check_ids(patch, ids, witness, PerlTestId.parse, '`path/to/file.t#subtest`', unit=lambda item: item.path,
+                  together='Control and security tests must be subtests of one file')
 
     def _discovery_argv(self, file: str) -> tuple[str, ...]:
         return ('/bin/sh', '-c', WRAPPER, 'corsair-tap-discover', self._config.workspace_root,

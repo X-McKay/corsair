@@ -72,6 +72,31 @@ def commit_tree(checkout, destination):
     return destination
 
 
+# Written by a language's setup phase into its dependency directory; `run` checks it before anything runs.
+SETUP_RECEIPT = 'corsair-setup.json'
+
+
+def sha256(path) -> str | None:
+    return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
+
+
+def write_setup(directory, record: dict) -> None:
+    """Record what a dependency directory was set up for (image, commit, lockfile digest, exit)."""
+    (directory / SETUP_RECEIPT).write_text(json.dumps(record, indent=2))
+
+
+def require_setup(directory, expected: dict) -> dict:
+    """The dependencies must be the ones a successful setup produced for this image, commit and lockfile, never
+    another's: every expected field, recomputed now, must equal the receipt's."""
+    try:
+        receipt = json.loads((directory / SETUP_RECEIPT).read_text())
+    except (OSError, ValueError) as error:
+        raise SystemExit(f'{directory}: no successful setup receipt ({error})')
+    if receipt.get('exit') != 0 or any(receipt.get(key) != value for key, value in expected.items()):
+        raise SystemExit(f'{directory}: set up for {receipt}, not for {expected}')
+    return receipt
+
+
 def require_image_id(parser: argparse.ArgumentParser, image: str) -> None:
     # Both phases must name the same content, so a tag that could move between them is refused.
     if not re.fullmatch(r'sha256:[0-9a-f]{64}', image):
@@ -162,7 +187,8 @@ def plain(value):
 
 def drive(runner, case, config, patch, ids, evidence, summary):
     """One runner run in `case`, with the stored reports under the evidence directory; writes and returns run.json."""
-    # LocalArtifacts opens an existing root and never creates it.
+    # LocalArtifacts opens an existing absolute root and never creates it.
+    evidence = Path(evidence).resolve()
     (evidence / 'objects').mkdir(mode=0o700)
     with case, LocalArtifacts(evidence / 'objects', max_bytes=8 << 20) as store:
         clock = time.monotonic()
