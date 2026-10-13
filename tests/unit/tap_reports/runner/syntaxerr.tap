@@ -1,0 +1,2 @@
+syntax error at t/syntaxerr.t line 3, near "= ;"
+Execution of t/syntaxerr.t aborted due to compilation errors.
