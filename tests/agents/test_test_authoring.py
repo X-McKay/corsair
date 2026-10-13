@@ -471,3 +471,16 @@ def test_rebinding_a_local_name_or_setting_the_environment_is_not_a_patch():
     assert self_observation("import os\nos.environ['LANG'] = 'C'\nopen_count = 0\n") == ()
     assert self_observation("import documents\ndocuments.CONFIG = {}\ndocuments.os_name = 'x'\n") == ()
     assert self_observation("import re\nimport app.mod as m\nPATTERN = re.compile('x')\nm.os.environ['LANG'] = 'C'\n") == ()
+
+
+@pytest.mark.parametrize("deferred", [
+    "    def never_called():\n        read_document()\n",
+    "    class Helper:\n        def never_called(self):\n            read_document()\n",
+    "    call = lambda: read_document()\n",
+])
+def test_deferred_target_calls_do_not_satisfy_structural_target_fact(deferred):
+    content = "def test_security():\n" + deferred + "    actual = 1\n    assert actual == 1\n"
+    facts = static_checks(content, "t.py::test_security", "read_document")
+    assert facts["has_assertion"] and not facts["calls_target"]
+    direct = content + "    read_document()\n"
+    assert static_checks(direct, "t.py::test_security", "read_document")["calls_target"]
