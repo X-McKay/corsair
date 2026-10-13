@@ -2,8 +2,8 @@
 
 from corsair.agents.environment.tools import TOOLSET_SHA256, environment_tools, toolset_sha256
 
-# Recorded from the pre-split tools.py on a9ba2b0 (SPEC-0052); change only with a reviewed tool change.
-OFFERED_SHA256 = "cdaf4dcd511993860421106f4858fc0448a4b053b8c337d9d0587ad76c0dd0a1"
+# SPEC-0053 adds explicit bounded correction arguments and guidance after the SPEC-0052 split.
+OFFERED_SHA256 = "5bdc3e1fff20f9280103e2facc581ae7006ae899810788d97b7a09de22975017"
 
 
 def test_toolset_offers_exactly_the_registered_tools_in_order():
@@ -13,7 +13,7 @@ def test_toolset_offers_exactly_the_registered_tools_in_order():
     assert {name: tool.max_retries for name, tool in tools.tools.items()} == dict.fromkeys(tools.tools, 0)
 
 
-def test_toolset_digest_is_unchanged_by_the_package_split():
+def test_toolset_digest_matches_reviewed_correction_contract():
     assert TOOLSET_SHA256 == toolset_sha256(environment_tools()) == OFFERED_SHA256
 
 

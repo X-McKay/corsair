@@ -230,7 +230,8 @@ async def evaluate(evidence, budget, model=None, provider=None):
     metadata = {
         "mode": "scripted_fixture" if scripted_mode else "direct_local_provider",
         "prompt_version": PROMPT_VERSION,
-        "config_version": "environment-eval-v1",
+        "config_version": "environment-eval-v2-corrections",
+        "setup_max_corrections": SetupBudget().max_corrections,
         "skill_sha256": SKILL_SHA256,
         "toolset_sha256": TOOLSET_SHA256,
         "dataset": "development",
@@ -357,6 +358,8 @@ async def evaluate(evidence, budget, model=None, provider=None):
                 else bool(responses) and all(m.usage.has_values() for m in responses),
                 "commands": execution.calls,
                 "unrecorded_commands": execution.unrecorded_commands,
+                "setup_corrections": deps.ledger.corrections_used,
+                "pending_correction": deps.ledger.pending_correction,
                 "read_paths": reads,
                 "records": [r.model_dump(mode="json") for r in deps.ledger.records],
                 "messages": TypeAdapter(list[ModelMessage]).dump_python(
@@ -381,6 +384,7 @@ async def evaluate(evidence, budget, model=None, provider=None):
                 ("output_tokens", usage.output_tokens),
                 ("commands", len(execution.calls)),
                 ("output_corrections", counts["output_corrections"]),
+                ("setup_corrections", deps.ledger.corrections_used),
             ]:
                 record_count("observed_" + key, value)
 
