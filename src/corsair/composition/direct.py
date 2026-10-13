@@ -29,7 +29,7 @@ from corsair.agents.environment.contracts import (BlockedEnvironment, Environmen
                                                   UnsupportedEnvironment)
 from corsair.agents.environment.dependencies import EnvironmentDependencies, SetupBudget
 from corsair.agents.evidence_assessment.agent import assessment_prompt, create_evidence_assessment_agent
-from corsair.agents.evidence_assessment.contracts import WINDOW_LINES, AssessmentInput, EvidenceAssessment
+from corsair.agents.evidence_assessment.contracts import WINDOW_LINES, AssessmentInput, ValidityInput, EvidenceAssessment
 from corsair.agents.evidence_assessment.dependencies import AssessmentDependencies
 from corsair.agents.issue_analysis.contracts import IssueAnalysisInput, SourceFile
 from corsair.agents.issue_identification import create_issue_identification_agent, identification_prompt
@@ -53,7 +53,7 @@ from corsair.ports.preparation import Preparation, PreparationRefused, PreparedS
 from corsair.ports.sandbox import SandboxHandle
 from corsair.ports.test_runner import ApprovedPatch, NativeTestRun, PatchFile, TestRunner, WitnessRequest
 
-from .evidence import evidence_items, freeze, observation_plan, run_evidence, witness_request
+from .evidence import evidence_items, review_items, freeze, observation_plan, run_evidence, witness_request
 from .progress import (Activity, GateDecided, RevisionEnded, RevisionStarted, RunEnded, RunEvent, RunObserver,
                        StageEnded, StageStarted, Usage, clean, current_observer, ignore)
 
@@ -303,6 +303,7 @@ class DirectRun:
     executions: tuple[FrozenExecution, ...] = ()
     gate: GateResult | None = None
     assessment: EvidenceAssessment | None = None
+    validity_review: EvidenceAssessment | None = None
     witnesses: tuple[WitnessEvidence, ...] = ()
     limitations: tuple[str, ...] = field(default=())
     runtime: RuntimeOutcome | None = None
@@ -682,13 +683,31 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
                     identification=identification, plan=plan)
     ready("authoring", lambda: f"{len(patch.files)} test file(s) written")
 
-    report(lambda: StageStarted("execution"))
     try:
         expected = observation_plan(plan, patch)
         frozen = freeze(patch, environment.approved_test_paths)
     except ValueError as exc:
         return stop("execution", f"patch not frozen: {exc}"[:2048], identification=identification, plan=plan,
                     patch=patch)
+    captured_sources = case.review_sources if case.review_sources is not None else {
+        "baseline": CapturedReviewSource(case.revision_sources["baseline"], source_files)}
+    review_sources = {revision: snapshot.files for revision, snapshot in captured_sources.items()
+                      if snapshot.source_sha256 == case.revision_sources.get(revision)}
+    validity = None
+    if expected.observation_mode == "unit_test":
+        try:
+            review_input = ValidityInput(scope=issue.scope, plan=expected,
+                revision_sources=case.revision_sources,
+                items=review_items(expected, patch, review_sources, case.revision_sources, plan, issue.issue))
+        except ValueError as exc:
+            return stop("assessment", f"validity input refused: {exc}"[:2048],
+                        identification=identification, plan=plan, patch=patch)
+        validity = await _stage("assessment", review_input)
+        if not isinstance(validity, EvidenceAssessment):
+            return stop("assessment", failure_of("assessment"),
+                        identification=identification, plan=plan, patch=patch)
+        ready("assessment", lambda: "outcome-blind validity review frozen")
+    report(lambda: StageStarted("execution"))
     executions = []
     for revision in ("baseline", "candidate"):
         if revision not in case.revision_sources:
@@ -707,7 +726,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         report(lambda: RevisionEnded(revision, "ran", outcomes(observed)) if observed is not None
                else RevisionEnded(revision, "refused", clean(f"{type(failure).__name__}: {failure}")))
     done = {"identification": identification, "plan": plan, "patch": patch, "observation_plan": expected,
-            "executions": tuple(executions)}
+            "executions": tuple(executions), "validity_review": validity}
     problems = []
     for e in executions:
         if e.observed is None:
@@ -737,35 +756,33 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
 
     def gate_run(revision):
         found = witnesses[revision]
-        return run_evidence(runs[revision][0], environment=identity, witness=found.witness,
-                            sandbox_events=found.sandbox_events)
+        observed_run = run_evidence(runs[revision][0], environment=identity, witness=found.witness,
+                                    sandbox_events=found.sandbox_events)
+        return observed_run.model_copy(update={"test_validity": validity.bound_validity.get(revision)}) if validity is not None else observed_run
     evidence = AssessmentEvidence(plan=expected, baseline=(gate_run("baseline"),),
                                   candidate=(gate_run("candidate"),) if "candidate" in runs else ())
     gate = assess(evidence)
-    observation_limits = (UNOBSERVED[:2] if request is not None else (
+    observation_limits = (UNOBSERVED[:2] if plan.security.witness is not None else (
         "Unit tests validate the stated property at the reviewed seam; external service and deployment behavior "
         "are outside this observation. Semantic review is model judgment, not independent runtime attestation.",))
     limitations = observation_limits + provenance + selected + unrequested + tuple(f"{revision} witness not admitted: {found.reason}"
                                      for revision, found in witnesses.items() if found.witness is None and plan.security.witness is not None) + tuple(
         f"{e.revision} workspace cleanup {e.observed.cleanup}" for e in executions if e.observed.cleanup != "confirmed")
-    captured_sources = case.review_sources if case.review_sources is not None else {
-        "baseline": CapturedReviewSource(case.revision_sources["baseline"], source_files)}
-    review_sources = {revision: snapshot.files for revision, snapshot in captured_sources.items()
-                      if snapshot.source_sha256 == case.revision_sources.get(revision)}
     try:
         assessment_input = AssessmentInput(scope=issue.scope, evidence=evidence,
                                            items=evidence_items(expected, patch, identity, runs, admitted={
                                                revision for revision, found in witnesses.items()
                                                if found.witness is not None},
-                                               review_sources=review_sources
-                                               if expected.observation_mode == "unit_test" else None,
-                                               test_plan=plan, issue=issue.issue))
+                                               review_sources=None,
+                                               test_plan=plan, issue=issue.issue, frozen_review=validity))
     except ValueError as exc:
         return stop("assessment", f"assessment input refused: {exc}"[:2048], gate=gate, limitations=limitations,
                     **done)
     assessment = await _stage("assessment", assessment_input)
     if not isinstance(assessment, EvidenceAssessment):
         return stop("assessment", failure_of("assessment"), gate=gate, limitations=limitations, **done)
+    if validity is not None:
+        assessment = assessment.model_copy(update={"validity_reviews": validity.validity_reviews})
     gate = assessment.gate_result or gate
     ready("assessment", lambda: f"{verdict(assessment.disposition)}; proposal "
                         f"{'admitted' if assessment.admission.admitted else 'rejected'}")

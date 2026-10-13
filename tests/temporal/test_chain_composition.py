@@ -236,3 +236,17 @@ async def select_runtime_with(catalog, inputs, tmp_path):
     configure_chain({"scripted": scripted_identification()}, reviewed_runners(None, tmp_path),
                     activity_config=ACTIVITY_CONFIG, catalog=catalog)
     return await select_runtime(inputs)
+
+
+def test_pre_execution_review_roundtrips_through_assessment_stage_union():
+    """The durable stage must decode review inputs without manufacturing execution evidence."""
+    from corsair.agents.evidence_assessment.contracts import AssessmentInput, ValidityInput
+    from corsair.workflows.chain_runtime import StageRequest
+    from evals.evidence_assessment.unit_test import dataset
+
+    inputs = dataset().cases[0].inputs
+    request = StageRequest(inputs, "scripted", CompositionBudget())
+    restored = asyncio.run(roundtrip(request, StageRequest[AssessmentInput | ValidityInput]))
+    assert isinstance(restored.inputs, ValidityInput)
+    assert restored == request
+    assert not hasattr(restored.inputs, "evidence")

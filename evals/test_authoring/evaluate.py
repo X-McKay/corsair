@@ -14,6 +14,8 @@ from time import perf_counter
 from typing import Literal
 from uuid import UUID, uuid4
 
+import yaml
+
 import logfire
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from pydantic_ai import capture_run_messages, models
@@ -46,7 +48,8 @@ from evals.test_authoring.static_runner import StaticRunner
 ROOT = Path(__file__).parent
 REPOSITORY = ROOT.parents[1]
 # The reviewed SPEC-0018 realization; scripted plumbing writes it, never a model.
-FILES = {"reference": (REPOSITORY / "benchmarks/fixtures/path-traversal/test_documents.py").read_text(),
+FILES = {"sql_unit": (REPOSITORY / "benchmarks/fixtures/sql-query-construction/test_queries.py").read_text(),
+         "reference": (REPOSITORY / "benchmarks/fixtures/path-traversal/test_documents.py").read_text(),
          # An absence plan (no_file_open) realized as the skill asks: catch around the call, assert on what it returned.
          "absence": (ROOT / "absence_realization.py").read_text(),
          "broken": "import pytest\nimport documents\n\ndef test_benign_control(:\n    pass\n",
@@ -138,6 +141,10 @@ def authoring_checks(inputs: TestAuthoringInput, output: AuthoringOutput, oracle
     absence = plan.security.test_id if plan.security_expectation.safe_behavior.startswith("no_") else None
     statics = [static_checks(files.get(spec.test_path, ""), spec.test_id, symbol, absence_test=absence)
                for spec in (plan.control, plan.security)]
+    if plan.security.witness is None:
+        # Unit plans admit dependency doubles; validity review establishes that the real target remains exercised.
+        # The shared stage admission facts still protect global facilities and evidence machinery.
+        statics = [{key: value for key, value in facts.items() if key != "no_mock"} for facts in statics]
     checks |= {
         "contract": set(files) <= set(approved) and output.control_test_id == plan.control.test_id
                     and output.security_test_id == plan.security.test_id
@@ -174,9 +181,17 @@ class AuthoringTrajectory(Evaluator[AuthoringCase, AuthoringOutput, AuthoringOra
                 "security_withheld": ctx.attributes.get("security_revealed") == 0}
 
 
-def dataset() -> Dataset[AuthoringCase, AuthoringOutput, AuthoringOracle]:
+DATASETS = {"development": "cases.yaml", "unit": "cases-unit.yaml"}
+
+
+def dataset(name: str = "development") -> Dataset[AuthoringCase, AuthoringOutput, AuthoringOracle]:
+    if name == "unit":
+        cases = yaml.safe_load((ROOT / DATASETS[name]).read_text())["cases"]
+        hashes = {case["name"]: sha256(json.dumps(case, sort_keys=True).encode()).hexdigest() for case in cases}
+        if hashes != json.loads((ROOT / "cases-unit.manifest.json").read_text()):
+            raise ValueError("unit authoring cases differ from their frozen manifest")
     return Dataset[AuthoringCase, AuthoringOutput, AuthoringOracle].from_file(
-        ROOT / "cases.yaml", custom_evaluator_types=(MatchesAuthoring, AuthoringTrajectory),
+        ROOT / DATASETS[name], custom_evaluator_types=(MatchesAuthoring, AuthoringTrajectory),
     )
 
 
@@ -242,11 +257,11 @@ class EvaluationBudget(BaseModel):
     dev_runs: int = Field(default=3, ge=1, le=5, strict=True)
 
 
-async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, provider=None):
+async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, provider=None, cases="development"):
     """Host only: runs are answered by injected observations or the static host runner, never executed."""
     evidence.mkdir(parents=True, exist_ok=False)
     logfire.configure(send_to_logfire=False, console=False)
-    corpus = dataset()
+    corpus = dataset(cases)
     scripted = model is None
     oracles = {case.inputs.fixture_id: case.metadata for case in corpus.cases}
     fixture_models = {case.inputs.fixture_id: scripted_model(case.inputs.inputs, case.metadata) for case in corpus.cases} if scripted else {}
@@ -257,7 +272,7 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, prov
                 "prompt_version": PROMPT_VERSION, "config_version": CONFIG_VERSION, "skill_sha256": SKILL_SHA256,
                 "toolset_sha256": TOOLSET_SHA256,
                 "budget": budget.model_dump(), "task_retries": 0, "max_concurrency": 1,
-                "dataset_sha256": sha256((ROOT / "cases.yaml").read_bytes()).hexdigest(),
+                "dataset": cases, "dataset_sha256": sha256((ROOT / DATASETS[cases]).read_bytes()).hexdigest(),
                 "output_contract": "TestPatch | BlockedAuthoring",
                 "draft_contract": "AuthoredPatchDraft | BlockedAuthoringDraft"}
     (evidence / "configuration.json").write_text(json.dumps(metadata, indent=2))
@@ -333,6 +348,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--provider-config", type=Path, help="Explicit provider configuration JSON; omitted means scripted fixture only")
+    parser.add_argument("--cases", choices=sorted(DATASETS), default="development")
     parser.add_argument("--repeat", type=int, default=EvaluationBudget().repeat)
     args = parser.parse_args()
     if args.evidence.exists() or args.evidence.is_symlink():
@@ -341,10 +357,10 @@ def main():
     async def run():
         budget = EvaluationBudget(repeat=args.repeat)
         if args.provider_config is None:
-            return await evaluate(args.evidence, budget)
+            return await evaluate(args.evidence, budget, cases=args.cases)
         config = load_agent_config(args.provider_config, "authoring")
         async with configured_model(config) as model:
-            return await evaluate(args.evidence, budget, model=model,
+            return await evaluate(args.evidence, budget, model=model, cases=args.cases,
                                   provider=config.model_dump(mode="json", exclude={"api_key_env"}))
     report = asyncio.run(run())
     report.print(include_input=False, include_output=False)

@@ -2,12 +2,12 @@
 
 from dataclasses import dataclass
 
-from .contracts import WINDOW_LINES, AssessmentInput, EvidenceExcerpt
+from .contracts import WINDOW_LINES, AssessmentInput, ValidityInput, EvidenceExcerpt
 
 
 @dataclass(frozen=True)
 class AssessmentDependencies:
-    inputs: AssessmentInput
+    inputs: AssessmentInput | ValidityInput
 
     def read_evidence(self, item_id: str, start_line: int, end_line: int) -> EvidenceExcerpt:
         item = next((item for item in self.inputs.items if item.item_id == item_id), None)

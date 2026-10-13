@@ -22,6 +22,7 @@ class Framework:
     passed: Callable[[bytes], bool]
     # SPEC-0071: whether a checkout path is a test file under the runner's own default discovery convention.
     test_file: Callable[[str], bool]
+    assertion_facts: tuple[str, ...] = ()  # Observed native failure types for downstream test authors.
 
 
 def _convention(pattern: str, ignored: tuple[str, ...] = ()) -> Callable[[str], bool]:
@@ -190,7 +191,8 @@ FRAMEWORKS = {
     "pytest": Framework(_pytest_file, _pytest_targets,
                         lambda output: _PYTEST_SUMMARY.search(output) is not None,
                         # `python_files` and `norecursedirs` defaults.
-                        _convention(r"(?:^|/)(?:test_[^/]*|[^/]*_test)\.py$", ("build", "dist", "node_modules", "venv", "CVS", "_darcs", "{arch}"))),
+                        _convention(r"(?:^|/)(?:test_[^/]*|[^/]*_test)\.py$", ("build", "dist", "node_modules", "venv", "CVS", "_darcs", "{arch}")),
+                        assertion_facts=("pytest plain assert failures report AssertionError; pytest.raises reports Failed when the expected exception is not raised. Match the planned native failure type.",)),
     # Maven Surefire with JUnit 5 or JUnit 4 (same ids and Surefire summary); ids are `fully.qualified.Class#method`,
     # files end with the class path.
     # Surefire's default includes under a module's `src/test/java`.
@@ -206,7 +208,8 @@ FRAMEWORKS = {
     "minitest": Framework(_file_id(".rb"), _minitest_targets,
                           lambda output: len(_MINITEST_SUMMARY.findall(output)) == 1,
                           # Rake's TestTask and the `test_*.rb` convention; bundled gems are not the project's.
-                          _convention(r"(?:^|/)(?:test_[^/]*|[^/]*_test)\.rb$", ("vendor",))),
+                          _convention(r"(?:^|/)(?:test_[^/]*|[^/]*_test)\.rb$", ("vendor",)),
+                          assertion_facts=("Minitest assertion failures, including assert_raises when the expected exception is not raised, report Minitest::Assertion. Match the planned native failure type.",)),
 }
 
 

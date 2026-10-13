@@ -38,7 +38,9 @@ def unit_assessor(seen, candidate=True, fix_applicable=True):
     async def respond(messages, info):
         prompt = next(p.content for m in messages for p in m.parts if p.part_kind == "user-prompt")
         items = [m.groupdict() for m in INVENTORY.finditer(prompt)]
-        seen[:] = items
+        pre_execution = prompt.startswith("Pre-execution")
+        if pre_execution:
+            seen[:] = items
         reads = [p.content for m in messages for p in m.parts if isinstance(p, ToolReturnPart)
                  and p.tool_name == "read_evidence"]
         for item in items:
@@ -55,11 +57,11 @@ def unit_assessor(seen, candidate=True, fix_applicable=True):
                     "rationale": {"statement": "Frozen tests call the saved implementation and assert the reported property", "citations": [cite(i) for i in selected]}}
         receipts = [cite(i) for i in items if i["kind"] == "receipt"]
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {
-            "execution": "completed", "finding": "reproduced", "fix": ("verified" if candidate else "not_verified") if fix_applicable else "not_applicable",
+            "execution": "unknown" if pre_execution else "completed", "finding": "inconclusive" if pre_execution else "reproduced", "fix": "not_applicable" if pre_execution else (("verified" if candidate else "not_verified") if fix_applicable else "not_applicable"),
             "application_observations": [], "sandbox_observations": [],
-            "interpretation": {"statement": "Planned assertion fails on baseline and passes on candidate", "citations": receipts},
+            "interpretation": {"statement": "Planned assertion fails on baseline and passes on candidate", "citations": [cite(items[0])] if pre_execution else receipts},
             "limitations": ["Only the reviewed component property is established"],
-            "validity_reviews": [reviews(r) for r in (("baseline", "candidate") if candidate else ("baseline",))],
+            "validity_reviews": [reviews(r) for r in (("baseline", "candidate") if candidate else ("baseline",))] if pre_execution else [],
         })])
     return FunctionModel(respond)
 
@@ -80,18 +82,23 @@ def test_composition_uses_independent_unit_reviews_for_final_gate(store, tmp_pat
     (tmp_path / "work").mkdir()
     runners = reviewed_runners(store, tmp_path / "work")
     class CheckingRunner:
-        def __init__(self, runner):
-            self.runner = runner
+        def __init__(self, runner, purpose):
+            self.runner, self.purpose = runner, purpose
         def run(self, patch, *, witness=None, **kwargs):
+            if self.purpose != "development":
+                assert seen, "Frozen execution cannot precede the validity review"
+                assert all(i["kind"] in ("plan", "source", "patch") for i in seen)
             requested.append(witness)
             return self.runner.run(patch, witness=witness, **kwargs)
     with models.override_allow_model_requests(False):
         result = asyncio.run(run_direct(case, stages(planning=unit_planner(), assessment=unit_assessor(seen, candidate_available, candidate_source != "no_candidate")),
-                                        lambda purpose: CheckingRunner(runners(purpose))))
+                                        lambda purpose: CheckingRunner(runners(purpose), purpose)))
     assert result.reason == "complete", result.reason
     assert requested and all(w is None for w in requested)
     assert result.observation_plan.observation_mode == "unit_test"
     assert all(e.observed.patch_sha256 == result.patch.patch_sha256 for e in result.executions)
+    assert result.validity_review.evidence is None
+    assert result.validity_review.gate_result is None
     assert result.gate == result.assessment.gate_result
     assert result.gate.permitted.finding == "reproduced"
     assert result.gate.permitted.fix == ("not_applicable" if candidate_source == "no_candidate" else

@@ -241,7 +241,7 @@ def _assess_run(plan: ObservationPlan, revision: Revision, index: int, run: RunE
             note('security_failed_with_safe_witness')
             return done('unusable')
     if plan.observation_mode == 'unit_test':
-        if witness is not None and witness.path_reached is False and witness.effect == 'observed':
+        if witness is not None and witness.path_reached is False:
             note('witness_unsupported')
             return done('unusable')
         validity = run.test_validity

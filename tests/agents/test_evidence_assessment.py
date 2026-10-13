@@ -319,11 +319,35 @@ def unit_draft(**changes):
 
 
 def unit_assess(output, data=None, reads=None):
+    from corsair.agents.evidence_assessment.contracts import ValidityInput
     data = data or unit_inputs()
-    reads = reads or tuple(i.item_id for i in data.items)
-    agent = create_evidence_assessment_agent(scripted(output, reads=reads), output_retries=0)
-    return agent.run_sync(assessment_prompt(data), deps=AssessmentDependencies(data),
-        usage_limits=UsageLimits(request_limit=12, tool_calls_limit=10)).output
+    # Trusted pre-execution capture admits one identity per revision.
+    source_ids = {}
+    for revision in ('baseline', 'candidate'):
+        ids = {r.source_sha256 for r in getattr(data.evidence, revision)}
+        if len(ids) != 1 or None in ids:
+            raise UnexpectedModelBehavior('mixed or missing captured source identities')
+        source_ids[revision] = ids.pop()
+    review_input = ValidityInput(scope=data.scope, plan=data.plan, revision_sources=source_ids,
+        items=tuple(i for i in data.items if i.kind in ('source', 'patch', 'plan')))
+    reads = reads or tuple(i.item_id for i in review_input.items)
+    admitted = {i.item_id for i in review_input.items}
+    reads = tuple(r for r in reads if (r if isinstance(r, str) else r["item_id"]) in admitted)
+    review_output = output | dict(execution='unknown', finding='inconclusive', fix='not_applicable',
+        application_observations=[], sandbox_observations=[],
+        interpretation=observation('Frozen tests reviewed before execution', ('plan', 1, 1)))
+    agent = create_evidence_assessment_agent(scripted(review_output, reads=reads), output_retries=0)
+    reviewed = agent.run_sync(assessment_prompt(review_input), deps=AssessmentDependencies(review_input),
+        usage_limits=UsageLimits(request_limit=20, tool_calls_limit=18)).output
+    evidence = data.evidence.model_copy(update={revision: tuple(r.model_copy(update={
+        'test_validity': reviewed.bound_validity.get(revision)}) for r in getattr(data.evidence, revision))
+        for revision in ('baseline', 'candidate')})
+    final_data = data.model_copy(update={'evidence': evidence})
+    final_output = output | {'validity_reviews': []}
+    agent = create_evidence_assessment_agent(scripted(final_output, reads=tuple(i.item_id for i in data.items)), output_retries=0)
+    result = agent.run_sync(assessment_prompt(final_data), deps=AssessmentDependencies(final_data),
+        usage_limits=UsageLimits(request_limit=20, tool_calls_limit=18)).output
+    return result.model_copy(update={'validity_reviews': reviewed.validity_reviews})
 
 
 def test_independent_unit_review_admits_without_database_witness():
@@ -457,7 +481,7 @@ def test_complete_evidence_preserves_historical_serialization():
     assert EvidenceItem.model_validate(original.model_dump()).complete
 
 
-@pytest.mark.parametrize('item_id', ['patch', 'baseline-source', 'test-plan', 'reported-condition'])
+@pytest.mark.parametrize('item_id', ['patch', 'test-plan', 'reported-condition'])
 def test_affirmative_review_requires_complete_read_windows(item_id):
     data = unit_inputs()
     original = next(i for i in data.items if i.item_id == item_id)
@@ -484,7 +508,23 @@ def test_affirmative_review_accepts_complete_paginated_patch():
         i.model_copy(update={'content': content, 'sha256': digest(content)}) if i.item_id == 'patch' else i
         for i in data.items)})
     reads = tuple(i.item_id for i in data.items) + ({'item_id': 'patch', 'start_line': 81},)
-    agent = create_evidence_assessment_agent(scripted(unit_draft(), reads=reads), output_retries=0)
-    result = agent.run_sync(assessment_prompt(data), deps=AssessmentDependencies(data),
-        usage_limits=UsageLimits(request_limit=16, tool_calls_limit=14)).output
+    result = unit_assess(unit_draft(), data, reads=reads)
     assert result.disposition.fix == 'verified'
+
+
+def test_pre_execution_validity_input_rejects_runtime_evidence():
+    from pydantic import ValidationError
+    from corsair.agents.evidence_assessment.contracts import ValidityInput
+    data = unit_inputs()
+    with pytest.raises(ValidationError, match='execution evidence'):
+        ValidityInput(scope=data.scope, plan=data.plan,
+            revision_sources={'baseline': digest('baseline-source')}, items=data.items)
+
+
+def test_final_assessor_cannot_rewrite_validity_after_seeing_outcomes():
+    data = unit_inputs()
+    agent = create_evidence_assessment_agent(scripted(unit_draft(), reads=tuple(i.item_id for i in data.items)),
+                                            output_retries=0)
+    with pytest.raises(UnexpectedModelBehavior, match='output retries'):
+        agent.run_sync(assessment_prompt(data), deps=AssessmentDependencies(data),
+                       usage_limits=UsageLimits(request_limit=20, tool_calls_limit=18))

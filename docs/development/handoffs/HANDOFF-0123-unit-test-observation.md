@@ -1,15 +1,17 @@
 ---
-id: HANDOFF-0120
+id: HANDOFF-0123
 kind: handoff
 title: Unit tests at application seams
 status: recorded
 updated: 2026-10-13
-related: [SPEC-0075, PLAN-0090]
+related: [SPEC-0078, PLAN-0093]
 ---
 
 # Unit tests at application seams
 
 ## Verified state
+
+Historical snapshot from the initial implementation session, renumbered to avoid a cross-lane reservation conflict. The uncommitted state below describes that session; publication and subsequent reviews are recorded in HANDOFF-0121, HANDOFF-0122 and the current handoff.
 
 Base is detached HEAD 1815f75498c0acbbd35dcaa20a42cef737e76866. Implementation remains uncommitted in the shared worktree. Earlier HANDOFF-0118/0119 review files and their CURRENT pointer were preserved. No PR publication, merges, provider calls or deployments occurred.
 
@@ -53,5 +55,5 @@ Next qualification should measure independent assessment on valid and deliberate
 ## Continuation prompt
 
 ```text
-Read AGENTS.md and docs/development/CURRENT.md, SPEC-0075, PLAN-0090 and HANDOFF-0120. Inspect git/source state and preserve unrelated review records. Unit tests at existing application seams are the accepted default across languages/frameworks/CWEs. Use the development/review skills. Verify the shared planner-authoring-assessment-disposition path and the retained offline evidence. Continue with bounded live semantic-review evaluation or an actual supported-runtime unit case using existing provider/runtime configuration; do not reintroduce mandatory low-level witnesses. Missing source or execution evidence remains inconclusive. Update records with actual outcomes and do not claim live or all-language qualification from host checks.
+Read AGENTS.md and docs/development/CURRENT.md, SPEC-0078, PLAN-0093 and HANDOFF-0123. Inspect git/source state and preserve unrelated review records. Unit tests at existing application seams are the accepted default across languages/frameworks/CWEs. Use the development/review skills. Verify the shared planner-authoring-assessment-disposition path and the retained offline evidence. Continue with bounded live semantic-review evaluation or an actual supported-runtime unit case using existing provider/runtime configuration; do not reintroduce mandatory low-level witnesses. Missing source or execution evidence remains inconclusive. Update records with actual outcomes and do not claim live or all-language qualification from host checks.
 ```

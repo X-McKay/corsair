@@ -1,10 +1,10 @@
 ---
-id: SPEC-0075
+id: SPEC-0078
 kind: spec
 title: Unit tests at application seams
 status: accepted
 updated: 2026-10-13
-related: [PLAN-0090]
+related: [PLAN-0093]
 ---
 
 # Unit tests at application seams
@@ -19,7 +19,7 @@ Planning declares a typed unit observation and its property/seam, with an explic
 
 Authoring uses native framework facilities, confined to approved test paths. A double replaces an external dependency at the reviewed boundary, never the implementation or property being tested. Execution retains native discovery, exactly two outcomes, patch/source identities, classified assertion failures, and attributable operational failures.
 
-The existing evidence-assessment agent independently reviews frozen test code, per-revision source, the plan and reported condition. Its conclusions about source linkage, condition exercised, assertion relevance and dependency scope are bound by trusted code to the exact observation plan and source. They are model judgments with retained citations, not formal proof or independent runtime attestation. The deterministic gate requires this validity evidence for unit observations; a model-authored pass alone is insufficient. Missing or negative review remains inconclusive for test validity, rather than requiring a low-level recorder. The composition has one validity-producing path through assessment finalization. No new agent, framework, scheduler or language-specific recorder is necessary.
+A fresh pre-execution call of the existing evidence-assessment agent reviews frozen test code, per-revision source, the plan and reported condition without access to receipts, test outcomes or verdicts. Its conclusions about source linkage, condition exercised, assertion relevance and dependency scope are bound by trusted code to the exact observation plan and source. They are model judgments with retained citations, not formal proof or independent runtime attestation. The deterministic gate requires this validity evidence for unit observations; a model-authored pass alone is insufficient. Missing or negative review remains inconclusive for test validity, rather than requiring a low-level recorder. The composition has one validity-producing path through pre-execution review finalization. The later disposition call consumes its immutable result and cannot produce new validity judgments. No new agent, framework, scheduler or language-specific recorder is necessary.
 
 Optional instrumentation remains additional evidence. Contradictions prevent conclusions. Legacy witness plans retain their existing admission rules and qualification history. Unknown execution, wrong source/patch, failed control, skipped tests, unplanned exceptions and sandbox interference never establish safety.
 
@@ -28,7 +28,7 @@ Optional instrumentation remains additional evidence. Contradictions prevent con
 - Unit plans without recorder facilities are admitted; missing observation, inconsistent modes and unexplained dependency doubles are refused.
 - Native controlled-dependency tests call a real SQL-construction function; the same two tests distinguish unsafe concatenation from parameter binding without a database.
 - Unit gates accept relevant reviewed assertions and reject absent/negative/stale review, wrong identities, operational failures and contradictory evidence.
-- Assessment review is source/patch/condition grounded and independently executed after authoring; authors cannot supply their own trusted validity record.
+- Assessment review is source/patch/condition grounded and executed after authoring and before investigation execution, without result evidence; authors cannot supply their own trusted validity record.
 - Compare frozen scripted planning, authoring and assessment evaluations. Add adversarial unit-review checks without relabeling old frozen cases or claiming scripted model quality.
 - Shared direct/durable routing uses the same contracts. Live provider semantic calibration and each runtime/framework remain separately qualified; cross-language policy is not blanket runtime support.
 

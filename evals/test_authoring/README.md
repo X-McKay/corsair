@@ -15,3 +15,9 @@ PYTHONPATH=src:. .venv/bin/python -m evals.test_authoring.evaluate --evidence .r
 ```
 
 Live mode drops the two checks that pin the scripted author's own run count and assertion lines, adds provider usage coverage, and records response ids and uncertain delivery in each receipt. Existing evidence directories are refused; every attempt keeps a receipt with `runner_sources` saying which runs were injected and which simulated.
+
+## Native unit observation set
+
+`make eval AGENT=authoring SET=unit` runs the frozen `cases-unit.yaml`/manifest set. Both cases inject a recording database into the real query constructor, assert benign behavior and hostile input parameter binding, and require no database or recorder. The scripted author writes the reviewed native pair in `benchmarks/fixtures/sql-query-construction/test_queries.py`; the host port simulates its development run. Native execution of that pair is separately covered by `tests/agents/test_test_authoring.py`. These are development cases, not held-out semantic qualification. Copied targets, vacuity and misplaced security logic belong to the separate validity review evaluation; authoring's structural checks do not prove their absence.
+
+Native assertion failure facts are operator data on `EnvironmentEvidence.assertion_facts`, populated from the selected framework table. Shared authoring guidance consumes these facts without framework recipes. Existing fixture cases and legacy evaluation bytes remain unchanged.

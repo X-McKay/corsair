@@ -86,6 +86,16 @@ def test_optional_contradictory_witness_blocks_unit_verdict(security, witness):
     assert result.permitted.finding == "inconclusive"
 
 
+@pytest.mark.parametrize("security", ["passed", "failed"])
+@pytest.mark.parametrize("effect", ["observed", "absent", "unknown"])
+def test_explicit_target_not_reached_overrides_affirmative_review(security, effect):
+    witness = Witness(artifact_sha256=digest("target not entered"), path_reached=False, effect=effect)
+    observed = unit_run(security).model_copy(update={"witness": witness})
+    result = gate((observed,))
+    assert result.permitted.finding == "inconclusive"
+    assert "witness_unsupported" in codes(result)
+
+
 @pytest.mark.parametrize('missing', ['control', 'exploit'])
 def test_both_probe_outcomes_are_required_even_with_valid_review(missing):
     observed = unit_run('passed')

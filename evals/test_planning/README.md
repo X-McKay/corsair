@@ -23,3 +23,7 @@ PYTHONPATH=src:. .venv/bin/python -m evals.test_planning.evaluate --evidence .ru
 ```
 
 A local-provider run adds `--provider-config PATH` (an explicit `LocalModelConfig` JSON). Defaults: two repeats, concurrency one, five requests, four successful tool calls, 48000 total tokens, one output correction, 240-second task deadline, no task or SDK retry. Existing evidence directories are refused before dispatch. Every attempt keeps a native-message receipt with read paths, corrections, unknown tools, usage, response ids and failures. Missing usage is not zero, unanswered requests stay uncertain and are not retried, and private receipts are never committed. Freeze source, corpus and config before the first provider run; a false negative needs review and a new corpus baseline, never a rewritten run.
+
+## Native unit observation set
+
+`make eval AGENT=planning SET=unit` runs the frozen `cases-unit.yaml`/manifest set: the same SQL construction concern over safe and unsafe source, using a recording dependency and no effect recorder. The reviewed plan calls the real function and limits its claim to query construction. This development set is not held out and does not replace the unchanged legacy comparison. Scripted results establish contracts and curated anchors, not live semantic accuracy.

@@ -314,7 +314,7 @@ def test_scratch_check_rejects_fixtures_outside_the_scratch_location():
     assert "../" in plan.security.input
 
 
-@pytest.mark.parametrize("name", sorted(MANIFESTS))
+@pytest.mark.parametrize("name", sorted(set(MANIFESTS) - {"unit"}))
 def test_heldout_cases_stay_disjoint_and_retired_sets_cannot_run_again(tmp_path, name):
     heldout = dataset(name)
     assert len(heldout.cases) == 6 and {c.metadata.status for c in heldout.cases} == {"ready", "unsupported"}

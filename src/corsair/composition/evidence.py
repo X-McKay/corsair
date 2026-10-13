@@ -9,7 +9,7 @@ from hashlib import sha256
 import json
 import re
 
-from corsair.agents.evidence_assessment.contracts import MAX_ITEM_CHARS, EvidenceItem
+from corsair.agents.evidence_assessment.contracts import MAX_ITEM_CHARS, EvidenceAssessment, EvidenceItem
 from corsair.agents.issue_identification.contracts import IssueIdentification
 from corsair.agents.test_authoring.contracts import TestPatch
 from corsair.agents.source.contracts import SourceFile
@@ -150,7 +150,7 @@ def run_evidence(observed: NativeTestRun, *, environment: EnvironmentIdentity, w
 
 
 def _item(item_id: str, kind: str, content: str, revision: Revision | None = None,
-          run: int | None = None, source_sha256: str | None = None) -> EvidenceItem:
+          run: int | None = None, source_sha256: str | None = None, path: str | None = None) -> EvidenceItem:
     complete = len(content) <= MAX_ITEM_CHARS
     if not complete:
         marker = f'\n[truncated by trusted code from {len(content)} characters]'
@@ -158,7 +158,7 @@ def _item(item_id: str, kind: str, content: str, revision: Revision | None = Non
     content = content or '(empty)'
     return EvidenceItem(item_id=item_id, kind=kind, revision=revision, run=run,
                         sha256=sha256(content.encode('utf-8')).hexdigest(), content=content,
-                        source_sha256=source_sha256, complete=complete)
+                        source_sha256=source_sha256, complete=complete, path=path)
 
 
 def _receipt_summary(observed: NativeTestRun) -> str:
@@ -174,14 +174,41 @@ def _receipt_summary(observed: NativeTestRun) -> str:
     return json.dumps(summary, indent=2, sort_keys=True)
 
 
+def review_items(plan: ObservationPlan, patch: TestPatch,
+                 review_sources: dict[Revision, tuple[SourceFile, ...]],
+                 source_identities: dict[Revision, str],
+                 test_plan: ReadyTestPlan, issue: str) -> tuple[EvidenceItem, ...]:
+    """Outcome-blind frozen artifacts, captured before either native probe executes.
+
+    Paths are metadata, so an admitted source file's full content still fits the evidence
+    bound. Source stays whole and available for selective numbered reads; this function
+    neither chooses a language-specific symbol boundary nor silently drops helpers.
+    """
+    items = [_item('plan', 'plan', plan.model_dump_json(indent=2)),
+             _item('test-plan', 'plan', test_plan.model_dump_json(indent=2)),
+             _item('reported-condition', 'plan', issue)]
+    for revision, sources in review_sources.items():
+        if revision not in source_identities:
+            continue
+        for index, source in enumerate(sources):
+            items.append(_item(f'{revision}-source-{index}', 'source', source.content,
+                               revision, 0, source_sha256=source_identities[revision], path=source.path))
+    items.extend(_item(f'patch-{index}', 'patch', item.content, path=item.path)
+                 for index, item in enumerate(patch.files))
+    return tuple(items)
+
+
 def evidence_items(plan: ObservationPlan, patch: TestPatch, environment: EnvironmentIdentity,
                    runs: dict[Revision, tuple[NativeTestRun, ...]],
                    admitted: frozenset[Revision] | set[Revision] = frozenset(),
                    review_sources: dict[Revision, tuple[SourceFile, ...]] | None = None,
-                   test_plan: ReadyTestPlan | None = None, issue: str | None = None) -> tuple[EvidenceItem, ...]:
+                   test_plan: ReadyTestPlan | None = None, issue: str | None = None,
+                   frozen_review: EvidenceAssessment | None = None) -> tuple[EvidenceItem, ...]:
     """Frozen artifacts the assessment agent may read; revisions are named baseline and candidate only."""
     items = [_item('plan', 'plan', plan.model_dump_json(indent=2)),
              _item('environment', 'environment', environment.model_dump_json(indent=2))]
+    if frozen_review is not None:
+        items.append(_item('test-validity', 'test_validity', frozen_review.model_dump_json(indent=2)))
     if review_sources is not None:
         if test_plan is not None:
             items.append(_item('test-plan', 'plan', test_plan.model_dump_json(indent=2)))
@@ -192,11 +219,12 @@ def evidence_items(plan: ObservationPlan, patch: TestPatch, environment: Environ
                 continue
             for index, source in enumerate(sources):
                 items.append(_item(f'{revision}-source-{index}', 'source',
-                                   f'Path: {source.path}\n{source.content}', revision, 0,
+                                   source.content, revision, 0,
                                    source_sha256=(runs[revision][0].workspace.source.sha256
-                                                  if runs[revision][0].workspace is not None else None)))
+                                                  if runs[revision][0].workspace is not None else None),
+                                   path=source.path))
     items += [_item(f'patch-{index}', 'patch',
-                    f'Path: {item.path}\n{item.content}' if review_sources is not None else item.content)
+                    item.content, path=item.path if review_sources is not None else None)
               for index, item in enumerate(patch.files)]
     for revision, observed_runs in runs.items():
         for index, observed in enumerate(observed_runs):

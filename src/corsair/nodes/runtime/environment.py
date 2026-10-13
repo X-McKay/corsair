@@ -12,6 +12,7 @@ import json
 import re
 from typing import Mapping
 
+from corsair.agents.environment.frameworks import FRAMEWORKS
 from corsair.agents.environment.contracts import EnvironmentInput, ReadyEnvironment, SmokeTest, Toolchain
 from corsair.agents.test_planning.contracts import BaselineTest, EnvironmentEvidence
 from corsair.core.blockers import Blocker
@@ -217,7 +218,9 @@ def ready_evidence(result: ReadyEnvironment, declared: EnvironmentEvidence,
         language=result.language, runtime=result.runtime, framework=result.framework,
         discovery_command=result.discovery_command, approved_test_paths=result.approved_test_paths,
         baseline_test=BaselineTest(test_id=result.baseline_test_id, path=result.baseline_test_path),
-        scratch_location=declared.scratch_location, observation_facilities=declared.observation_facilities,
+        scratch_location=declared.scratch_location,
+        observation_facilities=declared.observation_facilities,
+        assertion_facts=FRAMEWORKS[result.framework].assertion_facts,
         witness_facilities=declared.witness_facilities)
     observed = identity.model_copy(update={'image_digest': result.toolchain_image.rsplit('@sha256:', 1)[1],
                                            'recipe_sha256': recipe_sha256(result)})

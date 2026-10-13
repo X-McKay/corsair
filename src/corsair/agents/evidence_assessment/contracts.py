@@ -6,7 +6,7 @@ from typing import Annotated, Generic, Literal, TypeVar
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from corsair.core.disposition import (Admission, AssessmentEvidence, Disposition, Execution, Finding,
-                                      Fix, GateResult, Limitation, ObservationPlan)
+                                      Fix, GateResult, Limitation, ObservationPlan, TestValidity)
 
 MAX_ITEM_CHARS = 16384
 MAX_ITEMS = 32
@@ -29,6 +29,7 @@ class EvidenceItem(Contract):
     revision: Literal["baseline", "candidate"] | None
     run: int | None = Field(default=None, ge=0)
     sha256: str = Field(pattern=r'^[0-9a-f]{64}$')
+    path: str | None = Field(default=None, max_length=256, exclude_if=lambda value: value is None)
     source_sha256: str | None = Field(default=None, pattern=r'^[0-9a-f]{64}$',
                                      exclude_if=lambda value: value is None)
     content: str = Field(min_length=1, max_length=MAX_ITEM_CHARS)
@@ -63,6 +64,29 @@ class AssessmentInput(Contract):
     @property
     def plan(self) -> ObservationPlan:
         return self.evidence.plan
+
+
+class ValidityInput(Contract):
+    """Frozen pre-execution review; execution observations cannot enter this contract."""
+    scope: Literal["component", "application_path"]
+    plan: ObservationPlan
+    revision_sources: dict[Literal["baseline", "candidate"], str]
+    items: tuple[EvidenceItem, ...] = Field(min_length=1, max_length=MAX_ITEMS)
+
+    @model_validator(mode="after")
+    def review_only(self) -> "ValidityInput":
+        if self.plan.observation_mode != "unit_test":
+            raise ValueError("pre-execution validity requires unit-test mode")
+        if any(item.kind not in ("source", "patch", "plan") for item in self.items):
+            raise ValueError("validity review cannot contain execution evidence")
+        if len({item.item_id for item in self.items}) != len(self.items):
+            raise ValueError("duplicate evidence item id")
+        if sum(len(item.content) for item in self.items) > MAX_TOTAL_CHARS:
+            raise ValueError("evidence items exceed the admitted character budget")
+        if any(len(value) != 64 or any(c not in "0123456789abcdef" for c in value)
+               for value in self.revision_sources.values()):
+            raise ValueError("source identity must be a sha256 digest")
+        return self
 
 
 class EvidenceReference(Contract):
@@ -132,6 +156,7 @@ class ProposedDispositionDraft(_Proposal[EvidenceReference]):
 
 class EvidenceAssessment(_Proposal[EvidenceExcerpt]):
     """Final stage output: the proposal, the gate's ruling and the disposition that stands."""
+    bound_validity: dict[Literal["baseline", "candidate"], TestValidity] = Field(default_factory=dict, exclude_if=lambda value: not value)
     admission: Admission
     gate_limitations: tuple[Limitation, ...]
     gate_result: GateResult | None = Field(default=None, exclude_if=lambda value: value is None)

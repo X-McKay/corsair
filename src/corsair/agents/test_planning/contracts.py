@@ -71,6 +71,8 @@ class EnvironmentEvidence(Contract):
     baseline_test: BaselineTest | None
     scratch_location: Fact
     observation_facilities: tuple[Fact, ...] = Field(max_length=8, description="Facilities the prepared environment offers for observing an effect")
+    assertion_facts: tuple[Fact, ...] = Field(default=(), max_length=8, exclude_if=lambda value: not value,
+        description="Operator-owned native assertion failure facts from the selected harness")
     witness_facilities: tuple[WitnessFacility, ...] = Field(default=(), max_length=8, description="Operator recorders a planned witness must name")
 
     @field_validator("witness_facilities")
