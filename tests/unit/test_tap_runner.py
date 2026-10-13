@@ -7,7 +7,7 @@ import pytest
 
 from corsair.adapters.native_runner import WITNESS_READ
 from corsair.adapters.tap_runner import LISTER, WRAPPER, TapRunner, TapRunnerConfig, listed
-from corsair.nodes.witness import PERL_PROBE_SHA256, perl_probe_argv
+from corsair.adapters.tap_runner import PERL_PROBE_SHA256, perl_probe_argv
 from corsair.ports.test_runner import ApprovedPatch, PatchFile, PerlTestId, WitnessRequest
 from corsair.reports.tap import TapError, parse_tap
 from tests.unit.test_pytest_runner import Scripted, Workspace, store  # noqa: F401  (fixture)

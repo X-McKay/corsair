@@ -44,8 +44,8 @@ Excluded: process-start, socket and other effect kinds (the same gap exists for 
   `PERL5LIB` puts it ahead of the image's copy. The image is unchanged.
 - **Witness recorder `perl_open` (`file_open`).** `nodes/witness_probe.pl` writes the same `corsair-witness-v2`
   record as the Python probe, so `witness_evidence`, calibration and the gate are shared. The only changes there:
-  a capture names its probe digest, which must be one of the operator probes (`PROBES`), and the record's digest
-  must equal the capture's. The runner starts the file as `perl -Ilib -e BOOTSTRAP <probe> <config> <file>`. The
+  a capture names its probe digest, which must be one of the operator probes shipped beside the module (`PROBES`),
+  and the record's digest must equal the capture's. The runner starts the file as `perl -Ilib -e BOOTSTRAP <probe> <config> <file>`. The
   bootstrap installs `CORE::GLOBAL::open` before the test file compiles, wraps `Test::More::subtest` (with `goto`,
   so Test::More still reports the test's own line), and runs the file with `do`. At the start of each top-level
   subtest, the identified sub (by name, plus its package when the symbol is qualified, defined in the target file)
@@ -110,18 +110,25 @@ Excluded: process-start, socket and other effect kinds (the same gap exists for 
     only data: runner, setup command, dependency location, lockfiles, `env` and facilities. No chain, build or gate
     code tests for Perl. `Harness.env` and its use in `docker.workspace` are generic.
   - *Assertion reader.* `perl.py` is one entry in authoring's existing `LANGUAGES` table behind the single
-    `assertion_lines(content, test_id)` contract, chosen by the id grammar as the JavaScript and Ruby readers are.
-    It is language-specific because the lines where a test can fail are a fact of its source syntax.
+    `assertion_lines(content, test_id)` contract. Like the JavaScript and Ruby readers, it is chosen by the id
+    grammar, and a second list (`AUTHORED_TEST_ID`) names the admitted id grammars. It is language-specific because
+    the lines where a test can fail are a fact of its source syntax.
+    - Follow-up (next small PR after #128): choose the reader by the environment's admitted framework, the name the
+      harness table and `EnvironmentEvidence` already carry, for every existing reader. That removes the id-grammar
+      sniffing and the second list. It changes the authoring contract and its callers, so it is kept out of this
+      change.
   - *Failure type.* `not_ok` is set by the TAP report driver (`reports/tap.py`). The gate compares it with the
     planned `exception_type` exactly as it compares a Python exception name, and has no Perl branch. It is
     TAP-specific because a failed TAP assertion raises nothing and `not ok` is TAP's own result word.
-  - *Witness recorder.* The probe implements the shared `corsair-witness-v2` record. It is admitted by
-    `witness_evidence` through the generic digest set `PROBES`, and calibration and the gate are shared. Recorder
-    selection follows the table: the TAP runner, which the row's framework names, is the only code that starts the
-    Perl probe, as the pytest runner starts the Python one. Only the hook is Perl, because a file open can be seen
-    from inside an interpreter only through that language's own override point (`CORE::GLOBAL::open`, like
-    Python's audit hooks).
-  - Nothing found could be made generic with a smaller change, so no code changed in this audit.
+  - *Witness recorder.* The probe implements the shared `corsair-witness-v2` record. Calibration and the gate are
+    shared, and the shared witness module names no language. It admits a record when the record's digest matches
+    the capture's and is one of the operator probes shipped beside it (`witness_probe.*`). The Perl bootstrap and
+    argv live in the TAP driver (`adapters/tap_runner.py`). Recorder selection follows the table: the runner named
+    by the row's framework is the only code that starts its probe. The Python bootstrap is still in the shared
+    module, as on main. Only the hook is Perl, because a file open can be seen from inside an interpreter only
+    through that language's own override point (`CORE::GLOBAL::open`, like Python's audit hooks).
+  - Changed in this audit: the Perl bootstrap moved out of the shared witness module. The probe source and its
+    digest `7b220733…` are unchanged.
 - `file_open` is the Perl recorder's only kind, matching Python. In the Docker runs, all three corpus Perl
   development topics needed no CPAN download and ran cleanly. Their tests told the revisions apart, but their effects
   have no recorder in any language: process start (cmdi), a credential check (adminpw) and a header string

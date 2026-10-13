@@ -11,7 +11,8 @@ import subprocess
 
 import pytest
 
-from corsair.nodes.witness import PERL_PROBE_SHA256, PROBE_SHA256, Calibration, perl_probe_argv, witness_evidence
+from corsair.adapters.tap_runner import PERL_PROBE_SHA256, perl_probe_argv
+from corsair.nodes.witness import PROBE_SHA256, Calibration, witness_evidence
 from corsair.ports.artifacts import ArtifactRef
 from corsair.ports.test_runner import WitnessCapture, WitnessRequest
 from corsair.reports.tap import parse_tap
