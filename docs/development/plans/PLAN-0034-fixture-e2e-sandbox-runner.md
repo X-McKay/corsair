@@ -25,7 +25,7 @@ Out of scope, owned elsewhere: witness capture outside the test process (SPEC-00
 - [x] Storage quota facts from read-only inspection and a throwaway plain pod (below).
 - [x] Live gate `tests/qualification/test_credential_placeholder.py`, marker `credential_placeholder`, target `make qualify-credential-placeholder`: one provider holding a random fake credential via the pinned gRPC provider RPCs, attached at sandbox creation; an in-sandbox scan (`credential_scan.py`, given only prefix, length and digest) records the variable's form and fails on the raw value in any readable process environment or bounded file scan; sandbox and provider deleted with identity checks; evidence searched for the value. Egress substitution is not implemented: the pinned proto names `NetworkEndpoint.credential_binding` but not its semantics, YAML spelling or protocol requirements.
 - [ ] Run the credential placeholder gate live.
-- [ ] Review, CURRENT.md, HANDOFF-0052.
+- [x] Review, CURRENT.md, [HANDOFF-0052](../handoffs/HANDOFF-0052-fixture-e2e-sandbox-runner.md).
 
 ## Validation and progress
 
