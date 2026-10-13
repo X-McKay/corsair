@@ -174,12 +174,24 @@ def test_workspace_failure_hides_writes_and_runs_so_the_author_returns_blocked()
     assert offered == [ALL_TOOLS, ALL_TOOLS, READ_ONLY] and len(refusing.calls) == 1
     assert isinstance(result.output, BlockedAuthoring) and result.output.layer == "sandbox"
     assert [r.status for r in result.output.dev_runs] == ["workspace_failure"]
-    # A model that tries to rewrite and rerun anyway reaches no write or run.
+    # A model that tries to rewrite and rerun anyway reaches no write or run, and the stage ends blocked with
+    # trusted code's reason instead of failing on the withdrawn tool.
     refusing = RefusingWorkspace()
-    with pytest.raises(UnexpectedModelBehavior):
-        run(create_test_authoring_agent(responding([write(), RUN, write(FILES["broken"]), RUN], blocked)),
-            case().inputs.inputs, refusing)
-    assert len(refusing.calls) == 1
+    (result, _) = run(create_test_authoring_agent(responding([write(), RUN, write(FILES["broken"]), RUN], blocked)),
+                      case().inputs.inputs, refusing)
+    assert len(refusing.calls) == 1 and isinstance(result.output, BlockedAuthoring)
+    assert result.output.layer == "unknown" and result.output.files[0].content == REFERENCE
+    assert result.output.reason.startswith("the author called write_test_file after it was withdrawn: the last run "
+                                           "was a workspace failure")
+    assert [r.status for r in result.output.dev_runs] == ["workspace_failure"]
+
+
+def test_a_run_after_the_run_budget_is_spent_ends_the_stage_blocked():
+    (result, fake) = run(create_test_authoring_agent(responding([write(), RUN, RUN])), case().inputs.inputs,
+                         runner({"status": "collection_error"}), budget=AuthoringBudget(dev_runs=1))
+    assert len(fake.calls) == 1 and isinstance(result.output, BlockedAuthoring)
+    assert result.output.reason == ("the author called run_tests after it was withdrawn: the development run "
+                                    "budget is spent")
 
 
 def test_runs_requested_together_reserve_budget_and_only_the_first_runs():

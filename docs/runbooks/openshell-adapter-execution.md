@@ -14,6 +14,7 @@ For a fresh runtime, use unique unused evidence directories and run, sequentiall
 
 ```sh
 UV_OFFLINE=true make test-config
+UV_OFFLINE=true make toolchain-images
 UV_OFFLINE=true make kind-up
 UV_OFFLINE=true make admission-install
 UV_OFFLINE=true make toolchain-images-load

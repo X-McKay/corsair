@@ -14,7 +14,8 @@ import yaml
 from pydantic_ai.messages import ModelResponse, ToolCallPart, ToolReturnPart
 from pydantic_ai.models.function import FunctionModel
 
-from corsair.adapters.pytest_runner import PytestRunner, PytestRunnerConfig
+from corsair.adapters.pytest_runner import PytestRunnerConfig
+from corsair.investigation.frameworks import harness
 from corsair.agents.issue_analysis.contracts import IssueAnalysisInput
 from corsair.agents.source.contracts import SourceFile
 from corsair.agents.test_planning.contracts import BaselineTest, EnvironmentEvidence, WitnessFacility
@@ -71,7 +72,7 @@ def reviewed_runners(store, root: Path):
     """A fresh private workspace per purpose; only the reviewed test bytes are admitted for execution."""
     def runner(purpose):
         workspace = root / purpose
-        return PytestRunner(ReviewedWorkspace(store, workspace, VARIANTS[purpose]), ReviewedLocalExecution(workspace),
+        return harness("pytest").runner(ReviewedWorkspace(store, workspace, VARIANTS[purpose]), ReviewedLocalExecution(workspace),
                             store, PytestRunnerConfig(PREFIX, ".corsair-junit.xml", str(workspace),
                                                       witness_record_path=".corsair-witness.json"))
     return runner
