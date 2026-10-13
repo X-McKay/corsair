@@ -71,6 +71,11 @@ class StageEfficiency(BaseModel):
     output_corrections: int
     elapsed_seconds: float
     failure: str | None
+    # The caps derived from this stage's own input (SPEC-0043) and the cap it ended on, if any.
+    request_limit: int | None = None
+    tool_calls_limit: int | None = None
+    exhausted: str | None = None
+    tool_cap_reached: bool = False
 
 
 class ChainOutcome(BaseModel):
@@ -160,7 +165,9 @@ def outcome(run: DirectRun | ChainResult) -> ChainOutcome:
             input_tokens=a.usage and a.usage.input_tokens, output_tokens=a.usage and a.usage.output_tokens,
             elapsed_seconds=a.elapsed_seconds,
             output_corrections=sum(isinstance(part, RetryPromptPart) for m in a.messages for part in m.parts),
-            failure=_failure(a.failure))
+            failure=_failure(a.failure), request_limit=a.limits and a.limits.request_limit,
+            tool_calls_limit=a.limits and a.limits.tool_calls_limit, exhausted=a.exhausted and a.exhausted.limit,
+            tool_cap_reached=a.tool_cap_reached)
             for a in run.attempts))
 
 

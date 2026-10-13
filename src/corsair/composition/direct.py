@@ -21,13 +21,14 @@ from pydantic_ai.models import Model
 from pydantic_ai.usage import RunUsage, UsageLimits
 
 from corsair.agents.evidence_assessment.agent import assessment_prompt, create_evidence_assessment_agent
-from corsair.agents.evidence_assessment.contracts import AssessmentInput, EvidenceAssessment
+from corsair.agents.evidence_assessment.contracts import WINDOW_LINES, AssessmentInput, EvidenceAssessment
 from corsair.agents.evidence_assessment.dependencies import AssessmentDependencies
 from corsair.agents.issue_analysis.contracts import IssueAnalysisInput
 from corsair.agents.issue_analysis.identification import create_issue_identification_agent, identification_prompt
 from corsair.agents.issue_analysis.identification_contracts import IssueIdentification
 from corsair.agents.issue_analysis.tools import FixtureDependencies
 from corsair.agents.source.contracts import Contract
+from corsair.agents.source.tools import READ_LINE_LIMIT
 from corsair.agents.test_authoring.agent import authoring_prompt, create_test_authoring_agent
 from corsair.agents.test_authoring.contracts import TestAuthoringInput, TestPatch
 from corsair.agents.test_authoring.tools import AuthoringBudget, AuthoringDependencies
@@ -44,29 +45,118 @@ AgentStage = Literal["identification", "planning", "authoring", "assessment"]
 Purpose = Literal["development", "baseline", "candidate"]
 
 
-class StageBudget(Contract):
-    """Operator-owned per-stage caps; the provider configuration owns the response cap."""
-    request_limit: int = Field(strict=True, gt=0, le=24)
-    tool_calls_limit: int = Field(strict=True, ge=0, le=24)
-    total_tokens_limit: int = Field(strict=True, gt=0, le=262144)
-    timeout_seconds: float = Field(gt=0, le=1800, allow_inf_nan=False)
+class StageLimits(Contract):
+    """One stage run's caps, derived from its own input and recorded in its receipt (SPEC-0043)."""
+    request_limit: int = Field(strict=True, gt=0)
+    tool_calls_limit: int = Field(strict=True, ge=0)
+    total_tokens_limit: int = Field(strict=True, gt=0)
+    timeout_seconds: float = Field(gt=0, allow_inf_nan=False)
+    # Derivation: windows needed to read the stage's readable inputs once, plus input-sized work calls.
+    read_windows: int = Field(strict=True, ge=0)
+    work_tool_calls: int = Field(strict=True, ge=0)
 
     def usage_limits(self) -> UsageLimits:
         return UsageLimits(request_limit=self.request_limit, tool_calls_limit=self.tool_calls_limit,
                            total_tokens_limit=self.total_tokens_limit)
 
 
+class StageBudget(Contract):
+    """Operator-owned per-stage ceilings and derivation; the provider configuration owns the response cap.
+
+    A run's tool calls are its read windows plus its work calls plus ``slack_tool_calls``; requests are
+    those calls plus the output request and its retries plus one; tokens are ``tokens_per_request`` per
+    request. Each is capped by the ceiling here, so a derived cap never exceeds what the operator admitted.
+    """
+    request_limit: int = Field(strict=True, gt=0, le=64)
+    tool_calls_limit: int = Field(strict=True, ge=0, le=48)
+    total_tokens_limit: int = Field(strict=True, gt=0, le=262144)
+    timeout_seconds: float = Field(gt=0, le=1800, allow_inf_nan=False)
+    slack_tool_calls: int = Field(default=2, strict=True, ge=0, le=8)
+    tokens_per_request: int = Field(default=12000, strict=True, gt=0, le=32768)
+
+    def limits(self, read_windows: int, work_tool_calls: int, output_retries: int) -> StageLimits:
+        tools = min(read_windows + work_tool_calls + self.slack_tool_calls, self.tool_calls_limit)
+        requests = min(tools + output_retries + 2, self.request_limit)
+        return StageLimits(request_limit=requests, tool_calls_limit=tools,
+                           total_tokens_limit=min(requests * self.tokens_per_request, self.total_tokens_limit),
+                           timeout_seconds=self.timeout_seconds, read_windows=read_windows,
+                           work_tool_calls=work_tool_calls)
+
+
 class CompositionBudget(Contract):
-    identification: StageBudget = StageBudget(request_limit=6, tool_calls_limit=4, total_tokens_limit=64000,
-                                              timeout_seconds=300)
-    planning: StageBudget = StageBudget(request_limit=10, tool_calls_limit=8, total_tokens_limit=96000,
-                                        timeout_seconds=600)
-    authoring: StageBudget = StageBudget(request_limit=12, tool_calls_limit=10, total_tokens_limit=128000,
-                                         timeout_seconds=900)
-    assessment: StageBudget = StageBudget(request_limit=12, tool_calls_limit=10, total_tokens_limit=128000,
-                                          timeout_seconds=600)
+    identification: StageBudget = StageBudget(request_limit=20, tool_calls_limit=16, total_tokens_limit=128000,
+                                              timeout_seconds=300, tokens_per_request=8000)
+    planning: StageBudget = StageBudget(request_limit=20, tool_calls_limit=16, total_tokens_limit=160000,
+                                        timeout_seconds=600, tokens_per_request=10000)
+    authoring: StageBudget = StageBudget(request_limit=32, tool_calls_limit=28, total_tokens_limit=262144,
+                                         timeout_seconds=900, slack_tool_calls=2, tokens_per_request=12000)
+    assessment: StageBudget = StageBudget(request_limit=32, tool_calls_limit=28, total_tokens_limit=262144,
+                                          timeout_seconds=600, slack_tool_calls=3, tokens_per_request=10000)
     dev_runs: int = Field(default=3, strict=True, ge=1, le=5)
     output_retries: int = Field(default=1, strict=True, ge=0, le=1)
+    admission_refusals: int = Field(default=1, strict=True, ge=0, le=2)
+
+
+Limit = Literal["request_limit", "tool_calls_limit", "total_tokens_limit", "timeout_seconds"]
+
+
+class BudgetExhausted(Contract):
+    """The typed outcome of a stage that ended on one of its own caps instead of returning its output."""
+    status: Literal["budget_exhausted"] = "budget_exhausted"
+    stage: Literal["identification", "planning", "authoring", "assessment"]
+    limit: Limit
+    cap: float
+    limits: StageLimits
+
+
+def _windows(contents, window: int = READ_LINE_LIMIT) -> int:
+    return sum(-(-len(content.splitlines()) // window) or 1 for content in contents)
+
+
+def stage_limits(stage: "AgentStage", inputs: Any, budget: "CompositionBudget") -> StageLimits:
+    """Caps from the task: each readable input once in tool windows, plus the stage's own work calls."""
+    match stage:
+        case "identification" | "planning":
+            reads, work = _windows(source.content for source in inputs.source_files), 0
+        case "authoring":
+            # Per development run: up to two writes of each planned test path and the run itself; plus each
+            # admission refusal the author may act on.
+            paths = {inputs.plan.control.test_path, inputs.plan.security.test_path}
+            reads = _windows(source.content for source in inputs.source_files)
+            work = budget.dev_runs * (2 * len(paths) + 1) + budget.admission_refusals
+        case "assessment":
+            reads, work = _windows((item.content for item in inputs.items), WINDOW_LINES), 0
+    return getattr(budget, stage).limits(reads, work, budget.output_retries)
+
+
+def cap_reached(limits: StageLimits | None, usage: RunUsage | None) -> bool:
+    """Whether the run spent its tool-call cap; recorded on every attempt, whatever ended it."""
+    return limits is not None and usage is not None and usage.tool_calls >= limits.tool_calls_limit
+
+
+def exhaustion(stage: "AgentStage", limits: StageLimits, failure: BaseException | None, *,
+               deadline: bool = False) -> BudgetExhausted | None:
+    """Which cap ended a stage that returned no output; None when it failed for another reason.
+
+    Only the native limit errors are evidence of a cap: a call to a tool withdrawn at the cap is refused by
+    PydanticAI as UsageLimitExceeded naming tool_calls_limit. Every other failure, an UnexpectedModelBehavior
+    after the cap included (spent output retries or a malformed provider response), keeps its own
+    classification; whether the cap was reached is recorded separately as tool_cap_reached. A TimeoutError is
+    the stage's ``timeout_seconds`` only when ``deadline`` says the stage's own deadline fired: a provider, tool
+    or activity timeout inside the stage stays that layer's failure.
+    """
+    if failure is None:
+        return None
+    kind = failure.kind if isinstance(failure, RecordedFailure) else type(failure).__name__
+    limit: Limit | None = None
+    if kind == "TimeoutError" and deadline:
+        limit = "timeout_seconds"
+    elif kind == "UsageLimitExceeded":
+        limit = next((name for name in ("tool_calls_limit", "total_tokens_limit", "request_limit")
+                      if name in str(failure)), "request_limit")
+    if limit is None:
+        return None
+    return BudgetExhausted(stage=stage, limit=limit, cap=getattr(limits, limit), limits=limits)
 
 
 @dataclass(frozen=True)
@@ -103,6 +193,12 @@ class StageAttempt:
     messages: tuple[ModelMessage, ...]
     elapsed_seconds: float
     failure: BaseException | None
+    limits: StageLimits | None = None  # None: refused before its limits were derived
+    exhausted: BudgetExhausted | None = None
+
+    @property
+    def tool_cap_reached(self) -> bool:
+        return cap_reached(self.limits, self.usage)
 
 
 @dataclass(frozen=True)
@@ -160,21 +256,24 @@ def stage_call(stage: AgentStage, inputs: Any, budget: CompositionBudget, runner
         case "planning":
             return planning_prompt(inputs), PlanningDependencies(inputs)
         case "authoring":
-            return authoring_prompt(inputs), AuthoringDependencies(inputs, runner, AuthoringBudget(dev_runs=budget.dev_runs))
+            return authoring_prompt(inputs), AuthoringDependencies(inputs, runner, AuthoringBudget(
+                dev_runs=budget.dev_runs, admission_refusals=budget.admission_refusals))
         case "assessment":
             return assessment_prompt(inputs), AssessmentDependencies(inputs)
 
 
-async def _invoke(stage: Stage, agent: Agent[Any, Any], prompt: str, deps: Any, budget: StageBudget) -> StageAttempt:
+async def _invoke(stage: AgentStage, agent: Agent[Any, Any], prompt: str, deps: Any, limits: StageLimits) -> StageAttempt:
     usage, messages, output, failure = RunUsage(), [], None, None
     started = perf_counter()
+    deadline = asyncio.timeout(limits.timeout_seconds)
     try:
         with capture_run_messages() as messages:
-            async with asyncio.timeout(budget.timeout_seconds):
-                output = (await agent.run(prompt, deps=deps, usage=usage, usage_limits=budget.usage_limits())).output
+            async with deadline:
+                output = (await agent.run(prompt, deps=deps, usage=usage, usage_limits=limits.usage_limits())).output
     except Exception as exc:
         failure = exc
-    return StageAttempt(stage, output, usage, tuple(messages), perf_counter() - started, failure)
+    return StageAttempt(stage, output, usage, tuple(messages), perf_counter() - started, failure, limits,
+                        exhaustion(stage, limits, failure, deadline=deadline.expired()))
 
 
 # Recorded on every run that reaches the gates, because nothing below observes them.
@@ -192,7 +291,7 @@ async def run_direct(case: FixtureCase, models: StageModels, runners: Runners,
     async def invoke(stage: AgentStage, inputs: Any) -> StageAttempt:
         agent = AGENTS[stage](getattr(models, stage), output_retries=budget.output_retries)
         prompt, deps = stage_call(stage, inputs, budget, runners("development") if stage == "authoring" else None)
-        return await _invoke(stage, agent, prompt, deps, getattr(budget, stage))
+        return await _invoke(stage, agent, prompt, deps, stage_limits(stage, inputs, budget))
 
     async def execute(revision, patch, **request) -> NativeTestRun:
         return runners(revision).run(patch, **request)
@@ -213,6 +312,11 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         return DirectRun(stopped_at=stage, reason=reason, attempts=tuple(attempts), **values)
 
     def failure_of(stage: Stage) -> str:
+        exhausted = attempts[-1].exhausted
+        if exhausted is not None:
+            return (f"{stage} budget exhausted: {exhausted.limit} {exhausted.cap:g} "
+                    f"(derived from {exhausted.limits.read_windows} read windows and "
+                    f"{exhausted.limits.work_tool_calls} work calls)")
         failed = attempts[-1].failure
         kind = failed.kind if isinstance(failed, RecordedFailure) else type(failed).__name__
         return f"{stage} produced no output: {kind}: {failed}"[:2048]

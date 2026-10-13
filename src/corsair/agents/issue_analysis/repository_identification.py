@@ -16,6 +16,7 @@ from pydantic_ai.capabilities import Capability, Instrumentation
 from pydantic_ai.models import Model
 from pydantic_ai.models.instrumented import InstrumentationSettings
 
+from ..budget import tool_budget
 from ..source.contracts import Contract, SourceExcerpt
 from ..source.repository import RepositoryLimits, SourceTree, list_tree
 from ..source.repository_tools import repository_source_tools, run_source_reads
@@ -24,7 +25,7 @@ from .identification import finalize_draft
 from .identification_contracts import IssueIdentification, IssueIdentificationDraft
 
 PROMPT_VERSION = "issue-identification-repository-v1-grounding-3"
-CONFIG_VERSION = "issue-identification-repository-config-v2-grounding-3"
+CONFIG_VERSION = "issue-identification-repository-config-v3-grounding-3"
 TOOLSET_ID = "issue_identification_repository_source"
 SKILL_ID = "identify-issue-repository"
 SKILL_TEXT = (Path(__file__).parent / "skills" / SKILL_ID / "SKILL.md").read_text()
@@ -90,5 +91,6 @@ def create_repository_identification_agent(
         output_type=finalize_identification, instructions=INSTRUCTIONS,
         retries={"tools": TOOL_RETRIES, "output": output_retries},
         capabilities=[Capability(id=SKILL_ID, instructions=SKILL_TEXT, toolsets=[repository_source_tools(TOOLSET_ID)]),
+                      tool_budget(),
                       Instrumentation(settings=InstrumentationSettings(include_content=False, version=5))],
     )

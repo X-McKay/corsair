@@ -20,6 +20,7 @@ from uuid import uuid4
 from temporalio import workflow
 from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError, ApplicationError, ChildWorkflowError
+from temporalio.exceptions import TimeoutError as TemporalTimeoutError
 from temporalio.workflow import ActivityConfig
 
 with workflow.unsafe.imports_passed_through():
@@ -36,8 +37,8 @@ with workflow.unsafe.imports_passed_through():
     from corsair.agents.test_authoring.contracts import AuthoringResult, TestAuthoringInput
     from corsair.agents.test_planning.contracts import TestPlan, TestPlanningInput
     from corsair.composition.direct import (
-        AgentStage, CompositionBudget, FixtureCase, RecordedFailure, Runners, StageAttempt, StageModels, run_chain,
-        stage_call,
+        AgentStage, CompositionBudget, FixtureCase, RecordedFailure, Runners, StageAttempt, StageModels, exhaustion,
+        run_chain, stage_call, stage_limits,
     )
 
     from .chain_runtime import (
@@ -80,7 +81,7 @@ class ChainStage:
             try:
                 output = (await runtime.agents[self.stage].run(
                     prompt, model=request.model_key, deps=deps, usage=usage,
-                    usage_limits=getattr(request.budget, self.stage).usage_limits())).output
+                    usage_limits=stage_limits(self.stage, request.inputs, request.budget).usage_limits())).output
             except (AgentRunError, ActivityError) as exc:
                 failure = failure_record(exc)
         return StageRecord(output, usage, tuple(messages), failure)
@@ -135,17 +136,22 @@ class ChainInvestigation:
 
         async def invoke(stage: AgentStage, inputs: Any) -> StageAttempt:
             started = workflow.time()
+            # Pure derivation from the stage input: the same caps the child enforces.
+            limits = stage_limits(stage, inputs, request.budget)
             try:
                 record = await workflow.execute_child_workflow(
                     CHILDREN[stage].run, StageRequest(inputs, getattr(request.models, stage), request.budget),
-                    id=f"{parent}/{stage}",
-                    execution_timeout=timedelta(seconds=getattr(request.budget, stage).timeout_seconds))
+                    id=f"{parent}/{stage}", execution_timeout=timedelta(seconds=limits.timeout_seconds))
             except ChildWorkflowError as exc:
                 # Timed out or failed without returning: usage and messages were not observed here.
-                return StageAttempt(stage, None, None, (), workflow.time() - started, recorded(exc))
+                failure = recorded(exc)
+                # Only the child's own execution timeout is the stage deadline.
+                return StageAttempt(stage, None, None, (), workflow.time() - started, failure, limits,
+                                    exhaustion(stage, limits, failure,
+                                               deadline=isinstance(exc.cause, TemporalTimeoutError)))
             failure = record.failure and RecordedFailure(record.failure.kind, record.failure.message)
             return StageAttempt(stage, record.output, record.usage, record.messages, workflow.time() - started,
-                                failure)
+                                failure, limits, exhaustion(stage, limits, failure))
 
         async def execute(revision, patch, **run):
             try:
