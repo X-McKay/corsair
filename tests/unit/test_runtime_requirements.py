@@ -593,10 +593,10 @@ def test_setup_cfg_install_requires_is_read():
 STAGED_RUBY31 = {'id': 'ruby-3.1-bundler', 'language': 'ruby',
                  'base_image': 'docker.io/library/ruby@sha256:91627f55e8969006aab67d15c92fb930500ff73948803da1330b8a853fecebb5',
                  'image_source': 'deploy/qualification/toolchains/ruby31', 'runtime': {'name': 'ruby', 'version': '3.1.7'},
-                 'tools': {'bundler': '2.3.27'}, 'selector': {}, 'qualification': {'records': ['SPEC-0058'], 'report': 'x'}}
+                 'tools': {'bundler': '2.3.27'}, 'selector': {}, 'qualification': {'evidence': 'image-only', 'records': ['SPEC-0058'], 'report': 'x'}}
 STAGED_MINITEST = {'name': 'minitest', 'language': 'ruby', 'versions': '==5.14.4 || ==5.15.0 || ==5.27.0',
                    'runner': 'src/corsair/adapters/minitest_runner.py', 'images': ['ruby-3.1-bundler'],
-                   'qualification': {'records': ['SPEC-0063', 'PLAN-0068'], 'report': 'x'}}
+                   'qualification': {'evidence': 'image-only', 'records': ['SPEC-0063', 'PLAN-0068'], 'report': 'x'}}
 
 
 def test_ruby31_rows_select_the_four_minitest_cases_and_not_the_rspec_ones():
