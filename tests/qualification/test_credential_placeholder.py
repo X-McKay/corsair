@@ -1,6 +1,7 @@
 """Live OpenShell 0.1.3 provider credential placeholder check for SPEC-0025 private-repository fetch.
 
-Registers one provider holding a random, obviously fake credential through the native gRPC API,
+Imports one gate-owned provider profile (0.1.3 refuses a provider type with no profile in scope) and
+registers one provider holding a random, obviously fake credential through the native gRPC API,
 attaches it at sandbox creation, and records what the workload sees. The workload scan receives only
 a public prefix and a digest, never the credential. Egress substitution is not checked here: the
 pinned proto exposes `NetworkEndpoint.credential_binding`, but its substitution semantics are not
@@ -73,6 +74,28 @@ def provider_names(rpc):
             return names
 
 
+def profile_ids(rpc):
+    ids, token = [], ''
+    while True:
+        page = rpc('ListProviderProfiles', openshell_pb2.ListProviderProfilesRequest(
+            workspace_scope=datamodel_pb2.WorkspaceSelector(workspace=WORKSPACE), page_size=100, page_token=token))
+        ids += [p.id for p in page.profiles]
+        if not (token := page.next_page_token):
+            return ids
+
+
+def probe_profile(profile_id):
+    """Gate-owned profile: one required credential exposed as one environment variable, no endpoints.
+
+    0.1.3 refuses a provider whose type names no profile in scope; no shipped profile is assumed.
+    """
+    return openshell_pb2.ProviderProfileImportItem(source='corsair-qualification', profile=openshell_pb2.ProviderProfile(
+        id=profile_id, display_name='Corsair qualification fake credential',
+        description='Random fake credential for the SPEC-0025 placeholder check',
+        category=openshell_pb2.PROVIDER_PROFILE_CATEGORY_OTHER,
+        credentials=[openshell_pb2.ProviderProfileCredential(name=KEY, env_vars=[KEY], required=True)]))
+
+
 @pytest.mark.credential_placeholder
 def test_provider_credential_reaches_workload_only_as_placeholder(kube, adapter_gateway):
     native = adapter_gateway
@@ -82,9 +105,10 @@ def test_provider_credential_reaches_workload_only_as_placeholder(kube, adapter_
     dummy = PREFIX + secrets.token_hex(16)
     digest = hashlib.sha256(dummy.encode()).hexdigest()
     suffix = uuid.uuid4().hex[:10]
-    provider, name = 'qual-fake-' + suffix, 'cred-' + suffix
+    provider, name, profile = 'qual-fake-' + suffix, 'cred-' + suffix, 'corsair-qual-' + suffix
     summary = {'outcome': 'failed', 'scope': 'SPEC-0025 provider placeholder delivery; egress substitution unrun',
                'credential': {'key': KEY, 'sha256': digest, 'length': len(dummy), 'prefix': PREFIX, 'kind': 'random fake'},
+               'profile': {'id': profile, 'import_delivery': 'unrun', 'cleanup': 'unrun'},
                'provider': {'name': provider, 'create_delivery': 'unrun', 'cleanup': 'unrun'},
                'sandbox': {'name': name, 'create_delivery': 'unrun', 'cleanup': 'unrun'},
                'egress_substitution': 'unrun', 'internal_rpc_retry_counts': 'unknown',
@@ -100,10 +124,24 @@ def test_provider_credential_reaches_workload_only_as_placeholder(kube, adapter_
         try:
             image = summary['image'] = image_receipt('python')
             assert sdk.call('list_all', workspace=WORKSPACE) == [] and provider not in provider_names(rpc)
+            # Shipped profiles are recorded (credential env vars and auth styles inform SPEC-0025), never used.
+            shipped = rpc('ListProviderProfiles', openshell_pb2.ListProviderProfilesRequest(workspace_scope=scope, page_size=100))
+            summary['shipped_profiles'] = {p.id: [(c.name, list(c.env_vars), c.auth_style) for c in p.credentials]
+                                           for p in shipped.profiles}
+            assert profile not in profile_ids(rpc)
+            lint = rpc('LintProviderProfiles', openshell_pb2.LintProviderProfilesRequest(
+                workspace_scope=scope, profiles=[probe_profile(profile)]))
+            summary['profile']['lint'] = [MessageToDict(d, preserving_proto_field_name=True) for d in lint.diagnostics]
+            assert lint.valid, 'Probe profile refused by lint; see profile.lint'
+            summary['profile']['import_delivery'] = 'unknown'
+            imported = rpc('ImportProviderProfiles', openshell_pb2.ImportProviderProfilesRequest(
+                workspace_scope=scope, profiles=[probe_profile(profile)], request_id=str(uuid.uuid4())))
+            assert imported.imported and profile in profile_ids(rpc), 'Probe profile not imported'
+            summary['profile']['import_delivery'] = 'acknowledged'
             summary['provider']['create_delivery'] = 'unknown'
             created = rpc('CreateProvider', openshell_pb2.CreateProviderRequest(
                 workspace_scope=scope, request_id=str(uuid.uuid4()), provider=datamodel_pb2.Provider(
-                    metadata=datamodel_pb2.ObjectMeta(name=provider), type='generic', credentials={KEY: dummy})))
+                    metadata=datamodel_pb2.ObjectMeta(name=provider), type=profile, credentials={KEY: dummy})))
             provider_id = created.provider.metadata.id
             summary['provider'].update(create_delivery='acknowledged', id=provider_id)
             fetched = rpc('GetProvider', openshell_pb2.GetProviderRequest(workspace_scope=scope, name=provider)).provider
@@ -178,6 +216,18 @@ def test_provider_credential_reaches_workload_only_as_placeholder(kube, adapter_
             except Exception as error:
                 errors.append(error)
                 summary['provider']['cleanup_error'] = {'type': type(error).__name__, 'detail': str(error)}
+            try:
+                if summary['profile']['import_delivery'] != 'unrun':
+                    summary['profile']['cleanup'] = 'unconfirmed'
+                    if profile in profile_ids(rpc):
+                        deleted = rpc('DeleteProviderProfile', openshell_pb2.DeleteProviderProfileRequest(
+                            workspace_scope=scope, id=profile, allow_missing=False, request_id=str(uuid.uuid4())))
+                        summary['profile']['deletion_outcome'] = openshell_pb2.DeletionOutcome.Name(deleted.outcome)
+                    assert profile not in profile_ids(rpc), 'Probe profile still listed after deletion'
+                    summary['profile']['cleanup'] = 'confirmed (native list)'
+            except Exception as error:
+                errors.append(error)
+                summary['profile']['cleanup_error'] = {'type': type(error).__name__, 'detail': str(error)}
             summary['observed_calls'] = {'sdk': sdk.counter, 'provider_rpc': rpc.counter}
             body_passed = summary['outcome'] == 'passed'
             leaked = summary['evidence_contains_fake_credential'] = sorted(
