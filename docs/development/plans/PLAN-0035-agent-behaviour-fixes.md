@@ -58,6 +58,8 @@ After (RIG0 worktree `/home/al/git/corsair-pr34` at `8d45105`, `make test-config
 
 Assessment v4 with the 2048 thinking budget (`31f503f`, asm-7..9, server shared with another thread's eval): 2/3 admitted `completed`/`inconclusive`/`not_verified` equal to the gate, both treating JUnit as a claim and naming the missing witness; 1/3 exceeded the 10 tool-call limit re-reading already-read items after thinking-budget stops; 0 cap hits; no invented ids; the witness-rule retry never fired. Across versions: v3 0/3 output, v4 1/3 admitted (2/3 cap), v4 with budget 2/3 admitted (1/3 tool limit).
 
+Codex review of `12cd57a` (two findings, both fixed in the next commit): run_tests calls batched in one response would each run, so a workspace failure in the first could be blindly repeated before `prepare` hides the tool; now only the first run_tests call in a response runs and later ones return `not_run` (they would repeat the same files). And the authoring skill forced `blocked`/`sandbox` for every workspace or report failure; it now says `sandbox` only for a sandbox refusal, otherwise `unknown`, quoting the observed reason (`test-authoring-v4`). The batched-run test was confirmed to fail on the previous tools. `make test-config` 827, scripted authoring evals 12/12.
+
 Merging main brought witness capture (SPEC-0033, PR #35): the scripted assessor in `evals/fixture_e2e/case.py` now cites a revision's witness item when one is listed, so a witnessed reproduced/verified proposal satisfies this plan's grounding rule.
 
 Private evidence: `.runs/behaviour-20261013/after*/` (with `SUMMARY.md`) in `/home/al/git/corsair-pr34` on RIG0.

@@ -179,7 +179,7 @@ def test_workspace_failure_hides_writes_and_runs_so_the_author_returns_blocked()
     assert len(refusing.calls) == 1
 
 
-def test_runs_requested_together_each_reserve_budget_and_identity():
+def test_runs_requested_together_reserve_budget_and_only_the_first_runs():
     seen = []
     two = (ToolCallPart("run_tests", {}, tool_call_id="first"), ToolCallPart("run_tests", {}, tool_call_id="second"))
     blocked = {"status": "blocked", "layer": "unknown", "reason": "Stopped"}
@@ -188,10 +188,15 @@ def test_runs_requested_together_each_reserve_budget_and_identity():
     assert len(fake.calls) == 1
     runs = sorted(result.output.dev_runs, key=lambda r: r.run)
     assert [(r.run, r.status) for r in runs] == [(1, "discovered"), (2, "not_run")]
+    # With budget left, a second call in the same response would blindly repeat the first run's patch.
     (result, fake) = run(create_test_authoring_agent(responding([write(), two], blocked)), case().inputs.inputs,
                          runner({"status": "discovered"}, {"status": "discovered"}))
-    operations = {r.operation for r in result.output.dev_runs}
-    assert len(fake.calls) == 2 and len(operations) == 2
+    assert len(fake.calls) == 1
+    assert sorted((r.run, r.status) for r in result.output.dev_runs) == [(1, "discovered"), (2, "not_run")]
+    refusing = RefusingWorkspace()
+    (result, _) = run(create_test_authoring_agent(responding([write(), two], blocked)), case().inputs.inputs, refusing)
+    assert len(refusing.calls) == 1
+    assert sorted((r.run, r.status) for r in result.output.dev_runs) == [(1, "workspace_failure"), (2, "not_run")]
     (result, fake) = run(create_test_authoring_agent(responding([write(), two])), case().inputs.inputs,
                          runner({"status": "discovered"}), budget=AuthoringBudget(dev_runs=1))
     assert isinstance(result.output, TestPatch) and len(fake.calls) == 1

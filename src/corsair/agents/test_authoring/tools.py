@@ -157,7 +157,7 @@ def authoring_tools() -> FunctionToolset[AuthoringDependencies]:
     def run_tests(ctx: RunContext[AuthoringDependencies]) -> DevelopmentRun:
         """Apply the current patch to a fresh copy of the baseline source in the development sandbox, run native discovery and, when exactly the two planned tests are found, execute them once.
 
-        Returns discovered test ids, collection or compile errors and the control outcome. The security test's pass/fail outcome is withheld; a setup error or skip is shown. Every call counts against an operator run budget.
+        Returns discovered test ids, collection or compile errors and the control outcome. The security test's pass/fail outcome is withheld; a setup error or skip is shown. Every call counts against an operator run budget; only the first call in one response runs.
         """
         deps = ctx.deps
         plan = deps.inputs.plan
@@ -167,9 +167,19 @@ def authoring_tools() -> FunctionToolset[AuthoringDependencies]:
         if dispatched.count(ctx.tool_call_id) != 1:
             raise RuntimeError("run_tests call id must identify exactly one dispatched call in this run")
         number = dispatched.index(ctx.tool_call_id) + 1
+        # Calls in one response see the same files, so a later one would repeat the first run's patch blindly,
+        # including after a workspace failure with uncertain side effects; only the first runs.
+        response = next(message for message in ctx.messages if isinstance(message, ModelResponse)
+                        and message.run_id == ctx.run_id and any(isinstance(part, ToolCallPart)
+                                                                 and part.tool_call_id == ctx.tool_call_id
+                                                                 for part in message.parts))
+        batched = [part.tool_call_id for part in response.parts
+                   if isinstance(part, ToolCallPart) and part.tool_name == RUN_TOOL]
         files = current_files(ctx)
-        if not files or number > deps.budget.dev_runs:
-            reason = "no test file has been written" if not files else f"development run budget of {deps.budget.dev_runs} is spent"
+        if not files or number > deps.budget.dev_runs or batched[0] != ctx.tool_call_id:
+            reason = ("no test file has been written" if not files
+                      else f"development run budget of {deps.budget.dev_runs} is spent" if number > deps.budget.dev_runs
+                      else "only the first run_tests call in one response runs; the files cannot change between them")
             return DevelopmentRun(run=number, operation="", patch_sha256=sha256(b"").hexdigest(), status="not_run",
                                   discovered_test_ids=(), errors=reason, control=None, security=None,
                                   run_command=(), cleanup="not_required")
