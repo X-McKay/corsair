@@ -145,17 +145,28 @@ class DockerCase:
         removed = self.docker('exec', self.container, '/bin/rm', '-rf', WORK, *self.scratch)
         return 'confirmed' if removed.returncode == 0 else 'unconfirmed'
 
+    def stop_workers(self):
+        """After a timed-out exec: killing the docker client leaves its process running in the container, so kill every
+        process but PID 1 (`sleep infinity`), then confirm only PID 1 is left. Never retried."""
+        try:
+            self.docker('exec', self.container, '/bin/sh', '-c', 'kill -9 -1', timeout=30)
+            listed = self.docker('top', self.container, '-o', 'pid', timeout=30)
+        except subprocess.TimeoutExpired:
+            return 'unconfirmed'
+        pids = listed.stdout.decode(errors='replace').split()[1:] if listed.returncode == 0 else None
+        return 'confirmed' if pids is not None and len(pids) == 1 else 'unconfirmed'
+
     def execute(self, handle, argv, operation):
         started, clock = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), time.monotonic()
-        # A hang (for example a vulnerable infinite loop) is a terminal-unknown failure, never retried; the
-        # container is removed with everything in it on exit.
+        # A hang (for example a vulnerable infinite loop) is a terminal-unknown failure, never retried; its processes
+        # are killed before the container is reused, and the container is removed with everything in it on exit.
         try:
             result = self.docker('exec', '-w', WORK, self.container, *argv, timeout=self.timeout)
         except subprocess.TimeoutExpired as error:
             return ExecutionReceipt(operation=str(operation), handle=handle, started_at=started,
                                     elapsed_seconds=round(time.monotonic() - clock, 3), delivery='acknowledged',
                                     completion='unknown', reason='timeout', stdout=error.stdout or b'',
-                                    stderr=error.stderr or b'', native_exit=None, worker_cleanup='unconfirmed')
+                                    stderr=error.stderr or b'', native_exit=None, worker_cleanup=self.stop_workers())
         return ExecutionReceipt(operation=str(operation), handle=handle, started_at=started,
                                 elapsed_seconds=round(time.monotonic() - clock, 3), delivery='acknowledged',
                                 completion='terminal_observed', reason='terminal', stdout=result.stdout,

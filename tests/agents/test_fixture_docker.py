@@ -130,3 +130,20 @@ def test_the_docker_route_needs_the_rows_local_image(tmp_path, monkeypatch, caps
         cli.main()
     assert "needs a cpython-3.12-pytest entry" in capsys.readouterr().err
     assert not (tmp_path / "e").exists()
+
+
+@pytest.mark.parametrize("left, cleanup", [(b"PID\n4242\n", "confirmed"), (b"PID\n4242\n4243\n", "unconfirmed")])
+def test_a_timed_out_command_has_its_container_processes_killed(left, cleanup):
+    from corsair.adapters.docker_image import DockerCase
+    calls = []
+
+    def docker(*args, stdin=None, timeout=900):
+        calls.append(args)
+        if args[:2] == ("exec", "-w"):
+            raise subprocess.TimeoutExpired(args, timeout)
+        return subprocess.CompletedProcess(args, 0, left if args[0] == "top" else b"", b"")
+    case = DockerCase(IMAGE, Path("/nonexistent"), "commit", 1, kind="t", docker=docker)
+    case.container = "c0"
+    receipt = case.execute(case.handle(uuid4()), ("/bin/true",), uuid4())
+    assert receipt.completion == "unknown" and receipt.reason == "timeout" and receipt.worker_cleanup == cleanup
+    assert calls[1] == ("exec", "c0", "/bin/sh", "-c", "kill -9 -1") and calls[2] == ("top", "c0", "-o", "pid")
