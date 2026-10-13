@@ -11,7 +11,7 @@ related: [SPEC-0061, PLAN-0049, HANDOFF-0067]
 
 ## Objective and dependencies
 
-Implement SPEC-0061 for the `java` and `java8` images. Based on PR #51 (both images and their gates); rebased onto main once #51 merges. No matrix row changes.
+Implement SPEC-0061 for the `java` and `java8` images. Based on main after PR #51 merged (93a0fab), which carries both images and their gates. No matrix row changes.
 
 ## Steps
 
