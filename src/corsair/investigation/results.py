@@ -5,6 +5,8 @@ a language.
 from collections import Counter
 from pathlib import Path
 
+from pydantic_ai.exceptions import UsageLimitExceeded
+
 from corsair.composition.direct import DirectRun
 
 from .build import Investigation
@@ -26,10 +28,16 @@ MODEL_STAGES = ("identification", "planning", "authoring", "assessment")
 LABELS = ("LIKELY_EXPLOITABLE", "LIKELY_NOT_EXPLOITABLE", "INCONCLUSIVE", "UNABLE_TO_RUN", "ERROR")
 
 
-def headline(stopped_at: str | None, gate: dict | None, *, failed: bool = False, error: bool = False) -> str:
-    """The run's label. `failed`: the stage that ended the run raised (provider, timeout, harness) instead of
-    returning an outcome; `error`: the run itself crashed."""
-    if error or failed:
+def headline(stopped_at: str | None, gate: dict | None, *, failed: bool = False, exhausted: bool = False,
+             error: bool = False) -> str:
+    """The run's label. `exhausted`: an agent stage ran and stopped on its budget without an answer (the question
+    stays open: INCONCLUSIVE); `failed`: the stage that ended the run raised otherwise (provider, timeout, harness);
+    `error`: the run itself crashed."""
+    if error:
+        return "ERROR"
+    if exhausted:
+        return "INCONCLUSIVE"
+    if failed:
         return "ERROR"
     if stopped_at in BEFORE_MODEL:
         return "UNABLE_TO_RUN"
@@ -38,6 +46,14 @@ def headline(stopped_at: str | None, gate: dict | None, *, failed: bool = False,
     if stopped_at is not None or not gate:
         return "ERROR"  # Execution stopped, or a completed run without a gate
     return EXECUTION_LABELS.get(gate["execution"]) or FINDING_LABELS[gate["finding"]]
+
+
+def _exhausted(attempt) -> bool:
+    """The stage ran and stopped on its request, tool-call or token budget rather than failing; its own time limit
+    stays an ERROR, like any timeout."""
+    if attempt.exhausted is not None:
+        return attempt.exhausted.limit != "timeout_seconds"
+    return isinstance(attempt.failure, UsageLimitExceeded)
 
 
 def _usage(run: DirectRun) -> dict:
@@ -54,6 +70,7 @@ def record(label: str, evidence: Path, *, investigation: Investigation | None = 
     """`refused` is why the request could not start, `error` why the run crashed and `crashed_in` where (its
     traceback is `error.txt` beside the record); otherwise `run` is the chain's result."""
     environment = run.environment if run is not None else None
+    ending = [a for a in run.attempts if a.stage == run.stopped_at] if run is not None else []
     gate = run.gate.permitted.model_dump() if run is not None and run.gate else None
     final, basis = gate, "gate" if gate else None
     if run is not None and run.assessment is not None:
@@ -82,9 +99,8 @@ def record(label: str, evidence: Path, *, investigation: Investigation | None = 
         # when no environment was admitted.
         "baseline_basis": getattr(environment, "baseline_basis", None),
         "label": headline("admission" if run is None else run.stopped_at, final,
-                          failed=run is not None and any(a.stage == run.stopped_at and a.failure is not None
-                                                         for a in run.attempts),
-                          error=error is not None),
+                          failed=any(a.failure is not None for a in ending),
+                          exhausted=any(_exhausted(a) for a in ending), error=error is not None),
         # Which disposition the label follows: the assessment's standing disposition when the assessment ran (its
         # proposal if admitted, else the gate's), otherwise the gate's own result.
         "label_basis": basis,

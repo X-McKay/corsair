@@ -207,11 +207,13 @@ class PreparedSandbox:
     """A sandbox of one prepared toolchain image, live until the preparation port releases it.
 
     ``read_source`` returns a file's bytes from the operator's capture of the revision placed in the sandbox
-    (never from the sandbox), or None when the capture has no such file."""
+    (never from the sandbox), or None when the capture has no such file; ``source_paths`` lists every file of that
+    capture (SPEC-0071: without it a smoke baseline is refused)."""
     execution: SandboxExecution
     handle: SandboxHandle
     scratch_location: str
     read_source: Callable[[str], bytes | None]
+    source_paths: Callable[[], tuple[str, ...]] | None = None
 
 
 class Preparation(Protocol):

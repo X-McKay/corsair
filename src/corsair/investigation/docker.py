@@ -53,6 +53,22 @@ def captured_file(tree: Path, path: str, overlay: Path | None = None) -> bytes |
     return None
 
 
+# Above this many files the listing is not handed over (a smoke baseline is then refused), never truncated.
+MAX_CAPTURED_PATHS = 100_000
+
+
+def captured_paths(tree: Path) -> tuple[str, ...] | None:
+    """Every file of the commit's capture as the host wrote it (regular files and symlinks), relative to its root,
+    sorted, no contents and no overlay; None above MAX_CAPTURED_PATHS, since the smoke rule reads it as complete."""
+    paths = []
+    for path in tree.rglob("*"):
+        if path.is_symlink() or path.is_file():
+            paths.append(path.relative_to(tree).as_posix())
+            if len(paths) > MAX_CAPTURED_PATHS:
+                return None
+    return tuple(sorted(paths))
+
+
 def registry_access(names: tuple[str, ...]) -> tuple[str, tuple[str, ...], tuple[tuple[str, str], ...]]:
     """Network, environment and read-only mounts for registry access during setup: always the bridge, with the
     operator's proxy and CA variables among `names` that are set. A value carrying credentials (`user:pass@`) is
@@ -135,7 +151,8 @@ class DockerPreparation:
             sandbox.__exit__(None, None, None)
             raise RuntimeError(f"environment sandbox workspace copy failed: {copied.stderr[-512:]!r}")
         return PreparedSandbox(sandbox, sandbox.handle(operation), SCRATCH,
-                               lambda path: captured_file(self.tree, path, self.overlay))
+                               lambda path: captured_file(self.tree, path, self.overlay),
+                               lambda: captured_paths(self.tree))
 
     def release(self, sandbox: PreparedSandbox, operation) -> Literal["confirmed", "unconfirmed"]:
         sandbox.execution.__exit__(None, None, None)

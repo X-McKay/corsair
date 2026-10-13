@@ -285,6 +285,8 @@ def test_the_sandbox_reads_the_baseline_file_from_the_capture_never_the_sandbox(
     ("environment", None, {"failed": True}, "ERROR"),
     ("planning", None, {}, "INCONCLUSIVE"),
     ("authoring", None, {"failed": True}, "ERROR"),
+    ("environment", None, {"failed": True, "exhausted": True}, "INCONCLUSIVE"),
+    ("authoring", None, {"failed": True, "exhausted": True}, "INCONCLUSIVE"),
     ("execution", None, {}, "ERROR"),
     ("admission", None, {"error": True}, "ERROR"),
 ])
@@ -351,3 +353,51 @@ def test_a_repository_committed_in_the_checkout_is_named_relative_to_it(clone, t
     with pytest.raises(Refused, match="names no fixed revision") as refused:
         build(request(repo, baseline, None, repository="clone"), tmp_path / "nofix", {NODE: CONFIG}, checkout=checkout)
     assert record("manual:x", tmp_path, refused=str(refused.value))["label"] == "UNABLE_TO_RUN"
+
+
+def test_an_agent_stage_that_stops_on_its_budget_is_inconclusive(tmp_path):
+    from corsair.composition.direct import DirectRun, StageAttempt
+    from corsair.investigation.results import record
+    from pydantic_ai.exceptions import UsageLimitExceeded
+    attempt = StageAttempt("environment", None, None, (), 1.0, UsageLimitExceeded("total_tokens_limit 48000"))
+    item = record("manual:x", tmp_path, run=DirectRun(stopped_at="environment", attempts=(attempt,),
+                                                      reason="environment budget exhausted: total_tokens_limit 48000"))
+    assert (item["label"], item["stopped_at"]) == ("INCONCLUSIVE", "environment")
+    from corsair.composition.direct import BudgetExhausted, StageLimits
+    limits = StageLimits.model_construct()
+    timed_out = StageAttempt("environment", None, None, (), 240.0, TimeoutError("stage timed out"), limits,
+                             BudgetExhausted.model_construct(stage="environment", limit="timeout_seconds", cap=240,
+                                                             limits=limits))
+    assert record("manual:x", tmp_path, run=DirectRun(stopped_at="environment", attempts=(timed_out,),
+                                                      reason="x"))["label"] == "ERROR"
+    crashed = StageAttempt("environment", None, None, (), 1.0, ConnectionError("provider unreachable"))
+    assert record("manual:x", tmp_path, run=DirectRun(stopped_at="environment", attempts=(crashed,),
+                                                      reason="x"))["label"] == "ERROR"
+
+
+def test_the_sandbox_lists_the_captured_commits_files_for_the_smoke_rule(clone, tmp_path):
+    from corsair.investigation.docker import captured_paths
+    repo, baseline, candidate, _ = clone
+    built = build(request(repo, baseline, candidate), tmp_path / "trees", {NODE: CONFIG}, roots=(tmp_path / "sources",))
+    assert captured_paths(built.trees["baseline"]) == (".travis.yml", "lib/run.js", "package.json")
+    (built.trees["baseline"] / "link.js").symlink_to("lib/run.js")
+    assert "link.js" in captured_paths(built.trees["baseline"])
+    import corsair.investigation.docker as route
+    route.MAX_CAPTURED_PATHS, saved = 2, route.MAX_CAPTURED_PATHS
+    try:
+        assert captured_paths(built.trees["baseline"]) is None  # never a partial list
+    finally:
+        route.MAX_CAPTURED_PATHS = saved
+
+
+def test_pov_files_reach_identification_and_an_oversized_ticket_is_refused(clone, tmp_path):
+    repo, baseline, candidate, _ = clone
+    pov = {"description": "Call run with a crafted name", "files": [{"path": "poc.sh", "content": "node -e 'x'"}]}
+    text = request(repo, baseline, candidate, pov=pov).issue_text()
+    assert "Proof of concept (untrusted, not executed)" in text and "File poc.sh:\nnode -e 'x'" in text
+    ticket = {"provider": "github", "source": "acme/files", "id": "42", "url": "https://github.com/acme/files/issues/42",
+              "revision": "1", "title": "lib/run.js", "body": "x" * 9000, "format": "markdown", "state": "open",
+              "updated_at": "2026-10-13T00:00:00Z", "observed_at": "2026-10-13T00:00:00Z", "comments": []}
+    with pytest.raises(Refused, match="does not fit the identification input"):
+        build(request(repo, baseline, candidate, issue=ticket), tmp_path / "big", {NODE: CONFIG},
+              roots=(tmp_path / "sources",))
