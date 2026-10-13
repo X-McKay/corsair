@@ -1,5 +1,7 @@
 # Current work
 
+Corpus accuracy baseline and improvement loop: [repository runbook](../runbooks/corpus-improvement-loop.md), [PLAN-0087](plans/PLAN-0087-corpus-baseline-loop.md), and [fresh-session kickoff HANDOFF-0113](handoffs/HANDOFF-0113-repository-corpus-loop.md). The procedure covers 66 development / 16 held-out configurations, parallel bounded work, reviewed-oracle scorecards, frozen comparisons and independent example expansion. Documentation is ready; verify implementation dependencies against current source. [ISSUE-0008](issues/ISSUE-0008-fix-free-product-investigation.md) records candidate-free admission on the inspected base. No per-language accuracy baseline or unattended automation is claimed.
+
 Evaluation proposals: [IDEA-0009](ideas/IDEA-0009-eval-runner-measurement.md) proposes simple standalone reporting, failure accounting and reliable comparisons; [IDEA-0008](ideas/IDEA-0008-agent-release-policies.md) keeps release policies deferred. Documentation only; [publication handoff](handoffs/HANDOFF-0099-evaluation-ideas.md).
 
 Provider configuration: [SPEC-0066](specs/SPEC-0066-provider-configuration.md), [PLAN-0072](plans/PLAN-0072-provider-configuration.md). Per-agent native inference selection and GitHub/Azure ticket capture implemented; offline checks passed, live integrations unqualified. Latest handoff: [HANDOFF-0093](handoffs/HANDOFF-0093-provider-review-corrections.md).

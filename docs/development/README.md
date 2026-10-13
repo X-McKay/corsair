@@ -1,5 +1,7 @@
 # Development workflow
 
+For iterative corpus evaluation and per-language accuracy baselines, follow the [corpus improvement loop](../runbooks/corpus-improvement-loop.md) and its repository-owned kickoff records.
+
 Start each session with [AGENTS.md](../../AGENTS.md) and [CURRENT.md](CURRENT.md). The rulebook holds shared principles; this guide holds the process. Codex and Claude use the same records, definitions and skills. There is no separate tracker database, custom workflow service or required approval ceremony.
 
 ## Repository locations
