@@ -35,7 +35,7 @@ Implement SPEC-0064 for the `java` and `java8` images. Based on main after PR #5
 
 ## Decisions and next action
 
-Al chose CI over the RIG0 paste and over host networking in the cloud container (2026-10-13). The VUL4J-6 overlay is rebuilt from upstream in CI and reproduces #51's RIG0 overlay byte for byte (sha256 `18a406a5d65d…`): the Vul4J PoV at 45ddad15 unchanged, one blank line, then `ZipShortTest#testToBytes` from the fix commit renamed `testBenignZipShortToBytes`; the vulnerable revision is the fix's parent dcb0486 with the fix's test file. The overlay commit uses a fixed author and date, so it is the same object (92b75dbd) on every run.
+Al chose CI over the RIG0 paste and over host networking in the cloud container (2026-10-13). The VUL4J-6 overlay is rebuilt from upstream in CI and reproduces #51's RIG0 overlay byte for byte (sha256 `18a406a5d65d…`): the Vul4J PoV at 45ddad15 unchanged, one blank line, then `ZipShortTest#testToBytes` from the fix commit renamed `testBenignZipShortToBytes`; the vulnerable revision is the fix's parent dcb0486 with the fix's test file. The overlay commit uses a fixed author and date.
 
 
 Next: once #92's image-only job is on main, add one `java8`-scoped step after its build that runs `python -m tests.qualification.image_cases java8`; that CI run builds both images from the checked-in Dockerfiles (the list check) and runs VUL4J-6 fix and vulnerable. Attach its results here and in the PR, then the handoff. The images' gate receipts change with this source, so #51's live gate evidence names the old source; the next milestone gate covers them.

@@ -83,7 +83,9 @@ def prepare(case, work):
 def harness(*args):
     command = [sys.executable, '-m', 'tests.qualification.java_image_case', *args]
     print('+', ' '.join(command), flush=True)
-    return subprocess.run(command, cwd=ROOT, check=False)
+    # The project is not an installed package (pyproject `package = false`); the harness imports `corsair` from src.
+    path = os.pathsep.join(filter(None, (str(ROOT / 'src'), str(ROOT), os.environ.get('PYTHONPATH'))))
+    return subprocess.run(command, cwd=ROOT, check=False, env={**os.environ, 'PYTHONPATH': path})
 
 
 def outcome(run, ids):
