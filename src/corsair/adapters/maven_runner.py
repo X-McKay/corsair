@@ -32,7 +32,10 @@ CLAIM = {'passed': 'passed', 'failed': 'failed', 'error': 'failed', 'skipped': '
 
 @dataclass(frozen=True)
 class MavenRunnerConfig:
-    """Operator-owned Maven argv (binary, `-B -o`, `-f <root>/pom.xml`, repository and goal), never agent input.
+    """Operator-owned goal-free Maven prefix (binary, `-B -o`, `--file=<root>/pom.xml`, repository), never agent input.
+
+    Every token after the binary is an option, so no goal or phase can run a test outside the runner's
+    selection; the runner appends `test-compile` for discovery and `test` for execution.
 
     `java` and `console_jar` are absolute image paths for the pinned JUnit Platform console launcher; the
     dependency plugin coordinate is pinned and must be in the offline closure. Directories are Maven's
@@ -53,6 +56,8 @@ class MavenRunnerConfig:
         if (type(self.command) is not tuple or not self.command
                 or any(type(t) is not str or not t or '\0' in t for t in self.command)):
             raise ValueError('Runner command must be nonempty string tokens')
+        if any(token[0] != '-' for token in self.command[1:]):
+            raise ValueError('Maven prefix must hold options only (`--file=...`, `-D...`), never a goal or phase')
         if type(self.workspace_root) is not str or not self.workspace_root.startswith('/') or '\0' in self.workspace_root:
             raise ValueError('Workspace root must be an absolute operator path')
         if any(type(v) is not str or not v.startswith('/') or '\0' in v for v in (self.java, self.console_jar)):
@@ -78,6 +83,14 @@ def selection(ids: tuple[str, ...]) -> tuple[str, ...]:
 
 
 class MavenRunner(NativeRunner):
+    def run(self, patch, *, control_test_id, security_test_id, discovery_command, operation, witness=None):
+        # The admitted discovery command must be exactly the operator's goal-free prefix: a goal-bearing
+        # command would run test bodies (possibly other tests) before the listing.
+        if discovery_command != self._config.command:
+            raise ValueError('Maven discovery command must equal the operator\'s goal-free Maven prefix')
+        return super().run(patch, control_test_id=control_test_id, security_test_id=security_test_id,
+                           discovery_command=discovery_command, operation=operation, witness=witness)
+
     def _validate(self, patch: ApprovedPatch, ids: tuple[str, str], witness: WitnessRequest | None) -> None:
         if witness is not None and not isinstance(witness, WitnessRequest):
             raise ValueError('Witness capture needs a typed request')
@@ -102,13 +115,13 @@ class MavenRunner(NativeRunner):
     def _report(self, ids: tuple[str, ...]) -> str:
         return f'{self._module_dir(ids)}/{self._config.reports_dir}/TEST-{JavaTestId.parse(ids[0]).class_name}.xml'
 
-    def _discovery_argv(self, ids: tuple[str, ...], discovery_command: tuple[str, ...]) -> tuple[str, ...]:
+    def _discovery_argv(self, ids: tuple[str, ...]) -> tuple[str, ...]:
         config, module = self._config, self._module_dir(ids)
         cpfile = f'{module}/{config.output_dir}/corsair-test.classpath'
         roots = f'{module}/{config.output_dir}/test-classes:{module}/{config.output_dir}/classes'
         parsed = [JavaTestId.parse(i) for i in ids]
         reactor = selection(ids)[:-1]
-        maven = (*discovery_command, *reactor, 'test-compile', f'{config.dependency_plugin}:build-classpath',
+        maven = (*config.command, *reactor, 'test-compile', f'{config.dependency_plugin}:build-classpath',
                  f'-Dmdep.outputFile={config.output_dir}/corsair-test.classpath', '-Dmdep.includeScope=test')
         return ('/bin/sh', '-c', DISCOVER, 'corsair-maven-discover', cpfile, roots, config.java, config.console_jar,
                 *(f'{item.class_name}#{item.method}' for item in parsed), *maven)
@@ -116,7 +129,7 @@ class MavenRunner(NativeRunner):
     def _stages(self, prepared, ids, discovery_command, paths, operation, witness):
         handle = prepared.handle
         report, selected = self._report(ids), selection(ids)
-        command = self._discovery_argv(ids, discovery_command)
+        command = self._discovery_argv(ids)
         receipt, problem = self._execute(handle, command, uuid5(operation, 'discovery'))
         if problem:
             discovery = Discovery('execution_failure', (), self._excerpt(receipt), command, receipt)
@@ -140,7 +153,7 @@ class MavenRunner(NativeRunner):
 
     def _run_once(self, prepared: PreparedWorkspace, ids: tuple[str, str], report: str, selected: tuple[str, ...],
                   test_paths: frozenset[str], operation: UUID):
-        argv = ('/bin/sh', '-c', WRAPPER, 'corsair-maven', report, *self._config.command, *selected)
+        argv = ('/bin/sh', '-c', WRAPPER, 'corsair-maven', report, *self._config.command, *selected, 'test')
         receipt, problem = self._execute(prepared.handle, argv, operation)
         failure = lambda layer, detail, junit=None, status='execution_failure': (
             Execution(status, (), junit, None, detail, argv, receipt), layer)

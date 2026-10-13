@@ -15,7 +15,7 @@ Built on SPEC-0039 (PR #41, merged as `971ac82`), branch `claude/java-test-repor
 
 ## Validation and blockers
 
-`make test-config`: 930 passed (on main 971ac82). Host-only runs through real Maven on unchanged POMs (JUnit 4.12, JUnit 5.14.4 single and two-module, JSPWiki JUnit 5.4.0 at both commits) gave the expected outcomes (PLAN-0045). Blocked for live use: the launcher jar (`junit-platform-console-standalone` 1.14.4) and `maven-dependency-plugin` 3.8.1 are not yet in the Java toolchain image; G1/G3 workspace storage.
+`make test-config`: 933 passed (930 on main 971ac82, plus the goal-free Maven prefix fix from the Codex review: the operator prefix holds options only and the discovery command must equal it). Host-only runs through real Maven on unchanged POMs (JUnit 4.12, JUnit 5.14.4 single and two-module, JSPWiki JUnit 5.4.0 at both commits) gave the expected outcomes (PLAN-0045). Blocked for live use: the launcher jar (`junit-platform-console-standalone` 1.14.4) and `maven-dependency-plugin` 3.8.1 are not yet in the Java toolchain image; G1/G3 workspace storage.
 
 ## Decisions and next steps
 

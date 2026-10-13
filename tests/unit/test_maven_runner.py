@@ -11,7 +11,7 @@ from tests.unit.test_pytest_runner import Scripted, Workspace, store  # noqa: F4
 
 REPORTS = Path(__file__).with_name('surefire')
 ROOT = '/sandbox/src'
-MVN = ('/usr/share/maven/bin/mvn', '-B', '-ntp', '-o', '-Dmaven.repo.local=/opt/corsair-m2', '-f', ROOT + '/pom.xml', 'test')
+MVN = ('/usr/share/maven/bin/mvn', '-B', '-ntp', '-o', '-Dmaven.repo.local=/opt/corsair-m2', '--file=' + ROOT + '/pom.xml')
 WIKI = 'jspwiki-main/org.apache.wiki.BenchmarkWikiServletForwardingTest#'
 IDS = (WIKI + 'benignPageKeepsEncodedPageParameter', WIKI + 'inertWebRootResourceCannotSelectForwardTarget')
 TEST_PATH = 'jspwiki-main/src/test/java/org/apache/wiki/BenchmarkWikiServletForwardingTest.java'
@@ -19,7 +19,7 @@ PATCH = ApprovedPatch((PatchFile(TEST_PATH, b'class BenchmarkWikiServletForwardi
 REPORT = f'{ROOT}/jspwiki-main/target/surefire-reports/TEST-org.apache.wiki.BenchmarkWikiServletForwardingTest.xml'
 LISTED = (REPORTS / 'listing-jspwiki.txt').read_bytes()
 JAVA, CONSOLE = '/opt/java/openjdk/bin/java', '/opt/corsair/junit-platform-console-standalone.jar'
-PREFIX = MVN[:-1]
+PREFIX = MVN
 SKIPPED = ('<testsuite name="org.apache.wiki.BenchmarkWikiServletForwardingTest">' + ''.join(
     f'<testcase name="{m}" classname="org.apache.wiki.BenchmarkWikiServletForwardingTest"><skipped/></testcase>'
     for m in ('benignPageKeepsEncodedPageParameter', 'inertWebRootResourceCannotSelectForwardTarget')) + '</testsuite>').encode()
@@ -47,7 +47,7 @@ def test_listed_discovery_then_one_execution_admits_claims_from_surefire(store):
          *(i.removeprefix('jspwiki-main/') for i in IDS), *PREFIX, *selected[:-1], 'test-compile',
          'org.apache.maven.plugins:maven-dependency-plugin:3.8.1:build-classpath',
          '-Dmdep.outputFile=target/corsair-test.classpath', '-Dmdep.includeScope=test'),
-        ('/bin/sh', '-c', WRAPPER, 'corsair-maven', REPORT, *MVN, *selected)]
+        ('/bin/sh', '-c', WRAPPER, 'corsair-maven', REPORT, *MVN, *selected, 'test')]
     assert [call[1] for call in execution.calls] == [uuid5(operation, 'discovery'), uuid5(operation, 'execution')]
     assert result.failure_layer is None and result.cleanup == 'confirmed' and result.discovery.test_ids == IDS
     assert [case.outcome for case in result.execution.cases] == ['passed', 'failed']
@@ -137,6 +137,17 @@ def test_operator_config_is_bounded(config):
         MavenRunnerConfig(MVN, ROOT, **{'java': JAVA, 'console_jar': CONSOLE, **config})
     with pytest.raises(ValueError):
         MavenRunnerConfig(MVN, 'relative', JAVA, CONSOLE)
+    with pytest.raises(ValueError, match='goal'):
+        MavenRunnerConfig(MVN + ('test',), ROOT, JAVA, CONSOLE)
+    with pytest.raises(ValueError, match='goal'):
+        MavenRunnerConfig(('mvn', '-f', ROOT + '/pom.xml'), ROOT, JAVA, CONSOLE)
+
+
+@pytest.mark.parametrize('command', [MVN + ('test', '-Dtest=org.apache.wiki.OtherTest'), MVN[:-1], ()])
+def test_discovery_command_must_be_the_operator_prefix(store, command):
+    runner = MavenRunner(Workspace(store, ROOT), Scripted(), store, MavenRunnerConfig(MVN, ROOT, JAVA, CONSOLE))
+    with pytest.raises(ValueError, match='goal-free'):
+        runner.run(PATCH, control_test_id=IDS[0], security_test_id=IDS[1], discovery_command=command, operation=uuid4())
 
 
 def test_java_runs_become_gate_evidence(store):
