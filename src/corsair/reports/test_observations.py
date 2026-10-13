@@ -17,7 +17,7 @@ MAX_REPORT_BYTES = 4096
 
 class TestClaim(BaseModel):
     model_config = ConfigDict(extra='forbid', frozen=True, strict=True)
-    test_id: str = Field(min_length=1, max_length=128, pattern=r'^[A-Za-z0-9_./:-]+$')
+    test_id: str = Field(min_length=1, max_length=128, pattern=r'^[A-Za-z0-9_./:#-]+$')
     outcome: Literal['passed', 'failed', 'skipped']
 
 
