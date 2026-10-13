@@ -1,0 +1,155 @@
+"""Image-only run of the Maven runner on a real benchmark checkout: the prepared toolchain image under Docker, no OpenShell.
+
+Two phases, each its own container. `setup` resolves the project's own dependencies and Surefire provider into a
+case Maven repository with network (no test body runs: Surefire selects an absent test). `run` starts one
+`--network=none`, capability-dropped container from the same image and drives `MavenRunner` through a Docker-exec
+workspace and execution port: a fresh copy of the checkout per run, the unchanged test file as the patch, listing and
+execution exactly as SPEC-0041 builds them. This is image evidence for SPEC-0045, not sandbox qualification.
+"""
+import argparse
+import dataclasses
+import hashlib
+import json
+import os
+from pathlib import Path
+import subprocess
+import time
+from uuid import uuid4
+
+from corsair.adapters.local_artifacts import LocalArtifacts
+from corsair.adapters.maven_runner import MavenRunner, MavenRunnerConfig
+from corsair.ports.artifacts import ArtifactRef
+from corsair.ports.execution import ExecutionReceipt
+from corsair.ports.sandbox import SandboxHandle
+from corsair.ports.test_runner import ApprovedPatch, JavaTestId, PatchFile, PreparedWorkspace
+from tests.qualification.prepare_toolchains import DOCKER, LAUNCHER
+
+WORK, M2 = '/tmp/work', '/tmp/m2'
+MVN = '/usr/share/maven/bin/mvn'
+DEPENDENCY = 'org.apache.maven.plugins:maven-dependency-plugin:3.8.1'
+
+
+def docker(*args, stdin=None, timeout=900):
+    return subprocess.run([*DOCKER, *args], input=stdin, capture_output=True, timeout=timeout, check=False)
+
+
+def user():
+    return f'{os.getuid()}:{os.getgid()}'
+
+
+def setup(image, checkout, m2, evidence):
+    script = (f'cp -R /opt/corsair-m2/. /m2/; cp -R /src {WORK}; cd {WORK}; '
+              f'{MVN} -B -ntp -Dmaven.repo.local=/m2 test-compile {DEPENDENCY}:build-classpath '
+              f'-Dmdep.outputFile=target/corsair-setup.classpath -Dmdep.includeScope=test; '
+              f'{MVN} -B -ntp -Dmaven.repo.local=/m2 test -Dtest=CorsairSetupAbsentTest -DfailIfNoTests=false '
+              f'-Dsurefire.failIfNoSpecifiedTests=false')
+    result = docker('run', '--rm', '--user', user(), '-e', 'HOME=/tmp', '-v', f'{checkout}:/src:ro', '-v', f'{m2}:/m2',
+                    image, '/bin/sh', '-ec', script, timeout=1800)
+    (evidence / 'setup.stdout').write_bytes(result.stdout)
+    (evidence / 'setup.stderr').write_bytes(result.stderr)
+    return result.returncode
+
+
+class DockerCase:
+    """One offline container; each prepare is a fresh copy of the read-only checkout plus the patch."""
+
+    def __init__(self, image, checkout, m2, commit):
+        self.image, self.checkout, self.m2, self.commit = image, checkout, m2, commit
+        self.container = None
+
+    def __enter__(self):
+        result = docker('run', '-d', '--network=none', '--cap-drop=ALL', '--security-opt=no-new-privileges', '--user', user(),
+                        '-e', 'HOME=/tmp', '-v', f'{self.checkout}:/src:ro', '-v', f'{self.m2}:/m2:ro', self.image,
+                        '/bin/sleep', 'infinity')
+        assert result.returncode == 0, result.stderr
+        self.container = result.stdout.decode().strip()
+        return self
+
+    def __exit__(self, *exc):
+        docker('rm', '--force', self.container)
+        absent = docker('inspect', self.container)
+        self.cleanup = 'confirmed' if absent.returncode != 0 and b'no such object' in absent.stderr.lower() else 'unconfirmed'
+
+    def handle(self, operation):
+        return SandboxHandle(self.container, 'java-image-case', 'docker', 'corsair', str(operation))
+
+    def prepare(self, patch, operation):
+        copy = docker('exec', self.container, '/bin/sh', '-ec', f'rm -rf {WORK} {M2}; cp -R /src {WORK}; cp -R /m2 {M2}')
+        assert copy.returncode == 0, copy.stderr
+        for item in patch.files:
+            written = docker('exec', '-i', self.container, '/bin/sh', '-ec', 'cat > "$1"', 'write', f'{WORK}/{item.path}',
+                             stdin=item.content)
+            assert written.returncode == 0, written.stderr
+        digest = lambda text: ArtifactRef(hashlib.sha256(text.encode()).hexdigest(), len(text))
+        return PreparedWorkspace(self.handle(operation), digest(self.commit), digest(patch.sha256), patch.sha256)
+
+    def release(self, workspace, operation):
+        return 'confirmed' if docker('exec', self.container, '/bin/rm', '-rf', WORK, M2).returncode == 0 else 'unconfirmed'
+
+    def execute(self, handle, argv, operation):
+        started, clock = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), time.monotonic()
+        result = docker('exec', '-w', WORK, self.container, *argv)
+        return ExecutionReceipt(operation=str(operation), handle=handle, started_at=started,
+                                elapsed_seconds=round(time.monotonic() - clock, 3), delivery='acknowledged',
+                                completion='terminal_observed', reason='terminal', stdout=result.stdout,
+                                stderr=result.stderr, native_exit=result.returncode, worker_cleanup='confirmed')
+
+
+def plain(value):
+    if dataclasses.is_dataclass(value):
+        return {k: plain(v) for k, v in dataclasses.asdict(value).items()}
+    if hasattr(value, 'model_dump'):
+        return value.model_dump()
+    if isinstance(value, dict):
+        return {k: plain(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [plain(v) for v in value]
+    if isinstance(value, bytes):
+        text = value.decode('utf-8', 'replace')
+        return {'sha256': hashlib.sha256(value).hexdigest(), 'size': len(value), 'tail': text[-4000:]}
+    return value
+
+
+def run(image, checkout, m2, commit, ids, evidence):
+    item = JavaTestId.parse(ids[0])
+    path = item.source_path()
+    patch = ApprovedPatch((PatchFile(path, (Path(checkout) / path).read_bytes()),), (path,))
+    config = MavenRunnerConfig(command=(MVN, '-B', '-ntp', '-o', f'-Dmaven.repo.local={M2}', f'--file={WORK}/pom.xml'),
+                               workspace_root=WORK, java='/opt/java/openjdk/bin/java', console_jar=LAUNCHER)
+    with DockerCase(image, checkout, m2, commit) as case, LocalArtifacts(evidence / 'objects', max_bytes=8 << 20) as store:
+        clock = time.monotonic()
+        result = MavenRunner(case, case, store, config).run(patch, control_test_id=ids[0], security_test_id=ids[1],
+                                                             discovery_command=config.command, operation=uuid4())
+        elapsed = round(time.monotonic() - clock, 3)
+    summary = {'image': image, 'commit': commit, 'ids': ids, 'elapsed_seconds': elapsed, 'container_cleanup': case.cleanup,
+               'failure_layer': result.failure_layer, 'detail': result.detail, 'cleanup': result.cleanup,
+               'discovery': result.discovery and {'status': result.discovery.status, 'test_ids': result.discovery.test_ids},
+               'cases': result.execution and [(c.test_id, c.outcome) for c in result.execution.cases],
+               'run': plain(result)}
+    (evidence / 'run.json').write_text(json.dumps(summary, indent=2, default=str))
+    return summary
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('phase', choices=['setup', 'run'])
+    parser.add_argument('--image', required=True, help='Prepared toolchain image config id or tag')
+    parser.add_argument('--checkout', required=True, type=Path, help='Clean checkout of the case at one commit')
+    parser.add_argument('--m2', required=True, type=Path, help='Case Maven repository filled by setup')
+    parser.add_argument('--evidence', required=True, type=Path)
+    parser.add_argument('--id', action='append', default=[], help='Control then security `[module/]pkg.Class#method`')
+    args = parser.parse_args()
+    args.evidence.mkdir(parents=True, exist_ok=False)
+    commit = subprocess.run(['git', '-C', str(args.checkout), 'rev-parse', 'HEAD'], capture_output=True, text=True,
+                            check=True).stdout.strip()
+    if args.phase == 'setup':
+        args.m2.mkdir(parents=True, exist_ok=True)
+        code = setup(args.image, args.checkout.resolve(), args.m2.resolve(), args.evidence)
+        print(json.dumps({'phase': 'setup', 'commit': commit, 'exit': code}))
+        raise SystemExit(code)
+    summary = run(args.image, args.checkout.resolve(), args.m2.resolve(), commit, tuple(args.id), args.evidence)
+    print(json.dumps({k: v for k, v in summary.items() if k != 'run'}, indent=2, default=str))
+
+
+if __name__ == '__main__':
+    main()
