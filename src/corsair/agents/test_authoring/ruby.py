@@ -3,8 +3,10 @@
 A bounded reader for authored Minitest files: it skips comments, strings, heredocs, `%` literals, symbols, labels
 and regular expressions, tracks the keywords that close with `end` to find `def <method>` in the planned class, and
 reports the start line of each assertion call the method body makes (Ruby reports a failing call at the line where
-the call starts). Calls in blocks inside the method count; calls in a nested `def` do not. Constructs it cannot
-track are refused with a reason rather than guessed: `=begin` blocks, `__END__` and endless method definitions.
+the call starts). Calls in blocks inside the method count; calls in a nested `def` or in a lambda or proc body
+(`-> { }`, `lambda do end`, `proc { }`, `Proc.new { }`) do not, since those run only if called. Constructs it cannot
+track are refused with a reason rather than guessed: `=begin` blocks, `__END__`, endless method definitions and a
+file that defines or aliases an assertion name.
 """
 
 import re
@@ -13,6 +15,9 @@ ASSERTION = re.compile(r"(?:assert|refute)(?:_\w+)?[?!]?|must_\w+|wont_\w+|flunk
 REFUSED = (
     (re.compile(r"^=begin\b", re.MULTILINE), "=begin block"),
     (re.compile(r"^__END__\s*$", re.MULTILINE), "__END__"),
+    # A file that defines or aliases an assertion name could turn it into a no-op the reader still counts.
+    (re.compile(r"(?:\bdef\s+(?:self\s*\.\s*)?|\balias\s+:?|\b(?:alias_method|define_method|define_singleton_method)"
+                r"\s*\(?\s*[:\"']+)(?:" + ASSERTION.pattern + r")(?![\w?!])"), "definition of an assertion name"),
 )
 CONDITIONAL = {"if", "unless", "while", "until", "for"}
 # A conditional keyword opens a block only where a statement or expression starts.
@@ -22,9 +27,11 @@ STATEMENT_START = {None, ";", "=", "(", "[", "{", ",", "||", "&&", "!", "and", "
 OPERAND_AFTER = STATEMENT_START | {"==", "=~", "!~", "!=", "<", ">", "<=", ">=", "+", "-", "*", "?", ":", "<<",
                                    "when", "if", "unless", "while", "until", "elsif", "in", "return", "puts", "p"}
 PAIRS = {"(": ")", "[": "]", "{": "}", "<": ">"}
+# Blocks given to these run only when called: `-> { }`, `lambda { }`, `proc { }` and `Proc.new { }`.
+DEFERRING = {"lambda", "proc"}
 HEREDOC = re.compile(r"<<([~-]?)(['\"`]?)([A-Za-z_]\w*)\2")
 PERCENT = re.compile(r"%([qQwWiIrsx]?)([^\w\s])")
-TOKEN = re.compile(r"\|\|=|&&=|\+=|-=|==|=~|!~|!=|<=|>=|\|\||&&|<<|::|&\.|[A-Za-z_]\w*[?!]?|@{1,2}\w+|\$\w+"
+TOKEN = re.compile(r"\|\|=|&&=|\+=|->|-=|==|=~|!~|!=|<=|>=|\|\||&&|<<|::|&\.|[A-Za-z_]\w*[?!]?|@{1,2}\w+|\$\w+"
                    r"|\d[\w.]*|\S")
 
 
@@ -202,15 +209,35 @@ def ruby_assertion_lines(content: str, class_name: str, method: str) -> tuple[in
     # A name assigned anywhere in the file (`assert_msg = ...`) is a local variable where it appears bare.
     variables = {token for index, (token, _) in enumerate(tokens[:-1])
                  if tokens[index + 1][0] in {"=", "||=", "&&=", "+=", "-="} and (index == 0 or tokens[index - 1][0] != ".")}
-    # Open blocks closed by `end`: (keyword, qualified name of a class or module, method name of a def).
+    # Open blocks: (keyword, qualified name of a class or module, method name of a def). A `{` entry closes with
+    # `}`, every other with `end`; a `deferred` prefix marks a lambda or proc body.
     stack: list[tuple[str, str | None, str | None]] = []
     loop_header = False  # inside `while`/`until`/`for` before its line ends: an optional `do` opens nothing
+    arrow = None  # parenthesis depth since a `->` whose body has not opened yet
     lines: set[int] = set()
     definitions = 0
     for index, (token, line) in enumerate(tokens):
         previous = tokens[index - 1][0] if index else None
         if token == "\n":
             loop_header = False
+            continue
+        if token == "->":
+            arrow = 0
+            continue
+        if arrow is not None and token in {"(", ")"}:
+            arrow += 1 if token == "(" else -1
+        if token in {"{", "do"} and not (token == "do" and loop_header):
+            deferred = (arrow == 0 or previous in DEFERRING and (index < 2 or tokens[index - 2][0] not in {".", "&."})
+                        or previous == "new" and [t for t, _ in tokens[max(index - 3, 0):index - 1]] == ["Proc", "."])
+            if deferred:
+                arrow = None
+            stack.append((("deferred " if deferred else "") + token, None, None))
+            loop_header = False
+            continue
+        if token == "}":
+            if not stack or not stack[-1][0].endswith("{"):
+                raise ValueError(f"unmatched }} at line {line}")
+            stack.pop()
             continue
         if previous in {".", "&."}:
             pass  # a call on a receiver; `_(x).must_equal` is still an assertion below
@@ -239,23 +266,22 @@ def ruby_assertion_lines(content: str, class_name: str, method: str) -> tuple[in
             stack.append((token, None, None))
             continue
         elif token == "do":
-            if not loop_header:
-                stack.append((token, None, None))
-            loop_header = False
+            loop_header = False  # the optional `do` of a loop header
             continue
         elif token in CONDITIONAL and _statement_start(tokens, index):
             stack.append((token, None, None))
             loop_header = token in {"while", "until", "for"}
             continue
         elif token == "end":
-            if not stack:
+            if not stack or stack[-1][0].endswith("{"):
                 raise ValueError(f"unmatched end at line {line}")
             stack.pop()
             continue
         if ASSERTION.fullmatch(token) and previous != "def" and (token not in variables or previous in {".", "&."}):
             methods = [entry for entry in stack if entry[0] == "def"]
-            # Only the method body itself: a nested def runs only if called.
-            if len(methods) == 1 and methods[0][2] == method and _qualified(stack) == class_name:
+            # Only the method body itself: a nested def, lambda or proc runs only if called.
+            if len(methods) == 1 and methods[0][2] == method and _qualified(stack) == class_name and \
+                    not any(entry[0].startswith("deferred") for entry in stack):
                 lines.add(line)
     if stack:
         raise ValueError(f"test file has {len(stack)} unclosed block(s)")

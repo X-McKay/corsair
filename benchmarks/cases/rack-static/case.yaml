@@ -20,7 +20,7 @@ evaluator:
   case_id: CVE-2025-27610
   cwe: null
   fix_reference: https://github.com/rack/rack/commit/50caab74fa01ee8f5dbdee7bb2782126d20c6583
-  issue_reviewed: false
+  issue_reviewed: true  # issue text second look 2026-10-13: neutral, no advisory or dataset names
   reference_test:
     path: test/corsair_static_test.rb
     sha256: 621655824889e4b67bc79b0255d63244fa5d6b980bd34ddea9441c9ff31d8d89

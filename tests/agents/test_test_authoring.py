@@ -249,6 +249,17 @@ def test_input_refuses_unapproved_or_mismatched_plans():
             TestAuthoringInput.model_validate(altered)
 
 
+def test_input_admits_minitest_ids_the_authoring_checks_read():
+    data = case().inputs.inputs.model_dump()
+    data["environment"]["approved_test_paths"] = ["test/corsair_test.rb"]
+    for name in ("control", "security"):
+        data["plan"][name].update(test_path="test/corsair_test.rb", test_id=f"test/corsair_test.rb::CorsairTest#test_{name}")
+    TestAuthoringInput.model_validate(data)
+    data["plan"]["security"].update(test_id="test/corsair_test.rb::CorsairTest#helper")
+    with pytest.raises(ValidationError):
+        TestAuthoringInput.model_validate(data)
+
+
 @pytest.mark.parametrize("edit,check", [
     (lambda s: s.replace("import pytest", "import pytest\nfrom unittest import mock"), "no_mock"),
     (lambda s: s.replace("def test_security", "@pytest.mark.skip\ndef test_security"), "no_skip"),
