@@ -20,6 +20,7 @@ from corsair.agents.source.contracts import SourceFile
 from corsair.agents.test_planning.contracts import BaselineTest, EnvironmentEvidence
 from corsair.composition.direct import FixtureCase
 from corsair.core.disposition import EnvironmentIdentity
+from corsair.ports.test_runner import WitnessRequest
 
 from .reviewed import DISCOVER, FIXTURE, PREFIX, REVIEWED_TEST, ReviewedLocalExecution, ReviewedWorkspace
 
@@ -48,7 +49,9 @@ def fixture_case() -> FixtureCase:
         scratch_location="The per-test pytest tmp_path directory; fixtures must not be created elsewhere",
         observation_facilities=(
             "Python sys.addaudithook 'open' audit events recorded by the test itself inside the test process",
-            "Native JUnit XML outcomes, failure locations and captured stdout per test"))
+            "Native JUnit XML outcomes, failure locations and captured stdout per test",
+            "Operator witness probe, not test code: calls, returns, raised exceptions and file opens attributed to "
+            "the identified target function during each test's call phase"))
     # A declaration of what both revisions share, not an observed image or inventory digest.
     identity = EnvironmentIdentity(
         image_digest=_digest(f"{sys.executable}\n{sys.version}"), recipe_sha256=_digest(json.dumps(PREFIX)),
@@ -57,6 +60,7 @@ def fixture_case() -> FixtureCase:
     return FixtureCase(issue=IssueAnalysisInput(fixture_id="path-traversal-e2e-v1", issue=ISSUE, scope="component",
                                                 source_files=sources),
                        environment=environment, environment_identity=identity,
+                       witness_envelope=WitnessRequest("documents.py", "read_document", "outside.txt"),
                        revision_sources={revision: _digest((FIXTURE / VARIANTS[revision] / "documents.py").read_bytes())
                                          for revision in ("baseline", "candidate")})
 
@@ -66,7 +70,8 @@ def reviewed_runners(store, root: Path):
     def runner(purpose):
         workspace = root / purpose
         return PytestRunner(ReviewedWorkspace(store, workspace, VARIANTS[purpose]), ReviewedLocalExecution(workspace),
-                            store, PytestRunnerConfig(PREFIX, ".corsair-junit.xml", str(workspace)))
+                            store, PytestRunnerConfig(PREFIX, ".corsair-junit.xml", str(workspace),
+                                                      witness_record_path=".corsair-witness.json"))
     return runner
 
 
@@ -122,7 +127,8 @@ INVENTORY = re.compile(r"(?P<item>[a-z0-9][a-z0-9_.-]*) \(kind (?P<kind>\w+), (?
 
 
 def scripted_assessment(execution="completed", finding="inconclusive", fix="not_verified") -> FunctionModel:
-    """Reads every inventory item once and proposes the given triple, citing each revision's first item line."""
+    """Reads every inventory item once and proposes the given triple, citing each revision's witness item when
+    one is listed (the assessor's grounding rule), else its first item, at line 1."""
     async def respond(messages, info):
         prompt = next(part.content for message in messages for part in message.parts if part.part_kind == "user-prompt")
         items = [match.groupdict() for match in INVENTORY.finditer(prompt)]
@@ -132,7 +138,8 @@ def scripted_assessment(execution="completed", finding="inconclusive", fix="not_
                                                      tool_call_id=f"evidence-{done}")])
 
         def cite(revision):
-            item = next(i for i in items if i["revision"] == revision)
+            ordered = sorted((i for i in items if i["revision"] == revision), key=lambda i: i["kind"] != "witness")
+            item = ordered[0]
             return {"item_id": item["item"], "start_line": 1, "end_line": 1}
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {
             "execution": execution, "finding": finding, "fix": fix,

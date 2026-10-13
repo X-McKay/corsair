@@ -22,9 +22,12 @@ from corsair.adapters.openshell import OpenShellLifecycle
 from corsair.adapters.openshell_execution import OpenShellConnection, OpenShellExecution
 from corsair.adapters.openshell_workspace import CliUpload, OpenShellTestWorkspace, WorkspaceConfig
 from corsair.adapters.pytest_runner import PytestRunner, PytestRunnerConfig
+from corsair.composition.evidence import run_evidence
+from corsair.core.disposition import AssessmentEvidence, EnvironmentIdentity, ExpectedFailure, ObservationPlan, assess
+from corsair.nodes.witness import witness_evidence
 from corsair.ports.execution import ExecutionLimits
 from corsair.ports.sandbox import LifecycleLimits
-from corsair.ports.test_runner import ApprovedPatch, PatchFile
+from corsair.ports.test_runner import ApprovedPatch, PatchFile, WitnessRequest
 from deploy.openshell.artifacts import TOOLS
 from tests.qualification.gateway import gateway
 from tests.qualification.prepare_toolchains import image_receipt
@@ -39,6 +42,12 @@ PREFIX = ('/usr/bin/env', 'PYTEST_DISABLE_PLUGIN_AUTOLOAD=1', 'PYTHONDONTWRITEBY
           '-p', 'no:cacheprovider', '--basetemp', '/tmp/corsair-scratch')
 DISCOVER = PREFIX + ('--collect-only', '-q')
 REPETITIONS = 2
+# The admitted identification target for this fixture and the reviewed security assertion lines.
+REQUEST = WitnessRequest('documents.py', 'read_document', 'outside.txt')
+SECURITY_ASSERTION_LINES = (64, 65, 66)
+WHEELS = ROOT / 'deploy/qualification/toolchains/python/wheels.json'
+WITNESS_SOURCES = ['src/corsair/nodes/witness.py', 'src/corsair/nodes/witness_probe.py',
+                   'src/corsair/core/disposition.py', 'src/corsair/composition/evidence.py']
 SOURCES = ['src/corsair/adapters/openshell_workspace.py', 'src/corsair/adapters/pytest_runner.py',
            'src/corsair/ports/test_runner.py', 'src/corsair/reports/junit.py', 'src/corsair/adapters/openshell.py',
            'src/corsair/adapters/openshell_execution.py', 'src/corsair/adapters/git_source.py',
@@ -95,13 +104,46 @@ def sandboxes_absent(kube, names, record):
 
 @pytest.mark.test_workspace
 def test_reviewed_pair_runs_in_fresh_sandbox_workspaces(kube, adapter_gateway):
+    reviewed_pair(kube, adapter_gateway, witness=False)
+
+
+@pytest.mark.witness
+def test_operator_probe_witness_lets_the_gate_verify_the_reviewed_pair(kube, adapter_gateway):
+    """SPEC-0033: the same recipe with the operator probe; both records must be admitted and the gate must verify."""
+    reviewed_pair(kube, adapter_gateway, witness=True)
+
+
+def gate_result(runs, image, patch):
+    """The SPEC-0027 gates over the live runs; environment identity is the declared shared recipe, not observed."""
+    digest = lambda value: hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
+    identity = EnvironmentIdentity(image_digest=digest(image), recipe_sha256=digest(PREFIX),
+                                   dependency_inventory_sha256=hashlib.sha256(WHEELS.read_bytes()).hexdigest(),
+                                   policy_revision='qualification-default', limits_sha256=digest('execution-limits'))
+    plan = ObservationPlan(control_test_id=IDS[0], security_test_id=IDS[1],
+                           expected_failure=ExpectedFailure(exception_type='AssertionError', path='test_documents.py',
+                                                            function='test_security_rejects_outside_read',
+                                                            assertion_lines=SECURITY_ASSERTION_LINES),
+                           expected_safe_behavior='ValueError', frozen_patch_sha256=patch.sha256)
+    evidence = {}
+    for variant, revision in (('vulnerable', 'baseline'), ('fixed', 'candidate')):
+        evidence[revision] = tuple(run_evidence(result, environment=identity, witness=found.witness,
+                                                sandbox_events=found.sandbox_events)
+                                   for v, result, found in runs if v == variant)
+    return assess(AssessmentEvidence(plan=plan, **evidence))
+
+
+def reviewed_pair(kube, adapter_gateway, *, witness):
     native = adapter_gateway
+    name = 'witness' if witness else 'test-workspace'
     summary = dict(outcome='failed', scope='reviewed SPEC-0018 pair through OpenShellTestWorkspace and PytestRunner',
                    application_retries=0, native_internal_attempts='unknown', runs=[],
-                   witness='absent: JUnit and captured output are workload claims')
+                   witness=('operator probe in the test interpreter (SPEC-0033); tamper-evident, not tamper-proof'
+                            if witness else 'absent: JUnit and captured output are workload claims'))
+    witnessed = []
     kube.evidence.chmod(0o700)
-    (kube.evidence/'test-workspace-hashes.json').write_text(json.dumps(
-        {p: hashlib.sha256((ROOT/p).read_bytes()).hexdigest() for p in SOURCES}, indent=2))
+    (kube.evidence/f'{name}-hashes.json').write_text(json.dumps(
+        {p: hashlib.sha256((ROOT/p).read_bytes()).hexdigest() for p in SOURCES + (WITNESS_SOURCES if witness else [])},
+        indent=2))
     dirs = {name: kube.evidence/name for name in ('objects', 'source-receipts', 'lifecycle-receipts',
             'verifier-receipts', 'runner-receipts', 'upload-receipts', 'staging', 'repos')}
     for directory in dirs.values():
@@ -135,14 +177,16 @@ def test_reviewed_pair_runs_in_fresh_sandbox_workspaces(kube, adapter_gateway):
                 repo, commit = capture(kube, dirs['repos'], variant)
                 snapshot = source.capture(repo, commit, uuid4())
                 workspace = OpenShellTestWorkspace(lifecycle, verifier, upload, store, snapshot, config)
-                runner = PytestRunner(workspace, execution, store, PytestRunnerConfig(PREFIX, '/tmp/corsair-junit.xml', config.remote_root))
+                runner = PytestRunner(workspace, execution, store, PytestRunnerConfig(
+                    PREFIX, '/tmp/corsair-junit.xml', config.remote_root,
+                    witness_record_path='/tmp/corsair-witness.json' if witness else None))
                 for repetition in range(REPETITIONS):
                     operation = uuid4()
                     record = dict(variant=variant, repetition=repetition+1, operation=str(operation), snapshot=plain(snapshot))
                     summary['runs'].append(record)
                     started = time.monotonic()
                     result = runner.run(patch, control_test_id=IDS[0], security_test_id=IDS[1], discovery_command=DISCOVER,
-                                        operation=operation)
+                                        operation=operation, witness=REQUEST if witness else None)
                     record.update(elapsed_seconds=time.monotonic()-started, result=plain(result))
                     assert result.workspace is not None, result.detail
                     sandboxes_absent(kube, [result.workspace.handle.name], record)
@@ -159,11 +203,26 @@ def test_reviewed_pair_runs_in_fresh_sandbox_workspaces(kube, adapter_gateway):
                     else:
                         assert security.outcome == 'passed' and result.execution.receipt.native_exit == 0
                     assert store.get(result.execution.junit) == result.execution.receipt.stdout
+                    if witness:
+                        found = witness_evidence(result.witness, REQUEST, IDS[1])
+                        record['witness'] = dict(reason=found.reason, sandbox_events=None if found.sandbox_events is None
+                                                 else [e.model_dump() for e in found.sandbox_events],
+                                                 witness=found.witness.model_dump() if found.witness else None)
+                        assert found.reason == 'admitted' and found.sandbox_events == (), found.reason
+                        observed = (found.witness.path_reached, found.witness.effect, found.witness.safe_behavior)
+                        assert observed == ((True, 'observed', None) if variant == 'vulnerable'
+                                            else (True, 'absent', 'ValueError'))
+                        witnessed.append((variant, result, found))
                     record['outcome'] = 'passed'
+            if witness:
+                gate = gate_result(witnessed, image, patch)
+                summary['gate'] = gate.model_dump()
+                assert gate.permitted.model_dump() == dict(execution='completed', finding='reproduced', fix='verified')
+                assert gate.limitations == ()
         summary['outcome'] = 'passed'
     except BaseException as error:
         summary.update(error_type=type(error).__name__, error_detail=str(error))
         raise
     finally:
         summary['staging_empty'] = not any(dirs['staging'].iterdir())
-        (kube.evidence/'test-workspace.json').write_text(json.dumps(summary, indent=2, default=str))
+        (kube.evidence/f'{name}.json').write_text(json.dumps(summary, indent=2, default=str))
