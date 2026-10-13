@@ -18,6 +18,7 @@ def collect(*names):
 
 @pytest.mark.parametrize('names, gates', [
     (('python37',), ['test_native_python37_toolchain']),
+    (('perl526',), ['test_native_perl526_toolchain']),
     (('python',), ['test_native_python_toolchain']),
     (('java', 'python'), ['test_native_java_toolchain', 'test_native_python_toolchain']),
     (('python', 'java8', 'python37'), ['test_native_java8_toolchain', 'test_native_python37_toolchain', 'test_native_python_toolchain']),
@@ -26,6 +27,13 @@ def test_named_images_select_exactly_the_gates_they_cover(names, gates):
     code, found, output = collect(*names)
     assert code == 0, output
     assert found == [GATES + gate for gate in gates]
+
+
+def test_every_prepared_image_has_exactly_its_own_gate():
+    from tests.qualification.prepare_toolchains import BASES
+    code, found, output = collect()
+    assert code == 0, output
+    assert sorted(found) == sorted(f'{GATES}test_native_{name}_toolchain' for name in BASES)
 
 
 @pytest.mark.parametrize('names, message', [
