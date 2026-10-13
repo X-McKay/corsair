@@ -22,7 +22,7 @@ Implement [SPEC-0061](../specs/SPEC-0061-perl-tap-runner.md). It needs the `perl
 - [x] Staged `tap-harness` framework row (`==1.302073`, images `[perl-5.26-make]`).
 - [ ] Al's answer on the discovery decision card (listing preload recommended and implemented).
 - [x] #65 merged (main c31997c); branch restarted from main with the runner commit.
-- [ ] Open the PR; CI green.
+- [x] Draft PR #77; CI green; review ready with two optional notes (they ride the next code push).
 - [ ] Follow-ups: environment-agent admission of `tap-harness` with its eval baseline; Dist::Zilla cases; the remaining three `Makefile.PL` cases under Docker; matrix rows after the kind gate batch.
 
 ## Validation and progress

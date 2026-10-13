@@ -228,13 +228,17 @@ def test_an_over_budget_or_timed_out_stage_closes_attributably(temporal_address,
         client, identity, direct, durable = await both(temporal_address, store, tmp_path,
                                                        stages(identification=model), budget=budget)
         assert durable.stopped_at == direct.stopped_at == "identification"
-        assert durable.reason.startswith(f"identification produced no output: {kind}: ")
-        assert direct.reason.startswith(f"identification produced no output: {kind}")
+        # Both modes end on the same typed exhaustion of the cap derived from the stage input (SPEC-0043).
+        limit = next(iter(limits))
+        assert durable.reason == direct.reason
+        assert durable.reason.startswith(f"identification budget exhausted: {limit} {limits[limit]} ")
         (attempt,) = durable.attempts
         assert attempt.failure.kind == kind and attempt.output is None
+        assert attempt.exhausted == direct.attempts[0].exhausted and attempt.exhausted.limit == limit
+        assert attempt.limits == direct.attempts[0].limits
         if kind == "UsageLimitExceeded":
             # Failed inside the child: same native exception, its usage and messages are kept.
-            assert durable.reason == direct.reason and attempt.usage.requests == direct.attempts[0].usage.requests == 1
+            assert attempt.usage.requests == direct.attempts[0].usage.requests == 1
             assert len(attempt.messages) == len(direct.attempts[0].messages)
         else:
             # The child closed on its execution timeout without returning: usage is unknown, not zero.

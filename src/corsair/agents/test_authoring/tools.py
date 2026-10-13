@@ -19,9 +19,10 @@ from corsair.ports.test_runner import (
     MAX_PATCH_FILE_BYTES, ApprovedPatch, FailureDetail, NativeTestRun, PatchFile, TestCaseResult, TestRunner,
 )
 
-from ..source.contracts import SourceExcerpt, SourceFile
-from ..source.tools import READ_SOURCE_TOOL, TOOL_RETRIES, read_saved_source, window_source_tools
-from .contracts import DevelopmentOutcome, DevelopmentRun, TestAuthoringInput, WrittenFile
+from ..source.contracts import SourceExcerpt, SourceFile, SourceLine, SourceRead
+from ..source.tools import READ_LINE_LIMIT, READ_SOURCE_TOOL, TOOL_RETRIES, read_saved_source
+from .admission import self_observation
+from .contracts import DevelopmentOutcome, DevelopmentRun, RefusedWrite, TestAuthoringInput, UnreadSource, WrittenFile
 
 WRITE_TOOL = "write_test_file"
 RUN_TOOL = "run_tests"
@@ -35,10 +36,14 @@ class AuthoringBudget:
     """Operator-owned; nothing in the prompt, plan or source can change it."""
     dev_runs: int = 3
     reveal_security_outcome: bool = False
+    # Refused writes the author may act on; the next refusal ends the stage blocked at admission.
+    admission_refusals: int = 1
 
     def __post_init__(self):
         if type(self.dev_runs) is not int or not 1 <= self.dev_runs <= 5:
             raise ValueError("development run budget outside the admitted range 1..5")
+        if type(self.admission_refusals) is not int or not 0 <= self.admission_refusals <= 2:
+            raise ValueError("admission refusal budget outside the admitted range 0..2")
 
 
 @dataclass(frozen=True)
@@ -65,13 +70,27 @@ def _successful(ctx: RunContext, tool_name: str) -> list[tuple[ToolCallPart, Too
             and part.outcome == "success" and part.tool_call_id in calls]
 
 
+def _refused(content) -> bool:
+    status = content.get("status") if isinstance(content, dict) else getattr(content, "status", None)
+    return status == "refused"
+
+
 def current_files(ctx: RunContext) -> dict[str, str]:
-    """Latest successfully written content per approved path in this run."""
+    """Latest admitted content per approved path in this run; a refused write leaves the previous content."""
     files: dict[str, str] = {}
-    for call, _ in _successful(ctx, WRITE_TOOL):
-        args = call.args_as_dict()
-        files[args["path"]] = args["content"]
+    for call, ret in _successful(ctx, WRITE_TOOL):
+        if not _refused(ret.content):
+            args = call.args_as_dict()
+            files[args["path"]] = args["content"]
     return files
+
+
+def refused_writes(ctx: RunContext) -> list[RefusedWrite]:
+    return [RefusedWrite.model_validate(ret.content) for _, ret in _successful(ctx, WRITE_TOOL) if _refused(ret.content)]
+
+
+def admission_spent(ctx: RunContext[AuthoringDependencies]) -> bool:
+    return len(refused_writes(ctx)) > ctx.deps.budget.admission_refusals
 
 
 def development_runs(ctx: RunContext) -> list[DevelopmentRun]:
@@ -89,8 +108,11 @@ async def while_edits_can_help(ctx: RunContext[AuthoringDependencies], tool: Too
     """Hide writes and runs once no test edit can change the outcome, leaving only the output contract.
 
     After a workspace failure the tests never ran, so a rewrite cannot address it and another run would
-    blindly retry the refusal; once the run budget is spent, further writes could not be verified.
+    blindly retry the refusal; once the run budget is spent, further writes could not be verified; once the
+    admission refusals are spent, the stage ends blocked at admission.
     """
+    if admission_spent(ctx):
+        return None
     executed = [run for run in development_runs(ctx) if run.status != "not_run"]
     if executed and executed[-1].status == "workspace_failure":
         return None
@@ -144,13 +166,24 @@ def authoring_tools() -> FunctionToolset[AuthoringDependencies]:
     @tools.tool(name=WRITE_TOOL, retries=TOOL_RETRIES, prepare=while_edits_can_help)
     async def write_test_file(ctx: RunContext[AuthoringDependencies],
                               path: Annotated[str, Field(description="One of the approved test paths, exactly as given")],
-                              content: Annotated[str, Field(description="Complete new file content; replaces any earlier write of this path")]) -> WrittenFile:
-        """Write one complete test file into the patch. Only approved test paths are accepted; application source and test configuration are never writable."""
+                              content: Annotated[str, Field(description="Complete new file content; replaces any earlier write of this path")]) -> WrittenFile | RefusedWrite:
+        """Write one complete test file into the patch. Only approved test paths are accepted; application source and test configuration are never writable.
+
+        Test code that installs audit hooks, monitoring, tracing or profiling, raises audit events, or patches file, process, network or import facilities is refused: the operator witness observes the target, and a refused write leaves the file unchanged."""
         if path not in ctx.deps.inputs.environment.approved_test_paths:
             raise ModelRetry(f"{path} is not an approved test path")
         data = content.encode()
         if len(data) > MAX_PATCH_FILE_BYTES:
             raise ModelRetry(f"test file exceeds {MAX_PATCH_FILE_BYTES} bytes")
+        findings = self_observation(content)
+        if findings:
+            left = max(ctx.deps.budget.admission_refusals - len(refused_writes(ctx)), 0)
+            return RefusedWrite(status="refused", path=path, findings=findings[:32], refusals_left=left, reason=(
+                "Refused: test code must not observe, forge or replace what the operator witness observes ("
+                + "; ".join(f"line {f.line}: {f.facility}" for f in findings[:8]) + "). The operator witness already "
+                "records the target's calls, raised exceptions and file opens; remove these constructs and assert only "
+                "the planned required behavior. The file keeps its previous content. "
+                + ("Another refusal ends this stage blocked." if left else "This stage now ends blocked at admission.")))
         return WrittenFile(path=path, sha256=sha256(data).hexdigest(), size=len(data))
 
     @tools.tool(name=RUN_TOOL, retries=TOOL_RETRIES, sequential=True, prepare=while_edits_can_help)
@@ -196,9 +229,52 @@ def authoring_tools() -> FunctionToolset[AuthoringDependencies]:
     return tools
 
 
-def source_tools() -> FunctionToolset:
-    return window_source_tools(SOURCE_TOOLSET_ID)
+def readable_files(ctx: RunContext[AuthoringDependencies]) -> dict[str, str]:
+    """Saved source plus this run's admitted test writes; a written test path shows its latest admitted content."""
+    return {item.path: item.content for item in ctx.deps.source_files} | current_files(ctx)
 
 
-__all__ = ["READ_SOURCE_TOOL", "RUN_TOOL", "WRITE_TOOL", "AuthoringBudget", "AuthoringDependencies",
-           "approved_patch", "authoring_tools", "current_files", "development_runs", "source_tools", "summarize"]
+def source_tools() -> FunctionToolset[AuthoringDependencies]:
+    """Bounded windows over saved source and the author's own written tests.
+
+    Unlike the shared reader, an absent path or a start past the end is a typed answer, not a ModelRetry: with
+    no tool retries a ModelRetry ends the stage, and live authors re-read their own test file after a
+    collection error (PLAN-0048 write-only run: 10 of 14 failures).
+    """
+    tools = FunctionToolset[AuthoringDependencies](id=SOURCE_TOOLSET_ID)
+
+    @tools.tool(name=READ_SOURCE_TOOL, retries=TOOL_RETRIES)
+    async def read_source(ctx: RunContext[AuthoringDependencies],
+                          path: Annotated[str, Field(description="A saved path as listed in the inventory, or an approved test path you have written")],
+                          start_line: Annotated[int, Field(ge=1, description="First line, default 1; use the returned end_line plus one for the next window")] = 1) -> SourceRead | UnreadSource:
+        """Read up to 80 lines from start_line of a saved source file or of a test file you wrote, stopping at the actual end of file.
+
+        A written test path returns your latest admitted write, not the saved source. Returned numbered lines are the only coordinates that can authorize a citation.
+        """
+        files = readable_files(ctx)
+        written = sorted(current_files(ctx))
+        content = files.get(path)
+        if content is None:
+            approved = ctx.deps.inputs.environment.approved_test_paths
+            hint = (f"{path} is an approved test path you have not written yet; write_test_file creates it"
+                    if path in approved else f"{path} is neither in the saved source nor a test file you wrote")
+            return UnreadSource(status="not_in_source", path=path[:256], reason=(
+                f"{hint}. Readable: the saved paths in the inventory and your written test files "
+                f"({', '.join(written) or 'none yet'}). run_tests already reports collection and compile errors "
+                "with file and line; to change a test file, write it again in full with write_test_file.")[:4096])
+        lines = content.splitlines()
+        if start_line > len(lines):
+            return UnreadSource(status="past_end", path=path, reason=(
+                f"{path} has {len(lines)} lines; start_line {start_line} is past its end. "
+                + ("Read from line 1." if lines else "The file is empty.")))
+        end_line = min(start_line + READ_LINE_LIMIT - 1, len(lines))
+        return SourceRead(path=path, start_line=start_line, end_line=end_line,
+                          lines=tuple(SourceLine(number=number, text=lines[number - 1])
+                                      for number in range(start_line, end_line + 1)))
+
+    return tools
+
+
+__all__ = ["READ_SOURCE_TOOL", "RUN_TOOL", "WRITE_TOOL", "AuthoringBudget", "AuthoringDependencies", "admission_spent",
+           "approved_patch", "authoring_tools", "current_files", "development_runs", "readable_files", "refused_writes", "source_tools",
+           "summarize"]
