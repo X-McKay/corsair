@@ -33,8 +33,11 @@ The user asked on 2026-10-13 to continue until Corsair can test all of its examp
 | G12 Environment agent unconnected | `ReadyEnvironment` has no mapping to the chain's `EnvironmentEvidence`; identity declared, not observed | all (operator evidence allowed for bring-up) | medium | yes |
 | G13 Limits sized for the fixture | execution ≤300 s / 1 MiB (`ports/execution.py`); durable revision 10 min (`workflows/chain.py`); stage caps ≤24 calls (`composition/direct.py`) | larger builds | small edits, each re-qualified | yes |
 | G14 Other | durable chain not yet run on OpenShell (HANDOFF-0055); ISSUE-0007 limits live-quality claims; Vul4Py/SecBench.js tests cannot be copied in without a license; prove emits TAP | various | — | — |
+| G15 No automatic toolchain, runtime or framework resolution | one image per language (Python 3.12, Java 17); JUnit 5 only in the environment agent table (`agents/environment/frameworks.py`); Vul4J needs Java 8/11, older CPython likely; nothing reads a case's own build metadata to choose versions | every case whose versions differ from the single pinned image | large | yes, per runtime in the matrix |
 
 ## Proposal and limits
+
+**Target (Al, 2026-10-13):** the system handles any language, CWE, version and runtime automatically, including multiple JUnit, Java and Python versions, without per-case overrides or one pinned image per language. Every step below is built to that target: toolchain and framework choices are derived from the case's own build files (Maven/Gradle POMs and wrappers, `pyproject.toml`/`setup.cfg`/requirements/poetry metadata, `package.json` engines, gemspecs/Gemfile, cpanfile), resolved against an operator-owned, qualified runtime matrix of sandbox images, and recorded as observed environment evidence. A case whose requirement falls outside the qualified matrix is reported `unsupported` with the missing runtime named, never run on a substitute. Per-language and per-framework code exists only where formats genuinely differ (report parsing, test identity), behind one table per framework family.
 
 Recommended order, each step measurable across all 50 cases once step 1 exists:
 
@@ -42,14 +45,15 @@ Recommended order, each step measurable across all 50 cases once step 1 exists:
 2. **Host acquisition (G2c)**: a bounded bare-repository fetch of exact commits over HTTPS from github.com, `fsck --strict`, then `GitSource` capture for every resolvable case, recording sizes and which exceed the capture ceilings.
 3. **Repository-scale source access (G2b)**: a store-backed reader with bounded list and search tools replacing the 16-file inline inventory in all four agent stages; existing evals must not regress.
 4. **Storage, then a fetch-based test workspace (G1, G3)** per SPEC-0036 and SPEC-0025, qualified on JSPWiki and one Python case.
-5. **Java runner (G6, G8)**: framework-specific test identity (the environment agent's `junit5` table is the second consumer), Surefire report parsing and Java assertion lines, then the frozen JSPWiki draft as the first real E2E-2 with operator-supplied environment evidence.
-6. **Python and Java setup and images (G4, G5)**, then the environment agent (G12), limit re-qualification (G13) and a durable rerun (G14).
-7. **Witness for other effect kinds (G7)**, spec first, per CWE family.
-8. **JavaScript, then Ruby and Perl**: images, SPEC-0026 inventory rows and runners (Jest JUnit reporter, minitest/rspec JUnit, TAP).
-9. **Case admission (G10)** runs in parallel throughout: neutral issues, reference oracles and three runs per variant, with human review.
+5. **Toolchain resolution and runtime matrix (G15, G5)**: read build metadata into a typed requirement (language, runtime version range, build tool, test framework and version), choose from a qualified image matrix (several Java, Python and Node versions first), and feed the environment agent and `EnvironmentEvidence`; JUnit 4/5 and pytest versions are framework-table entries, not new code paths.
+6. **Java runner (G6, G8)**: framework-specific test identity (the environment agent's `junit5` table is the second consumer), Surefire report parsing and Java assertion lines, then the frozen JSPWiki draft as the first real E2E-2 with operator-supplied environment evidence.
+7. **Python and Java setup (G4)**, then the environment agent (G12), limit re-qualification (G13) and a durable rerun (G14).
+8. **Witness for other effect kinds (G7)**, spec first, per CWE family.
+9. **JavaScript, then Ruby and Perl**: matrix entries, SPEC-0026 inventory rows and runners (Jest JUnit reporter, minitest/rspec JUnit, TAP).
+10. **Case admission (G10)** runs in parallel throughout: neutral issues, reference oracles and three runs per variant, with human review.
 
 Limits: until G7 lands, most cases can at best end `inconclusive`/`not_verified` by design, which the report must count as such rather than as failures. Licensing (G14) restricts which dataset tests may be copied; reviewed equivalents are needed for Vul4Py and SecBench.js.
 
 ## Decision
 
-Proposed. Steps 1 and the SPEC-0036 storage work start under [PLAN-0040](../plans/PLAN-0040-workspace-storage-quota.md) because neither depends on the other or on the kind cluster for offline parts; steps 2, 3 and 5 are independent offline follow-ups suitable for parallel threads.
+Proposed. Steps 1 and the SPEC-0036 storage work start under [PLAN-0040](../plans/PLAN-0040-workspace-storage-quota.md) because neither depends on the other or on the kind cluster for offline parts; steps 2, 3, 6 and the offline part of 5 (build-metadata parsing into a typed requirement) are independent follow-ups suitable for parallel threads.

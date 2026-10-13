@@ -20,15 +20,16 @@ from evals.fixture_chain.evaluate import ChainOracle
 REPOSITORY = Path(__file__).resolve().parents[2]
 INVENTORY = REPOSITORY / "benchmarks/candidate-cases.json"
 CASES = REPOSITORY / "benchmarks/cases"
-Gap = Literal["G1", "G2", "G2b", "G2c", "G3", "G4", "G5", "G6", "G7", "G8", "G9", "G10", "G11", "G12", "G13", "G14"]
+Gap = Literal["G1", "G2", "G2b", "G2c", "G3", "G4", "G5", "G6", "G7", "G8", "G9", "G10", "G11", "G12", "G13", "G14", "G15"]
 Admission = Literal["not_admitted", "admitted"]
 Outcome = Literal["passed", "failed"]
 COMMIT = re.compile(r"[0-9a-f]{40}")
 ADVISORY = re.compile(r"\bCVE-\d{4}-\d{4,}\b|\bGHSA(?:-[0-9a-z]{4}){3}\b", re.IGNORECASE)
 
 # Operator-owned defaults for rows without a manifest, from the IDEA-0005 "Blocks" column by language. G7 applies
-# until a reviewed manifest shows the effect is a file open; G13 is unknown until a build is measured; G9 blocks none.
-_COMMON = ("G1", "G2", "G2b", "G2c", "G3", "G4", "G7", "G10", "G11", "G12")
+# until a reviewed manifest shows the effect is a file open; G13 is unknown until a build is measured; G9 blocks none;
+# G15 applies until runtime and framework versions are resolved from the case's own build files.
+_COMMON = ("G1", "G2", "G2b", "G2c", "G3", "G4", "G7", "G10", "G11", "G12", "G15")
 DEFAULT_BLOCKING: dict[str, tuple[Gap, ...]] = {
     "Java": (*_COMMON, "G5", "G6", "G8"),
     "Python": (*_COMMON, "G14"),  # Vul4Py tests cannot be copied without a license
