@@ -44,7 +44,7 @@ class Suite:
 
 
 SUITES: dict[str, Suite] = {
-    "environment": Suite("evals.environment.evaluate", {"development": ()}, note="recorded observations; setup commands never execute on the host"),
+    "environment": Suite("evals.environment.evaluate", {"development": ()}, note="synthetic observations; setup commands never execute on the host"),
     "identification": Suite("evals.issue_identification.evaluate", {"development": ()}, repeat=False),
     "planning": Suite("evals.test_planning.evaluate", {
         "development": ("--cases", "development"), "heldout": ("--cases", "heldout"),
@@ -144,7 +144,7 @@ def compare(current: dict, reference: dict | None, reference_id: str | None) -> 
     lines += [f"| {name} | {clean(before, name)} | {clean(summary, name)}"
               f"{' ←' if clean(before, name) != clean(summary, name) else ''} |" for name in names]
     metric_keys = sorted(set(summary.get("efficiency_mean", {})) | set(before.get("efficiency_mean", {})))
-    lines += ["", "## Efficiency (mean per attempt)", "", "| Metric | Before | Now |", "| --- | --- | --- |"]
+    lines += ["", "## Efficiency (mean per observed sample)", "", "| Metric | Before | Now |", "| --- | --- | --- |"]
     lines += [f"| {key} | {before.get('efficiency_mean', {}).get(key, '-')} | {summary.get('efficiency_mean', {}).get(key, '-')} |"
               for key in metric_keys]
     lines += ["", "Metric means use only observed samples; absent telemetry is unknown.", ""]

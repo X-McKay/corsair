@@ -77,3 +77,5 @@ only the semantic assertion fails. This bounded wording check does not establish
 understanding. Manifest deliberately renewed; prior dataset results remain incomparable. Follow-up
 Make run16/16 clean with15 assertions each; focused71 checks passed (one SDK warning). Root reports
 full suite at prior6f35dd3 passed997 tests; follow-up changes only evaluator/fixtures/regression records.
+
+Root final review: label shared metric means as per observed sample and label the suite synthetic in command metadata. Full offline suite at6f35dd3 passed997 checks; follow-up unsupported-requirement regression and affected checks passed71. No further provider dispatch was attempted after automatic approval review blocked external fixture transfer in the planning lane.
