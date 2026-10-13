@@ -50,6 +50,33 @@ def shell(kube, namespace, pod, script, timeout=300):
     return dict(exit_code=result.returncode, stdout=result.stdout, stderr=result.stderr)
 
 
+def delete_owned_namespace(kube, namespace, uid):
+    """Delete only the namespace this run created; a failed or uncertain query never reads as deleted."""
+    cleanup = dict(namespace_deleted=False)
+    if uid is None:
+        cleanup['refused'] = 'namespace ownership unknown; no automatic deletion'
+        return cleanup
+    lookup = lambda: kube.run('get', 'namespace', namespace, '--ignore-not-found', '-o', 'json', check=False)
+    try:
+        current = lookup()
+        if current.returncode:
+            cleanup['unknown'] = f'namespace query failed ({current.returncode}); deletion not attempted'
+            return cleanup
+        if current.stdout.strip():
+            if json.loads(current.stdout)['metadata']['uid'] != uid:
+                cleanup['refused'] = 'namespace identity changed; replacement not deleted'
+                return cleanup
+            kube.run('delete', 'namespace', namespace, '--wait=true', '--timeout=180s', check=False, timeout=200)
+        after = lookup()
+        if after.returncode:
+            cleanup['unknown'] = f'namespace query after deletion failed ({after.returncode})'
+            return cleanup
+        cleanup['namespace_deleted'] = not after.stdout.strip()
+    except Exception as error:  # timeouts and uncertain delivery stay unknown, never confirmed
+        cleanup['unknown'] = f'{type(error).__name__}: {str(error)[-500:]}'
+    return cleanup
+
+
 @pytest.mark.workspace_quota
 def test_quota_class_bounds_bytes_and_inodes_and_contains_exhaustion(kube):
     require_platform(kube)
@@ -99,17 +126,7 @@ def test_quota_class_bounds_bytes_and_inodes_and_contains_exhaustion(kube):
         assert abs(record['after']['node_var_used_kib'] - record['before']['node_var_used_kib']) < NODE_DRIFT_KIB
         record['outcome'] = 'passed'
     finally:
-        cleanup = dict(namespace_deleted=False)
-        current = kube.run('get', 'namespace', namespace, '--ignore-not-found', '-o', 'json', check=False).stdout.strip()
-        if uid is None:
-            cleanup['refused'] = 'namespace ownership unknown; no automatic deletion'
-        elif current and json.loads(current)['metadata']['uid'] != uid:
-            cleanup['refused'] = 'namespace identity changed; replacement not deleted'
-        elif current:
-            kube.run('delete', 'namespace', namespace, '--wait=true', '--timeout=180s', check=False, timeout=200)
-        if uid is not None and 'refused' not in cleanup:
-            cleanup['namespace_deleted'] = not kube.run('get', 'namespace', namespace, '--ignore-not-found', '-o',
-                                                        'json', check=False).stdout.strip()
+        cleanup = delete_owned_namespace(kube, namespace, uid)
         deadline = time.monotonic() + 120
         while time.monotonic() < deadline:
             left = [pv['metadata']['name'] for pv in kube.get('pv')['items']
