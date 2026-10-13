@@ -6,7 +6,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
 
-from corsair.ports.test_runner import MAX_PATCH_FILE_BYTES, MAX_PATCH_FILES, MAX_TEST_ID, RUBY_TEST_ID, TEST_ID
+from corsair.ports.test_runner import MAX_PATCH_FILE_BYTES, MAX_PATCH_FILES, MAX_TEST_ID, RUBY_TEST_ID, TEST_ID, names_test_in
 
 from ..source.contracts import Contract, Fact, SourceFile, bounded_inventory, confined_path
 from ..test_planning.contracts import EnvironmentEvidence, ReadyTestPlan
@@ -46,7 +46,7 @@ class TestAuthoringInput(Contract):
         for spec in (self.plan.control, self.plan.security):
             if spec.test_path not in self.environment.approved_test_paths:
                 raise ValueError(f"planned test path {spec.test_path} is not approved")
-            if not spec.test_id.startswith(spec.test_path + "::"):
+            if not names_test_in(spec.test_id, spec.test_path):
                 raise ValueError(f"planned test id {spec.test_id} must be a native node id in {spec.test_path}")
             if len(spec.test_id) > MAX_TEST_ID or not AUTHORED_TEST_ID.fullmatch(spec.test_id):
                 raise ValueError(f"planned test id {spec.test_id} is not a supported native node id")

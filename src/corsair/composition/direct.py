@@ -50,6 +50,7 @@ from corsair.nodes.runtime.contracts import RuntimeInputs, RuntimeOutcome
 from corsair.nodes.runtime.environment import RuntimeCatalog, check_ready, ready_evidence, select_runtime
 from corsair.nodes.witness import Calibration, WitnessEvidence, witness_evidence
 from corsair.ports.execution import SandboxExecution
+from corsair.ports.preparation import Preparation, PreparationRefused, PreparedSandbox
 from corsair.ports.sandbox import SandboxHandle
 from corsair.ports.test_runner import ApprovedPatch, NativeTestRun, PatchFile, TestRunner, WitnessRequest
 
@@ -218,29 +219,6 @@ class SetupSource(Contract):
 
 
 @dataclass(frozen=True)
-class PreparedSandbox:
-    """A sandbox of one prepared toolchain image, live until the preparation port releases it.
-
-    ``read_source`` returns a file's bytes from the operator's capture of the revision placed in the sandbox
-    (never from the sandbox), or None when the capture has no such file; ``source_paths`` lists every file of that
-    capture (SPEC-0071: without it a smoke baseline is refused)."""
-    execution: SandboxExecution
-    handle: SandboxHandle
-    scratch_location: str
-    read_source: Callable[[str], bytes | None]
-    source_paths: Callable[[], tuple[str, ...]] | None = None
-
-
-class Preparation(Protocol):
-    """Operator-owned sandbox lifecycle for the environment stage; adapters are chosen outside the chain."""
-    def prepare(self, toolchain: Toolchain, operation: UUID, *, overlay: tuple[PatchFile, ...] = ()) -> PreparedSandbox:
-        """`overlay`: operator files (SPEC-0071 smoke tests) written beside the captured commit; an overlay path the
-        capture already has is refused before any sandbox is created."""
-        ...
-    def release(self, sandbox: PreparedSandbox, operation: UUID) -> Literal["confirmed", "unconfirmed"]: ...
-
-
-@dataclass(frozen=True)
 class CapturedReviewSource:
     """Operator-captured review files attributed to an admitted revision identity.
 
@@ -258,6 +236,7 @@ class FixtureCase:
     environment: EnvironmentEvidence
     environment_identity: EnvironmentIdentity
     # Operator-known digest of each revision's captured source; a run from any other source is refused.
+    # The revisions that run, in order: always the baseline, the candidate only when the case names a fix.
     revision_sources: dict[Literal["baseline", "candidate"], str]
     # Operator-approved probe target and planned effect file; without it no witness is requested unless
     # `witness_from_recorders` lets the environment's operator witness facilities bind one (SPEC-0073).
@@ -417,7 +396,9 @@ async def prepare_environment(inputs: EnvironmentInput, model: Model | None, pre
         sandbox = await asyncio.to_thread(partial(preparation.prepare, overlay=overlay), selected, operation)
     except Exception as exc:
         # Nothing was handed back to release; whether a sandbox exists is the adapter's to report.
-        return StageAttempt("environment", None, None, (), perf_counter() - started, exc, limits, cleanup="unconfirmed")
+        left = exc.cleanup if isinstance(exc, PreparationRefused) else "unconfirmed"
+        return StageAttempt("environment", None, None, (), perf_counter() - started, exc, limits,
+                            cleanup=None if left == "not_required" else left)
     try:
         agent = AGENTS["environment"](model, output_retries=budget.output_retries)
         deps = EnvironmentDependencies(inputs=inputs, execution=sandbox.execution, handle=sandbox.handle,
@@ -713,6 +694,8 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
                     patch=patch)
     executions = []
     for revision in ("baseline", "candidate"):
+        if revision not in case.revision_sources:
+            continue  # No fix commit: only the reported revision runs and the gate leaves the fix not_applicable
         operation, observed, failure = new_operation(), None, None
         report(lambda: RevisionStarted(revision))
         try:
@@ -740,7 +723,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
     if problems:
         return stop("execution", "; ".join(problems)[:2048], **done)
 
-    ready("execution", lambda: "both revisions ran")
+    ready("execution", lambda: "both revisions ran" if len(executions) == 2 else "reported revision ran")
     runs = {e.revision: (e.observed,) for e in executions}
     # SPEC-0040: an absence counts as the planned safe behavior on either revision only when the plan's control
     # witness is observed in the same run, so an uncalibrated baseline absence is never not_reproduced.
@@ -766,7 +749,8 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         found = witnesses[revision]
         return run_evidence(runs[revision][0], environment=identity, witness=found.witness,
                             sandbox_events=found.sandbox_events, test_validity=validity.get(revision))
-    evidence = AssessmentEvidence(plan=expected, baseline=(gate_run("baseline"),), candidate=(gate_run("candidate"),))
+    evidence = AssessmentEvidence(plan=expected, baseline=(gate_run("baseline"),),
+                                  candidate=(gate_run("candidate"),) if "candidate" in runs else ())
     gate = assess(evidence)
     observation_limits = (UNOBSERVED[:2] if request is not None else (
         "Unit tests validate the stated property at the reviewed seam; external service and deployment behavior "

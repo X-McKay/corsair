@@ -34,7 +34,7 @@ def unit_planner():
     return FunctionModel(respond)
 
 
-def unit_assessor(seen, candidate=True):
+def unit_assessor(seen, candidate=True, fix_applicable=True):
     async def respond(messages, info):
         prompt = next(p.content for m in messages for p in m.parts if p.part_kind == "user-prompt")
         items = [m.groupdict() for m in INVENTORY.finditer(prompt)]
@@ -51,7 +51,7 @@ def unit_assessor(seen, candidate=True):
                     "rationale": {"statement": "Frozen tests call the saved implementation and assert the reported property", "citations": [cite(i) for i in selected]}}
         receipts = [cite(i) for i in items if i["kind"] == "receipt"]
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {
-            "execution": "completed", "finding": "reproduced", "fix": "verified" if candidate else "not_verified",
+            "execution": "completed", "finding": "reproduced", "fix": ("verified" if candidate else "not_verified") if fix_applicable else "not_applicable",
             "application_observations": [], "sandbox_observations": [],
             "interpretation": {"statement": "Planned assertion fails on baseline and passes on candidate", "citations": receipts},
             "limitations": ["Only the reviewed component property is established"],
@@ -60,11 +60,13 @@ def unit_assessor(seen, candidate=True):
     return FunctionModel(respond)
 
 
-@pytest.mark.parametrize("candidate_source", ["present", "missing", "wrong_identity"])
+@pytest.mark.parametrize("candidate_source", ["present", "missing", "wrong_identity", "no_candidate"])
 def test_composition_uses_independent_unit_reviews_for_final_gate(store, tmp_path, candidate_source):
     case = fixture_case()
+    if candidate_source == "no_candidate":
+        case = replace(case, revision_sources={"baseline": case.revision_sources["baseline"]})
     sources = {"baseline": CapturedReviewSource(case.revision_sources["baseline"], case.issue.source_files)}
-    if candidate_source != "missing":
+    if candidate_source not in ("missing", "no_candidate"):
         sources["candidate"] = CapturedReviewSource(
             case.revision_sources["candidate"] if candidate_source == "present" else "0" * 64,
             (SourceFile(path="documents.py", content=(FIXTURE / CASES["exploitable"]["candidate"] / "documents.py").read_text()),))
@@ -80,7 +82,7 @@ def test_composition_uses_independent_unit_reviews_for_final_gate(store, tmp_pat
             requested.append(witness)
             return self.runner.run(patch, witness=witness, **kwargs)
     with models.override_allow_model_requests(False):
-        result = asyncio.run(run_direct(case, stages(planning=unit_planner(), assessment=unit_assessor(seen, candidate_available)),
+        result = asyncio.run(run_direct(case, stages(planning=unit_planner(), assessment=unit_assessor(seen, candidate_available, candidate_source != "no_candidate")),
                                         lambda purpose: CheckingRunner(runners(purpose))))
     assert result.reason == "complete", result.reason
     assert requested and all(w is None for w in requested)
@@ -88,11 +90,16 @@ def test_composition_uses_independent_unit_reviews_for_final_gate(store, tmp_pat
     assert all(e.observed.patch_sha256 == result.patch.patch_sha256 for e in result.executions)
     assert result.gate == result.assessment.gate_result
     assert result.gate.permitted.finding == "reproduced"
-    assert result.gate.permitted.fix == ("verified" if candidate_available else "not_verified")
+    assert result.gate.permitted.fix == ("not_applicable" if candidate_source == "no_candidate" else
+                                         "verified" if candidate_available else "not_verified")
     assert len(result.assessment.validity_reviews) == (2 if candidate_available else 1)
     assert {i["revision"] for i in seen if i["kind"] == "source"} == ({"baseline", "candidate"} if candidate_available else {"baseline"})
     assert result.assessment.evidence.baseline[0].test_validity is not None
-    assert (result.assessment.evidence.candidate[0].test_validity is not None) == candidate_available
+    if candidate_source == "no_candidate":
+        assert not result.assessment.evidence.candidate
+        assert len(result.executions) == 1
+    else:
+        assert (result.assessment.evidence.candidate[0].test_validity is not None) == candidate_available
 
 
 def test_captured_review_sources_roundtrip_in_durable_chain_request():

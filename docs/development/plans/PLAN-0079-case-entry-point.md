@@ -68,8 +68,13 @@ stages reached per cohort. Esprima stays for JavaScript assertion lines (Al kept
 - [ ] Witness envelope: `build` sets none, so the chain requests no witness on this route (an operator-approved
   envelope is fixture-only today).
 - [ ] Baseline test in the planner's saved inventory (finding below); chain thread's call.
-- [ ] `--issue github:owner/repo#N | azure:org/project#N` through the existing ticket readers; ticket-source list.
-- [ ] Ref resolution (branch or default branch to a commit) and vulnerable-only runs (no fixed commit).
+- [x] `--id github:owner/repo#N | azure:org/project#N` (make `ID=`) through the existing ticket readers; a GitHub
+  issue defaults to its own repository, Azure DevOps also needs `--repository`. The provider configuration's
+  `tickets` source is the allowlist: an id naming any other source is refused before any request.
+- [x] Fix-free runs (Al, 2026-10-13, "Allow fix-free runs"): a request without `fixed_revision` is admitted; only the
+  reported revision is acquired, set up and run, the gate leaves the fix `not_applicable` (SPEC-0027's gate already
+  does with no candidate runs), the label follows the finding as before, and the eval match is unchanged.
+- [ ] Ref resolution (branch or default branch to a commit).
 - [ ] Ruby (Minitest), Maven (JUnit) and pytest image-only entries from their threads; operator smoke test.
 - [ ] First live cohort when the model is free and Al says go.
 
@@ -109,3 +114,7 @@ environment stage can only confirm that framework, since its own admission and `
 Images stay plain pinned upstream runtimes; per-framework facts live in the one table. Next: the chain thread decides
 how the admitted baseline test reaches the planner's inventory; then the issue-id path and the other frameworks'
 image-only entries, and a live `jest` cohort on Al's go.
+
+Fix-free runs (Al, 2026-10-13): a missing fix commit is no longer an UNABLE_TO_RUN admission stop. The reported
+revision alone decides the finding; no fix is claimed either way, so `fix` is `not_applicable` in the gate, the
+assessment's admitted disposition and the record.

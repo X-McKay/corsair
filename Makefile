@@ -36,10 +36,13 @@ eval:
 eval-baseline:
 	uv run --locked python -m evals.run "$(AGENT)" --promote "$(RUN)"
 
-# A wrapper for `uv run corsair run`: one issue end to end from a corsair-issue-request/v1 file; prepared local
+# A wrapper for `uv run corsair run`: one issue end to end from ISSUE_JSON=<corsair-issue-request/v1 file>, or
+# ID=github:owner/repo#N (or azure:org/project#N with REPOSITORY=) with REVISION= and FIXED_REVISION=; prepared local
 # images from CORSAIR_IMAGES. Extra flags (--repository-host, --local-root) go in INVESTIGATE_ARGS.
 investigate:
-	uv run --locked corsair run --issue-json "$(ISSUE_JSON)" --provider-config "$(PROVIDER_CONFIG)" $(INVESTIGATE_ARGS)
+	uv run --locked corsair run $(if $(ID),--id "$(ID)",--issue-json "$(ISSUE_JSON)") \
+		$(if $(REPOSITORY),--repository "$(REPOSITORY)") $(if $(REVISION),--revision "$(REVISION)") \
+		$(if $(FIXED_REVISION),--fixed-revision "$(FIXED_REVISION)") --provider-config "$(PROVIDER_CONFIG)" $(INVESTIGATE_ARGS)
 
 # One benchmark case through `investigate` for diagnosis, never a baseline (evals/case_e2e); cohorts use
 # `make eval AGENT=chain SET=<cohort>`. Needs CORSAIR_CASE_SOURCES and CORSAIR_IMAGES.
@@ -234,6 +237,23 @@ qualify-python37-case:
 	mkdir -p "$(CORSAIR_QUAL_RUN)"
 	PYTHONPATH="$(CURDIR)/src:$(CURDIR)" uv run --locked python -m evals.benchmark.sources fetch --run-dir "$(CORSAIR_QUAL_RUN)-sources" --cases CVE-2021-32839 --keep --pins "$(CORSAIR_QUAL_RUN)-sources/source-pins.json"
 	CORSAIR_CASE_SOURCES="$(CORSAIR_QUAL_RUN)-sources" uv run --locked python -m pytest $(PYTEST_ROOT) tests/qualification -m python37_case --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
+
+# SPEC-0070 static workspace verifier, uploaded into every sandbox so no image needs an interpreter. Built with the
+# Go toolchain pinned in its go.mod (GOTOOLCHAIN fetches it if the host has another) and checked against the
+# committed digest, which the adapters pin.
+VERIFIER_GO := go1.24.7
+.PHONY: workspace-verifier
+workspace-verifier:
+	mkdir -p .state/tools
+	cd tools/workspace-verify && CGO_ENABLED=0 GOTOOLCHAIN=$(VERIFIER_GO) go build -trimpath -buildvcs=false -ldflags=-buildid= -o $(CURDIR)/.state/tools/workspace-verify .
+	cd .state/tools && sha256sum -c $(CURDIR)/tools/workspace-verify/workspace-verify.sha256
+
+.PHONY: qualify-environment-preparation
+# SPEC-0070: the chain's environment stage in an OpenShellPreparation sandbox (scripted model) and an operator sweep.
+qualify-environment-preparation: workspace-verifier
+	test ! -e "$(CORSAIR_QUAL_RUN)"
+	mkdir -p "$(CORSAIR_QUAL_RUN)"
+	uv run --locked python -m pytest $(PYTEST_ROOT) tests/qualification -m environment_preparation --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
 
 .PHONY: qualify-witness
 qualify-witness:

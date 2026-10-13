@@ -192,6 +192,27 @@ def test_contract_checks_environment_only_with_run_context_and_always_checks_ids
         ReadyTestPlanDraft.model_validate(edit(("security", "test_id"), "test_documents.py::test_benign_control"))
 
 
+@pytest.mark.parametrize("path,other,native", [
+    # The approved files are exact names in each runner's own layout; a planned id must name a test inside its path.
+    ("tests/test_traversal.py", "tests/test_other.py", lambda p, n: f"{p}::{n}"),
+    ("test/traversal_test.rb", "test/other_test.rb", lambda p, n: f"{p}::TraversalTest#{n}"),
+    ("__tests__/traversal.test.js", "__tests__/other.test.js", lambda p, n: f"{p}::{n}"),
+    ("t/traversal.t", "t/other.t", lambda p, n: f"{p}#{n}"),
+    ("core/src/test/java/org/example/TraversalTest.java", "core/src/test/java/org/example/OtherTest.java",
+     lambda p, n: f"core/org.example.{p.rsplit('/', 1)[1].removesuffix('.java')}#{n}"),
+])
+def test_planned_ids_must_name_a_test_in_their_approved_file(path, other, native):
+    environment = case().inputs.environment.model_copy(update={"approved_test_paths": (path, other)})
+    inputs = case().inputs.model_copy(update={"environment": environment})
+    plan = reference()
+    for name in ("control", "security"):
+        plan[name].update(test_path=path, test_id=native(path, f"test_{name}"))
+    ReadyTestPlanDraft.model_validate(plan, context=inputs)
+    plan["security"]["test_id"] = native(other, "test_security")
+    with pytest.raises(ValidationError, match="does not name a test in its test path"):
+        ReadyTestPlanDraft.model_validate(plan, context=inputs)
+
+
 def test_previous_run_reads_do_not_authorize_citations():
     c = case()
     prior = run(create_test_planning_agent(responding(reference())), c.inputs)
