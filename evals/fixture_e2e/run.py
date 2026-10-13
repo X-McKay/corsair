@@ -24,7 +24,9 @@ from pydantic_ai.usage import RunUsage
 from corsair.adapters.local_artifacts import LocalArtifacts
 from corsair.agents.evidence_assessment import agent as assessment
 from corsair.agents.issue_identification import agent as identification
-from corsair.agents.provider import LocalModelConfig, local_model
+from corsair.agents.provider import LocalModelConfig
+from corsair.inference.config import InferenceConfig, inference_config, load_inference
+from corsair.inference.models import configured_model, preflight
 from corsair.agents.test_authoring import agent as authoring
 from corsair.agents.test_authoring.skills import SKILL_SHA256 as AUTHORING_SKILL
 from corsair.agents.test_planning import agent as planning
@@ -52,12 +54,15 @@ VERSIONS = {
 PROFILE_FIELDS = {"response_token_limit", "thinking_mode", "thinking_token_budget", "timeout_seconds"}
 
 
-def stage_configs(base: LocalModelConfig, profiles: dict) -> dict[str, LocalModelConfig]:
+def stage_configs(base: LocalModelConfig | InferenceConfig, profiles: dict, stages=STAGES) -> dict:
     """Each stage's provider configuration: the base with that stage's profile fields, revalidated."""
     if not isinstance(profiles, dict) or set(profiles) - set(STAGES) or any(
             not isinstance(fields, dict) or set(fields) - PROFILE_FIELDS for fields in profiles.values()):
         raise ValueError(f"stage profiles map stages {STAGES} to fields {sorted(PROFILE_FIELDS)}")
-    return {stage: LocalModelConfig.model_validate(base.model_dump() | profiles.get(stage, {})) for stage in STAGES}
+    resolved = ({stage: base for stage in stages} if isinstance(base, LocalModelConfig)
+                else {stage: inference_config(base).resolve(stage) for stage in stages})
+    return {stage: type(profile).model_validate(profile.model_dump() | profiles.get(stage, {}))
+            for stage, profile in resolved.items()}
 
 
 def encode(value):
@@ -157,7 +162,7 @@ def attempt_record(attempt) -> dict:
             "messages": TypeAdapter(list[ModelMessage]).dump_python(list(attempt.messages), mode="json")}
 
 
-async def record_run(evidence: Path, live: tuple[str, ...], config: LocalModelConfig | None, case: FixtureCase,
+async def record_run(evidence: Path, live: tuple[str, ...], config: LocalModelConfig | InferenceConfig | None, case: FixtureCase,
                      runners, runner: dict, profiles: dict | None = None, drain_seconds: float = 900) -> DirectRun:
     """Run one composition into an existing private evidence directory and keep every receipt.
 
@@ -166,11 +171,13 @@ async def record_run(evidence: Path, live: tuple[str, ...], config: LocalModelCo
     """
     logfire.configure(send_to_logfire=False, console=False)
     async with AsyncExitStack() as stack:
-        configs = stage_configs(config, profiles or {}) if live else {}
+        configs = stage_configs(config, profiles or {}, live) if live else {}
+        for profile in configs.values():
+            preflight(profile)
         models = {}
         for stage in live:
             if configs[stage] not in models:
-                models[configs[stage]] = await stack.enter_async_context(local_model(configs[stage]))
+                models[configs[stage]] = await stack.enter_async_context(configured_model(configs[stage]))
         scripted = SCRIPTED | {"planning": lambda: scripted_planning(case.environment.discovery_command)}
         selected = {stage: models[configs[stage]] if stage in live else scripted[stage]() for stage in STAGES}
         budget = CompositionBudget()
@@ -202,7 +209,7 @@ async def record_run(evidence: Path, live: tuple[str, ...], config: LocalModelCo
     return run
 
 
-async def main_async(evidence: Path, live: tuple[str, ...], config: LocalModelConfig | None,
+async def main_async(evidence: Path, live: tuple[str, ...], config: LocalModelConfig | InferenceConfig | None,
                      profiles: dict | None = None) -> DirectRun:
     """Reviewed host workspace: only the reviewed SPEC-0018 test bytes execute."""
     evidence.mkdir(parents=True, exist_ok=False)
@@ -231,7 +238,7 @@ def summary(run: DirectRun) -> dict:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence", type=Path, required=True)
-    parser.add_argument("--provider-config", type=Path, help="Explicit LocalModelConfig JSON; required with --live")
+    parser.add_argument("--provider-config", type=Path, help="Per-agent provider JSON (or legacy LocalModelConfig); required with --live")
     parser.add_argument("--stage-profiles", type=Path,
                         help="Optional JSON of per-stage request controls layered on --provider-config")
     parser.add_argument("--live", default="", help=f"Comma-separated stages to run on the provider: {','.join(STAGES)}")
@@ -241,13 +248,13 @@ def main():
         parser.error("--live names unknown stages or lacks --provider-config")
     if args.evidence.exists() or args.evidence.is_symlink():
         parser.error("evidence directory already exists")
-    config = LocalModelConfig.model_validate_json(args.provider_config.read_bytes()) if args.provider_config else None
+    config = load_inference(args.provider_config) if args.provider_config else None
     profiles = json.loads(args.stage_profiles.read_bytes()) if args.stage_profiles else None
     if profiles is not None:
         if config is None:
             parser.error("--stage-profiles needs --provider-config")
         try:
-            stage_configs(config, profiles)
+            stage_configs(config, profiles, live)
         except ValueError as exc:
             parser.error(str(exc))
     run = asyncio.run(main_async(args.evidence, live, config, profiles))

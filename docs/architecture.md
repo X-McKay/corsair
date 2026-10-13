@@ -49,8 +49,8 @@ Environment readiness requires a relevant build and a discovered, executed basel
 | Port | Contract | First implementation and extension |
 | --- | --- | --- |
 | Sandbox | Lifecycle, files, command results, boundary observations, cleanup | OpenShell SDK; fixture/local execution for development; another qualified backend later |
-| Model selection | Supply a configured PydanticAI model and capability requirements | Native local OpenAI-compatible provider or native Bedrock provider |
-| Issue | Immutable finding and discussion snapshot | Supported GitHub client; Azure DevOps work-item adapter later |
+| Model selection | Supply a configured PydanticAI model and capability requirements | Per-agent named profiles: native vLLM, OpenAI-compatible Chat Completions or Bedrock Converse |
+| Issue | Immutable finding and discussion snapshot | Read-only GitHub issues and Azure DevOps Services work-item REST adapters |
 | Source | Resolve and acquire an exact source identity | Git acquisition without executing repository hooks |
 | Artifacts | Store/read immutable objects by authorized reference and digest | Standard filesystem on persistent storage; object-storage SDK later |
 
@@ -101,3 +101,5 @@ Use PydanticAI for loops, outputs, limits, providers, overrides, and instrumenta
 Application-specific code is limited to stage contracts, restricted domain tools, evidence interpretation/gates, SDK translation, and composition. Do not build another scheduler, tracing system, provider protocol, credential broker, generic graph engine, or agent simulator. Additional agents, services, repair loops, or shared state require a concrete failing case, named owner, and measured benefit.
 
 Use explicit Temporal transitions as the graph execution authority. Adding a graph library is unnecessary unless it improves implementation without duplicating durable state or scheduling.
+
+Provider composition and current limits: [configuration runbook](runbooks/provider-configuration.md).

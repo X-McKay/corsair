@@ -1,6 +1,6 @@
 """One command per agent: run its eval suite on the host and file the result for comparison (SPEC-0044).
 
-    make eval AGENT=planning [SET=heldout3] [PROVIDER_CONFIG=<LocalModelConfig.json>] [REPEAT=3] [NOTE=...]
+    make eval AGENT=planning [SET=heldout3] [PROVIDER_CONFIG=<providers.json>] [REPEAT=3] [NOTE=...]
     make eval-baseline AGENT=planning RUN=<run id>
 
 Each suite keeps its own CLI and native report; this wrapper only chooses an evidence directory, runs the
@@ -48,8 +48,8 @@ SUITES: dict[str, Suite] = {
     "environment": Suite("evals.environment.evaluate", {"development": ()}, note="synthetic observations; setup commands never execute on the host"),
     "identification": Suite("evals.issue_identification.evaluate", {"development": ()}, repeat=False),
     "planning": Suite("evals.test_planning.evaluate", {
-        "development": ("--cases", "development"), "heldout": ("--cases", "heldout"),
-        "heldout2": ("--cases", "heldout2"), "heldout3": ("--cases", "heldout3")}),
+        # heldout and heldout2 are retired (SPEC-0040); the suite refuses them, so they are not offered here.
+        "development": ("--cases", "development"), "heldout3": ("--cases", "heldout3")}),
     "authoring": Suite("evals.test_authoring.evaluate", {"development": ()},
                        note="runs answered by injected observations or the static host runner; tests are not executed"),
     "assessment": Suite("evals.evidence_assessment.evaluate", {
@@ -238,7 +238,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("agent", choices=agents)
     parser.add_argument("--set", dest="set_name", help="Case set; defaults to the suite's first set")
-    parser.add_argument("--provider-config", type=Path, help="Explicit LocalModelConfig JSON; omitted means scripted")
+    parser.add_argument("--provider-config", type=Path, help="Per-agent provider JSON (or legacy LocalModelConfig); omitted means scripted")
     parser.add_argument("--repeat", type=int)
     parser.add_argument("--note", default="", help="Free text recorded with the run, e.g. what changed")
     parser.add_argument("--promote", metavar="RUN", help="Make RUN the baseline for its set and mode instead of running")

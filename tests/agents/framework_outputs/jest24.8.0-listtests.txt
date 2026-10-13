@@ -1,0 +1,5 @@
+/tmp/w/native.test.js
+/tmp/w/test/ok.test.js
+/tmp/w/test/skip.test.js
+/tmp/w/test/fail.test.js
+/tmp/w/test/todo.test.js

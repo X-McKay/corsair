@@ -28,7 +28,8 @@ from temporalio.client import Client
 from corsair.adapters.local_artifacts import LocalArtifacts
 from corsair.adapters.pytest_runner import PytestRunner, PytestRunnerConfig
 from corsair.agents.issue_analysis.contracts import IssueAnalysisInput
-from corsair.agents.provider import LocalModelConfig, local_model
+from corsair.inference.config import InferenceConfig, inference_config, load_inference
+from corsair.inference.models import agent_models
 from corsair.agents.source.contracts import SourceFile
 from corsair.composition.direct import CompositionBudget, DirectRun, FixtureCase, Stage, StageModels, run_direct
 from corsair.core.disposition import Disposition
@@ -176,19 +177,23 @@ def input_key(inputs: ChainInput) -> str:
 
 
 async def evaluate(evidence: Path, budget: CompositionBudget = CompositionBudget(), *, mode: str = "direct",
-                   run=run_direct, live: tuple[str, ...] = (), model=None, config: LocalModelConfig | None = None,
+                   run=run_direct, live: tuple[str, ...] = (), model=None, config: InferenceConfig | None = None,
                    repeat: int = 1):
     """``run`` is the composition coroutine, ``run(case, models, runners, budget) -> DirectRun``; ``model`` serves
     the stages named in ``live``."""
     if set(live) - set(STAGES) or bool(live) != (model is not None):
         raise ValueError("live stages need a provider model and only known stage names")
+    if isinstance(model, dict) and set(model) != set(live):
+        raise ValueError("model mapping must exactly match live stages")
     evidence.mkdir(parents=True, exist_ok=False)
     logfire.configure(send_to_logfire=False, console=False)
     corpus = dataset()
     stages = {input_key(case.inputs): (case.inputs, case.metadata) for case in corpus.cases}
     metadata = {"mode": mode, "composition": f"{run.__module__}.{run.__qualname__}", "live_stages": list(live),
                 "budget": budget.model_dump(), "provider": config.model_dump() if config else None,
-                "model": describe_model(model) if model is not None else "scripted",
+                "model": ({stage: describe_model(model[stage]) for stage in live} if isinstance(model, dict)
+                          else describe_model(model) if model is not None else "scripted"),
+                "stage_providers": {stage: inference_config(config).resolve(stage).model_dump() for stage in live} if config else {},
                 "versions": {stage: dict(zip(VERSION_FIELDS, VERSIONS[stage]))
                              for stage in STAGES},
                 "runner": "reviewed_host_workspace", "witness_capture": "none", "repeat": repeat, "max_concurrency": 1,
@@ -203,7 +208,7 @@ async def evaluate(evidence: Path, budget: CompositionBudget = CompositionBudget
         (directory / "artifacts").mkdir(mode=0o700)
         (directory / "inputs.json").write_text(inputs.model_dump_json(indent=2))
         scripted = scripted_stages(*stages[input_key(inputs)])
-        selected = StageModels(**{stage: model if stage in live else scripted[stage] for stage in STAGES})
+        selected = StageModels(**{stage: (model[stage] if isinstance(model, dict) else model) if stage in live else scripted[stage] for stage in STAGES})
         set_eval_attribute("receipts", str(directory))
         with LocalArtifacts(directory / "artifacts", max_bytes=4 * 1024 * 1024) as store, \
                 models.override_allow_model_requests(bool(live)):
@@ -250,7 +255,7 @@ def passed(report) -> bool:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence", type=Path, required=True)
-    parser.add_argument("--provider-config", type=Path, help="Explicit LocalModelConfig JSON; required with --live")
+    parser.add_argument("--provider-config", type=Path, help="Per-agent provider JSON (or legacy LocalModelConfig); required with --live")
     parser.add_argument("--live", default="", help=f"Comma-separated stages to run on the provider: {','.join(STAGES)}")
     parser.add_argument("--repeat", type=int, default=1)
     parser.add_argument("--temporal-address", help="Explicitly owned Temporal service; runs the durable chain")
@@ -260,11 +265,11 @@ def main():
         parser.error("--live names unknown stages or lacks --provider-config")
     if args.evidence.exists() or args.evidence.is_symlink():
         parser.error("evidence directory already exists")
-    config = LocalModelConfig.model_validate_json(args.provider_config.read_bytes()) if args.provider_config else None
+    config = load_inference(args.provider_config) if args.provider_config else None
 
     async def go():
         async with AsyncExitStack() as stack:
-            model = await stack.enter_async_context(local_model(config)) if live else None
+            model = await stack.enter_async_context(agent_models(config, live)) if live else None
             if args.temporal_address is None:
                 return await evaluate(args.evidence, live=live, model=model, config=config, repeat=args.repeat)
             client = await Client.connect(args.temporal_address, plugins=[PydanticAIPlugin()])
