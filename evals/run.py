@@ -30,7 +30,8 @@ import sys
 REPOSITORY = Path(__file__).resolve().parents[1]
 RESULTS = REPOSITORY / ".runs" / "evals"
 # Top-level suite identity; the chain nests per-stage prompt/config/skill under "versions" and names its live stages.
-IDENTITY = ("prompt_version", "config_version", "skill_sha256", "versions", "live_stages", "composition", "model",
+# toolset_sha256 digests the offered tool definitions (SPEC-0052); suites that do not report it leave it absent.
+IDENTITY = ("prompt_version", "config_version", "skill_sha256", "toolset_sha256", "versions", "live_stages", "composition", "model",
             "dataset", "dataset_sha256", "mode", "runner", "execution", "budget")
 
 
