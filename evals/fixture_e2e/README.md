@@ -12,7 +12,7 @@ PYTHONPATH=src:. .venv/bin/python -m evals.fixture_e2e.run --evidence .runs/fixt
 
 Stages not named in `--live` are scripted. Every run requests the [SPEC-0033](../../docs/development/specs/SPEC-0033-witness-capture.md) operator probe witness for the approved envelope, so the gate can permit `reproduced`/`verified`; the probe is tamper-evident, not tamper-proof. The CLI uses the reviewed host workspace, which refuses a live author's own tests.
 
-`sandbox.py` runs every purpose in a fresh OpenShell sandbox through the [SPEC-0032](../../docs/development/specs/SPEC-0032-openshell-test-workspace.md) test workspace, so a live author's tests execute there and never on the host ([PLAN-0034](../../docs/development/plans/PLAN-0034-fixture-e2e-sandbox-runner.md)). It needs a qualified kind/OpenShell runtime; the live gate runs an all-scripted control first, then the live runs:
+`sandbox.py` runs every purpose in a fresh OpenShell sandbox through the [SPEC-0032](../../docs/development/specs/SPEC-0032-openshell-test-workspace.md) test workspace, so a live author's tests execute there and never on the host ([PLAN-0034](../../docs/development/plans/PLAN-0034-fixture-e2e-sandbox-runner.md)). It needs a qualified kind/OpenShell runtime, set up as in the [toolchain runbook](../../docs/runbooks/openshell-toolchains.md) (`make toolchain-images` builds the images that `make toolchain-images-load` puts on the node, so it comes first on a fresh worktree); the live gate runs an all-scripted control first, then the live runs:
 
 ```sh
 make qualify-fixture-e2e CORSAIR_NETWORK_RUN=<network evidence> CORSAIR_PROVIDER_CONFIG=<LocalModelConfig.json> \
