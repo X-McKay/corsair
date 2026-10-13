@@ -13,11 +13,16 @@ kind-up:
 kind-down:
 	uv run --locked python deploy/kind/bootstrap.py down
 
+# SPEC-0036 workspace quota class on the owned node (proposed, unqualified).
+.PHONY: workspace-storage
+workspace-storage:
+	uv run --locked python deploy/kind/bootstrap.py workspace-storage
+
 test-config:
 	uv run --locked python -m pytest tests/configuration tests/unit tests/agents tests/temporal/test_fixture_contracts.py tests/temporal/test_issue_analysis_composition.py tests/temporal/test_chain_composition.py
 
 # One agent's isolated eval suite on the host (SPEC-0044); results under .runs/evals/<agent>/.
-# AGENT=identification|planning|authoring|assessment|chain; optional SET, PROVIDER_CONFIG, REPEAT, NOTE.
+# AGENT=identification|planning|authoring|environment|assessment|chain; optional SET, PROVIDER_CONFIG, REPEAT, NOTE.
 eval:
 	uv run --locked python -m evals.run "$(AGENT)" $(if $(SET),--set "$(SET)") $(if $(PROVIDER_CONFIG),--provider-config "$(PROVIDER_CONFIG)") $(if $(REPEAT),--repeat "$(REPEAT)") $(if $(NOTE),--note "$(NOTE)")
 
@@ -192,3 +197,10 @@ qualify-witness:
 	test ! -e "$(CORSAIR_QUAL_RUN)"
 	mkdir -p "$(CORSAIR_QUAL_RUN)"
 	uv run --locked python -m pytest tests/qualification -m witness --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
+
+# SPEC-0036 storage stage on plain pods; requires make workspace-storage on this owned node.
+.PHONY: qualify-workspace-quota
+qualify-workspace-quota:
+	test ! -e "$(CORSAIR_QUAL_RUN)"
+	mkdir -p "$(CORSAIR_QUAL_RUN)"
+	uv run --locked python -m pytest tests/qualification -m workspace_quota --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"

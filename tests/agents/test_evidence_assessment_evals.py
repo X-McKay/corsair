@@ -64,3 +64,29 @@ def test_verified_claim_citing_only_junit_is_refused_by_the_stage_and_recorded(t
     report = run(tmp_path, ("true_pair",), true_pair={"cite_witness": False})
     assert not report.cases and [failure.name for failure in report.failures] == ["true_pair"]
     assert not passed(report)
+
+
+@pytest.mark.parametrize('revision', ['baseline', 'candidate'])
+def test_witness_grounding_evaluator_detects_uncited_repeat(tmp_path, revision):
+    from types import SimpleNamespace
+    from evals.evidence_assessment.evaluate import ScoredAssessment
+
+    # Development inputs only; add an equivalent repeat without changing the frozen corpus.
+    case = next(case for case in dataset('development').cases if case.name == 'true_pair')
+    report = run(tmp_path, ('true_pair',))
+    output = report.cases[0].output
+    runs = getattr(case.inputs.evidence, revision)
+    witness = next(item for item in case.inputs.items if item.kind == 'witness' and item.revision == revision)
+    repeat = witness.model_copy(update={'item_id': witness.item_id + '-repeat', 'run': 1})
+    inputs = case.inputs.model_copy(update={
+        'evidence': case.inputs.evidence.model_copy(update={revision: runs + runs}),
+        'items': case.inputs.items + (repeat,)})
+    oracle = case.metadata.model_copy(update={'witness_items': case.metadata.witness_items | {
+        revision: case.metadata.witness_items[revision] + (repeat.item_id,)}})
+    ctx = SimpleNamespace(inputs=inputs, output=output, metadata=oracle)
+    assert not ScoredAssessment().evaluate(ctx)['witness_grounded']
+    citation = next(c for observation in (*output.application_observations, output.interpretation)
+                    for c in observation.citations if c.item_id == witness.item_id)
+    ctx.output = output.model_copy(update={'interpretation': output.interpretation.model_copy(update={
+        'citations': output.interpretation.citations + (citation.model_copy(update={'item_id': repeat.item_id}),)})})
+    assert ScoredAssessment().evaluate(ctx)['witness_grounded']

@@ -324,3 +324,16 @@ def _compose(inputs, root, store, reveal):
         assert failure.failure_line in patch.security_assertion_lines
     else:
         assert patch.dev_runs[0].security == "withheld"
+
+
+@pytest.mark.parametrize("deferred", [
+    "    def never_called():\n        read_document()\n",
+    "    class Helper:\n        def never_called(self):\n            read_document()\n",
+    "    call = lambda: read_document()\n",
+])
+def test_deferred_target_calls_do_not_satisfy_structural_target_fact(deferred):
+    content = "def test_security():\n" + deferred + "    actual = 1\n    assert actual == 1\n"
+    facts = static_checks(content, "t.py::test_security", "read_document")
+    assert facts["has_assertion"] and not facts["calls_target"]
+    direct = content + "    read_document()\n"
+    assert static_checks(direct, "t.py::test_security", "read_document")["calls_target"]
