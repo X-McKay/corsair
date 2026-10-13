@@ -18,6 +18,8 @@ COMMIT = re.compile(r"[0-9a-f]{40}")
 HTTPS = re.compile(r"https://[a-z0-9.-]+(?:/[A-Za-z0-9._~%-]+)+")
 # An operator-allowlisted local repository root (eval cases); the entry refuses any path outside the allowed roots.
 LOCAL = re.compile(r"file:///[^\0\n]+")
+# A repository committed in this checkout (corpus cases), relative to the checkout root; never escaping it.
+RELATIVE = re.compile(r"(?![/~])(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+")
 
 
 class _Frozen(BaseModel):
@@ -54,7 +56,8 @@ class Pov(_Frozen):
 class IssueRequest(_Frozen):
     schema_: Literal["corsair-issue-request/v1"] = Field(alias="schema")
     issue: TicketSnapshot | ManualIssue = Field(discriminator="provider")
-    repository: str | None = Field(default=None, description="https URL, or file:// under an operator-allowed root")
+    repository: str | None = Field(default=None, description=(
+        "https URL, file:// under an operator-allowed root, or a path relative to the checkout root"))
     revision: str | None = Field(default=None, description="The vulnerable revision's commit")
     fixed_revision: str | None = Field(default=None, description="The fix's commit; without it no fix is verified")
     scope: Literal["component", "application_path"] | None = None
@@ -65,8 +68,9 @@ class IssueRequest(_Frozen):
     @field_validator("repository")
     @classmethod
     def repository_url(cls, value: str | None) -> str | None:
-        if value is not None and not (HTTPS.fullmatch(value) or LOCAL.fullmatch(value)):
-            raise ValueError("repository must be a plain https URL or a file:// path")
+        relative = value is not None and RELATIVE.fullmatch(value) and ".." not in value.split("/")
+        if value is not None and not (HTTPS.fullmatch(value) or LOCAL.fullmatch(value) or relative):
+            raise ValueError("repository must be a plain https URL, a file:// path or a path inside the checkout")
         return value
 
     @field_validator("revision", "fixed_revision")

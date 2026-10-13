@@ -15,6 +15,31 @@ STAGES = ("admission", "runtime", "environment", "identification", "planning", "
           "complete")
 
 
+# The headline label, one table (Al, 2026-10-13): what kind of outcome a run had, with the stage and reason under it.
+# The eval match keeps comparing the three-part result, never this label.
+FINDING_LABELS = {"reproduced": "LIKELY_EXPLOITABLE", "not_reproduced": "LIKELY_NOT_EXPLOITABLE",
+                  "refuted_in_scope": "LIKELY_NOT_EXPLOITABLE", "inconclusive": "INCONCLUSIVE"}
+EXECUTION_LABELS = {"failed": "ERROR", "unknown": "ERROR", "blocked": "UNABLE_TO_RUN", "unsupported": "UNABLE_TO_RUN"}
+# Stops before the model stages for a case reason: the request, its runtime, route or environment cannot be run.
+BEFORE_MODEL = ("admission", "runtime", "environment")
+MODEL_STAGES = ("identification", "planning", "authoring", "assessment")
+LABELS = ("LIKELY_EXPLOITABLE", "LIKELY_NOT_EXPLOITABLE", "INCONCLUSIVE", "UNABLE_TO_RUN", "ERROR")
+
+
+def headline(stopped_at: str | None, gate: dict | None, *, failed: bool = False, error: bool = False) -> str:
+    """The run's label. `failed`: the stage that ended the run raised (provider, timeout, harness) instead of
+    returning an outcome; `error`: the run itself crashed."""
+    if error or failed:
+        return "ERROR"
+    if stopped_at in BEFORE_MODEL:
+        return "UNABLE_TO_RUN"
+    if stopped_at in MODEL_STAGES:
+        return "INCONCLUSIVE"  # The chain ran; a stage's own outcome (blocked, unsupported, refused) settled nothing
+    if stopped_at is not None or not gate:
+        return "ERROR"  # Execution stopped, or a completed run without a gate
+    return EXECUTION_LABELS.get(gate["execution"]) or FINDING_LABELS[gate["finding"]]
+
+
 def _usage(run: DirectRun) -> dict:
     return {f"{index}-{a.stage}": {"requests": a.usage.requests if a.usage else None,
                                    "input_tokens": a.usage.input_tokens if a.usage else None,
@@ -25,8 +50,9 @@ def _usage(run: DirectRun) -> dict:
 
 
 def record(label: str, evidence: Path, *, investigation: Investigation | None = None, run: DirectRun | None = None,
-           refused: str | None = None) -> dict:
-    """`refused` is why the request could not start; otherwise `run` is the chain's result."""
+           refused: str | None = None, error: str | None = None) -> dict:
+    """`refused` is why the request could not start, `error` why the run crashed; otherwise `run` is the chain's
+    result."""
     environment = run.environment if run is not None else None
     cleanup = {}
     if run is not None:
@@ -54,8 +80,13 @@ def record(label: str, evidence: Path, *, investigation: Investigation | None = 
         "baseline_basis": getattr(environment, "baseline_basis", None),
         "reached": "admission" if run is None else (run.stopped_at or "complete"),
         "stopped_at": "admission" if run is None else run.stopped_at,
-        "reason": refused if run is None else run.reason,
+        "reason": (error or refused) if run is None else run.reason,
         "gate": run.gate.permitted.model_dump() if run is not None and run.gate else None,
+        "label": headline("admission" if run is None else run.stopped_at,
+                          run.gate.permitted.model_dump() if run is not None and run.gate else None,
+                          failed=run is not None and any(a.stage == run.stopped_at and a.failure is not None
+                                                         for a in run.attempts),
+                          error=error is not None),
         "outcomes": outcomes, "usage": {} if run is None else _usage(run), "cleanup": cleanup,
         "evidence": str(evidence)}
 
@@ -79,7 +110,7 @@ def summary_line(item: dict) -> str:
         state = f"stopped at {item['stopped_at']}: {item['reason']}".replace("\n", " ")[:400]
     cleanup = "confirmed" if item["cleanup"] and all(v in ("confirmed", None, "not_run") for v in item["cleanup"].values()) \
         else ("unconfirmed" if item["cleanup"] else "none needed")
-    return f"{head}: {state} — {chosen}; {requests} model requests; cleanup {cleanup}; {item['evidence']}"
+    return f"{head}: {item['label']}; {state} — {chosen}; {requests} model requests; cleanup {cleanup}; {item['evidence']}"
 
 
 def with_expected(item: dict, case: str, expected) -> dict:
@@ -104,6 +135,7 @@ def cohort_summary(items: list[dict]) -> dict:
     languages = sorted({language(item) for item in items})
     return {"cases": len(items), "total": reached(items),
             "by_language": {name: reached([i for i in items if language(i) == name]) for name in languages},
+            "labels": {name: sum(item["label"] == name for item in items) for name in LABELS},
             "matches_expected": dict(Counter(str(item.get("matches_expected")) for item in items))}
 
 

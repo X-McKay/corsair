@@ -50,6 +50,12 @@ stages reached per cohort. Esprima stays for JavaScript assertion lines (Al kept
 - [x] `corsair` console script (`[project.scripts]`, uv_build backend, `src/corsair` a namespace package), `corsair run` in `corsair.investigate`, `make investigate ISSUE_JSON=` a wrapper: request, record and summary line, receipts under a new
   private evidence directory; `corsair.investigation.results` record incl. reserved `baseline_basis`
   ("project" | "operator_smoke"), cohort roll-up.
+- [x] Headline label first in the record and summary line (`results.headline`, one table; Al, 2026-10-13):
+  LIKELY_EXPLOITABLE (gate completed, finding reproduced); LIKELY_NOT_EXPLOITABLE (completed, not_reproduced or
+  refuted_in_scope); INCONCLUSIVE (completed and inconclusive, or a model stage's own outcome ended the run);
+  UNABLE_TO_RUN (stopped at admission, runtime or environment for a case reason, or execution blocked/unsupported);
+  ERROR (execution failed or unknown, a stage that raised instead of answering, or a crash). The stage and reason
+  follow; the eval match still compares the three-part result; the cohort counts per label.
 - [x] `evals/case_e2e`: a case becomes its issue request (manual issue, `file://` clone under
   `CORSAIR_CASE_SOURCES`) plus `expected.json` the entry never reads; `run.py` (`make run CASE=`), `evaluate.py`
   (`make eval AGENT=chain SET=jest`), `cohorts.yaml`.

@@ -83,7 +83,7 @@ def test_an_issue_request_holds_the_issue_and_commits_and_nothing_an_operator_ow
             request(repo, baseline, candidate, **{field: value})
     with pytest.raises(ValidationError, match="exact 40-hex commits"):
         request(repo, "main", candidate)
-    with pytest.raises(ValidationError, match="plain https URL or a file:// path"):
+    with pytest.raises(ValidationError, match="plain https URL, a file:// path or a path inside the checkout"):
         request(repo, baseline, candidate, repository="ssh://git@example.invalid/demo")
 
 
@@ -209,7 +209,7 @@ def test_records_summary_lines_and_the_cohort_roll_up(tmp_path):
     refused = record("manual:abc", tmp_path, refused="runtime undetermined: no engines")
     assert (refused["reached"], refused["reason"], refused["selected"], refused["usage"]) == (
         "admission", "runtime undetermined: no engines", None, {})
-    assert summary_line(refused).startswith("manual:abc: stopped at admission: runtime undetermined")
+    assert summary_line(refused).startswith("manual:abc: UNABLE_TO_RUN; stopped at admission: runtime undetermined")
     oracle = ChainOracle(stopped_at="planning", gate=None, assessment_admitted=None)
     stopped = record("manual:def", tmp_path, run=DirectRun(stopped_at="planning", reason="no witness recorder", attempts=()))
     planning = with_expected(stopped, "CVE-2", oracle)
@@ -220,6 +220,8 @@ def test_records_summary_lines_and_the_cohort_roll_up(tmp_path):
     assert summary["by_language"]["not selected"]["admission"] == 3 and summary["total"]["runtime"] == 2
     assert summary["total"]["authoring"] == 1 and summary["total"]["complete"] == 1
     assert "| total | 3 | 2 | 2 | 2 | 2 | 1 | 1 | 1 | 1 |" in markdown(summary)
+    assert summary["labels"] == {"LIKELY_EXPLOITABLE": 0, "LIKELY_NOT_EXPLOITABLE": 0, "INCONCLUSIVE": 1,
+                                 "UNABLE_TO_RUN": 1, "ERROR": 1}
 
 
 def test_a_cohort_records_a_case_that_cannot_start_before_any_model(tmp_path, monkeypatch):
@@ -265,3 +267,54 @@ def test_the_sandbox_reads_the_baseline_file_from_the_capture_never_the_sandbox(
     assert captured_file(tree, "tests/test_corsair_smoke.py", overlay).startswith(b"def test_environment_runs")
     assert captured_file(tree, "link.js") is None and captured_file(tree, "../outside.js") is None
     assert captured_file(tree, "missing.js") is None
+
+
+@pytest.mark.parametrize("stopped_at, gate, flags, expected", [
+    (None, {"execution": "completed", "finding": "reproduced"}, {}, "LIKELY_EXPLOITABLE"),
+    (None, {"execution": "completed", "finding": "not_reproduced"}, {}, "LIKELY_NOT_EXPLOITABLE"),
+    (None, {"execution": "completed", "finding": "refuted_in_scope"}, {}, "LIKELY_NOT_EXPLOITABLE"),
+    (None, {"execution": "completed", "finding": "inconclusive"}, {}, "INCONCLUSIVE"),
+    (None, {"execution": "failed", "finding": "inconclusive"}, {}, "ERROR"),
+    (None, {"execution": "unknown", "finding": "inconclusive"}, {}, "ERROR"),
+    (None, {"execution": "blocked", "finding": "inconclusive"}, {}, "UNABLE_TO_RUN"),
+    (None, {"execution": "unsupported", "finding": "inconclusive"}, {}, "UNABLE_TO_RUN"),
+    (None, None, {}, "ERROR"),
+    ("admission", None, {}, "UNABLE_TO_RUN"),
+    ("runtime", None, {}, "UNABLE_TO_RUN"),
+    ("environment", None, {}, "UNABLE_TO_RUN"),
+    ("environment", None, {"failed": True}, "ERROR"),
+    ("planning", None, {}, "INCONCLUSIVE"),
+    ("authoring", None, {"failed": True}, "ERROR"),
+    ("execution", None, {}, "ERROR"),
+    ("admission", None, {"error": True}, "ERROR"),
+])
+def test_the_headline_label_tells_each_kind_of_outcome_apart(stopped_at, gate, flags, expected):
+    from corsair.investigation.results import headline
+    assert headline(stopped_at, gate, **flags) == expected
+
+
+def test_a_crashed_run_is_recorded_as_error_with_its_reason(tmp_path):
+    from corsair.investigation.results import record, summary_line
+    crashed = record("manual:abc", tmp_path, error="DockerError: daemon not reachable")
+    assert (crashed["label"], crashed["reason"]) == ("ERROR", "DockerError: daemon not reachable")
+    assert summary_line(crashed).startswith("manual:abc: ERROR; stopped at admission: DockerError")
+
+
+def test_a_repository_committed_in_the_checkout_is_named_relative_to_it(clone, tmp_path):
+    repo, baseline, candidate, _ = clone
+    checkout = tmp_path / "sources"
+    built = build(request(repo, baseline, candidate, repository="clone"), tmp_path / "rel", {NODE: CONFIG},
+                  checkout=checkout)
+    assert built.repository == "clone" and "execSync" in (built.trees["baseline"] / "lib/run.js").read_text()
+    for escape in ("../clone", "/abs/clone", "~/clone", "a/../../clone"):
+        with pytest.raises(ValidationError, match="inside the checkout"):
+            request(repo, baseline, candidate, repository=escape)
+    (checkout / "out").symlink_to(tmp_path)
+    with pytest.raises(Refused, match="escapes the checkout"):
+        build(request(repo, baseline, candidate, repository="out/elsewhere"), tmp_path / "esc", {NODE: CONFIG},
+              checkout=checkout)
+    # A request without a fixed revision cannot run yet: an admission stop, UNABLE_TO_RUN.
+    from corsair.investigation.results import record
+    with pytest.raises(Refused, match="names no fixed revision") as refused:
+        build(request(repo, baseline, None, repository="clone"), tmp_path / "nofix", {NODE: CONFIG}, checkout=checkout)
+    assert record("manual:x", tmp_path, refused=str(refused.value))["label"] == "UNABLE_TO_RUN"

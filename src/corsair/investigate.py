@@ -140,10 +140,13 @@ def investigate(request: IssueRequest, evidence: Path, images: dict[str, str], *
     else:
         try:
             run = asyncio.run(_chain(investigation, evidence, config, models, profiles, timeout))
-        except RuntimeError as failure:
-            if "dependency setup" not in str(failure):
-                raise
-            item = record(request.label, evidence, investigation=investigation, refused=str(failure))
+        except Exception as failure:
+            if isinstance(failure, RuntimeError) and "dependency setup" in str(failure):
+                item = record(request.label, evidence, investigation=investigation, refused=str(failure))
+            else:
+                # A crash (Docker, harness, receipts) is recorded as ERROR with its type, never retried.
+                item = record(request.label, evidence, investigation=investigation,
+                              error=f"{type(failure).__name__}: {failure}"[:2048])
         else:
             item = record(request.label, evidence, investigation=investigation, run=run)
     item["summary"] = summary_line(item)
