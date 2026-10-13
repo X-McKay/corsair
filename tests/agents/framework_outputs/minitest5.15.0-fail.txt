@@ -1,0 +1,13 @@
+Run options: --seed 48609
+
+# Running:
+
+F
+
+Finished in 0.000673s, 1486.1358 runs/s, 1486.1358 assertions/s.
+
+  1) Failure:
+FailTest#test_a [test/fail_test.rb:3]:
+Expected false to be truthy.
+
+1 runs, 1 assertions, 1 failures, 0 errors, 0 skips

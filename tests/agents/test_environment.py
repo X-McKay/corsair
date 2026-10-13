@@ -1,6 +1,7 @@
 """Environment agent contract and trajectory checks through native SDK calls and a scripted execution port."""
 
 from dataclasses import dataclass, field, replace
+from pathlib import Path
 from uuid import UUID
 
 import pytest
@@ -228,6 +229,68 @@ def test_read_output_returns_retained_bytes_beyond_the_tail():
 
 TAP_OK = (b"t/ok.t .. \n1..2\nok 1 - a\nok 2 - b\nok\nAll tests successful.\n"
           b"Files=1, Tests=2,  0 wallclock secs ( 0.03 usr  0.00 sys +  0.03 cusr  0.00 csys =  0.06 CPU)\nResult: PASS\n")
+
+
+FRAMEWORK_OUTPUTS = Path(__file__).parent / "framework_outputs"
+JEST = ("node", "node_modules/jest/bin/jest.js", "--ci")
+JEST_ID = "test/ok.test.js"
+MINITEST_ID = "test/ok_test.rb"
+
+
+def captured(name: str) -> bytes:
+    return (FRAMEWORK_OUTPUTS / name).read_bytes()
+
+
+# Probe files (framework_outputs/README.md): ok has two passing tests, one logging; skip and todo each add one skipped
+# or todo test to a passing one; fail has one failing test; empty defines no test.
+@pytest.mark.parametrize("framework,test_id,path,command,name,ok", [
+    ("jest", JEST_ID, JEST_ID, (*JEST, "--json", "--runTestsByPath", JEST_ID), "jest24.8.0-ok.json", True),
+    ("jest", JEST_ID, JEST_ID, ("npx", "jest", "--json", "--runTestsByPath", JEST_ID), "jest24.8.0-ok.json", True),
+    ("jest", JEST_ID, JEST_ID, (*JEST, "--json", JEST_ID), "jest24.8.0-ok.json", False),  # a pattern, not a path
+    ("jest", JEST_ID, JEST_ID, (*JEST, "--runTestsByPath", JEST_ID), "jest24.8.0-ok-without-json.txt", False),
+    ("jest", JEST_ID, JEST_ID, (*JEST, "--json", "--runTestsByPath", JEST_ID), "jest24.8.0-skip.json", False),
+    ("jest", JEST_ID, JEST_ID, (*JEST, "--json", "--runTestsByPath", JEST_ID), "jest24.8.0-todo.json", False),
+    ("jest", JEST_ID, JEST_ID, (*JEST, "--json", "--runTestsByPath", JEST_ID), "jest24.8.0-fail.json", False),
+    ("jest", JEST_ID, JEST_ID, (*JEST, "--json", "--runTestsByPath", JEST_ID, "-t", "a"), "jest24.8.0-ok.json", False),
+    ("jest", JEST_ID, JEST_ID, (*JEST, "--json", "--runTestsByPath", JEST_ID, "test/skip.test.js"), "jest24.8.0-ok.json", False),
+    ("jest", JEST_ID, JEST_ID, (*JEST, "--json", "--runTestsByPath", "--passWithNoTests", JEST_ID), "jest24.8.0-ok.json", False),
+    ("jest", JEST_ID, JEST_ID, (*JEST, "--json", "--runTestsByPath", "--rootDir=lib", JEST_ID), "jest24.8.0-ok.json", False),
+    # An inline or file config can change test matching, roots and reporters.
+    ("jest", JEST_ID, JEST_ID, (*JEST, "--json", "--runTestsByPath", "-c", '{"testMatch":["**/other.js"]}', JEST_ID),
+     "jest24.8.0-ok.json", False),
+    ("jest", JEST_ID, JEST_ID, (*JEST, "--json", "--runTestsByPath", "--config=jest.other.js", JEST_ID), "jest24.8.0-ok.json", False),
+    ("jest", JEST_ID, "lib/" + JEST_ID, (*JEST, "--json", "--runTestsByPath", JEST_ID), "jest24.8.0-ok.json", False),
+    ("jest", "test/ok.test.js::a", "test/ok.test.js", (*JEST, "--json", "--runTestsByPath", "test/ok.test.js::a"), "jest24.8.0-ok.json", False),
+    ("minitest", MINITEST_ID, MINITEST_ID, ("ruby", "-Itest", MINITEST_ID), "minitest5.15.0-ok.txt", True),
+    ("minitest", MINITEST_ID, MINITEST_ID, ("bundle", "exec", "/usr/local/bin/ruby", "-I", "test", "-rjson", MINITEST_ID, "--seed", "0"),
+     "minitest5.15.0-ok.txt", True),
+    ("minitest", MINITEST_ID, MINITEST_ID, ("ruby", "-Itest", MINITEST_ID), "minitest5.15.0-skip.txt", False),
+    ("minitest", MINITEST_ID, MINITEST_ID, ("ruby", "-Itest", MINITEST_ID), "minitest5.15.0-fail.txt", False),
+    ("minitest", MINITEST_ID, MINITEST_ID, ("ruby", "-Itest", MINITEST_ID), "minitest5.15.0-empty.txt", False),
+    ("minitest", MINITEST_ID, MINITEST_ID, ("ruby", "-Itest", MINITEST_ID, "-n", "test_a"), "minitest5.15.0-ok.txt", False),
+    ("minitest", MINITEST_ID, MINITEST_ID, ("ruby", "-Itest", MINITEST_ID, "--name=/a/"), "minitest5.15.0-ok.txt", False),
+    ("minitest", MINITEST_ID, MINITEST_ID, ("ruby", "-Itest", "-e", "load 'test/ok_test.rb'"), "minitest5.15.0-ok.txt", False),
+    ("minitest", MINITEST_ID, MINITEST_ID, ("ruby", "-Itest", MINITEST_ID, "test/skip_test.rb"), "minitest5.15.0-ok.txt", False),
+    ("minitest", MINITEST_ID, MINITEST_ID, ("rake", "test"), "minitest5.15.0-ok.txt", False),
+    # Ruby options before the file other than -I and -r change what runs: -C changes directory, -s runs another script.
+    ("minitest", MINITEST_ID, MINITEST_ID, ("ruby", "-Csub", MINITEST_ID), "minitest5.15.0-ok.txt", False),
+    ("minitest", MINITEST_ID, MINITEST_ID, ("ruby", "-C", "sub", MINITEST_ID), "minitest5.15.0-ok.txt", False),
+    ("minitest", MINITEST_ID, MINITEST_ID, ("ruby", "-s", "other.rb", MINITEST_ID), "minitest5.15.0-ok.txt", False),
+    ("minitest", MINITEST_ID, MINITEST_ID, ("ruby", "-x", MINITEST_ID), "minitest5.15.0-ok.txt", False),
+    ("minitest", MINITEST_ID, MINITEST_ID, ("ruby", "-Itest", "-rbundler/setup", MINITEST_ID, "-s", "0"), "minitest5.15.0-ok.txt", True),
+    ("minitest", MINITEST_ID, "lib/" + MINITEST_ID, ("ruby", "-Itest", MINITEST_ID), "minitest5.15.0-ok.txt", False),
+    ("minitest", "test/ok_test.rb::OkTest#test_a", MINITEST_ID, ("ruby", "-Itest", "test/ok_test.rb::OkTest#test_a"),
+     "minitest5.15.0-ok.txt", False),
+])
+def test_file_unit_admission_on_captured_output(framework, test_id, path, command, name, ok):
+    from corsair.agents.environment.frameworks import FRAMEWORKS, file_matches
+    entry = FRAMEWORKS[framework]
+    assert (file_matches(framework, test_id, path) and entry.targets(command, test_id) and entry.passed(captured(name))) is ok
+
+
+def test_jest_listing_names_the_baseline_file():
+    # `--listTests` prints absolute paths; validation needs the repository-relative id among the discovery output.
+    assert JEST_ID.encode() in captured("jest24.8.0-listtests.txt")
 
 
 @pytest.mark.parametrize("framework,test_id,path,command,output,ok", [
