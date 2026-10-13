@@ -45,6 +45,8 @@ Minitest fold-in (main e090d27 merged): runner unit suites 190 passed unchanged;
 
 These match PLAN-0068's runs. The Java harness was checked by its smoke test only: a VUL4J rerun needs the Maven setup, which the next live batch repeats.
 
+2026-10-13, discovery-command rule dropped (from main after #101): the Maven, TAP, Jest and Minitest runners refused any discovery command other than the operator's prefix, but none of them executes that command (each builds its own listing from the prefix), and the environment agent admits a real listing command (`prove --dry`, `--listTests`, a file-listing command for Minitest), so every non-pytest case would stop at its first run. The core and the four runners no longer carry `exact_discovery`; the environment's command is accepted and not run (nothing stores it; the runner evidence keeps the argv it executed). Each runner test (`test_environment_discovery_command_is_accepted_not_run`) runs a real discovery command and the prefix with the same scripted steps and asserts the same executed argv and a completed run; an empty command is still refused. pytest is unchanged: its runner executes the discovery command it is given.
+
 ## Decisions and next action
 
 The per-framework checks after a run (empty report, wrapper exit 125, allowed exits) stay in each driver, because they are what genuinely differs. Exit agreement is not one of them: it moved into the core so a new driver cannot skip it. Next: review and Al's merge word; then the environment agent's tap-harness admission as a separate PR from main.

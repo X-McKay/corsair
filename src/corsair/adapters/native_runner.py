@@ -78,11 +78,8 @@ def check_ids(patch: ApprovedPatch, ids: tuple[str, str], witness: WitnessReques
 class NativeRunner:
     """Subclasses implement `_validate` (refuse before any workspace exists) and `_stages`.
 
-    `exact_discovery`, when set, is the refusal for a discovery command other than the operator's own
-    prefix: for frameworks whose runner builds the listing itself, any other command could run tests.
     `tool` and `report_format` name the framework in the exit-agreement refusal.
     """
-    exact_discovery: str | None = None
     tool, report_format = 'runner', 'report'
 
     def __init__(self, workspace: TestWorkspace, execution: SandboxExecution, store: ArtifactStore, config):
@@ -97,8 +94,6 @@ class NativeRunner:
     def run(self, patch: ApprovedPatch, *, control_test_id: str, security_test_id: str,
             discovery_command: tuple[str, ...], operation: UUID,
             witness: WitnessRequest | None = None) -> NativeTestRun:
-        if self.exact_discovery is not None and discovery_command != self._config.command:
-            raise ValueError(self.exact_discovery)
         if not isinstance(operation, UUID) or not isinstance(patch, ApprovedPatch):
             raise ValueError('Operator operation and approved patch required')
         ids = (control_test_id, security_test_id)
