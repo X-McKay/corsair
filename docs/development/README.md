@@ -46,6 +46,17 @@ An issue can stay open while its dependent plan is blocked. A template, render, 
 5. **Validate and review:** Run the smallest meaningful suite, then affected consumers and necessary live/durable/agent evaluations. Apply the review skill; retain failed attempts, actual coverage and unknowns.
 6. **Record and hand off:** Update the living records/current index, add a handoff snapshot, and report actual outcome/next steps. Commit and publish according to user authorization. Existing design docs remain the architectural source of truth.
 
+## Isolated agent evaluation
+
+Each agent is improved through its own loop, independent of the cluster and of other workstreams ([SPEC-0044](specs/SPEC-0044-isolated-agent-evaluation.md)):
+
+1. **Eval set:** frozen typed stage inputs with evaluator-only oracles under `evals/<stage>/`; held-out sets beside the development set, frozen by manifest and never named in records (SPEC-0023).
+2. **One command:** `make eval AGENT=<identification|planning|authoring|assessment|chain> [SET=…] [PROVIDER_CONFIG=<LocalModelConfig.json>] [REPEAT=…] [NOTE="what changed"]`. Without `PROVIDER_CONFIG` it runs scripted; with it, live against that model.
+3. **Results:** `.runs/evals/<agent>/<UTC stamp>-<set>-<mode>/` holds `command.json`, the suite's `evidence/`, `summary.json` (prompt/config/skill versions, model, dataset digest, pass rates, efficiency) and `comparison.md` against the promoted baseline or else the previous run; `index.jsonl` lists every run. Promote a reference with `make eval-baseline AGENT=<name> RUN=<run id>`.
+4. **No cluster:** sandboxes, runners and command executors are ports answered by fixtures, recorded observations or deterministic host doubles. Model-written code is never executed on the host; the authoring eval uses a static host runner and leaves execution dimensions unknown until a sandbox replay.
+
+A change to an agent states the baseline it was compared with and the comparison's result in its plan. A new agent ships with its eval set and a `SUITES` entry in `evals/run.py`.
+
 ## Using the skills
 
 Launch the client from the repository. Codex supports repository `.agents/skills` and follows symlinked skill folders; Claude uses real project folders in `.claude/skills`. Preserve Git symlinks when cloning. Do not copy and independently edit a second skill set.
