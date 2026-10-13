@@ -158,6 +158,9 @@ class _ReadyPlan(Contract, Generic[Citation]):
             raise ValueError("control and security tests need distinct test ids")
         environment = _environment(info)
         if environment is not None:
+            # SPEC-0022 precondition, admitted in code: without an executed baseline no native test is known to run.
+            if environment.baseline_test is None:
+                raise ValueError("environment.baseline_test is null, so no native test is known to run: return unsupported")
             for spec in (self.control, self.security):
                 if spec.test_path not in environment.approved_test_paths:
                     raise ValueError(f"test path {spec.test_path} is not an approved test path")

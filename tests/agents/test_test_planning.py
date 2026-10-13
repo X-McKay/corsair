@@ -324,3 +324,10 @@ def test_typed_witness_admits_absence_identifier_and_refuses_without_listed_faci
     data["environment"]["witness_facilities"] = []
     with pytest.raises(UnexpectedModelBehavior):
         run(create_test_planning_agent(responding(reference()), output_retries=0), TestPlanningInput.model_validate(data))
+
+
+def test_ready_plan_is_refused_without_an_executed_baseline_test():
+    data = case().inputs.model_dump()
+    data["environment"]["baseline_test"] = None
+    with pytest.raises(UnexpectedModelBehavior):
+        run(create_test_planning_agent(responding(reference()), output_retries=0), TestPlanningInput.model_validate(data))
