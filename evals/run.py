@@ -44,6 +44,7 @@ class Suite:
 
 
 SUITES: dict[str, Suite] = {
+    "environment": Suite("evals.environment.evaluate", {"development": ()}, note="synthetic observations; setup commands never execute on the host"),
     "identification": Suite("evals.issue_identification.evaluate", {"development": ()}, repeat=False),
     "planning": Suite("evals.test_planning.evaluate", {
         "development": ("--cases", "development"), "heldout": ("--cases", "heldout"),
@@ -57,7 +58,7 @@ SUITES: dict[str, Suite] = {
                    note="live authoring needs the sandbox; authoring stays scripted on the host"),
 }
 # Agents without an isolated eval set yet, and where the gap is planned.
-MISSING = {"environment": "no isolated eval set yet; see PLAN-0048 step 5"}
+MISSING = {}
 
 
 def _git(*args: str) -> str:
@@ -85,7 +86,20 @@ def summarize(evidence: Path) -> dict:
             assertions[key][1] += 1
             if not value:
                 entry["failed_assertions"][key] = entry["failed_assertions"].get(key, 0) + 1
-        for key, value in case["metrics"].items():
+        # record_count keeps measured zeros in attributes because native Evals drops
+        # zero increments. Use that fallback once per metric, without filling missing data.
+        observed = {
+            key: value for key, value in case.get("attributes", {}).items()
+            if key.startswith("observed_") and isinstance(value, (int, float))
+            and not isinstance(value, bool)
+        }
+        for key, value in (observed | case["metrics"]).items():
+            # RunUsage defaults to zero and can contain partial response totals.
+            # Neither is a complete token measurement when provider coverage failed.
+            if (case.get("attributes", {}).get("provider_usage_present") is False
+                    and key in {"observed_input_tokens", "observed_output_tokens",
+                                "input_tokens", "output_tokens"}):
+                continue
             metrics.setdefault(key, []).append(value)
         for key, item in case["scores"].items():
             metrics.setdefault("score_" + key, []).append(item["value"])
@@ -101,6 +115,7 @@ def summarize(evidence: Path) -> dict:
             "task_failures": len(report["failures"]),
             "assertions": {key: {"passed": p, "total": t} for key, (p, t) in sorted(assertions.items())},
             "cases": dict(sorted(cases.items())),
+            "efficiency_samples": {key: {"observed": len(values), "attempts": attempts} for key, values in sorted(metrics.items())},
             "efficiency_mean": {key: round(sum(v) / len(v), 3) for key, v in sorted(metrics.items())}}
 
 
@@ -111,12 +126,16 @@ def _rate(item: dict | None) -> str:
 def compare(current: dict, reference: dict | None, reference_id: str | None) -> str:
     """Markdown differences; identity changes are listed first because they decide comparability."""
     summary = current["summary"]
+    if summary.get("report") == "missing":
+        return f"# {current['agent']} {current['run']}\n\nReport missing: attempt counts, failures and telemetry are unknown.\n"
     lines = [f"# {current['agent']} {current['run']}", "",
              f"Clean attempts: {summary.get('clean_attempts', 0)}/{summary.get('attempts', 0)}"
              f" (task failures {summary.get('task_failures', 0)})", ""]
     if reference is None:
         return "\n".join(lines + ["No earlier run with this set and mode; nothing to compare.", ""])
     before = reference["summary"]
+    if before.get("report") == "missing":
+        return "\n".join(lines + [f"Reference {reference_id} has a missing report; comparison unavailable.", ""])
     lines += [f"Compared with {reference_id} ({reference['reference_kind']}): clean attempts "
               f"{before.get('clean_attempts', 0)}/{before.get('attempts', 0)}.", ""]
     changed = {key: (before["identity"].get(key), summary["identity"].get(key)) for key in IDENTITY
@@ -138,9 +157,12 @@ def compare(current: dict, reference: dict | None, reference_id: str | None) -> 
     lines += [f"| {name} | {clean(before, name)} | {clean(summary, name)}"
               f"{' ←' if clean(before, name) != clean(summary, name) else ''} |" for name in names]
     metric_keys = sorted(set(summary.get("efficiency_mean", {})) | set(before.get("efficiency_mean", {})))
-    lines += ["", "## Efficiency (mean per attempt)", "", "| Metric | Before | Now |", "| --- | --- | --- |"]
+    lines += ["", "## Efficiency (mean per observed sample)", "", "| Metric | Before | Now |", "| --- | --- | --- |"]
     lines += [f"| {key} | {before.get('efficiency_mean', {}).get(key, '-')} | {summary.get('efficiency_mean', {}).get(key, '-')} |"
               for key in metric_keys]
+    lines += ["", "Metric means use only observed samples; absent telemetry is unknown.", ""]
+    for key, coverage in summary.get("efficiency_samples", {}).items():
+        lines.append(f"- `{key}` coverage: {coverage['observed']}/{coverage['attempts']} attempts")
     return "\n".join(lines + [""])
 
 
