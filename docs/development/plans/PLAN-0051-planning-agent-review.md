@@ -59,3 +59,8 @@ Cross-review found Java/JavaScript currency symbols and format characters still 
 
 Focused native admission/evaluator checks:21 passed, one existing deprecation warning. Final scripted development12/12 against12/12 at `.runs/evals/planning/20261013T101200Z-development-scripted`, unchanged estimated requests/tools/tokens. The independent implementation_call scorer now applies the defined lexical boundary rather than a substring; mutated-output negatives prove prefix and Unicode suffix sensitivity.
 Full-suite repeat, live provider and runtime checks unrun for this bounded correction; earlier checks remain historical. git diff --check passed.
+
+
+Current-main integration review (2026-10-13): main 8606068 merged cleanly.
+Planning/configuration checks: 63 passed; unchanged frozen host-only Make suite 12/12.
+No new source behavior, corpus changes, provider calls or runtime qualification.
