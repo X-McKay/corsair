@@ -72,7 +72,9 @@ class OneFile:
     `tools` name the runner token; `values` are options whose value is the next token; `refused` are options (by
     name before any `=`) that would list, filter, replay, reinterpret or load code that could rewrite the output;
     `short` are single-dash letters refused inside a bundle (`-vD`), except in an attached `keep` option such as
-    `-Ilib`; `required` must all appear.
+    `-Ilib`; `required` must all appear. `before`, when set, is the only options allowed between the runner token and
+    the file, each with its value attached or next (for Ruby, whose options there can change directory or run
+    another script).
     """
     tools: tuple[str, ...]
     values: tuple[str, ...]
@@ -80,6 +82,7 @@ class OneFile:
     short: str
     keep: tuple[str, ...]
     required: tuple[str, ...]
+    before: tuple[str, ...] | None = None
 
     def __call__(self, command: tuple[str, ...], test_id: str) -> bool:
         starts = [i for i, token in enumerate(command) if any(token == t or token.endswith("/" + t) for t in self.tools)]
@@ -89,6 +92,13 @@ class OneFile:
         for token in arguments:
             if skip:
                 skip = False
+                continue
+            if self.before is not None and not files and token[:1] == "-":
+                if token in self.before:
+                    skip = True
+                    continue
+                if not token.startswith(self.before):
+                    return False
                 continue
             name = token.split("=", 1)[0]
             bundle = token[:1] == "-" and token[:2] != "--" and not token.startswith(self.keep)
@@ -107,16 +117,18 @@ _tap_targets = OneFile(tools=("prove",), values=("-I", "-j", "--jobs"),
                                 "--archive", "--rc", "--source", "--plugin", "--module", "-P", "-M"),
                        short="DPMae", keep=("-I",), required=("--norc",))
 # Jest: `--runTestsByPath` makes the file argument a path, not a pattern; `--json` puts the results on stdout.
-_jest_targets = OneFile(tools=("jest", "jest.js"), values=("-c", "--config", "-w", "--maxWorkers", "--testTimeout"),
-                        refused=("-t", "--testNamePattern", "--testPathPattern", "--testPathIgnorePatterns", "--listTests",
+# `-c/--config` is refused: an inline or file config can change test matching, roots and reporters.
+_jest_targets = OneFile(tools=("jest", "jest.js"), values=("-w", "--maxWorkers", "--testTimeout"),
+                        refused=("-c", "--config", "-t", "--testNamePattern", "--testPathPattern", "--testPathIgnorePatterns", "--listTests",
                                  "-o", "--onlyChanged", "--changedSince", "--findRelatedTests", "--lastCommit", "--watch",
                                  "--watchAll", "--passWithNoTests", "--testRegex", "--testMatch", "--outputFile",
                                  "--rootDir", "--roots", "--projects", "--testRunner", "--reporters"),
-                        short="tob", keep=(), required=("--runTestsByPath", "--json"))
-# Ruby loading one Minitest file; Minitest's own `-n/--name` and `-e/--exclude` filters and other programs are refused.
-_minitest_targets = OneFile(tools=("ruby",), values=("-I", "-r", "--seed", "-s"),
-                            refused=("-e", "-n", "--name", "-x", "--exclude", "-S"), short="enxS", keep=("-I", "-r"),
-                            required=())
+                        short="tocb", keep=(), required=("--runTestsByPath", "--json"))
+# Ruby loading one Minitest file: only `-I` and `-r` before the file (others such as `-C` or `-s` change what runs);
+# after it, Minitest's own `-n/--name` and `-e/--exclude` filters are refused.
+_minitest_targets = OneFile(tools=("ruby",), values=("--seed", "-s"),
+                            refused=("-e", "-n", "--name", "-x", "--exclude"), short="enx", keep=(),
+                            required=(), before=("-I", "-r"))
 
 
 def _tap_passed(output: bytes) -> bool:

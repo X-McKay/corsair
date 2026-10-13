@@ -255,6 +255,10 @@ def captured(name: str) -> bytes:
     ("jest", JEST_ID, JEST_ID, (*JEST, "--json", "--runTestsByPath", JEST_ID, "test/skip.test.js"), "jest24.8.0-ok.json", False),
     ("jest", JEST_ID, JEST_ID, (*JEST, "--json", "--runTestsByPath", "--passWithNoTests", JEST_ID), "jest24.8.0-ok.json", False),
     ("jest", JEST_ID, JEST_ID, (*JEST, "--json", "--runTestsByPath", "--rootDir=lib", JEST_ID), "jest24.8.0-ok.json", False),
+    # An inline or file config can change test matching, roots and reporters.
+    ("jest", JEST_ID, JEST_ID, (*JEST, "--json", "--runTestsByPath", "-c", '{"testMatch":["**/other.js"]}', JEST_ID),
+     "jest24.8.0-ok.json", False),
+    ("jest", JEST_ID, JEST_ID, (*JEST, "--json", "--runTestsByPath", "--config=jest.other.js", JEST_ID), "jest24.8.0-ok.json", False),
     ("jest", JEST_ID, "lib/" + JEST_ID, (*JEST, "--json", "--runTestsByPath", JEST_ID), "jest24.8.0-ok.json", False),
     ("jest", "test/ok.test.js::a", "test/ok.test.js", (*JEST, "--json", "--runTestsByPath", "test/ok.test.js::a"), "jest24.8.0-ok.json", False),
     ("minitest", MINITEST_ID, MINITEST_ID, ("ruby", "-Itest", MINITEST_ID), "minitest5.15.0-ok.txt", True),
@@ -268,6 +272,12 @@ def captured(name: str) -> bytes:
     ("minitest", MINITEST_ID, MINITEST_ID, ("ruby", "-Itest", "-e", "load 'test/ok_test.rb'"), "minitest5.15.0-ok.txt", False),
     ("minitest", MINITEST_ID, MINITEST_ID, ("ruby", "-Itest", MINITEST_ID, "test/skip_test.rb"), "minitest5.15.0-ok.txt", False),
     ("minitest", MINITEST_ID, MINITEST_ID, ("rake", "test"), "minitest5.15.0-ok.txt", False),
+    # Ruby options before the file other than -I and -r change what runs: -C changes directory, -s runs another script.
+    ("minitest", MINITEST_ID, MINITEST_ID, ("ruby", "-Csub", MINITEST_ID), "minitest5.15.0-ok.txt", False),
+    ("minitest", MINITEST_ID, MINITEST_ID, ("ruby", "-C", "sub", MINITEST_ID), "minitest5.15.0-ok.txt", False),
+    ("minitest", MINITEST_ID, MINITEST_ID, ("ruby", "-s", "other.rb", MINITEST_ID), "minitest5.15.0-ok.txt", False),
+    ("minitest", MINITEST_ID, MINITEST_ID, ("ruby", "-x", MINITEST_ID), "minitest5.15.0-ok.txt", False),
+    ("minitest", MINITEST_ID, MINITEST_ID, ("ruby", "-Itest", "-rbundler/setup", MINITEST_ID, "-s", "0"), "minitest5.15.0-ok.txt", True),
     ("minitest", MINITEST_ID, "lib/" + MINITEST_ID, ("ruby", "-Itest", MINITEST_ID), "minitest5.15.0-ok.txt", False),
     ("minitest", "test/ok_test.rb::OkTest#test_a", MINITEST_ID, ("ruby", "-Itest", "test/ok_test.rb::OkTest#test_a"),
      "minitest5.15.0-ok.txt", False),

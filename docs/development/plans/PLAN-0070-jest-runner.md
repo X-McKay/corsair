@@ -38,6 +38,8 @@ After #74's guards were adopted (image config id, committed tree, fresh dependen
 
 2026-10-13, environment-agent admission of `jest` and `minitest` (branch from main 165afac), generalised with `tap-harness` as file-unit frameworks in `agents/environment/frameworks.py`: the baseline id is one plain repository-relative test file, one rule (`OneFile`) checks that the baseline command runs exactly that file under the runner with no filtering, listing or code-loading option, and each framework reads its own result. Jest needs `--json --runTestsByPath` and admits the JSON report only with one suite, every test passed and no pending, todo or failed test; Minitest needs `ruby` (or `bundle exec ruby`) on the one file without `-n/--name/-e/--exclude` and exactly one summary line with at least one run and no failure, error or skip. Checked against output captured offline in the `node8` (Jest 24.8.0) and `ruby31` (Minitest 5.15.0) images (`tests/agents/framework_outputs/`); prompt `environment-v6-file-unit-frameworks`; `make eval AGENT=environment` scripted 16/16; live eval waits for the model server.
 
+2026-10-13, review fix on #101: a Minitest baseline command now allows only `-I` and `-r` before the file (an allow-list, as for prove), since `ruby -Csub <file>` runs `sub/<file>` and `ruby -s other.rb <file>` runs `other.rb`; Jest's `-c/--config` is refused, since an inline or file config can change test matching, roots and reporters. Tests for each evasion in `tests/agents/test_environment.py`.
+
 ## Decisions and next action
 
 One file, identifier titles, never-matching-pattern listing (SPEC-0057). Next: the live gate, then the framework row.
