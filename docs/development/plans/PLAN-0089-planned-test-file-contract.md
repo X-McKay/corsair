@@ -31,11 +31,14 @@ Why it is general: the rule is the existing id grammars, not any case, path, rep
 - [x] Shared rule in the test-runner port; planning admission and authoring handoff use it.
 - [x] Transfer: the same planning test over five distinct runner layouts (pytest under `tests/`, Minitest `test/*_test.rb`, Jest `__tests__/*.test.js`, TAP `t/*.t`, JUnit in a Maven module); only the pytest root-level layout appeared in the original evidence.
 - [x] Scripted isolated evals before and after; offline suite.
-- [ ] Live comparison through the campaign owner (one live-inference user): planning development set at this commit against the promoted baseline, then the diagnosed `ih-python-pathtraversal` successor on Docker.
+- [x] Live planning comparison through the campaign owner (merged as `bfc4e52` from head `890d9e8`).
+- [ ] Diagnosed `ih-python-pathtraversal` successor on Docker (campaign slot attempt-0001 of `m1-python-7b0b724`: main `bfc4e52` + campaign entry `0d9890f` + pytest environment skill line `3cc5896`).
 
 ## Validation and progress
 
 Before (main `1815f75`, this container, scripted): planning 12/12, authoring 20/20, environment 16/16, chain fixture 5/5 clean attempts. After: planning 12/12, authoring 20/20, environment 16/16, chain 5/5, every assertion row identical (only `task_seconds` differs); planning `heldout3` scripted 12/12 (reference plans only; nothing tuned on it). `TERM=xterm TEST_WORKERS=4 make test-config`: 1971 passed, 11 warnings. `git diff --check` passed. No frozen eval case, oracle or manifest changed. No live model, Docker or corpus run in this lane.
+
+Live planning development set (campaign owner on RIG0, model not shared, development cases only; evidence under the owner's worktree `.runs/evals/planning/`, not published): reference main `1815f75` run `20261013T214309Z-development-live` 11/12 clean (failure `path_traversal_unguarded` [2/2]); candidate `890d9e8` run `20261013T215409Z-development-live` 10/12 clean (failures `no_baseline_test` [1/2] and [2/2]). In both failures the model first answered ready, was refused by the existing `environment.baseline_test is null` check, then answered unsupported without citing source read in the run, and the single output correction was already spent. That refusal is raised before the approved-path loop, so `names_test_in` never ran in either failure; neither run had an id/path mismatch. Read as sampling variance on n=12 rather than a regression of this change; the pattern "a second refusal arrives after the single output correction is spent" is logged by the campaign owner as a separate cross-stage hypothesis. The live eval shows no case where the new rule fired, so its live benefit is still unmeasured.
 
 ## Decisions and next action
 
