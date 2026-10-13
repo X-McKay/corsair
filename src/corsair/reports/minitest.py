@@ -74,7 +74,8 @@ def parse_minitest(data: bytes, test_ids: tuple[str, ...], *, root: str, test_pa
         raise MinitestReportError('Expected one corsair-minitest-v1 report')
     results = {}
     for item in document['tests']:
-        if type(item) is not dict or set(item) != {'class', 'name', 'outcome', 'failure'}:
+        if (type(item) is not dict or set(item) != {'class', 'name', 'outcome', 'failure'}
+                or any(type(item[key]) is not str for key in ('class', 'name', 'outcome'))):
             raise MinitestReportError('Malformed result in Minitest report')
         test_id = keys.get((item['class'], item['name']))
         if test_id is None:

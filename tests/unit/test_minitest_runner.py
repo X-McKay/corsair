@@ -116,6 +116,7 @@ PASS = capture('5.15.0', 'pass.json')
     (PASS.replace(b'corsair-minitest-v1', b'corsair-minitest-v0'), 0, 'invalid_report', 'report'),
     (b'{"schema": "corsair-minitest-v1", "tests": [], "tests": []}', 0, 'invalid_report', 'report'),
     (PASS + b'trailing', 0, 'invalid_report', 'report'),
+    (PASS.replace(b'"class":"Widget::CorsairTest"', b'"class":[]', 1), 0, 'invalid_report', 'report'),  # unhashable identity
 ])
 def test_inconsistent_or_missing_reports_are_retained_not_admitted(store, stdout, native_exit, status, layer):
     result, *_ = run(store, (listing('test_control', 'test_fixed'), 0), (stdout, native_exit))
@@ -130,6 +131,10 @@ def test_inconsistent_or_missing_reports_are_retained_not_admitted(store, stdout
     lambda t: t.append(dict(t[0])),                                    # duplicate result
     lambda t: t[0].update(extra=1),
     lambda t: t.pop(),                                                 # missing result
+    lambda t: t[0].update({'class': []}),                              # identities must be strings
+    lambda t: t[0].update({'class': {'a': 1}}),
+    lambda t: t[0].update(name=['test_control']),
+    lambda t: t[0].update(outcome=['passed']),
 ])
 def test_parser_refuses_ambiguous_reports(mutate):
     report = json.loads(PASS)
