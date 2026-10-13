@@ -76,14 +76,14 @@ def _name(node: ast.AST) -> str | None:
 
 
 def static_checks(content: str, test_id: str, target_symbol: str) -> dict[str, bool]:
-    """Evaluation facts for one test: calls the planned target, no mocks, skips, swallowing or constant asserts."""
+    """Structural evaluation facts; target calls exclude deferred bodies, without proving reachability or semantics."""
     try:
         tree = ast.parse(content)
         function = _function(tree, test_id)
     except (SyntaxError, ValueError):
         return {"parses_and_defines_test": False}
     nodes = list(ast.walk(tree))
-    body = list(ast.walk(function))
+    body = _executable(function)
     return {
         "parses_and_defines_test": True,
         "calls_target": any(isinstance(n, ast.Call) and _name(n.func) == target_symbol for n in body),
