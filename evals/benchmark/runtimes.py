@@ -294,7 +294,7 @@ def inputs(pins: Path, parents: Path | None) -> dict:
     the parent POMs (by coordinate) that were supplied. The fetched trees are identified by the pinned commits."""
     detector = b''.join(f.name.encode() + b'\0' + f.read_bytes() for f in sorted((REPOSITORY / 'src/corsair/nodes/runtime').glob('*.py')))
     return dict(detector=_digest(detector), matrix=_digest(MATRIX.read_bytes()), pins=_digest(pins.read_bytes()),
-                inventory=_digest(INVENTORY.read_bytes()), corpus=_digest((corpus.CORPUS / 'manifest.json').read_bytes()),
+                inventory=_digest(INVENTORY.read_bytes()), corpus='sha256:' + corpus.tree_digest(),
                 parents={key: _digest(data) for key, data in sorted(load_parents(parents).items())})
 
 

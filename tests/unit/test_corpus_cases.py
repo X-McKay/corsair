@@ -93,4 +93,4 @@ def test_runtime_report_covers_every_corpus_case_and_hides_held_out_names():
     named = [r["case_id"] for r in report["corpus"]["development"]]
     assert named == [c.case_id for c in loaded if c.split == "development"]
     assert sum(report["corpus"]["held_out"].values()) == sum(c.split == "held_out" for c in loaded)
-    assert report["inputs"]["corpus"] == "sha256:" + cases.sha256((CORPUS / "manifest.json").read_bytes()).hexdigest()
+    assert report["inputs"]["corpus"] == "sha256:" + cases.tree_digest()
