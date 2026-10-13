@@ -5,8 +5,8 @@ and regular expressions, tracks the keywords that close with `end` to find `def 
 reports the start line of each assertion call the method body makes (Ruby reports a failing call at the line where
 the call starts). Calls in blocks inside the method count; calls in a nested `def` or in a lambda or proc body
 (`-> { }`, `lambda do end`, `proc { }`, `Proc.new { }`) do not, since those run only if called. Constructs it cannot
-track are refused with a reason rather than guessed: `=begin` blocks, `__END__`, endless method definitions and a
-file that defines or aliases an assertion name.
+track are refused with a reason rather than guessed: `=begin` blocks, `__END__`, endless method definitions, a file
+that defines or aliases an assertion name and a file that reopens Minitest.
 """
 
 import re
@@ -18,6 +18,9 @@ REFUSED = (
     # A file that defines or aliases an assertion name could turn it into a no-op the reader still counts.
     (re.compile(r"(?:\bdef\s+(?:self\s*\.\s*)?|\balias\s+:?|\b(?:alias_method|define_method|define_singleton_method)"
                 r"\s*\(?\s*[:\"']+)(?:" + ASSERTION.pattern + r")(?![\w?!])"), "definition of an assertion name"),
+    (re.compile(r"\b(?:class|module)\s+(?:::)?Minitest\b(?!\s*::\s*(?!Assertions\b|Test\b|Expectations\b)\w)"
+                r"|\bMinitest\s*::\s*(?:Assertions|Test|Expectations)\s*\.\s*(?:class_eval|module_eval|class_exec|send)\b"),
+     "reopening of Minitest"),
 )
 CONDITIONAL = {"if", "unless", "while", "until", "for"}
 # A conditional keyword opens a block only where a statement or expression starts.

@@ -91,6 +91,9 @@ def test_lambda_and_proc_bodies_run_only_if_called():
     ('class T\n  alias assert_equal refute_nil\n  def test_a\n  end\nend\n', 'assertion name'),
     ('class T\n  alias_method :assert, :puts\n  def test_a\n  end\nend\n', 'assertion name'),
     ('class T\n  define_method(:assert_equal) { |*| }\n  def test_a\n  end\nend\n', 'assertion name'),
+    ('module Minitest::Assertions\n  def check = nil\nend\nclass T\n  def test_a\n  end\nend\n', 'reopening of Minitest'),
+    ('module Minitest\n  class Test\n  end\nend\nclass T\n  def test_a\n  end\nend\n', 'reopening of Minitest'),
+    ('Minitest::Test.class_eval { }\nclass T\n  def test_a\n  end\nend\n', 'reopening of Minitest'),
 ])
 def test_refusals(content, message):
     method = 'test_missing' if message == 'not defined' else 'test_shapes' if content.startswith('module') else 'test_a'
