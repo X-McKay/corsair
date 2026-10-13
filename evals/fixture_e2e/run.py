@@ -257,7 +257,11 @@ def main():
             stage_configs(config, profiles, live)
         except ValueError as exc:
             parser.error(str(exc))
-    run = asyncio.run(main_async(args.evidence, live, config, profiles))
+    # SPEC-0072: the run's activity on stderr; stdout keeps the JSON summary.
+    from corsair.adapters.terminal import TerminalDisplay
+    from corsair.composition.progress import observing
+    with TerminalDisplay(f"fixture run → {args.evidence}") as display, observing(display):
+        run = asyncio.run(main_async(args.evidence, live, config, profiles))
     print(json.dumps(summary(run) | {
         "config_sha256": sha256((args.evidence / "configuration.json").read_bytes()).hexdigest()}, indent=2))
 
