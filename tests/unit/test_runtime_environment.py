@@ -25,7 +25,7 @@ def test_selected_row_is_the_only_toolchain():
 
 
 @pytest.mark.parametrize('requires, prepared, reason', [
-    ('>=3.7,<3.12', PREPARED, 'runtime unsupported: cpython'),
+    ('>=3.8,<3.12', PREPARED, 'runtime unsupported: cpython'),
     ('>=3.10', {}, 'has no prepared image'),
 ])
 def test_stop_replaces_the_agent_run(requires, prepared, reason):
@@ -45,7 +45,7 @@ def test_ready_must_stay_on_the_selection():
 
 
 def test_runtime_stop_distinguishes_new_image_from_preparation_and_keeps_ranges():
-    requirement, selection = project(">=3.7,<3.12")
+    requirement, selection = project(">=3.8,<3.12")
     result = environment_input(requirement, selection, load(), PREPARED, **FIELDS)
     assert result.diagnostic.code == "image_unavailable"
     assert requirement.components[0].allowed in result.diagnostic.render()

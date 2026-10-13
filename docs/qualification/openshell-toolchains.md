@@ -110,3 +110,32 @@ The shared gateway passed TLS, caller auth, identity and access isolation (probe
 Real case, image-only (Docker on RIG0, not OpenShell): VUL4J-6 (commons-compress, JUnit 4.12, Surefire 2.19.1) through `MavenRunner` in a `--network=none`, capability-dropped container of the java8 image. The control is a Corsair-authored copy of `ZipShortTest#testToBytes` added to Vul4J's `Test_CVE_2018_1324`, whose PoV method stays byte-identical. Fix revision: both ids listed, control and PoV passed (8.8 s). Vulnerable revision with the fix's test file: control passed, PoV `TestTimedOutException` after 6000 ms, the CVE-2018-1324 loop hitting the test's own timeout (11.8 s). This qualifies JUnit 4.12 with the runner on this image; it is not sandbox evidence.
 
 Not established: JUnit 4 before 4.12 (no Vintage discovery), any JUnit 4 or 5 version other than those listed, JDK 8 under other Maven versions, a checked-in expected Maven cache manifest for either Java image (follow-up), and the SPEC-0042 benchmark report, whose matrix input predates these rows.
+
+## SPEC-0046: CPython 3.7 image, real case and witness v2 probe (2026-10-13)
+
+[SPEC-0046](../development/specs/SPEC-0046-cpython37-toolchain.md) adds the `python37` image and pytest 6 to 7 support in the runner, parser and probe. Run on RIG0 in the worktree `.worktrees/claude/toolchain-python37-drklks`, on a fresh cluster that worktree created after `make kind-down` in the JDK 8 worktree. Commands, every attempt and the corrections are in [PLAN-0050](../development/plans/PLAN-0050-cpython37-toolchain.md). Evidence is under the worktree's `.runs/` and archived to `/home/al/git/corsair/.runs/py37-toolchain-20261013/` on RIG0.
+
+| Artifact | Immutable selection |
+| --- | --- |
+| Official CPython 3.7 | `docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b` (`3.7-slim`, Debian 12) |
+| Prepared image | `corsair-python37:40be61014c031922`, config sha256:86f897d206b1efda625eb1654b2f30ea4c69214318810f66b861c4238620ade9, node manifest sha256:b8e51f30c0d928f809d91c360bcb20a5cf3672af444959f4f5a900c7040b29ca |
+| Measured in the sandbox | Python 3.7.17 (GCC 12.2.0), pytest 7.4.4 |
+
+Network `py37-network-20261013T131142Z` (3 passed) and admission `py37-admission-20261013T131451Z` (1 passed) at 93a0fab, reused for every gate on the same node. `make openshell-install` ran before each gate, because each gate's cleanup removes the gateway and its private state.
+
+| Gate | Commit | Run | Result |
+| --- | --- | --- | --- |
+| `qualify-toolchain TOOLCHAINS=python37` | 794a003 (93a0fab plus #86) | `py37-toolchain-20261013T133347Z` | 1 passed, 188.4 s; sandbox 13ca59c6-0a85-4a33-99e9-e41786232f3e; shared gateway TLS, caller auth, identity and access isolation passed (probe sandbox 03ed858f-c421-4f94-bc75-393b7219f562); 21 observed SDK calls, internal retries unknown |
+| `qualify-python37-case` (CVE-2021-32839) | 4117e3f (794a003 plus #88) | `py37-case-20261013T134635Z` | 1 passed, 104.4 s; baseline (9.38 s, cs-951ee7603f9557ab) and fix (11.63 s, cs-c3e8b75027f65ce3) each discovered exactly the two planned ids, completed with native exit 0 and 2 passed; witness captured and refused by name: `witness probe unsupported on this runtime: CPython 3.7.17 has no sys.monitoring (3.12+)` |
+| `qualify-witness` | 4117e3f | `py37-witness-20261013T134900Z` | 1 passed, 146.7 s on the 3.12 image; probe digest c89e0d65181b78daa2f729b91f550ffa14cde45868a5daaf0ddb62e25cb43eb6 (`corsair-witness-v2`) |
+
+Every sandbox, the gateway, PV, private state and port-forward were confirmed removed after each gate. Failed attempts are retained:
+- `py37-toolchain-20261013T131750Z` (93a0fab): the cold-install check asserted an absolute `six.__file__`; CPython 3.7 keeps a module's `__file__` relative when imported through a relative `sys.path` entry. The check now inserts an absolute entry (#86).
+- `py37-toolchain-20261013T133252Z` (794a003): setup error, gateway `owner.json` missing, because the previous gate's cleanup had removed the gateway; `make openshell-install` was rerun first.
+- `py37-case-20261013T133724Z` (794a003): discovery found no admitted ids, because the patch carried the whole upstream `tests/test_format.py` (about 60 tests, some parametrized). The patch now keeps the module's imports and only the two planned methods, copied line for line (#88).
+
+Assessment eval on the regenerated v2 set, scripted, development: `20261013T135139Z-development-scripted`, 51/51 clean, mean repeat agreement 1.0, dataset sha256 22773b81…; promoted as the scripted development baseline (no earlier run with this set and mode).
+
+The matrix rows `cpython-3.7-pytest` and pytest `==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4` on it rest on these runs; 7.4.4 ran in the sandbox, the other versions rest on real output on 3.7.17 checked offline. The CVE-2021-32839 run is not a disposition: the upstream test is functional and passes at both commits.
+
+Not established: pytest below 6.0 (4.6 and 5.4 reject `--import-mode=importlib`), witness observation on 3.7 (refused by design), dependency installation for real 3.7 cases (the environment agent's setup), and the SPEC-0042 benchmark report, which needs fetched trees to regenerate. Reselecting the stored requirements in `benchmarks/runtime-requirements.json` against the new matrix moves 15 revisions of 9 Python cases from unsupported to `cpython-3.7-pytest`; that is a selection check, not a regenerated report.

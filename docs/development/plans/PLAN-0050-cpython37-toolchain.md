@@ -2,7 +2,7 @@
 id: PLAN-0050
 kind: plan
 title: CPython 3.7 toolchain image and older pytest
-status: in_progress
+status: complete
 updated: 2026-10-13
 related: [SPEC-0046, SPEC-0033, SPEC-0037]
 ---
@@ -19,10 +19,10 @@ Implement [SPEC-0046](../specs/SPEC-0046-cpython37-toolchain.md): a CPython 3.7 
 - [x] Make the probe load on 3.7 and pytest 6+, record an unsupported runtime and refuse it by name; regenerate the evidence-assessment set.
 - [x] Add `deploy/qualification/toolchains/python37`, per-directory receipts, `TOOLCHAINS=` selection and the 3.7 gate; build it offline locally.
 - [x] Add `make qualify-python37-case` for CVE-2021-32839 and let the workspace bound be raised to 512 entries by the operator.
-- [ ] Live on RIG0: fresh kind node; re-prepare the existing `python` and `java` images too, since per-directory receipts change every receipt digest (a mismatch there is the receipt format, not a source change); `TOOLCHAINS=python37` build, load and gate; `make qualify-python37-case`; `make qualify-witness`, because the probe bytes and schema changed for 3.12 as well.
-- [ ] Assessment baseline: re-run the scripted evidence-assessment eval on RIG0 and promote it with `make eval-baseline AGENT=assessment` against the pre-#55 baseline; if a live assessment baseline exists by then, re-run it on the regenerated set and compare.
-- [ ] Add the `cpython-3.7-pytest` matrix row and widen the pytest framework row with the gate report as evidence; regenerate the SPEC-0042 report.
-- [ ] Review, CURRENT.md, handoff.
+- [x] Live on RIG0: fresh kind node; re-prepare the existing `python` and `java` images too, since per-directory receipts change every receipt digest (a mismatch there is the receipt format, not a source change); `TOOLCHAINS=python37` build, load and gate; `make qualify-python37-case`; `make qualify-witness`, because the probe bytes and schema changed for 3.12 as well.
+- [x] Assessment baseline: re-run the scripted evidence-assessment eval on RIG0 and promote it with `make eval-baseline AGENT=assessment` against the pre-#55 baseline; if a live assessment baseline exists by then, re-run it on the regenerated set and compare.
+- [x] Add the `cpython-3.7-pytest` matrix row and a pytest framework row scoped to it with the gate report as evidence; the SPEC-0042 report regeneration needs fetched trees and stays pending (stored requirements reselected instead).
+- [x] Review, CURRENT.md, handoff ([HANDOFF-0068](../handoffs/HANDOFF-0068-cpython37-toolchain-qualified.md)).
 
 ## Validation and progress
 
@@ -36,6 +36,10 @@ Al's review of 72b6861 (P2): `TOOLCHAINS` reached pytest as a `-k` substring, so
 
 Review of 1ba724f (Hold, records only). The frozen evidence-assessment set (`cases.yaml`, `held_out.json`) was regenerated and re-frozen with `--freeze-held-out`, mechanically: only the schema string, probe digest, witness artifact hashes and the new `"unsupported": null` field changed, but those are agent-visible and `dataset_sha256` changes (development b614014f… to 22773b81…), so earlier assessment baselines are not comparable by hash. Scripted development comparison in the container (not a baseline): main f6a87d6 and this branch 1ede65d both 51/51 clean, identical assertion and repeat-agreement tables; mean input tokens 6105.3 to 6134.0 (+0.5%, the longer record). Held-out and live runs not run here. `evals/evidence_assessment/evaluate.py` also changes on #49 and #58 (merged): whichever of #49 and #55 merges later regenerates the set and re-runs this comparison. #44 (f48b004) also changes the probe, SPEC-0033 and the set: whichever of #44 and #55 merges second resolves the probe, regenerates and re-freezes the set, and `make qualify-witness` runs after both. The SPEC-0033 qualified probe remains the pre-#55 `corsair-witness-v1` digest (PLAN-0039, `.runs/witness-20261013T042451`) until `make qualify-witness` passes on this branch.
 
+2026-10-13, RIG0, worktree `.worktrees/claude/toolchain-python37-drklks`, fresh cluster after `make kind-down` in the JDK 8 worktree. At 93a0fab: `make tools kind-up`, `qualify-network` (`py37-network-20261013T131142Z`, 3 passed), `admission-artifacts admission-install qualify-admission` (`py37-admission-20261013T131451Z`, 1 passed), `openshell-install`, `toolchain-images toolchain-images-load TOOLCHAINS="python python37"`. Gate 1 attempt 1 (`py37-toolchain-20261013T131750Z`) failed: CPython 3.7 keeps a relative `sys.path` entry's `__file__` relative, so the cold-install check's absolute-prefix assertion failed; fixed in #86 (794a003 on 93a0fab, merged c4ea946). Attempt 2 (`…133252Z`, 794a003) errored in setup: the previous gate's cleanup had removed the gateway and `owner.json`; `make openshell-install` now runs before every gate. Attempt 3 (`…133347Z`) passed, 188.4 s. Case attempt 1 (`py37-case-20261013T133724Z`) found no admitted ids, because the patch carried the whole upstream test module with parametrized tests; #88 keeps only the two planned methods (4117e3f, merged 2d6b459). Case attempt 2 (`py37-case-20261013T134635Z`, 4117e3f) passed, 104.4 s, witness refused by name at both commits. `make qualify-witness` (`py37-witness-20261013T134900Z`, 4117e3f) passed, 146.7 s, qualifying the v2 probe c89e0d65…. `make eval AGENT=assessment` scripted development `20261013T135139Z-development-scripted` 51/51 clean, promoted (no earlier run on this set and mode). Results and identities in [the toolchain report](../../qualification/openshell-toolchains.md#spec-0046-cpython-37-image-real-case-and-witness-v2-probe-2026-10-13); evidence archived to `/home/al/git/corsair/.runs/py37-toolchain-20261013/` (1363 files). The cluster was handed to #49's thread and is still owned by this worktree until `make kind-down` runs there.
+
+Matrix rows (evidence-only PR from main bb4f3b7): `cpython-3.7-pytest` after the 3.12 row and pytest `==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4` scoped to it. Reselecting the stored requirements in `benchmarks/runtime-requirements.json` moves 15 revisions of 9 Python cases (CVE-2019-1010017, CVE-2021-32839, CVE-2022-24065 fix, CVE-2022-24439, CVE-2022-29217, CVE-2023-23934 fix, CVE-2023-25577 fix, CVE-2023-32681, CVE-2023-34457) from unsupported to this row; `>=3.8,<3.12` stays unsupported (no nearby-version fallback).
+
 ## Decisions and next action
 
-Qualified floor pytest 6.0 (importlib mode); witness on 3.7 refused by name rather than a weaker observer; matrix row only after the live gate. Next: ask for the kind cluster, then run the live steps on RIG0 under `/home/al/git/corsair/.worktrees/claude/toolchain-python37-drklks` with evidence under that worktree's own `.runs` (the installer accepts admission proof only from the installing checkout).
+Qualified floor pytest 6.0 (importlib mode); witness on 3.7 refused by name rather than a weaker observer; matrix row only after the live gate (under the lighter process adopted 2026-10-13 these rows are `evidence: live`). Next: none in this plan; a 3.7 case's dependency setup belongs to the environment agent.
