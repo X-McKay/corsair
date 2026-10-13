@@ -366,7 +366,7 @@ def test_adjacent_cited_ranges_can_jointly_cover_identified_anchor():
 
 @pytest.mark.parametrize("symbol", ["read_document£", "read_document\u200c", "read_document\u200d"])
 def test_exact_extended_identifier_spelling_is_preserved(symbol):
-    from corsair.agents.test_planning.agent import _symbol_occurs
+    from corsair.agents.test_planning.validation import _symbol_occurs
     assert _symbol_occurs(symbol, f"documents.{symbol}(root, name)")
 
 
