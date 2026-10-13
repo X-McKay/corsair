@@ -16,16 +16,18 @@ Implement the durable mode of [SPEC-0068](../specs/SPEC-0068-chain-environment-s
 ## Steps
 
 - [x] SPEC-0068 durable-mode section: one activity, no retry, why not per-call activities.
-- [ ] One module-level `prepare_environment` shared by `run_direct` and the activity.
-- [ ] `StageKeys.environment` (optional, admitted like the others), `ChainRuntime.preparation` and the worker's models, `configure_chain(..., preparation=)`, `run_durable(..., preparation=)`, the stage budget in the ceiling check.
-- [ ] The activity and its typed record; the workflow schedules it once with the stage timeout plus a margin, and a failed activity is a recorded failure with unconfirmed cleanup.
-- [ ] `ChainResult.environment`, `AttemptRecord.cleanup` and the environment results in the attempt record.
-- [ ] Native test: durable equals direct for a ready and a blocked case with one `prepare_environment` scheduled; no preparation stops with `PreparationMissing`.
-- [ ] `make test-config`, native tests, `make eval AGENT=chain`, `make eval AGENT=environment`; CURRENT.md row; handoff ([HANDOFF-0096](../handoffs/HANDOFF-0096-durable-environment-stage.md)).
+- [x] One module-level `prepare_environment` shared by `run_direct` and the activity.
+- [x] `StageKeys.environment` (optional, admitted like the others), `ChainRuntime.preparation` and the worker's models, `configure_chain(..., preparation=)`, `run_durable(..., preparation=)`, the stage budget in the ceiling check.
+- [x] The activity and its typed record; the workflow schedules it once with the stage timeout plus a margin, and a failed activity is a recorded failure with unconfirmed cleanup.
+- [x] `ChainResult.environment`, `AttemptRecord.cleanup` and the environment results in the attempt record.
+- [x] Native test: durable equals direct for a ready and a blocked case with one `prepare_environment` scheduled; no preparation stops with `PreparationMissing`.
+- [x] `make test-config`, native tests, `make eval AGENT=chain`, `make eval AGENT=environment`; CURRENT.md row; handoff ([HANDOFF-0096](../handoffs/HANDOFF-0096-durable-environment-stage.md)).
 
 ## Validation and progress
 
 - 2026-10-13: records written; PLAN-0075 and HANDOFF-0096 reserved in the shared record-numbers file.
+- 2026-10-13, main `7d04cf3` merged (#91, #101, #99): `make test-config` 1756 passed. Native Temporal `tests/temporal/test_chain_native.py` 14/14 against a local dev server: durable equals direct for a ready case (complete) and a blocked case (stops at `environment`), apart from the random setup-command operation ids, with one `corsair.chain.prepare_environment` scheduled at one attempt and the sandbox prepared and released once; no environment key and no worker preparation each stop with `PreparationMissing` as in direct mode. `make eval AGENT=chain` scripted 5/5 clean; `make eval AGENT=environment` scripted 16/16.
+- Main `59492d2` (#104) merged afterwards: SPEC-0068's trust line now says the non-pytest runners accept the agent's discovery command without running it.
 
 ## Decisions and next action
 
