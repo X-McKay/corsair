@@ -23,7 +23,7 @@ Implement [SPEC-0033](../specs/SPEC-0033-witness-capture.md): the execution node
 - [x] Live gate authored: `make qualify-witness` (marker `witness`) on the SPEC-0032 recipe with the gates over the four runs.
 - [x] Independent adversarial review; findings fixed (below).
 - [ ] Live qualification on a fresh RIG0 kind node; results here.
-- [ ] Review, CURRENT.md row and HANDOFF-0051.
+- [x] Review, CURRENT.md row and [HANDOFF-0051](../handoffs/HANDOFF-0051-witness-capture.md).
 
 ## Validation and progress
 
@@ -35,8 +35,25 @@ Implement [SPEC-0033](../specs/SPEC-0033-witness-capture.md): the execution node
 
 2026-10-13, Al's review of `391682e` (two P1, both reproduced with the real probe and gates): a target reading only a benign config file supported `reproduced` because any open counted as the effect, and an application read executed by a module body during an import was hidden because any importlib ancestor frame excluded the open, letting a candidate reach `verified`. Fixed: witnesses are requested only inside an operator-approved envelope (target plus planned effect file name) matching the identification target, and only opens of that file are the effect; only opens and `OSError`s issued directly by importlib loader frames are excluded. Both counterexamples are now real subprocess regressions, plus envelope refusal in the composition. `make test-config`: 820 passed.
 
-Live: not yet run. The RIG0 helper found the shared kind cluster in use by the fully live E2E thread and changed nothing; the run waits for that thread to finish.
+Live: not run.
+- The fully live E2E thread then handed over its fresh RIG0 node: network 3/3 and admission 1/1 today, toolchain images loaded, gateway installed.
+- The qualification fixtures only accept kind state and evidence inside the running worktree.
+- Al approved hardlinking the kind kubeconfig into `/home/al/git/corsair-witness`, but RIG0's auto-mode safety check denied all three staging attempts.
+- Nothing was staged and the cluster was untouched. `make test-config` on RIG0 at `646f7fd`: 820 passed.
 
 ## Decisions and next action
 
-The design fork (in-interpreter operator probe versus an out-of-process kernel observer) was put to the user as a decision card; work continued on the recommended probe. The probe travels as an execution argument instead of a file, so the SPEC-0032 tree admission and the toolchain image are unchanged. Next: run `make qualify-witness` on RIG0, record the result, then the handoff.
+The design fork (in-interpreter operator probe versus an out-of-process kernel observer) was put to the user as a decision card; work continued on the recommended probe. The probe travels as an execution argument instead of a file, so the SPEC-0032 tree admission and the toolchain image are unchanged. Next: run the live gate interactively on RIG0, then record the result here. Command sequence:
+
+```
+cd /home/al/git/corsair-witness
+mkdir -p -m 700 .state/kind .state/openshell .runs/reused-live-e2e-20261013
+ln ../corsair-live-e2e/.state/kind/kubeconfig .state/kind/kubeconfig
+cp -p ../corsair-live-e2e/.state/kind/owner.json .state/kind/
+cp -a ../corsair-live-e2e/.runs/live-e2e-20261013/{network,admission} .runs/reused-live-e2e-20261013/
+jq '.admission_evidence="/home/al/git/corsair-witness/.runs/reused-live-e2e-20261013/admission"' ../corsair-live-e2e/.state/openshell/owner.json > .state/openshell/owner.json && chmod 600 .state/openshell/owner.json
+make tools
+CORSAIR_NETWORK_RUN=.runs/reused-live-e2e-20261013/network CORSAIR_QUAL_RUN=.runs/witness-$(date -u +%Y%m%dT%H%M%S) make qualify-witness
+rm .state/kind/kubeconfig
+cd ../corsair-live-e2e && make openshell-install CORSAIR_ADMISSION_RUN=.runs/live-e2e-20261013/admission
+```
