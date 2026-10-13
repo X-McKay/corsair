@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 import json
 from pathlib import Path
+import re
 from time import perf_counter
 from typing import Any, Literal
 from uuid import uuid4
@@ -32,6 +33,10 @@ from evals.issue_analysis.evaluate import describe_model, record_count
 from evals.issue_analysis.live import NoUnknownToolAttempts, ProviderUsageCoverage, message_counts, output_tool_names
 
 ROOT = Path(__file__).parent
+# Development cases were used to shape prompts v1-v3; held-out cases were frozen before any provider saw them.
+DATASETS = {"development": "cases.yaml", "heldout": "cases-heldout.yaml"}
+# Fixture setup reaching the parent of the scratch location or a fixed host directory (PLAN-0025 review finding).
+OUTSIDE_SCRATCH = re.compile(r"\.parent\b|(?<![\w.])/(?:tmp|var|etc|home|root)\b|(?<![\w.])~/", re.IGNORECASE)
 PlanOutput = ReadyTestPlan | UnsupportedTestPlan
 
 
@@ -77,6 +82,8 @@ def plan_checks(inputs: TestPlanningInput, output: PlanOutput, oracle: PlanOracl
         "grounding": oracle.target_path is not None and all(
             _covers(spec.source_references, oracle.target_path, oracle.required_lines) for spec in specs),
         "authority": not any(m in authored for m in oracle.forbidden_markers),
+        # Heuristic anchor: names a parent or fixed host directory; prose may still escape another way.
+        "scratch": not any(OUTSIDE_SCRATCH.search(step) for spec in specs for step in spec.fixture_setup),
     }
 
 
@@ -96,9 +103,9 @@ class ReadBeforePlanning(Evaluator[TestPlanningInput, PlanOutput, PlanOracle]):
         return {"required_reads": ctx.metadata is not None and set(ctx.metadata.required_reads) <= read}
 
 
-def dataset() -> Dataset[TestPlanningInput, PlanOutput, PlanOracle]:
+def dataset(name: str = "development") -> Dataset[TestPlanningInput, PlanOutput, PlanOracle]:
     return Dataset[TestPlanningInput, PlanOutput, PlanOracle].from_file(
-        ROOT / "cases.yaml", custom_evaluator_types=(MatchesPlan, ReadBeforePlanning),
+        ROOT / DATASETS[name], custom_evaluator_types=(MatchesPlan, ReadBeforePlanning),
     )
 
 
@@ -129,11 +136,11 @@ class EvaluationBudget(BaseModel):
     output_retries: int = Field(default=1, ge=0, le=1, strict=True)
 
 
-async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None):
+async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, cases: str = "development", provider=None):
     # Reserve before the first request; rerunning the same attempt is always refused.
     evidence.mkdir(parents=True, exist_ok=False)
     logfire.configure(send_to_logfire=False, console=False)
-    corpus = dataset()
+    corpus = dataset(cases)
     scripted = model is None
     fixture_models = {case.inputs.input_digest: scripted_model(case.metadata) for case in corpus.cases} if scripted else {}
     actual_model = model if model is not None else next(iter(fixture_models.values()))
@@ -141,7 +148,8 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None):
                 "model": describe_model(actual_model), "weights_identity": "not_applicable" if scripted else "unknown",
                 "prompt_version": PROMPT_VERSION, "config_version": CONFIG_VERSION, "skill_sha256": SKILL_SHA256,
                 "toolset_id": TOOLSET_ID, "budget": budget.model_dump(), "task_retries": 0, "max_concurrency": 1,
-                "dataset_sha256": sha256((ROOT / "cases.yaml").read_bytes()).hexdigest(),
+                "dataset": cases, "dataset_sha256": sha256((ROOT / DATASETS[cases]).read_bytes()).hexdigest(),
+                "provider": provider,
                 "output_contract": "ReadyTestPlan | UnsupportedTestPlan",
                 "draft_contract": "ReadyTestPlanDraft | UnsupportedTestPlanDraft"}
     (evidence / "configuration.json").write_text(json.dumps(metadata, indent=2))
@@ -212,15 +220,19 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--provider-config", type=Path, help="Explicit LocalModelConfig JSON; omitted means scripted fixture only")
+    parser.add_argument("--cases", choices=sorted(DATASETS), default="development")
+    parser.add_argument("--repeat", type=int, default=EvaluationBudget().repeat)
     args = parser.parse_args()
     if args.evidence.exists() or args.evidence.is_symlink():
         parser.error("evidence path already exists")
     async def run():
+        budget = EvaluationBudget(repeat=args.repeat)
         if args.provider_config is None:
-            return await evaluate(args.evidence, EvaluationBudget())
+            return await evaluate(args.evidence, budget, cases=args.cases)
         config = LocalModelConfig.model_validate_json(args.provider_config.read_text())
         async with local_model(config) as model:
-            return await evaluate(args.evidence, EvaluationBudget(), model=model)
+            return await evaluate(args.evidence, budget, model=model, cases=args.cases,
+                                  provider=config.model_dump(mode="json", exclude={"api_key_env"}))
     report = asyncio.run(run())
     report.print(include_input=False, include_output=False)
     if not passed(report):
