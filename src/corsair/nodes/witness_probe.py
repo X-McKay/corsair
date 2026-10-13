@@ -22,7 +22,11 @@ MAX_TESTS = 16
 
 
 def _name(value):
-    return type(value).__name__ if isinstance(value, BaseException) else None
+    """Builtin exceptions by bare name (the planner's vocabulary), others qualified so a local lookalike never matches."""
+    if not isinstance(value, BaseException):
+        return None
+    kind = type(value)
+    return kind.__name__ if kind.__module__ == 'builtins' else f'{kind.__module__}.{kind.__qualname__}'
 
 
 class Probe:
@@ -34,7 +38,11 @@ class Probe:
                        'target': {'path': config['target_path'], 'symbol': self.symbol},
                        'tool_registered': False, 'intact': False, 'tests': {}}
         self.active = None
+        # Keyed by identity with the code object kept alive: equal code objects from other files or
+        # qualnames compare equal, so an equality-keyed cache would let a lookalike pass as the target.
         self.known = {}
+        self.files = {}
+        self.raised = []
         monitoring = sys.monitoring
         self.tool = config['tool_id']
         events = monitoring.events
@@ -51,16 +59,27 @@ class Probe:
         sys.addaudithook(self._audit)
 
     def _target(self, code):
-        known = self.known.get(code)
-        if known is None:
-            known = (code.co_qualname == self.symbol
-                     and os.path.realpath(code.co_filename) == self.target_file)
-            self.known[code] = known
-        return known
+        entry = self.known.get(id(code))
+        if entry is None or entry[0] is not code:
+            filename = code.co_filename
+            if filename not in self.files:
+                self.files[filename] = os.path.realpath(filename) == self.target_file
+            entry = (code, code.co_qualname == self.symbol and self.files[filename])
+            self.known[id(code)] = entry
+        return entry[1]
 
     def _on_stack(self, frame):
         while frame is not None:
             if self._target(frame.f_code):
+                return True
+            frame = frame.f_back
+        return False
+
+    @staticmethod
+    def _importing(frame):
+        # Module loading reads source and bytecode through importlib; that is never the planned effect.
+        while frame is not None:
+            if frame.f_code.co_filename.startswith(('<frozen importlib', '<frozen zipimport')):
                 return True
             frame = frame.f_back
         return False
@@ -96,6 +115,10 @@ class Probe:
     def _raise(self, code, offset, exception):
         test = self._test()
         if test is not None and isinstance(exception, OSError) and self._on_stack(sys._getframe(1)):
+            # RAISE fires again in every frame the exception propagates through; record it once.
+            if any(seen is exception for seen in self.raised):
+                return
+            self.raised.append(exception)
             if len(test['os_errors']) < MAX_OPENS:
                 test['os_errors'].append({'type': _name(exception), 'errno': exception.errno})
             else:
@@ -105,7 +128,8 @@ class Probe:
         if event != 'open' or self.active is None:
             return
         test = self._test()
-        if test is None or not self._on_stack(sys._getframe(1)):
+        frame = sys._getframe(1)
+        if test is None or not self._on_stack(frame) or self._importing(frame):
             return
         path = args[0] if args else None
         if isinstance(path, bytes):
@@ -129,6 +153,7 @@ class Probe:
             if self.active is not None:
                 tests[self.active]['complete'] = True
             self.active = None
+            self.raised.clear()
 
     def pytest_sessionfinish(self, session, exitstatus):
         self.active = None

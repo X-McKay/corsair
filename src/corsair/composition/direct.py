@@ -207,7 +207,11 @@ async def run_direct(case: FixtureCase, models: StageModels, runners: Runners,
         return stop("execution", f"patch not frozen: {exc}"[:2048], identification=identification, plan=plan,
                     patch=patch)
     executions = []
-    request = witness_request(identification)
+    try:
+        request, unrequested = witness_request(identification), ()
+    except ValueError as exc:
+        # The identified symbol or path cannot address a probe target: run without one and say so.
+        request, unrequested = None, (f"no witness requested: {exc}"[:512],)
     for revision in ("baseline", "candidate"):
         operation, observed, failure = uuid4(), None, None
         try:
@@ -235,7 +239,9 @@ async def run_direct(case: FixtureCase, models: StageModels, runners: Runners,
 
     identity = case.environment_identity
     runs = {e.revision: (e.observed,) for e in executions}
-    witnesses = {e.revision: witness_evidence(e.observed.witness, request, plan.security.test_id) for e in executions}
+    witnesses = {e.revision: (witness_evidence(e.observed.witness, request, plan.security.test_id) if request else
+                              WitnessEvidence(None, None, "no witness was requested or captured for this run"))
+                 for e in executions}
     done["witnesses"] = tuple(witnesses.values())
 
     def gate_run(revision):
@@ -244,12 +250,14 @@ async def run_direct(case: FixtureCase, models: StageModels, runners: Runners,
                             sandbox_events=found.sandbox_events)
     evidence = AssessmentEvidence(plan=expected, baseline=(gate_run("baseline"),), candidate=(gate_run("candidate"),))
     gate = assess(evidence)
-    limitations = UNOBSERVED + tuple(f"{revision} witness not admitted: {found.reason}"
+    limitations = UNOBSERVED + unrequested + tuple(f"{revision} witness not admitted: {found.reason}"
                                      for revision, found in witnesses.items() if found.witness is None) + tuple(
         f"{e.revision} workspace cleanup {e.observed.cleanup}" for e in executions if e.observed.cleanup != "confirmed")
     try:
         assessment_input = AssessmentInput(scope=issue.scope, evidence=evidence,
-                                           items=evidence_items(expected, patch, identity, runs))
+                                           items=evidence_items(expected, patch, identity, runs, admitted={
+                                               revision for revision, found in witnesses.items()
+                                               if found.witness is not None}))
     except ValueError as exc:
         return stop("assessment", f"assessment input refused: {exc}"[:2048], gate=gate, limitations=limitations,
                     **done)

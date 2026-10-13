@@ -36,18 +36,18 @@ def read(root, name, error=None):
 '''
 
 
-def run_probe(tmp_path, test_body, command=COMMAND, target=TARGET):
+def run_probe(tmp_path, test_body, command=COMMAND, target=TARGET, request=REQUEST):
     (tmp_path / 'target.py').write_text(target)
     (tmp_path / 'test_case.py').write_text('import os\nfrom pathlib import Path\nimport target\n\n' + test_body)
-    argv = probe_argv(command, REQUEST, root=str(tmp_path), record_path='witness.json', nonce=NONCE)
+    argv = probe_argv(command, request, root=str(tmp_path), record_path='witness.json', nonce=NONCE)
     argv = (sys.executable,) + argv[1:]
     done = subprocess.run(argv, cwd=tmp_path, capture_output=True, timeout=60, env={'PYTHONPATH': '.'})
     record = (tmp_path / 'witness.json').read_bytes() if (tmp_path / 'witness.json').exists() else b''
     return done, record
 
 
-def capture(record, **changes):
-    values = dict(status='captured', request=REQUEST, nonce=NONCE, probe_sha256=PROBE_SHA256, record=record,
+def capture(record, request=REQUEST, **changes):
+    values = dict(status='captured', request=request, nonce=NONCE, probe_sha256=PROBE_SHA256, record=record,
                   artifact=ArtifactRef(sha256(record).hexdigest(), len(record)), detail='', receipt=None)
     return WitnessCapture(**(values | changes))
 
@@ -215,3 +215,77 @@ def test_the_probe_argv_stays_well_inside_the_execution_adapter_bound():
             + probe_argv(PREFIX, WitnessRequest('documents.py', 'read_document'), root='/tmp/workspace',
                          record_path='/tmp/corsair-witness.json', nonce=NONCE) + ('--tb=native',) + ids)
     assert sum(len(arg.encode()) + 1 for arg in argv) < 12288
+
+
+def test_an_identical_function_elsewhere_is_never_the_target(tmp_path):
+    """Equal code objects from another file compare equal; attribution must not follow equality."""
+    (tmp_path / 'lookalike.py').write_text(TARGET)
+    found, record = mapped(tmp_path, '''
+import pytest
+import lookalike
+def test_security(tmp_path):
+    (tmp_path / "x").write_text("x")
+    with pytest.raises(ValueError):
+        target.read(tmp_path, "x", error="reject")
+    assert lookalike.read(tmp_path, "x") == "x"
+''')
+    security = record['tests'][SECURITY]
+    assert (security['entered'], security['exits'], security['opens']) == (1, ['ValueError'], [])
+    assert (found.witness.effect, found.witness.safe_behavior) == ('absent', 'ValueError')
+
+
+def test_module_loading_inside_the_target_is_not_the_effect(tmp_path):
+    target = TARGET + '''
+def lazy(name):
+    import lazy_dependency
+    raise ValueError(name)
+'''
+    (tmp_path / 'lazy_dependency.py').write_text('VALUE = 1\n')
+    request = WitnessRequest('target.py', 'lazy')
+    done, record = run_probe(tmp_path, '''
+import pytest
+def test_security():
+    with pytest.raises(ValueError):
+        target.lazy("x")
+''', target=target, request=request)
+    found = witness_evidence(capture(record, request), request, SECURITY)
+    assert json.loads(record)['tests'][SECURITY]['opens'] == []
+    assert (found.witness.effect, found.witness.safe_behavior) == ('absent', 'ValueError')
+
+
+def test_one_denial_propagating_through_frames_is_one_event(tmp_path):
+    target = TARGET + '''
+def inner(path):
+    raise PermissionError(errno.EACCES, 'denied', str(path))
+
+def outer(path):
+    return inner(path)
+'''
+    request = WitnessRequest('target.py', 'outer')
+    done, record = run_probe(tmp_path, '''
+import pytest
+def test_security(tmp_path):
+    with pytest.raises(PermissionError):
+        target.outer(tmp_path / "secret")
+''', target=target, request=request)
+    found = witness_evidence(capture(record, request), request, SECURITY)
+    assert len(json.loads(record)['tests'][SECURITY]['os_errors']) == 1 and len(found.sandbox_events) == 1
+
+
+def test_a_local_class_named_like_a_builtin_is_not_the_builtin(tmp_path):
+    target = TARGET + '''
+class ValueError(Exception):
+    pass
+
+def shadow(name):
+    raise ValueError(name)
+'''
+    request = WitnessRequest('target.py', 'shadow')
+    done, record = run_probe(tmp_path, '''
+import pytest
+def test_security():
+    with pytest.raises(Exception):
+        target.shadow("x")
+''', target=target, request=request)
+    found = witness_evidence(capture(record, request), request, SECURITY)
+    assert found.witness.safe_behavior == 'target.ValueError'

@@ -20,13 +20,18 @@ Implement [SPEC-0033](../specs/SPEC-0033-witness-capture.md): the execution node
 - [x] `PytestRunner`: optional witness request, `witness_record_path`, single fixed read-back after a completed execution.
 - [x] Composition: target from the identification, witness and sandbox events per revision into the gates, refusal reasons as limitations, record as a `witness` evidence item; CLI journal forwards the request.
 - [x] Offline tests: real probe subprocesses, runner orchestration, composition reaching `reproduced`/`verified`.
-- [x] Live gate `make qualify-witness` (marker `witness`) on the SPEC-0032 recipe with the gates over the four runs.
+- [x] Live gate authored: `make qualify-witness` (marker `witness`) on the SPEC-0032 recipe with the gates over the four runs.
+- [x] Independent adversarial review; findings fixed (below).
 - [ ] Live qualification on a fresh RIG0 kind node; results here.
 - [ ] Review, CURRENT.md row and HANDOFF-0051.
 
 ## Validation and progress
 
 2026-10-13, cloud container from main `0d9bb5a`: prototype over the reviewed pair through the real runner and reviewed host workspace gave vulnerable `(path_reached True, effect observed)` and fixed `(True, absent, ValueError)` on the first run. `make test-config` 811 passed (781 on main; new probe, runner and composition checks, one replaced composition check), one existing pydantic_graph deprecation warning. Two unit expectations were wrong on first run and corrected: a test opened `sub/../outside.txt` without creating `sub`, which the probe correctly reported as a failed open (effect unknown); and an exception in `pytest_sessionfinish` made pytest exit 1, not an internal error, so the probe now sets `INTERNAL_ERROR` itself when the record path is occupied. The live gate collects (`-m witness --collect-only`: 1 selected).
+
+2026-10-13, independent Opus review of `f21294a` (empirical CPython 3.12 checks): blocking, the target cache keyed by code equality let an identical function in another file pass as the target (verified end to end) and import-time `.pyc` opens inside the target counted as the effect; should-fix, an unaddressable identified symbol crashed the composition, one `OSError` produced an event per frame, and refused or malformed records reached the assessor and could stop it. All fixed: identity-keyed cache, importlib frames excluded, request refusal runs unwitnessed with a limitation, one event per exception, only admitted records exposed, non-builtin exception types qualified. New negative checks for each. Recorded, not fixed: `observed` means any non-import open by the target (SPEC-0033 limits); the fixture planner input now lists the probe, so its prompts are not like-for-like with the PLAN-0031 baseline.
+
+`make test-config` after the fixes: 816 passed.
 
 Live: not yet run. The RIG0 helper found the shared kind cluster in use by the fully live E2E thread and changed nothing; the run waits for that thread to finish.
 

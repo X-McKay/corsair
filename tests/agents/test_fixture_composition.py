@@ -233,3 +233,17 @@ def test_journal_keeps_a_refused_development_run(store, tmp_path):
     observed = entry["observed"]
     assert observed["failure_layer"] == "workspace" and observed["cleanup"] == "unconfirmed"
     assert "reviewed SPEC-0018" in observed["detail"]
+
+
+def test_a_target_the_probe_cannot_address_runs_without_a_witness(store, tmp_path, monkeypatch):
+    """An identified symbol the probe refuses never crashes the chain; the runs proceed unwitnessed and say why."""
+    from corsair.composition import direct
+
+    def refused(identification):
+        raise ValueError("Witness target needs a plain qualified symbol")
+    monkeypatch.setattr(direct, "witness_request", refused)
+    run = compose(store, tmp_path)
+    assert run.stopped_at is None and all(e.observed.witness is None for e in run.executions)
+    assert run.gate.permitted == Disposition(execution="completed", finding="inconclusive", fix="not_verified")
+    assert "no witness requested: Witness target needs a plain qualified symbol" in run.limitations
+    assert not any("witness (kind witness" in prompt for prompt in prompts(run))

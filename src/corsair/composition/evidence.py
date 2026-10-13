@@ -132,7 +132,8 @@ def _receipt_summary(observed: NativeTestRun) -> str:
 
 
 def evidence_items(plan: ObservationPlan, patch: TestPatch, environment: EnvironmentIdentity,
-                   runs: dict[Revision, tuple[NativeTestRun, ...]]) -> tuple[EvidenceItem, ...]:
+                   runs: dict[Revision, tuple[NativeTestRun, ...]],
+                   admitted: frozenset[Revision] | set[Revision] = frozenset()) -> tuple[EvidenceItem, ...]:
     """Frozen artifacts the assessment agent may read; revisions are named baseline and candidate only."""
     items = [_item('plan', 'plan', plan.model_dump_json(indent=2)),
              _item('environment', 'environment', environment.model_dump_json(indent=2))]
@@ -149,8 +150,8 @@ def evidence_items(plan: ObservationPlan, patch: TestPatch, environment: Environ
             elif observed.discovery is not None and observed.discovery.errors:
                 items.append(_item(f'{prefix}-stdout', 'stdout', observed.discovery.errors, revision, index))
             captured = observed.witness
-            if captured is not None and captured.status == 'captured':
-                # The operator probe's record, not test output; the gate decides what it supports.
+            if captured is not None and captured.status == 'captured' and revision in admitted:
+                # Only an admitted probe record, never test output or a refused record; the gate decides its weight.
                 record = json.dumps(json.loads(captured.record), indent=2, sort_keys=True)
                 items.append(_item(f'{prefix}-witness', 'witness', record, revision, index))
     return tuple(items)
