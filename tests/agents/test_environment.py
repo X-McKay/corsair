@@ -569,3 +569,16 @@ def test_missing_maven_is_terminal_even_for_wrapper_correction(wrapper_args):
     blocked = {"status": "blocked", "layer": "build", "evidence": "mvn: not found", "run_ids": [1], "citations": []}
     run(blocked, [("run_setup_command", {"command": list(bad)}), correction_call(("./mvnw", *wrapper_args))], execution)
     assert execution.calls == [bad]
+
+
+def test_an_order_refusal_names_the_listed_command_without_its_own_run():
+    """Corpus pathtraversal (2026-10-13): the same build listed as a recipe step and as build_command needs two
+    runs; a refusal that named no command left the agent resubmitting the same draft."""
+    execution = ScriptedExecution(dict(DISCOVERED))
+    twice = ready(recipe=[*ready()["recipe"], {"phase": "build", "command": list(BUILD),
+                                                "source": {"path": ".github/workflows/ci.yml", "start_line": 4, "end_line": 4}}])
+    with pytest.raises(UnexpectedModelBehavior) as refused:
+        run(twice, SETUP, execution)
+    detail = str(refused.value.__cause__)
+    assert "the build command 'python3.12 -m compileall -q -b documents.py' has no successful run" in detail
+    assert "a command listed twice needs two runs" in detail

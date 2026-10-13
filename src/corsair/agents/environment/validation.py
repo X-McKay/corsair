@@ -69,7 +69,15 @@ async def finalize_environment(ctx: RunContext[EnvironmentDependencies], draft: 
         required = [s.command for s in draft.recipe] + [draft.build_command, draft.discovery_command, draft.baseline_test_command]
         positions = _subsequence([records[rid].command for rid in succeeded], required)
         if positions is None:
-            raise ModelRetry("recipe, build, discovery and baseline test commands must each have succeeded in this order in this run")
+            names = [f"recipe step {n}" for n in range(1, len(draft.recipe) + 1)] + ["build", "discovery", "baseline test"]
+            observed, start, missing = [records[rid].command for rid in succeeded], 0, 0
+            for missing, command in enumerate(required):
+                if command not in observed[start:]:
+                    break
+                start = observed.index(command, start) + 1
+            raise ModelRetry("recipe, build, discovery and baseline test commands must each have succeeded in this order "
+                             f"in this run; the {names[missing]} command {' '.join(required[missing])!r} has no successful "
+                             "run after the commands listed before it (a command listed twice needs two runs)")
         discovery, baseline = succeeded[positions[-2]], succeeded[positions[-1]]
         if draft.baseline_test_id.encode() not in deps.ledger.outputs[discovery][0]:
             raise ModelRetry("baseline_test_id must appear in the discovery command's output")
