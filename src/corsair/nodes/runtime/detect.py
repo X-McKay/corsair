@@ -23,6 +23,8 @@ ROOT = ('pyproject.toml', 'setup.py', 'setup.cfg', 'requirements*.txt', 'require
         'dist.ini', '.travis.yml', 'appveyor.yml', 'Jenkinsfile', 'requirements/*.txt', 'requirements/*.in',
         '.mvn/wrapper/maven-wrapper.properties', 'gradle/wrapper/gradle-wrapper.properties', '.github/workflows/*.yml',
         '.github/workflows/*.yaml')
+# Root-only names whose leading `*` must not cross directories (test-requirements.txt, dev_requirements.in).
+TOP = ('*-requirements*.txt', '*_requirements*.txt', '*-requirements*.in', '*_requirements*.in')
 MARKERS: dict[Language, tuple[str, ...]] = {
     'python': ('pyproject.toml', 'setup.py', 'setup.cfg', 'Pipfile', 'requirements.txt', 'tox.ini'),
     'java': ('pom.xml', 'build.gradle', 'build.gradle.kts'),
@@ -36,7 +38,8 @@ def is_build_file(path: str) -> bool:
     """Whether `path` (relative to the project root, '/'-separated) is build metadata the detector reads."""
     if '/node_modules/' in f'/{path}' or path.startswith('/'): return False
     name = path.rsplit('/', 1)[-1]
-    return any(fnmatchcase(name, p) for p in ANYWHERE) or any(fnmatchcase(path, p) for p in ROOT)
+    return any(fnmatchcase(name, p) for p in ANYWHERE) or any(fnmatchcase(path, p) for p in ROOT) or \
+        ('/' not in path and any(fnmatchcase(path, p) for p in TOP))
 
 
 def languages(paths) -> tuple[Language, ...]:

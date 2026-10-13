@@ -55,12 +55,12 @@ class FrameworkRow(_Frozen):
     language: Language
     versions: str = Field(description='Canonical version set the runner and report parser are qualified for')
     runner: str
-    images: tuple[str, ...] = Field(default=(), description='Image ids this range was qualified on; empty means every '
-                                                            'image of the language')
+    images: tuple[str, ...] = Field(min_length=1, description='Image ids this range was qualified on; a new image row has '
+                                                                'no framework support until its own range is qualified')
     qualification: Qualification
 
     def applies(self, row: 'ImageRow') -> bool:
-        return row.language == self.language and (not self.images or row.id in self.images)
+        return row.language == self.language and row.id in self.images
 
     @field_validator('versions')
     @classmethod

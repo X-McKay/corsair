@@ -5013,6 +5013,14 @@
           "declares": "*"
          },
          {
+          "path": "test_requirements.txt",
+          "line": 1,
+          "text": "pytest",
+          "strength": "constraint",
+          "source": "requirements",
+          "declares": "*"
+         },
+         {
           "path": "tox.ini",
           "line": 20,
           "text": "pytest --cov=cookiecutter --cov-report=term --cov-fail-under=100 --cov-branch {posargs:tests}",
@@ -5164,6 +5172,7 @@
        "pyproject.toml",
        "setup.cfg",
        "setup.py",
+       "test_requirements.txt",
        "tox.ini"
       ],
       "unresolved": []
@@ -5222,6 +5231,14 @@
           "strength": "constraint",
           "source": "config",
           "declares": "*"
+         },
+         {
+          "path": "test-requirements.txt",
+          "line": 13,
+          "text": "pytest",
+          "strength": "constraint",
+          "source": "requirements",
+          "declares": "*"
          }
         ],
         "unparsed": []
@@ -5313,7 +5330,8 @@
        "pyproject.toml",
        "requirements-dev.txt",
        "requirements.txt",
-       "setup.py"
+       "setup.py",
+       "test-requirements.txt"
       ],
       "unresolved": []
      },
@@ -5363,6 +5381,14 @@
           "strength": "constraint",
           "source": "config",
           "declares": "*"
+         },
+         {
+          "path": "test-requirements.txt",
+          "line": 13,
+          "text": "pytest",
+          "strength": "constraint",
+          "source": "requirements",
+          "declares": "*"
          }
         ],
         "unparsed": []
@@ -5454,7 +5480,8 @@
        "pyproject.toml",
        "requirements-dev.txt",
        "requirements.txt",
-       "setup.py"
+       "setup.py",
+       "test-requirements.txt"
       ],
       "unresolved": []
      },

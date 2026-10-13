@@ -14,6 +14,9 @@ TOX_ENV = re.compile(r'^py(\d)(\d+)$')
 CI_KEYS = ('python-version', 'python', 'python_version', 'py', 'python-versions')
 FRAMEWORK = ('test_framework', 'pytest', 'registry')
 RUNTIME = ('runtime', 'cpython', 'image')
+MAX_TOX_ENVS = 128
+# requirements.txt, requirements-dev.txt, test-requirements.txt, dev_requirements.in, ...
+REQUIREMENTS_FILE = r'([\w.]+[-_])?requirements([-_.][\w.-]*)?\.(txt|in)'
 
 
 def _runtime(c: Collector, strength, source, path, needle, text, listed_series=True):
@@ -96,11 +99,28 @@ def detect(c: Collector) -> None:
                       poetry(python))
             except VersionSyntaxError as error:
                 c.unparsed('runtime', 'cpython', 'image', 'pyproject.toml', 'python', str(error))
-        for group in ('dev-dependencies',):
-            pytest = _spec(c, typed(c, poetry_table, group, dict, FRAMEWORK, here) or {}, here)
+        # Poetry dependency tables: the main and legacy dev tables, and every Poetry >= 1.2 group.
+        tables = [dependencies, typed(c, poetry_table, 'dev-dependencies', dict, FRAMEWORK, here) or {}]
+        for name, group in (typed(c, poetry_table, 'group', dict, FRAMEWORK, here, '[tool.poetry.group') or {}).items():
+            group = typed(c, {name: group}, name, dict, FRAMEWORK, here, f'[tool.poetry.group.{name}') or {}
+            tables.append(typed(c, group, 'dependencies', dict, FRAMEWORK, here, f'[tool.poetry.group.{name}') or {})
+        for table in tables:
+            pytest = _spec(c, table, here)
             if pytest is not None:
                 try: c.add(*FRAMEWORK, 'constraint', 'poetry', here, 'pytest', poetry(pytest))
                 except VersionSyntaxError as error: c.unparsed(*FRAMEWORK, here, 'pytest', str(error))
+        # PEP 735 dependency groups (string entries; include-group tables name other groups) and uv's dev list.
+        groups = typed(c, data, 'dependency-groups', dict, FRAMEWORK, here, '[dependency-groups]') or {}
+        for name in list(groups):
+            for entry in typed(c, groups, name, list, FRAMEWORK, here) or []:
+                if isinstance(entry, str): _requirement_lines(c, here, [entry], 'dependency-groups')
+                elif not (isinstance(entry, dict) and set(entry) == {'include-group'} and entry['include-group'] in groups):
+                    c.unparsed(*FRAMEWORK, here, name, f'dependency-groups {name!r} entry {str(entry)[:40]!r} is not a requirement or include-group')
+        uv = typed(c, tool, 'uv', dict, FRAMEWORK, here, '[tool.uv') or {}
+        uv_dev = typed(c, uv, 'dev-dependencies', list, FRAMEWORK, here) or []
+        _requirement_lines(c, here, [r for r in uv_dev if isinstance(r, str)], 'uv')
+        if any(not isinstance(r, str) for r in uv_dev):
+            c.unparsed(*FRAMEWORK, here, 'dev-dependencies', 'tool.uv dev-dependencies lists a non-string entry')
         if 'pytest' in tool:
             c.add(*FRAMEWORK, 'constraint', 'config', 'pyproject.toml', '[tool.pytest', pep440(''))
         backend = data['build-system'].get('build-backend') if isinstance(data.get('build-system'), dict) else None
@@ -143,7 +163,7 @@ def detect(c: Collector) -> None:
                     _pytest(c, 'setup.py', node.value, match[2], 'setup.py')
     for path in sorted(files):
         name = path.rsplit('/', 1)[-1]
-        if (path.count('/') == 0 and re.fullmatch(r'requirements.*\.(txt|in)', name)) or re.fullmatch(r'requirements/[^/]+\.(txt|in)', path):
+        if (path.count('/') == 0 and re.fullmatch(REQUIREMENTS_FILE, name)) or re.fullmatch(r'requirements/[^/]+\.(txt|in)', path):
             _requirement_lines(c, path, (c.text(path) or '').splitlines(), 'requirements')
     if (text := c.text('tox.ini')) is not None:
         parser = configparser.ConfigParser(interpolation=None, strict=False)
@@ -152,8 +172,12 @@ def detect(c: Collector) -> None:
         except configparser.Error as error:
             c.unparsed('runtime', 'cpython', 'image', 'tox.ini', '', f'invalid tox.ini: {error}')
         else:
-            if parser.has_option('tox', 'envlist'):
-                for env in _expand(parser.get('tox', 'envlist')):
+            envs = _expand(parser.get('tox', 'envlist')) if parser.has_option('tox', 'envlist') else []
+            if envs is None:
+                c.unparsed(*RUNTIME, 'tox.ini', 'envlist', f'envlist expands to more than {MAX_TOX_ENVS} environments')
+                envs = []
+            if envs:
+                for env in envs:
                     for factor in env.split('-'):
                         if (match := TOX_ENV.fullmatch(factor)):
                             _runtime(c, 'tested', 'tox', 'tox.ini', factor, f'{match[1]}.{match[2]}')
@@ -221,8 +245,9 @@ def detect(c: Collector) -> None:
         _pipfile_python(c, 'Pipfile.lock', typed(c, meta, 'requires', dict, RUNTIME, 'Pipfile.lock', '"requires"', 'pinned'))
 
 
-def _expand(envlist: str) -> list[str]:
-    """tox envlist entries with `{a,b}` factor groups expanded; comma or newline separated."""
+def _expand(envlist: str) -> list[str] | None:
+    """tox envlist entries with `{a,b}` factor groups expanded; comma or newline separated. None when the expansion
+    would exceed MAX_TOX_ENVS, checked before each product is materialised (eight groups already make 256)."""
     entries, depth, current = [], 0, ''
     for char in envlist:
         if char == ',' and depth == 0 or char == '\n':
@@ -241,5 +266,7 @@ def _expand(envlist: str) -> list[str]:
             if not match:
                 expanded.append(item)
                 continue
-            stack += [item[:match.start()] + option.strip() + item[match.end():] for option in match[1].split(',')]
+            options = match[1].split(',')
+            if len(expanded) + len(stack) + len(options) > MAX_TOX_ENVS: return None
+            stack += [item[:match.start()] + option.strip() + item[match.end():] for option in options]
     return expanded

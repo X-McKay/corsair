@@ -204,7 +204,7 @@ def test_selection_supported_unsupported_conflict():
     selection = select(java17, matrix)
     assert selection.status == 'unsupported' and [n.name for n in selection.needs] == ['junit5']  # no Maven runner row yet
     with_runner = Matrix.model_validate({**matrix.model_dump(), 'frameworks': [*matrix.model_dump()['frameworks'], {
-        'name': 'junit5', 'language': 'java', 'versions': '>=5.13', 'runner': 'x',
+        'name': 'junit5', 'language': 'java', 'versions': '>=5.13', 'runner': 'x', 'images': ['temurin-17-maven'],
         'qualification': {'records': ['SPEC-0039'], 'report': 'x'}}]})
     assert select(java17, with_runner).status == 'supported'
 
@@ -320,7 +320,13 @@ def test_framework_rows_scoped_to_images():
     assert select(python_project('>=3.7,<3.8', '==6.2.5'), matrix).image_id == 'cpython-3.7-pytest'
     assert select(python_project('>=3.12', '==6.2.5'), matrix).status == 'unsupported'  # pytest 6 not qualified on 3.12
     with pytest.raises(ValueError, match='duplicate framework row'):
-        Matrix.model_validate({**data, 'images': [py312, py37], 'frameworks': [new, {**old, 'images': []}]})
+        Matrix.model_validate({**data, 'images': [py312, py37], 'frameworks': [new, {**old, 'images': [py312['id'], py37['id']]}]})
+    with pytest.raises(ValueError, match='at least 1'):
+        Matrix.model_validate({**data, 'frameworks': [{**new, 'images': []}]})
+    # Al's re-review of dbbb980: a new image row without its own framework row gets no framework support.
+    unscoped = Matrix.model_validate({**data, 'images': [py312, py37, *data['images'][1:]]})
+    probe = detect({'pyproject.toml': b'[project]\nrequires-python = ">=3.7,<3.8"\n[tool.pytest.ini_options]\n'}, 'python')
+    assert select(probe, unscoped).status == 'unsupported'
     with pytest.raises(ValueError, match='not a python row'):
         Matrix.model_validate({**data, 'frameworks': [{**old, 'images': ['temurin-17-maven']}]})
 
@@ -393,3 +399,54 @@ def test_structurally_malformed_metadata_never_raises():
                 else json.dumps(doc)
             requirement = detect({marker: b'{}' if marker == 'package.json' else b'', path: body.encode()}, language)
             if not isinstance(requirement, str): select(requirement, matrix)
+
+
+def test_tox_expansion_and_oversized_sets_are_bounded():
+    # Al's re-review: eight {1,2} groups made 256 versions and raised Component.allowed's length check.
+    tox = b'[tox]\nenvlist = py' + b'{1,2}' * 8 + b'\n[testenv]\ncommands = pytest\n'
+    selection = select(detect({'tox.ini': tox}, 'python'), load())
+    assert selection.status == 'undetermined' and 'envlist expands to more than' in selection.missing[0]
+    many = '\n'.join(f'          - "3.{n}"' for n in range(200)).encode()
+    ci = b'jobs:\n  test:\n    strategy:\n      matrix:\n        python:\n' + many + b'\n    steps:\n      - run: pytest\n'
+    runtime = component(detect({'setup.py': b'', '.github/workflows/t.yml': ci}, 'python'), 'runtime', 'cpython')
+    assert not runtime.declared and 'over the 512-character limit' in runtime.unparsed[0].reason
+
+
+@pytest.mark.parametrize('files', [
+    {'pyproject.toml': b'[tool.poetry.dependencies]\npython = "^3.12"\n[tool.poetry.group.dev.dependencies]\npytest = "^7.4"\n[tool.pytest.ini_options]\n'},
+    {'pyproject.toml': b'[project]\nrequires-python = ">=3.12"\n[dependency-groups]\ntest = ["pytest>=7,<8"]\ndev = [{include-group = "test"}]\n'},
+    {'pyproject.toml': b'[project]\nrequires-python = ">=3.12"\n[tool.uv]\ndev-dependencies = ["pytest>=7,<8"]\n'},
+    {'setup.py': b'', '.python-version': b'3.12.15\n', 'test-requirements.txt': b'pytest>=7,<8\n'},
+    {'setup.py': b'', '.python-version': b'3.12.15\n', 'dev_requirements.txt': b'pytest>=7,<8\n'},
+])
+def test_modern_pytest_constraints_are_read(files):
+    # Al's re-review: Poetry groups, PEP 735 groups, uv dev lists and *-requirements.txt were missed, so a <8 project
+    # was reported supported on the pytest 9 runner.
+    assert all(is_build_file(path) for path in files)
+    requirement = detect(files, 'python')
+    assert parse_set(component(requirement, 'test_framework', 'pytest').allowed).contains(v('7.4'))
+    assert select(requirement, load()).status == 'unsupported'
+
+
+def test_java_unread_pins_and_version_file_names():
+    junit = ('<dependencies><dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId>'
+             '<version>5.14.0</version></dependency></dependencies>')
+    matrix = Matrix.model_validate({**load().model_dump(), 'frameworks': [*load().model_dump()['frameworks'], {
+        'name': 'junit5', 'language': 'java', 'versions': '5.14.*', 'runner': 'x', 'images': ['temurin-17-maven'],
+        'qualification': {'records': ['SPEC-0039'], 'report': 'x'}}]})
+    base = '<properties><maven.compiler.release>17</maven.compiler.release></properties>'
+    assert select(detect({'pom.xml': pom(base + junit)}, 'java'), matrix).status == 'supported'
+    # Al's re-review: an unreadable or undefined toolchains JDK pin was dropped and 17 was selected.
+    for version in ('21-ea', '${tc.jdk}'):
+        toolchain = (f'<build><plugins><plugin><artifactId>maven-toolchains-plugin</artifactId><configuration><toolchains>'
+                     f'<jdk><version>{version}</version></jdk></toolchains></configuration></plugin></plugins></build>')
+        assert select(detect({'pom.xml': pom(base + toolchain + junit)}, 'java'), matrix).status == 'undetermined'
+    # A family with one readable and one unresolved version counts as unread.
+    engine = junit.replace('</dependencies>', '<dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter-engine'
+                           '</artifactId><version>${engine}</version></dependency></dependencies>')
+    assert select(detect({'pom.xml': pom(base + engine)}, 'java'), matrix).status == 'undetermined'
+    # jenv names: the 64 in a vendor name is not the release; `system` is an unread pin.
+    for name, allowed in ((b'openjdk64-17.0.2\n', '17.*'), (b'oracle64-1.8.0.292\n', '8.*')):
+        assert component(detect({'pom.xml': pom(''), '.java-version': name}, 'java'), 'runtime', 'jdk').allowed == allowed
+    system = component(detect({'pom.xml': pom(''), '.java-version': b'system\n'}, 'java'), 'runtime', 'jdk')
+    assert not system.declared and system.unparsed[0].strength == 'pinned'
