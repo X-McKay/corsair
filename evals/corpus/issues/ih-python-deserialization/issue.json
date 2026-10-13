@@ -1,0 +1,13 @@
+{
+  "schema": "corsair-issue-request/v1",
+  "issue": {
+    "provider": "manual",
+    "title": "Deserialization of untrusted data in load_profile",
+    "body": "Reported location: app.py line 4, in load_profile. Weakness class: CWE-502.\n\n`blob` reaches a pickle unpickler in load_profile.\n\nAnalyze this component only.",
+    "format": "markdown"
+  },
+  "repository": "evals/corpus/issues/ih-python-deserialization/repository.git",
+  "revision": "0ccbbe857cc9ae01375a20f462e56a4857e0809e",
+  "scope": "component",
+  "fixed_revision": "5ed6344e9d956c15ce1b312c4cec32133d8cd5a0"
+}

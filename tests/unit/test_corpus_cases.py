@@ -94,3 +94,10 @@ def test_runtime_report_covers_every_corpus_case_and_hides_held_out_names():
     assert named == [c.case_id for c in loaded if c.split == "development"]
     assert sum(report["corpus"]["held_out"].values()) == sum(c.split == "held_out" for c in loaded)
     assert report["inputs"]["corpus"] == "sha256:" + cases.tree_digest()
+
+
+def test_the_python_cohort_is_every_python_development_case_and_no_held_out_case():
+    cohorts = json.loads((Path(__file__).parents[2] / "evals/corpus/cohorts.json").read_text())
+    python = {c.case_id for c in load() if c.language == "python"}
+    held_out = set(json.loads(HELD_OUT.read_text()))
+    assert set(cohorts["corpus-python"]) == python - held_out and len(cohorts["corpus-python"]) == 17

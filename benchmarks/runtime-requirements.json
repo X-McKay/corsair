@@ -2,8 +2,8 @@
  "schema_version": 1,
  "spec": "SPEC-0042",
  "inputs": {
-  "detector": "sha256:9777fdcf75890bf511d03c74fb01a07ce7d02e9eeab02b0739850a384ade0beb",
-  "matrix": "sha256:b0192f8c0959ae477fd2de1880460137a0992198b516e107705d0382df8f1c2f",
+  "detector": "sha256:4c8ef1f661bcaff87c65b11fc1f8ab87ff4ff7fc25d9c4033f789b494a74cca0",
+  "matrix": "sha256:43e05927ee8c0d68cf3c05cb84b403ccef54b06020b331fd3b27045e1581370f",
   "pins": "sha256:ea068e2eec63dacc43b4858c39c656891e49248ea6fbc17db1845bb9a0b9bff1",
   "inventory": "sha256:c534cf5619a2f6ba55a35697b0a54d9d0680e54a8ce340db664d3b071c20ab87",
   "corpus": "sha256:0d21afaa5ef667a4237935fe3475ffc0966d8194941a99bd5a7b07fcf5b8ebed",
@@ -1727,7 +1727,9 @@
        "satisfied": false
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "f238cf4f1091be19fbcfd086b042c86a1bcaa7fc",
@@ -1942,7 +1944,9 @@
        "satisfied": false
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
    "status": "supported",
@@ -2844,7 +2848,9 @@
        "satisfied": false
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "58cdbbef9c77ab2b44870f9d606593b49cde76d9",
@@ -3248,7 +3254,9 @@
        "satisfied": false
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
    "status": "supported",
@@ -4117,7 +4125,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "3dfefdec1f7b2a4ee0ef8902afdea720b1572cb3",
@@ -4262,7 +4272,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
    "status": "supported",
@@ -4569,7 +4581,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "live"
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "71b707758851e4b622f87d9a73266e06f60aeab4",
@@ -4716,7 +4730,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "live"
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
    "status": "supported",
@@ -4878,7 +4894,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "live"
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "8238a9e450ed1524e40cb3a8b0b3c00606903aeb",
@@ -5032,7 +5050,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "live"
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
    "status": "supported",
@@ -5249,7 +5269,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "live"
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
    "status": "supported",
@@ -5404,7 +5426,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "live"
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "2625ed9fc074091c531c27ffcba7902771130261",
@@ -5551,7 +5575,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "live"
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
    "status": "supported",
@@ -5728,7 +5754,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "live"
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "9c528670c455b8d948aff95ed50e22940d1ad3fc",
@@ -5897,7 +5925,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "live"
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
    "status": "supported",
@@ -6096,7 +6126,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "live"
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
    "status": "supported",
@@ -6295,7 +6327,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "live"
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
    "status": "supported",
@@ -6477,7 +6511,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "live"
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "74ea7cf7a6a27a4eeb2ae24e162bcc942a6706d5",
@@ -6651,7 +6687,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "live"
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
    "status": "supported",
@@ -6801,7 +6839,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "live"
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "d57c4a269bba3b9a0c5bfa20292955b849006d9e",
@@ -6943,7 +6983,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "live"
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
    "status": "supported",
@@ -7561,7 +7603,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "c0711c656686e902af2cd92d6aecc8074de4d83d",
@@ -7793,7 +7837,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
    "status": "supported",
@@ -7925,7 +7971,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "45d4a901478c6a8f396c8b959dd6cf8fd3f955b6",
@@ -8049,7 +8097,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
    "status": "supported",
@@ -8986,7 +9036,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "ae65651eab053fc6dc4590dbb863a268215c1fc5",
@@ -9094,7 +9146,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
    "status": "supported",
@@ -9281,7 +9335,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "c16a56a9d6575ddc53d15e76d58f0ebcb0eeb149",
@@ -9454,7 +9510,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
    "status": "supported",
@@ -9621,7 +9679,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "3580f5d0874a9abf5483528f73bda9a7fd9ec7f1",
@@ -9780,7 +9840,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
    "status": "supported",
@@ -10115,7 +10177,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "945d35141d94490f749640bd4390acd6a2193995",
@@ -10442,7 +10506,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
    "status": "supported",
@@ -10694,7 +10760,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "77f557ef84698efeb6eed04e4a9704eaf85b741d",
@@ -10920,7 +10988,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
    "status": "supported",
@@ -11175,7 +11245,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "e9742ef85a75867cbd696860e3bf3e32b681f98d",
@@ -11422,7 +11494,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
    "status": "supported",
@@ -11563,7 +11637,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "d7aba06953f9fa789c411676b941d20df8ef73de",
@@ -11690,7 +11766,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
    "status": "supported",
@@ -12597,7 +12675,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "50caab74fa01ee8f5dbdee7bb2782126d20c6583",
@@ -12820,7 +12900,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
    "status": "supported",
@@ -12998,7 +13080,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
    "status": "supported",
@@ -13319,7 +13403,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "cd3e00de20ddaff34ea30f7a74a7b9dad189d1d8",
@@ -13632,7 +13718,9 @@
        "satisfied": true
       }
      ],
-     "evidence": "image-only"
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
    "status": "supported",
@@ -13683,9 +13771,29 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      },
      "candidate": {
@@ -13719,13 +13827,33 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      }
     },
-    "status": "undetermined",
+    "status": "supported",
     "revisions_agree": true
    },
    {
@@ -13764,9 +13892,29 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      },
      "candidate": {
@@ -13800,13 +13948,33 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      }
     },
-    "status": "undetermined",
+    "status": "supported",
     "revisions_agree": true
    },
    {
@@ -13845,9 +14013,29 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      },
      "candidate": {
@@ -13881,13 +14069,33 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      }
     },
-    "status": "undetermined",
+    "status": "supported",
     "revisions_agree": true
    },
    {
@@ -13926,9 +14134,29 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      },
      "candidate": {
@@ -13962,13 +14190,33 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      }
     },
-    "status": "undetermined",
+    "status": "supported",
     "revisions_agree": true
    },
    {
@@ -14007,9 +14255,29 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      },
      "candidate": {
@@ -14043,13 +14311,33 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      }
     },
-    "status": "undetermined",
+    "status": "supported",
     "revisions_agree": true
    },
    {
@@ -14088,9 +14376,29 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      },
      "candidate": {
@@ -14124,13 +14432,33 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      }
     },
-    "status": "undetermined",
+    "status": "supported",
     "revisions_agree": true
    },
    {
@@ -14169,13 +14497,33 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      }
     },
-    "status": "undetermined",
+    "status": "supported",
     "revisions_agree": true
    },
    {
@@ -14214,13 +14562,33 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      }
     },
-    "status": "undetermined",
+    "status": "supported",
     "revisions_agree": true
    },
    {
@@ -14839,7 +15207,9 @@
         "satisfied": true
        }
       ],
-      "evidence": "image-only"
+      "evidence": "image-only",
+      "runtime_basis": "declared",
+      "inferred_from": []
      },
      "candidate": {
       "requirement": {
@@ -14946,7 +15316,9 @@
         "satisfied": true
        }
       ],
-      "evidence": "image-only"
+      "evidence": "image-only",
+      "runtime_basis": "declared",
+      "inferred_from": []
      }
     },
     "status": "supported",
@@ -15008,9 +15380,26 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "unsupported",
+      "needs": [
+       {
+        "kind": "runtime",
+        "name": "node",
+        "allowed": ">=14.15,<15 || >=16.10,<17 || >=18",
+        "preferred": null
+       },
+       {
+        "kind": "test_framework",
+        "name": "jest",
+        "allowed": ">=29.7.0,<30",
+        "preferred": "29.7.0"
+       }
+      ],
+      "rejected": [
+       {
+        "image_id": "node-8.17.0-npm",
+        "unmet": []
+       }
       ]
      },
      "candidate": {
@@ -15064,13 +15453,30 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "unsupported",
+      "needs": [
+       {
+        "kind": "runtime",
+        "name": "node",
+        "allowed": ">=14.15,<15 || >=16.10,<17 || >=18",
+        "preferred": null
+       },
+       {
+        "kind": "test_framework",
+        "name": "jest",
+        "allowed": ">=29.7.0,<30",
+        "preferred": "29.7.0"
+       }
+      ],
+      "rejected": [
+       {
+        "image_id": "node-8.17.0-npm",
+        "unmet": []
+       }
       ]
      }
     },
-    "status": "undetermined",
+    "status": "unsupported",
     "revisions_agree": true
    },
    {
@@ -15109,9 +15515,29 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "perl-5.26-make",
+      "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "perl",
+        "allowed": ">=5.8.1",
+        "provided": "5.26.3",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "tap-harness",
+        "allowed": "*",
+        "provided": "==1.302073",
+        "satisfied": true
+       }
+      ],
+      "evidence": "image-only",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "tap-harness ==1.302073 supports perl >=5.8.1 (MIN_PERL_VERSION 5.008001 in Test-More/test-more v1.302073 Makefile.PL (checked 2026-10-13))"
       ]
      },
      "candidate": {
@@ -15145,13 +15571,33 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "perl-5.26-make",
+      "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "perl",
+        "allowed": ">=5.8.1",
+        "provided": "5.26.3",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "tap-harness",
+        "allowed": "*",
+        "provided": "==1.302073",
+        "satisfied": true
+       }
+      ],
+      "evidence": "image-only",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "tap-harness ==1.302073 supports perl >=5.8.1 (MIN_PERL_VERSION 5.008001 in Test-More/test-more v1.302073 Makefile.PL (checked 2026-10-13))"
       ]
      }
     },
-    "status": "undetermined",
+    "status": "supported",
     "revisions_agree": true
    },
    {
@@ -15190,9 +15636,29 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "perl-5.26-make",
+      "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "perl",
+        "allowed": ">=5.8.1",
+        "provided": "5.26.3",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "tap-harness",
+        "allowed": "*",
+        "provided": "==1.302073",
+        "satisfied": true
+       }
+      ],
+      "evidence": "image-only",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "tap-harness ==1.302073 supports perl >=5.8.1 (MIN_PERL_VERSION 5.008001 in Test-More/test-more v1.302073 Makefile.PL (checked 2026-10-13))"
       ]
      },
      "candidate": {
@@ -15226,13 +15692,33 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "perl-5.26-make",
+      "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "perl",
+        "allowed": ">=5.8.1",
+        "provided": "5.26.3",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "tap-harness",
+        "allowed": "*",
+        "provided": "==1.302073",
+        "satisfied": true
+       }
+      ],
+      "evidence": "image-only",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "tap-harness ==1.302073 supports perl >=5.8.1 (MIN_PERL_VERSION 5.008001 in Test-More/test-more v1.302073 Makefile.PL (checked 2026-10-13))"
       ]
      }
     },
-    "status": "undetermined",
+    "status": "supported",
     "revisions_agree": true
    },
    {
@@ -15293,7 +15779,7 @@
       },
       "status": "undetermined",
       "missing": [
-       "runtime version not declared in the build files"
+       "runtime version not declared in the build files, and no inference row covers vitest >=2.1.9,<3"
       ]
      },
      "candidate": {
@@ -15349,7 +15835,7 @@
       },
       "status": "undetermined",
       "missing": [
-       "runtime version not declared in the build files"
+       "runtime version not declared in the build files, and no inference row covers vitest >=2.1.9,<3"
       ]
      }
     },
@@ -15412,9 +15898,29 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "perl-5.26-make",
+      "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "perl",
+        "allowed": ">=5.8.1",
+        "provided": "5.26.3",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "tap-harness",
+        "allowed": "*",
+        "provided": "==1.302073",
+        "satisfied": true
+       }
+      ],
+      "evidence": "image-only",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "tap-harness ==1.302073 supports perl >=5.8.1 (MIN_PERL_VERSION 5.008001 in Test-More/test-more v1.302073 Makefile.PL (checked 2026-10-13))"
       ]
      },
      "candidate": {
@@ -15468,13 +15974,33 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "perl-5.26-make",
+      "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "perl",
+        "allowed": ">=5.8.1",
+        "provided": "5.26.3",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "tap-harness",
+        "allowed": "*",
+        "provided": "==1.302073",
+        "satisfied": true
+       }
+      ],
+      "evidence": "image-only",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "tap-harness ==1.302073 supports perl >=5.8.1 (MIN_PERL_VERSION 5.008001 in Test-More/test-more v1.302073 Makefile.PL (checked 2026-10-13))"
       ]
      }
     },
-    "status": "undetermined",
+    "status": "supported",
     "revisions_agree": true
    },
    {
@@ -15533,9 +16059,26 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "unsupported",
+      "needs": [
+       {
+        "kind": "runtime",
+        "name": "node",
+        "allowed": ">=14.15,<15 || >=16.10,<17 || >=18",
+        "preferred": null
+       },
+       {
+        "kind": "test_framework",
+        "name": "jest",
+        "allowed": ">=29.7.0,<30",
+        "preferred": "29.7.0"
+       }
+      ],
+      "rejected": [
+       {
+        "image_id": "node-8.17.0-npm",
+        "unmet": []
+       }
       ]
      },
      "candidate": {
@@ -15589,13 +16132,30 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "unsupported",
+      "needs": [
+       {
+        "kind": "runtime",
+        "name": "node",
+        "allowed": ">=14.15,<15 || >=16.10,<17 || >=18",
+        "preferred": null
+       },
+       {
+        "kind": "test_framework",
+        "name": "jest",
+        "allowed": ">=29.7.0,<30",
+        "preferred": "29.7.0"
+       }
+      ],
+      "rejected": [
+       {
+        "image_id": "node-8.17.0-npm",
+        "unmet": []
+       }
       ]
      }
     },
-    "status": "undetermined",
+    "status": "unsupported",
     "revisions_agree": true
    },
    {
@@ -15634,9 +16194,29 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      },
      "candidate": {
@@ -15670,13 +16250,33 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      }
     },
-    "status": "undetermined",
+    "status": "supported",
     "revisions_agree": true
    },
    {
@@ -15715,9 +16315,29 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      },
      "candidate": {
@@ -15751,13 +16371,33 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      }
     },
-    "status": "undetermined",
+    "status": "supported",
     "revisions_agree": true
    },
    {
@@ -15796,9 +16436,29 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      },
      "candidate": {
@@ -15832,13 +16492,33 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      }
     },
-    "status": "undetermined",
+    "status": "supported",
     "revisions_agree": true
    },
    {
@@ -15897,9 +16577,26 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "unsupported",
+      "needs": [
+       {
+        "kind": "runtime",
+        "name": "node",
+        "allowed": ">=14.15,<15 || >=16.10,<17 || >=18",
+        "preferred": null
+       },
+       {
+        "kind": "test_framework",
+        "name": "jest",
+        "allowed": ">=29.7.0,<30",
+        "preferred": "29.7.0"
+       }
+      ],
+      "rejected": [
+       {
+        "image_id": "node-8.17.0-npm",
+        "unmet": []
+       }
       ]
      },
      "candidate": {
@@ -15953,13 +16650,30 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "unsupported",
+      "needs": [
+       {
+        "kind": "runtime",
+        "name": "node",
+        "allowed": ">=14.15,<15 || >=16.10,<17 || >=18",
+        "preferred": null
+       },
+       {
+        "kind": "test_framework",
+        "name": "jest",
+        "allowed": ">=29.7.0,<30",
+        "preferred": "29.7.0"
+       }
+      ],
+      "rejected": [
+       {
+        "image_id": "node-8.17.0-npm",
+        "unmet": []
+       }
       ]
      }
     },
-    "status": "undetermined",
+    "status": "unsupported",
     "revisions_agree": true
    },
    {
@@ -15998,9 +16712,29 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      },
      "candidate": {
@@ -16034,13 +16768,33 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      }
     },
-    "status": "undetermined",
+    "status": "supported",
     "revisions_agree": true
    },
    {
@@ -16118,7 +16872,9 @@
         "satisfied": true
        }
       ],
-      "evidence": "image-only"
+      "evidence": "image-only",
+      "runtime_basis": "declared",
+      "inferred_from": []
      },
      "candidate": {
       "requirement": {
@@ -16190,7 +16946,9 @@
         "satisfied": true
        }
       ],
-      "evidence": "image-only"
+      "evidence": "image-only",
+      "runtime_basis": "declared",
+      "inferred_from": []
      }
     },
     "status": "supported",
@@ -16252,9 +17010,26 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "unsupported",
+      "needs": [
+       {
+        "kind": "runtime",
+        "name": "node",
+        "allowed": ">=14.15,<15 || >=16.10,<17 || >=18",
+        "preferred": null
+       },
+       {
+        "kind": "test_framework",
+        "name": "jest",
+        "allowed": ">=29.7.0,<30",
+        "preferred": "29.7.0"
+       }
+      ],
+      "rejected": [
+       {
+        "image_id": "node-8.17.0-npm",
+        "unmet": []
+       }
       ]
      },
      "candidate": {
@@ -16308,13 +17083,30 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "unsupported",
+      "needs": [
+       {
+        "kind": "runtime",
+        "name": "node",
+        "allowed": ">=14.15,<15 || >=16.10,<17 || >=18",
+        "preferred": null
+       },
+       {
+        "kind": "test_framework",
+        "name": "jest",
+        "allowed": ">=29.7.0,<30",
+        "preferred": "29.7.0"
+       }
+      ],
+      "rejected": [
+       {
+        "image_id": "node-8.17.0-npm",
+        "unmet": []
+       }
       ]
      }
     },
-    "status": "undetermined",
+    "status": "unsupported",
     "revisions_agree": true
    },
    {
@@ -16353,9 +17145,29 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      },
      "candidate": {
@@ -16389,13 +17201,33 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      }
     },
-    "status": "undetermined",
+    "status": "supported",
     "revisions_agree": true
    },
    {
@@ -16434,9 +17266,29 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      },
      "candidate": {
@@ -16470,13 +17322,33 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      }
     },
-    "status": "undetermined",
+    "status": "supported",
     "revisions_agree": true
    },
    {
@@ -16675,7 +17547,9 @@
         "satisfied": true
        }
       ],
-      "evidence": "image-only"
+      "evidence": "image-only",
+      "runtime_basis": "declared",
+      "inferred_from": []
      },
      "candidate": {
       "requirement": {
@@ -16747,7 +17621,9 @@
         "satisfied": true
        }
       ],
-      "evidence": "image-only"
+      "evidence": "image-only",
+      "runtime_basis": "declared",
+      "inferred_from": []
      }
     },
     "status": "supported",
@@ -16831,9 +17707,29 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      },
      "candidate": {
@@ -16867,13 +17763,33 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      }
     },
-    "status": "undetermined",
+    "status": "supported",
     "revisions_agree": true
    },
    {
@@ -17033,9 +17949,29 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      },
      "candidate": {
@@ -17069,13 +18005,33 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      }
     },
-    "status": "undetermined",
+    "status": "supported",
     "revisions_agree": true
    },
    {
@@ -17114,9 +18070,29 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      },
      "candidate": {
@@ -17150,20 +18126,41 @@
        ],
        "unresolved": []
       },
-      "status": "undetermined",
-      "missing": [
-       "runtime version not declared in the build files"
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
       ]
      }
     },
-    "status": "undetermined",
+    "status": "supported",
     "revisions_agree": true
    }
   ],
   "held_out": {
-   "javascript undetermined": 2,
-   "perl undetermined": 1,
-   "python undetermined": 5
+   "javascript undetermined": 1,
+   "javascript unsupported": 1,
+   "perl supported (image-only, runtime inferred)": 1,
+   "python supported (runtime inferred)": 5
   }
  }
 }
