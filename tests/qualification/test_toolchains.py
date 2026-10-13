@@ -16,8 +16,10 @@ from tests.qualification.gateway import native_gateway
 from tests.qualification.test_lifecycle import SdkReceipts
 from tests.qualification.test_policy import require_network, owned_sandbox, observe_policy, global_policy_observation, wait_logging_activation, expect_permission_denied
 from tests.qualification.prepare_toolchains import JAVA_TESTS, JEST, LAUNCHER, NODE_TESTS, NODES, NPM, PERLS, PYTHONS, RUBY_RUN, RUBY_SUMMARY, RUBY_TESTS, SOURCE, TAP_TESTS, image_receipt, jest_report, source_hashes, tap_report
+from corsair.adapters.jest_runner import LIST_NOTHING, JestRunner, JestRunnerConfig
 from corsair.adapters.maven_runner import WRAPPER, MavenRunner, MavenRunnerConfig, selection
 from corsair.adapters.minitest_runner import MinitestRunner, MinitestRunnerConfig, listed as minitest_listed
+from corsair.reports.jest import listed as jest_listed, parse_jest
 from corsair.reports.junit_listing import listed
 from corsair.reports.minitest import parse_minitest
 
@@ -206,6 +208,23 @@ def node_offline(sdk, name, remote, record, language):
     expect_completed(result, 1, f'Tests:       1 failed, {len(NODE_TESTS)} passed, {len(NODE_TESTS) + 1} total')
     assert 'Expected: 2' in result.stderr and 'Received: 1' in result.stderr
     record['offline_diagnostics'] = ['missing-package/npm-offline-cache', 'no-discovery', 'syntax/suite', 'assertion']
+    node_runner_commands(sdk, name, remote, record)
+
+
+def node_runner_commands(sdk, name, remote, record):
+    """The Jest runner's own discovery and execution argv (SPEC-0057) on the fixture, offline in the sandbox."""
+    ids = tuple('native.test.js::' + test for test in NODE_TESTS)
+    runner = JestRunner(None, None, None, JestRunnerConfig(JEST, remote, '/tmp/corsair-jest.json'))
+    listing = execute(sdk, name, list(runner._argv(ids, LIST_NOTHING)), remote, timeout=120)
+    assert listing.exit_code == 0, listing.stderr[-2000:]
+    found = jest_listed(listing.stdout.encode(), root=remote, path='native.test.js')
+    assert found is not None and sorted(found) == sorted(ids), listing.stdout[-2000:]
+    result = execute(sdk, name, list(runner._argv(ids)), remote, timeout=120)
+    assert result.exit_code == 0, result.stderr[-2000:]
+    cases = parse_jest(result.stdout.encode(), ids, root=remote, test_paths=frozenset(['native.test.js']))
+    assert [case.outcome for case in cases] == ['passed', 'passed']
+    record['runner_commands'] = {'listing': found, 'listing_sha256': hashlib.sha256(listing.stdout.encode()).hexdigest(),
+                                 'report_sha256': hashlib.sha256(result.stdout.encode()).hexdigest()}
 
 
 # One small dependency-free package, pinned by the registry's SHA-512 as a project lockfile pins it.
@@ -456,7 +475,7 @@ def python_dependencies(kube, cli, sdk, name, remote, record, endpoint, pair, la
 def toolchain_gate(kube, gateway, language):
     """One image's gate, into its own evidence subdirectory; select one image by its test node id."""
     assert not (kube.evidence / 'toolchain.json').exists(), 'Another toolchain gate already wrote this evidence directory'
-    sources = ['tests/qualification/test_toolchains.py', 'tests/qualification/prepare_toolchains.py', 'tests/qualification/test_policy.py', 'tests/qualification/test_lifecycle.py', 'tests/qualification/gateway.py', 'tests/qualification/support.py', 'src/corsair/adapters/maven_runner.py', 'src/corsair/reports/junit_listing.py', 'src/corsair/adapters/minitest_runner.py', 'src/corsair/reports/minitest.py', 'policies/openshell/identity.yaml', 'deploy/runtime-lock.yaml', 'pyproject.toml', 'uv.lock']
+    sources = ['tests/qualification/test_toolchains.py', 'tests/qualification/prepare_toolchains.py', 'tests/qualification/test_policy.py', 'tests/qualification/test_lifecycle.py', 'tests/qualification/gateway.py', 'tests/qualification/support.py', 'src/corsair/adapters/maven_runner.py', 'src/corsair/reports/junit_listing.py', 'src/corsair/adapters/jest_runner.py', 'src/corsair/reports/jest.py', 'src/corsair/adapters/minitest_runner.py', 'src/corsair/reports/minitest.py', 'src/corsair/ports/test_runner.py', 'policies/openshell/identity.yaml', 'deploy/runtime-lock.yaml', 'pyproject.toml', 'uv.lock']
     (kube.evidence / 'toolchain-source-hashes.json').write_text(json.dumps(dict(source_hashes(language), **{p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest() for p in sources}), indent=2))
     summary = {'outcome': 'failed', 'sandboxes': [], 'internal_retry_counts': 'unknown'}
     endpoint = NetworkFixture(kube, 'toolchain-endpoint')
