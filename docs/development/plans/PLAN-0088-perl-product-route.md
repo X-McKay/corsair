@@ -37,6 +37,7 @@ its approved file, read by the TAP assertion reader added here. No second id-pat
   `names_test_in` rule.
 - [x] Docker proof through product ports with operator tests (`evals/case_e2e/operator_tests.py`, committed cases).
 - [x] Compare frozen scripted evaluations against main.
+- [x] RIG0 replay of all six committed cases, sqli with CPAN setup: all matched (below).
 - [ ] Live: the same corpus topics through `corsair run` with the local model (RIG0), once lane ordering allows.
 - [ ] Next capability: a process-start recorder (spec first), so cmdi-like topics can be decided.
 
@@ -69,12 +70,25 @@ Docker, image-only, plain Docker in the cloud container:
 | ih-perl-cmdi | corpus development | cpanfile (empty) | passed / failed `not_ok` | passed / passed | target entered; not admitted: control open not observed (process effect) | completed / inconclusive / not_verified | yes (expected gap) |
 | ih-perl-adminpw | corpus development | cpanfile | passed / failed `not_ok` | passed / passed | same | completed / inconclusive / not_verified | yes (expected gap) |
 | ih-perl-responsesplitting | corpus development | cpanfile | passed / failed `not_ok` | passed / passed | same | completed / inconclusive / not_verified | yes (expected gap) |
-| ih-perl-sqli | corpus development | needs DBI, DBD::SQLite from CPAN | not run | not run | not run | not run | unrun: the cloud container gives setup containers no registry route |
+| ih-perl-sqli | corpus development | needs DBI, DBD::SQLite from CPAN | not run here | not run here | not run here | not run here | unrun in the cloud container (no registry route); run on RIG0, see below |
 | ih-perl-xss | corpus development | Build.PL needs Module::Build and Test2::V0 from CPAN | not run | not run | not run | not run | unrun; Test2::V0 subtests are outside the lister and probe |
 | the one held-out Perl topic | held out | n/a | n/a | n/a | n/a | n/a | never inspected or run |
 
 Every workspace and container cleanup was confirmed. The operator tests and expectations are evaluation artifacts in
 `evals/case_e2e/operator_cases/`. No production code reads them.
+
+RIG0 replay (operator run relayed 2026-10-13 22:06Z; no model, run alongside another lane's model run). Worktree
+`.worktrees/non-python-path` detached at `c8eba1d`. Image: a local RIG0 build of the same `perl526` source, config
+`sha256:ce3853861371…`. Its digest differs from the cloud build `329e659a4d80…` because they are separate builds; both
+are from the row's digest-pinned base. All six committed cases matched their expected gate:
+- perl-notes and perl-pages: completed / reproduced / verified.
+- ih-perl-cmdi, ih-perl-adminpw, ih-perl-responsesplitting and ih-perl-sqli: completed / inconclusive / not_verified,
+  with limitations `witness_missing` x2, `no_valid_run` and `baseline_not_reproduced`.
+- ih-perl-sqli: its setup reached CPAN over the Docker bridge and installed DBI into `.corsair-deps`.
+
+Evidence is at `.runs/perl-operator-1` under that worktree. No matrix change follows. The row pins the base image,
+and `CORSAIR_IMAGES` names the locally built image per host. Pinning one shared built image would need a published
+image, which is an operator decision outside this lane.
 
 Interpretation: setup, discovery, one execution, TAP admission, exit agreement, the witness record and the gate now
 carry Perl end to end. The two synthetic cases show a decisive evidence-backed disposition is reachable. The corpus

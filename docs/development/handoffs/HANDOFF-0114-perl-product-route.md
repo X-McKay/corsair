@@ -28,6 +28,8 @@ related: [SPEC-0074, PLAN-0088, PLAN-0087, ISSUE-0008]
   the witness admitted on both revisions. Three corpus Perl development topics (cmdi, adminpw, responsesplitting) run
   cleanly and their tests tell the revisions apart. The gate stays inconclusive because their effects have no
   recorder in any language.
+- **RIG0 replay.** At `c8eba1d`, all six committed cases matched their expectation on RIG0's own `perl526` build
+  (`sha256:ce3853861371…`), sqli included. Its setup installed DBI from CPAN. Details are in PLAN-0088.
 - **Not done.** No live model run, no OpenShell gate and no accuracy claim. Matrix rows are unchanged: the Perl rows
   stay `image-only`.
 
@@ -66,7 +68,7 @@ related: [SPEC-0074, PLAN-0088, PLAN-0087, ISSUE-0008]
   docker pull docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7
   docker build --network=none -t corsair-perl526-lane4 deploy/qualification/toolchains/perl526
   echo "{\"perl-5.26-make\": \"$(docker image inspect --format '{{.Id}}' corsair-perl526-lane4)\"}" > $W/.runs/images-perl.json
-  # 1. No model: every committed case, sqli included (setup reaches CPAN over the Docker bridge).
+  # 1. Done at c8eba1d (all six matched; PLAN-0088). No model: every committed case, sqli included (setup reaches CPAN over the Docker bridge).
   PYTHONPATH=src:. .venv/bin/python -m evals.case_e2e.operator_tests --case perl-notes --case perl-pages \
     --case ih-perl-cmdi --case ih-perl-adminpw --case ih-perl-responsesplitting --case ih-perl-sqli \
     --images $W/.runs/images-perl.json --evidence $W/.runs/perl-operator-1
