@@ -11,7 +11,7 @@ related: [SPEC-0062, PLAN-0049, PLAN-0050]
 
 ## Objective and dependencies
 
-Implement [SPEC-0062](../specs/SPEC-0062-live-qualification-tooling.md). Branch `claude/qualification-tooling-sig4ss` stacks on PR #51 (`dfb9d62`: per-image gates on one module-scoped gateway, pytest root pinned in make targets, merged with #55's `TOOLCHAINS` selection and `qualify-python37-case`). When #51 merges, main is merged in so the diff is this plan's commits only.
+Implement [SPEC-0062](../specs/SPEC-0062-live-qualification-tooling.md). Branch `claude/qualification-tooling-sig4ss` built on PR #51 (merged as `93a0fab`: per-image gates on one module-scoped gateway, pytest root pinned in make targets, merged with #55's `TOOLCHAINS` selection and `qualify-python37-case`).
 
 ## Steps
 
