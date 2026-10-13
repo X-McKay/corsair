@@ -28,6 +28,10 @@ from evals.fixture_e2e.case import (
     fixture_case, reviewed_runners, scripted_assessment, scripted_authoring, scripted_identification,
     scripted_planning,
 )
+from tests.agents.test_chain_environment_stage import (
+    BASELINE, BUILD, OK, SETUP, Sandboxes, catalog, environment_model, pyproject, ready_draft,
+)
+from evals.fixture_e2e.reviewed import DISCOVER
 from tests.temporal.support import EXECUTION_TIMEOUT, workflow_runner
 
 PLUGINS = [PydanticAIPlugin()]
@@ -303,26 +307,77 @@ def test_runtime_stage_stops_both_modes_before_any_child(temporal_address, reque
     asyncio.run(check())
 
 
-def test_environment_stage_stops_durable_mode_until_its_slice(temporal_address, request, store, tmp_path):
-    """SPEC-0068: durable mode never falls back to the declared environment for a case with setup source."""
-    case = replace(fixture_case(), runtime=RuntimeInputs(files={
-        "pyproject.toml": b'[project]\nrequires-python = ">=3.10"\n[tool.pytest.ini_options]\n'}), setup=SetupSource(
-        commit="1" * 40, source_private=False, policy_profile="setup-public",
-        source_files=(SourceFile(path="ci.yml", content="steps:\n  - run: pytest -q\n"),)))
-    catalog = RuntimeCatalog(load(), {"cpython-3.12-pytest": "corsair-python@sha256:" + "a" * 64})
+ENVIRONMENT_CASES = {
+    "ready": (OK, [BUILD, DISCOVER, BASELINE], ready_draft()),
+    "blocked": (OK | {DISCOVER: (2, "ERROR: file or directory not found: tests\n")}, [BUILD, DISCOVER],
+                {"status": "blocked", "layer": "discovery", "evidence": "file or directory not found", "run_ids": [2],
+                 "citations": []}),
+}
+
+
+def without_operations(result):
+    dumped = result.model_dump(mode="json")
+    return dumped | {"receipts": [r | {"operation": None} for r in dumped["receipts"]]}
+
+
+@pytest.mark.parametrize("outcome", sorted(ENVIRONMENT_CASES))
+def test_durable_environment_stage_matches_direct_mode(temporal_address, request, store, tmp_path, outcome):
+    """PLAN-0075: the whole environment stage is one activity, scheduled once, and routes like direct mode."""
+    observations, commands, draft = ENVIRONMENT_CASES[outcome]
+    case = replace(fixture_case(), runtime=pyproject(">=3.10"), setup=SETUP)
+
+    async def check():
+        client = await Client.connect(temporal_address, plugins=PLUGINS)
+        identity = "corsair-chain-environment-" + str(uuid4())
+        direct_sandboxes, durable_sandboxes = Sandboxes(observations), Sandboxes(observations)
+        with models.override_allow_model_requests(False):
+            direct = await run_direct(case, stages(environment=environment_model(commands, draft)),
+                                      runners_for(store, tmp_path / "direct"), catalog=catalog(),
+                                      preparation=direct_sandboxes)
+            durable = await asyncio.wait_for(run_durable(
+                case, stages(environment=environment_model(commands, draft)), runners_for(store, tmp_path / "durable"),
+                client=client, catalog=catalog(), preparation=durable_sandboxes, workflow_id=identity,
+                execution_timeout=EXECUTION_TIMEOUT, workflow_runner=workflow_runner()), 60)
+        same_routing(direct, durable)
+        # Equal but for each setup command's operation id, which is random in both modes.
+        assert without_operations(durable.environment) == without_operations(direct.environment)
+        assert durable.environment.status == outcome
+        assert durable.limitations == direct.limitations and durable.runtime == direct.runtime
+        assert durable.attempts[0].cleanup == direct.attempts[0].cleanup == "confirmed"
+        assert durable_sandboxes.commands == direct_sandboxes.commands == list(commands)
+        assert len(durable_sandboxes.prepared) == len(durable_sandboxes.released) == 1
+        saved = dict(await histories(client, identity, request.config.getoption("--temporal-evidence-dir")))
+        names = [e.activity_task_scheduled_event_attributes.activity_type.name for e in scheduled(saved[identity])]
+        assert names[:2] == ["corsair.chain.select_runtime", "corsair.chain.prepare_environment"]
+        assert names.count("corsair.chain.prepare_environment") == 1
+        environment = scheduled(saved[identity])[1].activity_task_scheduled_event_attributes
+        assert environment.retry_policy.maximum_attempts == 1
+        if outcome == "blocked":
+            assert set(saved) == {identity} and durable.stopped_at == "environment"
+    asyncio.run(check())
+
+
+@pytest.mark.parametrize("environment, preparation", [(False, True), (True, False)])
+def test_durable_environment_stage_without_its_ports_stops_like_direct_mode(temporal_address, request, store,
+                                                                           tmp_path, environment, preparation):
+    """SPEC-0068: no environment model key or no worker preparation stops with PreparationMissing, never the declaration."""
+    case = replace(fixture_case(), runtime=pyproject(">=3.10"), setup=SETUP)
+    model = environment_model([], ready_draft()) if environment else None
+    sandboxes = Sandboxes(OK) if preparation else None
 
     async def check():
         client = await Client.connect(temporal_address, plugins=PLUGINS)
         identity = "corsair-chain-environment-" + str(uuid4())
         with models.override_allow_model_requests(False):
+            direct = await run_direct(case, stages(environment=model), runners_for(store, tmp_path / "direct"),
+                                      catalog=catalog(), preparation=sandboxes)
             durable = await asyncio.wait_for(run_durable(
-                case, stages(), runners_for(store, tmp_path / "durable"), client=client, catalog=catalog,
-                workflow_id=identity, execution_timeout=EXECUTION_TIMEOUT, workflow_runner=workflow_runner()), 60)
-        assert (durable.stopped_at, durable.runtime.status) == ("environment", "supported")
-        assert durable.reason.startswith("environment produced no output: EnvironmentStageNotDurable: ")
-        assert [a.stage for a in durable.attempts] == ["environment"]
+                case, stages(environment=model), runners_for(store, tmp_path / "durable"), client=client,
+                catalog=catalog(), preparation=sandboxes, workflow_id=identity, execution_timeout=EXECUTION_TIMEOUT,
+                workflow_runner=workflow_runner()), 60)
+        same_routing(direct, durable)
+        assert durable.reason.startswith("environment produced no output: PreparationMissing: ")
         saved = dict(await histories(client, identity, request.config.getoption("--temporal-evidence-dir")))
-        assert set(saved) == {identity}
-        assert [e.activity_task_scheduled_event_attributes.activity_type.name for e in scheduled(saved[identity])] == [
-            "corsair.chain.select_runtime"]
+        names = [e.activity_task_scheduled_event_attributes.activity_type.name for e in scheduled(saved[identity])]
+        assert names == ["corsair.chain.select_runtime"] + (["corsair.chain.prepare_environment"] if environment else [])
     asyncio.run(check())

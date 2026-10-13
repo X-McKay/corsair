@@ -37,14 +37,14 @@ with workflow.unsafe.imports_passed_through():
     from corsair.agents.test_authoring.contracts import AuthoringResult, TestAuthoringInput
     from corsair.agents.test_planning.contracts import TestPlan, TestPlanningInput
     from corsair.composition.direct import (
-        AgentStage, CompositionBudget, FixtureCase, RecordedFailure, Runners, StageAttempt, StageModels, exhaustion,
-        run_chain, stage_call, stage_limits,
+        NO_PREPARATION, AgentStage, CompositionBudget, FixtureCase, Preparation, PreparationMissing, RecordedFailure,
+        Runners, StageAttempt, StageModels, exhaustion, run_chain, stage_call, stage_limits,
     )
 
     from .chain_runtime import (
-        STAGES, ChainRequest, ChainResult, ChainRuntime, RevisionRequest, StageKeys, StageRecord, StageRequest,
-        WorkerRunner, chain_result, configure_chain, configured, execute_revision, failure_record, recorded,
-        select_runtime, serving, within,
+        STAGES, ChainRequest, ChainResult, ChainRuntime, EnvironmentRequest, RevisionRequest, StageKeys, StageRecord,
+        StageRequest, WorkerRunner, chain_result, configure_chain, configured, execute_revision, failure_record,
+        recorded, run_environment, select_runtime, serving, within,
     )
     from corsair.nodes.runtime.contracts import RuntimeInputs, RuntimeOutcome
     from corsair.nodes.runtime.environment import RuntimeCatalog
@@ -53,7 +53,8 @@ with workflow.unsafe.imports_passed_through():
 REVISION_TIMEOUT = timedelta(minutes=10)
 # Detection and selection read at most 1 MiB of encoded build files in memory.
 SELECTION_TIMEOUT = timedelta(minutes=1)
-NOT_DURABLE = "The case carries setup source; the environment stage has no durable mode yet (SPEC-0068)"
+# Beyond the environment stage's own deadline, which the activity enforces: sandbox preparation and release.
+PREPARATION_MARGIN = timedelta(minutes=5)
 # Default for ``run_durable``: one attempt per model request or tool call, so nothing is blindly repeated.
 ACTIVITY_CONFIG: ActivityConfig = {"start_to_close_timeout": timedelta(minutes=5), "retry_policy": RetryPolicy(maximum_attempts=1)}
 
@@ -136,7 +137,8 @@ CHILDREN = {"identification": IdentificationStage, "planning": PlanningStage, "a
 class ChainInvestigation:
     @workflow.run
     async def run(self, request: ChainRequest) -> ChainResult:
-        _admit(tuple(getattr(request.models, stage) for stage in STAGES), request.budget)
+        keys = tuple(getattr(request.models, stage) for stage in STAGES)
+        _admit(keys + ((request.models.environment,) if request.models.environment else ()), request.budget)
         parent = workflow.info().workflow_id
 
         async def invoke(stage: AgentStage, inputs: Any) -> StageAttempt:
@@ -144,9 +146,7 @@ class ChainInvestigation:
             # Pure derivation from the stage input: the same caps the child enforces.
             limits = stage_limits(stage, inputs, request.budget)
             if stage == "environment":
-                # SPEC-0068: the environment stage runs in direct mode only until its durable slice; never the declaration.
-                return StageAttempt(stage, None, None, (), 0.0, RecordedFailure(
-                    "EnvironmentStageNotDurable", NOT_DURABLE), limits)
+                return await environment(inputs, limits, started)
             try:
                 record = await workflow.execute_child_workflow(
                     CHILDREN[stage].run, StageRequest(inputs, getattr(request.models, stage), request.budget),
@@ -161,6 +161,24 @@ class ChainInvestigation:
             failure = record.failure and RecordedFailure(record.failure.kind, record.failure.message)
             return StageAttempt(stage, record.output, record.usage, record.messages, workflow.time() - started,
                                 failure, limits, exhaustion(stage, limits, failure))
+
+        async def environment(inputs, limits, started) -> StageAttempt:
+            # PLAN-0075: the whole stage is one activity on the worker holding the preparation port, never retried.
+            if request.models.environment is None:
+                return StageAttempt("environment", None, None, (), 0.0,
+                                    RecordedFailure(PreparationMissing.__name__, NO_PREPARATION), limits)
+            try:
+                record = await workflow.execute_activity(
+                    run_environment, EnvironmentRequest(inputs, request.models.environment, request.budget),
+                    start_to_close_timeout=timedelta(seconds=limits.timeout_seconds) + PREPARATION_MARGIN,
+                    retry_policy=RetryPolicy(maximum_attempts=1))
+            except ActivityError as exc:
+                # Unknown how far it got: usage and messages were not observed, and the sandbox may still exist.
+                return StageAttempt("environment", None, None, (), workflow.time() - started, recorded(exc), limits,
+                                    cleanup="unconfirmed")
+            failure = record.failure and RecordedFailure(record.failure.kind, record.failure.message)
+            return StageAttempt("environment", record.output, record.usage, record.messages, record.elapsed_seconds,
+                                failure, limits, record.exhausted, record.cleanup)
 
         async def execute(revision, patch, **run):
             try:
@@ -196,22 +214,23 @@ async def chain_worker(client: Client, task_queue: str, **options: Any) -> Async
     if runtime is None:
         raise ValueError("configure_chain must run before a chain worker is built")
     with serving():
-        async with Worker(client, task_queue=task_queue, workflows=list(WORKFLOWS), activities=[execute_revision, select_runtime],
+        async with Worker(client, task_queue=task_queue, workflows=list(WORKFLOWS), activities=[execute_revision, select_runtime, run_environment],
                           plugins=[AgentPlugin(agent) for agent in runtime.agents.values()], **options) as worker:
             yield worker
 
 
 async def run_durable(case: FixtureCase, models: StageModels, runners: Runners,
                       budget: CompositionBudget = CompositionBudget(), *, client: Client,
-                      catalog: RuntimeCatalog | None = None,
+                      catalog: RuntimeCatalog | None = None, preparation: Preparation | None = None,
                       workflow_id: str | None = None, execution_timeout: timedelta | None = None,
                       activity_config: ActivityConfig = ACTIVITY_CONFIG, **worker_options: Any) -> ChainResult:
     """``run_direct``'s arguments under an in-process worker; ``budget`` is also the ceiling. The client needs
     ``PydanticAIPlugin``. The workflow id (default random) names the parent and ``<id>/<stage>`` children."""
-    configure_chain({stage: getattr(models, stage) for stage in STAGES}, runners, activity_config=activity_config,
-                    ceiling=budget, catalog=catalog)
+    stages = STAGES + (("environment",) if models.environment is not None else ())
+    configure_chain({stage: getattr(models, stage) for stage in stages}, runners, activity_config=activity_config,
+                    ceiling=budget, catalog=catalog, preparation=preparation)
     identity = workflow_id or f"corsair-chain-{uuid4()}"
     # One configuration per process: an overlapping run_durable is refused rather than served another's models.
     async with chain_worker(client, identity, **worker_options):
-        return await client.execute_workflow(ChainInvestigation.run, ChainRequest(case, StageKeys(*STAGES), budget),
+        return await client.execute_workflow(ChainInvestigation.run, ChainRequest(case, StageKeys(*stages), budget),
                                              id=identity, task_queue=identity, execution_timeout=execution_timeout)

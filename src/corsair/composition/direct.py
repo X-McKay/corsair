@@ -343,6 +343,35 @@ async def _invoke(stage: AgentStage, agent: Agent[Any, Any], prompt: str, deps: 
                         exhaustion(stage, limits, failure, deadline=deadline.expired()))
 
 
+async def prepare_environment(inputs: EnvironmentInput, model: Model | None, preparation: Preparation | None,
+                              budget: CompositionBudget) -> StageAttempt:
+    """The environment stage, once and in one process in every mode: prepare a sandbox of the selected toolchain,
+    run the environment agent there and release it. The setup ledger and live sandbox never leave this call."""
+    limits = stage_limits("environment", inputs, budget)
+    if preparation is None or model is None:
+        return StageAttempt("environment", None, None, (), 0.0, PreparationMissing(NO_PREPARATION), limits)
+    (selected,), operation, started = inputs.toolchains, uuid4(), perf_counter()
+    try:
+        sandbox = await asyncio.to_thread(preparation.prepare, selected, operation)
+    except Exception as exc:
+        # Nothing was handed back to release; whether a sandbox exists is the adapter's to report.
+        return StageAttempt("environment", None, None, (), perf_counter() - started, exc, limits, cleanup="unconfirmed")
+    try:
+        agent = AGENTS["environment"](model, output_retries=budget.output_retries)
+        deps = EnvironmentDependencies(inputs=inputs, execution=sandbox.execution, handle=sandbox.handle,
+                                       toolchain_id=selected.toolchain_id, scratch_location=sandbox.scratch_location,
+                                       budget=SetupBudget(max_commands=budget.setup_commands), new_operation=uuid4)
+        attempt = await _invoke("environment", agent, environment_prompt(inputs), deps, limits)
+    except Exception as exc:
+        attempt = StageAttempt("environment", None, None, (), perf_counter() - started, exc, limits)
+    finally:
+        try:
+            cleanup = await asyncio.to_thread(preparation.release, sandbox, operation)
+        except Exception:
+            cleanup = "unconfirmed"
+    return replace(attempt, cleanup="confirmed" if cleanup == "confirmed" else "unconfirmed")
+
+
 # Recorded on every run that reaches the gates, because nothing below observes them.
 UNOBSERVED = ("The witness probe runs inside the test interpreter: it is operator-owned and tamper-evident, not "
               "tamper-proof against hostile test code.",
@@ -366,7 +395,7 @@ async def run_direct(case: FixtureCase, models: StageModels, runners: Runners,
     ``models.environment``."""
     async def invoke(stage: AgentStage, inputs: Any) -> StageAttempt:
         if stage == "environment":
-            return await environment_stage(inputs)
+            return await prepare_environment(inputs, models.environment, preparation, budget)
         agent = AGENTS[stage](getattr(models, stage), output_retries=budget.output_retries)
         prompt, deps = stage_call(stage, inputs, budget, runners("development") if stage == "authoring" else None)
         return await _invoke(stage, agent, prompt, deps, stage_limits(stage, inputs, budget))
@@ -379,30 +408,6 @@ async def run_direct(case: FixtureCase, models: StageModels, runners: Runners,
             raise RuntimeCatalogMissing(NO_CATALOG)
         return select_runtime(inputs, catalog)
 
-    async def environment_stage(inputs: EnvironmentInput) -> StageAttempt:
-        limits = stage_limits("environment", inputs, budget)
-        if preparation is None or models.environment is None:
-            return StageAttempt("environment", None, None, (), 0.0, PreparationMissing(NO_PREPARATION), limits)
-        (selected,), operation, started = inputs.toolchains, uuid4(), perf_counter()
-        try:
-            sandbox = await asyncio.to_thread(preparation.prepare, selected, operation)
-        except Exception as exc:
-            # Nothing was handed back to release; whether a sandbox exists is the adapter's to report.
-            return StageAttempt("environment", None, None, (), perf_counter() - started, exc, limits, cleanup="unconfirmed")
-        try:
-            agent = AGENTS["environment"](models.environment, output_retries=budget.output_retries)
-            deps = EnvironmentDependencies(inputs=inputs, execution=sandbox.execution, handle=sandbox.handle,
-                                           toolchain_id=selected.toolchain_id, scratch_location=sandbox.scratch_location,
-                                           budget=SetupBudget(max_commands=budget.setup_commands), new_operation=uuid4)
-            attempt = await _invoke("environment", agent, environment_prompt(inputs), deps, limits)
-        except Exception as exc:
-            attempt = StageAttempt("environment", None, None, (), perf_counter() - started, exc, limits)
-        finally:
-            try:
-                cleanup = await asyncio.to_thread(preparation.release, sandbox, operation)
-            except Exception:
-                cleanup = "unconfirmed"
-        return replace(attempt, cleanup="confirmed" if cleanup == "confirmed" else "unconfirmed")
     return await run_chain(case, invoke, execute, select, new_operation=uuid4)
 
 
