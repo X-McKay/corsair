@@ -54,6 +54,12 @@ async def finalize_authoring(ctx: RunContext[AuthoringDependencies], result: Aut
                          f" at line {final.security.failure_line}, not through its planned {planned} assertion; an error"
                          " before the planned assertion cannot distinguish the revisions: fix the observed error and run"
                          " again, or return blocked")
+    if final.security_contradicts_witness:
+        # Gap 11: the gate would classify this run security_passed_with_effect; nothing the test asserts sees the effect.
+        raise ModelRetry("the final run's security test passed although the operator witness recorded the target "
+                         f"performing the planned effect on {plan.security.witness.subject}: its assertion cannot detect "
+                         "that effect; assert on what the call returned or on fixture state the effect changes, run again, "
+                         "or return blocked")
     try:
         assertion_lines(files[plan.control.test_path], plan.control.test_id)
         security_lines = assertion_lines(files[plan.security.test_path], plan.security.test_id)

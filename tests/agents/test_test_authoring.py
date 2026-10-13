@@ -21,8 +21,9 @@ from corsair.agents.test_authoring import (
 from corsair.agents.test_authoring.admission import REVIEWED_SELF_OBSERVING, self_observation
 from corsair.agents.test_authoring.skills import SKILL_TEXT
 from corsair.agents.test_authoring.static import assertion_lines, static_checks
-from corsair.ports.test_runner import NativeTestRun
-from evals.fixture_e2e.reviewed import DISCOVER, PREFIX, ReviewedLocalExecution, ReviewedWorkspace
+from corsair.ports.sandbox import SandboxHandle
+from corsair.ports.test_runner import NativeTestRun, PreparedWorkspace
+from evals.fixture_e2e.reviewed import DISCOVER, FIXTURE, PREFIX, ReviewedLocalExecution, ReviewedWorkspace
 from evals.test_authoring.evaluate import (
     FILES, EvaluationBudget, ScriptedRun, ScriptedRunner, authoring_checks, dataset, evaluate, passed,
 )
@@ -541,3 +542,59 @@ def test_deferred_target_calls_do_not_satisfy_structural_target_fact(deferred):
     assert facts["has_assertion"] and not facts["calls_target"]
     direct = content + "    read_document()\n"
     assert static_checks(direct, "t.py::test_security", "read_document")["calls_target"]
+
+
+# Live run 2's security test under the reviewed plan's ids: it re-reads the outside file, which a read never changes.
+INSENSITIVE = """from pathlib import Path
+
+import documents
+
+
+def test_benign_control(tmp_path: Path):
+    (tmp_path / "allowed").mkdir()
+    (tmp_path / "allowed" / "document.txt").write_text("hello")
+    assert documents.read_document(tmp_path / "allowed", "document.txt") == "hello"
+
+
+def test_security_rejects_outside_read(tmp_path: Path):
+    (tmp_path / "allowed").mkdir()
+    (tmp_path / "outside.txt").write_text("outside")
+    documents.read_document(tmp_path / "allowed", "../outside.txt")
+    assert (tmp_path / "outside.txt").read_text() == "outside"
+"""
+
+
+class FixedBytesWorkspace(ReviewedWorkspace):
+    """The vulnerable fixture with these repository-owned test bytes; nothing model-written runs on the host."""
+    def __init__(self, store, root, tests):
+        super().__init__(store, root, "vulnerable")
+        self.tests = tests
+
+    def prepare(self, patch, operation):
+        assert [(f.path, f.content) for f in patch.files] == [("test_documents.py", self.tests.encode())]
+        source = (FIXTURE / "vulnerable" / "documents.py").read_bytes()
+        self.root.mkdir(mode=0o700)
+        (self.root / "documents.py").write_bytes(source)
+        (self.root / "test_documents.py").write_text(self.tests)
+        return PreparedWorkspace(SandboxHandle("dev", "host", "local", "tests", str(operation)),
+                                 self.store.put(source), self.store.put(self.tests.encode()), patch.sha256)
+
+
+def test_a_security_test_that_passes_while_the_witness_sees_the_effect_is_refused(tmp_path):
+    """Gap 11: with the operator envelope on development runs, an insensitive security test is shown and refused."""
+    data = case().inputs.inputs.model_dump()
+    data["plan"]["discovery_command"] = data["environment"]["discovery_command"] = list(DISCOVER)
+    data["witness"] = {"target_path": "documents.py", "target_symbol": "read_document", "effect_name": "outside.txt"}
+    inputs = TestAuthoringInput.model_validate(data)
+    root = (tmp_path / "workspace").resolve()
+    (tmp_path / "artifacts").mkdir(mode=0o700)
+    seen = []
+    with LocalArtifacts(tmp_path / "artifacts", max_bytes=1024 * 1024) as store:
+        native = PytestRunner(FixedBytesWorkspace(store, root, INSENSITIVE), ReviewedLocalExecution(root), store,
+                              PytestRunnerConfig(PREFIX, ".corsair-junit.xml", str(root),
+                                                 witness_record_path=str(tmp_path / "witness.json")))
+        with pytest.raises(UnexpectedModelBehavior):
+            run(create_test_authoring_agent(responding([*READS, write(INSENSITIVE), RUN], seen=seen), output_retries=0),
+                inputs, native)
+    assert seen[0].security_contradicts_witness and seen[0].security.outcome == "passed"
+    assert seen[0].control.outcome == "passed"

@@ -37,7 +37,7 @@ from corsair.agents.issue_analysis.tools import FixtureDependencies
 from corsair.agents.source.contracts import Contract
 from corsair.agents.source.tools import READ_LINE_LIMIT
 from corsair.agents.test_authoring.agent import authoring_prompt, create_test_authoring_agent
-from corsair.agents.test_authoring.contracts import TestAuthoringInput, TestPatch
+from corsair.agents.test_authoring.contracts import DevelopmentWitness, TestAuthoringInput, TestPatch
 from corsair.agents.test_authoring.dependencies import AuthoringBudget, AuthoringDependencies
 from corsair.agents.test_planning.agent import create_test_planning_agent
 from corsair.agents.test_planning.dependencies import PlanningDependencies
@@ -574,7 +574,16 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         return stop("planning", f"plan unsupported: {plan.missing_capability}", identification=identification)
 
     try:
-        authoring_input = TestAuthoringInput(plan=plan, source_files=source_files, environment=environment)
+        request, unrequested = witness_request(identification, case.witness_envelope, plan.security.witness), ()
+    except ValueError as exc:
+        # No approved envelope covers the identified target: run without a witness and say so.
+        request, unrequested = None, (f"no witness requested: {exc}"[:512],)
+    # Development runs observe the same envelope, so authoring can refuse a test that cannot see the effect.
+    development_witness = (DevelopmentWitness(target_path=request.target_path, target_symbol=request.target_symbol,
+                                              effect_name=request.effect_name) if request is not None else None)
+    try:
+        authoring_input = TestAuthoringInput(plan=plan, source_files=source_files, environment=environment,
+                                             witness=development_witness)
     except ValueError as exc:
         return stop("authoring", f"authoring input refused: {exc}"[:2048], identification=identification, plan=plan)
     patch = await _stage("authoring", authoring_input)
@@ -591,11 +600,6 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         return stop("execution", f"patch not frozen: {exc}"[:2048], identification=identification, plan=plan,
                     patch=patch)
     executions = []
-    try:
-        request, unrequested = witness_request(identification, case.witness_envelope, plan.security.witness), ()
-    except ValueError as exc:
-        # No approved envelope covers the identified target: run without a witness and say so.
-        request, unrequested = None, (f"no witness requested: {exc}"[:512],)
     for revision in ("baseline", "candidate"):
         operation, observed, failure = new_operation(), None, None
         try:

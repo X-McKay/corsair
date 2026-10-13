@@ -23,7 +23,7 @@ Branch `claude/verdict-gaps-run2-n9lj9y` from main 184e609. Implements [PLAN-008
 | 8 | Live run 2, Docker live-002 | Assessment proposed `not_reproduced` where the gate allowed `inconclusive` (gate rejected it; reported verdict was right) | Assessment skill v6 states what `not_reproduced` needs; gate unchanged |
 | 9 | Docker live-002 | Security test raised `FileNotFoundError` in its own setup on both revisions; acceptance refused only setup errors and skips | `run_tests` shows a security failure of an unplanned type; finalization refuses the patch with type and line |
 | 10 | Docker live-006 | Prose before the final JSON; the one correction also failed, run stopped at authoring | Not fixed yet. PydanticAI prompted output strips prose only before a fenced block, not bare JSON; needs live-006 `attempt-2-authoring.json` to fix the right case |
-| 11 | Docker live-006, live-002 | Dev run withholds the security outcome, so a test that cannot fail is frozen unseen | Not done yet. Planned: capture the witness in authoring dev runs (direct and durable deps) and refuse a security test that passes while the witness sees the planned effect. Refusing any pass on the reported revision was rejected: it assumes the baseline is vulnerable and makes `not_reproduced` impossible |
+| 11 | Docker live-006, live-002 | Dev run withholds the security outcome, so a test that cannot fail is frozen unseen | Authoring's development runs capture the witness (envelope carried in `TestAuthoringInput.witness`, direct and durable); a security pass while the witness observed the planned effect is shown and refused. Refusing any pass on the reported revision was rejected: it assumes the baseline is vulnerable and makes `not_reproduced` impossible. Live-002's setup error is gap 9 |
 
 ## Validation and blockers
 
@@ -31,7 +31,7 @@ Branch `claude/verdict-gaps-run2-n9lj9y` from main 184e609. Implements [PLAN-008
 
 ## Decisions and next steps
 
-The gate stays authoritative; the assessment agent moves. Draft PR #117. Next: gap 11 (witness in authoring dev runs), gap 10 once the live-006 response is available, then a live end-to-end run of the fixture case on this branch, then live `make eval AGENT=authoring` and `AGENT=assessment` baselines when the model is free, and `make qualify-witness` at the next milestone gate.
+The gate stays authoritative; the assessment agent moves. Draft PR #117. Next: gap 10 once the live-006 response is available, then a live end-to-end run of the fixture case on this branch, then live `make eval AGENT=authoring` and `AGENT=assessment` baselines when the model is free, and `make qualify-witness` at the next milestone gate.
 
 ## Continuation prompt
 
