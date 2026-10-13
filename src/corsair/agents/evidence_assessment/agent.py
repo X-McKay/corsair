@@ -12,13 +12,14 @@ from pydantic_ai.models.instrumented import InstrumentationSettings
 
 from corsair.core.disposition import Disposition, admit, assess
 
+from ..budget import tool_budget
 from .contracts import AssessmentInput, EvidenceAssessment, EvidenceRead, ProposedDispositionDraft
 from .tools import READ_EVIDENCE_TOOL, TOOL_RETRIES, AssessmentDependencies, evidence_tools
 
 # PROMPT_VERSION covers everything the model sees (instructions, skill, rendered prompt,
 # tool and output schema text); CONFIG_VERSION covers retry budgets and instrumentation.
 PROMPT_VERSION = "evidence-assessment-v4"
-CONFIG_VERSION = "evidence-assessment-config-v1"
+CONFIG_VERSION = "evidence-assessment-config-v2"
 SKILL_ID = "assess-evidence"
 SKILL_BYTES = (Path(__file__).parent / "skills" / SKILL_ID / "SKILL.md").read_bytes()
 SKILL_TEXT = SKILL_BYTES.decode("utf-8")
@@ -102,6 +103,7 @@ def create_evidence_assessment_agent(
         model, name="evidence_assessment", deps_type=AssessmentDependencies, output_type=finalize_assessment,
         instructions=INSTRUCTIONS, retries={"tools": TOOL_RETRIES, "output": output_retries},
         capabilities=[Capability(id=SKILL_ID, instructions=SKILL_TEXT, toolsets=[evidence_tools()]),
+                      tool_budget(),
                       Instrumentation(settings=InstrumentationSettings(include_content=False, version=5)),
                       *([durability] if durability is not None else [])],
     )

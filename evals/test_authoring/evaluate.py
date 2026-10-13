@@ -37,7 +37,11 @@ ROOT = Path(__file__).parent
 REPOSITORY = ROOT.parents[1]
 # The reviewed SPEC-0018 realization; scripted plumbing writes it, never a model.
 FILES = {"reference": (REPOSITORY / "benchmarks/fixtures/path-traversal/test_documents.py").read_text(),
-         "broken": "import pytest\nimport documents\n\ndef test_benign_control(:\n    pass\n"}
+         "broken": "import pytest\nimport documents\n\ndef test_benign_control(:\n    pass\n",
+         # What live authors wrote in PLAN-0039: their own audit hook beside the operator witness.
+         "self_observing": ("import sys\nimport documents\n\nOPENS = []\nsys.addaudithook(lambda event, args: "
+                            "OPENS.append(args[0]) if event == 'open' else None)\n\n\ndef test_benign_control(tmp_path):\n"
+                            "    (tmp_path / 'd.txt').write_text('x')\n    assert documents.read_document(tmp_path, 'd.txt') == 'x'\n")}
 AuthoringOutput = TestPatch | BlockedAuthoring
 
 
@@ -154,7 +158,9 @@ def scripted_model(inputs: TestAuthoringInput, oracle: AuthoringOracle) -> Funct
         draft = ({"status": "patch", "security_assertion_lines": list(oracle.security_assertion_lines),
                   "limitations": ["Development runs observe buildability and discovery, not the security outcome"]}
                  if oracle.status == "patch" else
-                 {"status": "blocked", "layer": oracle.layer, "reason": "The observed development runs did not admit the planned tests"})
+                 # Trusted code assigns the admission layer; the model-facing draft cannot name it.
+                 {"status": "blocked", "layer": "unknown" if oracle.layer == "admission" else oracle.layer,
+                  "reason": "The observed development runs did not admit the planned tests"})
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {"result": draft})])
     return FunctionModel(respond)
 

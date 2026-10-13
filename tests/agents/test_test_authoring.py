@@ -2,6 +2,7 @@
 
 import asyncio
 from dataclasses import replace
+from hashlib import sha256
 
 import pytest
 from pydantic import ValidationError
@@ -17,6 +18,7 @@ from corsair.agents.test_authoring import (
     AuthoringBudget, AuthoringDependencies, BlockedAuthoring, TestAuthoringInput, TestPatch, authoring_prompt,
     create_test_authoring_agent,
 )
+from corsair.agents.test_authoring.admission import REVIEWED_SELF_OBSERVING, self_observation
 from corsair.agents.test_authoring.skills import SKILL_TEXT
 from corsair.agents.test_authoring.static import assertion_lines, static_checks
 from corsair.ports.test_runner import NativeTestRun
@@ -289,8 +291,8 @@ def test_pytest_raises_bindings_are_assertions():
 def test_native_evals_repeat_and_preserve_receipts(tmp_path):
     evidence = tmp_path / "attempt"
     report = asyncio.run(evaluate(evidence, EvaluationBudget()))
-    assert passed(report) and len(report.cases) == 12 and len(report.case_groups()) == 6
-    assert len(list(evidence.glob("attempt-*.json"))) == 12
+    assert passed(report) and len(report.cases) == 16 and len(report.case_groups()) == 8
+    assert len(list(evidence.glob("attempt-*.json"))) == 16
     assert all(c.attributes["security_revealed"] == 0 for c in report.cases)
     assert report.experiment_metadata["runner"] == "scripted_observations"
     with pytest.raises(FileExistsError):
@@ -324,3 +326,80 @@ def _compose(inputs, root, store, reveal):
         assert failure.failure_line in patch.security_assertion_lines
     else:
         assert patch.dev_runs[0].security == "withheld"
+
+
+HOOKED = "import sys\nimport documents\n\nsys.addaudithook(lambda e, a: None)\n\n\ndef test_benign_control(tmp_path):\n    assert True\n"
+
+
+@pytest.mark.parametrize("content, facility", [
+    (HOOKED, "sys.addaudithook"),
+    ("import sys as s\ns.monitoring.use_tool_id(3, 'x')\n", "sys.monitoring"),
+    ("from sys import addaudithook as hook\nhook(print)\n", "import sys.addaudithook"),
+    ("import sys\nsys.audit('open', 'x')\n", "sys.audit"),
+    ("import sys\ngetattr(sys, 'addaudithook')(print)\n", "string 'addaudithook'"),
+    ("import threading\nthreading.settrace(print)\n", "threading.settrace"),
+    ("def test_x(monkeypatch):\n    monkeypatch.setattr('builtins.open', print)\n",
+     "monkeypatch.setattr(builtins.open)"),
+    ("import os\n\ndef test_x(monkeypatch):\n    monkeypatch.setattr(os, 'open', print)\n", "monkeypatch.setattr(os)"),
+    ("import documents\n\ndef test_x(monkeypatch):\n    monkeypatch.setattr(documents, 'open', print)\n",
+     "monkeypatch.setattr(open)"),
+    ("from unittest import mock\n", "import unittest.mock"),
+    ("import ctypes\n", "import ctypes"),
+])
+def test_self_observation_is_found_by_line(content, facility):
+    findings = self_observation(content)
+    assert facility in {f.facility for f in findings} and all(f.line >= 1 for f in findings)
+
+
+def test_plain_tests_and_reviewed_bytes_are_admitted():
+    plain = ("import os\nfrom pathlib import Path\n\nimport documents\n\n\ndef test_x(tmp_path: Path, monkeypatch):\n"
+             "    monkeypatch.setenv('HOME', str(tmp_path))\n    (tmp_path / 'a').write_text('s')\n"
+             "    with open(tmp_path / 'a') as f:\n        assert f.read() == 's'\n    assert os.path.exists(tmp_path)\n")
+    assert self_observation(plain) == () and self_observation("def broken(:\n") == ()
+    # The SPEC-0018 pair predates the witness and observes opens itself; it is admitted by its reviewed digest only.
+    assert sha256(REFERENCE.encode()).hexdigest() in REVIEWED_SELF_OBSERVING and self_observation(REFERENCE) == ()
+    assert self_observation(REFERENCE + "\n")
+
+
+def test_refused_write_keeps_previous_content_and_the_author_can_act_once():
+    offered = []
+    agent = create_test_authoring_agent(responding([write(HOOKED), write(), RUN], offered=offered))
+    result, fake = run(agent, case().inputs.inputs)
+    assert isinstance(result.output, TestPatch) and len(fake.calls) == 1
+    assert [f.content for f in result.output.files] == [REFERENCE]
+    refusal = next(p.content for m in result.all_messages() for p in m.parts
+                   if isinstance(p, ToolReturnPart) and p.tool_name == "write_test_file")
+    assert refusal.status == "refused" and refusal.refusals_left == 1 and "line 4: sys.addaudithook" in refusal.reason
+    assert offered[1:4] == [ALL_TOOLS] * 3
+
+
+def test_second_refusal_ends_blocked_at_admission():
+    offered = []
+    draft = {"status": "blocked", "layer": "unknown", "reason": "refused"}
+    agent = create_test_authoring_agent(responding([write(HOOKED), write(HOOKED)], final=draft, offered=offered))
+    result, fake = run(agent, case().inputs.inputs)
+    assert isinstance(result.output, BlockedAuthoring) and result.output.layer == "admission"
+    assert "sys.addaudithook" in result.output.reason and result.output.files == () and fake.calls == []
+    assert offered[-1] == READ_ONLY
+    # A patch draft after the refusals is overruled the same way.
+    agent = create_test_authoring_agent(responding([write(HOOKED), write(), RUN, write(HOOKED)]))
+    result, fake = run(agent, case().inputs.inputs)
+    assert isinstance(result.output, BlockedAuthoring) and result.output.layer == "admission" and len(fake.calls) == 1
+
+
+def test_tools_are_withdrawn_at_the_tool_call_cap_and_the_author_returns_its_output():
+    offered = []
+    steps = [ToolCallPart("read_source", {"path": "documents.py"}), write(), RUN, write(), RUN]
+
+    async def respond(messages, info):
+        offered.append([t.name for t in info.function_tools])
+        done = sum(isinstance(p, ToolReturnPart) for m in messages for p in m.parts)
+        if info.function_tools and done < len(steps):
+            return ModelResponse(parts=[replace(steps[done], tool_call_id=f"call-{done}")])
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {"result": PATCH})])
+    inputs = case().inputs.inputs
+    result = create_test_authoring_agent(FunctionModel(respond)).run_sync(
+        authoring_prompt(inputs), deps=AuthoringDependencies(inputs, runner()),
+        usage_limits=UsageLimits(request_limit=8, tool_calls_limit=3))
+    assert isinstance(result.output, TestPatch) and result.usage.tool_calls == 3
+    assert offered == [ALL_TOOLS, ALL_TOOLS, ALL_TOOLS, []]

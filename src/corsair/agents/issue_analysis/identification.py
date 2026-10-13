@@ -10,13 +10,14 @@ from pydantic_ai.messages import ModelRequest, ToolReturnPart
 from pydantic_ai.models import Model
 from pydantic_ai.models.instrumented import InstrumentationSettings
 
+from ..budget import tool_budget
 from .contracts import IssueAnalysisInput, SourceRead
 from .identification_contracts import IssueIdentification, IssueIdentificationDraft
 from .tools import READ_SOURCE_TOOL, TOOL_RETRIES, FixtureDependencies
 from .tools.identification import identification_tools
 
 PROMPT_VERSION = "issue-identification-v3"
-CONFIG_VERSION = "issue-identification-config-v3"
+CONFIG_VERSION = "issue-identification-config-v4"
 SKILL_ID = "identify-issue"
 SKILL_TEXT = (Path(__file__).parent / "skills" / SKILL_ID / "SKILL.md").read_text()
 SKILL_SHA256 = sha256(SKILL_TEXT.encode()).hexdigest()
@@ -68,6 +69,7 @@ def create_issue_identification_agent(
         model, name="issue_identification", deps_type=FixtureDependencies, output_type=finalize_identification,
         instructions=INSTRUCTIONS, retries={"tools": TOOL_RETRIES, "output": output_retries},
         capabilities=[Capability(id=SKILL_ID, instructions=SKILL_TEXT, toolsets=[identification_tools()]),
+                      tool_budget(),
                       Instrumentation(settings=InstrumentationSettings(include_content=False, version=5)),
                       *([durability] if durability is not None else [])],
     )
