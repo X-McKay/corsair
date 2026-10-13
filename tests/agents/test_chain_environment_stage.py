@@ -118,6 +118,9 @@ def test_an_admitted_ready_environment_replaces_the_declaration(run):
     declared = fixture_case().environment_identity
     assert recipe_sha256(ready) in assessed and declared.recipe_sha256 not in assessed
     assert result.limitations[:4] == UNOBSERVED[:2] + OBSERVED_IDENTITY
+    # The revisions run on the operator's runners, so planning keeps the declared scratch, not the released sandbox's.
+    planned = str(next(a for a in result.attempts if a.stage == 'planning').messages)
+    assert fixture_case().environment.scratch_location in planned and '/sandbox/scratch' not in planned
     assert UNOBSERVED[2] not in result.limitations
 
 
@@ -177,3 +180,12 @@ def test_setup_source_without_a_runtime_selection_ends_the_run(run):
     result = run(replace(fixture_case(), setup=SETUP), environment_model([], ready_draft()), preparation=Sandboxes(OK))
     _stopped_before_identification(result)
     assert result.reason == 'setup source needs a runtime selected from build files; the case carries none'
+
+
+def test_an_agent_discovery_command_reaches_no_runner_unless_the_plan_carries_it(run):
+    """Discovery is agent-proposed and runner-admitted (SPEC-0068): the plan must echo the mapped command, and
+    the runners admit what they execute. A plan that does not carry it stops before any revision run."""
+    other = DISCOVER + ('-p', 'no:warnings')
+    result = run(case(), environment_model([BUILD, other, BASELINE], ready_draft(discovery_command=list(other))),
+                 catalog=catalog(), preparation=Sandboxes(OK | {other: (0, f'{BASELINE_ID}\n')}))
+    assert result.stopped_at == 'planning' and result.executions == () and result.gate is None

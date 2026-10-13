@@ -97,8 +97,9 @@ class StageBudget(Contract):
 
 
 class CompositionBudget(Contract):
-    environment: StageBudget = StageBudget(request_limit=24, tool_calls_limit=24, total_tokens_limit=192000,
-                                           timeout_seconds=900, tokens_per_request=8000)
+    # The environment agent's isolated eval budget (evals/environment EvaluationBudget), not wider (SPEC-0068).
+    environment: StageBudget = StageBudget(request_limit=16, tool_calls_limit=20, total_tokens_limit=48000,
+                                           timeout_seconds=240, tokens_per_request=8000)
     setup_commands: int = Field(default=12, strict=True, ge=1, le=16)
     identification: StageBudget = StageBudget(request_limit=20, tool_calls_limit=16, total_tokens_limit=128000,
                                               timeout_seconds=300, tokens_per_request=8000)
@@ -350,8 +351,8 @@ UNOBSERVED = ("The witness probe runs inside the test interpreter: it is operato
               "Environment identity is the operator's declaration for both revisions, not an observed image or "
               "dependency digest.")
 UNSELECTED = "Runtime not selected from build files: the runtime is the operator's declaration."
-OBSERVED_IDENTITY = ("Environment image and recipe observed by the environment stage; dependency inventory, policy "
-                     "revision and limits are the operator's declaration.",
+OBSERVED_IDENTITY = ("Environment image and recipe observed by the environment stage; scratch location, dependency "
+                     "inventory, policy revision and limits are the operator's declaration.",
                      "Revisions run on the operator's runners, not in the environment stage's prepared sandbox.")
 
 
@@ -384,7 +385,7 @@ async def run_direct(case: FixtureCase, models: StageModels, runners: Runners,
             return StageAttempt("environment", None, None, (), 0.0, PreparationMissing(NO_PREPARATION), limits)
         (selected,), operation, started = inputs.toolchains, uuid4(), perf_counter()
         try:
-            sandbox = preparation.prepare(selected, operation)
+            sandbox = await asyncio.to_thread(preparation.prepare, selected, operation)
         except Exception as exc:
             # Nothing was handed back to release; whether a sandbox exists is the adapter's to report.
             return StageAttempt("environment", None, None, (), perf_counter() - started, exc, limits, cleanup="unconfirmed")
@@ -398,7 +399,7 @@ async def run_direct(case: FixtureCase, models: StageModels, runners: Runners,
             attempt = StageAttempt("environment", None, None, (), perf_counter() - started, exc, limits)
         finally:
             try:
-                cleanup = preparation.release(sandbox, operation)
+                cleanup = await asyncio.to_thread(preparation.release, sandbox, operation)
             except Exception:
                 cleanup = "unconfirmed"
         return replace(attempt, cleanup="confirmed" if cleanup == "confirmed" else "unconfirmed")

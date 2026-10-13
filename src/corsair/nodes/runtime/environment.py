@@ -182,13 +182,14 @@ def recipe_sha256(result: ReadyEnvironment) -> str:
 def ready_evidence(result: ReadyEnvironment, declared: EnvironmentEvidence,
                    identity: EnvironmentIdentity) -> tuple[EnvironmentEvidence, EnvironmentIdentity]:
     """SPEC-0068: the chain's environment from an admitted ready result. Observed fields come from the result; the
-    operator's recorders, dependency inventory, policy revision and limits stay as declared. Raises ValueError when
-    the result does not fit the evidence contracts."""
+    operator's recorders, scratch location, dependency inventory, policy revision and limits stay as declared (the
+    revisions run on the operator's runners, not in the released preparation sandbox). Raises ValueError when the
+    result does not fit the evidence contracts."""
     evidence = EnvironmentEvidence(
         language=result.language, runtime=result.runtime, framework=result.framework,
         discovery_command=result.discovery_command, approved_test_paths=result.approved_test_paths,
         baseline_test=BaselineTest(test_id=result.baseline_test_id, path=result.baseline_test_path),
-        scratch_location=result.scratch_location, observation_facilities=declared.observation_facilities,
+        scratch_location=declared.scratch_location, observation_facilities=declared.observation_facilities,
         witness_facilities=declared.witness_facilities)
     observed = identity.model_copy(update={'image_digest': result.toolchain_image.rsplit('@sha256:', 1)[1],
                                            'recipe_sha256': recipe_sha256(result)})
