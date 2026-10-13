@@ -8,7 +8,7 @@ import sys
 import pytest
 
 from corsair.core.disposition import SandboxEvent
-from corsair.nodes.witness import BOOTSTRAP, PROBE_SHA256, PROBE_SOURCE, probe_argv, witness_evidence
+from corsair.nodes.witness import BOOTSTRAP, PROBE_SHA256, PROBE_SOURCE, Calibration, probe_argv, witness_evidence
 from corsair.ports.artifacts import ArtifactRef
 from corsair.ports.test_runner import WitnessCapture, WitnessRequest
 
@@ -16,6 +16,7 @@ REQUEST = WitnessRequest('target.py', 'read', 'outside.txt')
 COMMAND = ('python3.12', '-m', 'pytest', '-p', 'no:cacheprovider', '-q')
 NONCE = 'nonce-1'
 SECURITY = 'test_case.py::test_security'
+CONTROL = Calibration('test_case.py::test_control', 'allowed/document.txt')
 TARGET = '''import errno, os
 from pathlib import Path
 
@@ -331,16 +332,90 @@ def test_security(tmp_path):
     assert (found.witness.effect, found.witness.safe_behavior) == ('observed', 'ValueError')
 
 
+def calibrated(data, **control):
+    """The record with a control call phase that opened the control subject on the target's stack."""
+    entry = {'entered': 1, 'exits': [None], 'opens': [{'path': '/scratch/t0/allowed/document.txt', 'planned': False}],
+             'os_errors': [], 'truncated': False, 'complete': True, 'offstack_planned': 0} | control
+    return json.dumps(data | {'tests': data['tests'] | {CONTROL.test_id: entry}}).encode()
+
+
+def absent(data, **control):
+    return witness_evidence(capture(calibrated(data, **control)), REQUEST, SECURITY,
+                            planned_safe_behavior='no_file_open', control=CONTROL)
+
+
 def test_absence_is_the_planned_safe_behavior_however_the_target_exits(record):
     """SPEC-0040 `no_file_open`: a fix that returns normally, or rejects, without the planned open is safe."""
     data = json.loads(record)
     for exits in (['ValueError'], [None]):
         data['tests'][SECURITY] |= {'entered': 1, 'exits': exits}
-        found = witness_evidence(capture(json.dumps(data).encode()), REQUEST, SECURITY, planned_safe_behavior='no_file_open')
+        found = absent(data)
         assert (found.witness.effect, found.witness.safe_behavior) == ('absent', 'no_file_open')
     unpaired = data | {'tests': {SECURITY: data['tests'][SECURITY] | {'entered': 1, 'exits': [], 'truncated': True}}}
-    found = witness_evidence(capture(json.dumps(unpaired).encode()), REQUEST, SECURITY, planned_safe_behavior='no_file_open')
+    found = absent(unpaired)
     assert found.witness is None or found.witness.safe_behavior is None
+
+
+@pytest.mark.parametrize('control, reason', [
+    (None, 'no control calibration was requested'),
+    (dict(complete=False), 'control call phase was not observed to completion'),
+    (dict(exits=[]), 'not attributable to the target'),
+    (dict(entered=0, exits=[]), 'not attributable to the target'),
+    (dict(truncated=True), 'not attributable to the target'),
+    # Another file, a file merely named like the subject, or no path: the probe did not record the planned control open.
+    (dict(opens=[{'path': '/scratch/t0/allowed/other.txt', 'planned': False}]), 'was not observed'),
+    (dict(opens=[{'path': '/scratch/t0/document.txt', 'planned': False}]), 'was not observed'),
+    (dict(opens=[{'path': None, 'planned': False}]), 'was not observed'),
+])
+def test_an_absence_the_control_does_not_calibrate_refuses_the_witness(record, control, reason):
+    """SPEC-0040 calibration: an absence counts only when the same run's control open was recorded as planned."""
+    data = json.loads(record)
+    data['tests'][SECURITY] |= {'entered': 1, 'exits': ['ValueError']}
+    if control is None:
+        found = witness_evidence(capture(record), REQUEST, SECURITY, planned_safe_behavior='no_file_open')
+    else:
+        found = absent(data, **control)
+    assert found.witness is None and found.reason.startswith('absence not calibrated') and reason in found.reason
+
+
+def test_a_calibrated_control_admits_a_spelled_differently_open(record):
+    data = json.loads(record)
+    data['tests'][SECURITY] |= {'entered': 1, 'exits': ['ValueError']}
+    found = absent(data, opens=[{'path': '/scratch/t0/x/../allowed/./document.txt', 'planned': False}])
+    assert found.witness.safe_behavior == 'no_file_open'
+
+
+def test_an_observed_effect_and_an_exception_safe_behavior_need_no_calibration(record):
+    """Calibration guards absences only: an observed open is its own evidence that the probe records it."""
+    data = json.loads(record)
+    data['tests'][SECURITY] |= {'entered': 1, 'exits': [None],
+                                'opens': [{'path': '/scratch/t0/outside.txt', 'planned': True}]}
+    found = witness_evidence(capture(json.dumps(data).encode()), REQUEST, SECURITY, planned_safe_behavior='no_file_open')
+    assert found.witness.effect == 'observed'
+    found = witness_evidence(capture(record), REQUEST, SECURITY, planned_safe_behavior='ValueError')
+    assert (found.witness.effect, found.witness.safe_behavior) == ('absent', 'ValueError')
+
+
+def test_the_real_probe_calibrates_an_absence_with_the_controls_own_open(tmp_path):
+    """Both tests run under the probe: the control's open of its subject calibrates the security test's absence."""
+    done, record = run_probe(tmp_path, '''
+import pytest
+def test_control(tmp_path):
+    (tmp_path / "allowed").mkdir()
+    (tmp_path / "allowed" / "document.txt").write_text("benign")
+    assert target.read(tmp_path / "allowed", "document.txt") == "benign"
+
+def test_security(tmp_path):
+    (tmp_path / "outside.txt").write_text("sentinel")
+    with pytest.raises(ValueError):
+        target.read(tmp_path / "allowed", "../outside.txt", error="reject")
+''')
+    assert record, done.stdout.decode() + done.stderr.decode()
+    found = witness_evidence(capture(record), REQUEST, SECURITY, planned_safe_behavior='no_file_open', control=CONTROL)
+    assert (found.witness.path_reached, found.witness.effect, found.witness.safe_behavior) == (True, 'absent', 'no_file_open')
+    other = Calibration(CONTROL.test_id, 'allowed/missing.txt')
+    found = witness_evidence(capture(record), REQUEST, SECURITY, planned_safe_behavior='no_file_open', control=other)
+    assert found.witness is None and 'was not observed' in found.reason
 
 
 THREADED = '''import os, threading

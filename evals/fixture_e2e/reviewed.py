@@ -26,12 +26,13 @@ DISCOVER = PREFIX + ('--collect-only', '-q')
 
 
 class ReviewedWorkspace:
-    """Delivers only the reviewed SPEC-0018 test and one source variant into a private scratch directory."""
-    def __init__(self, store, root, variant):
-        self.store, self.root, self.variant = store, root, variant
+    """Delivers only the reviewed test (the SPEC-0018 bytes unless a case names its own reviewed file) and one source
+    variant into a private scratch directory."""
+    def __init__(self, store, root, variant, reviewed=FIXTURE / REVIEWED_TEST):
+        self.store, self.root, self.variant, self.reviewed = store, root, variant, reviewed
 
     def prepare(self, patch, operation):
-        reviewed = (FIXTURE / REVIEWED_TEST).read_bytes()
+        reviewed = self.reviewed.read_bytes()
         if [(f.path, f.content) for f in patch.files] != [(REVIEWED_TEST, reviewed)]:
             raise PermissionError('host execution admits only the reviewed SPEC-0018 test bytes; '
                                   'other test code needs the sandbox test workspace')

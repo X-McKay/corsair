@@ -16,7 +16,7 @@ from corsair.adapters.pytest_runner import PytestRunner, PytestRunnerConfig
 from corsair.composition.evidence import run_evidence
 from corsair.core.disposition import (AssessmentEvidence, EnvironmentIdentity, ExpectedFailure, ObservationPlan,
                                       assess)
-from corsair.nodes.witness import witness_evidence
+from corsair.nodes.witness import Calibration, witness_evidence
 from corsair.ports.sandbox import SandboxHandle
 from corsair.ports.test_runner import ApprovedPatch, PatchFile, PreparedWorkspace, WitnessRequest
 from evals.fixture_e2e.reviewed import DISCOVER, FIXTURE, PREFIX, ReviewedLocalExecution
@@ -105,9 +105,9 @@ def gate(tmp_path, tests: str, assertion_lines: tuple[int, ...]):
                                                      witness_record_path=str(tmp_path / f'{revision}-witness.json')))
             observed = runner.run(patch, control_test_id=IDS[0], security_test_id=IDS[1], discovery_command=DISCOVER,
                                   operation=uuid4(), witness=REQUEST)
-            # As the chain does: an absence is the planned safe behavior only on the candidate.
-            found = witness_evidence(observed.witness, REQUEST, IDS[1], planned_safe_behavior=(
-                'no_file_open' if revision == 'candidate' else None))
+            # As the chain does: the planned absence on both revisions, calibrated by the control's own open.
+            found = witness_evidence(observed.witness, REQUEST, IDS[1], planned_safe_behavior='no_file_open',
+                                     control=Calibration(IDS[0], 'allowed/note.txt'))
             assert found.reason == 'admitted', found.reason
             runs[revision] = run_evidence(observed, environment=ENV, witness=found.witness,
                                           sandbox_events=found.sandbox_events)

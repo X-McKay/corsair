@@ -31,7 +31,7 @@ from corsair.nodes.runtime.environment import RuntimeCatalog
 from corsair.investigate import images
 from evals.issue_analysis.evaluate import describe_model
 
-from .case import (fixture_case, reviewed_runners, scripted_assessment, scripted_authoring, scripted_identification,
+from .case import (CASES, fixture_case, reviewed_runners, scripted_assessment, scripted_authoring, scripted_identification,
                    scripted_planning)
 
 SCRIPTED = {"identification": scripted_identification, "planning": scripted_planning,
@@ -94,19 +94,32 @@ async def record_run(evidence: Path, live: tuple[str, ...], config: LocalModelCo
     return run
 
 
+def scripted_for(case: str, discovery: tuple[str, ...]) -> dict:
+    """The scripted stage models for a fixture case; the not-exploitable case's assessor proposes the triple its
+    gates permit (the security test passes on both confined revisions), so a scripted control shows it admitted."""
+    models = SCRIPTED | {"identification": lambda: scripted_identification(case),
+                         "planning": lambda: scripted_planning(discovery, case),
+                         "authoring": lambda: scripted_authoring(case)}
+    if case != "exploitable":
+        models["assessment"] = lambda: scripted_assessment(finding="not_reproduced", fix="not_verified")
+    return models
+
+
 async def main_async(evidence: Path, live: tuple[str, ...], config: LocalModelConfig | InferenceConfig | None,
-                     profiles: dict | None = None) -> DirectRun:
+                     profiles: dict | None = None, case: str = "exploitable") -> DirectRun:
     """Reviewed host workspace: only the reviewed SPEC-0018 test bytes execute."""
     evidence.mkdir(parents=True, exist_ok=False)
     (evidence / "work").mkdir(mode=0o700)
     (evidence / "artifacts").mkdir(mode=0o700)
     with LocalArtifacts(evidence / "artifacts", max_bytes=4 * 1024 * 1024) as store:
-        return await record_run(evidence, live, config, fixture_case(), reviewed_runners(store, evidence / "work"),
-                                {"route": "reviewed_host_workspace"}, profiles)
+        fixture = fixture_case(case)
+        return await record_run(evidence, live, config, fixture, reviewed_runners(store, evidence / "work", case),
+                                {"route": "reviewed_host_workspace", "case": case}, profiles,
+                                scripted=scripted_for(case, fixture.environment.discovery_command))
 
 
 async def docker_async(evidence: Path, live: tuple[str, ...], config: LocalModelConfig | InferenceConfig | None,
-                       image: str, profiles: dict | None = None, timeout: int = 120) -> DirectRun:
+                       image: str, profiles: dict | None = None, timeout: int = 120, case: str = "exploitable") -> DirectRun:
     """Plain Docker: every purpose in a fresh offline container of `image`; unqualified, risk accepted."""
     from .docker import ROUTE, ROW, docker_case, docker_runners, limits
     evidence.mkdir(parents=True, exist_ok=False)
@@ -114,9 +127,11 @@ async def docker_async(evidence: Path, live: tuple[str, ...], config: LocalModel
     (evidence / "artifacts").mkdir(mode=0o700)
     (evidence / "docker").mkdir(mode=0o700)
     with ExitStack() as containers, LocalArtifacts(evidence / "artifacts", max_bytes=4 * 1024 * 1024) as store:
-        runners = docker_runners(image, evidence / "docker", store, containers, timeout)
-        return await record_run(evidence, live, config, docker_case(image, timeout), runners,
-                                ROUTE | {"image_row": ROW, "image": image, "limits": limits(timeout)}, profiles)
+        runners = docker_runners(image, evidence / "docker", store, containers, timeout, case)
+        fixture = docker_case(image, timeout, case)
+        return await record_run(evidence, live, config, fixture, runners,
+                                ROUTE | {"image_row": ROW, "image": image, "limits": limits(timeout), "case": case},
+                                profiles, scripted=scripted_for(case, fixture.environment.discovery_command))
 
 
 def summary(run: DirectRun) -> dict:
@@ -147,6 +162,10 @@ def main():
     parser.add_argument("--images", type=Path, default=os.environ.get("CORSAIR_IMAGES"),
                         help='With --sandbox docker: JSON {"<row id>": "sha256:<config id>"}; default $CORSAIR_IMAGES')
     parser.add_argument("--timeout", type=int, default=120, help="With --sandbox docker: seconds per container command")
+    parser.add_argument("--case", choices=tuple(CASES), default="exploitable",
+                        help="exploitable: the reported traversal exists at the baseline and the candidate fixes it; "
+                             "not-exploitable: the same report, but every revision rejects the path with ValueError; "
+                             "not-exploitable-absent: every revision returns an empty result without opening the file")
     args = parser.parse_args()
     live = tuple(stage for stage in args.live.split(",") if stage)
     if set(live) - set(STAGES) or (live and args.provider_config is None):
@@ -175,10 +194,10 @@ def main():
         if image is None:
             parser.error("--sandbox docker needs --images or CORSAIR_IMAGES")
         with TerminalDisplay(f"fixture run (docker, unqualified) → {args.evidence}") as display, observing(display):
-            run = asyncio.run(docker_async(args.evidence, live, config, image, profiles, args.timeout))
+            run = asyncio.run(docker_async(args.evidence, live, config, image, profiles, args.timeout, args.case))
     else:
         with TerminalDisplay(f"fixture run → {args.evidence}") as display, observing(display):
-            run = asyncio.run(main_async(args.evidence, live, config, profiles))
+            run = asyncio.run(main_async(args.evidence, live, config, profiles, args.case))
     route = json.loads((args.evidence / "configuration.json").read_text())["runner"]
     containers = args.evidence / "docker" / "containers.json"
     removed = ([c["cleanup"] for c in json.loads(containers.read_text())] if containers.exists() else None)

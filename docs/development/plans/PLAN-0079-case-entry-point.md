@@ -68,7 +68,9 @@ stages reached per cohort. Esprima stays for JavaScript assertion lines (Al kept
 - [ ] Witness envelope: `build` sets none, so the chain requests no witness on this route (an operator-approved
   envelope is fixture-only today).
 - [ ] Baseline test in the planner's saved inventory (finding below); chain thread's call.
-- [ ] `--issue github:owner/repo#N | azure:org/project#N` through the existing ticket readers; ticket-source list.
+- [x] `--id github:owner/repo#N | azure:org/project#N` (make `ID=`) through the existing ticket readers; a GitHub
+  issue defaults to its own repository, Azure DevOps also needs `--repository`. The provider configuration's
+  `tickets` source is the allowlist: an id naming any other source is refused before any request.
 - [x] Fix-free runs (Al, 2026-10-13, "Allow fix-free runs"): a request without `fixed_revision` is admitted; only the
   reported revision is acquired, set up and run, the gate leaves the fix `not_applicable` (SPEC-0027's gate already
   does with no candidate runs), the label follows the finding as before, and the eval match is unchanged.

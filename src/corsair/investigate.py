@@ -1,9 +1,11 @@
-"""`uv run corsair run --issue-json <file>`: one issue investigated end to end.
+"""`uv run corsair run --issue-json <file> | --id <issue id>`: one issue investigated end to end.
 
 The request (`corsair-issue-request/v1`) names the issue, the repository, its vulnerable commit and optionally the
-fix's commit; the system selects the runtime from the repository's own build files, prepares the environment,
-identifies, plans, authors, runs the vulnerable revision and the fixed one when given (without it no fix is verified:
-fix not_applicable), gates and assesses. Everything a request does not carry is selected or inferred and
+fix's commit; an issue id (`github:owner/repo#N`, `azure:org/project#N`) is captured through the ticket readers into
+the same request with the repository and commits given as flags (a GitHub issue defaults to its own repository). The
+system selects the runtime from the repository's own build files, prepares the environment, identifies, plans,
+authors, runs the vulnerable revision and the fixed one when given (without it no fix is verified: fix
+not_applicable), gates and assesses. Everything a request does not carry is selected or inferred and
 recorded with its basis. Today's route is image-only: the selected row's local image under plain Docker
 (`corsair.investigation.docker`), every agent stage live on the provider. A request that cannot start is recorded
 at admission with its reason before any model request; nothing is retried. Receipts, `record.json` and the summary
@@ -30,7 +32,9 @@ from corsair.inference.config import InferenceConfig, load_inference
 from corsair.inference.models import configured_model, preflight
 from corsair.investigation.build import Investigation, Refused, build
 from corsair.investigation.docker import SETUP_NETWORK, DockerPreparation, DockerRunners, install
+from corsair.investigation.issue_id import capture as capture_issue
 from corsair.investigation.request import IssueRequest
+from corsair.ports.tickets import TicketError
 from corsair.investigation.results import record, summary_line
 
 REPOSITORY = Path(__file__).resolve().parents[2]
@@ -167,10 +171,28 @@ def investigate(request: IssueRequest, evidence: Path, images: dict[str, str], *
     return item
 
 
+async def request_for_id(issue: str, provider_config: Path, **fields) -> IssueRequest:
+    """The issue request for an issue id: the captured ticket plus the given repository, commits and scope; the
+    operator's `tickets` source (if the provider file has one) supplies the token and limits."""
+    from corsair.configuration import ProviderConfig
+    value = json.loads(provider_config.read_text())
+    configured = ProviderConfig.model_validate(value).tickets if isinstance(value, dict) and "inference" in value else None
+    snapshot = await capture_issue(issue, configured)
+    return IssueRequest.model_validate({"schema": "corsair-issue-request/v1", "issue": snapshot.model_dump(mode="json"),
+                                        **{k: v for k, v in fields.items() if v is not None}})
+
+
 def main(argv: list[str] | None = None, prog: str = "corsair run") -> int:
     parser = argparse.ArgumentParser(prog=prog, description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--issue-json", required=True, type=Path, help="A corsair-issue-request/v1 file")
+    issue = parser.add_mutually_exclusive_group(required=True)
+    issue.add_argument("--issue-json", type=Path, help="A corsair-issue-request/v1 file")
+    issue.add_argument("--id", dest="issue", help="github:owner/repo#N or azure:org/project#N; only the provider "
+                       "configuration's tickets source, captured read-only")
+    parser.add_argument("--repository", help="With --id: https repository (default: a GitHub issue's own)")
+    parser.add_argument("--revision", help="With --id: the vulnerable commit (40 hex)")
+    parser.add_argument("--fixed-revision", help="With --id: the fix's commit (40 hex); optional")
+    parser.add_argument("--scope", choices=("component", "application_path"), help="With --id: identification scope")
     parser.add_argument("--provider-config", required=True, type=Path, help="Per-agent provider JSON")
     parser.add_argument("--images", type=Path, default=os.environ.get("CORSAIR_IMAGES"),
                         help='JSON {"<row id>": "sha256:<config id>"}; default $CORSAIR_IMAGES')
@@ -184,10 +206,18 @@ def main(argv: list[str] | None = None, prog: str = "corsair run") -> int:
     parser.add_argument("--sandbox", choices=("docker",), default="docker",
                         help="docker: plain Docker, unqualified (risk accepted); the only route this command has yet")
     args = parser.parse_args(argv)
+    given = [name for name in ("repository", "revision", "fixed_revision", "scope") if getattr(args, name)]
+    if args.issue_json and given:
+        parser.error(f"--issue-json carries {', '.join(given)} itself")
     try:
-        request = IssueRequest.model_validate_json(args.issue_json.read_bytes())
         prepared = images(args.images) if args.images else None
-    except (ValueError, OSError) as error:
+        if args.issue_json:
+            request = IssueRequest.model_validate_json(args.issue_json.read_bytes())
+        else:
+            request = asyncio.run(request_for_id(args.issue, args.provider_config, repository=args.repository,
+                                                 revision=args.revision, fixed_revision=args.fixed_revision,
+                                                 scope=args.scope))
+    except (ValueError, OSError, TicketError) as error:
         parser.error(str(error)[:2048])
     if prepared is None:
         parser.error("pass --images or set CORSAIR_IMAGES")

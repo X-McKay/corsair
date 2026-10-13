@@ -21,8 +21,12 @@ kind-down:
 workspace-storage:
 	uv run --locked python deploy/kind/bootstrap.py workspace-storage
 
+# The offline suite is CPU-bound; pytest-xdist spreads it over the cores (PLAN-0085). `TEST_WORKERS=0 make test-config`
+# runs it serially; set it in the environment, since the qualify-image guard test refuses command-line variables that
+# reach its sub-make through MAKEFLAGS.
+TEST_WORKERS ?= auto
 test-config:
-	uv run --locked python -m pytest $(PYTEST_ROOT) tests/configuration tests/unit tests/agents tests/temporal/test_fixture_contracts.py tests/temporal/test_issue_analysis_composition.py tests/temporal/test_chain_composition.py
+	uv run --locked python -m pytest $(PYTEST_ROOT) -n $(TEST_WORKERS) tests/configuration tests/unit tests/agents tests/temporal/test_fixture_contracts.py tests/temporal/test_issue_analysis_composition.py tests/temporal/test_chain_composition.py
 
 # One agent's isolated eval suite on the host (SPEC-0044); results under .runs/evals/<agent>/.
 # AGENT=identification|planning|authoring|environment|assessment|chain; optional SET, PROVIDER_CONFIG, REPEAT, NOTE.
@@ -32,10 +36,13 @@ eval:
 eval-baseline:
 	uv run --locked python -m evals.run "$(AGENT)" --promote "$(RUN)"
 
-# A wrapper for `uv run corsair run`: one issue end to end from a corsair-issue-request/v1 file; prepared local
+# A wrapper for `uv run corsair run`: one issue end to end from ISSUE_JSON=<corsair-issue-request/v1 file>, or
+# ID=github:owner/repo#N (or azure:org/project#N with REPOSITORY=) with REVISION= and FIXED_REVISION=; prepared local
 # images from CORSAIR_IMAGES. Extra flags (--repository-host, --local-root) go in INVESTIGATE_ARGS.
 investigate:
-	uv run --locked corsair run --issue-json "$(ISSUE_JSON)" --provider-config "$(PROVIDER_CONFIG)" $(INVESTIGATE_ARGS)
+	uv run --locked corsair run $(if $(ID),--id "$(ID)",--issue-json "$(ISSUE_JSON)") \
+		$(if $(REPOSITORY),--repository "$(REPOSITORY)") $(if $(REVISION),--revision "$(REVISION)") \
+		$(if $(FIXED_REVISION),--fixed-revision "$(FIXED_REVISION)") --provider-config "$(PROVIDER_CONFIG)" $(INVESTIGATE_ARGS)
 
 # One benchmark case through `investigate` for diagnosis, never a baseline (evals/case_e2e); cohorts use
 # `make eval AGENT=chain SET=<cohort>`. Needs CORSAIR_CASE_SOURCES and CORSAIR_IMAGES.
