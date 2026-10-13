@@ -13,7 +13,8 @@ from corsair.adapters.git_source import Executable, GitSource, SourceLimits, git
 from corsair.adapters.local_artifacts import LocalArtifacts
 from corsair.nodes.source_fetch import (FETCH_SCRIPT, INVENTORY_SCRIPT, MATERIALIZE_SCRIPT, CredentialBinding,
                                         FetchRecipe, FetchTarget, SourceFetchRefused, admit_fetch, fetch_command,
-                                        fetch_source, parse_fetch_receipt)
+                                        WorkspaceBudget, WorkspaceBudgetRefused, admit_workspace_budget,
+                                        fetch_source, node_free_bytes, parse_fetch_receipt)
 from corsair.ports.artifacts import ArtifactRef, SourceFile, SourceSnapshot
 from corsair.ports.execution import ExecutionError, ExecutionReceipt
 from corsair.ports.sandbox import SandboxHandle
@@ -293,3 +294,20 @@ def test_materialization_refuses_symlink_and_submodule_entries(fixture_repo, tmp
     git(work, '-c', 'protocol.file.allow=always', 'fetch', '-q', '--depth=1', 'file://'+str(repo), commit)
     result = script(MATERIALIZE_SCRIPT, work, commit=commit)
     assert (result.returncode, result.stdout) == (65, b'') and os.listdir(work) == ['.git']
+
+
+def test_workspace_budget_refuses_oversized_trees_and_short_nodes_before_any_sandbox(tmp_path):
+    budget = WorkspaceBudget(4 << 20, 1 << 20, str(tmp_path))
+    assert admit_workspace_budget(snapshot(), budget, 5 << 20) == sum(len(d) for _, _, d in FILES)
+    with pytest.raises(WorkspaceBudgetRefused) as short:
+        admit_workspace_budget(snapshot(), budget, (5 << 20) - 1)
+    assert short.value.layer == 'host' and 'storage_budget' in short.value.reason
+    big = snapshot((('big', '100644', b'x' * ((1 << 20) + 1)),))
+    with pytest.raises(WorkspaceBudgetRefused) as oversized:
+        admit_workspace_budget(big, budget, 1 << 40)
+    assert oversized.value.layer == 'sandbox'
+    assert node_free_bytes(budget) > 0
+    for bad in (dict(workspace_bytes=1024), dict(reserve_bytes=True), dict(node_path='relative')):
+        with pytest.raises(ValueError): WorkspaceBudget(**dict(workspace_bytes=4 << 20, reserve_bytes=1 << 20,
+                                                               node_path=str(tmp_path)) | bad)
+    with pytest.raises(ValueError): admit_workspace_budget(snapshot(), budget, -1)

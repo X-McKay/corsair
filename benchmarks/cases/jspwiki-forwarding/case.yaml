@@ -38,4 +38,4 @@ evaluator:
   admission: not_admitted
   # G2 is met by this manifest. G2c remains: the complete bare fetch and GitSource capture were private and
   # manual, nothing in the repository acquires source. G13 is unknown until a build is measured; G9 does not apply.
-  blocking: [G1, G2b, G2c, G3, G4, G5, G6, G7, G8, G10, G11, G12, G15]
+  blocking: [G2b, G2c, G3, G4, G5, G6, G7, G8, G10, G11, G12, G15]
