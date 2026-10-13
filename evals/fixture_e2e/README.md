@@ -20,6 +20,8 @@ PYTHONPATH=src:. .venv/bin/python -m evals.fixture_e2e.run --sandbox docker --im
   --evidence .runs/fixture-e2e-<date>/docker-001 [--provider-config <config.json> --live identification,planning,authoring,assessment]
 ```
 
+`--case not-exploitable` (host and Docker routes) keeps the same issue text but runs the confined `fixed/documents.py` at every revision, so the reported traversal does not exist. Its expected result is `completed / not_reproduced / not_verified` (no reproduced baseline, so no fix is verified; the gate records `baseline_not_reproduced`), headline label LIKELY_NOT_EXPLOITABLE; the scripted assessor proposes that triple. The gate reaches `not_reproduced` only when the plan's safe behavior is the exception the baseline's target raises (`ValueError`); a `no_file_open` plan stays `inconclusive` on the baseline until SPEC-0040's control calibration lands. `configuration.json` records `runner.case`; agents see neither the case name nor the variant names.
+
 `sandbox.py` runs every purpose in a fresh OpenShell sandbox through the [SPEC-0032](../../docs/development/specs/SPEC-0032-openshell-test-workspace.md) test workspace, so a live author's tests execute there and never on the host ([PLAN-0034](../../docs/development/plans/PLAN-0034-fixture-e2e-sandbox-runner.md)). It needs a qualified kind/OpenShell runtime; the live gate runs an all-scripted control first, then the live runs:
 
 ```sh

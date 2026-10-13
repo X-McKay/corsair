@@ -32,16 +32,20 @@ ISSUE = ("The read_document function accepts a user supplied filename. Check whe
 BASELINE_TEST = ('from pathlib import Path\n\nimport documents\n\n\ndef test_reads_existing_document(tmp_path: Path):\n'
                  '    (tmp_path / "note.txt").write_text("hello")\n'
                  '    assert documents.read_document(tmp_path, "note.txt") == "hello"\n')
-# Where each purpose's fresh workspace comes from; never visible to an agent.
-VARIANTS = {"development": "vulnerable", "baseline": "vulnerable", "candidate": "fixed"}
+# Where each purpose's fresh workspace comes from, per fixture case; never visible to an agent. In the
+# not-exploitable case the issue reports the same traversal, but every revision is the confined source.
+CASES = {"exploitable": {"development": "vulnerable", "baseline": "vulnerable", "candidate": "fixed"},
+         "not-exploitable": {"development": "fixed", "baseline": "fixed", "candidate": "fixed"}}
+VARIANTS = CASES["exploitable"]
 
 
 def _digest(value: str | bytes) -> str:
     return sha256(value if isinstance(value, bytes) else value.encode()).hexdigest()
 
 
-def fixture_case() -> FixtureCase:
-    sources = (SourceFile(path="documents.py", content=(FIXTURE / "vulnerable" / "documents.py").read_text()),
+def fixture_case(case: str = "exploitable") -> FixtureCase:
+    variants = CASES[case]
+    sources = (SourceFile(path="documents.py", content=(FIXTURE / variants["baseline"] / "documents.py").read_text()),
                SourceFile(path="test_existing.py", content=BASELINE_TEST))
     environment = EnvironmentEvidence(
         language="Python", runtime="CPython 3.12", framework=f"pytest {pytest.__version__}",
@@ -64,15 +68,15 @@ def fixture_case() -> FixtureCase:
                                                 source_files=sources),
                        environment=environment, environment_identity=identity,
                        witness_envelope=WitnessRequest("documents.py", "read_document", "outside.txt"),
-                       revision_sources={revision: _digest((FIXTURE / VARIANTS[revision] / "documents.py").read_bytes())
+                       revision_sources={revision: _digest((FIXTURE / variants[revision] / "documents.py").read_bytes())
                                          for revision in ("baseline", "candidate")})
 
 
-def reviewed_runners(store, root: Path):
+def reviewed_runners(store, root: Path, case: str = "exploitable"):
     """A fresh private workspace per purpose; only the reviewed test bytes are admitted for execution."""
     def runner(purpose):
         workspace = root / purpose
-        return harness("pytest").runner(ReviewedWorkspace(store, workspace, VARIANTS[purpose]), ReviewedLocalExecution(workspace),
+        return harness("pytest").runner(ReviewedWorkspace(store, workspace, CASES[case][purpose]), ReviewedLocalExecution(workspace),
                             store, PytestRunnerConfig(PREFIX, ".corsair-junit.xml", str(workspace),
                                                       witness_record_path=".corsair-witness.json"))
     return runner
@@ -89,21 +93,34 @@ def _reads_then(paths, output):
     return FunctionModel(respond)
 
 
-def scripted_identification() -> FunctionModel:
+def target_end(case: str = "exploitable") -> int:
+    """read_document runs from line 3 to the end of the case's baseline source."""
+    return len((FIXTURE / CASES[case]["baseline"] / "documents.py").read_text().splitlines())
+
+
+def scripted_identification(case: str = "exploitable") -> FunctionModel:
+    end = target_end(case)
     return _reads_then(["documents.py"], lambda info: {
         "status": "ready", "scope": "component", "reason": None,
-        "target": {"symbol": "read_document", "source": {"path": "documents.py", "start_line": 3, "end_line": 4}}})
+        "target": {"symbol": "read_document", "source": {"path": "documents.py", "start_line": 3, "end_line": end}}})
 
 
-def reference_plan(discovery: tuple[str, ...] = DISCOVER) -> dict:
+def reference_plan(discovery: tuple[str, ...] = DISCOVER, case: str = "exploitable") -> dict:
+    """The planning dataset's reference plan, its documents.py references spanning the case's identified target."""
     cases = yaml.safe_load((REPOSITORY / "evals/test_planning/cases.yaml").read_text())["cases"]
     plan = next(c for c in cases if c["name"] == "path_traversal_unguarded")["metadata"]["reference_plan"]
-    return plan | {"discovery_command": list(discovery)}
+    end = target_end(case)
+
+    def span(references):
+        return [r | {"end_line": end} if r["path"] == "documents.py" else r for r in references]
+    return plan | {"discovery_command": list(discovery), "citations": span(plan["citations"]),
+                   **{test: plan[test] | {"source_references": span(plan[test]["source_references"])}
+                      for test in ("control", "security")}}
 
 
-def scripted_planning(discovery: tuple[str, ...] = DISCOVER) -> FunctionModel:
+def scripted_planning(discovery: tuple[str, ...] = DISCOVER, case: str = "exploitable") -> FunctionModel:
     """The reference plan for the environment whose discovery command is ``discovery``."""
-    return _reads_then(["documents.py", "test_existing.py"], lambda info: {"plan": reference_plan(discovery)})
+    return _reads_then(["documents.py", "test_existing.py"], lambda info: {"plan": reference_plan(discovery, case)})
 
 
 # Assertion lines of test_security_rejects_outside_read in the reviewed bytes, as the authoring dataset records.
