@@ -632,17 +632,12 @@ def test_ruby31_rows_select_the_four_minitest_cases_and_not_the_rspec_ones():
 
 
 def test_perl_selection_admits_a_tap_harness_ready_result():
-    # The environment agent's `tap-harness` ready result is admitted by a Perl selection that admitted the TAP row.
+    # The environment agent's `tap-harness` ready result is admitted by a Perl selection of the matrix rows, and only it.
     from corsair.agents.environment.contracts import ReadyEnvironment
     from corsair.nodes.runtime.environment import check_ready
     fixture = Path(__file__).resolve().parents[2] / 'deploy/qualification/toolchains/perl526/Makefile.PL'
-    matrix = load().model_dump()
-    runner = {'name': 'tap-harness', 'language': 'perl', 'versions': '==1.302073', 'runner': 'src/corsair/adapters/tap_runner.py',
-              'images': ['perl-5.26-make'], 'qualification': {'records': ['SPEC-0056', 'SPEC-0061'], 'report': 'x'}}
-    images = [*(i for i in matrix['images'] if i['id'] != 'perl-5.26-make'), STAGED_PERL526]
-    frameworks = [*(f for f in matrix['frameworks'] if f['name'] != 'tap-harness'), runner]
-    selection = select(detect({'Makefile.PL': fixture.read_bytes()}, 'perl'),
-                       Matrix.model_validate({**matrix, 'images': images, 'frameworks': frameworks}))
+    selection = select(detect({'Makefile.PL': fixture.read_bytes()}, 'perl'), load())
+    assert selection.status == 'supported' and selection.image_id == 'perl-5.26-make'
     prepared = {'perl-5.26-make': 'docker.io/library/corsair-perl526@sha256:' + '0' * 64}
     ready = lambda framework: ReadyEnvironment.model_construct(toolchain_id='perl-5.26-make',
                                                                toolchain_image=prepared['perl-5.26-make'], framework=framework)
