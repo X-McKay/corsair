@@ -32,10 +32,16 @@ eval:
 eval-baseline:
 	uv run --locked python -m evals.run "$(AGENT)" --promote "$(RUN)"
 
-# One issue end to end from a corsair-issue-request/v1 file (src/corsair/investigate.py); prepared local images
-# from CORSAIR_IMAGES. Extra flags (--repository-host, --local-root) go in INVESTIGATE_ARGS.
+# One issue end to end (src/corsair/investigate.py): ISSUE_JSON=<corsair-issue-request/v1 file>, or
+# ISSUE=github:owner/repo#N (or azure:org/project#N with REPOSITORY=) with REVISION= and FIXED_REVISION=; prepared
+# local images from CORSAIR_IMAGES. https repositories are fetched only from REPOSITORY_HOST; other flags go in
+# INVESTIGATE_ARGS.
+REPOSITORY_HOST ?= github.com
 investigate:
-	PYTHONPATH=src uv run --locked python -m corsair.investigate --issue-json "$(ISSUE_JSON)" --provider-config "$(PROVIDER_CONFIG)" $(INVESTIGATE_ARGS)
+	PYTHONPATH=src uv run --locked python -m corsair.investigate $(if $(ISSUE),--issue "$(ISSUE)",--issue-json "$(ISSUE_JSON)") \
+		$(if $(REPOSITORY),--repository "$(REPOSITORY)") $(if $(REVISION),--revision "$(REVISION)") \
+		$(if $(FIXED_REVISION),--fixed-revision "$(FIXED_REVISION)") --repository-host "$(REPOSITORY_HOST)" \
+		--provider-config "$(PROVIDER_CONFIG)" $(INVESTIGATE_ARGS)
 
 # One benchmark case through `investigate` for diagnosis, never a baseline (evals/case_e2e); cohorts use
 # `make eval AGENT=chain SET=<cohort>`. Needs CORSAIR_CASE_SOURCES and CORSAIR_IMAGES.
