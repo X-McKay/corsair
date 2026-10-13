@@ -1,18 +1,16 @@
 # Repository-scale identification smoke (SPEC-0038). Inputs reach the agent; metadata is evaluator-only.
-# The issue text is the draft neutral issue from PR #39's benchmarks/cases/jspwiki-forwarding/case.yaml
-# (not yet independently reviewed, G10). Accepted targets come from the upstream fix 88d89d65, which
+# The issue text is the reviewed agent issue from benchmarks/cases/jspwiki-forwarding/case.yaml (2026-10-13; v1
+# used the earlier draft, which disclosed the security test's safe target, so v1 smoke results are not comparable). Accepted targets come from the upstream fix 88d89d65, which
 # changes DefaultURLConstructor.getForwardPage, and from the reference test, which calls WikiServlet.doGet.
-name: repository-identification-smoke-v1
+name: repository-identification-smoke-v2
 cases:
 - name: jspwiki_forward_page
   inputs:
     case_id: jspwiki-forwarding-baseline
     issue: |
-      JSPWiki's WikiServlet chooses where to forward an incoming GET request from the request path.
-      A report says that a request whose path names a resource under the web application root, rather
-      than a wiki page, is forwarded to that resource instead of the normal wiki page endpoint.
-      Determine whether the request path can steer the servlet's forward target away from the wiki
-      page view, and under which preconditions.
+      JSPWiki's WikiServlet handles incoming GET requests by selecting a server-side forward destination.
+      A report says request-controlled path information may influence that destination and select a
+      web-application resource. Determine whether this occurs and under which preconditions.
     scope: component
     repository:
       commit: f140a2a4371735ad24d04a1d78c6e1d9ceaed76f

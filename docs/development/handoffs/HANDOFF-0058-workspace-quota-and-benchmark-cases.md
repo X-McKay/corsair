@@ -25,7 +25,7 @@ Branch `claude/benchmark-readiness-7xbmvr` from main `334aa03`, draft PR #39. De
 
 **Update 2026-10-13 09:20Z: quota deferred.** The owner chose to defer the SPEC-0036 quota as hardening after the live gate stayed blocked (auto-mode refusals, and his Bash hook refusing `mkfs.`, `dd if=` and `kubectl delete namespace`, which the gate uses). In its place, SPEC-0025 now admits public benchmark runs with one sandbox per node behind a pre-flight `WorkspaceBudget` (`nodes/source_fetch.py`, unit-tested, not yet called by any route): tree at most a quarter of the workspace, node free space at least workspace plus reserve, quota recorded unqualified. G1 no longer blocks benchmark cases; G15 runtime selection is next on the critical path (its own thread). A tmpfs-per-volume probe on RIG0 enforced bytes and inodes synchronously and is the simpler route when the quota returns (SPEC-0036). The XFS manifests and gates stay in the branch, unrun.
 
-Next: Al's review of the JSPWiki issue text; connect `admit_workspace_budget` when the SPEC-0025 fetch route is wired (G3), with the operator's workspace size and reserve in configuration. Independent offline follow-ups from IDEA-0005 continue in their own threads.
+Next: (JSPWiki issue text reviewed 2026-10-13, see PLAN-0040.) Connect `admit_workspace_budget` when the SPEC-0025 fetch route is wired (G3), with the operator's workspace size and reserve in configuration. Independent offline follow-ups from IDEA-0005 continue in their own threads.
 
 ## Continuation prompt
 
