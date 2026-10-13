@@ -122,6 +122,8 @@ The same re-review (posted from Al's account) added seven threads, all fixed wit
 - SPEC-0042's benchmark counts and the CURRENT.md row now match the report and say the hand-off is not yet called.
 The package.json `dependencies` thread repeated the earlier finding fixed in `20d34b6`.
 
+From the same review's non-blocking notes: the report JSON now carries an `inputs` header with SHA-256 digests of the detector source, the matrix, the pins file, the inventory and each supplied parent POM, so a rerun (for example on RIG0) can be compared input by input; results are unchanged. Not changed: requirement lines with environment markers (`pytest<5; python_version<"3"` beside `pytest>=8; python_version>="3"`) still intersect into a conflict and give undetermined. That fails closed; evaluating markers against each candidate row is left for when a benchmark case needs it (none of the 39 does).
+
 The CPython 3.7 image thread pointed out that per-language framework rows would let a 3.7 image claim pytest 9 (qualified only on 3.12) and the reverse. Framework rows took an `images` scope, with a selection check over two scoped pytest rows and loader refusals for overlap and foreign image ids; both toolchain threads were told by cross-session message.
 
 The report rerun after these fixes changed no outcome; the JSON gains each unread line's strength. PR #42 has since merged; main's `benchmarks/source-pins.json` differs from the pins used here only in CVE-2023-31486's URL and note, a case this container cannot fetch, so the report stands.

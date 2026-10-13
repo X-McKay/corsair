@@ -10,6 +10,7 @@ The pins file (`benchmarks/source-pins.json`, SPEC-0037) names each case's fix c
 """
 import argparse
 from collections import Counter
+import hashlib
 import json
 from pathlib import Path, PurePosixPath
 import re
@@ -21,7 +22,7 @@ import urllib.request
 from corsair.nodes.runtime.contracts import RuntimeRequirement
 from corsair.nodes.runtime.detect import detect, is_build_file
 from corsair.nodes.runtime.java import Pom
-from corsair.nodes.runtime.matrix import load, select
+from corsair.nodes.runtime.matrix import MATRIX, load, select
 from corsair.nodes.runtime.versions import parse_set, parse_version
 
 REPOSITORY = Path(__file__).resolve().parents[2]
@@ -227,6 +228,19 @@ def markdown(results: list[dict]) -> str:
     return '\n'.join(lines) + '\n'
 
 
+def _digest(data: bytes) -> str:
+    return 'sha256:' + hashlib.sha256(data).hexdigest()
+
+
+def inputs(pins: Path, parents: Path | None) -> dict:
+    """What the report was computed from, so a rerun can be compared: detector source, matrix, pins, inventory and
+    the parent POMs (by coordinate) that were supplied. The fetched trees are identified by the pinned commits."""
+    detector = b''.join(f.name.encode() + b'\0' + f.read_bytes() for f in sorted((REPOSITORY / 'src/corsair/nodes/runtime').glob('*.py')))
+    return dict(detector=_digest(detector), matrix=_digest(MATRIX.read_bytes()), pins=_digest(pins.read_bytes()),
+                inventory=_digest(INVENTORY.read_bytes()),
+                parents={key: _digest(data) for key, data in sorted(load_parents(parents).items())})
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('action', choices=['checkout', 'parents', 'report'])
@@ -241,7 +255,9 @@ def main() -> None:
     if args.action == 'parents': return fetch_parents(args.trees, args.parents)
     inventory = json.loads(INVENTORY.read_text())['cases']
     results = evaluate(args.trees, pins, inventory, load_parents(args.parents))
-    if args.json: args.json.write_text(json.dumps(dict(schema_version=1, spec='SPEC-0042', results=results), indent=1) + '\n')
+    if args.json:
+        document = dict(schema_version=1, spec='SPEC-0042', inputs=inputs(args.pins, args.parents), results=results)
+        args.json.write_text(json.dumps(document, indent=1) + '\n')
     sys.stdout.write(markdown(results))
 
 
