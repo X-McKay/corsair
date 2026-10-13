@@ -93,8 +93,8 @@ def outcome(run, ids):
     (test_id, outcome, failure_detail). Any other shape is a harness defect, not a test result."""
     cases = {}
     for row in run.get('cases') or []:
-        assert isinstance(row, (list, tuple)) and len(row) in (2, 3) and all(isinstance(v, str) for v in row[:2]), \
-            f'unexpected case row {row!r}'
+        if not (isinstance(row, (list, tuple)) and len(row) in (2, 3) and all(isinstance(v, str) for v in row[:2])):
+            raise SystemExit(f'unexpected case row {row!r}')
         cases[row[0]] = row[1]
     return tuple(cases.get(test_id, 'missing') for test_id in ids)
 

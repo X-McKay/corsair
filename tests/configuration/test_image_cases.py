@@ -27,5 +27,5 @@ def test_outcome_reads_both_harness_row_shapes(rows):
 
 @pytest.mark.parametrize('rows', [[['a.B#control']], [['a.B#control', 'passed', '', 'extra']], [{'id': 'a.B#control'}]])
 def test_outcome_refuses_other_row_shapes(rows):
-    with pytest.raises(AssertionError):
+    with pytest.raises(SystemExit):
         outcome({'cases': rows}, ('a.B#control',))

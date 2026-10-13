@@ -58,3 +58,15 @@ jobs:
         env:
           TOOLCHAINS: ${{ steps.select.outputs.toolchains }}
         run: uv run --locked python -m tests.qualification.image_cases $TOOLCHAINS --evidence .runs/ci/image-cases
+      # Keep each case's summary, run and setup records; the clones and Maven repositories stay on the runner.
+      - name: Keep real-case evidence
+        if: always() && steps.select.outputs.toolchains != ''
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: image-cases
+          path: |
+            .runs/ci/image-cases
+            !.runs/ci/image-cases/*/*/work
+            !.runs/ci/image-cases/*/*/m2
+          if-no-files-found: ignore
+          retention-days: 30
