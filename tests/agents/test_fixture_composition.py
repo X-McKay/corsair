@@ -326,6 +326,54 @@ def test_a_planned_absence_is_verified_when_the_fix_never_opens_the_sentinel(sto
     assert run.gate.permitted == Disposition(execution="completed", finding="reproduced", fix="verified")
 
 
+def _not_exploitable(store, root, **overrides):
+    """The same traversal report over the confined source at every revision."""
+    case = "not-exploitable"
+    values = dict(identification=scripted_identification(case), planning=scripted_planning(case=case)) | overrides
+    (root / "work").mkdir()
+    return asyncio.run(run_direct(fixture_case(case), stages(**values), reviewed_runners(store, root / "work", case)))
+
+
+def _absence_planning(control_subject=None):
+    from evals.fixture_e2e.case import DISCOVER, _reads_then, reference_plan
+    plan = reference_plan(DISCOVER, "not-exploitable")
+    plan["security_expectation"] = plan["security_expectation"] | {"safe_behavior": "no_file_open"}
+    if control_subject:
+        plan["control"] = plan["control"] | {"witness": plan["control"]["witness"] | {"subject": control_subject}}
+    return _reads_then(["documents.py", "test_existing.py"], lambda info: {"plan": plan})
+
+
+def test_a_report_the_baseline_refuses_with_the_planned_exception_is_admitted_not_reproduced(store, tmp_path):
+    """The probe sees the baseline's target raise the planned ValueError without the outside open, so the gate
+    permits not_reproduced; with nothing reproduced no fix is verified."""
+    run = _not_exploitable(store, tmp_path, assessment=scripted_assessment(finding="not_reproduced", fix="not_verified"))
+    baseline, candidate = (w.witness for w in run.witnesses)
+    for witness in (baseline, candidate):
+        assert (witness.path_reached, witness.effect, witness.safe_behavior) == (True, "absent", "ValueError")
+    assert run.gate.permitted == Disposition(execution="completed", finding="not_reproduced", fix="not_verified")
+    assert {(r.revision, r.classification) for r in run.gate.runs} == {("baseline", "safe"), ("candidate", "safe")}
+    assert [limitation.code for limitation in run.gate.limitations] == ["baseline_not_reproduced"]
+    assert run.assessment.admission.admitted and run.assessment.disposition == run.gate.permitted
+    assert not any(label in prompt for prompt in prompts(run) for label in ("vulnerable", "fixed", "exploitable"))
+
+
+def test_a_calibrated_absence_on_the_baseline_is_not_reproduced(store, tmp_path):
+    """SPEC-0040 calibration: the control's recorded open of its subject lets the baseline's `no_file_open` count."""
+    run = _not_exploitable(store, tmp_path, planning=_absence_planning(),
+                           assessment=scripted_assessment(finding="not_reproduced", fix="not_verified"))
+    assert [w.witness.safe_behavior for w in run.witnesses] == ["no_file_open", "no_file_open"]
+    assert run.gate.permitted == Disposition(execution="completed", finding="not_reproduced", fix="not_verified")
+    assert run.assessment.admission.admitted
+
+
+def test_an_absence_the_control_does_not_calibrate_stays_inconclusive(store, tmp_path):
+    """A control subject the run never opens: the facility is not shown to record the effect, so no absence counts."""
+    run = _not_exploitable(store, tmp_path, planning=_absence_planning("allowed/unopened.txt"))
+    assert all(w.witness is None and "absence not calibrated" in w.reason for w in run.witnesses)
+    assert run.gate.permitted == Disposition(execution="completed", finding="inconclusive", fix="not_verified")
+    assert any("baseline witness not admitted: absence not calibrated" in limitation for limitation in run.limitations)
+
+
 def test_stage_limits_are_derived_from_each_stage_input_and_recorded(store, tmp_path):
     run = compose(store, tmp_path)
     limits = {a.stage: a.limits for a in run.attempts}
