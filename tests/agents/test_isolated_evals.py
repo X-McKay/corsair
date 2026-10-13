@@ -141,3 +141,45 @@ def test_chain_identity_carries_per_stage_versions_and_live_stages(tmp_path):
     assert before["summary"]["identity"] != after["summary"]["identity"]
     text = eval_run.compare(after, before | {"reference_kind": "baseline"}, before["run"])
     assert "`versions`" in text and "test-planning-v7" in text and "`live_stages`" in text
+
+
+@pytest.mark.parametrize("name", [
+    "posix_spawn", "posix_spawnp", "spawnle", "spawnlp", "spawnlpe",
+    "spawnve", "spawnvp", "spawnvpe", "execvp", "execvpe", "execle",
+    "execlp", "execlpe", "forkpty",
+])
+@pytest.mark.parametrize("form", ["import os\nos.{name}('x')",
+                                  "import os as o\no.{name}('x')",
+                                  "from os import {name} as launch\nlaunch('x')",
+                                  "import os\nlaunch = os.{name}"])
+def test_listed_os_process_names_are_refused_in_supported_binding_forms(name, form):
+    assert not no_process_or_network(form.format(name=name))
+
+
+def test_deferred_literals_and_assertions_do_not_satisfy_plan_facts():
+    plan = dataset().cases[0].inputs.inputs.plan
+    content = ("def test_benign_control():\n    assert True\n\n"
+               "def test_security_rejects_outside_read():\n"
+               "    def never_called():\n        path = '../outside.txt'\n        assert False\n"
+               "    actual = 1\n    assert actual == 1\n")
+    facts = admission_facts(plan, {"test_documents.py": content}, (7,))
+    assert not facts["planned_input_in_security"]
+    assert not facts["planned_failure_is_assert"]
+
+
+@pytest.mark.parametrize("control_body", [
+    "    go = lambda: open('../outside.txt')\n    go()\n",
+    "    def go():\n        return open('../outside.txt')\n    go()\n",
+    "    def unused():\n        return open('../outside.txt')\n    assert True\n",
+])
+def test_adversarial_control_literals_remain_refused_inside_nested_scopes(control_body):
+    # Parse only: none of this authored code executes on the host. Negative
+    # control facts stay conservative even when call reachability is unknown.
+    plan = dataset().cases[0].inputs.inputs.plan
+    content = ("def test_benign_control():\n" + control_body
+               + "\ndef test_security_rejects_outside_read():\n"
+               "    path = '../outside.txt'\n    assert path\n")
+    facts = admission_facts(plan, {"test_documents.py": content}, (len(content.splitlines()),))
+    assert facts["planned_input_in_security"]
+    assert facts["planned_failure_is_assert"]
+    assert not facts["planned_input_not_in_control"]
