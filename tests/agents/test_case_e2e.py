@@ -411,3 +411,9 @@ def test_pov_files_reach_identification_and_an_oversized_ticket_is_refused(clone
     with pytest.raises(Refused, match="does not fit the identification input"):
         build(request(repo, baseline, candidate, issue=ticket), tmp_path / "big", {NODE: CONFIG},
               roots=(tmp_path / "sources",))
+    manual = {"provider": "manual", "title": "lib/run.js", "body": "x" * 9000}
+    long_pov = {"description": "", "files": [{"path": "poc.sh", "content": "y" * 8190}]}
+    for name, fields in (("manual", {"issue": manual}), ("pov", {"pov": long_pov})):
+        with pytest.raises(Refused, match="does not fit the identification input"):
+            build(request(repo, baseline, candidate, **fields), tmp_path / name, {NODE: CONFIG},
+                  roots=(tmp_path / "sources",))

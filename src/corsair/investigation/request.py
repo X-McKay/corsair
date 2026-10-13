@@ -33,7 +33,10 @@ class ManualIssue(_Frozen):
     format: Literal["markdown", "html"] = "markdown"
 
     def issue_text(self, *, max_chars: int = 8192) -> str:
-        return f"{self.title}\n\n{self.body}"[:max_chars]
+        text = f"{self.title}\n\n{self.body}"
+        if len(text) > max_chars:
+            raise ValueError(f"issue text is {len(text)} characters; identification accepts at most {max_chars}")
+        return text
 
     @property
     def digest(self) -> str:
@@ -83,14 +86,17 @@ class IssueRequest(_Frozen):
 
     def issue_text(self) -> str:
         """Untrusted issue content for identification: the ticket's text, then any PoV description and files, within
-        the identification input's 8192 characters. Raises ValueError when the ticket's own text exceeds it."""
+        the identification input's 8192 characters. Raises ValueError when the whole exceeds it, never cutting it."""
         text = self.issue.issue_text()
         if self.pov:
             parts = [self.pov.description] if self.pov.description else []
             parts += [f"File {item.path}:\n{item.content}" for item in self.pov.files]
             if parts:
                 text = f"{text}\n\nProof of concept (untrusted, not executed):\n" + "\n\n".join(parts)
-        return text[:8192]
+        if len(text) > 8192:
+            raise ValueError(f"issue text with its proof of concept is {len(text)} characters; identification "
+                             "accepts at most 8192")
+        return text
 
     @property
     def label(self) -> str:

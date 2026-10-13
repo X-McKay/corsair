@@ -68,7 +68,9 @@ stages reached per cohort. Esprima stays for JavaScript assertion lines (Al kept
 - [ ] Witness envelope: `build` sets none, so the chain requests no witness on this route (an operator-approved
   envelope is fixture-only today).
 - [ ] Baseline test in the planner's saved inventory (finding below); chain thread's call.
-- [ ] `--issue github:owner/repo#N | azure:org/project#N` through the existing ticket readers; ticket-source list.
+- [x] `--id github:owner/repo#N | azure:org/project#N` (make `ID=`) through the existing ticket readers; a GitHub
+  issue defaults to its own repository, Azure DevOps also needs `--repository`. The provider configuration's
+  `tickets` source is the allowlist: an id naming any other source is refused before any request.
 - [ ] Ref resolution (branch or default branch to a commit) and vulnerable-only runs (no fixed commit).
 - [ ] Ruby (Minitest), Maven (JUnit) and pytest image-only entries from their threads; operator smoke test.
 - [ ] First live cohort when the model is free and Al says go.
