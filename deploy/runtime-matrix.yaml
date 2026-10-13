@@ -63,6 +63,18 @@ images:
       records: [SPEC-0056, PLAN-0061]
       report: docs/development/plans/PLAN-0061-perl526-toolchain.md
       note: Perl 5.26.3 and GNU Make 4.2.1 measured in the image with no network; gate body under plain Docker. Kind/OpenShell gate not yet run.
+  - id: node-8.17.0-npm
+    language: javascript
+    base_image: docker.io/library/node@sha256:c9025a77a42d87e95433337ac581c0d42810c1263f0e78802691046920d1560b
+    image_source: deploy/qualification/toolchains/node8
+    runtime: {name: node, version: 8.17.0}
+    tools: {npm: 6.13.4}
+    selector: {}
+    qualification:
+      evidence: image-only
+      records: [SPEC-0055, PLAN-0062, SPEC-0057, PLAN-0070]
+      report: docs/development/plans/PLAN-0070-jest-runner.md
+      note: Node 8.17.0 and npm 6.13.4 measured in the image with no network; the gate body and its Jest fixture passed under plain Docker. Yarn 1.21.1 ships in the upstream image but no case has run with it. Kind/OpenShell gate not yet run.
 frameworks:
   - name: pytest
     language: python
@@ -104,3 +116,13 @@ frameworks:
       records: [SPEC-0061, PLAN-0066]
       report: docs/development/plans/PLAN-0066-perl-tap-runner.md
       note: Test::More 1.302073 (core in the image); CVE-2023-31486 through the TAP runner under plain Docker, security test fails at 7bdf71f and passes at 77f557e.
+  - name: jest
+    language: javascript
+    versions: ==24.8.0 || ==24.9.0
+    runner: src/corsair/adapters/jest_runner.py
+    images: [node-8.17.0-npm]
+    qualification:
+      evidence: image-only
+      records: [SPEC-0057, PLAN-0070]
+      report: docs/development/plans/PLAN-0070-jest-runner.md
+      note: Jest 24.8.0 (CVE-2020-7730, bestzip) and 24.9.0 (CVE-2020-15123, codecov-node) through the Jest runner under plain Docker; each security test fails at its baseline and passes at its fix.

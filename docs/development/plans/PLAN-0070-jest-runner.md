@@ -17,10 +17,10 @@ Implement [SPEC-0057](../specs/SPEC-0057-jest-runner.md) on top of the Node 8 im
 
 - [x] Check on Node 8.17.0 / Jest 24.8.0 that `--testNamePattern '(?!)'` lists tests without running bodies or hooks, and capture real reports.
 - [x] `JsTestId`, `reports/jest.py`, `adapters/jest_runner.py`, unit tests over the captured reports; gate `node_runner_commands` on the fixture.
-- [ ] Live: the node8 gate with the runner commands on RIG0.
+- [ ] Live: the node8 gate with the runner commands, in the milestone gate batch (SPEC-0062 lighter path); it upgrades both rows to `live`.
 - [x] Image-only real case: CVE-2020-7730 (bestzip) through `tests/qualification/node_image_case.py` at both commits.
 - [x] Image-only real case: CVE-2020-15123 (codecov-node) the same way.
-- [ ] Framework row `jest` with the image row.
+- [x] Image row `node-8.17.0-npm` and framework row `jest` (`==24.8.0 || ==24.9.0`), both `evidence: image-only`.
 - [x] Harness guards as #74: an image config id, the checkout's HEAD blobs (`commit_tree`) rather than worktree bytes, and a fresh dependency directory per setup; setup writes a receipt (commit, image, `package-lock.json` SHA-256, exit 0) beside `node_modules` and `run` refuses a directory whose receipt does not match its own commit, image and lockfile, recording the receipt in `run.json`.
 - [ ] Mocha and AVA runners; environment `jest` admission with its own eval.
 
@@ -35,9 +35,11 @@ Second real case, image-only, same image (config id `sha256:744310a4…`): CVE-2
 
 After #74's guards were adopted (image config id, committed tree, fresh dependency directory), the codecov case was rerun the same way in fresh directories: baseline control passed and security failed, fix both passed, cleanup confirmed.
 
+Row check, 2026-10-13, cloud container, on main 86b37ce plus #92 (the `evidence` field): both cases reran through `node_image_case.py` in fresh directories with the same image config id `sha256:744310a4…`. Installed Jest 24.8.0 (bestzip) and 24.9.0 (codecov-node). bestzip: baseline `fcea252e` control passed, security failed at `test/corsair.spec.js:23`; fix `45d4a901` both passed. codecov-node: baseline `5f6cc62d` control passed, security failed at `test/corsair.test.js:27`; fix `c0711c65` both passed. Container and workspace cleanup confirmed on all four runs. With the new rows, `select` routes all four commits' build files to `node-8.17.0-npm`. The rows list npm 6.13.4 only: Yarn 1.21.1 is in the image but no case has run with it. The environment agent does not admit `jest` yet, so JavaScript cases select the image but stop at environment admission until that follow-up lands.
+
 ## Decisions and next action
 
-One file, identifier titles, never-matching-pattern listing (SPEC-0057). Next: the live gate, then the framework row.
+One file, identifier titles, never-matching-pattern listing (SPEC-0057). Next: Mocha and AVA as drivers after the consolidation PR; environment `jest` admission; the milestone gate upgrades the rows to `live`.
 
 Review fixes at the same head: a non-string assertion `status` (for example `[]`) is refused as a malformed report instead of raising `TypeError`; the runner binary must be absolute. With the receipt, the codecov case was rerun in fresh directories (baseline control passed, security failed; fix both passed; cleanup confirmed), and running the fix commit against the baseline's dependency directory was refused before any container started.
 
