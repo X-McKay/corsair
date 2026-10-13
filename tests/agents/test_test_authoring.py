@@ -294,7 +294,7 @@ def test_native_evals_repeat_and_preserve_receipts(tmp_path):
     assert passed(report) and len(report.cases) == 16 and len(report.case_groups()) == 8
     assert len(list(evidence.glob("attempt-*.json"))) == 16
     assert all(c.attributes["security_revealed"] == 0 for c in report.cases)
-    assert report.experiment_metadata["runner"] == "scripted_observations"
+    assert report.experiment_metadata["runner"] == "injected_observations_and_static_host_runner"
     with pytest.raises(FileExistsError):
         asyncio.run(evaluate(evidence, EvaluationBudget()))
 
