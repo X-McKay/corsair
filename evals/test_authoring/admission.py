@@ -8,7 +8,7 @@ they would do when executed. The audit-hook rule belongs to the authoring stage'
 import ast
 import re
 
-from corsair.agents.test_authoring.static import _function
+from corsair.agents.test_authoring.static import _executable, _function
 from corsair.agents.test_planning.contracts import ReadyTestPlan
 
 PROCESS_OR_NETWORK = frozenset({"subprocess", "socket", "ssl", "urllib", "http", "requests", "httpx", "aiohttp",
@@ -16,7 +16,10 @@ PROCESS_OR_NETWORK = frozenset({"subprocess", "socket", "ssl", "urllib", "http",
                                 "runpy", "asyncio", "concurrent"})
 # Dynamic forms that could reach any of the above without a visible import.
 DYNAMIC_CALLS = frozenset({"__import__", "eval", "exec", "compile", "getattr"})
-OS_PROCESS_CALLS = frozenset({"system", "popen", "spawnl", "spawnv", "execv", "execve", "execl", "fork", "startfile"})
+OS_PROCESS_CALLS = frozenset({"system", "popen", "spawnl", "spawnle", "spawnlp", "spawnlpe",
+                                "spawnv", "spawnve", "spawnvp", "spawnvpe",
+                                "posix_spawn", "posix_spawnp", "execv", "execve", "execvp", "execvpe",
+                                "execl", "execle", "execlp", "execlpe", "fork", "forkpty", "startfile"})
 QUOTED = re.compile(r"'([^']+)'|\"([^\"]+)\"")
 
 
@@ -24,8 +27,8 @@ def quoted_literals(text: str) -> set[str]:
     return {single or double for single, double in QUOTED.findall(text)}
 
 
-def _strings(node: ast.AST) -> list[str]:
-    return [n.value for n in ast.walk(node) if isinstance(n, ast.Constant) and isinstance(n.value, str)]
+def _strings(node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
+    return [n.value for n in _executable(node) if isinstance(n, ast.Constant) and isinstance(n.value, str)]
 
 
 def no_process_or_network(content: str) -> bool:
@@ -81,11 +84,11 @@ def admission_facts(plan: ReadyTestPlan, files: dict[str, str], security_lines: 
     facts = {"no_process_or_network": all(no_process_or_network(content) for content in files.values())}
     adversarial = quoted_literals(plan.security.input) - quoted_literals(plan.control.input)
     if adversarial:
-        # The planned adversarial value reaches only the security test.
+        # The literal occurs in the security body outside deferred scopes; this does not prove dataflow.
         facts["planned_input_in_security"] = all(any(value in s for s in _strings(security)) for value in adversarial)
         facts["planned_input_not_in_control"] = not any(value in s for value in adversarial for s in _strings(control))
     if plan.security_expectation.failure_type == "AssertionError":
         # Decision recorded with authoring v5: the planned failure is a plain assert, not pytest.raises.
-        asserts = {n.lineno for n in ast.walk(security) if isinstance(n, ast.Assert)}
+        asserts = {n.lineno for n in _executable(security) if isinstance(n, ast.Assert)}
         facts["planned_failure_is_assert"] = bool(security_lines) and set(security_lines) <= asserts
     return facts
