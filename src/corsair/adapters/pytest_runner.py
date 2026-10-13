@@ -1,14 +1,11 @@
 """Native pytest runner: fresh workspace, exact discovery, one execution, claims from pytest's JUnit."""
 from dataclasses import dataclass
-from typing import Literal
 from uuid import UUID, uuid5
 
-from corsair.ports.artifacts import ArtifactStore
-from corsair.ports.execution import ExecutionReceipt, SandboxExecution
-from corsair.ports.sandbox import SandboxHandle
+from corsair.adapters.native_runner import NativeRunner, error_text
 from corsair.nodes.witness import MAX_RECORD_BYTES, PROBE_SHA256, probe_argv
-from corsair.ports.test_runner import (MAX_TEST_ID, TEST_ID, ApprovedPatch, Discovery, Execution, NativeTestRun,
-                                       PreparedWorkspace, TestWorkspace, WitnessCapture, WitnessRequest)
+from corsair.ports.test_runner import (MAX_TEST_ID, TEST_ID, ApprovedPatch, Discovery, Execution, PreparedWorkspace,
+                                       WitnessCapture, WitnessRequest)
 from corsair.reports.junit import MAX_JUNIT_BYTES, JUnitError, parse_junit
 from corsair.reports.test_observations import AdmittedTestClaims, TestClaim, WorkloadTestReport
 
@@ -52,21 +49,6 @@ class PytestRunnerConfig:
             raise ValueError('Witness record path must be a plain operator path distinct from the JUnit path')
 
 
-def _error(error: BaseException) -> str:
-    return f'{type(error).__name__}: {error}'[:2048]
-
-
-def _incomplete(receipt: ExecutionReceipt, operation: UUID, handle: SandboxHandle) -> str | None:
-    if receipt.operation != str(operation) or receipt.handle != handle:
-        return 'receipt identity does not match the requested execution'
-    if (receipt.delivery != 'acknowledged' or receipt.completion != 'terminal_observed' or receipt.reason != 'terminal'
-            or receipt.failure_layer is not None or receipt.storage_error is not None
-            or receipt.worker_cleanup != 'confirmed' or type(receipt.native_exit) is not int):
-        return (f'incomplete execution: delivery={receipt.delivery} completion={receipt.completion} '
-                f'reason={receipt.reason} layer={receipt.failure_layer} cleanup={receipt.worker_cleanup}')
-    return None
-
-
 def collected(stdout: bytes) -> tuple[str, ...] | None:
     """`--collect-only -q` lists node ids up to the first blank line; any other line is not exact discovery."""
     try:
@@ -77,19 +59,10 @@ def collected(stdout: bytes) -> tuple[str, ...] | None:
     return tuple(block) if all(TEST_ID.fullmatch(line) for line in block) else None
 
 
-class PytestRunner:
-    def __init__(self, workspace: TestWorkspace, execution: SandboxExecution, store: ArtifactStore,
-                 config: PytestRunnerConfig):
-        self._workspace, self._execution, self._store, self._config = workspace, execution, store, config
-
-    def run(self, patch: ApprovedPatch, *, control_test_id: str, security_test_id: str,
-            discovery_command: tuple[str, ...], operation: UUID,
-            witness: WitnessRequest | None = None) -> NativeTestRun:
-        if not isinstance(operation, UUID) or not isinstance(patch, ApprovedPatch):
-            raise ValueError('Operator operation and approved patch required')
+class PytestRunner(NativeRunner):
+    def _validate(self, patch: ApprovedPatch, ids: tuple[str, str], witness: WitnessRequest | None) -> None:
         if witness is not None and (not isinstance(witness, WitnessRequest) or self._config.witness_record_path is None):
             raise ValueError('Witness capture needs a typed request and an operator record path')
-        ids = (control_test_id, security_test_id)
         paths = {item.path for item in patch.files}
         if (any(type(i) is not str or not TEST_ID.fullmatch(i) or len(i) > MAX_TEST_ID or i[0] == '-'
                 or i.split('::')[0] not in paths for i in ids) or len(set(ids)) != 2):
@@ -97,46 +70,6 @@ class PytestRunner:
         if (any(path[0] == '-' for path in paths) or self._config.junit_path in paths
                 or self._config.witness_record_path in paths):
             raise ValueError('Patch paths conflict with runner arguments')
-        if type(discovery_command) is not tuple or not discovery_command or any(type(t) is not str for t in discovery_command):
-            raise ValueError('Discovery command must be string tokens')
-        base = dict(operation=str(operation), patch_sha256=patch.sha256)
-        try:
-            prepared = self._workspace.prepare(patch, operation)
-        except Exception as error:
-            # Preparation may have created a sandbox before failing: never infer absence.
-            return NativeTestRun(**base, workspace=None, discovery=None, execution=None, cleanup='unconfirmed',
-                                 failure_layer='workspace', detail=f'prepare: {_error(error)}')
-        cleanup: Literal['confirmed', 'unconfirmed'] = 'unconfirmed'
-        released, captured = '', None
-        try:
-            if prepared.patch_sha256 != patch.sha256:
-                discovery = execution = None
-                layer, detail = 'workspace', 'prepared workspace does not hold this patch'
-            else:
-                discovery, execution, layer, detail, captured = self._stages(
-                    prepared, ids, discovery_command, sorted(paths), operation, witness)
-        finally:
-            try:
-                cleanup = 'confirmed' if self._workspace.release(prepared, operation) == 'confirmed' else 'unconfirmed'
-            except Exception as error:
-                released = f'; release: {_error(error)}'
-        return NativeTestRun(**base, workspace=prepared, discovery=discovery, execution=execution, cleanup=cleanup,
-                             failure_layer=layer, detail=detail+released, witness=captured)
-
-    def _execute(self, handle: SandboxHandle, argv: tuple[str, ...], operation: UUID) -> tuple[ExecutionReceipt | None, str | None]:
-        try:
-            receipt = self._execution.execute(handle, argv, operation)
-        except Exception as error:
-            # Never retried: delivery of the failed command may be unknown.
-            return getattr(error, 'receipt', None), _error(error)
-        return receipt, _incomplete(receipt, operation, handle)
-
-    def _excerpt(self, receipt: ExecutionReceipt | None) -> str:
-        if receipt is None:
-            return ''
-        limit = self._config.max_excerpt_chars
-        return (f'exit={receipt.native_exit}\nstdout:\n{receipt.stdout[:limit*4].decode("utf-8", "replace")[:limit]}'
-                f'\nstderr:\n{receipt.stderr[:limit*4].decode("utf-8", "replace")[:limit]}')
 
     def _stages(self, prepared, ids, discovery_command, paths, operation, witness):
         handle = prepared.handle
@@ -175,7 +108,7 @@ class PytestRunner:
         try:
             artifact = self._store.put(receipt.stdout)
         except Exception as error:
-            return unavailable(f'record storage: {_error(error)}', receipt)
+            return unavailable(f'record storage: {error_text(error)}', receipt)
         return WitnessCapture('captured', request, nonce, PROBE_SHA256, receipt.stdout, artifact, '', receipt)
 
     def _run_once(self, prepared: PreparedWorkspace, ids: tuple[str, str], test_paths: frozenset[str], operation: UUID,
@@ -194,7 +127,7 @@ class PytestRunner:
             junit = self._store.put(receipt.stdout)
         except Exception as error:
             # The command completed; only retention of its JUnit bytes failed.
-            return failure('report', f'junit storage: {_error(error)}')
+            return failure('report', f'junit storage: {error_text(error)}')
         if receipt.native_exit not in (0, 1):
             return failure('execution', f'execution: pytest exit {receipt.native_exit}', junit)
         try:
