@@ -23,7 +23,7 @@ from corsair.adapters.receipts import ReceiptDirectory
 from corsair.ports.artifacts import ArtifactRef, ArtifactStore, SourceSnapshot
 from corsair.ports.execution import ExecutionError, ExecutionReceipt, SandboxExecution
 from corsair.ports.sandbox import SandboxHandle, SandboxLifecycle
-from corsair.ports.test_runner import ApprovedPatch, PreparedWorkspace
+from corsair.ports.test_runner import ApprovedPatch, PatchFile, PreparedWorkspace
 
 # Default bounds admit the SPEC-0018 fixture; an operator may raise entries up to the ceiling for a small real
 # project (SPEC-0046 ran one 73-file benchmark tree). Larger trees wait for in-sandbox source fetch (SPEC-0025).
@@ -60,21 +60,65 @@ print(json.dumps(out,sort_keys=True))
 '''
 
 
+def _canonical(path) -> bool:
+    return (type(path) is str and path.startswith('/') and not path.endswith('/') and '\0' not in path
+            and str(PurePosixPath(path)) == path and '..' not in PurePosixPath(path).parts)
+
+
+@dataclass(frozen=True)
+class UploadedVerifier:
+    """The static operator verifier (`tools/workspace-verify`, SPEC-0070), uploaded into each sandbox before the
+    tree so no image needs an interpreter. Each placement uploads it into a directory named for that operation.
+
+    It reports the SHA-256 of itself and the host refuses any other value. That is a consistency check, not
+    attestation: a process already running in the sandbox could replace it and print the pinned value. The trust
+    rests on the operator-pinned image, the only code that runs before the check."""
+    binary: Path
+    sha256: str
+    remote_parent: str
+    name: str = 'corsair-verifier'
+
+    def __post_init__(self):
+        if not isinstance(self.binary, Path) or not self.binary.is_absolute() or not _canonical(self.remote_parent):
+            raise ValueError('Absolute host binary and canonical remote parent required')
+        if type(self.sha256) is not str or len(self.sha256) != 64 or self.sha256.strip('0123456789abcdef'):
+            raise ValueError('Lowercase SHA-256 verifier pin required')
+        if type(self.name) is not str or not self.name or '/' in self.name or self.name in ('.', '..'):
+            raise ValueError('Single plain verifier directory name required')
+
+    def directory(self, operation: UUID) -> str:
+        """The upload's directory name, unpredictable before the placement's operation exists."""
+        return f'{self.name}-{operation.hex}'
+
+    def remote_path(self, operation: UUID) -> str:
+        return f'{self.remote_parent}/{self.directory(operation)}/verify'
+
+
 @dataclass(frozen=True)
 class WorkspaceConfig:
-    """Operator-owned placement and bounds; the remote root becomes the runner's workspace root."""
+    """Operator-owned placement and bounds; the remote root becomes the runner's workspace root.
+
+    Exactly one verifier route: `python`, an interpreter in the image running `VERIFY`, or `verifier`, the
+    uploaded static binary that works in any image."""
     staging: Path
     remote_parent: str
     root_name: str
-    python: str
+    python: str | None
     max_files: int = FIXTURE_TREE_FILES
     max_bytes: int = MAX_TREE_BYTES
+    verifier: UploadedVerifier | None = None
 
     def __post_init__(self):
-        for path in (self.remote_parent, self.python):
-            if (type(path) is not str or not path.startswith('/') or path.endswith('/') or '\0' in path
-                    or str(PurePosixPath(path)) != path or '..' in PurePosixPath(path).parts):
+        if (self.python is None) == (self.verifier is None):
+            raise ValueError('Exactly one workspace verifier route required')
+        if self.verifier is not None and not isinstance(self.verifier, UploadedVerifier):
+            raise ValueError('Uploaded verifier configuration required')
+        for path in (self.remote_parent,) + ((self.python,) if self.python is not None else ()):
+            if not _canonical(path):
                 raise ValueError('Canonical absolute operator paths required')
+        if (self.verifier is not None and self.verifier.remote_parent == self.remote_parent
+                and self.root_name.startswith(self.verifier.name + '-')):
+            raise ValueError('Verifier and workspace root must differ')
         if type(self.root_name) is not str or not self.root_name or '/' in self.root_name or self.root_name in ('.', '..'):
             raise ValueError('Single plain workspace root name required')
         if not isinstance(self.staging, Path) or not self.staging.is_absolute():
@@ -204,10 +248,17 @@ class OpenShellTestWorkspace:
             confined_path(f.path)
         self._lifecycle, self._execution, self._upload = lifecycle, execution, upload
         self._store, self._snapshot, self._config = store, snapshot, config
+        self._verifier = None
+        if config.verifier is not None:
+            # Read once and pinned here, so every sandbox receives the same bytes the host checked.
+            data = config.verifier.binary.read_bytes()
+            if hashlib.sha256(data).hexdigest() != config.verifier.sha256:
+                raise ValueError('Workspace verifier binary does not match its pin')
+            self._verifier = data
 
-    def _expected(self, patch: ApprovedPatch):
+    def _expected(self, added: tuple[PatchFile, ...]):
         source = {f.path: (MODES[f.mode], f.artifact.size, f.artifact.sha256) for f in self._snapshot.files}
-        tests = {f.path: (0o400, len(f.content), hashlib.sha256(f.content).hexdigest()) for f in patch.files}
+        tests = {f.path: (0o400, len(f.content), hashlib.sha256(f.content).hexdigest()) for f in added}
         files = source | tests
         parents = {'/'.join(p.split('/')[:n]) for p in files for n in range(1, p.count('/') + 1)}
         if source.keys() & tests.keys() or files.keys() & parents:
@@ -216,22 +267,22 @@ class OpenShellTestWorkspace:
             raise ValueError('Workspace exceeds the fixture bound')
         return files, parents
 
-    def _stage(self, operation: UUID, patch: ApprovedPatch, parents) -> tuple[Path, Path]:
+    def _stage(self, operation: UUID, added: tuple[PatchFile, ...], parents) -> tuple[Path, Path]:
         base = self._config.staging / operation.hex
         base.mkdir(mode=0o700)
         try:
-            return base, self._write(base, patch, parents)
+            return base, self._write(base, added, parents)
         except BaseException:
             shutil.rmtree(base, ignore_errors=True)
             raise
 
-    def _write(self, base: Path, patch: ApprovedPatch, parents) -> Path:
+    def _write(self, base: Path, added: tuple[PatchFile, ...], parents) -> Path:
         root = base / self._config.root_name
         root.mkdir(mode=0o700)
         for parent in sorted(parents):
             (root / parent).mkdir(mode=0o700)
         content = {f.path: (MODES[f.mode], self._store.get(f.artifact)) for f in self._snapshot.files}
-        content |= {f.path: (0o400, f.content) for f in patch.files}
+        content |= {f.path: (0o400, f.content) for f in added}
         for path, (mode, data) in sorted(content.items()):
             fd = os.open(root / path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
             with os.fdopen(fd, 'wb') as stream:
@@ -241,9 +292,12 @@ class OpenShellTestWorkspace:
                 os.fsync(stream.fileno())
         return root
 
-    def _observe(self, handle: SandboxHandle, operation: UUID) -> tuple[dict, ExecutionReceipt]:
-        argv = (self._config.python, '-I', '-S', '-B', '-c', VERIFY, self._config.remote_root,
-                str(self._config.max_files), str(MAX_FILE_BYTES))
+    def _observe(self, handle: SandboxHandle, operation: UUID,
+                 placed: str | None = None) -> tuple[dict, ExecutionReceipt]:
+        limits = (self._config.remote_root, str(self._config.max_files), str(MAX_FILE_BYTES))
+        verifier = self._config.verifier
+        argv = ((placed,) + limits if verifier is not None
+                else (self._config.python, '-I', '-S', '-B', '-c', VERIFY) + limits)
         try:
             receipt = self._execution.execute(handle, argv, operation)
         except ExecutionError as error:
@@ -258,7 +312,33 @@ class OpenShellTestWorkspace:
             observed = None
         if not isinstance(observed, dict):
             raise WorkspaceError('admission', 'verifier output is not one JSON object', 'unconfirmed', receipt)
+        if verifier is not None and observed.pop('verifier_sha256', None) != verifier.sha256:
+            raise WorkspaceError('admission', 'verifier is not the pinned executable', 'unconfirmed', receipt)
         return observed, receipt
+
+    def _deliver_verifier(self, handle: SandboxHandle, operation: UUID) -> None:
+        """Upload the pinned verifier into its own directory; never replayed, like the tree upload. Its staging
+        copy is separate from the tree's and, after a timeout, retained for the same reason."""
+        verifier, retain = self._config.verifier, False
+        base = self._config.staging / f'{operation.hex}.verifier'
+        base.mkdir(mode=0o700)
+        try:
+            local = base / verifier.directory(operation)
+            local.mkdir(mode=0o700)
+            fd = os.open(local / 'verify', os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, 'wb') as stream:
+                stream.write(self._verifier)
+                stream.flush()
+                os.fchmod(stream.fileno(), 0o500)
+                os.fsync(stream.fileno())
+            try:
+                self._upload.upload(handle, local, verifier.remote_parent, operation)
+            except UploadError as error:
+                retain = error.descendants_unknown
+                raise
+        finally:
+            if not retain:
+                shutil.rmtree(base, ignore_errors=True)
 
     def _admit(self, observed: dict, files, parents) -> None:
         euid = observed.get('euid')
@@ -272,21 +352,39 @@ class OpenShellTestWorkspace:
     def prepare(self, patch: ApprovedPatch, operation: UUID) -> PreparedWorkspace:
         if not isinstance(operation, UUID) or not isinstance(patch, ApprovedPatch):
             raise ValueError('Operator operation and approved patch required')
-        files, parents = self._expected(patch)
         refs = {f.path: self._store.put(f.content) for f in patch.files}
         tests = self._store.put(_patch_manifest(patch, refs))
+        handle = self._place(patch.files, operation)
+        return PreparedWorkspace(handle, self._snapshot.manifest, tests, patch.sha256)
+
+    def prepare_source(self, operation: UUID, added: tuple[PatchFile, ...] = ()) -> SandboxHandle:
+        """A fresh sandbox holding exactly the captured source plus any operator overlay files (SPEC-0070, SPEC-0071
+        smoke tests), each verified the same way, and nothing else."""
+        if not isinstance(operation, UUID) or not all(isinstance(f, PatchFile) for f in added):
+            raise ValueError('Operator operation and overlay files required')
+        return self._place(tuple(added), operation)
+
+    def _place(self, added: tuple[PatchFile, ...], operation: UUID) -> SandboxHandle:
+        files, parents = self._expected(added)
         try:
-            base, root = self._stage(operation, patch, parents)
+            base, root = self._stage(operation, added, parents)
         except Exception as error:
             raise WorkspaceError('staging', f'{type(error).__name__}: {error}', 'not_required') from error
-        handle, retain = None, False
+        handle, retain, placed = None, False, None
         try:
             try:
                 handle = self._lifecycle.create(uuid5(operation, 'create'))
                 self._lifecycle.wait_ready(handle, uuid5(operation, 'ready'))
             except Exception as error:
                 raise WorkspaceError('sandbox', f'{type(error).__name__}: {error}', 'unconfirmed') from error
-            before, receipt = self._observe(handle, uuid5(operation, 'absent'))
+            if self._config.verifier is not None:
+                try:
+                    self._deliver_verifier(handle, uuid5(operation, 'verifier'))
+                    placed = self._config.verifier.remote_path(uuid5(operation, 'verifier'))
+                except UploadError as error:
+                    retain = error.descendants_unknown  # Reported as retained staging; the verifier's copy is kept
+                    raise WorkspaceError('upload', f'verifier: {error} (delivery {error.delivery})', 'unconfirmed') from error
+            before, receipt = self._observe(handle, uuid5(operation, 'absent'), placed)
             if before != dict(exists=False, euid=before.get('euid')):
                 raise WorkspaceError('admission', 'remote workspace root exists before upload', 'unconfirmed', receipt)
             try:
@@ -295,12 +393,12 @@ class OpenShellTestWorkspace:
                 retain = error.descendants_unknown
                 detail = f'{error} (delivery {error.delivery}' + (f'; receipt storage {error.storage_error})' if error.storage_error else ')')
                 raise WorkspaceError('upload', detail, 'unconfirmed') from error
-            observed, receipt = self._observe(handle, uuid5(operation, 'verify'))
+            observed, receipt = self._observe(handle, uuid5(operation, 'verify'), placed)
             try:
                 self._admit(observed, files, parents)
             except ValueError as error:
                 raise WorkspaceError('admission', str(error), 'unconfirmed', receipt) from error
-            return PreparedWorkspace(handle, self._snapshot.manifest, tests, patch.sha256)
+            return handle
         except Exception as error:
             failure = error if isinstance(error, WorkspaceError) else WorkspaceError(
                 'sandbox', f'{type(error).__name__}: {error}', 'unconfirmed')
@@ -325,3 +423,6 @@ class OpenShellTestWorkspace:
 
     def release(self, workspace: PreparedWorkspace, operation: UUID) -> Literal['confirmed', 'unconfirmed']:
         return self._delete(workspace.handle, uuid5(operation, 'release'))
+
+    def release_source(self, handle: SandboxHandle, operation: UUID) -> Literal['confirmed', 'unconfirmed']:
+        return self._delete(handle, uuid5(operation, 'release'))

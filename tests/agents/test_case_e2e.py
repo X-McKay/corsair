@@ -115,7 +115,6 @@ def test_a_request_that_cannot_start_is_refused_before_any_model(clone, tmp_path
         with pytest.raises(Refused, match=match):
             build(req, tmp_path / f"w{len(list(tmp_path.iterdir()))}", images, roots=allowed)
     refused("does not hold the candidate commit", request(repo, baseline, "f" * 40))
-    refused("names no fixed revision", request(repo, baseline, None))
     refused("names no revision", request(repo, None, candidate))
     refused("not under an operator-allowed", request(repo, baseline, candidate), allowed=(tmp_path / "elsewhere",))
     refused("names no repository", request(repo, baseline, candidate, repository=None))
@@ -348,11 +347,12 @@ def test_a_repository_committed_in_the_checkout_is_named_relative_to_it(clone, t
     with pytest.raises(Refused, match="escapes the checkout"):
         build(request(repo, baseline, candidate, repository="out/elsewhere"), tmp_path / "esc", {NODE: CONFIG},
               checkout=checkout)
-    # A request without a fixed revision cannot run yet: an admission stop, UNABLE_TO_RUN.
-    from corsair.investigation.results import record
-    with pytest.raises(Refused, match="names no fixed revision") as refused:
-        build(request(repo, baseline, None, repository="clone"), tmp_path / "nofix", {NODE: CONFIG}, checkout=checkout)
-    assert record("manual:x", tmp_path, refused=str(refused.value))["label"] == "UNABLE_TO_RUN"
+    # Without a fixed revision only the reported revision is acquired and runs (fix-free runs, Al 2026-10-13).
+    fix_free = build(request(repo, baseline, None, repository="clone"), tmp_path / "nofix", {NODE: CONFIG},
+                     checkout=checkout)
+    assert set(fix_free.commits) == set(fix_free.trees) == set(fix_free.case.revision_sources) == {"baseline"}
+    from corsair.investigation.results import record, summary_line
+    assert "(no fix commit)" in summary_line(record("manual:x", tmp_path, investigation=fix_free, refused="x"))
 
 
 def test_an_agent_stage_that_stops_on_its_budget_or_never_answers_is_inconclusive(tmp_path):
@@ -411,3 +411,9 @@ def test_pov_files_reach_identification_and_an_oversized_ticket_is_refused(clone
     with pytest.raises(Refused, match="does not fit the identification input"):
         build(request(repo, baseline, candidate, issue=ticket), tmp_path / "big", {NODE: CONFIG},
               roots=(tmp_path / "sources",))
+    manual = {"provider": "manual", "title": "lib/run.js", "body": "x" * 9000}
+    long_pov = {"description": "", "files": [{"path": "poc.sh", "content": "y" * 8190}]}
+    for name, fields in (("manual", {"issue": manual}), ("pov", {"pov": long_pov})):
+        with pytest.raises(Refused, match="does not fit the identification input"):
+            build(request(repo, baseline, candidate, **fields), tmp_path / name, {NODE: CONFIG},
+                  roots=(tmp_path / "sources",))
