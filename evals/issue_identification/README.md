@@ -23,4 +23,4 @@ Candidate history: v1 completed all16 but scored7/16. Six report-selection misma
 
 V2 completed15/16 with all15 completed outputs passing every selection/provenance/budget check. The remaining attempt requested lines1–80 from a two-line file and was refused with tool retries0; it remains a failure. V3 removes the caller-controlled read endpoint as described above; corpus, provider and finite budgets remain unchanged.
 
-The grounding review (SPEC-0046) preserves the frozen corpus and adds a source_quote assertion against exact saved-source lines. Symbol validation requires literal occurrence without identifier prefixes or suffixes; this is an occurrence guard, not proof of a declaration or semantic relevance.
+The grounding review (SPEC-0051) preserves the frozen corpus and adds a source_quote assertion against exact saved-source lines. Symbol validation requires literal occurrence without identifier prefixes or suffixes; this is an occurrence guard, not proof of a declaration or semantic relevance.

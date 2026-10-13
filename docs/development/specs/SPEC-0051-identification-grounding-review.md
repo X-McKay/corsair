@@ -1,10 +1,10 @@
 ---
-id: SPEC-0046
+id: SPEC-0051
 kind: spec
 title: Identification grounding review
 status: accepted
 updated: 2026-10-13
-related: [SPEC-0024, SPEC-0038, SPEC-0044, PLAN-0050]
+related: [SPEC-0024, SPEC-0038, SPEC-0044, PLAN-0055]
 ---
 
 # Identification grounding review
@@ -24,3 +24,5 @@ Preserve the eight-case development corpus and compare baseline/candidate using 
 ## Decisions and open questions
 
 The bounded occurrence check can still match a comment or string, so semantic localization remains a model task evaluated by curated selections. No grammar or AST heuristic is introduced. Keep prompts/skills unchanged because the review identifies no measured defect needing their alteration. Broader independent repository cases and exposed-versus-held-out evaluation remain future work, rather than modifying frozen oracles to accommodate this candidate.
+
+Review correction: identifier continuations now include Unicode combining/spacing marks through an adjacent-character identifier check, plus $. Literal occurrence remains a structural boundary check. Existing corpus and tool authority are unchanged.

@@ -1,10 +1,10 @@
 ---
-id: PLAN-0050
+id: PLAN-0055
 kind: plan
 title: Identification grounding review
 status: complete
 updated: 2026-10-13
-related: [SPEC-0046, SPEC-0024, SPEC-0038, SPEC-0044, HANDOFF-0070]
+related: [SPEC-0051, SPEC-0024, SPEC-0038, SPEC-0044, HANDOFF-0070]
 ---
 
 # Identification grounding review
@@ -46,3 +46,11 @@ Same actual Make environment with `PROVIDER_CONFIG=.runs/identification-review/p
 Added exact-quote assertion was also applied separately to retained baseline outputs: 16/16 pass; original baseline report unchanged. First helper command omitted PYTHONPATH and failed with ModuleNotFoundError before any provider dispatch; corrected host helper passed. Pydantic Evals drops zero-valued metric increments; summaries may average successful-tool metrics only over nonzero entries. Use native receipts/observed attributes for all-attempt totals (14/16 tools = 0.875 per attempt in each live run), not the summary's conditional mean 1.0. Missing telemetry remains unknown, not zero.
 
 Required full actual `make test-config`: 1009 passed, one existing event-loop deprecation warning, 50.55 seconds. Focused 65 passed; record/link guards 5 passed after writing records. Candidate source/config/corpus/skill manifest verifies all eight entries unchanged after live execution. Final diff review applied the Corsair review skill; root reviewed code/records and found no blocker. No dependency installation, infrastructure, repository live smoke, new Temporal execution or untrusted host execution occurred. Historical repository mode still requires broader independent evaluation, durable serialization and downstream admission; this work does not renew those claims.
+
+## Current-head review correction
+
+Independent review confirmed that Python regex \w excludes valid Unicode identifier continuation marks: a suffixed combining accent was admitted as an exact target. Literal matches now inspect adjacent characters using Python's identifier-continuation check plus Java/JavaScript $. Negative native stage tests cover combining and spacing marks; exact Unicode spellings and existing punctuation/dollar cases remain supported. This lexical rule remains conservative and is not semantic source proof. Prompt/config identity advanced to grounding-2 (planning config v4). No dataset/held-out changes or live provider calls. Earlier broad review-test attempts were interrupted after they stalled in the restricted worktree; subsequent focused checks and scripted comparisons are recorded below.
+
+Focused Unicode/identifier checks:22 passed; development scripted16/16 versus16/16, `.runs/evals/identification/20261013T100737Z-development-scripted`, unchanged estimated requests/tools/tokens. SPEC-0051 and PLAN-0055 replace this branch's previous colliding identifiers; all tracked references updated. These are new record identities, not changes to the other PR's records.
+
+Final affected identification/repository and documentation/dataset guards:77 passed, one existing event-loop deprecation warning. git diff --check passed. Live candidate rerun and full-suite repeat unrun; prior full-suite source remains separately recorded.

@@ -232,6 +232,9 @@ def test_partial_or_whitespace_symbols_cannot_become_ready(symbol):
 @pytest.mark.parametrize('declared,selected,accepted', [
     ('prefix_read_document', 'read_document', False),
     ('read_document_suffix', 'read_document', False),
+    ('read_document\u0301', 'read_document', False),
+    ('read_document\u093e', 'read_document', False),
+    ('read_document\u0301', 'read_document\u0301', True),
     ('αread_document', 'read_document', False),
     ('$read_document', 'read_document', False),
     ('read_document$', 'read_document', False),

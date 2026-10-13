@@ -17,8 +17,8 @@ from .identification_contracts import IssueIdentification, IssueIdentificationDr
 from .tools import READ_SOURCE_TOOL, TOOL_RETRIES, FixtureDependencies
 from .tools.identification import identification_tools
 
-PROMPT_VERSION = "issue-identification-v3-grounding-1"
-CONFIG_VERSION = "issue-identification-config-v3-grounding-1"
+PROMPT_VERSION = "issue-identification-v3-grounding-2"
+CONFIG_VERSION = "issue-identification-config-v3-grounding-2"
 SKILL_ID = "identify-issue"
 SKILL_TEXT = (Path(__file__).parent / "skills" / SKILL_ID / "SKILL.md").read_text()
 SKILL_SHA256 = sha256(SKILL_TEXT.encode()).hexdigest()
@@ -49,6 +49,16 @@ def identification_prompt(inputs: IssueAnalysisInput) -> str:
     )
 
 
+def _symbol_occurs(symbol: str, text: str) -> bool:
+    """Literal occurrence bounded by Unicode identifier continuations and Java/JS '$'."""
+    def continuation(char: str) -> bool:
+        return char == "$" or ("_" + char).isidentifier()
+
+    return any((match.start() == 0 or not continuation(text[match.start() - 1]))
+               and (match.end() == len(text) or not continuation(text[match.end()]))
+               for match in re.finditer(re.escape(symbol), text))
+
+
 def finalize_draft(deps: IdentificationDependencies, draft: IssueIdentificationDraft,
                    reads: list[SourceRead]) -> IssueIdentification:
     """Shared by inline and repository modes: scope, run-local read coverage, symbol and quotation."""
@@ -65,9 +75,7 @@ def finalize_draft(deps: IdentificationDependencies, draft: IssueIdentificationD
     except ValueError as exc:
         raise ModelRetry(str(exc)) from exc
     # Literal escaped matching is only an occurrence check, not a language parser.
-    # Include '$' because Java/JavaScript identifiers may contain it; '\w' also
-    # prevents ASCII fragments from matching inside Unicode identifiers.
-    if re.search(r"(?<![\w$])" + re.escape(draft.target.symbol) + r"(?![\w$])", source.quote) is None:
+    if not _symbol_occurs(draft.target.symbol, source.quote):
         raise ModelRetry("exact target symbol must occur without identifier prefixes or suffixes in the selected source excerpt")
     return IssueIdentification.model_validate(draft.model_dump() | {
         "reported_issue": deps.inputs.issue,
