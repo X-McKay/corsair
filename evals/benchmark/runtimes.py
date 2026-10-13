@@ -204,6 +204,16 @@ def recommend(results: list[dict]) -> list[tuple[str, str, list[str]]]:
     return rows
 
 
+def _outcome(record: dict) -> str:
+    """A supported case counts as qualified only on live rows; image-only selections are counted apart."""
+    if record['status'] != 'supported': return record['status']
+    # The weakest evidence across every evaluated revision: one image-only commit makes the case image-only.
+    levels = [r.get('evidence', 'evidence unrecorded') for r in record.get('revisions', {}).values() if r.get('status') == 'supported']
+    for level in ('evidence unrecorded', 'image-only'):
+        if not levels or level in levels: return 'supported (' + (level if levels else 'evidence unrecorded') + ')'
+    return 'supported'
+
+
 def markdown(results: list[dict]) -> str:
     lines = ['| Case | Language | Outcome | Runtime allowed | Unmet or missing |', '| --- | --- | --- | --- | --- |']
     for record in results:
@@ -216,8 +226,8 @@ def markdown(results: list[dict]) -> str:
             detail = '; '.join(f"{n['name']} {n['preferred'] or n['allowed']}" for n in revision['needs'])
         else: detail = '; '.join(revision.get('missing', [record.get('detail', '')]))
         agree = '' if record.get('revisions_agree', True) else ' (fix differs)'
-        lines.append(f"| {record['case_id']} | {record['language']} | {record['status']}{agree} | {allowed.replace('|', '/')} | {detail.replace('|', '/')[:300]} |")
-    counts = Counter(r['status'] for r in results)
+        lines.append(f"| {record['case_id']} | {record['language']} | {_outcome(record)}{agree} | {allowed.replace('|', '/')} | {detail.replace('|', '/')[:300]} |")
+    counts = Counter(_outcome(r) for r in results)
     lines += ['', 'Outcomes: ' + ', '.join(f'{k} {v}' for k, v in sorted(counts.items())), '',
               '| Language | Suggested runtime row | Cases whose runtime it satisfies |', '| --- | --- | --- |']
     lines += [f'| {language} | {row} | {len(cases)}: {", ".join(cases)} |' for language, row, cases in recommend(results)]

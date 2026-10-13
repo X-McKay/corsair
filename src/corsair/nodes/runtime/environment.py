@@ -91,13 +91,13 @@ def _blocker(requirement: RuntimeRequirement | str, selection: Selection | None)
         requirements = '; '.join(f'{c.kind} {c.name} {c.allowed}' for c in requirement.components)
         framework_only = all(n.kind == 'test_framework' for n in selection.needs)
         return blocker('framework_unqualified' if framework_only else 'image_unavailable',
-                       'No qualified framework runner matches.' if framework_only else 'No qualified base-image row satisfies the project.',
+                       'No framework row matches.' if framework_only else 'No matrix row satisfies the project.',
                        [f'Required components for {requirement.language}: {requirements}.',
                         'Inspect selection.needs and selection.rejected for exact version ranges and per-image mismatches; preferred versions are suggestions, not qualification.',
-                        'Qualify the framework/runner on the matching image and register its exact tested version set.' if framework_only else
-                        'Add a digest-pinned image with the required runtime/build tools; build and qualify it before registering it in deploy/runtime-matrix.yaml.',
+                        'Check the framework/runner on the matching image (image-only, then live at the milestone gate) and register its exact tested version set.' if framework_only else
+                        'Add a digest-pinned image with the required runtime/build tools; check it image-only before registering it in deploy/runtime-matrix.yaml with its evidence level.',
                         'Follow .claude/skills/corsair-base-image/SKILL.md; preserve project constraints and qualify framework support as well.'])
-    return blocker('image_not_prepared', f'Qualified image {selection.image_id} is not prepared on this node.',
+    return blocker('image_not_prepared', f'Matrix row {selection.image_id} has no prepared image on this node.',
                    ['Use the existing row and toolchain preparation/load runbook; verify the node image receipt and digest.',
                     'Do not create a replacement row or use the base-image digest as the prepared application image.'])
 

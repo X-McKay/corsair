@@ -91,7 +91,7 @@ def test_framework_only_mismatch_does_not_prescribe_a_new_runtime():
     requirement = detect({"pyproject.toml": b'[project]\nrequires-python=">=3.12"\n[project.optional-dependencies]\ntest=["pytest<8"]\n'}, 'python')
     result = environment_input(requirement, select(requirement, load()), load(), PREPARED, **FIELDS)
     assert result.diagnostic.code == "framework_unqualified"
-    assert "Qualify the framework/runner" in result.diagnostic.render()
+    assert "Check the framework/runner" in result.diagnostic.render()
 
 
 def test_undetermined_stops_before_environment_input_validation():
