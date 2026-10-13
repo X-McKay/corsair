@@ -36,6 +36,15 @@ def setup(image, checkout, modules, evidence):
     return result.returncode
 
 
+CONFIG = JestRunnerConfig(command=JEST, workspace_root=WORK, report_path='/tmp/corsair-jest.json')
+
+
+def workspace(image, checkout, modules, commit, timeout, evidence=None):
+    """The offline container of one revision: a fresh copy of its tree and of the dependencies setup installed."""
+    return DockerCase(image, checkout, commit, timeout, kind='node-image-case', docker=docker, evidence=evidence,
+                      mounts=((modules, '/modules'),), env=('HOME=/tmp',), copies=f'cp -R /modules/node_modules {WORK}/;')
+
+
 def setup_identity(image, checkout, commit):
     """What a dependency directory was installed for: the commit, the image and the lockfile it installed."""
     return {'commit': commit, 'image': image, 'package_lock_sha256': sha256(checkout / 'package-lock.json')}
@@ -48,10 +57,7 @@ def run(image, checkout, modules, commit, ids, evidence, test_file, timeout):
     staged = evidence / 'patch'
     (staged / path).parent.mkdir(parents=True)
     (staged / path).write_bytes(Path(test_file).read_bytes())
-    config = JestRunnerConfig(command=JEST, workspace_root=WORK, report_path='/tmp/corsair-jest.json')
-    case = DockerCase(image, checkout, commit, timeout, kind='node-image-case', docker=docker,
-                      mounts=((modules, '/modules'),), env=('HOME=/tmp',), copies=f'cp -R /modules/node_modules {WORK}/;')
-    return drive(JestRunner, case, config, tests_patch(path, staged), ids, evidence,
+    return drive(JestRunner, workspace(image, checkout, modules, commit, timeout), CONFIG, tests_patch(path, staged), ids, evidence,
                  {'image': image, 'commit': commit, 'setup_receipt': receipt, 'test_file': str(test_file)})
 
 

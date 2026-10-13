@@ -42,6 +42,8 @@ class Suite:
     repeat: bool = True
     live: tuple[str, ...] = ()
     note: str = ""
+    # Sets served by another module than `module`, e.g. the chain's benchmark case cohorts.
+    set_modules: dict[str, str] = field(default_factory=dict)
 
 
 SUITES: dict[str, Suite] = {
@@ -54,9 +56,11 @@ SUITES: dict[str, Suite] = {
                        note="runs answered by injected observations or the static host runner; tests are not executed"),
     "assessment": Suite("evals.evidence_assessment.evaluate", {
         "development": ("--split", "development"), "held_out": ("--split", "held_out")}),
-    "chain": Suite("evals.fixture_chain.evaluate", {"fixture": ()},
+    "chain": Suite("evals.fixture_chain.evaluate", {"fixture": (), "jest": ("--cohort", "jest")},
                    live=("--live", "identification,planning,assessment"),
-                   note="live authoring needs the sandbox; authoring stays scripted on the host"),
+                   note="fixture: live authoring needs the sandbox, so authoring stays scripted on the host; cohorts "
+                        "(evals/case_e2e/cohorts.yaml) run every stage live over image-only Docker ports",
+                   set_modules={"jest": "evals.case_e2e.evaluate"}),
 }
 # Agents without an isolated eval set yet, and where the gap is planned.
 MISSING = {}
@@ -192,9 +196,10 @@ def run(agent: str, set_name: str, provider_config: Path | None, repeat: int | N
     run_id = f"{stamp}-{set_name}-{mode}"
     run_dir = agent_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
-    argv = [sys.executable, "-m", suite.module, "--evidence", str(run_dir / "evidence"), *suite.sets[set_name]]
+    module = suite.set_modules.get(set_name, suite.module)
+    argv = [sys.executable, "-m", module, "--evidence", str(run_dir / "evidence"), *suite.sets[set_name]]
     if provider_config:
-        argv += ["--provider-config", str(provider_config.resolve()), *suite.live]
+        argv += ["--provider-config", str(provider_config.resolve()), *(() if module != suite.module else suite.live)]
     if repeat is not None:
         if not suite.repeat:
             raise SystemExit(f"{agent} has no --repeat option")
