@@ -161,6 +161,23 @@ qualify-test-workspace:
 	mkdir -p "$(CORSAIR_QUAL_RUN)"
 	uv run --locked python -m pytest tests/qualification -m test_workspace --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
 
+# SPEC-0025 provider placeholder delivery with a random fake credential; egress substitution unqualified.
+.PHONY: qualify-credential-placeholder
+qualify-credential-placeholder:
+	test ! -e "$(CORSAIR_QUAL_RUN)"
+	mkdir -p "$(CORSAIR_QUAL_RUN)"
+	uv run --locked python -m pytest tests/qualification -m credential_placeholder --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
+
+# E2E-0 over OpenShellTestWorkspace: scripted control, then CORSAIR_E2E_RUNS live runs of CORSAIR_E2E_LIVE stages;
+# optional CORSAIR_STAGE_PROFILES is the evals.fixture_e2e.run --stage-profiles JSON.
+CORSAIR_E2E_LIVE ?= identification,planning,authoring,assessment
+CORSAIR_E2E_RUNS ?= 1
+.PHONY: qualify-fixture-e2e
+qualify-fixture-e2e:
+	test ! -e "$(CORSAIR_QUAL_RUN)"
+	test -z "$(CORSAIR_E2E_LIVE)" -o "$(CORSAIR_E2E_RUNS)" = 0 -o -f "$(CORSAIR_PROVIDER_CONFIG)"
+	mkdir -p "$(CORSAIR_QUAL_RUN)"
+	uv run --locked python -m pytest tests/qualification -m fixture_e2e --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --provider-config "$(CORSAIR_PROVIDER_CONFIG)" --e2e-live "$(CORSAIR_E2E_LIVE)" --e2e-runs "$(CORSAIR_E2E_RUNS)" $(if $(CORSAIR_STAGE_PROFILES),--e2e-stage-profiles "$(CORSAIR_STAGE_PROFILES)") --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
 
 .PHONY: qualify-witness
 qualify-witness:
