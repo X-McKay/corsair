@@ -141,7 +141,9 @@ def test_provider_credential_reaches_workload_only_as_placeholder(kube, adapter_
             summary['provider']['create_delivery'] = 'unknown'
             created = rpc('CreateProvider', openshell_pb2.CreateProviderRequest(
                 workspace_scope=scope, request_id=str(uuid.uuid4()), provider=datamodel_pb2.Provider(
-                    metadata=datamodel_pb2.ObjectMeta(name=provider), type=profile, credentials={KEY: dummy})))
+                    metadata=datamodel_pb2.ObjectMeta(name=provider), type=profile, credentials={KEY: dummy},
+                    # cred-003: without this, CreateProvider did not find the workspace-scoped imported profile.
+                    profile_workspace=WORKSPACE)))
             provider_id = created.provider.metadata.id
             summary['provider'].update(create_delivery='acknowledged', id=provider_id)
             fetched = rpc('GetProvider', openshell_pb2.GetProviderRequest(workspace_scope=scope, name=provider)).provider
