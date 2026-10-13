@@ -82,3 +82,10 @@ def test_minitest_without_a_ruby_version_infers_from_the_gem_metadata():
     chosen = selection({'Gemfile': b"source 'https://rubygems.org'\ngem 'minitest', '5.15.0'\n"}, 'ruby')
     assert chosen.status == 'supported' and chosen.image_id == 'ruby-3.1-bundler' and chosen.runtime_basis == 'inferred'
     assert next(c for c in chosen.checks if c.kind == 'runtime').allowed == '>=2.2,<4.0'
+
+
+def test_when_only_a_declared_tool_rejects_the_inferred_image_the_tool_is_named():
+    package = json.dumps({'scripts': {'test': 'jest'}, 'devDependencies': {'jest': '24.9.0'}, 'engines': {'npm': '>=7'}}).encode()
+    chosen = selection({'package.json': package}, 'javascript')
+    assert chosen.status == 'unsupported'
+    assert [(n.kind, n.name) for n in chosen.needs] == [('build_tool', 'npm')]

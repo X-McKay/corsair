@@ -191,7 +191,7 @@ def _infer(requirement: RuntimeRequirement, matrix: Matrix, wanted: list[Compone
                   key=lambda r: parse_version(r.runtime.version), reverse=True)
     covering = [(c, i) for c in frameworks for i in matrix.inference if i.language == requirement.language
                 and i.framework == c.name and not parse_set(c.allowed).intersect(parse_set(i.versions)).is_empty]
-    rejected = []
+    rejected, tool_blocked = [], {}
     for row in rows:
         provided = {('build_tool', k): v for k, v in row.tools.items()}
         checks = [_check(c, provided.get((c.kind, c.name))) for c in others]
@@ -211,6 +211,12 @@ def _infer(requirement: RuntimeRequirement, matrix: Matrix, wanted: list[Compone
             return Supported(status='supported', image_id=row.id, image=row.base_image, checks=(runtime, *checks, framework),
                              evidence=evidence, runtime_basis='inferred', inferred_from=tuple(dict.fromkeys(used))[:16])
         rejected.append(Rejection(image_id=row.id, unmet=tuple(c for c in checks if not c.satisfied)))
+        if usable:
+            # The runtime and framework fit this row; only the project's declared tools did not.
+            tool_blocked.update({c.name: c for c, check in zip(others, checks) if not check.satisfied})
+    if tool_blocked:
+        return Unsupported(status='unsupported', rejected=tuple(rejected), needs=tuple(
+            Need(kind=c.kind, name=c.name, allowed=c.allowed, preferred=c.preferred) for c in tool_blocked.values()))
     if not covering:
         return Undetermined(status='undetermined', missing=tuple(
             f'runtime version not declared in the build files, and no inference row covers {c.name} {c.allowed}'[:MAX_TEXT]

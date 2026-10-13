@@ -5,6 +5,6 @@ Each request here is a corpus case's issue text pointed at the case's own not-ex
 | Request | Why it can reach `not_reproduced` |
 |---|---|
 | `ih-python-pathtraversal.json` | `read_doc` raises `ValueError` before opening a path outside `data/`; the `audit_open` witness records the planned file's absence and the target's exit. |
-| `ih-python-xxe.json` | Probe of the absence path: the parser never opens the external entity and returns normally, so the plan's safe behavior must be `no_file_open`, which stays `inconclusive` on the baseline until SPEC-0040's control calibration lands. Expected INCONCLUSIVE today. |
+| `ih-python-xxe.json` | Probe of the absence path: the safe parser never opens a file and returns normally, so the plan's safe behavior must be `no_file_open`. SPEC-0040 calibration (PLAN-0084) needs the control's call to record its own file open, and no benign input makes this parser open one, so the absence cannot be calibrated. Expected INCONCLUSIVE. |
 
 `repository` is checkout-relative like the corpus cases, so `corsair run --issue-json evals/corpus/negative/<case>.json` runs from this checkout. Answer keys stay in this README, never in what an agent reads.

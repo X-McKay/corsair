@@ -77,7 +77,7 @@ class Sandboxes:
         self.overlays.append(overlay)
         return PreparedSandbox(self, SandboxHandle(id='prep', name='prep', workspace='corsair', owner='test',
                                                    creation_operation=str(operation)), '/sandbox/scratch',
-                               self.capture.get)
+                               self.capture.get, lambda: tuple(self.capture))
 
     def release(self, sandbox, operation):
         self.released.append(sandbox.handle)
@@ -139,8 +139,10 @@ def test_a_project_without_tests_runs_on_the_operator_smoke_test(run):
     baseline = PREFIX + ('-q', smoke.test_id)
     observations = {BUILD: (0, ''), DISCOVER: (0, f'{smoke.test_id}\n1 test collected\n'), baseline: (0, '1 passed in 0.01s\n')}
     draft = ready_draft(baseline_test_id=smoke.test_id, baseline_test_path=smoke.path, baseline_test_command=list(baseline))
+    # The capture holds no test file, so the system's own listing finds none either.
+    capture = {f.path: f.content.encode() for f in fixture_case().issue.source_files if f.path != 'test_existing.py'}
     result = run(case(), environment_model([BUILD, DISCOVER, baseline], draft), catalog=catalog(),
-                 preparation=Sandboxes(observations))
+                 preparation=Sandboxes(observations, capture=capture))
     assert (result.stopped_at, result.reason) == (None, 'complete')
     assert result.environment.baseline_basis == 'operator_smoke' and SMOKE_BASELINE in result.limitations
     # Planning sees the smoke file as the baseline file in its inventory; identification never does.
@@ -158,6 +160,44 @@ def test_the_smoke_test_is_refused_when_discovery_lists_a_project_test(run):
                  preparation=Sandboxes(observations))
     _stopped_before_identification(result)
     assert 'discovery listed project tests' in str(result.attempts[0].messages)
+
+
+def test_the_smoke_test_is_refused_when_the_checkout_has_a_test_the_agent_listing_omits(run):
+    # The agent's discovery lists only the smoke test; the operator's listing of the capture still finds the project's.
+    smoke = SMOKE_TESTS['pytest']
+    baseline = PREFIX + ('-q', smoke.test_id)
+    observations = {BUILD: (0, ''), DISCOVER: (0, f'{smoke.test_id}\n1 test collected\n'), baseline: (0, '1 passed in 0.01s\n')}
+    draft = ready_draft(baseline_test_id=smoke.test_id, baseline_test_path=smoke.path, baseline_test_command=list(baseline))
+    result = run(case(), environment_model([BUILD, DISCOVER, baseline], draft), catalog=catalog(),
+                 preparation=Sandboxes(observations))
+    _stopped_before_identification(result)
+    assert 'the checkout has project tests (test_existing.py)' in str(result.attempts[0].messages)
+
+
+def test_the_smoke_test_is_refused_without_an_operator_listing_of_the_checkout(run):
+    smoke = SMOKE_TESTS['pytest']
+    baseline = PREFIX + ('-q', smoke.test_id)
+    observations = {BUILD: (0, ''), DISCOVER: (0, f'{smoke.test_id}\n1 test collected\n'), baseline: (0, '1 passed in 0.01s\n')}
+    draft = ready_draft(baseline_test_id=smoke.test_id, baseline_test_path=smoke.path, baseline_test_command=list(baseline))
+    sandboxes = Sandboxes(observations)
+    unlisted = lambda toolchain, operation, *, overlay=(): replace(Sandboxes.prepare(sandboxes, toolchain, operation, overlay=overlay), source_paths=None)
+    sandboxes.prepare = unlisted
+    result = run(case(), environment_model([BUILD, DISCOVER, baseline], draft), catalog=catalog(), preparation=sandboxes)
+    _stopped_before_identification(result)
+    assert 'no operator listing of the checkout' in str(result.attempts[0].messages)
+
+
+def test_the_smoke_test_is_refused_when_discovery_names_only_the_smoke_file(run):
+    smoke = SMOKE_TESTS['pytest']
+    narrow = DISCOVER + (smoke.path,)
+    baseline = PREFIX + ('-q', smoke.test_id)
+    observations = {BUILD: (0, ''), narrow: (0, f'{smoke.test_id}\n1 test collected\n'), baseline: (0, '1 passed in 0.01s\n')}
+    draft = ready_draft(baseline_test_id=smoke.test_id, baseline_test_path=smoke.path, baseline_test_command=list(baseline),
+                        discovery_command=list(narrow))
+    result = run(case(), environment_model([BUILD, narrow, baseline], draft), catalog=catalog(),
+                 preparation=Sandboxes(observations))
+    _stopped_before_identification(result)
+    assert 'general one' in str(result.attempts[0].messages)
 
 
 def test_a_baseline_on_the_smoke_path_must_be_the_smoke_test(run):
