@@ -43,12 +43,16 @@ with workflow.unsafe.imports_passed_through():
 
     from .chain_runtime import (
         STAGES, ChainRequest, ChainResult, ChainRuntime, RevisionRequest, StageKeys, StageRecord, StageRequest,
-        WorkerRunner, chain_result, configure_chain, configured, execute_revision, failure_record, recorded, serving,
-        within,
+        WorkerRunner, chain_result, configure_chain, configured, execute_revision, failure_record, recorded,
+        select_runtime, serving, within,
     )
+    from corsair.nodes.runtime.contracts import RuntimeInputs, RuntimeOutcome
+    from corsair.nodes.runtime.environment import RuntimeCatalog
 
 # Operator-owned: the reviewed host runner bounds each subprocess at 60 s; an OpenShell runner may take longer.
 REVISION_TIMEOUT = timedelta(minutes=10)
+# Detection and selection read at most 1 MiB of encoded build files in memory.
+SELECTION_TIMEOUT = timedelta(minutes=1)
 # Default for ``run_durable``: one attempt per model request or tool call, so nothing is blindly repeated.
 ACTIVITY_CONFIG: ActivityConfig = {"start_to_close_timeout": timedelta(minutes=5), "retry_policy": RetryPolicy(maximum_attempts=1)}
 
@@ -163,7 +167,15 @@ class ChainInvestigation:
                 raise recorded(exc) from None
             return result.observed
 
-        return chain_result(await run_chain(request.case, invoke, execute, new_operation=workflow.uuid4))
+        async def select(inputs: RuntimeInputs) -> RuntimeOutcome:
+            try:
+                return await workflow.execute_activity(
+                    select_runtime, inputs, start_to_close_timeout=SELECTION_TIMEOUT,
+                    retry_policy=RetryPolicy(maximum_attempts=1))
+            except ActivityError as exc:
+                raise recorded(exc) from None
+
+        return chain_result(await run_chain(request.case, invoke, execute, select, new_operation=workflow.uuid4))
 
 
 WORKFLOWS = (ChainInvestigation, IdentificationStage, PlanningStage, AuthoringStage, AssessmentStage)
@@ -179,19 +191,20 @@ async def chain_worker(client: Client, task_queue: str, **options: Any) -> Async
     if runtime is None:
         raise ValueError("configure_chain must run before a chain worker is built")
     with serving():
-        async with Worker(client, task_queue=task_queue, workflows=list(WORKFLOWS), activities=[execute_revision],
+        async with Worker(client, task_queue=task_queue, workflows=list(WORKFLOWS), activities=[execute_revision, select_runtime],
                           plugins=[AgentPlugin(agent) for agent in runtime.agents.values()], **options) as worker:
             yield worker
 
 
 async def run_durable(case: FixtureCase, models: StageModels, runners: Runners,
                       budget: CompositionBudget = CompositionBudget(), *, client: Client,
+                      catalog: RuntimeCatalog | None = None,
                       workflow_id: str | None = None, execution_timeout: timedelta | None = None,
                       activity_config: ActivityConfig = ACTIVITY_CONFIG, **worker_options: Any) -> ChainResult:
     """``run_direct``'s arguments under an in-process worker; ``budget`` is also the ceiling. The client needs
     ``PydanticAIPlugin``. The workflow id (default random) names the parent and ``<id>/<stage>`` children."""
     configure_chain({stage: getattr(models, stage) for stage in STAGES}, runners, activity_config=activity_config,
-                    ceiling=budget)
+                    ceiling=budget, catalog=catalog)
     identity = workflow_id or f"corsair-chain-{uuid4()}"
     # One configuration per process: an overlapping run_durable is refused rather than served another's models.
     async with chain_worker(client, identity, **worker_options):
