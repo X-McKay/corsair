@@ -225,10 +225,17 @@ def test_the_chosen_baseline_test_file_joins_the_inventory_from_the_capture(run)
     assert (captured.path, captured.content) == (saved.path, saved.content) and 'def test_reads_existing_document' in planned
 
 
-@pytest.mark.parametrize('capture', [{}, {'test_existing.py': b'\xff\xfe not utf-8'}])
-def test_a_baseline_test_file_the_capture_cannot_supply_ends_the_run(run, capture):
+LARGE_TEST = b'def test_reads_existing_document():\n' + b'    assert True  # padding\n' * 1000
+
+
+@pytest.mark.parametrize('capture, why', [
+    ({}, 'is not in the captured revision'),
+    ({'test_existing.py': b'\xff\xfe not utf-8'}, 'is not UTF-8 text'),
+    # Coordinator review of f4dbecb: a large plain test file is refused for its size, never called "not text".
+    ({'test_existing.py': LARGE_TEST}, f'is {len(LARGE_TEST)} characters; saved source holds at most 16384 per file'),
+])
+def test_a_baseline_test_file_the_capture_cannot_supply_ends_the_run(run, capture, why):
     result = run(without_baseline_file(), environment_model([BUILD, DISCOVER, BASELINE], ready_draft()),
                  catalog=catalog(), preparation=Sandboxes(OK, capture=capture))
     _stopped_before_identification(result)
-    assert result.reason == ('ready environment refused: baseline test file test_existing.py is not text in the '
-                             'captured revision')
+    assert result.reason == f'ready environment refused: baseline test file test_existing.py {why}'

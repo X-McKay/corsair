@@ -182,7 +182,7 @@ class ChainInvestigation:
             failure = record.failure and RecordedFailure(record.failure.kind, record.failure.message)
             return StageAttempt("environment", record.output, record.usage, record.messages, record.elapsed_seconds,
                                 failure, limits, record.exhausted, record.cleanup, record.messages_omitted,
-                                record.baseline_source)
+                                record.baseline_source, record.baseline_refusal)
 
         async def execute(revision, patch, **run):
             try:

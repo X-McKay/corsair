@@ -250,6 +250,7 @@ class StageAttempt:
     messages_omitted: bool = False  # Durable environment stage: its record would not fit the activity payload
     # The ready environment's baseline test file from the operator's capture; planning and authoring need it.
     baseline_source: SourceFile | None = None
+    baseline_refusal: str | None = None  # Why the capture could not supply that file as saved source
 
     @property
     def tool_cap_reached(self) -> bool:
@@ -370,7 +371,8 @@ async def prepare_environment(inputs: EnvironmentInput, model: Model | None, pre
                                        budget=SetupBudget(max_commands=budget.setup_commands), new_operation=uuid4)
         attempt = await _invoke("environment", agent, environment_prompt(inputs), deps, limits)
         if isinstance(attempt.output, ReadyEnvironment):
-            attempt = replace(attempt, baseline_source=captured(sandbox, attempt.output.baseline_test_path))
+            source, refusal = captured(sandbox, attempt.output.baseline_test_path)
+            attempt = replace(attempt, baseline_source=source, baseline_refusal=refusal)
     except Exception as exc:
         attempt = StageAttempt("environment", None, None, (), perf_counter() - started, exc, limits)
     finally:
@@ -381,13 +383,28 @@ async def prepare_environment(inputs: EnvironmentInput, model: Model | None, pre
     return replace(attempt, cleanup="confirmed" if cleanup == "confirmed" else "unconfirmed")
 
 
-def captured(sandbox: PreparedSandbox, path: str) -> SourceFile | None:
-    """One file of the captured revision as saved source, or None when the capture lacks it or it is not text."""
+SOURCE_CHARACTERS = SourceFile.model_fields["content"].metadata[0].max_length
+
+
+def captured(sandbox: PreparedSandbox, path: str) -> tuple[SourceFile | None, str | None]:
+    """One file of the captured revision as saved source, or why it cannot be: missing, not UTF-8, or larger than
+    the saved-source contract holds per file."""
     try:
         data = sandbox.read_source(path)
-        return None if data is None else SourceFile(path=path, content=data.decode("utf-8"))
-    except (UnicodeDecodeError, ValueError):
-        return None
+    except Exception as exc:
+        return None, f"could not be read from the capture: {type(exc).__name__}"
+    if data is None:
+        return None, "is not in the captured revision"
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        return None, "is not UTF-8 text"
+    if len(text) > SOURCE_CHARACTERS:
+        return None, f"is {len(text)} characters; saved source holds at most {SOURCE_CHARACTERS} per file"
+    try:
+        return SourceFile(path=path, content=text), None
+    except ValueError as exc:
+        return None, f"is not admissible saved source: {exc}"[:512]
 
 
 # Recorded on every run that reaches the gates, because nothing below observes them.
@@ -533,8 +550,9 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         if result.baseline_test_path not in {source.path for source in source_files}:
             baseline = attempts[-1].baseline_source
             if baseline is None or baseline.path != result.baseline_test_path:
+                why = attempts[-1].baseline_refusal or "was not read from the capture"
                 return stop("environment", f"ready environment refused: baseline test file "
-                                           f"{result.baseline_test_path} is not text in the captured revision"[:2048])
+                                           f"{result.baseline_test_path} {why}"[:2048])
             source_files += (baseline,)
 
     identification = await _stage("identification", issue)
