@@ -50,10 +50,15 @@ def _usage(run: DirectRun) -> dict:
 
 
 def record(label: str, evidence: Path, *, investigation: Investigation | None = None, run: DirectRun | None = None,
-           refused: str | None = None, error: str | None = None) -> dict:
-    """`refused` is why the request could not start, `error` why the run crashed; otherwise `run` is the chain's
-    result."""
+           refused: str | None = None, error: str | None = None, crashed_in: str | None = None) -> dict:
+    """`refused` is why the request could not start, `error` why the run crashed and `crashed_in` where (its
+    traceback is `error.txt` beside the record); otherwise `run` is the chain's result."""
     environment = run.environment if run is not None else None
+    gate = run.gate.permitted.model_dump() if run is not None and run.gate else None
+    final, basis = gate, "gate" if gate else None
+    if run is not None and run.assessment is not None:
+        final = run.assessment.disposition.model_dump()
+        basis = "assessment_admitted" if run.assessment.admission.admitted else "gate_assessment_rejected"
     cleanup = {}
     if run is not None:
         cleanup = {"environment": next((a.cleanup for a in run.attempts if a.stage == "environment"), None),
@@ -76,15 +81,20 @@ def record(label: str, evidence: Path, *, investigation: Investigation | None = 
         # Which test proved the environment: the project's own test or the operator smoke test (SPEC-0071); None
         # when no environment was admitted.
         "baseline_basis": getattr(environment, "baseline_basis", None),
-        "reached": "admission" if run is None else (run.stopped_at or "complete"),
-        "stopped_at": "admission" if run is None else run.stopped_at,
-        "reason": (error or refused) if run is None else run.reason,
-        "gate": run.gate.permitted.model_dump() if run is not None and run.gate else None,
-        "label": headline("admission" if run is None else run.stopped_at,
-                          run.gate.permitted.model_dump() if run is not None and run.gate else None,
+        "label": headline("admission" if run is None else run.stopped_at, final,
                           failed=run is not None and any(a.stage == run.stopped_at and a.failure is not None
                                                          for a in run.attempts),
                           error=error is not None),
+        # Which disposition the label follows: the assessment's standing disposition when the assessment ran (its
+        # proposal if admitted, else the gate's), otherwise the gate's own result.
+        "label_basis": basis,
+        "final": final,
+        "reached": "admission" if run is None else (run.stopped_at or "complete"),
+        "stopped_at": (crashed_in or "admission") if run is None else run.stopped_at,
+        "crashed": error is not None,
+        "reason": (error or refused) if run is None else run.reason,
+        "gate": gate,
+        "traceback": str(evidence / "error.txt") if error is not None else None,
         "outcomes": outcomes, "usage": {} if run is None else _usage(run), "cleanup": cleanup,
         "evidence": str(evidence)}
 
@@ -99,12 +109,13 @@ def summary_line(item: dict) -> str:
     if item["revisions"]:
         head += f" @{item['revisions']['baseline'][:8]} (fix {item['revisions']['candidate'][:8]})"
     if item["stopped_at"] is None:
-        gate = item["gate"] or {}
+        gate = item["final"] or {}
         outcome = "; ".join(f"{revision} " + ", ".join(f"{test.rsplit(':', 1)[-1]} {result}" for test, result in cases)
                             for revision, cases in item["outcomes"].items())
         state = f"{gate.get('execution')} · {gate.get('finding')} · {gate.get('fix')}; {outcome}"
     else:
-        state = f"stopped at {item['stopped_at']}: {item['reason']}".replace("\n", " ")[:400]
+        verb = "crashed in" if item.get("crashed") else "stopped at"
+        state = f"{verb} {item['stopped_at']}: {item['reason']}".replace("\n", " ")[:400]
     cleanup = "confirmed" if item["cleanup"] and all(v in ("confirmed", None, "not_run") for v in item["cleanup"].values()) \
         else ("unconfirmed" if item["cleanup"] else "none needed")
     return f"{head}: {item['label']}; {state} — {chosen}; {requests} model requests; cleanup {cleanup}; {item['evidence']}"
