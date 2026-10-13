@@ -40,10 +40,10 @@ Offline checks: `make test-config` on this branch (result in the PR). The #88 op
 
 ## Decisions and next steps
 
-On 2026-10-13 Al adopted the lighter qualification path: matrix rows carry `evidence: image-only | live`, and only `live` counts as qualified. These rows are `live`. Once the schema PR from the process thread is on main, merge main and add `evidence: live` to both rows. Al says "merge".
+On 2026-10-13 Al adopted the lighter qualification path: matrix rows carry `evidence: image-only | live`, and only `live` counts as qualified. Both rows carry `qualification.evidence: live` (schema from #92), and selection of the 3.7 row reports `live`. Al says "merge".
 
 ## Continuation prompt
 
 ```text
-Read AGENTS.md and docs/development/CURRENT.md, then SPEC-0046, PLAN-0050 and this handoff. Inspect git state. If the matrix `evidence` field is on main, merge main into the row PR and mark both CPython 3.7 rows `evidence: live`; run make test-config; push. Do not rerun live gates for a records-only change.
+Read AGENTS.md and docs/development/CURRENT.md, then SPEC-0046, PLAN-0050 and this handoff. Inspect git state. After #94 merges, no work remains in PLAN-0050; a 3.7 case's dependency setup belongs to the environment agent. Do not rerun live gates for a records-only change.
 ```

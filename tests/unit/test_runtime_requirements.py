@@ -197,7 +197,7 @@ def test_selection_supported_unsupported_conflict():
     supported = select(python_project('>=3.9'), matrix)
     assert supported.status == 'supported' and supported.image_id == 'cpython-3.12-pytest'
     old = select(python_project('>=3.7,<3.12'), matrix)
-    assert old.status == 'supported' and old.image_id == 'cpython-3.7-pytest'  # SPEC-0046 row, never a nearby version
+    assert (old.status, old.image_id, old.evidence) == ('supported', 'cpython-3.7-pytest', 'live')  # SPEC-0046 row, never a nearby version
     between = select(python_project('>=3.8,<3.12'), matrix)
     assert between.status == 'unsupported' and [(n.name, n.allowed) for n in between.needs] == [('cpython', '>=3.8,<3.12')]
     old_pytest = select(python_project('>=3.9', '==6.2.5'), matrix)

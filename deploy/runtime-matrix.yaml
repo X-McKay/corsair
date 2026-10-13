@@ -35,6 +35,7 @@ images:
     tools: {}
     selector: {}
     qualification:
+      evidence: live
       records: [SPEC-0046, PLAN-0050]
       report: docs/qualification/openshell-toolchains.md
       note: Toolchain gate qualified CPython 3.7.17 with pytest 7.4.4 on RIG0 at 794a003 (93a0fab plus #86); CVE-2021-32839 ran through the pytest runner at both commits at 4117e3f (#88).
@@ -91,6 +92,7 @@ frameworks:
     runner: src/corsair/adapters/pytest_runner.py
     images: [cpython-3.7-pytest]
     qualification:
+      evidence: live
       records: [SPEC-0046, PLAN-0050]
       report: docs/qualification/openshell-toolchains.md
       note: 7.4.4 by the toolchain gate and CVE-2021-32839 in the sandbox; 6.0.2, 6.2.5, 7.0.1 and 7.2.0 by real discovery, JUnit and summary output on CPython 3.7.17 checked offline (tests/unit/pytest_reports). 4.6 and 5.4 reject --import-mode=importlib.
