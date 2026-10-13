@@ -20,6 +20,9 @@ from corsair.nodes.source_fetch import HOST, FetchTarget
 
 PIN_REF = 'refs/corsair/pinned'
 GIB = 1024**3
+# Git fsck message ids that concern only the formatting of historical commit and tree objects. Old history in
+# several benchmark repositories carries them; the object hashes still verify. An operator may downgrade only these.
+FORMAT_ONLY_FSCK = frozenset({'badTimezone', 'missingSpaceBeforeEmail', 'zeroPaddedFilemode'})
 
 
 @dataclass(frozen=True)
@@ -44,16 +47,19 @@ class HostTransport:
 @dataclass(frozen=True)
 class AcquireLimits:
     """`depth` None fetches the commit's complete ancestry, which `GitSource` admits; a depth gives a shallow,
-    measure-only repository that `GitSource` refuses."""
+    measure-only repository that `GitSource` refuses. `fsck_warn` downgrades named format-only fsck errors to
+    recorded warnings; empty by default."""
     wall_seconds: int = 600
     repository_bytes: int = 2*GIB
     memory_bytes: int = 4*GIB
     depth: int | None = None
+    fsck_warn: frozenset[str] = frozenset()
 
     def __post_init__(self):
         if (any(type(v) is not int or v <= 0 for v in (self.wall_seconds, self.repository_bytes, self.memory_bytes))
                 or self.wall_seconds > 3600 or self.repository_bytes > 16*GIB or self.memory_bytes > 8*GIB
-                or not (self.depth is None or (type(self.depth) is int and 1 <= self.depth <= 64))):
+                or not (self.depth is None or (type(self.depth) is int and 1 <= self.depth <= 64))
+                or type(self.fsck_warn) is not frozenset or not self.fsck_warn <= FORMAT_ONLY_FSCK):
             raise ValueError('Bounded operator acquisition limits required')
 
 
@@ -85,6 +91,7 @@ class AcquiredSource:
     fetched_at: str
     elapsed_seconds: float
     git_version: str
+    fsck_warnings: tuple[str, ...]  # downgraded fsck message ids actually reported, with the objects in the receipt
 
     def target(self, commit: str | None = None) -> FetchTarget:
         """The SPEC-0025 sandbox fetch target for this commit or, by name, its fetched first parent."""
@@ -102,6 +109,8 @@ class AcquisitionError(RuntimeError):
 
 NETWORK = re.compile(rb'CONNECT tunnel failed|Could not resolve host|Failed to connect|Connection (?:timed out|refused)'
                      rb'|SSL certificate problem|gnutls_handshake|OpenSSL SSL_')
+FSCK_REFUSED = re.compile(rb'fsck error in packed object')
+FSCK_MESSAGE = re.compile(rb'[0-9a-f]{40}: (\w+):')
 UNAVAILABLE = re.compile(rb'not our ref|couldn\'t find remote ref|Repository not found|repository \S+ not found'
                          rb'|upload-pack: not our ref|The requested URL returned error: 40[34]')
 
@@ -115,6 +124,7 @@ def _fetch_layer(error: Exception, stderr: bytes) -> str:
         return 'budget'
     if NETWORK.search(stderr): return 'host_network'
     if UNAVAILABLE.search(stderr): return 'source_unavailable'
+    if FSCK_REFUSED.search(stderr): return 'source_admission'
     return 'transport'
 
 
@@ -168,6 +178,8 @@ class GitAcquisition:
         config = ['-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false', '-c', 'protocol.allow=never',
                   '-c', 'transfer.fsckObjects=true', '-c', 'submodule.recurse=false', '-c', 'credential.helper=',
                   '-c', 'pack.threads=2']
+        for message in sorted(limits.fsck_warn):
+            config += ['-c', f'fetch.fsck.{message}=warn', '-c', f'fsck.{message}=warn']
         if network:
             config += ['-c', 'protocol.https.allow=always']
             if self._transport.proxy: config += ['-c', 'http.proxy='+self._transport.proxy]
@@ -194,7 +206,8 @@ class GitAcquisition:
                                stderr=err[-4096:].decode('utf8', 'replace'))
             raise TimeoutError('Acquisition wall budget exhausted') from None
         observation.update(exit=process.returncode, elapsed_seconds=time.monotonic()-started, stdout_bytes=len(out),
-                           stderr=err[-4096:].decode('utf8', 'replace'))
+                           stderr=err[-4096:].decode('utf8', 'replace'),
+                           fsck_messages=sorted({m.decode() for m in FSCK_MESSAGE.findall(err)}))
         if process.returncode not in allowed:
             error = _Exit(process.returncode); error.stderr = err
             raise error
@@ -233,7 +246,7 @@ class GitAcquisition:
         limits = self._limits
         receipt = dict(operation=str(operation), url=target.url, commit=target.commit, destination=str(destination),
                        outcome='unknown', layer='configuration', started_at=datetime.now(timezone.utc).isoformat(),
-                       limits=asdict(limits), proxy=self._transport.proxy is not None,
+                       limits=dict(asdict(limits), fsck_warn=sorted(limits.fsck_warn)), proxy=self._transport.proxy is not None,
                        git=dict(path=str(self._git.path), sha256=self._git.sha256), native_calls=[])
         try:
             if not isinstance(target, FetchTarget) or target.credential is not None:
@@ -265,15 +278,20 @@ class GitAcquisition:
             size = _bytes_on_disk(destination)
             if size > limits.repository_bytes: raise ValueError('Repository byte budget exceeded')
             receipt['layer'] = 'source_admission'
-            stats, parents, parent, shallow = self.inspect(destination, target.commit, deadline=deadline, calls=calls,
-                                                           expect_shallow=limits.depth is not None)
+            try:
+                stats, parents, parent, shallow = self.inspect(destination, target.commit, deadline=deadline,
+                                                               calls=calls, expect_shallow=limits.depth is not None)
+            except TimeoutError:
+                receipt['layer'] = 'budget'; raise
+            except _Exit:  # a failing fsck is the integrity refusal itself; any other local Git failure is not
+                if calls[-1]['args'][0] != 'fsck': receipt['layer'] = 'native_git'
+                raise
+            warnings = tuple(sorted({m for call in calls for m in call.get('fsck_messages', ())}))
             result = AcquiredSource(target.url, target.commit, stats, parents, parent, shallow, str(destination), size,
-                                    receipt['started_at'], time.monotonic()-started, version)
+                                    receipt['started_at'], time.monotonic()-started, version, warnings)
             receipt.update(outcome='completed', layer=None, result=asdict(result))
         except Exception as error:
             cause = error
-            if receipt['layer'] == 'source_admission' and isinstance(error, TimeoutError): receipt['layer'] = 'budget'
-            if receipt['layer'] == 'source_admission' and isinstance(error, _Exit): receipt['layer'] = 'native_git'
             receipt.update(outcome='failed', error_type=type(error).__name__, error_detail=str(error))
         receipt['elapsed_seconds'] = time.monotonic()-started
         self._journal.write(operation, 'result', receipt)

@@ -167,3 +167,23 @@ def test_tree_stats_counts_noncanonical_paths_and_refuses_unknown_entries():
     with pytest.raises(ValueError): tree_stats('c'*40, 'e'*40, f'040000 tree {blob} -\tdir\x00'.encode())
     with pytest.raises(ValueError): tree_stats('c'*40, 'e'*40, b'100644 blob x 1\tno-terminator')
 
+
+
+def test_format_only_fsck_errors_refuse_unless_the_operator_downgrades_them(tmp_path, origin):
+    work, base, _ = origin
+    tree = git('rev-parse', 'HEAD^{tree}', cwd=work)
+    # Historical commits with a malformed time zone exist in real repositories; the hash still identifies them.
+    body = f'tree {tree}\nparent {base}\nauthor a <a@b> 0 +99999\ncommitter a <a@b> 0 +0000\n\nold\n'
+    odd = subprocess.run([GIT, 'hash-object', '-t', 'commit', '--literally', '-w', '--stdin'], cwd=work, check=True,
+                         input=body, capture_output=True, text=True).stdout.strip()
+    git('update-ref', 'refs/heads/odd', odd, cwd=work)
+    with acquisition(tmp_path, fake_git(tmp_path, work)) as acquire:
+        with pytest.raises(AcquisitionError) as raised:
+            acquire.acquire(FetchTarget(URL, odd), tmp_path/'refused', uuid4())
+    assert raised.value.layer == 'source_admission'
+    assert raised.value.receipt['native_calls'][-1]['fsck_messages'] == ['badTimezone']
+    (tmp_path/'receipts').rename(tmp_path/'receipts-1')
+    with acquisition(tmp_path, fake_git(tmp_path, work), fsck_warn=frozenset({'badTimezone'})) as acquire:
+        source = acquire.acquire(FetchTarget(URL, odd), tmp_path/'repo', uuid4())
+    assert source.commit == odd and source.fsck_warnings == ('badTimezone',)
+    with pytest.raises(ValueError): AcquireLimits(fsck_warn=frozenset({'missingTree'}))

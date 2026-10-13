@@ -111,12 +111,14 @@ def fetch(requests: list[SourceRequest], run: Path, transport: HostTransport, li
             started = time.monotonic()
             record = dict(case_id=request.case_id, url=request.target.url, commit=request.target.commit,
                           via=request.via, repository_matches_inventory=request.repository_matches_inventory,
-                          depth=limits.depth)
+                          depth=limits.depth, fsck_warn=sorted(limits.fsck_warn))
             directory = _private(case_dir(run, request.case_id))
             try:
                 source = acquisition.acquire(request.target, directory/'repo', uuid4())
             except AcquisitionError as error:
+                calls = error.receipt.get('native_calls') or [{}]
                 record.update(outcome='refused', layer=error.layer, detail=str(error)[:600],
+                              stderr=calls[-1].get('stderr', '')[-600:],
                               elapsed_seconds=round(time.monotonic()-started, 3))
                 records[request.case_id] = record
                 print(f'{request.case_id}: refused {error.layer}', file=sys.stderr)
@@ -158,6 +160,7 @@ def main():
     run.add_argument('--proxy', help='Explicit operator HTTPS proxy, scheme://host:port')
     run.add_argument('--ca-bundle', type=Path, help='Explicit operator CA bundle for the proxy')
     run.add_argument('--no-capture', action='store_true')
+    run.add_argument('--fsck-warn', nargs='*', default=[], help='Format-only fsck message ids to record, not refuse')
     run.add_argument('--keep', action='store_true', help='Keep fetched repositories (default: delete after recording)')
     run.add_argument('--pins', type=Path, default=PINS)
     args = parser.parse_args()
@@ -174,7 +177,8 @@ def main():
     selected = [item for item in resolved if not args.cases or item.case_id in args.cases]
     if args.cases and len(selected) != len(set(args.cases)): parser.error('unknown or unresolved case id')
     transport = HostTransport(HOSTS, args.proxy, args.ca_bundle.resolve() if args.ca_bundle else None)
-    records = fetch(selected, args.run_dir.resolve(), transport, AcquireLimits(depth=args.depth), not args.no_capture)
+    limits = AcquireLimits(depth=args.depth, fsck_warn=frozenset(args.fsck_warn))
+    records = fetch(selected, args.run_dir.resolve(), transport, limits, not args.no_capture)
     write_pins(records, unresolved, args.pins)
     if not args.keep:  # receipts stay; repositories and captured objects are reproducible from the pins
         for case in records:
