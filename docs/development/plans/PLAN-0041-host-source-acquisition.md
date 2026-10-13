@@ -24,6 +24,7 @@ Implement [SPEC-0037](../specs/SPEC-0037-host-source-acquisition.md): a host ste
 - [x] `GitSource`: opt-in format-only fsck ignore, opt-in recorded skip of symlinks/submodules, sizes from the tree listing, raised ceilings; tests in `tests/unit/test_artifacts.py`.
 - [x] Second full run with capture under the new options; CVE-2023-31486 fetched on RIG0.
 - [x] SPEC-0025 sandbox recipe skips and reports the same entries (`FetchRecipe.skip_nonregular`), admission matches them against the snapshot; `make test-config` 870 passed.
+- [x] Review fixes (Codex): native stdout streamed under an operator cap (`output_bytes`, 64 MiB) and stderr kept as a bounded tail with fsck ids collected per line, the process session killed on overflow (`budget`); receipt-storage failures raise `AcquisitionError('receipt_storage')` carrying the known outcome. `make test-config` 872 passed; streaming smoke re-fetched JSPWiki and rails with identical sizes and warnings (`.runs/acquire-smoke-streaming/`).
 
 ## Validation and progress
 

@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 import os
 from pathlib import Path
 import re
+import selectors
 import signal
 import subprocess
 import time
@@ -51,9 +52,11 @@ class AcquireLimits:
     memory_bytes: int = 4*GIB
     depth: int | None = None
     fsck_warn: frozenset[str] = frozenset()
+    output_bytes: int = 64*1024*1024  # stdout retained per native call; listings of the largest trees use < 2 MiB
 
     def __post_init__(self):
-        if (any(type(v) is not int or v <= 0 for v in (self.wall_seconds, self.repository_bytes, self.memory_bytes))
+        if (any(type(v) is not int or v <= 0 for v in (self.wall_seconds, self.repository_bytes, self.memory_bytes,
+                                                         self.output_bytes)) or self.output_bytes > 256*1024*1024
                 or self.wall_seconds > 3600 or self.repository_bytes > 16*GIB or self.memory_bytes > 8*GIB
                 or not (self.depth is None or (type(self.depth) is int and 1 <= self.depth <= 64))
                 or type(self.fsck_warn) is not frozenset or not self.fsck_warn <= FORMAT_ONLY_FSCK):
@@ -98,7 +101,8 @@ class AcquiredSource:
 
 
 class AcquisitionError(RuntimeError):
-    """`layer`: configuration, host_network, source_unavailable, transport, budget, source_admission or native_git."""
+    """`layer`: configuration, host_network, source_unavailable, transport, budget, source_admission, native_git or
+    receipt_storage (the receipt then still carries the known outcome)."""
     def __init__(self, layer: str, detail: str, receipt: dict):
         self.layer, self.receipt = layer, receipt
         super().__init__(f'{layer}: {detail}')
@@ -117,12 +121,16 @@ XFSZ = re.compile(rb'died of signal %d\b' % signal.SIGXFSZ)
 
 def _fetch_layer(error: Exception, stderr: bytes) -> str:
     # The file-size limit kills the writer (index-pack) with SIGXFSZ; fetch itself then exits 128.
-    if isinstance(error, TimeoutError) or isinstance(error, _Exit) and error.code == -signal.SIGXFSZ or XFSZ.search(stderr):
+    if isinstance(error, (TimeoutError, _Budget)) or isinstance(error, _Exit) and error.code == -signal.SIGXFSZ or XFSZ.search(stderr):
         return 'budget'
     if NETWORK.search(stderr): return 'host_network'
     if UNAVAILABLE.search(stderr): return 'source_unavailable'
     if FSCK_REFUSED.search(stderr): return 'source_admission'
     return 'transport'
+
+
+class _Budget(ValueError):
+    pass
 
 
 class _Exit(RuntimeError):
@@ -190,25 +198,48 @@ class GitAcquisition:
         observation = dict(args=args, network=network, exit=None, elapsed_seconds=None, stdout_bytes=0, stderr='')
         calls.append(observation)
         started = time.monotonic()
+        # Both pipes are streamed with fixed bounds: stdout up to the operator cap, stderr as a 4 KiB tail plus the
+        # fsck message ids seen line by line. Exceeding a cap or the deadline ends the whole process session.
+        out, tail, partial, messages = bytearray(), b'', b'', set()
         process = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                    env=env, start_new_session=True)
         try:
-            out, err = process.communicate(timeout=max(0.001, deadline-time.monotonic()))
-        except subprocess.TimeoutExpired:
+            with selectors.DefaultSelector() as ready:
+                ready.register(process.stdout, selectors.EVENT_READ, 'stdout')
+                ready.register(process.stderr, selectors.EVENT_READ, 'stderr')
+                while ready.get_map():
+                    remaining = deadline-time.monotonic()
+                    if remaining <= 0: raise TimeoutError('Acquisition wall budget exhausted')
+                    for key, _ in ready.select(remaining):
+                        data = os.read(key.fd, 65536)
+                        if not data: ready.unregister(key.fileobj); continue
+                        if key.data == 'stdout':
+                            if len(out)+len(data) > limits.output_bytes:
+                                raise _Budget('Native stdout byte budget exceeded; remainder unknown')
+                            out.extend(data)
+                        else:
+                            tail = (tail+data)[-4096:]
+                            lines = (partial+data).split(b'\n'); partial = lines.pop()[-4096:]
+                            messages.update(m.decode() for line in lines for m in FSCK_MESSAGE.findall(line))
+            process.wait(timeout=max(0.001, deadline-time.monotonic()))
+        except (TimeoutError, subprocess.TimeoutExpired, _Budget) as error:
             # Fetch helpers are grandchildren; end the whole session this call started.
             try: os.killpg(process.pid, signal.SIGKILL)
             except ProcessLookupError: pass
-            out, err = process.communicate()
-            observation.update(exit=process.returncode, elapsed_seconds=time.monotonic()-started,
-                               stderr=err[-4096:].decode('utf8', 'replace'))
+            process.wait()
+            observation.update(exit=process.returncode, elapsed_seconds=time.monotonic()-started, stdout_bytes=len(out),
+                               stderr=tail.decode('utf8', 'replace'), fsck_messages=sorted(messages))
+            if isinstance(error, _Budget): raise
             raise TimeoutError('Acquisition wall budget exhausted') from None
+        finally:
+            process.stdout.close(); process.stderr.close()
+        messages.update(m.decode() for m in FSCK_MESSAGE.findall(partial))
         observation.update(exit=process.returncode, elapsed_seconds=time.monotonic()-started, stdout_bytes=len(out),
-                           stderr=err[-4096:].decode('utf8', 'replace'),
-                           fsck_messages=sorted({m.decode() for m in FSCK_MESSAGE.findall(err)}))
+                           stderr=tail.decode('utf8', 'replace'), fsck_messages=sorted(messages))
         if process.returncode not in allowed:
-            error = _Exit(process.returncode); error.stderr = err
+            error = _Exit(process.returncode); error.stderr = tail
             raise error
-        return out
+        return bytes(out)
 
     def inspect(self, repo: Path, commit: str, *, deadline: float | None = None, calls: list | None = None,
                 expect_shallow: bool | None = None) -> tuple[TreeStats, tuple[str, ...], TreeStats | None, bool]:
@@ -253,7 +284,10 @@ class GitAcquisition:
                 raise ValueError('UUID and canonical absolute destination required')
         except ValueError as error:
             raise AcquisitionError('configuration', str(error), dict(receipt, outcome='refused', delivery='not_dispatched')) from error
-        self._journal.write(operation, 'intent', receipt)
+        try: self._journal.write(operation, 'intent', receipt)
+        except Exception as error:
+            raise AcquisitionError('receipt_storage', f'{type(error).__name__}: {error}',
+                                   dict(receipt, outcome='refused', delivery='not_dispatched')) from error
         started = time.monotonic(); deadline = started+limits.wall_seconds
         calls = receipt['native_calls']
         result = None; cause = None
@@ -268,7 +302,7 @@ class GitAcquisition:
                 self._native(destination, ['fetch', '--no-tags', '--no-write-fetch-head', '--no-progress', *depth,
                                            '--end-of-options', target.url, f'{target.commit}:{PIN_REF}'],
                              deadline, calls, network=True)
-            except (TimeoutError, _Exit) as error:
+            except (TimeoutError, _Budget, _Exit) as error:
                 receipt['layer'] = _fetch_layer(error, getattr(error, 'stderr', b''))
                 raise
             receipt['layer'] = 'budget'
@@ -278,7 +312,7 @@ class GitAcquisition:
             try:
                 stats, parents, parent, shallow = self.inspect(destination, target.commit, deadline=deadline,
                                                                calls=calls, expect_shallow=limits.depth is not None)
-            except TimeoutError:
+            except (TimeoutError, _Budget):
                 receipt['layer'] = 'budget'; raise
             except _Exit:  # a failing fsck is the integrity refusal itself; any other local Git failure is not
                 if calls[-1]['args'][0] != 'fsck': receipt['layer'] = 'native_git'
@@ -289,8 +323,13 @@ class GitAcquisition:
             receipt.update(outcome='completed', layer=None, result=asdict(result))
         except Exception as error:
             cause = error
+            if isinstance(error, (TimeoutError, _Budget)): receipt['layer'] = 'budget'
             receipt.update(outcome='failed', error_type=type(error).__name__, error_detail=str(error))
         receipt['elapsed_seconds'] = time.monotonic()-started
-        self._journal.write(operation, 'result', receipt)
+        try: self._journal.write(operation, 'result', receipt)
+        except Exception as error:
+            # The work happened; keep its known outcome, layer and result in memory for the caller.
+            receipt['storage_error'] = f'{type(error).__name__}: {error}'
+            raise AcquisitionError('receipt_storage', receipt['storage_error'], receipt) from (cause or error)
         if cause is not None: raise AcquisitionError(receipt['layer'], str(cause), receipt) from cause
         return result

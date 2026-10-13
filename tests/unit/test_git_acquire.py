@@ -187,3 +187,25 @@ def test_format_only_fsck_errors_refuse_unless_the_operator_downgrades_them(tmp_
         source = acquire.acquire(FetchTarget(URL, odd), tmp_path/'repo', uuid4())
     assert source.commit == odd and source.fsck_warnings == ('badTimezone',)
     with pytest.raises(ValueError): AcquireLimits(fsck_warn=frozenset({'missingTree'}))
+
+
+def test_stdout_is_bounded_and_kills_the_call(tmp_path, origin):
+    with acquisition(tmp_path, fake_git(tmp_path, origin[0]), output_bytes=64) as acquire:
+        with pytest.raises(AcquisitionError) as raised:  # `git version` fits; the commit object does not
+            acquire.acquire(FetchTarget(URL, origin[2]), tmp_path/'repo', uuid4())
+    assert raised.value.layer == 'budget' and 'stdout byte budget' in str(raised.value)
+    with pytest.raises(ValueError): AcquireLimits(output_bytes=257*1024*1024)
+
+
+def test_result_receipt_loss_keeps_the_known_outcome(tmp_path, origin, monkeypatch):
+    with acquisition(tmp_path, fake_git(tmp_path, origin[0])) as acquire:
+        original = acquire._journal.write
+        def fail_result(operation, suffix, value):
+            if suffix == 'result': raise OSError('receipt disk full')
+            return original(operation, suffix, value)
+        monkeypatch.setattr(acquire._journal, 'write', fail_result)
+        with pytest.raises(AcquisitionError) as raised:
+            acquire.acquire(FetchTarget(URL, origin[2]), tmp_path/'repo', uuid4())
+    receipt = raised.value.receipt
+    assert raised.value.layer == 'receipt_storage' and receipt['outcome'] == 'completed'
+    assert receipt['result']['commit'] == origin[2] and 'disk full' in receipt['storage_error']

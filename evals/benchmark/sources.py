@@ -123,6 +123,7 @@ def fetch(requests: list[SourceRequest], run: Path, transport: HostTransport, li
             except AcquisitionError as error:
                 calls = error.receipt.get('native_calls') or [{}]
                 record.update(outcome='refused', layer=error.layer, detail=str(error)[:600],
+                              acquisition_outcome=error.receipt.get('outcome'),
                               stderr=calls[-1].get('stderr', '')[-600:],
                               elapsed_seconds=round(time.monotonic()-started, 3))
                 records[request.case_id] = record

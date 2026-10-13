@@ -38,4 +38,4 @@ def test_committed_pins_match_the_resolver():
             assert record['baseline_candidate'] in (None, *record['parents'])
         else:
             assert record['layer'] in ('host_network', 'source_unavailable', 'transport', 'budget',
-                                       'source_admission', 'native_git')
+                                       'source_admission', 'native_git', 'receipt_storage')
