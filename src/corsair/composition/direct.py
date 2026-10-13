@@ -52,8 +52,8 @@ from corsair.ports.sandbox import SandboxHandle
 from corsair.ports.test_runner import ApprovedPatch, NativeTestRun, TestRunner, WitnessRequest
 
 from .evidence import evidence_items, freeze, observation_plan, run_evidence, witness_request
-from .progress import (Activity, GateDecided, RevisionEnded, RevisionStarted, RunEnded, RunObserver, StageEnded,
-                       StageStarted, Usage, clean, current_observer, ignore)
+from .progress import (Activity, GateDecided, RevisionEnded, RevisionStarted, RunEnded, RunEvent, RunObserver,
+                       StageEnded, StageStarted, Usage, clean, current_observer, ignore)
 
 Stage = Literal["runtime", "environment", "identification", "planning", "authoring", "execution", "assessment"]
 AgentStage = Literal["environment", "identification", "planning", "authoring", "assessment"]
@@ -501,8 +501,16 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
     # What the environment stage could not confirm or keep; every later stop carries it.
     stage_notes: tuple[str, ...] = ()
 
+    def report(event: Callable[[], RunEvent]) -> None:
+        # Built only when someone watches, and never able to end or reroute the run (SPEC-0072).
+        if observe is not ignore:
+            try:
+                observe(event())
+            except Exception:
+                pass
+
     async def _stage(stage: AgentStage, inputs: Any) -> Any:
-        observe(StageStarted(stage))
+        report(lambda: StageStarted(stage))
         attempts.append(await invoke(stage, inputs))
         return attempts[-1].output
 
@@ -515,14 +523,14 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
                      attempt.elapsed_seconds, limits and limits.request_limit, limits and limits.tool_calls_limit,
                      limits and limits.total_tokens_limit, limits and limits.timeout_seconds)
 
-    def ready(stage: Stage, detail: str) -> None:
-        observe(StageEnded(stage, "ready", clean(detail), spent(stage)))
+    def ready(stage: Stage, detail: Callable[[], str]) -> None:
+        report(lambda: StageEnded(stage, "ready", clean(detail()), spent(stage)))
 
     def stop(stage: Stage, reason: str, **values) -> DirectRun:
         values.setdefault("limitations", stage_notes)
-        observe(StageEnded(stage, "stopped", clean(reason, 2048), spent(stage)))
-        observe(RunEnded(stage, clean(reason, 2048), values["gate"] and verdict(values["gate"].permitted)
-                         if "gate" in values else None))
+        report(lambda: StageEnded(stage, "stopped", clean(reason, 2048), spent(stage)))
+        report(lambda: RunEnded(stage, clean(reason, 2048), values["gate"] and verdict(values["gate"].permitted)
+                                if "gate" in values else None))
         return DirectRun(stopped_at=stage, reason=reason, attempts=tuple(attempts), runtime=runtime,
                          environment=prepared, **values)
 
@@ -537,7 +545,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         return f"{stage} produced no output: {kind}: {failed}"[:2048]
 
     if case.runtime is not None:
-        observe(StageStarted("runtime"))
+        report(lambda: StageStarted("runtime"))
         try:
             runtime = await select(case.runtime)
         except Exception as exc:
@@ -548,7 +556,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         if case.setup is None and (mismatch := declared_mismatch(case, runtime)):
             return stop("runtime", mismatch[:2048])
         selected = ("Runtime selected from the baseline revision's build files; the candidate's were not read.",)
-        ready("runtime", f"{runtime.selection.image_id} ({runtime.requirement.language})")
+        ready("runtime", lambda: f"{runtime.selection.image_id} ({runtime.requirement.language})")
 
     if case.setup is not None:
         # SPEC-0068: the environment agent prepares the selected toolchain; its admitted result replaces the declaration.
@@ -584,7 +592,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
                 return stop("environment", f"ready environment refused: baseline test file "
                                            f"{result.baseline_test_path} {why}"[:2048])
             source_files += (baseline,)
-        ready("environment", f"{result.language} {result.runtime}; baseline tests {result.baseline_outcome}")
+        ready("environment", lambda: f"{result.language} {result.runtime}; baseline tests {result.baseline_outcome}")
 
     identification = await _stage("identification", issue)
     if not isinstance(identification, IssueIdentification):
@@ -592,7 +600,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
     if identification.status != "ready":
         return stop("identification", f"identification {identification.status}: {identification.reason}",
                     identification=identification)
-    ready("identification", "issue located in the source")
+    ready("identification", lambda: "issue located in the source")
 
     try:
         planning_input = TestPlanningInput(scope=issue.scope, identification=identification,
@@ -604,7 +612,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         return stop("planning", failure_of("planning"), identification=identification)
     if not isinstance(plan, ReadyTestPlan):
         return stop("planning", f"plan unsupported: {plan.missing_capability}", identification=identification)
-    ready("planning", f"control {plan.control.test_id}; security {plan.security.test_id}")
+    ready("planning", lambda: f"control {plan.control.test_id}; security {plan.security.test_id}")
 
     try:
         authoring_input = TestAuthoringInput(plan=plan, source_files=source_files, environment=environment)
@@ -616,9 +624,9 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
     if not isinstance(patch, TestPatch):
         return stop("authoring", f"authoring blocked at {patch.layer}: {patch.reason}",
                     identification=identification, plan=plan)
-    ready("authoring", f"{len(patch.files)} test file(s) written")
+    ready("authoring", lambda: f"{len(patch.files)} test file(s) written")
 
-    observe(StageStarted("execution"))
+    report(lambda: StageStarted("execution"))
     try:
         expected = observation_plan(plan, patch)
         frozen = freeze(patch, environment.approved_test_paths)
@@ -633,7 +641,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         request, unrequested = None, (f"no witness requested: {exc}"[:512],)
     for revision in ("baseline", "candidate"):
         operation, observed, failure = new_operation(), None, None
-        observe(RevisionStarted(revision))
+        report(lambda: RevisionStarted(revision))
         try:
             observed = await execute(revision, frozen, control_test_id=plan.control.test_id,
                                      security_test_id=plan.security.test_id,
@@ -643,8 +651,8 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
             # A refused request (bad ids or patch) dispatched nothing; it is recorded, never retried.
             failure = exc
         executions.append(FrozenExecution(revision, operation, observed, failure))
-        observe(RevisionEnded(revision, "ran", outcomes(observed)) if observed is not None
-                else RevisionEnded(revision, "refused", clean(f"{type(failure).__name__}: {failure}")))
+        report(lambda: RevisionEnded(revision, "ran", outcomes(observed)) if observed is not None
+               else RevisionEnded(revision, "refused", clean(f"{type(failure).__name__}: {failure}")))
     done = {"identification": identification, "plan": plan, "patch": patch, "observation_plan": expected,
             "executions": tuple(executions)}
     problems = []
@@ -659,7 +667,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
     if problems:
         return stop("execution", "; ".join(problems)[:2048], **done)
 
-    ready("execution", "both revisions ran")
+    ready("execution", lambda: "both revisions ran")
     runs = {e.revision: (e.observed,) for e in executions}
     def witness_of(e):
         if not request:
@@ -677,7 +685,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
                             sandbox_events=found.sandbox_events)
     evidence = AssessmentEvidence(plan=expected, baseline=(gate_run("baseline"),), candidate=(gate_run("candidate"),))
     gate = assess(evidence)
-    observe(GateDecided(verdict(gate.permitted)))
+    report(lambda: GateDecided(verdict(gate.permitted)))
     limitations = UNOBSERVED[:2] + provenance + selected + unrequested + tuple(f"{revision} witness not admitted: {found.reason}"
                                      for revision, found in witnesses.items() if found.witness is None) + tuple(
         f"{e.revision} workspace cleanup {e.observed.cleanup}" for e in executions if e.observed.cleanup != "confirmed")
@@ -692,9 +700,9 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
     assessment = await _stage("assessment", assessment_input)
     if not isinstance(assessment, EvidenceAssessment):
         return stop("assessment", failure_of("assessment"), gate=gate, limitations=limitations, **done)
-    ready("assessment", f"{verdict(assessment.disposition)}; proposal "
+    ready("assessment", lambda: f"{verdict(assessment.disposition)}; proposal "
                         f"{'admitted' if assessment.admission.admitted else 'rejected'}")
-    observe(RunEnded(None, "complete", verdict(assessment.disposition)))
+    report(lambda: RunEnded(None, "complete", verdict(assessment.disposition)))
     return DirectRun(stopped_at=None, reason="complete", attempts=tuple(attempts), gate=gate, assessment=assessment,
                      limitations=limitations, runtime=runtime, environment=prepared, **done)
 

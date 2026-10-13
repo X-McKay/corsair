@@ -87,6 +87,16 @@ def test_a_stopped_run_reports_the_stage_and_reason_and_starts_nothing_after(sto
     assert events[-1].reason == clean(run.reason, 2048) and "missing_information" in events[-1].reason
 
 
+def test_a_failing_view_never_changes_a_run(store, tmp_path):
+    def broken(event):
+        raise RuntimeError("display failed")
+    watched = chain(store, tmp_path / "watched", broken)
+    plain = chain(store, tmp_path / "plain")
+    assert (watched.stopped_at, watched.reason, watched.gate) == (plain.stopped_at, plain.reason, plain.gate)
+    assert [a.stage for a in watched.attempts] == [a.stage for a in plain.attempts]
+    assert all(a.failure is None for a in watched.attempts)
+
+
 def test_observing_reaches_runs_started_inside_it_and_no_others(store, tmp_path):
     seen = []
     with observing(seen.append):
@@ -171,6 +181,29 @@ def test_display_text_cannot_carry_terminal_controls_or_credentials():
     assert "\x1b" not in shown and "\x07" not in shown and "\r" not in shown and "\x00" not in shown
     assert "abcdefghijklmnop" not in shown and "ABCDEFGHIJKLMNOP1234" not in shown
     assert clean("x" * 500, 20) == "x" * 19 + "…"
+    assert "\u202e" not in clean("name\u202etxt.exe")
+
+
+@pytest.mark.parametrize("text, kept, hidden", [
+    ('curl -H "Authorization: token abcdef1234567890" https://example.test', "curl -H", "abcdef1234567890"),
+    ("API_KEY=abcdef1234567890 npm ci", "npm ci", "abcdef1234567890"),
+    ("password=hunter22 make", "make", "hunter22"),
+    ("pip config set global.index-url https://user:hunter2pass@proxy:3128/simple", "@proxy:3128", "hunter2pass"),
+    ("export AWS_ACCESS=AKIAABCDEFGHIJKLMNOP", "export", "AKIAABCDEFGHIJKLMNOP"),
+    ("npm_config_//registry/:_authToken: glpat-abcdefgh12345678", "registry", "glpat-abcdefgh12345678"),
+    ("ssh-key -----BEGIN OPENSSH PRIVATE KEY----- b3BlbnNzaC1rZXk -----END OPENSSH PRIVATE KEY----- done", "done",
+     "b3BlbnNzaC1rZXk"),
+])
+def test_credentials_in_free_text_commands_are_masked(text, kept, hidden):
+    shown = clean(text)
+    assert kept in shown and hidden not in shown and "[masked]" in shown
+    assert hidden not in preview({"command": text})
+
+
+def test_ordinary_text_about_tokens_and_limits_is_kept():
+    for text in ("token generation failed", "authoring budget exhausted: total_tokens_limit 262144",
+                 "pip install -r requirements.txt", "https://example.test/path?q=1"):
+        assert clean(text) == text
     assert preview({"path": "a.py", "password": "p", "Authorization": "Basic zz", "lines": [1, 2]}) == (
         'path="a.py", password=[masked], Authorization=[masked], lines=<list>')
     assert preview('{"path": "a.py"}') == 'path="a.py"'

@@ -140,16 +140,33 @@ def current_observer() -> RunObserver | None:
     return _observer.get()
 
 
-CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]|\x1b\[[0-?]*[ -/]*[@-~]")
-SECRET_NAME = re.compile(r"token|secret|password|passwd|api[_-]?key|authorization|credential|cookie", re.I)
-SECRET_VALUE = re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}|\b(sk|ghp|gho|ghs|github_pat|xox[abp])[-_][A-Za-z0-9_-]{8,}")
+# C0/C1 controls, CSI sequences and the Unicode marks that reorder a line (bidi overrides and isolates).
+CONTROL = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]|[\x00-\x08\x0b-\x1f\x7f-\x9f\u200e\u200f\u202a-\u202e\u2066-\u2069]")
+SECRET_WORD = r"token|secret|password|passwd|pwd|api[_-]?key|access[_-]?key|private[_-]?key|authorization|credential|cookie"
+SECRET_NAME = re.compile(SECRET_WORD, re.I)
+CREDENTIAL = r"(?=[A-Za-z._~+/=-]*[0-9])[A-Za-z0-9._~+/=-]{8,}"
+SECRETS = (
+    # URL userinfo: https://user:pass@host
+    (re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://)[^/\s@]+@"), r"\1[masked]@"),
+    # An authorization scheme and its credential: Bearer x, Basic x; token x and Digest x when x looks like one
+    (re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}"), "[masked]"),
+    (re.compile(rf"(?i)\b(token|digest)\s+{CREDENTIAL}"), "[masked]"),
+    # <secret-like name>=value or <secret-like name>: value, in commands, headers, env and text
+    (re.compile(rf"(?i)\b([A-Za-z0-9_.-]*(?:{SECRET_WORD})[A-Za-z0-9_.-]*)(\s*[=:]\s*)(\"[^\"]*\"|'[^']*'|[^\s,;&\"']+)"),
+     r"\1\2[masked]"),
+    # Well-known credential prefixes and private key blocks
+    (re.compile(r"\b(?:(?:sk|ghp|gho|ghs|ghu|github_pat|glpat|xox[abprs])[-_][A-Za-z0-9_-]{8,}|(?:AKIA|ASIA)[0-9A-Z]{16}"
+                r"|AIza[0-9A-Za-z_-]{30,})"), "[masked]"),
+    (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?(-----END [A-Z ]*PRIVATE KEY-----|$)"), "[masked]"),
+)
 
 
 def clean(text: object, limit: int = 240) -> str:
     """One display line: no control characters or escape sequences, credential-shaped values masked, cut to
     ``limit`` characters."""
     line = CONTROL.sub("", " ".join(str(text).split()))
-    line = SECRET_VALUE.sub("[masked]", line)
+    for pattern, replacement in SECRETS:
+        line = pattern.sub(replacement, line)
     return line if len(line) <= limit else line[:limit - 1] + "…"
 
 
@@ -175,8 +192,15 @@ class Activity(AbstractCapability[Any]):
 
     def __init__(self, stage: str, observe: RunObserver, limits: Any = None, started: float | None = None):
         super().__init__()
-        self.stage, self.observe, self.limits = stage, observe, limits
+        self.stage, self.watcher, self.limits = stage, observe, limits
         self.started = perf_counter() if started is None else started
+
+    def observe(self, event: RunEvent) -> None:
+        # A failing view never fails the stage (SPEC-0072).
+        try:
+            self.watcher(event)
+        except Exception:
+            pass
 
     def usage(self, usage: Any, turn: int = 0) -> Usage:
         limits = self.limits
