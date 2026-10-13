@@ -122,7 +122,7 @@ Excluded: process-start, socket and other effect kinds (the same gap exists for 
     TAP-specific because a failed TAP assertion raises nothing and `not ok` is TAP's own result word.
   - *Witness recorder.* The probe implements the shared `corsair-witness-v2` record. Calibration and the gate are
     shared, and the shared witness module names no language. It admits a record when the record's digest matches
-    the capture's and is one of the operator probes shipped beside it (`witness_probe.*`). The Perl bootstrap and
+    the capture's and is one of the operator probe files named beside it (`PROBE_FILES`). The Perl bootstrap and
     argv live in the TAP driver (`adapters/tap_runner.py`). Recorder selection follows the table: the runner named
     by the row's framework is the only code that starts its probe. The Python bootstrap is still in the shared
     module, as on main. Only the hook is Perl, because a file open can be seen from inside an interpreter only

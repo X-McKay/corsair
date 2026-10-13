@@ -21,10 +21,11 @@ from corsair.ports.test_runner import WitnessCapture, WitnessRequest
 
 PROBE_SOURCE = (Path(__file__).with_name('witness_probe.py')).read_text(encoding='utf-8')
 PROBE_SHA256 = sha256(PROBE_SOURCE.encode('utf-8')).hexdigest()
-# Every operator probe beside this module (one per language driver, which injects it) writes the same record; a
-# capture names the probe that ran, and only these digests are admitted.
-PROBES = frozenset(sha256(path.read_text(encoding='utf-8').encode('utf-8')).hexdigest()
-                   for path in Path(__file__).parent.glob('witness_probe.*'))
+# The operator probes shipped beside this module (each injected by its own driver) write the same record; a capture
+# names the probe that ran, and only these exact files' digests are admitted.
+PROBE_FILES = ('witness_probe.py', 'witness_probe.pl')
+PROBES = frozenset(sha256(Path(__file__).with_name(name).read_text(encoding='utf-8').encode('utf-8')).hexdigest()
+                   for name in PROBE_FILES)
 TOOL_ID = 4  # sys.monitoring ids 0-2 and 5 are reserved for debugger, coverage, profiler and optimizer
 MAX_RECORD_BYTES = 65536
 # Fixed bootstrap: the probe and its JSON config are the first two arguments; pytest gets the rest.
