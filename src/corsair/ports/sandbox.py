@@ -61,3 +61,29 @@ class SandboxLifecycle(Protocol):
     def create(self, operation: UUID) -> SandboxHandle: ...
     def wait_ready(self, handle: SandboxHandle, operation: UUID) -> None: ...
     def delete(self, handle: SandboxHandle, operation: UUID) -> None: ...
+
+
+@dataclass(frozen=True)
+class PolicyReceipt:
+    """A network policy revision observed loaded on the original sandbox; stored but unloaded never counts."""
+    operation: str
+    handle: SandboxHandle
+    phase: str
+    policy_sha256: str
+    delivery: Literal['not_dispatched', 'unknown', 'acknowledged']
+    loaded: bool
+    elapsed_seconds: float
+    native_version: int | None = None
+    native_hash: str | None = None
+    error_detail: str | None = None
+    storage_error: str | None = None
+
+
+class PolicyError(RuntimeError):
+    def __init__(self, receipt: PolicyReceipt):
+        self.receipt = receipt
+        super().__init__(f'policy {receipt.phase} {receipt.operation}: {receipt.storage_error or receipt.error_detail}')
+
+
+class SandboxPolicy(Protocol):
+    def apply(self, handle: SandboxHandle, policy: dict, phase: str, operation: UUID) -> PolicyReceipt: ...

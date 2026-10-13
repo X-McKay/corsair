@@ -214,6 +214,14 @@ class PreparedSandbox:
     read_source: Callable[[str], bytes | None]
 
 
+class PreparationRefused(RuntimeError):
+    """A preparation that ended before handing back a sandbox, with its failure layer and what it left behind:
+    ``not_required`` when it refused before any sandbox existed (SPEC-0070)."""
+    def __init__(self, layer: str, reason: str, cleanup: Literal["not_required", "confirmed", "unconfirmed"]):
+        self.layer, self.reason, self.cleanup = layer, reason, cleanup
+        super().__init__(f"{layer}: {reason}")
+
+
 class Preparation(Protocol):
     """Operator-owned sandbox lifecycle for the environment stage; adapters are chosen outside the chain."""
     def prepare(self, toolchain: Toolchain, operation: UUID) -> PreparedSandbox: ...
@@ -363,7 +371,9 @@ async def prepare_environment(inputs: EnvironmentInput, model: Model | None, pre
         sandbox = await asyncio.to_thread(preparation.prepare, selected, operation)
     except Exception as exc:
         # Nothing was handed back to release; whether a sandbox exists is the adapter's to report.
-        return StageAttempt("environment", None, None, (), perf_counter() - started, exc, limits, cleanup="unconfirmed")
+        left = exc.cleanup if isinstance(exc, PreparationRefused) else "unconfirmed"
+        return StageAttempt("environment", None, None, (), perf_counter() - started, exc, limits,
+                            cleanup=None if left == "not_required" else left)
     try:
         agent = AGENTS["environment"](model, output_retries=budget.output_retries)
         deps = EnvironmentDependencies(inputs=inputs, execution=sandbox.execution, handle=sandbox.handle,

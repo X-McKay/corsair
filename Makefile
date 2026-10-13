@@ -221,6 +221,13 @@ qualify-python37-case:
 	PYTHONPATH="$(CURDIR)/src:$(CURDIR)" uv run --locked python -m evals.benchmark.sources fetch --run-dir "$(CORSAIR_QUAL_RUN)-sources" --cases CVE-2021-32839 --keep --pins "$(CORSAIR_QUAL_RUN)-sources/source-pins.json"
 	CORSAIR_CASE_SOURCES="$(CORSAIR_QUAL_RUN)-sources" uv run --locked python -m pytest $(PYTEST_ROOT) tests/qualification -m python37_case --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
 
+.PHONY: qualify-environment-preparation
+# SPEC-0070: the chain's environment stage in an OpenShellPreparation sandbox (scripted model) and an operator sweep.
+qualify-environment-preparation:
+	test ! -e "$(CORSAIR_QUAL_RUN)"
+	mkdir -p "$(CORSAIR_QUAL_RUN)"
+	uv run --locked python -m pytest $(PYTEST_ROOT) tests/qualification -m environment_preparation --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
+
 .PHONY: qualify-witness
 qualify-witness:
 	test ! -e "$(CORSAIR_QUAL_RUN)"

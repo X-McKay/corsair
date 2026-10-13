@@ -23,7 +23,7 @@ from corsair.adapters.receipts import ReceiptDirectory
 from corsair.ports.artifacts import ArtifactRef, ArtifactStore, SourceSnapshot
 from corsair.ports.execution import ExecutionError, ExecutionReceipt, SandboxExecution
 from corsair.ports.sandbox import SandboxHandle, SandboxLifecycle
-from corsair.ports.test_runner import ApprovedPatch, PreparedWorkspace
+from corsair.ports.test_runner import ApprovedPatch, PatchFile, PreparedWorkspace
 
 # Default bounds admit the SPEC-0018 fixture; an operator may raise entries up to the ceiling for a small real
 # project (SPEC-0046 ran one 73-file benchmark tree). Larger trees wait for in-sandbox source fetch (SPEC-0025).
@@ -205,9 +205,9 @@ class OpenShellTestWorkspace:
         self._lifecycle, self._execution, self._upload = lifecycle, execution, upload
         self._store, self._snapshot, self._config = store, snapshot, config
 
-    def _expected(self, patch: ApprovedPatch):
+    def _expected(self, added: tuple[PatchFile, ...]):
         source = {f.path: (MODES[f.mode], f.artifact.size, f.artifact.sha256) for f in self._snapshot.files}
-        tests = {f.path: (0o400, len(f.content), hashlib.sha256(f.content).hexdigest()) for f in patch.files}
+        tests = {f.path: (0o400, len(f.content), hashlib.sha256(f.content).hexdigest()) for f in added}
         files = source | tests
         parents = {'/'.join(p.split('/')[:n]) for p in files for n in range(1, p.count('/') + 1)}
         if source.keys() & tests.keys() or files.keys() & parents:
@@ -216,22 +216,22 @@ class OpenShellTestWorkspace:
             raise ValueError('Workspace exceeds the fixture bound')
         return files, parents
 
-    def _stage(self, operation: UUID, patch: ApprovedPatch, parents) -> tuple[Path, Path]:
+    def _stage(self, operation: UUID, added: tuple[PatchFile, ...], parents) -> tuple[Path, Path]:
         base = self._config.staging / operation.hex
         base.mkdir(mode=0o700)
         try:
-            return base, self._write(base, patch, parents)
+            return base, self._write(base, added, parents)
         except BaseException:
             shutil.rmtree(base, ignore_errors=True)
             raise
 
-    def _write(self, base: Path, patch: ApprovedPatch, parents) -> Path:
+    def _write(self, base: Path, added: tuple[PatchFile, ...], parents) -> Path:
         root = base / self._config.root_name
         root.mkdir(mode=0o700)
         for parent in sorted(parents):
             (root / parent).mkdir(mode=0o700)
         content = {f.path: (MODES[f.mode], self._store.get(f.artifact)) for f in self._snapshot.files}
-        content |= {f.path: (0o400, f.content) for f in patch.files}
+        content |= {f.path: (0o400, f.content) for f in added}
         for path, (mode, data) in sorted(content.items()):
             fd = os.open(root / path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
             with os.fdopen(fd, 'wb') as stream:
@@ -272,11 +272,21 @@ class OpenShellTestWorkspace:
     def prepare(self, patch: ApprovedPatch, operation: UUID) -> PreparedWorkspace:
         if not isinstance(operation, UUID) or not isinstance(patch, ApprovedPatch):
             raise ValueError('Operator operation and approved patch required')
-        files, parents = self._expected(patch)
         refs = {f.path: self._store.put(f.content) for f in patch.files}
         tests = self._store.put(_patch_manifest(patch, refs))
+        handle = self._place(patch.files, operation)
+        return PreparedWorkspace(handle, self._snapshot.manifest, tests, patch.sha256)
+
+    def prepare_source(self, operation: UUID) -> SandboxHandle:
+        """A fresh sandbox holding exactly the captured source and nothing else (SPEC-0070 environment stage)."""
+        if not isinstance(operation, UUID):
+            raise ValueError('Operator operation required')
+        return self._place((), operation)
+
+    def _place(self, added: tuple[PatchFile, ...], operation: UUID) -> SandboxHandle:
+        files, parents = self._expected(added)
         try:
-            base, root = self._stage(operation, patch, parents)
+            base, root = self._stage(operation, added, parents)
         except Exception as error:
             raise WorkspaceError('staging', f'{type(error).__name__}: {error}', 'not_required') from error
         handle, retain = None, False
@@ -300,7 +310,7 @@ class OpenShellTestWorkspace:
                 self._admit(observed, files, parents)
             except ValueError as error:
                 raise WorkspaceError('admission', str(error), 'unconfirmed', receipt) from error
-            return PreparedWorkspace(handle, self._snapshot.manifest, tests, patch.sha256)
+            return handle
         except Exception as error:
             failure = error if isinstance(error, WorkspaceError) else WorkspaceError(
                 'sandbox', f'{type(error).__name__}: {error}', 'unconfirmed')
@@ -325,3 +335,6 @@ class OpenShellTestWorkspace:
 
     def release(self, workspace: PreparedWorkspace, operation: UUID) -> Literal['confirmed', 'unconfirmed']:
         return self._delete(workspace.handle, uuid5(operation, 'release'))
+
+    def release_source(self, handle: SandboxHandle, operation: UUID) -> Literal['confirmed', 'unconfirmed']:
+        return self._delete(handle, uuid5(operation, 'release'))
