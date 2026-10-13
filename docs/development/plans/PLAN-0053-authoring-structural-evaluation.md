@@ -35,3 +35,28 @@ Baseline root-owned `make eval AGENT=authoring`: 12/12 at `.runs/evals/authoring
 ## Decisions and next action
 
 Review and merge this independent evaluator PR, then reconcile PR49 without copying unmerged changes. Authoring held-out creation and sandbox replay remain PLAN-0048 follow-ups; do not inspect hidden sets during prompt iteration. Existing authorization covers commits; parent owns publication.
+
+
+## PR56 negative-control review correction
+
+Claude review at `db98c54` identified a real negative-control regression: the changed
+`_strings(control)` excluded nested functions/lambdas even when the control calls them.
+Reproduced on trusted checker sources only: `go = lambda: open('../outside.txt'); go()`
+made the prior negative absence fact True; the corrected fact is False. Negative
+control checking now conservatively scans the whole function, while positive security
+literal/target/assertion checks retain their scoped traversal. Three AST-only regressions
+cover called lambdas, called nested functions and an uncalled helper (absence remains
+conservative). No test code executes on the host. Process test naming and CURRENT/README
+now state explicit os names/supported bindings; pre-existing posix.system and indirect
+__dict__/vars access remain outside this bounded checker rather than expanding scope.
+
+Fresh origin/main `f6a87d6` (PR58 assessment improvements) merged cleanly into this
+branch; PR49 was not on that main, so its separate tests were not copied. The prior
+review's PR49 append conflict still requires keeping both test sides when integration
+is authorized. Focused authoring/isolated suites109 passed with one existing SDK warning.
+Same frozen host suite12/12 at `.runs/evals/authoring/20261013T102020Z-development-scripted`, compared with `20261013T100038Z-development-scripted`12/12. `make test-config`:1108 passed, one existing SDK warning, 52.56 seconds. Updated workflow guards5 passed; `git diff --check` passed.
+Evaluator source is not part of native eval IDENTITY; the command records source Git
+identity, but aggregate same-identity comparison alone does not prove evaluator equivalence.
+The frozen cases do not exercise these nested-control constructs; dedicated regressions
+provide that evidence. Prompt/config/skill and dataset are unchanged; live/provider and
+sandbox replay remain unrun. Existing authorization permits updating/pushing PR56.

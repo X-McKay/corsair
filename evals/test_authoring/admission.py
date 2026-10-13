@@ -32,11 +32,12 @@ def _strings(node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
 
 
 def no_process_or_network(content: str) -> bool:
-    """No process creation, raw network or foreign-function use anywhere in the file.
+    """Refuse listed process/network imports and explicit os process names structurally.
 
     os process calls are refused through any binding of os (``import os as x``) and when imported by name
     (``from os import system``), not only as the literal ``os.system``; dynamic imports, eval/exec/compile
     and getattr are refused outright, since they could reach any of these without a visible import.
+    Other bindings (such as posix) and indirect __dict__/vars access remain outside this check.
     """
     tree = ast.parse(content)
     os_names = {"os"}
@@ -86,7 +87,11 @@ def admission_facts(plan: ReadyTestPlan, files: dict[str, str], security_lines: 
     if adversarial:
         # The literal occurs in the security body outside deferred scopes; this does not prove dataflow.
         facts["planned_input_in_security"] = all(any(value in s for s in _strings(security)) for value in adversarial)
-        facts["planned_input_not_in_control"] = not any(value in s for value in adversarial for s in _strings(control))
+        # Absence is conservative: helpers/lambdas may be called by the control,
+        # so any adversarial literal anywhere in that function invalidates this fact.
+        control_strings = [n.value for n in ast.walk(control)
+                           if isinstance(n, ast.Constant) and isinstance(n.value, str)]
+        facts["planned_input_not_in_control"] = not any(value in s for value in adversarial for s in control_strings)
     if plan.security_expectation.failure_type == "AssertionError":
         # Decision recorded with authoring v5: the planned failure is a plain assert, not pytest.raises.
         asserts = {n.lineno for n in _executable(security) if isinstance(n, ast.Assert)}
