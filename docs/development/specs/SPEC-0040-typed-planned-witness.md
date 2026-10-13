@@ -4,7 +4,7 @@ kind: spec
 title: Typed planned witness for the test planner
 status: draft
 updated: 2026-10-13
-related: [SPEC-0022, SPEC-0027, SPEC-0033, PLAN-0038, SPEC-0023]
+related: [SPEC-0022, SPEC-0027, SPEC-0033, PLAN-0038, PLAN-0044, SPEC-0023]
 ---
 
 # Typed planned witness for the test planner
@@ -13,18 +13,18 @@ related: [SPEC-0022, SPEC-0027, SPEC-0033, PLAN-0038, SPEC-0023]
 
 PLAN-0038 removed the planner's mechanical failures, but its held-out plans still state witnesses in prose that the facility contradicts (an event the call raises anyway, an event the facility never produces, a link path instead of its target), choose payloads whose effect no listed facility records, and carry identifiers from unrelated cases. Three prompt iterations moved these only partly. This spec replaces the free-form security witness with a typed planned witness that deterministic code can check when the plan is admitted and that the SPEC-0033 probe can bind at execution, so a wrong witness is refused or shown wrong by evidence instead of by review.
 
-In scope: the planner contract, the operator's environment evidence, plan admission checks, the evaluator, and the mapping from a plan to the SPEC-0033 `WitnessRequest` in place of the per-case operator envelope. Excluded: new probe effect kinds beyond those the probe already records, other languages, durable mode changes and any change to the SPEC-0027 gates. Design only: nothing here is implemented yet.
+In scope: the planner contract, the operator's environment evidence, plan admission checks, the evaluator, and the mapping from a plan to the SPEC-0033 `WitnessRequest` in place of the per-case operator envelope. Excluded: new probe effect kinds beyond those the probe already records, other languages, durable mode changes and any change to the SPEC-0027 gates. Implemented in stages under PLAN-0044: the contract, admission checks, prompt and evaluator first; the composition binding and control calibration below follow once the planner is measured.
 
 ## Boundaries and design
 
-**Operator-owned facility kinds.** `EnvironmentEvidence` gains `witness_facilities: tuple[WitnessFacility, ...]`, each `{id: Identifier, kind: Literal["file_open", ...], description: Fact}`. A kind is added only when the execution probe can record it; today that is `file_open` (SPEC-0033). The existing prose `observation_facilities` stay for context. The facility list is operator data, never model-editable.
+**Operator-owned facility kinds.** `EnvironmentEvidence` gains `witness_facilities: tuple[WitnessFacility, ...]` (default empty), each `{id: Identifier, kind: Literal["file_open", "process_start", "socket_connect"], description: Fact}`, with unique ids. The kinds are the in-process audit events the planner can name; the SPEC-0033 probe records only `file_open` today, so a plan naming another kind is admitted but its witness stays unbound at execution (refused, the gates stay `inconclusive`) until the probe records that kind. The existing prose `observation_facilities` stay for context. The facility list is operator data, never model-editable.
 
-**Planned witness.** Each `TestSpecification` gains `witness: PlannedWitness{facility: Identifier, effect: Literal[...], subject: ScratchPath, expectation: Literal["occurs", "absent"]}`. `subject` is a path relative to the scratch location (no absolute path, no `..` after normalization), naming the sentinel the effect would touch. The prose `observable_witness` remains as explanation only and is never read by a gate.
+**Planned witness.** Each `TestSpecification` gains `witness: PlannedWitness{facility: Identifier, effect: Literal[...], subject: ScratchPath, expectation: Literal["occurs", "absent"]}`. For `file_open`, `subject` is a path relative to the scratch location (no absolute path, no `..`, no `~`), naming the sentinel the effect would touch; for the other kinds it is a token (`[A-Za-z0-9_.:/-]+`) that appears in the recorded arguments or address. The prose `observable_witness` remains as explanation only and is never read by a gate.
 
 **Admission checks** (in the planner's output function, as `ModelRetry`, and repeated by the evaluator):
 - `facility` names a listed facility and `effect` equals its kind; an unknown facility means no listed facility observes the effect, so the plan must be unsupported.
 - The control expects `occurs` on a benign subject and the security test expects `absent` on the adversarial subject, and the two subjects differ.
-- The security subject appears in the security fixture setup or input (the payload must aim at the sentinel), and nothing in fixture setup reaches outside the scratch location (the existing scratch check, now on a typed path).
+- The security subject (its file name for `file_open`) appears in the security fixture setup or input, so the payload aims at the sentinel. The evaluator's `scratch` heuristic over fixture prose is unchanged.
 - `security_expectation.safe_behavior` is either an exception type that `required_behavior` names, or the identifier `no_<effect>`; any other identifier is refused.
 
 **Calibration by the control at execution.** The plan's subjects replace the operator envelope: the composition builds `WitnessRequest(target_path, target_symbol, effect_name=subject)` from the admitted plan, still bound to the admitted identification target. At execution the control witness must be observed as planned on both revisions; if it is not, the planned witness is wrong for this facility and the run's witness is refused with that reason, so the gates stay at `inconclusive` rather than trusting an absence. This turns "a witness the facility never records" into evidence instead of a review finding.
@@ -33,7 +33,7 @@ In scope: the planner contract, the operator's environment evidence, plan admiss
 
 ## Acceptance and validation
 
-Offline: contract tests for each refusal above; the reference plans of the development and both held-out sets rewritten with typed witnesses and still admitted; the composition builds the witness request from the plan and refuses a run whose control witness is absent. Evaluator: a `planned_witness` check comparing facility, effect and expectation with the oracle, replacing the substring `witness` markers for typed cases. Live: development set first; then a third held-out set written and reviewed by agents other than the prompt author and frozen by manifest before one run, under PLAN-0038's pre-registered criteria.
+Offline: contract tests for each refusal above; the development reference plans (and the authoring and fixture E2E plans built from them) carry typed witnesses and are still admitted; the two earlier held-out sets are retired, because their frozen environments list no typed facility; the composition builds the witness request from the plan and refuses a run whose control witness is absent. Evaluator: a `planned_witness` check comparing facility, effect and expectation with the oracle, replacing the substring `witness` markers for typed cases. Live: development set first; then a third held-out set written and reviewed by agents other than the prompt author and frozen by manifest before one run, under PLAN-0038's pre-registered criteria.
 
 ## Decisions and open questions
 

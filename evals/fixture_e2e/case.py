@@ -17,7 +17,7 @@ from pydantic_ai.models.function import FunctionModel
 from corsair.adapters.pytest_runner import PytestRunner, PytestRunnerConfig
 from corsair.agents.issue_analysis.contracts import IssueAnalysisInput
 from corsair.agents.source.contracts import SourceFile
-from corsair.agents.test_planning.contracts import BaselineTest, EnvironmentEvidence
+from corsair.agents.test_planning.contracts import BaselineTest, EnvironmentEvidence, WitnessFacility
 from corsair.composition.direct import FixtureCase
 from corsair.core.disposition import EnvironmentIdentity
 from corsair.ports.test_runner import WitnessRequest
@@ -51,7 +51,10 @@ def fixture_case() -> FixtureCase:
             "Python sys.addaudithook 'open' audit events recorded by the test itself inside the test process",
             "Native JUnit XML outcomes, failure locations and captured stdout per test",
             "Operator witness probe, not test code: calls, returns, raised exceptions and file opens attributed to "
-            "the identified target function during each test's call phase"))
+            "the identified target function during each test's call phase"),
+        witness_facilities=(WitnessFacility(
+            id="audit_open", kind="file_open",
+            description="Python sys.addaudithook 'open' events recording each path the test process opens during the call"),))
     # A declaration of what both revisions share, not an observed image or inventory digest.
     identity = EnvironmentIdentity(
         image_digest=_digest(f"{sys.executable}\n{sys.version}"), recipe_sha256=_digest(json.dumps(PREFIX)),
