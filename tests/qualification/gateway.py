@@ -1,5 +1,6 @@
 """Bounded native gateway/identity probes; no Corsair sandbox adapter."""
 import base64
+import contextlib
 import hashlib
 import json
 import os
@@ -121,8 +122,9 @@ def workspace_storage(kube, pair, sandbox_uid):
     return {'pvc': {'name': claim_name, 'uid': claim['metadata']['uid']}, 'pv': {'name': pv['metadata']['name'], 'uid': pv['metadata']['uid']}}
 
 
-@pytest.fixture
-def gateway(kube):
+@contextlib.contextmanager
+def native_gateway(kube):
+    """The installed gateway's controls, then its uninstall; it can be consumed once per `openshell-install`."""
     os.umask(0o077)
     sources = ['tests/qualification/gateway.py', 'tests/qualification/install_gateway.py', 'tests/qualification/support.py', 'deploy/openshell/values.yaml', 'policies/openshell/identity.yaml']
     (kube.evidence / 'source-hashes.json').write_text(json.dumps({path: hashlib.sha256((ROOT / path).read_bytes()).hexdigest() for path in sources}, indent=2))
@@ -281,3 +283,9 @@ def gateway(kube):
                 (kube.evidence / 'cleanup.json').write_text(json.dumps(cleanup, indent=2))
                 summary['outcome'] = 'passed' if all(summary[key] == 'passed' for key in ('gateway', 'tls', 'caller_auth', 'identity', 'access_isolation')) and all(cleanup.get(key) is True for key in ('confirmed', 'pv_confirmed', 'private_state_absent', 'port_forward_confirmed')) else 'failed'
                 (kube.evidence / 'gateway.json').write_text(json.dumps(summary, indent=2))
+
+
+@pytest.fixture
+def gateway(kube):
+    with native_gateway(kube) as value:
+        yield value
