@@ -4,7 +4,7 @@ kind: handoff
 title: Approved UI design implementation
 status: recorded
 updated: 2026-10-13
-related: [SPEC-0069, PLAN-0076, HANDOFF-0100, IDEA-0009]
+related: [SPEC-0072, PLAN-0079, HANDOFF-0100, IDEA-0009]
 ---
 
 # Approved UI design implementation
@@ -22,7 +22,7 @@ Server adds only paired total-token samples and SPA routes, and handles canceled
 - make ui-build:17 UI unit tests and TypeScript/Vite production build passed.
 - CORSAIR_UI_PYTHON=<worktree>/.venv/bin/python make ui-test:42passed,6 intentionally skipped duplicate mobile contrast checks in4.2s. Desktop/dark/mobile test real local API against synthetic saved fixtures, including populated comparisons and no horizontal overflow.
 - UV_CACHE_DIR=/tmp/corsair-provider-uv-cache make test-config:1831passed in112.39s, including43 server boundary/metrics/cancellation tests, after merging current main.
-- Review corrected native execution-mode versus wrapper provider-mode comparison. Initial browser failures and remediation retained in PLAN-0076. git diff --check passed before publication; development-workflow guards rerun after final record edits.
+- Review corrected native execution-mode versus wrapper provider-mode comparison. Initial browser failures and remediation retained in PLAN-0079. git diff --check passed before publication; development-workflow guards rerun after final record edits.
 - Actual saved scripted identification report inspected in production preview:1run,16attempts and16native latency/token samples. This is fixture evidence, not live model accuracy. No live inference, Temporal server or OpenShell workload launched.
 - Preview listens at127.0.0.1:8765 with updated production assets and backend; Ctrl-C stops it. Browser test servers use disposable roots and exit. Screenshots and logs remain local outside Git; no .runs/.state or raw private artifacts committed.
 
@@ -35,5 +35,5 @@ Approved design is implemented. Update existing PR #107, inspect its CI and revi
 ## Continuation prompt
 
 ```text
-Read AGENTS.md, CURRENT.md, SPEC-0069, PLAN-0076 and HANDOFF-0101. Inspect codex/corsair-ui and PR #107 source/CI before trusting the recorded state. Use the Corsair development skill. Review the approved UI against real saved reports; make bounded requested revisions, preserving unknown telemetry, cohort boundaries and descriptive comparison limits. Run make ui-build ui-test and relevant server tests; run make test-config for backend contract changes. Update records and write a new handoff. Do not launch workloads, promote baselines or merge without authorization.
+Read AGENTS.md, CURRENT.md, SPEC-0072, PLAN-0079 and HANDOFF-0101. Inspect codex/corsair-ui and PR #107 source/CI before trusting the recorded state. Use the Corsair development skill. Review the approved UI against real saved reports; make bounded requested revisions, preserving unknown telemetry, cohort boundaries and descriptive comparison limits. Run make ui-build ui-test and relevant server tests; run make test-config for backend contract changes. Update records and write a new handoff. Do not launch workloads, promote baselines or merge without authorization.
 ```

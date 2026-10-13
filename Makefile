@@ -275,7 +275,7 @@ archive-runs: export QUALIFY_DEST = $(DEST)
 archive-runs:
 	PYTHONPATH="$(CURDIR)/src:$(CURDIR)" uv run --locked python -m tests.qualification.qualify_image archive --dest "$$QUALIFY_DEST"
 
-# Local read-only evidence UI (SPEC-0069). Node 22+; no model or sandbox work is launched.
+# Local read-only evidence UI (SPEC-0072). Node 22+; no model or sandbox work is launched.
 .PHONY: ui-install ui-build ui-check ui-test ui
 ui-install:
 	npm --prefix ui ci

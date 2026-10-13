@@ -1,17 +1,17 @@
 ---
-id: PLAN-0076
+id: PLAN-0079
 kind: plan
 title: Local Corsair results interface
 status: complete
 updated: 2026-10-13
-related: [SPEC-0069, SPEC-0044, IDEA-0009]
+related: [SPEC-0072, SPEC-0044, IDEA-0009]
 ---
 
 # Local Corsair results interface
 
 ## Objective and dependencies
 
-Implement SPEC-0069 in managed worktree corsair-ui on branch codex/corsair-ui, starting from main e760f05. User authorized parallel development and selected inspection of existing results. Reference source: infosec-harness UI at 52aa2ac. No existing Corsair web API; use a narrow local read-only projection over current evidence formats.
+Implement SPEC-0072 in managed worktree corsair-ui on branch codex/corsair-ui, starting from main e760f05. User authorized parallel development and selected inspection of existing results. Reference source: infosec-harness UI at 52aa2ac. No existing Corsair web API; use a narrow local read-only projection over current evidence formats.
 
 ## Steps
 
@@ -113,3 +113,9 @@ Final integration validation: `UV_CACHE_DIR=/tmp/corsair-provider-uv-cache make 
 
 
 Publication follow-up: dbd4b94 pushed to PR107. Remote UI run38448429354 passed frontend/browser checks, built the production image, generated the actual16-attempt report and matched its API/native distributions, then failed the immediate post-stop cleanup confirmation. The log does not establish whether Docker diagnostic wording or removal timing caused that assertion. Replaced diagnostic-text matching with up to5seconds of successful read-only container-list queries filtered by the exact owned ID; no blind stop/delete retries. Failure still leaves cleanup explicitly unconfirmed. Final local smoke and remote rerun are checked before reporting completion.
+
+
+Main integration follow-up: UI CI38448821099 passed at67772c9, including production build, actual scripted producer/distribution smoke and portable cleanup. The earlier offline merge CI38448429238 had1917passes/1failure: main acquired SPEC-0069/PLAN-0076 for runtime inference while this update was underway. Merged main ae65af9 (merge1665ef2), preserved the new corpus/runtime work, and renumbered only the UI records to SPEC-0072/PLAN-0079 with owned references updated. Main's inference records keep their IDs. Combined-source offline checks and image smoke are rerun because the matrix loader changed.
+
+
+Combined-main validation: `make test-config`1917passed/1skipped in116.66s. The skip is an inherited Ruby smoke check because Ruby is not installed on this host (`tests/unit/test_environment_smoke.py`, separately verified22passed/1skipped). Browser checks64passed/8 deliberate duplicate-contrast skips in12.2s. New production image4e7d4236fe23e4eed4337d94696832f15687e1b7a3a4a0c25dc517f8cb45d6d5 built and passed the actual-report/distribution and missing-storage smoke; containersc536231517cf/1a15247272c3 removed with native-list absence confirmed. Record guards5passed; git diff --check passed. No new live qualification claims. Final PR description uses the renumbered UI records; current remote CI remains a head-specific gate.

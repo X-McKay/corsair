@@ -1,10 +1,10 @@
 ---
-id: SPEC-0069
+id: SPEC-0072
 kind: spec
 title: Local Corsair results interface
 status: accepted
 updated: 2026-10-13
-related: [SPEC-0044, IDEA-0009, PLAN-0076]
+related: [SPEC-0044, IDEA-0009, PLAN-0079]
 ---
 
 # Local Corsair results interface
