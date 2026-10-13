@@ -1,4 +1,4 @@
-name: test-authoring-development-v1
+name: test-authoring-development-v2
 cases:
 - name: reference_realization
   inputs:
@@ -115,9 +115,7 @@ cases:
     - run: true
     runner_runs:
     - &id003
-      status: discovered
-      control: passed
-      security: failed
+      status: static
     status: patch
     runs: 1
     security_assertion_lines: &id002
@@ -243,9 +241,7 @@ cases:
     - *id001
     - run: true
     runner_runs:
-    - status: discovered
-      control: passed
-      security: passed
+    - status: static
     status: patch
     runs: 1
     security_assertion_lines: *id002
