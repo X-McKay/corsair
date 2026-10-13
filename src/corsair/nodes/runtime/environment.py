@@ -19,7 +19,7 @@ from corsair.nodes.runtime.detect import detect, is_build_file
 from corsair.nodes.runtime.matrix import Matrix, select
 
 # Environment agent framework table names (agents/environment/frameworks.py) per runner-table framework name.
-AGENT_FRAMEWORK = {'pytest': 'pytest', 'junit5': 'junit5', 'junit4': 'junit4'}
+AGENT_FRAMEWORK = {'pytest': 'pytest', 'junit5': 'junit5', 'junit4': 'junit4', 'tap-harness': 'tap-harness'}
 PREPARED_IMAGE = re.compile(r'^[^@\s]+@sha256:[0-9a-f]{64}$')
 
 
