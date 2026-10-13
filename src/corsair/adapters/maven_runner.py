@@ -76,9 +76,8 @@ def selection(ids: tuple[str, ...]) -> tuple[str, ...]:
 
 
 class MavenRunner(NativeRunner):
-    # A goal-bearing discovery command would run test bodies (possibly other tests) before the listing.
-    exact_discovery = 'Maven discovery command must equal the operator\'s goal-free Maven prefix'
-    # Maven also exits 1 for build failures; with a complete report that names a failure the two agree.
+    # The environment's discovery command is accepted and not run: the listing is always built from the operator prefix.
+    # Maven exits 1 for build failures; with a complete report that names a failure the two agree.
     tool, report_format = 'maven', 'Surefire'
 
     def _validate(self, patch: ApprovedPatch, ids: tuple[str, str], witness: WitnessRequest | None) -> None:

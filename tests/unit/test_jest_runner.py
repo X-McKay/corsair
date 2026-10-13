@@ -21,11 +21,11 @@ BASELINE = (REPORTS / 'node8-jest24.8.0-baseline-run.json').read_bytes()
 CANDIDATE = (REPORTS / 'node8-jest24.8.0-candidate-run.json').read_bytes()
 
 
-def run(store, *steps, ids=IDS, patch=PATCH, witness=None):
+def run(store, *steps, ids=IDS, patch=PATCH, witness=None, discovery=JEST):
     workspace, execution = Workspace(store, ROOT), Scripted(*steps)
     runner = JestRunner(workspace, execution, store, JestRunnerConfig(JEST, ROOT, REPORT))
     operation = uuid4()
-    result = runner.run(patch, control_test_id=ids[0], security_test_id=ids[1], discovery_command=JEST,
+    result = runner.run(patch, control_test_id=ids[0], security_test_id=ids[1], discovery_command=discovery,
                         operation=operation, witness=witness)
     return result, execution, workspace, operation
 
@@ -129,11 +129,16 @@ def test_operator_paths_are_bounded(root, report):
         JestRunnerConfig(JEST, root, report)
 
 
-@pytest.mark.parametrize('command', [JEST + ('--runTestsByPath', 'test/x.test.js'), JEST[:2], ()])
-def test_discovery_command_must_be_the_operator_prefix(store, command):
-    runner = JestRunner(Workspace(store, ROOT), Scripted(), store, JestRunnerConfig(JEST, ROOT, REPORT))
-    with pytest.raises(ValueError, match='prefix'):
-        runner.run(PATCH, control_test_id=IDS[0], security_test_id=IDS[1], discovery_command=command, operation=uuid4())
+@pytest.mark.parametrize('command', [JEST + ('--listTests',), ('npx', 'jest', '--listTests')])
+def test_environment_discovery_command_is_accepted_not_run(store, command):
+    # The runner builds its own listing, so the environment's discovery command is carried, never run: the argv
+    # executed and the result are those of the operator prefix. An empty command is still refused.
+    expected, executed, *_ = run(store, (LISTED, 0), (BASELINE, 1))
+    result, execution, *_ = run(store, (LISTED, 0), (BASELINE, 1), discovery=command)
+    assert [call[0] for call in execution.calls] == [call[0] for call in executed.calls]
+    assert result.execution.status == expected.execution.status == 'completed'
+    with pytest.raises(ValueError):
+        run(store, discovery=())
 
 
 def test_selection_anchors_full_names():

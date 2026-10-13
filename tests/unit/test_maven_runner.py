@@ -27,11 +27,11 @@ BASELINE = (REPORTS / 'jspwiki-baseline-surefire3.xml').read_bytes()
 CANDIDATE = (REPORTS / 'jspwiki-candidate-surefire3.xml').read_bytes()
 
 
-def run(store, *steps, ids=IDS, patch=PATCH, witness=None, **config):
+def run(store, *steps, ids=IDS, patch=PATCH, witness=None, discovery=PREFIX, **config):
     workspace, execution = Workspace(store, ROOT), Scripted(*steps)
     runner = MavenRunner(workspace, execution, store, MavenRunnerConfig(MVN, ROOT, JAVA, CONSOLE, **config))
     operation = uuid4()
-    result = runner.run(patch, control_test_id=ids[0], security_test_id=ids[1], discovery_command=PREFIX,
+    result = runner.run(patch, control_test_id=ids[0], security_test_id=ids[1], discovery_command=discovery,
                         operation=operation, witness=witness)
     return result, execution, workspace, operation
 
@@ -143,11 +143,16 @@ def test_operator_config_is_bounded(config):
         MavenRunnerConfig(('mvn', '-f', ROOT + '/pom.xml'), ROOT, JAVA, CONSOLE)
 
 
-@pytest.mark.parametrize('command', [MVN + ('test', '-Dtest=org.apache.wiki.OtherTest'), MVN[:-1], ()])
-def test_discovery_command_must_be_the_operator_prefix(store, command):
-    runner = MavenRunner(Workspace(store, ROOT), Scripted(), store, MavenRunnerConfig(MVN, ROOT, JAVA, CONSOLE))
-    with pytest.raises(ValueError, match='goal-free'):
-        runner.run(PATCH, control_test_id=IDS[0], security_test_id=IDS[1], discovery_command=command, operation=uuid4())
+@pytest.mark.parametrize('command', [MVN + ('test-compile',), ('mvn', '-q', 'test', '-DskipTests')])
+def test_environment_discovery_command_is_accepted_not_run(store, command):
+    # The runner builds its own listing, so the environment's discovery command is carried, never run: the argv
+    # executed and the result are those of the operator prefix. An empty command is still refused.
+    expected, executed, *_ = run(store, (LISTED, 0), (BASELINE, 1))
+    result, execution, *_ = run(store, (LISTED, 0), (BASELINE, 1), discovery=command)
+    assert [call[0] for call in execution.calls] == [call[0] for call in executed.calls]
+    assert result.execution.status == expected.execution.status == 'completed'
+    with pytest.raises(ValueError):
+        run(store, discovery=())
 
 
 def test_java_runs_become_gate_evidence(store):
