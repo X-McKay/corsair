@@ -2,9 +2,9 @@
 id: IDEA-0006
 kind: idea
 title: Standard agent packages, identity, receipts and shared scaffolding skill
-status: proposed
+status: accepted
 updated: 2026-10-13
-related: [IDEA-0002, IDEA-0004, SPEC-0023, SPEC-0044, PLAN-0048]
+related: [IDEA-0002, IDEA-0004, SPEC-0023, SPEC-0044, PLAN-0048, SPEC-0052, PLAN-0056]
 ---
 
 # Standard agent packages, identity, receipts and shared scaffolding skill
@@ -177,6 +177,10 @@ Its description should trigger when creating a Corsair agent, adding a tool or s
 Prefer a thin skill that invokes deterministic repository tooling over embedding a second implementation in prose. Skill metadata does not grant tools, approve graph integration or certify qualification. Add it to the existing skill metadata/symlink guards and developer invocation guide when implemented. Test generator failures and negative cases in temporary directories; actual Claude/Codex discovery/invocation requires separate client smoke evidence, not merely a passing symlink check.
 
 ## Decision
+
+**Accepted with changes (Al, 2026-10-13):** adopt, and if successful cascade across all agents. The selected variant: identity is a `toolset_sha256` field added to the SPEC-0044 run identity, not a new manifest/receipt layer (section D waits for a second consumer); the skill is a thin guide to the convention with no generator (section F waits for a new agent); the environment agent is the reference package instead of planning, because open PRs change every other agent. Specified by [SPEC-0052](../specs/SPEC-0052-environment-agent-package-convention.md), planned with the cascade in [PLAN-0056](../plans/PLAN-0056-agent-package-convention.md), convention in [agent-packages.md](../../agent-packages.md).
+
+Original proposal text follows.
 
 **Proposed implementation; user-selected direction recorded.** The user selected one file per tool and asked to capture the agent convention and shared scaffolding skill in an idea PR. This change records that direction only. It does not create a new agent, generator, skill, spec/plan, capability, runtime/profile, provider, baseline or live qualification.
 
