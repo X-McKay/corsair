@@ -25,4 +25,5 @@ def offered_tools() -> PreparedToolset[PlanningDependencies]:
     return planning_tools().prepared(withdraw_when_read)
 
 
-TOOLSET_SHA256 = toolset_sha256(planning_tools())
+# The digest covers what is offered: the wrapper type and its rule's qualified name around the reader.
+TOOLSET_SHA256 = toolset_sha256(offered_tools())

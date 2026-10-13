@@ -15,9 +15,9 @@ Branch `claude/planning-layout-k5v8wa` from main `497db9f` (#44 and #74 merged),
 
 ## Validation and blockers
 
-Recorded in PLAN-0056: identical offered-surface capture (including the request after the reader is withdrawn), pinned digest equal to the pre-split digest, 597 agent and chain-composition tests, scripted planning eval 12/12 before and after with no changed row, `make test-config` 1383 passed, and 1387 passed after merging #82. Unrun: live-provider and held-out planning evals, durable worker run beyond the offline Temporal suites.
+Recorded in PLAN-0056: identical offered-surface capture (including the request after the reader is withdrawn), reader digest pinned to the pre-split value and `TOOLSET_SHA256` over the offered `PreparedToolset` (`68bfbba4…`, after Codex's review), 597 agent and chain-composition tests, scripted planning eval 12/12 before and after with no changed row, `make test-config` 1383 passed, and 1387 passed after merging #82. Unrun: live-provider and held-out planning evals, durable worker run beyond the offline Temporal suites.
 
-#82 (identification and authoring) merged as `462306a` while this PR was open; the branch merged main, keeping #82's `issue_identification` and authoring `dependencies` imports beside this change's planning imports and both record entries. #82's `toolset_identity` wrapper support does not change the planning pin, which digests the unwrapped toolset; captures and checks were rerun after the merge.
+#82 (identification and authoring) merged as `462306a` while this PR was open; the branch merged main, keeping #82's `issue_identification` and authoring `dependencies` imports beside this change's planning imports and both record entries. #82's `toolset_identity` wrapper support lets `TOOLSET_SHA256` digest the offered `PreparedToolset` (done after Codex's review); the reader digest stays pinned to its pre-split value. Captures and checks were rerun after the merge.
 
 ## Decisions and next steps
 
