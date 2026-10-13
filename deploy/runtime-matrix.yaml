@@ -27,6 +27,18 @@ images:
       records: [SPEC-0007, PLAN-0008]
       report: docs/qualification/openshell-toolchains.md
       note: Toolchain gate qualified CPython 3.12.15 with pytest 9.0.2; the image source pins pytest 9.0.3 since PR #30.
+  - id: cpython-3.7-pytest
+    language: python
+    base_image: docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b
+    image_source: deploy/qualification/toolchains/python37
+    runtime: {name: cpython, version: 3.7.17}
+    tools: {}
+    selector: {}
+    qualification:
+      evidence: live
+      records: [SPEC-0046, PLAN-0050]
+      report: docs/qualification/openshell-toolchains.md
+      note: Toolchain gate qualified CPython 3.7.17 with pytest 7.4.4 on RIG0 at 794a003 (93a0fab plus #86); CVE-2021-32839 ran through the pytest runner at both commits at 4117e3f (#88).
   - id: temurin-17-maven
     language: java
     base_image: docker.io/library/maven@sha256:5394efaabc436795b507ca400aaf86311db03543072e0e87ae66c595965d4aed
@@ -86,6 +98,16 @@ frameworks:
       records: [SPEC-0028, PLAN-0027, SPEC-0032, PLAN-0032]
       report: docs/qualification/openshell-test-workspace.md
       note: pytest runner and JUnit report parser exercised with pytest 9.0.x only (reviewed SPEC-0018 pair).
+  - name: pytest
+    language: python
+    versions: ==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4
+    runner: src/corsair/adapters/pytest_runner.py
+    images: [cpython-3.7-pytest]
+    qualification:
+      evidence: live
+      records: [SPEC-0046, PLAN-0050]
+      report: docs/qualification/openshell-toolchains.md
+      note: 7.4.4 by the toolchain gate and CVE-2021-32839 in the sandbox; 6.0.2, 6.2.5, 7.0.1 and 7.2.0 by real discovery, JUnit and summary output on CPython 3.7.17 checked offline (tests/unit/pytest_reports). 4.6 and 5.4 reject --import-mode=importlib.
   - name: junit4
     language: java
     versions: ==4.13.2 || ==4.12
