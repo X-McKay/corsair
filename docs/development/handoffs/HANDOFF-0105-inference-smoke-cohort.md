@@ -11,7 +11,7 @@ related: [SPEC-0069, PLAN-0076, SPEC-0071, PLAN-0078, SPEC-0067, PLAN-0073]
 
 ## Verified state
 
-PR #115, branch `claude/eval-corpus-import-jcfaz1` from main `184e609` (after #97 and #106). Offline only; no case was run end to end.
+PR #115, branch `claude/eval-corpus-import-jcfaz1` from main `184e609` (after #97 and #106). Head `576c206`. This branch itself was checked offline only. At 18:24Z the first corpus case (`ih-python-pathtraversal`) was running live on RIG0 through `corsair run --sandbox docker` on a merge of #109 `e90a8e3` with this head (`cecc10d`), all model stages live; its result is not recorded here yet.
 
 - [SPEC-0069](../specs/SPEC-0069-inferred-runtime.md): `inference` rows in `deploy/runtime-matrix.yaml` (pytest, Jest, Test::More, Minitest, each citing its release metadata). A project with no declared runtime gets the newest qualified image in range, recorded as `runtime_basis: inferred` with `inferred_from`. Refusal paths: unread constraint or no covering row is undetermined; covering rows with no fitting image is unsupported, naming the runtime range or the declared tool that blocked it.
 - [SPEC-0071](../specs/SPEC-0071-operator-smoke-test.md): `smoke` template data on each matrix framework row, carried on `RuntimeOutcome.smoke_tests`. It is written beside the capture by `Preparation.prepare(..., overlay=)` and offered as `EnvironmentInput.smoke_tests`. Finalization admits a smoke baseline only with its exact id, with a discovery command that does not name the smoke file, when discovery lists no other test, and when the operator's listing of the captured revision (`PreparedSandbox.source_paths`) holds no file the runner's default convention would discover (`checkout_tests`); an adapter without that listing gets no smoke baseline. `baseline_basis` is `project_test` or `operator_smoke`; the smoke file reaches planning through #106's baseline-file path, and the chain adds a limitation. Prompt `environment-v7-operator-smoke-test`.
@@ -25,7 +25,8 @@ PR #115, branch `claude/eval-corpus-import-jcfaz1` from main `184e609` (after #9
 ## Decisions and next steps
 
 - The smoke file is written up front with the capture, because the sandbox is prepared once. Absence of a project test is checked from the run's own discovery output and from the operator's listing of the whole capture, not only by the skill. The OpenShell (#116) and Docker (#113) preparation adapters must supply `source_paths` before a smoke baseline can pass on them.
-- Next: the first live case (`ih-python-pathtraversal`) through #109's entry point, then `SET=corpus-python`; the Jest and JUnit templates under the image-only harness; then the live environment eval.
+- Corpus answer key: pairs expect completed/reproduced/verified, the two single-revision topics completed/not_reproduced/not_applicable (`expected.json`, never read by the system). Held-out ids live only in `evals/corpus/held_out.json`.
+- Next: record the first live case's result line and route each stop by stage, then `SET=corpus-python`; the Jest and JUnit templates under the image-only harness; then the live environment eval.
 
 ## Continuation prompt
 
