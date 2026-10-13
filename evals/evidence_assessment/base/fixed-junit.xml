@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="0" skipped="0" tests="2" time="0.001" timestamp="2026-01-01T00:00:00.000000+00:00" hostname="runner"><testcase classname="test_documents" name="test_benign_control" time="0.001"><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+{"exception": null, "opens": ["/workspace/scratch/test_benign_control0/allowed/document.txt"], "returned_sha256": "f40c8d728e47452149f6b8afecfa91e4b3f517bc64ba3cc3a07a902d0c68cd3f", "source_sha256": "87ef8e4536ced850e63035cff042c0e988efedc8993463a5005ddc346eaa9b7d", "test": "control"}
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="test_documents" name="test_security_rejects_outside_read" time="0.001"><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+{"exception": "ValueError", "opens": [], "returned_sha256": null, "source_sha256": "87ef8e4536ced850e63035cff042c0e988efedc8993463a5005ddc346eaa9b7d", "test": "security"}
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase></testsuite></testsuites>
