@@ -20,7 +20,7 @@ Implement SPEC-0064 for the `java` and `java8` images. Based on main after PR #5
 - [x] Offline guard in `make test-config`; base-image skill rule updated.
 - [x] Compare with #51's retained RIG0 inventories (same artifacts and hashes).
 - [x] `tests/qualification/image_cases.py`: per-image real-case table for CI (VUL4J-6 on `java8`), offline guard.
-- [ ] CI (Al, 2026-10-13: "Lets run it in CI", replacing the RIG0 paste): #92's image-only job builds both images from the checked-in files; a `java8`-scoped step runs `image_cases.py java8` (VUL4J-6 fix and vulnerable through `java_image_case`).
+- [ ] CI (Al, 2026-10-13: "Lets run it in CI", replacing the RIG0 paste): #92's image-only job builds both images from the checked-in files; one generic step runs `image_cases.py` over every built image directory (a directory without `CASES` entries is a no-op; each case names its language's harness in `LANGUAGES`), so VUL4J-6 fix and vulnerable run through `java_image_case` whenever `java8` is built.
 
 ## Validation and progress
 
@@ -38,4 +38,4 @@ Implement SPEC-0064 for the `java` and `java8` images. Based on main after PR #5
 Al chose CI over the RIG0 paste and over host networking in the cloud container (2026-10-13). The VUL4J-6 overlay is rebuilt from upstream in CI and reproduces #51's RIG0 overlay byte for byte (sha256 `18a406a5d65d…`): the Vul4J PoV at 45ddad15 unchanged, one blank line, then `ZipShortTest#testToBytes` from the fix commit renamed `testBenignZipShortToBytes`; the vulnerable revision is the fix's parent dcb0486 with the fix's test file. The overlay commit uses a fixed author and date.
 
 
-Next: once #92's image-only job is on main, add one `java8`-scoped step after its build that runs `python -m tests.qualification.image_cases java8`; that CI run builds both images from the checked-in Dockerfiles (the list check) and runs VUL4J-6 fix and vulnerable. Attach its results here and in the PR, then the handoff. The images' gate receipts change with this source, so #51's live gate evidence names the old source; the next milestone gate covers them.
+Next: #92's job is on main and runs `image_cases.py` for the built images (first CI run failed before any case ran: the harness subprocess could not import `corsair` because the project is not an installed package; fixed by passing `src` on PYTHONPATH). Attach its results here and in the PR, then the handoff. The images' gate receipts change with this source, so #51's live gate evidence names the old source; the next milestone gate covers them.

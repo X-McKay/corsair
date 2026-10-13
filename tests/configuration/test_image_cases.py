@@ -2,7 +2,7 @@
 import pytest
 
 from corsair.ports.test_runner import JavaTestId
-from tests.qualification.image_cases import CASES, outcome
+from tests.qualification.image_cases import CASES, LANGUAGES, outcome
 from tests.qualification.prepare_toolchains import BASES
 
 
@@ -10,6 +10,7 @@ def test_case_table_entries_are_complete():
     assert CASES and set(CASES) <= set(BASES)
     for cases in CASES.values():
         for case in cases:
+            assert case['language'] in LANGUAGES
             control, security = case['ids']
             assert JavaTestId.parse(control).source_path() == JavaTestId.parse(security).source_path() == case['pov']['path']
             assert set(case['expect']) == {'fix', 'vulnerable'} and case['expect']['fix'][0] == case['expect']['vulnerable'][0] == 'passed'

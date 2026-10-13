@@ -23,7 +23,7 @@ GIT_ENV = {'GIT_AUTHOR_NAME': 'Corsair', 'GIT_AUTHOR_EMAIL': 'corsair@invalid', 
 # the PoV file byte for byte, then (after one blank line) a Corsair-authored control copied verbatim from the
 # unrelated upstream ZipShortTest#testToBytes, the same overlay #51 ran on RIG0.
 VUL4J_6 = {
-    'id': 'VUL4J-6',
+    'id': 'VUL4J-6', 'language': 'java',
     'repository': 'https://github.com/tuhh-softsec/vul4j', 'branch': 'VUL4J-6',
     'fix': '2a2f1dc48e22a34ddb72321a4db211da91aa933b', 'vulnerable': 'dcb0486fb4cb2b6592c04d6ec2edbd3f690df5f2',
     'pov': {'commit': '45ddad15edd0f56a38d1d10e1ac6e1c2de9de881',
@@ -58,7 +58,7 @@ def control_method(source, method, name):
     return source[start:source.index('\n    }\n', start) + 7].replace(f'void {method}()', f'void {name}()', 1)
 
 
-def prepare(case, work):
+def prepare(case, work, control_method):
     clone = work / 'source.git'
     git('clone', '--quiet', '--bare', '--single-branch', '--branch', case['branch'], case['repository'], str(clone))
     pov = blob(clone, case['pov']['commit'], case['pov']['path'], case['pov']['sha256'])
@@ -80,8 +80,8 @@ def prepare(case, work):
     return trees, digest
 
 
-def harness(*args):
-    command = [sys.executable, '-m', 'tests.qualification.java_image_case', *args]
+def harness(module, *args):
+    command = [sys.executable, '-m', module, *args]
     print('+', ' '.join(command), flush=True)
     # The project is not an installed package (pyproject `package = false`); the harness imports `corsair` from src.
     path = os.pathsep.join(filter(None, (str(ROOT / 'src'), str(ROOT), os.environ.get('PYTHONPATH'))))
@@ -99,23 +99,33 @@ def outcome(run, ids):
     return tuple(cases.get(test_id, 'missing') for test_id in ids)
 
 
+# Per language: the image-case harness module, how the upstream control is cut from its test file, and the extra
+# harness arguments per phase. Node and Ruby add their own entry beside Java's; the case flow stays the same.
+LANGUAGES = {
+    'java': {'harness': 'tests.qualification.java_image_case', 'control': control_method,
+             'arguments': lambda evidence, trees: {'setup': ('--m2', str(evidence / 'm2')),
+                                                   'run': ('--m2', str(evidence / 'm2'), '--tests-from', str(trees['fix']))}},
+}
+
+
 def run_case(image, case, evidence):
     evidence.mkdir(parents=True)
-    trees, digest = prepare(case, evidence / 'work')
-    m2 = evidence / 'm2'
+    language = LANGUAGES[case['language']]
+    trees, digest = prepare(case, evidence / 'work', language['control'])
+    module, extra = language['harness'], language['arguments'](evidence, trees)
     results = {'case': case['id'], 'image': image, 'overlay_sha256': digest, 'revisions': {}}
     ok = True
     for revision in ('fix', 'vulnerable'):
         commit = git('rev-parse', 'HEAD', cwd=trees[revision]).decode().strip()
-        setup = harness('setup', '--image', image, '--checkout', str(trees[revision]), '--m2', str(m2),
+        setup = harness(module, 'setup', '--image', image, '--checkout', str(trees[revision]), *extra['setup'],
                         '--evidence', str(evidence / f'setup-{revision}'))
         entry = results['revisions'][revision] = {'commit': commit, 'setup_exit': setup.returncode}
         if setup.returncode:
             ok = False
             continue
         ids = [arg for test_id in case['ids'] for arg in ('--id', test_id)]
-        harness('run', '--image', image, '--checkout', str(trees[revision]), '--m2', str(m2), '--tests-from',
-                str(trees['fix']), '--evidence', str(evidence / f'run-{revision}'), *ids)
+        harness(module, 'run', '--image', image, '--checkout', str(trees[revision]), *extra['run'],
+                '--evidence', str(evidence / f'run-{revision}'), *ids)
         report = evidence / f'run-{revision}' / 'run.json'
         run = json.loads(report.read_text()) if report.exists() else {}
         got = outcome(run, case['ids'])
@@ -133,11 +143,16 @@ def run_case(image, case, evidence):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('toolchain', help='Image directory; its cases come from CASES')
+    parser.add_argument('toolchains', nargs='+', help='Image directories; each runs its CASES entries, none is a no-op')
     parser.add_argument('--evidence', required=True, type=Path)
     args = parser.parse_args()
-    image = json.loads((ROOT / '.cache/toolchains' / args.toolchain / 'build.json').read_text())['config_id']
-    ok = all([run_case(image, case, args.evidence / case['id']) for case in CASES.get(args.toolchain, ())])
+    ok = True
+    for toolchain in args.toolchains:
+        if not CASES.get(toolchain):
+            print(f'{toolchain}: no real cases', flush=True)
+            continue
+        image = json.loads((ROOT / '.cache/toolchains' / toolchain / 'build.json').read_text())['config_id']
+        ok = all([run_case(image, case, args.evidence / toolchain / case['id']) for case in CASES[toolchain]]) and ok
     raise SystemExit(0 if ok else 1)
 
 
