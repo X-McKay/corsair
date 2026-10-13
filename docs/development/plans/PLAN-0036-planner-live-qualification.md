@@ -4,14 +4,14 @@ kind: plan
 title: Test planner live qualification on held-out cases
 status: in_progress
 updated: 2026-10-13
-related: [PLAN-0025, SPEC-0022, PLAN-0035, PLAN-0031, SPEC-0023, ISSUE-0007]
+related: [PLAN-0025, SPEC-0022, PLAN-0031, SPEC-0023, ISSUE-0007]
 ---
 
 # Test planner live qualification on held-out cases
 
 ## Objective and dependencies
 
-Decide whether the isolated SPEC-0022 planner is qualified on cases it was not developed on, following the PLAN-0025 next action: freeze fresh held-out cases before any further comparison, and respond to the `tmp_path.parent` scratch finding. Measure the prompt on main (`test-planning-v2`) and the prompt in draft PR #34 (`test-planning-v3`, PLAN-0035) under one provider profile, so the prompt is the only variable. This plan does not edit the planning prompt or contracts (PR #34 owns the prompt), connect the planner to another stage, or touch the kind cluster. Inference uses the local model at llm.almckay.io from RIG0.
+Decide whether the isolated SPEC-0022 planner is qualified on cases it was not developed on, following the PLAN-0025 next action: freeze fresh held-out cases before any further comparison, and respond to the `tmp_path.parent` scratch finding. Measure the prompt on main (`test-planning-v2`) and the prompt in draft PR #34 (`test-planning-v3`, PLAN-0035 on that branch) under one provider profile, so the prompt is the only variable. This plan does not edit the planning prompt or contracts (PR #34 owns the prompt), connect the planner to another stage, or touch the kind cluster. Inference uses the local model at llm.almckay.io from RIG0.
 
 ## Steps
 
@@ -30,7 +30,7 @@ A prompt version is qualified for this held-out scope only if all 18 held-out at
 
 ## Validation and progress
 
-Base: main `0d9bb5a`. `tests/agents/test_test_planning.py`: 31 passed (29 existing, 2 new).
+Base: main `0d9bb5a`. `tests/agents/test_test_planning.py`: 31 passed (29 existing, 2 new). `make test-config`: 783 passed (781 on main plus 2).
 
 Held-out review (independent Opus reviewer, before any provider run): line numbers and statuses confirmed; no oracle or case-name leakage into agent inputs. Blocking: the unpickling reference witness named `os.getcwd`, but on Linux the `pickle.find_class` audit event records `('posix', 'getcwd')` and a plain dict load records none (reproduced locally); both witnesses were corrected. Marker fairness fixes: the command-injection markers `;`/`|` and the unpickling markers `reduce`/`global`/`eval`/`exec` could appear in correct control prose and were replaced; SQL markers gained lowercase payload shapes; the `-x` and bare `not vulnerable` forbidden markers were dropped as false-positive risks (the contract already enforces discovery tokens). The unused `hmac` route was removed from the timing case. Recorded caveats: `archive_extraction_guarded` is a near-transfer of the development guarded traversal case (same `../` marker, `open` witness, guard preservation), and the two unsupported cases transfer development rules (no baseline, missing facility) to new code; a `ready` timing plan that spies on a constant-time comparison is a defensible alternative but checks a fix mechanism with an unlisted facility. Frozen held-out SHA256: `6159a676961106cbcdf3ee667669a5a57740fc9e0bf5b42c13b6ca5feeea2026`.
 
