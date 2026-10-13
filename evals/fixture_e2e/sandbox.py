@@ -8,7 +8,8 @@ from hashlib import sha256
 import json
 
 from corsair.adapters.openshell_workspace import OpenShellTestWorkspace, WorkspaceConfig
-from corsair.adapters.pytest_runner import PytestRunner, PytestRunnerConfig
+from corsair.adapters.pytest_runner import PytestRunnerConfig
+from corsair.investigation.frameworks import harness
 from corsair.agents.test_planning.contracts import EnvironmentEvidence
 from corsair.composition.direct import FixtureCase
 from corsair.core.disposition import EnvironmentIdentity
@@ -75,5 +76,5 @@ def sandbox_runners(lifecycle, verifier, execution, upload, store, snapshots: di
     runner_config = PytestRunnerConfig(PREFIX, JUNIT, config.remote_root, witness_record_path=WITNESS_RECORD)
 
     def runner(purpose):
-        return PytestRunner(workspaces[VARIANTS[purpose]], execution, store, runner_config)
+        return harness("pytest").runner(workspaces[VARIANTS[purpose]], execution, store, runner_config)
     return runner

@@ -26,7 +26,8 @@ from pydantic_evals.evaluators import Evaluator
 from temporalio.client import Client
 
 from corsair.adapters.local_artifacts import LocalArtifacts
-from corsair.adapters.pytest_runner import PytestRunner, PytestRunnerConfig
+from corsair.adapters.pytest_runner import PytestRunnerConfig
+from corsair.investigation.frameworks import harness
 from corsair.agents.issue_analysis.contracts import IssueAnalysisInput
 from corsair.inference.config import InferenceConfig, inference_config, load_inference
 from corsair.inference.models import agent_models
@@ -128,7 +129,7 @@ def chain_runners(store, root: Path, revisions: dict[Purpose, Variant]):
     """A fresh private reviewed workspace per purpose holding this case's variant."""
     def runner(purpose):
         workspace = root / purpose
-        return PytestRunner(ReviewedWorkspace(store, workspace, revisions[purpose]), ReviewedLocalExecution(workspace),
+        return harness("pytest").runner(ReviewedWorkspace(store, workspace, revisions[purpose]), ReviewedLocalExecution(workspace),
                             store, PytestRunnerConfig(PREFIX, ".corsair-junit.xml", str(workspace),
                                                       witness_record_path=".corsair-witness.json"))
     return runner
