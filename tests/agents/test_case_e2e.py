@@ -209,7 +209,7 @@ def test_records_summary_lines_and_the_cohort_roll_up(tmp_path):
     refused = record("manual:abc", tmp_path, refused="runtime undetermined: no engines")
     assert (refused["reached"], refused["reason"], refused["selected"], refused["usage"]) == (
         "admission", "runtime undetermined: no engines", None, {})
-    assert summary_line(refused).startswith("manual:abc: INCONCLUSIVE; stopped at admission: runtime undetermined")
+    assert summary_line(refused).startswith("manual:abc: UNABLE_TO_RUN; stopped at admission: runtime undetermined")
     oracle = ChainOracle(stopped_at="planning", gate=None, assessment_admitted=None)
     stopped = record("manual:def", tmp_path, run=DirectRun(stopped_at="planning", reason="no witness recorder", attempts=()))
     planning = with_expected(stopped, "CVE-2", oracle)
@@ -220,6 +220,8 @@ def test_records_summary_lines_and_the_cohort_roll_up(tmp_path):
     assert summary["by_language"]["not selected"]["admission"] == 3 and summary["total"]["runtime"] == 2
     assert summary["total"]["authoring"] == 1 and summary["total"]["complete"] == 1
     assert "| total | 3 | 2 | 2 | 2 | 2 | 1 | 1 | 1 | 1 |" in markdown(summary)
+    assert summary["labels"] == {"LIKELY_EXPLOITABLE": 0, "LIKELY_NOT_EXPLOITABLE": 0, "INCONCLUSIVE": 1,
+                                 "UNABLE_TO_RUN": 1, "ERROR": 1}
 
 
 def test_a_cohort_records_a_case_that_cannot_start_before_any_model(tmp_path, monkeypatch):
@@ -267,13 +269,32 @@ def test_the_sandbox_reads_the_baseline_file_from_the_capture_never_the_sandbox(
     assert captured_file(tree, "missing.js") is None
 
 
-@pytest.mark.parametrize("finding, expected", [("reproduced", "LIKELY_EXPLOITABLE"),
-                                               ("not_reproduced", "LIKELY_NOT_EXPLOITABLE"),
-                                               ("refuted_in_scope", "LIKELY_NOT_EXPLOITABLE"),
-                                               ("inconclusive", "INCONCLUSIVE")])
-def test_the_headline_label_follows_the_gate_finding(finding, expected):
-    from corsair.investigation.results import headline as label
-    gate = {"execution": "completed", "finding": finding, "fix": "verified"}
-    assert label(None, gate) == expected
-    # Any early stop is inconclusive whatever a gate said.
-    assert label("assessment", gate) == label("admission", None) == "INCONCLUSIVE"
+@pytest.mark.parametrize("stopped_at, gate, flags, expected", [
+    (None, {"execution": "completed", "finding": "reproduced"}, {}, "LIKELY_EXPLOITABLE"),
+    (None, {"execution": "completed", "finding": "not_reproduced"}, {}, "LIKELY_NOT_EXPLOITABLE"),
+    (None, {"execution": "completed", "finding": "refuted_in_scope"}, {}, "LIKELY_NOT_EXPLOITABLE"),
+    (None, {"execution": "completed", "finding": "inconclusive"}, {}, "INCONCLUSIVE"),
+    (None, {"execution": "failed", "finding": "inconclusive"}, {}, "ERROR"),
+    (None, {"execution": "unknown", "finding": "inconclusive"}, {}, "ERROR"),
+    (None, {"execution": "blocked", "finding": "inconclusive"}, {}, "UNABLE_TO_RUN"),
+    (None, {"execution": "unsupported", "finding": "inconclusive"}, {}, "UNABLE_TO_RUN"),
+    (None, None, {}, "ERROR"),
+    ("admission", None, {}, "UNABLE_TO_RUN"),
+    ("runtime", None, {}, "UNABLE_TO_RUN"),
+    ("environment", None, {}, "UNABLE_TO_RUN"),
+    ("environment", None, {"failed": True}, "ERROR"),
+    ("planning", None, {}, "INCONCLUSIVE"),
+    ("authoring", None, {"failed": True}, "ERROR"),
+    ("execution", None, {}, "ERROR"),
+    ("admission", None, {"error": True}, "ERROR"),
+])
+def test_the_headline_label_tells_each_kind_of_outcome_apart(stopped_at, gate, flags, expected):
+    from corsair.investigation.results import headline
+    assert headline(stopped_at, gate, **flags) == expected
+
+
+def test_a_crashed_run_is_recorded_as_error_with_its_reason(tmp_path):
+    from corsair.investigation.results import record, summary_line
+    crashed = record("manual:abc", tmp_path, error="DockerError: daemon not reachable")
+    assert (crashed["label"], crashed["reason"]) == ("ERROR", "DockerError: daemon not reachable")
+    assert summary_line(crashed).startswith("manual:abc: ERROR; stopped at admission: DockerError")
