@@ -92,10 +92,10 @@ frameworks:
     runner: src/corsair/adapters/maven_runner.py
     images: [temurin-8-maven]
     qualification:
-      evidence: live
+      evidence: image-only
       records: [SPEC-0045, PLAN-0049]
       report: docs/qualification/openshell-toolchains.md
-      note: 4.13.2 by the toolchain gate fixture in the sandbox; 4.12 by VUL4J-6 (commons-compress, Surefire 2.19.1) on the same image outside OpenShell (image-only). Vintage needs 4.12 or later.
+      note: Image-only as a whole because one row carries both versions; 4.13.2 passed the toolchain gate fixture in the sandbox (live), 4.12 by VUL4J-6 (commons-compress, Surefire 2.19.1) on the same image outside OpenShell (image-only). Vintage needs 4.12 or later.
   - name: junit5
     language: java
     versions: ==5.14.4

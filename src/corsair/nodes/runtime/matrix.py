@@ -153,7 +153,10 @@ def select(requirement: RuntimeRequirement, matrix: Matrix) -> Selection:
         if all(check.satisfied for check in checks if check.kind != 'test_framework'):
             runtime_fits = True
             if any(f.satisfied for f in frameworks):
-                return Supported(status='supported', image_id=row.id, image=row.base_image, checks=checks)
+                rows = [row.qualification.evidence, *(f.qualification.evidence for f in matrix.frameworks if f.applies(row)
+                                                      and any(c.satisfied and c.name == f.name for c in frameworks))]
+                evidence = 'live' if all(e == 'live' for e in rows) else 'image-only'
+                return Supported(status='supported', image_id=row.id, image=row.base_image, checks=checks, evidence=evidence)
         unmet = [c for c in checks if not c.satisfied and c.kind != 'test_framework']
         rejected.append(Rejection(image_id=row.id, unmet=tuple(unmet + ([] if any(f.satisfied for f in frameworks) else frameworks))))
     if runtime_fits and unread:
