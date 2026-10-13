@@ -42,6 +42,14 @@ def _encoded(path: str, data: bytes) -> int:
     return len(json.dumps(path)) + 4 + 4 * -(-len(data) // 3)
 
 
+def _cut(path: str) -> str:
+    """`path` cut to at most 1024 encoded bytes (pydantic writes non-ASCII as raw UTF-8), the reserve per omitted name."""
+    path = path[:1024]
+    while len(json.dumps(path, ensure_ascii=False).encode()) > len(json.dumps('x' * 1024)):
+        path = path[:-1]
+    return path
+
+
 def runtime_inputs(files: Mapping[str, bytes], language: Language | None = None, *,
                    parents: Mapping[str, bytes] | None = None, root: str = '.') -> RuntimeInputs:
     """The case's runtime inputs from a snapshot's files: build files only, smallest first, while the encoded inputs
@@ -59,7 +67,7 @@ def runtime_inputs(files: Mapping[str, bytes], language: Language | None = None,
         if cost <= budget and len(path) <= 1024:
             kept[path], budget = files[path], budget - cost
         else:
-            omitted.append(path[:1024])
+            omitted.append(_cut(path))
     return RuntimeInputs(files=kept, language=language, parents=parents, root=root, omitted=tuple(sorted(omitted))[:64])
 
 

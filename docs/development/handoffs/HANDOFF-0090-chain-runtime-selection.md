@@ -22,7 +22,7 @@ No agent package, prompt, toolset, matrix row or eval set changed. Nothing is li
 
 ## Validation and blockers
 
-See [PLAN-0065](../plans/PLAN-0065-chain-runtime-selection.md#validation-and-progress): `make test-config` 1258 passed; native Temporal chain file 10/10 against a local dev server; scripted chain 5/5 and environment 16/16. No blocker for this slice. A live run needs the environment stage first.
+See [PLAN-0065](../plans/PLAN-0065-chain-runtime-selection.md#validation-and-progress): `make test-config` 1637 passed on the merge head; native Temporal chain file 10/10 against a local dev server; scripted chain 5/5 and environment 16/16. No blocker for this slice. A live run needs the environment stage first.
 
 ## Decisions and next steps
 

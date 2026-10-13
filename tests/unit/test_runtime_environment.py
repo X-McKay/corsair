@@ -124,3 +124,7 @@ def test_payload_bound_counts_paths_and_encoding_not_only_content():
     assert select_runtime(inputs, RuntimeCatalog(load(), PREPARED)).status == 'undetermined'
     with pytest.raises(ValueError):
         RuntimeInputs(files={'poetry.lock': b'#' * (MAX_INPUT_BYTES * 3 // 4)})
+    wide = {f'{i:03d}/{"é" * 1500}/pom.xml': b'x' * 20_000 for i in range(100)}
+    wide['pom.xml'] = b'#' * 700_000
+    inputs = runtime_inputs(wide)
+    assert len(inputs.omitted) == 64 and len(inputs.__pydantic_serializer__.to_json(inputs)) <= MAX_INPUT_BYTES

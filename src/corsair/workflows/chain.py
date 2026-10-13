@@ -51,7 +51,7 @@ with workflow.unsafe.imports_passed_through():
 
 # Operator-owned: the reviewed host runner bounds each subprocess at 60 s; an OpenShell runner may take longer.
 REVISION_TIMEOUT = timedelta(minutes=10)
-# Detection and selection read at most 4,096 build files of 1 MiB each in memory.
+# Detection and selection read at most 1 MiB of encoded build files in memory.
 SELECTION_TIMEOUT = timedelta(minutes=1)
 # Default for ``run_durable``: one attempt per model request or tool call, so nothing is blindly repeated.
 ACTIVITY_CONFIG: ActivityConfig = {"start_to_close_timeout": timedelta(minutes=5), "retry_policy": RetryPolicy(maximum_attempts=1)}
