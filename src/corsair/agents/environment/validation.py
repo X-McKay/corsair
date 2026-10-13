@@ -50,8 +50,8 @@ async def finalize_environment(ctx: RunContext[EnvironmentDependencies], draft: 
     quoted = lambda ref: deps.read_source(ref.path, ref.start_line, ref.end_line).model_dump()
     values = draft.model_dump() | {"receipts": [r.model_dump() for r in deps.ledger.records]}
     if draft.status == "ready":
-        if deps.ledger.halted:
-            raise ModelRetry("a command had an unknown outcome or an execution error; report blocked, not ready")
+        if deps.ledger.halted or deps.ledger.pending_correction is not None:
+            raise ModelRetry("setup has an unresolved command failure or execution halt; report blocked, not ready")
         if draft.toolchain_id != deps.toolchain_id:
             raise ModelRetry("ready requires the preparation sandbox's toolchain")
         framework = FRAMEWORKS.get(draft.framework)
@@ -78,14 +78,20 @@ async def finalize_environment(ctx: RunContext[EnvironmentDependencies], draft: 
         values |= {"recipe": [s.model_dump() | {"source": quoted(s.source)} for s in draft.recipe],
                    "toolchain_image": toolchain.image, "language": toolchain.language, "runtime": toolchain.runtime, "baseline_outcome": "passed", "scratch_location": deps.scratch_location}
     else:
+        if draft.status == "unsupported" and (deps.ledger.halted or deps.ledger.pending_correction is not None):
+            raise ModelRetry("setup halted on an observed failure; report blocked and cite its run, not unsupported")
         values["citations"] = [quoted(c) for c in draft.citations]
         if draft.status == "blocked":
+            values["diagnostics"] = [d.model_dump() for d in deps.ledger.diagnostics]
             if set(draft.run_ids) - set(runs):
                 raise ModelRetry("blocked run_ids must name commands run in this run")
             failed = [rid for rid in draft.run_ids if records[rid].exit_code != 0 or records[rid].execution_error
                       or records[rid].delivery != "acknowledged" or records[rid].completion != "terminal_observed"]
             if draft.run_ids and not failed:
                 raise ModelRetry("blocked evidence must cite at least one failed command")
+            if not draft.run_ids and any(r.exit_code != 0 or r.execution_error or r.delivery != "acknowledged"
+                                        or r.completion != "terminal_observed" for r in records.values()):
+                raise ModelRetry("cite the failed command run_ids; do not hide an observed failure behind a generic halt")
             if not draft.run_ids and (draft.layer not in ("sandbox", "unknown") or not (
                     deps.ledger.halted or len(deps.ledger.records) >= deps.budget.max_commands)):
                 raise ModelRetry("blocked without cited runs requires a halt or an exhausted budget and layer sandbox or unknown")

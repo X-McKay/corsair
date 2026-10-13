@@ -188,6 +188,7 @@ def test_budget_is_operator_owned_and_enforced():
     blocked = {"status": "blocked", "layer": "unknown", "evidence": "budget exhausted before setup completed", "run_ids": [], "citations": []}
     result = run(blocked, calls, execution, budget=SetupBudget(max_commands=2)).output
     assert len(execution.calls) == 2 and len(result.receipts) == 2
+    assert result.diagnostics[0].code == "setup_budget"
     with pytest.raises(ValueError):
         SetupBudget(max_commands=0)
 
@@ -205,7 +206,7 @@ def test_blocked_must_cite_observed_failure_for_attributed_layer():
     with pytest.raises(UnexpectedModelBehavior):
         run(registry, calls, ScriptedExecution())  # the cited run succeeded
     with pytest.raises(UnexpectedModelBehavior):
-        run(registry | {"layer": "sandbox", "run_ids": []}, calls, ScriptedExecution({INSTALL: denied}))  # no halt
+        run(registry | {"layer": "sandbox", "run_ids": []}, calls, ScriptedExecution({INSTALL: denied}))  # failed command must be cited even after a halt
 
 
 def test_unsupported_toolchain_is_grounded_and_runs_nothing():
@@ -286,3 +287,167 @@ def test_pytest_admission_reads_a_genuine_summary(tmp_path, body, ok):
     run_ = subprocess.run([sys.executable, "-m", "pytest", "-c", "/dev/null", "--rootdir", ".", "-q", "-p", "no:cacheprovider",
                            "test_genuine.py::test_genuine"], cwd=tmp_path, capture_output=True, timeout=60)
     assert run_.returncode == 0 and FRAMEWORKS["pytest"].passed(run_.stdout) is ok
+
+
+@pytest.mark.parametrize("output,code", [
+    (b"ERROR: No matching distribution found for absent==7", "dependency_resolution"),
+    (b"Connection timed out", "connectivity"),
+    (b"certificate verify failed", "tls_trust"),
+    (b"403 Forbidden", "registry_access"),
+    (b"compile error", "setup_command_failed"),
+])
+def test_failure_stops_all_later_commands_and_returns_trusted_guidance(output, code):
+    execution = ScriptedExecution({INSTALL: (1, output, "terminal")})
+    blocked = {"status": "blocked", "layer": "unknown", "evidence": output.decode(), "run_ids": [1], "citations": []}
+    # Scripted model deliberately attempts the build after failure: the execution port must never see it.
+    result = run(blocked, SETUP[:3] + [("run_setup_command", {"command": list(BUILD)})], execution).output
+    assert execution.calls == [INSTALL]
+    assert result.diagnostics[0].code == code
+    assert result.diagnostics[0].actions and result.diagnostics[0].evidence
+    with pytest.raises(UnexpectedModelBehavior):
+        run(ready(), SETUP, ScriptedExecution({INSTALL: (1, output, "terminal")}))
+
+
+def test_model_cannot_supply_operator_diagnostics():
+    from corsair.agents.environment.contracts import BlockedEnvironmentDraft
+    with pytest.raises(ValidationError):
+        BlockedEnvironmentDraft.model_validate({"status": "blocked", "layer": "unknown", "evidence": "x",
+                                               "run_ids": [], "citations": [], "diagnostics": []})
+
+
+def test_a_halt_cannot_be_hidden_as_unsupported():
+    unsupported = {"status": "unsupported", "requirement": "different toolchain needed",
+                   "citations": [{"path": ".github/workflows/ci.yml", "start_line": 4, "end_line": 4}]}
+    with pytest.raises(UnexpectedModelBehavior):
+        run(unsupported, SETUP[:3], ScriptedExecution({INSTALL: (1, b"build failed", "terminal")}))
+
+
+def test_retained_output_can_still_be_read_after_halt():
+    output = b"No matching distribution found for example-missing==1"
+    blocked = {"status": "blocked", "layer": "dependency", "evidence": output.decode(), "run_ids": [1], "citations": []}
+    execution = ScriptedExecution({INSTALL: (1, output, "terminal")})
+    result = run(blocked, SETUP[:3] + [("read_output", {"run_id": 1, "stream": "stdout", "offset": 0})], execution)
+    assert result.output.diagnostics[0].code == "dependency_resolution"
+    assert execution.calls == [INSTALL]
+
+
+def test_zero_exit_with_unconfirmed_cleanup_is_a_citeable_blocker():
+    class UnconfirmedCleanup(ScriptedExecution):
+        def execute(self, handle, command, operation):
+            return replace(super().execute(handle, command, operation), worker_cleanup="unconfirmed")
+    blocked = {"status": "blocked", "layer": "sandbox", "evidence": "Execution worker cleanup is unconfirmed.",
+               "run_ids": [1], "citations": []}
+    execution = UnconfirmedCleanup()
+    result = run(blocked, SETUP[:3], execution).output
+    assert result.receipts[0].exit_code == 0
+    assert result.receipts[0].execution_error == blocked["evidence"]
+    assert result.diagnostics[0].code == "cleanup_unconfirmed"
+
+
+def test_budget_refusal_does_not_invalidate_completed_successful_evidence():
+    execution = ScriptedExecution(dict(DISCOVERED))
+    calls = SETUP + [("run_setup_command", {"command": list(BASELINE)})]
+    result = run(ready(), calls, execution, budget=SetupBudget(max_commands=4)).output
+    assert result.status == "ready"
+    assert execution.calls == [INSTALL, BUILD, DISCOVER, BASELINE]
+    assert len(result.receipts) == 4
+
+# These trajectories use the production tools/finalizer and synthetic terminal receipts.
+# They measure correction admission, not how often a live model chooses a useful fix.
+BAD_DISCOVER = ("python3.12", "-m", "pytest", "--collect-onyl", "-q")
+
+
+def correction_call(command, run_id=1, reason="Correct the misspelled collection flag shown in the usage error"):
+    return ("run_setup_command", {"command": list(command), "correction": {"run_id": run_id, "reason": reason}})
+
+
+@pytest.mark.parametrize("bad,corrected,code,output", [
+    (BAD_DISCOVER, DISCOVER, 4, b"pytest: error: unrecognized arguments: --collect-onyl"),
+])
+def test_minor_invocation_correction_can_reach_ready_with_failed_receipt_retained(bad, corrected, code, output):
+    execution = ScriptedExecution(DISCOVERED | {bad: (code, output, "terminal")})
+    result = run(ready(), [("run_setup_command", {"command": list(bad)}),
+                          correction_call(corrected)] + SETUP, execution).output
+    assert result.status == "ready"
+    assert result.receipts[0].exit_code == code
+    assert execution.calls[:2] == [bad, corrected]
+    assert len(result.receipts) == 6
+
+
+@pytest.mark.parametrize("bad,code,output", [
+    (BAD_DISCOVER, 4, b"unrecognized arguments: --collect-onyl\n403 forbidden"),
+    (BAD_DISCOVER, 4, b"unrecognized arguments: --collect-onyl\ncertificate verify failed"),
+    (BAD_DISCOVER, 4, b"unrecognized arguments: --collect-onyl\nno matching distribution found"),
+    (BAD_DISCOVER, 1, b"unrecognized arguments: --collect-onyl"),
+    (("sh", "-c", "pytest --collect-onyl"), 4, b"unrecognized arguments: --collect-onyl"),
+    (("mvn", "validate"), 127, b"build failed"),
+])
+def test_only_narrow_invocation_symptoms_allow_correction(bad, code, output):
+    execution = ScriptedExecution({bad: (code, output, "terminal")})
+    blocked = {"status": "blocked", "layer": "build", "evidence": output.decode(), "run_ids": [1], "citations": []}
+    result = run(blocked, [("run_setup_command", {"command": list(bad)}), correction_call(DISCOVER)], execution).output
+    assert result.status == "blocked" and execution.calls == [bad]
+
+
+@pytest.mark.parametrize("extra", [
+    ("run_setup_command", {"command": list(DISCOVER)}),
+    correction_call(DISCOVER, run_id=2),
+    correction_call(DISCOVER, reason=" "),
+    correction_call(BAD_DISCOVER),
+    correction_call(("sh", "-c", "pytest --collect-only")),
+    correction_call(("pytest", "--collect-only")),
+])
+def test_invalid_correction_never_dispatches_or_clears_pending_failure(extra):
+    execution = ScriptedExecution({BAD_DISCOVER: (4, b"unrecognized arguments: --collect-onyl", "terminal")})
+    blocked = {"status": "blocked", "layer": "discovery", "evidence": "unrecognized arguments", "run_ids": [1], "citations": []}
+    result = run(blocked, [("run_setup_command", {"command": list(BAD_DISCOVER)}), extra], execution).output
+    assert result.status == "blocked" and execution.calls == [BAD_DISCOVER]
+
+
+def test_unresolved_correctable_failure_cannot_hide_behind_prior_ready_evidence():
+    execution = ScriptedExecution(DISCOVERED | {BAD_DISCOVER: (4, b"unrecognized arguments: --collect-onyl", "terminal")})
+    with pytest.raises(UnexpectedModelBehavior):
+        run(ready(), SETUP + [("run_setup_command", {"command": list(BAD_DISCOVER)})], execution)
+
+
+@pytest.mark.parametrize("budget", [SetupBudget(max_corrections=0), SetupBudget(max_commands=1)])
+def test_operator_budget_can_disable_correction(budget):
+    execution = ScriptedExecution({BAD_DISCOVER: (4, b"unrecognized arguments: --collect-onyl", "terminal")})
+    blocked = {"status": "blocked", "layer": "discovery", "evidence": "unrecognized arguments", "run_ids": [1], "citations": []}
+    run(blocked, [("run_setup_command", {"command": list(BAD_DISCOVER)}), correction_call(DISCOVER)], execution, budget=budget)
+    assert execution.calls == [BAD_DISCOVER]
+
+
+def test_two_failed_corrections_exhaust_attempt_allowance():
+    bad2, bad3 = (*BAD_DISCOVER, "--bad2"), (*BAD_DISCOVER, "--bad3")
+    execution = ScriptedExecution({c: (4, b"unrecognized arguments: bad flag", "terminal")
+                                   for c in (BAD_DISCOVER, bad2, bad3)})
+    blocked = {"status": "blocked", "layer": "discovery", "evidence": "unrecognized arguments", "run_ids": [3], "citations": []}
+    run(blocked, [("run_setup_command", {"command": list(BAD_DISCOVER)}), correction_call(bad2),
+                  correction_call(bad3, run_id=2), correction_call(DISCOVER, run_id=3)], execution)
+    assert execution.calls == [BAD_DISCOVER, bad2, bad3]
+
+
+def test_unknown_delivery_with_invocation_error_text_is_still_terminal():
+    execution = ScriptedExecution({BAD_DISCOVER: (4, b"unrecognized arguments: bad flag", "unknown")})
+    blocked = {"status": "blocked", "layer": "sandbox", "evidence": "native stream ended", "run_ids": [1], "citations": []}
+    run(blocked, [("run_setup_command", {"command": list(BAD_DISCOVER)}), correction_call(DISCOVER)], execution)
+    assert execution.calls == [BAD_DISCOVER]
+
+
+def test_failed_invocation_cannot_be_repeated_after_successful_correction():
+    execution = ScriptedExecution(DISCOVERED | {BAD_DISCOVER: (4, b"unrecognized arguments: bad flag", "terminal")})
+    calls = [("run_setup_command", {"command": list(BAD_DISCOVER)}), correction_call(DISCOVER),
+             ("run_setup_command", {"command": list(BAD_DISCOVER)})] + SETUP
+    result = run(ready(), calls, execution).output
+    assert result.status == "ready"
+    assert execution.calls.count(BAD_DISCOVER) == 1
+
+
+@pytest.mark.parametrize("wrapper_args", [("validate",), ("deploy",)])
+def test_missing_maven_is_terminal_even_for_wrapper_correction(wrapper_args):
+    bad = ("mvn", "validate")
+    execution = ScriptedExecution({bad: (127, b"mvn: not found", "terminal")})
+    blocked = {"status": "blocked", "layer": "build", "evidence": "mvn: not found", "run_ids": [1], "citations": []}
+    run(blocked, [("run_setup_command", {"command": list(bad)}), correction_call(("./mvnw", *wrapper_args))], execution)
+    assert execution.calls == [bad]
