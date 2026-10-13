@@ -97,7 +97,8 @@ maven-hashes:
 	for dir in $(or $(TOOLCHAINS),java java8); do \
 	  docker --host=unix:///var/run/docker.sock build --no-cache --target cache --tag corsair-m2-$$dir deploy/qualification/toolchains/$$dir \
 	  && docker --host=unix:///var/run/docker.sock run --rm --network=none corsair-m2-$$dir cat /opt/corsair-m2.sha256 > deploy/qualification/toolchains/$$dir/m2.sha256.new \
-	  && mv deploy/qualification/toolchains/$$dir/m2.sha256.new deploy/qualification/toolchains/$$dir/m2.sha256 || exit 1; \
+	  && mv deploy/qualification/toolchains/$$dir/m2.sha256.new deploy/qualification/toolchains/$$dir/m2.sha256 \
+	  || { rm -f deploy/qualification/toolchains/$$dir/m2.sha256.new; exit 1; }; \
 	done
 
 .PHONY: qualify-recovery

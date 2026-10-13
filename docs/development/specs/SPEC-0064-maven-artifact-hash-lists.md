@@ -32,5 +32,6 @@ In scope: the image cache (fixture build, Surefire 3.6.0 and its JUnit Platform 
 
 ## Decisions and open questions
 
+- The check runs after preparation, so a substituted artifact has already executed during the fixture's `mvn test` before the build fails. It cannot reach the image, since the build fails, but it ran in the build container; pinning before execution would need a verifying Maven repository or a pre-fetch by hash, which Maven's resolver does not offer natively. Recorded as a limit, not addressed here.
 - `diff` against a plain list, not `sha256sum -c`, because `-c` ignores files that are not listed; the list must also reject extras.
 - Not done: the case repository filled during case setup stays checked by Maven's `-C` only; pinning a case's dependencies is a per-case problem, not an image one.
