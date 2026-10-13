@@ -1,6 +1,15 @@
-"""Deterministic Python AST facts about authored tests; structure, not proof of test semantics."""
+"""Deterministic Python AST facts about authored tests; structure, not proof of test semantics.
+
+`assertion_lines` reads each test in its own language: a Jest id (`path.js::[suite::]name`) through
+`javascript.py`, every other id as a pytest node id here. Another language adds its id grammar and reader to
+`LANGUAGES`.
+"""
 
 import ast
+
+from corsair.ports.test_runner import JS_TEST_ID
+
+from . import javascript
 
 SKIP_NAMES = {"skip", "skipif", "xfail", "importorskip"}
 MOCK_MODULES = {"mock", "unittest.mock", "pytest_mock"}
@@ -59,7 +68,7 @@ def _checks(tree: ast.Module, function: ast.FunctionDef | ast.AsyncFunctionDef) 
                                                 and any(raises(item.context_expr) for item in node.items))}
 
 
-def assertion_lines(content: str, test_id: str) -> tuple[int, ...]:
+def python_assertion_lines(content: str, test_id: str) -> tuple[int, ...]:
     """Lines where the named test can fail on its own check: assert statements and pytest.raises blocks it runs."""
     try:
         tree = ast.parse(content)
@@ -69,6 +78,16 @@ def assertion_lines(content: str, test_id: str) -> tuple[int, ...]:
     if not lines:
         raise ValueError(f"{test_id} has no assertion")
     return tuple(sorted(lines))
+
+
+# Test id grammar and the reader of that language's assertion lines; ids matching none are pytest node ids.
+LANGUAGES = ((JS_TEST_ID, javascript.assertion_lines),)
+
+
+def assertion_lines(content: str, test_id: str) -> tuple[int, ...]:
+    """Lines where the named test can fail on its own check, read in the test's own language."""
+    reader = next((read for grammar, read in LANGUAGES if grammar.fullmatch(test_id)), python_assertion_lines)
+    return reader(content, test_id)
 
 
 def _name(node: ast.AST) -> str | None:
