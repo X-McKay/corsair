@@ -1,8 +1,10 @@
 """SPEC-0042: build metadata to runtime requirement, and selection against the runtime matrix (offline)."""
+import json
 from pathlib import Path
 
 import pytest
 
+from corsair.nodes.runtime.contracts import RuntimeRequirement
 from corsair.nodes.runtime.detect import MAX_FILE_BYTES, detect, is_build_file
 from corsair.nodes.runtime.matrix import Matrix, load, select
 from corsair.nodes.runtime.versions import (gem, maven, npm, parse_set, parse_version, pep440, perl, java_feature,
@@ -591,3 +593,36 @@ def test_project_dependencies_are_read(dependencies, status):
 def test_setup_cfg_install_requires_is_read():
     files = {'setup.cfg': b'[options]\npython_requires = >=3.12\ninstall_requires =\n    pytest<8\n[tool:pytest]\n'}
     assert select(detect(files, 'python'), load()).status == 'unsupported'
+
+
+# SPEC-0058 image row and SPEC-0063 runner row, staged here until the live gate passes; runtime and Bundler are what
+# the image measured, and the Minitest versions are the ones the runner's own scripts ran against (PLAN-0068).
+STAGED_RUBY31 = {'id': 'ruby-3.1-bundler', 'language': 'ruby',
+                 'base_image': 'docker.io/library/ruby@sha256:91627f55e8969006aab67d15c92fb930500ff73948803da1330b8a853fecebb5',
+                 'image_source': 'deploy/qualification/toolchains/ruby31', 'runtime': {'name': 'ruby', 'version': '3.1.7'},
+                 'tools': {'bundler': '2.3.27'}, 'selector': {}, 'qualification': {'evidence': 'image-only', 'records': ['SPEC-0058'], 'report': 'x'}}
+STAGED_MINITEST = {'name': 'minitest', 'language': 'ruby', 'versions': '==5.14.4 || ==5.15.0 || ==5.27.0',
+                   'runner': 'src/corsair/adapters/minitest_runner.py', 'images': ['ruby-3.1-bundler'],
+                   'qualification': {'evidence': 'image-only', 'records': ['SPEC-0063', 'PLAN-0068'], 'report': 'x'}}
+
+
+def test_ruby31_rows_select_the_four_minitest_cases_and_not_the_rspec_ones():
+    requirements = json.loads((Path(__file__).resolve().parents[2] / 'benchmarks/runtime-requirements.json').read_text())
+    revisions = {(r['case_id'], name): RuntimeRequirement.model_validate(revision['requirement'])
+                 for r in requirements['results'] if r['language'] == 'ruby' and 'revisions' in r
+                 for name, revision in r['revisions'].items() if 'requirement' in revision}
+    matrix = load().model_dump()
+    image_only = Matrix.model_validate({**matrix, 'images': [*matrix['images'], STAGED_RUBY31]})
+    both = Matrix.model_validate({**image_only.model_dump(), 'frameworks': [*matrix['frameworks'], STAGED_MINITEST]})
+    minitest = {'CVE-2023-22794', 'CVE-2025-27610', 'CVE-2023-36823', 'CVE-2024-21510'}
+    assert {case for case, _ in revisions} >= minitest | {'CVE-2020-10187', 'CVE-2017-0889'}
+    for (case, name), requirement in revisions.items():
+        if case in minitest:
+            # The image alone runs nothing: without the runner row the only need is Minitest itself.
+            selection = select(requirement, image_only)
+            assert selection.status == 'unsupported' and [n.name for n in selection.needs] == ['minitest'], (case, name)
+            selection = select(requirement, both)
+            assert selection.status == 'supported' and selection.image_id == 'ruby-3.1-bundler', (case, name)
+        elif case in ('CVE-2020-10187', 'CVE-2017-0889'):
+            # These need Ruby 2.4-2.7 and RSpec; 3.1 is never substituted.
+            assert select(requirement, both).status == 'unsupported', (case, name)
