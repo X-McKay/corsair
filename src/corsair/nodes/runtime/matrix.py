@@ -2,6 +2,7 @@
 is unsupported with the missing components named, or is undetermined. No row is ever chosen as a substitute."""
 from pathlib import Path
 import re
+from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 import yaml
@@ -17,6 +18,9 @@ VersionText = str
 
 
 class Qualification(_Frozen):
+    # `image-only`: the image built and the gate body and a real case passed under plain Docker; selectable while the
+    # project is in development, never reported as qualified. `live`: the kind/OpenShell toolchain gate passed.
+    evidence: Literal['live', 'image-only']
     records: tuple[str, ...] = Field(min_length=1)
     report: str = Field(min_length=1)
     note: str = ''
