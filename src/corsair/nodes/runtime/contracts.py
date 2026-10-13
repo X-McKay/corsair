@@ -9,6 +9,7 @@ from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from corsair.agents.environment.contracts import Toolchain
 from corsair.core.blockers import Blocker
 
 Language = Literal['python', 'java', 'javascript', 'ruby', 'perl']
@@ -142,11 +143,13 @@ class RuntimeOutcome(_Frozen):
                               description="The selected row's prepared image on this node")
     reason: str = Field(max_length=2048)
     diagnostic: Blocker | None = Field(default=None, description='Operator or developer guidance; absent only when supported')
+    toolchain: Toolchain | None = Field(default=None, description="The selected row as the environment agent's only toolchain (SPEC-0068)")
 
     @model_validator(mode='after')
     def consistent(self) -> 'RuntimeOutcome':
         supported = isinstance(self.selection, Supported)
         if (self.status == 'supported') != (self.image is not None) or (self.status == 'supported') != (self.diagnostic is None) or \
+                (self.toolchain is not None and (self.status != 'supported' or self.toolchain.image != self.image)) or \
                 (self.status in ('supported', 'not_prepared')) != supported or (self.requirement is None) == (self.detection is None):
             raise ValueError('runtime outcome fields disagree with its status')
         return self
