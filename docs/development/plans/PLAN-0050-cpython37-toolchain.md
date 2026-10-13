@@ -38,4 +38,4 @@ Review of 1ba724f (Hold, records only). The frozen evidence-assessment set (`cas
 
 ## Decisions and next action
 
-Qualified floor pytest 6.0 (importlib mode); witness on 3.7 refused by name rather than a weaker observer; matrix row only after the live gate. Next: ask for the kind cluster, then run the live steps on RIG0 under `/home/al/git/corsair/.worktrees/claude/toolchain-python37-drklks` with evidence under `/home/al/git/corsair/.runs`.
+Qualified floor pytest 6.0 (importlib mode); witness on 3.7 refused by name rather than a weaker observer; matrix row only after the live gate. Next: ask for the kind cluster, then run the live steps on RIG0 under `/home/al/git/corsair/.worktrees/claude/toolchain-python37-drklks` with evidence under that worktree's own `.runs` (the installer accepts admission proof only from the installing checkout).
