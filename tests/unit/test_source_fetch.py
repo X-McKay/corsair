@@ -57,8 +57,9 @@ def test_recipe_is_a_constant_and_data_only_travels_as_arguments():
     other = FetchTarget('https://dev.azure.com/org/project/_git/repo', 'a'*40, credential)
     first, second = fetch_command(RECIPE, TARGET), fetch_command(RECIPE, other)
     assert first[:5] == second[:5] == ('/bin/sh', '-euc', FETCH_SCRIPT, 'corsair-source-fetch', '/bin/sh')
-    assert first[5:] == ('/usr/bin/git', '/sandbox/src', URL, COMMIT, '')
-    assert second[7:] == (other.url, 'a'*40, 'ADO_PLACEHOLDER')
+    assert first[5:] == ('/usr/bin/git', '/sandbox/src', URL, COMMIT, '', '')
+    assert second[7:] == (other.url, 'a'*40, 'ADO_PLACEHOLDER', '')
+    assert fetch_command(replace(RECIPE, skip_nonregular=True), TARGET)[-1] == '1'
     assert URL not in FETCH_SCRIPT and 'github' not in FETCH_SCRIPT and 'protocol.allow=never' in FETCH_SCRIPT
     with pytest.raises(ValueError): fetch_command(replace(RECIPE, allowed_hosts=frozenset({'dev.azure.com'})), TARGET)
 
@@ -209,8 +210,8 @@ def git(repo, *args, input=None, env=()):
                           capture_output=True, env=ENV | dict(env)).stdout
 
 
-def script(text, workdir, url='', commit='', name=''):
-    return subprocess.run(['/bin/sh', '-euc', text, 'corsair-source-fetch', '/bin/sh', GIT, str(workdir), url, commit, name],
+def script(text, workdir, url='', commit='', name='', skip=''):
+    return subprocess.run(['/bin/sh', '-euc', text, 'corsair-source-fetch', '/bin/sh', GIT, str(workdir), url, commit, name, skip],
                           capture_output=True, env=ENV)
 
 
@@ -278,6 +279,48 @@ def test_materialized_bytes_match_capture_without_checkout_transformations(fixtu
         with pytest.raises(SourceFetchRefused) as error: admit_fetch(mutated(name, change), captured, recipe, target)
         assert error.value.layer == 'source_admission', name
     assert admit_fetch(mutated('unchanged', lambda w: None), captured, recipe, target).file_count == 4
+
+
+def nonregular_commit(repo, entry):
+    blob = git(repo, 'hash-object', '-w', '--stdin', input=b'/etc/passwd').strip()
+    plain = b'100644 blob ' + blob + b'\tplain\0'
+    subtree = git(repo, 'mktree', '-z', input=b''.join(sorted([plain, entry.replace(b'{blob}', blob)],
+                                                               key=lambda e: e.split(b'\t')[1]))).strip()
+    tree = git(repo, 'mktree', '-z', input=b'040000 tree ' + subtree + b'\tdir\0').strip()
+    raw = b'tree '+tree+b'\nauthor Fixture <fixture@invalid> 1 +0000\ncommitter Fixture <fixture@invalid> 1 +0000\n\nfixture\n'
+    commit = git(repo, 'hash-object', '-t', 'commit', '-w', '--stdin', input=raw).strip().decode()
+    git(repo, 'update-ref', 'refs/heads/nonregular', commit)
+    return commit
+
+
+@pytest.mark.parametrize('entry,mode', [(b'120000 blob {blob}\tlink\0', '120000'),
+                                        (b'160000 commit ' + b'a'*40 + b'\tmodule\0', '160000')])
+def test_skipped_entries_match_a_capture_that_skipped_them(fixture_repo, tmp_path, entry, mode):
+    repo, _, _ = fixture_repo
+    if not PRLIMIT: pytest.skip('prlimit not installed; GitSource capture needs it')
+    commit = nonregular_commit(repo, entry)
+    root = tmp_path/'capture'; root.mkdir(mode=0o700); (root/'objects').mkdir(mode=0o700); (root/'receipts').mkdir(mode=0o700)
+    with LocalArtifacts(root/'objects', max_bytes=1024*1024) as store, GitSource(
+            pin(GIT), pin(PRLIMIT), store=store, limits=SourceLimits(), receipts=root/'receipts', skip_nonregular=True) as source:
+        captured = source.capture(repo, commit, uuid4())
+    assert [(e.path, e.mode) for e in captured.skipped] == [('dir/link' if mode == '120000' else 'dir/module', mode)]
+    work = tmp_path/'work'; work.mkdir(); git(work, 'init', '-q')
+    git(work, '-c', 'protocol.file.allow=always', 'fetch', '-q', '--depth=1', 'file://'+str(repo), commit)
+    result = script(MATERIALIZE_SCRIPT, work, commit=commit, skip='1')
+    assert result.returncode == 0, result.stderr
+    assert sorted(os.listdir(work/'dir')) == ['plain'] and b'\nskip '+mode.encode() in result.stdout
+    recipe = replace(RECIPE, workdir=str(work), skip_nonregular=True)
+    target = FetchTarget(URL, commit)
+    assert admit_fetch(receipt(result.stdout), captured, recipe, target).file_count == 1
+    with pytest.raises(ValueError, match='recipe must skip'): admit_fetch(receipt(result.stdout), captured, RECIPE, target)
+    other = replace(captured, skipped=(replace(captured.skipped[0], object='b'*40),))
+    with pytest.raises(SourceFetchRefused, match='skipped entries differ'): admit_fetch(receipt(result.stdout), other, recipe, target)
+    with pytest.raises(SourceFetchRefused, match='skipped entries differ'):
+        admit_fetch(receipt(result.stdout), replace(captured, skipped=()), recipe, target)
+    (work/'dir/link').symlink_to('/etc/passwd')  # a skipped path that appears in the workdir anyway is refused
+    planted = script(INVENTORY_SCRIPT, work, commit=commit, skip='1')
+    with pytest.raises(SourceFetchRefused, match='non-regular entry'): admit_fetch(receipt(planted.stdout), captured, recipe, target)
+    with pytest.raises(ValueError, match='Malformed skip'): parse_fetch_receipt(result.stdout.replace(b'skip '+mode.encode(), b'skip 100644'), 64)
 
 
 @pytest.mark.parametrize('entry', [b'120000 blob {blob}\tlink\0', b'160000 commit ' + b'a'*40 + b'\tmodule\0'])

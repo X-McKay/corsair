@@ -23,6 +23,7 @@ Implement [SPEC-0037](../specs/SPEC-0037-host-source-acquisition.md): a host ste
 - [x] Review, CURRENT.md row, handoff ([HANDOFF-0059](../handoffs/HANDOFF-0059-host-source-acquisition.md)), draft PR #42.
 - [x] `GitSource`: opt-in format-only fsck ignore, opt-in recorded skip of symlinks/submodules, sizes from the tree listing, raised ceilings; tests in `tests/unit/test_artifacts.py`.
 - [x] Second full run with capture under the new options; CVE-2023-31486 fetched on RIG0.
+- [x] SPEC-0025 sandbox recipe skips and reports the same entries (`FetchRecipe.skip_nonregular`), admission matches them against the snapshot; `make test-config` 870 passed.
 
 ## Validation and progress
 

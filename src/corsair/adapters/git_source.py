@@ -15,7 +15,7 @@ from uuid import UUID
 
 from corsair.adapters.local_artifacts import ArtifactStorageError
 from corsair.adapters.receipts import ReceiptDirectory
-from corsair.ports.artifacts import ArtifactStore, SourceFile, SourceSnapshot
+from corsair.ports.artifacts import ArtifactStore, SkippedEntry, SourceFile, SourceSnapshot
 
 
 @dataclass(frozen=True)
@@ -226,7 +226,7 @@ class GitSource:
             manifest_bytes = (json.dumps(manifest_value,sort_keys=True,separators=(',',':'))+'\n').encode()
             manifest = self._store.put(manifest_bytes)
             receipt['admitted_artifacts'].append(asdict(manifest))
-            snapshot = SourceSnapshot(commit,tree,tuple(files),manifest)
+            snapshot = SourceSnapshot(commit,tree,tuple(files),manifest,tuple(SkippedEntry(**item) for item in skipped))
             receipt.update(outcome='completed',snapshot=asdict(snapshot),layer=None)
         except Exception as error:
             cause = error; receipt.update(outcome='failed',error_type=type(error).__name__,error_detail=str(error))
