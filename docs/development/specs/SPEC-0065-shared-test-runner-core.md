@@ -4,7 +4,7 @@ kind: spec
 title: One test runner core across languages
 status: draft
 updated: 2026-10-13
-related: [SPEC-0028, SPEC-0039, SPEC-0041, SPEC-0061, SPEC-0057, SPEC-0063, PLAN-0071]
+related: [SPEC-0028, SPEC-0039, SPEC-0041, SPEC-0061, PLAN-0071]
 ---
 
 # One test runner core across languages
@@ -17,7 +17,7 @@ The runners for pytest, Maven Surefire, Perl TAP, Jest and Minitest repeated the
 
 Not in scope: changing any runner's commands, ids, refusals or outcomes; the environment agent's framework admission; witnesses.
 
-## Design
+## Boundaries and design
 
 **Runner core** (`adapters/native_runner.py`). `NativeRunner` owns, for every framework:
 - the fresh workspace and its release;
@@ -64,5 +64,9 @@ Behaviour is preserved:
 - CVE-2023-31486 under Docker through the consolidated harness and runner gives the same outcomes at both revisions.
 
 Jest and Minitest move onto the core when #83 and #84 are on main. Their capture suites must pass unchanged, and their Docker cases must reproduce.
+
+## Decisions and open questions
+
+The checks after a run that really differ by framework stay in each driver: Maven's missing report, the TAP wrapper's exit 125 and each framework's allowed exit codes. A table of flags would hide them. A shared "exactly the planned ids" rule also catches a patch that brings a whole upstream test file: the CPython 3.7 sqlparse case listed 60 tests and stopped at discovery (fixed by #88).
 
 Plan: [PLAN-0071](../plans/PLAN-0071-shared-test-runner-core.md).
