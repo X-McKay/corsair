@@ -27,6 +27,7 @@ and persisting the events.
 - `run_chain` takes `observe` (default: ignore) and reports stage boundaries, revision runs and the gate. It
   never changes routing. `run_direct` takes `observe`, defaulting to the one `progress.observing()` set in the
   current context, so an entry point opts in once around its run without threading an argument through.
+- Tool events carry PydanticAI's tool-call id, so concurrent calls to one tool keep their own arguments.
 - Inside agent stages, PydanticAI's native capability hooks report activity: a per-run `Activity` capability
   (`after_model_request`, `on_model_request_error`, `wrap_tool_execute`, `on_tool_validate_error`,
   `on_output_validate_error`). It hands every value on unchanged and re-raises every error. It is attached only
@@ -36,14 +37,16 @@ and persisting the events.
   or event that raises is ignored, in the chain and in the `Activity` hooks.
 - Text is cleaned once, when the event is made: control characters, escape sequences and bidi marks are removed
   (repository and model text cannot drive or reorder the terminal); long text is cut; credentials are masked:
-  values after secret-like names (`API_KEY=…`, `password: …`, `Authorization: …`), URL userinfo, `Bearer`/`Basic`
+  the whole value of an `Authorization` or `Proxy-Authorization` header, values after secret-like names
+  (`API_KEY=…`, `password: …`), URL userinfo, `Bearer`/`Basic`
   credentials and credential-shaped `token`/`Digest` values, well-known key prefixes (`AKIA`, `ghp_`, `glpat-`,
   `sk-`, …) and private key blocks; tool arguments under secret-like names are masked whole. The environment
   agent's setup commands are free text, so this is where leaks would otherwise appear. Provider configuration is
   never an event.
 - `corsair.adapters.terminal.TerminalDisplay` (rich 15.0.0, pinned) is the view. On a terminal it shows a
   colored log under a live status line (stage, turn, budget spent, running tool). Elsewhere (a pipe, a log
-  file, `TERM=dumb`) it prints plain UTC-timestamped lines with no colors, cursor movement or wrapping;
+  file, `TERM=dumb`) it prints plain UTC-timestamped lines, including a line when each tool call starts (there is no status
+  line to show a slow call), with no colors, cursor movement or wrapping;
   `NO_COLOR` removes colors. It writes to stderr, so a command's stdout (a result line or JSON) stays
   machine-readable.
 

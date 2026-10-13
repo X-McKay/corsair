@@ -62,6 +62,7 @@ class ToolCalled:
     stage: str
     tool: str
     arguments: str
+    call_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -72,6 +73,7 @@ class ToolReturned:
     outcome: Literal["ok", "retry", "error"]
     detail: str
     elapsed_seconds: float
+    call_id: str = ""  # The ToolCalled it answers; calls in one turn may finish in any order
 
 
 @dataclass(frozen=True)
@@ -148,6 +150,8 @@ CREDENTIAL = r"(?=[A-Za-z._~+/=-]*[0-9])[A-Za-z0-9._~+/=-]{8,}"
 SECRETS = (
     # URL userinfo: https://user:pass@host
     (re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://)[^/\s@]+@"), r"\1[masked]@"),
+    # An Authorization header's whole value, whatever its scheme or length
+    (re.compile(r"(?i)\b((?:proxy-)?authorization)(\s*[=:]\s*)[^\"',;]+"), r"\1\2[masked]"),
     # An authorization scheme and its credential: Bearer x, Basic x; token x and Digest x when x looks like one
     (re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}"), "[masked]"),
     (re.compile(rf"(?i)\b(token|digest)\s+{CREDENTIAL}"), "[masked]"),
@@ -223,18 +227,18 @@ class Activity(AbstractCapability[Any]):
         raise error
 
     async def wrap_tool_execute(self, ctx, *, call, tool_def, args, handler):
-        name, started = clean(call.tool_name, 64), perf_counter()
-        self.observe(ToolCalled(self.stage, name, preview(args)))
+        name, started, call_id = clean(call.tool_name, 64), perf_counter(), call.tool_call_id or ""
+        self.observe(ToolCalled(self.stage, name, preview(args), call_id))
         try:
             result = await handler(args)
         except ToolRetryError as retry:
-            self.observe(ToolReturned(self.stage, name, "retry", clean(retry), perf_counter() - started))
+            self.observe(ToolReturned(self.stage, name, "retry", clean(retry), perf_counter() - started, call_id))
             raise
         except Exception as error:
             self.observe(ToolReturned(self.stage, name, "error", clean(f"{type(error).__name__}: {error}"),
-                                      perf_counter() - started))
+                                      perf_counter() - started, call_id))
             raise
-        self.observe(ToolReturned(self.stage, name, "ok", "", perf_counter() - started))
+        self.observe(ToolReturned(self.stage, name, "ok", "", perf_counter() - started, call_id))
         return result
 
     async def on_tool_validate_error(self, ctx, *, call, tool_def, args, error):

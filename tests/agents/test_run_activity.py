@@ -188,6 +188,8 @@ def test_display_text_cannot_carry_terminal_controls_or_credentials():
     ('curl -H "Authorization: token abcdef1234567890" https://example.test', "curl -H", "abcdef1234567890"),
     ("API_KEY=abcdef1234567890 npm ci", "npm ci", "abcdef1234567890"),
     ("password=hunter22 make", "make", "hunter22"),
+    ('curl -H "Authorization: Basic dTpw" https://example.test', "https://example.test", "dTpw"),
+    ("Proxy-Authorization: Negotiate YIIabc def", "Proxy-Authorization", "YIIabc"),
     ("pip config set global.index-url https://user:hunter2pass@proxy:3128/simple", "@proxy:3128", "hunter2pass"),
     ("export AWS_ACCESS=AKIAABCDEFGHIJKLMNOP", "export", "AKIAABCDEFGHIJKLMNOP"),
     ("npm_config_//registry/:_authToken: glpat-abcdefgh12345678", "registry", "glpat-abcdefgh12345678"),
@@ -211,8 +213,8 @@ def test_ordinary_text_about_tokens_and_limits_is_kept():
 
 EVENTS = [StageStarted("identification"),
           ModelTurn("identification", 1, ("read_source",), False, Usage(1, 0, 1500, 2.0, 20, 16, 128000, 300)),
-          ToolCalled("identification", "read_source", 'path="a.py"'),
-          ToolReturned("identification", "read_source", "retry", "path is not in the saved source", 0.1),
+          ToolCalled("identification", "read_source", 'path="a.py"', "c1"),
+          ToolReturned("identification", "read_source", "retry", "path is not in the saved source", 0.1, "c1"),
           Retry("identification", "output", "", "1 error(s); line: must be positive"),
           StageEnded("identification", "stopped", "identification produced no output: UnexpectedModelBehavior",
                      Usage(3, 1, 4200, 9.0, 20, 16, 128000, 300)),
@@ -225,11 +227,24 @@ def test_off_a_terminal_the_display_prints_plain_unwrapped_lines():
         for event in EVENTS:
             display(event)
     lines = out.getvalue().splitlines()
-    assert "\x1b" not in out.getvalue() and len(lines) == 7
+    assert "\x1b" not in out.getvalue() and len(lines) == 8
     assert lines[1].endswith(" identification started")
-    assert 'identification tool read_source(path="a.py") retry 0.1s: path is not in the saved source' in lines[3]
+    assert lines[3].endswith('identification tool read_source(path="a.py") started')
+    assert 'identification tool read_source(path="a.py") retry 0.1s: path is not in the saved source' in lines[4]
     assert lines[-2].endswith("| turns 3 · tools 1/16 · tokens 4.2k/128k · 9s/300s")
     assert lines[-1].endswith("result stopped at identification — identification produced no output")
+
+
+def test_concurrent_calls_to_one_tool_keep_their_own_arguments():
+    out = io.StringIO()
+    with TerminalDisplay(file=out) as display:
+        for event in (ToolCalled("planning", "read_source", 'path="a.py"', "first"),
+                      ToolCalled("planning", "read_source", 'path="b.py"', "second"),
+                      ToolReturned("planning", "read_source", "error", "OSError: gone", 0.0, "second"),
+                      ToolReturned("planning", "read_source", "ok", "", 0.2, "first")):
+            display(event)
+    error, ok = out.getvalue().splitlines()[2:]
+    assert 'read_source(path="b.py") error' in error and 'read_source(path="a.py") ok' in ok
 
 
 def test_on_a_terminal_the_display_colors_its_lines_and_clears_its_status_line():

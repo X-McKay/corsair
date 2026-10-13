@@ -33,6 +33,10 @@ Implement [SPEC-0072](../specs/SPEC-0072-run-activity-display.md) on direct mode
   form, reporting built only when observed and unable to raise. After merging main: 17 activity tests passed;
   `make test-config` first runs failed the work-record check (status `implemented` is not a valid state;
   `related` named PLAN-0079, which is not on main yet), both fixed; `make test-config` then 1805 passed.
+- Codex review of 15b7e21: an `Authorization` value with a short or unknown-scheme credential was only partly
+  masked; plain mode printed nothing while a tool ran; concurrent calls to one tool could show each other's
+  arguments. Fixed: the whole header value is masked, plain mode prints a start line per tool call, tool events
+  carry the call id. 20 activity tests passed; `make test-config` 1808 passed.
 - Scripted fixture CLI (`python -m evals.fixture_e2e.run --evidence <new dir>`, no model calls) printed the
   plain view to a pipe and its JSON summary to stdout unchanged.
 - No live model, cluster or durable run.

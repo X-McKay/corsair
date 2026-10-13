@@ -48,7 +48,7 @@ class TerminalDisplay:
         self.stage: str | None = None
         self.state = ""
         self.status: Status | None = None
-        self.pending: dict[str, list[str]] = {}  # Arguments of calls not yet returned, per tool, in call order
+        self.pending: dict[str, str] = {}  # Arguments of calls not yet returned, by call id
 
     def __enter__(self) -> "TerminalDisplay":
         if self.title:
@@ -80,12 +80,15 @@ class TerminalDisplay:
                                         (spend(usage, live=True), "dim")),
                           plain=f"{stage} turn {turn}: {asked} | {spend(usage, live=True)}")
                 self.state = f"turn {turn} · {spend(usage, live=True)}"
-            case ToolCalled(stage, tool, arguments):
-                self.pending.setdefault(tool, []).append(arguments)
-                self._update(f"{self.state} · running {tool}")
-            case ToolReturned(stage, tool, outcome, detail, elapsed):
-                calls = self.pending.get(tool) or [""]
-                arguments = calls.pop(0)
+            case ToolCalled(stage, tool, arguments, call_id):
+                self.pending[call_id] = arguments
+                if self.live:
+                    self._update(f"{self.state} · running {tool}")
+                else:
+                    # No status line off a terminal: a slow or hung tool shows as started.
+                    self._line(Text(""), plain=f"{stage} tool {tool}({arguments}) started")
+            case ToolReturned(stage, tool, outcome, detail, elapsed, call_id):
+                arguments = self.pending.pop(call_id, "")
                 style = {"ok": "green", "retry": "yellow", "error": "red"}[outcome]
                 mark = {"ok": "⚙", "retry": "↻", "error": "✗"}[outcome]
                 self._sub(Text.assemble((mark + " ", style), (tool, "bold"), (f"({arguments})", "dim"), " ",
