@@ -28,7 +28,7 @@ Each agent package follows the [agent package convention](agent-packages.md): on
 | --- | --- | --- |
 | Issue identification | Reported security concern and relevant source target, or a concrete blocker | Confined source/issue reads only |
 | Environment | Successful setup recipe, dependency closure, environment evidence | Preparation sandbox commands and approved setup artifacts; no application changes or policy edits |
-| Test planning | Conditional test hypothesis, setup/preconditions, two-test specification and evidence requirements | Source and environment evidence reads only |
+| Test planning | Conditional hypothesis, existing application test seam, two native unit tests by default, validity and scoped evidence requirements | Source and environment evidence reads only |
 | Test authoring | Exactly two native tests, test patch, run command | Approved test writes and bounded development execution in the prepared environment |
 | Evidence assessment | Interpretation, citations, limitations, proposed disposition | Frozen execution and source evidence reads only |
 
@@ -40,7 +40,9 @@ Agent factories, output contracts, prompts, and toolsets are reused in direct an
 
 ## Deterministic responsibilities
 
-Deterministic nodes acquire snapshots, resolve revisions, enforce support, replay setup, verify native discovery, freeze test artifacts, execute tests, collect receipts and policy events, validate conclusions, render reports, and manage cleanup. Their checks establish execution facts; model prose cannot override them.
+Deterministic nodes acquire snapshots, resolve revisions, enforce support, replay setup, verify native discovery, freeze test artifacts, execute tests, collect receipts and policy events, validate conclusions, render reports, and manage cleanup. Their checks establish execution facts and admit explicit test-validity evidence; model prose cannot override them. Keep execution admission distinct from semantic test review. Gates consume the planned property and evidence from the real test seam; a low-level effect recorder is optional supporting evidence. Missing recorder support alone must not block a valid unit test. A passing model-authored assertion still requires source linkage and validity checks before a conclusive disposition. Unit-assertion admission consumes the existing evidence-assessment agent’s independent review bound to the exact source and frozen observation plan/test patch; retained operator review is also supported. An authoring agent cannot self-attest. Missing review yields inconclusive validity, and the existing admitted witness path remains available. This is a bounded review contract, not universal automated semantic verification.
+
+Use the same evidence contract across languages and frameworks: intended source, existing seam, benign/adversarial inputs, relevant assertions, controlled-dependency limits, discovery and fresh execution. Framework adapters translate native results; they do not add a mandatory language-specific observation mechanism. Controlled dependency doubles are permitted when they retain the real production logic that owns the tested property. Escalate to integration scope only when that property requires a real external behavior.
 
 Environment readiness requires a relevant build and a discovered, executed baseline test or admitted native control fixture. An existing unrelated suite failure is retained and assessed; it is not silently hidden or automatically equated with environment failure.
 

@@ -7,6 +7,8 @@ description: Use when creating a new Corsair agent, adding a model-facing tool t
 
 Read [the agent package convention](../../../docs/agent-packages.md) first; it is authoritative and this skill does not repeat it. Use `corsair-development` for records and `corsair-review` before finishing. This skill grants no tools, approves no graph integration and certifies nothing.
 
+For investigation agents and tools, preserve the shared unit-test-first contract across languages/frameworks/CWEs: exactly two native tests through existing real application seams; controlled dependencies retain the real logic owning the security property; source/condition/assertion validity is distinct from execution admission. Optional witnesses provide bounded supporting evidence. Do not add mandatory language-specific recorders or let missing database/filesystem telemetry alone reject a valid unit test. Evaluate both a sound seam-based test and invalid substitute/irrelevant assertions.
+
 ## New agent
 
 1. Confirm the objective is a new role rather than a change to an existing agent. Write its spec: typed input and outcomes, narrow ports, authority, failure layers and the frozen eval set it ships with.

@@ -6,6 +6,7 @@ sandbox observations). Test claims stay claims; these gates only refuse to let
 them support more than the investigation contract allows.
 """
 
+from hashlib import sha256
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -39,6 +40,13 @@ class ObservationPlan(_Frozen):
     expected_failure: ExpectedFailure
     expected_safe_behavior: Token
     frozen_patch_sha256: Sha256
+    observation_mode: Literal["unit_test", "effect_witness"] = Field(
+        default="effect_witness", exclude_if=lambda value: value == "effect_witness")
+    test_plan_sha256: Sha256 | None = Field(default=None, exclude_if=lambda value: value is None)
+
+    @property
+    def review_digest(self) -> str:
+        return sha256(self.model_dump_json().encode()).hexdigest()
 
     @model_validator(mode='after')
     def distinct_tests(self):
@@ -89,6 +97,23 @@ class SandboxEvent(_Frozen):
     touches_witness_path: bool | None
 
 
+class TestValidity(_Frozen):
+    """Independent review of frozen tests against one exact source; never author self-attestation.
+
+    Bound by trusted assessment finalization (or an independent operator review).
+    The artifact retains rationale and scope; booleans describe review conclusions,
+    not static proof.
+    """
+    __test__ = False
+    artifact_sha256: Sha256
+    observation_plan_sha256: Sha256
+    source_sha256: Sha256
+    source_linked: bool
+    condition_exercised: bool
+    assertions_relevant: bool
+    dependency_scope_valid: bool
+
+
 class RunEvidence(_Frozen):
     """One fresh execution of the frozen patch on one revision."""
     delivery: Literal['not_dispatched', 'unknown', 'acknowledged']
@@ -101,6 +126,8 @@ class RunEvidence(_Frozen):
     witness: Witness | None
     environment: EnvironmentIdentity
     sandbox_events: tuple[SandboxEvent, ...] = ()
+    source_sha256: Sha256 | None = Field(default=None, exclude_if=lambda value: value is None)
+    test_validity: TestValidity | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class AssessmentEvidence(_Frozen):
@@ -122,6 +149,7 @@ LimitationCode = Literal[
     'unplanned_failure', 'unclassified_failure', 'witness_missing', 'witness_unsupported',
     'sandbox_attributed', 'sandbox_event_recorded', 'contradiction', 'no_valid_run',
     'incomplete_repeats', 'baseline_not_reproduced', 'environment_mismatch',
+    'test_validity_missing', 'test_validity_unsupported',
     'candidate_not_safe', 'security_passed_with_effect', 'security_failed_with_safe_witness']
 
 
@@ -212,6 +240,21 @@ def _assess_run(plan: ObservationPlan, revision: Revision, index: int, run: RunE
                 and witness.safe_behavior == plan.expected_safe_behavior):
             note('security_failed_with_safe_witness')
             return done('unusable')
+    if plan.observation_mode == 'unit_test':
+        if witness is not None and witness.path_reached is False and witness.effect == 'observed':
+            note('witness_unsupported')
+            return done('unusable')
+        validity = run.test_validity
+        if validity is None:
+            note('test_validity_missing')
+            return done('unusable')
+        if (plan.test_plan_sha256 is None or run.source_sha256 is None
+                or validity.observation_plan_sha256 != plan.review_digest
+                or validity.source_sha256 != run.source_sha256
+                or not all((validity.source_linked, validity.condition_exercised,
+                            validity.assertions_relevant, validity.dependency_scope_valid))):
+            note('test_validity_unsupported')
+            return done('unusable')
     if security.outcome == 'failed':
         failure, expected = security.failure, plan.expected_failure
         if (failure is None or None in (failure.exception_type, failure.path,
@@ -223,11 +266,15 @@ def _assess_run(plan: ObservationPlan, revision: Revision, index: int, run: RunE
                 or failure.line not in expected.assertion_lines):
             note('unplanned_failure')
             return done('unusable')
+        if plan.observation_mode == 'unit_test':
+            return done('reproduces')
         if witness is None or witness.effect != 'observed' or witness.path_reached is False:
             note('witness_missing' if witness is None or witness.effect == 'unknown'
                  else 'witness_unsupported')
             return done('unusable')
         return done('reproduces')
+    if plan.observation_mode == 'unit_test':
+        return done('safe')
     if (witness is None or witness.path_reached is None or witness.effect == 'unknown'
             or witness.safe_behavior is None):
         note('witness_missing')

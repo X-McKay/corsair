@@ -18,7 +18,7 @@ from uuid import uuid4
 from corsair.adapters.docker_image import commit_tree
 from corsair.agents.issue_analysis.contracts import IssueAnalysisInput, SourceFile
 from corsair.agents.test_planning.contracts import EnvironmentEvidence
-from corsair.composition.direct import FixtureCase, SetupSource
+from corsair.composition.direct import CapturedReviewSource, FixtureCase, SetupSource
 from corsair.core.disposition import EnvironmentIdentity
 from corsair.nodes.runtime.detect import is_build_file
 from corsair.nodes.runtime.environment import RuntimeCatalog, framework_row, runtime_inputs, select_runtime
@@ -224,6 +224,11 @@ def build(request: IssueRequest, work: Path, images: dict[str, str], *, roots: t
         revision_sources={revision: _digest(commit) for revision, commit in commits.items()},
         # A real issue has no per-case envelope; the framework table's recorders bind the request (SPEC-0073).
         witness_from_recorders=True,
+        review_sources={revision: CapturedReviewSource(
+                            source_sha256=_digest(commits[revision]),
+                            files=_bounded(_readable(tree, (source.path for source in sources)),
+                                           SOURCE_FILES, SOURCE_BYTES))
+                        for revision, tree in trees.items()},
         runtime=runtime,
         setup=SetupSource(commit=request.revision, source_private=False, policy_profile=SETUP_POLICY, source_files=setup))
     return Investigation(request, case, catalog, framework, harness, outcome.selection.image_id, image, commits, trees,

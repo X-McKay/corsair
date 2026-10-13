@@ -37,7 +37,8 @@ The remaining 1A admission commands and limitations are documented in the [admis
 - Keep a fixed graph of five focused agents and deterministic evidence gates.
 - Use small ports and SDK-backed adapters for external capabilities. Local model endpoints and Bedrock, and GitHub and Azure DevOps, must be interchangeable through explicit configuration.
 - Support isolated agent execution with and without Temporal, and with fixture/local execution or OpenShell.
-- Preserve scope, test validity, and application observations separately from sandbox enforcement.
+- Default to exactly two native unit tests through existing application seams across languages and frameworks; use inputs, outputs, specific exceptions, fixture state and controlled dependencies, and require integration evidence when the property needs it.
+- Preserve scope, test validity, and application observations separately from execution and sandbox enforcement. Witness instrumentation supports evidence where useful; missing low-level telemetry alone does not invalidate a sound unit test.
 - Use immutable artifacts, explicit invalidation, attributable failures, and tested recovery and cleanup.
 - Measure outcomes, trajectories, consistency, grounding, robustness, security, durability, efficiency, and composition.
 - Exclude repository-supplied environment hint files from the initial release. Discover setup from existing repository documentation, manifests, and CI.

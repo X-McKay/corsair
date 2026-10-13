@@ -118,6 +118,20 @@ class TestPlanningInput(Contract):
         return sha256(self.model_dump_json().encode("utf-8")).hexdigest()
 
 
+class PlannedObservation(Contract):
+    """A native assertion at an existing application seam, shared across runtimes."""
+    kind: Literal["return_value", "exception", "fixture_state", "dependency_call"]
+    property: Fact = Field(description="The concrete application property asserted by this test")
+    seam: Fact = Field(description="Existing test seam through which the real implementation is called and observed")
+    controlled_dependency: Fact | None = Field(default=None, description="Dependency double and its bounded behavior; never a replacement for the implementation under test")
+
+    @model_validator(mode="after")
+    def dependency_description(self) -> "PlannedObservation":
+        if self.kind == "dependency_call" and self.controlled_dependency is None:
+            raise ValueError("dependency_call requires a controlled_dependency description")
+        return self
+
+
 class TestSpecification(Contract, Generic[Citation]):
     __test__ = False
 
@@ -127,11 +141,20 @@ class TestSpecification(Contract, Generic[Citation]):
     implementation_call: Fact = Field(description="The real implementation call, naming the identified target")
     input: Fact
     required_behavior: Fact = Field(description="Specific required behavior; for security, a specific rejection or absence of effect, never an arbitrary exception")
-    observable_witness: Fact = Field(description="Explanation of the witness, separating the application observation from any sandbox observation; never read by a gate")
-    witness: PlannedWitness
+    observable_witness: Fact = Field(description="Explanation of the native assertion or witness and its scope; sandbox observations are separate; never read by a gate")
+    witness: PlannedWitness | None = None
+    observation: PlannedObservation | None = None
     source_references: tuple[Citation, ...] = Field(min_length=1, max_length=8)
 
     _path = field_validator("test_path")(confined_path)
+
+    @model_validator(mode="after")
+    def observation_required(self) -> "TestSpecification[Citation]":
+        if self.witness is None and self.observation is None:
+            raise ValueError("a test without a witness requires a typed unit-test observation")
+        if self.witness is not None and self.observation is not None:
+            raise ValueError("choose a unit-test observation or a legacy witness for each test")
+        return self
 
 
 class SecurityExpectation(Contract):
@@ -160,6 +183,8 @@ class _ReadyPlan(Contract, Generic[Citation]):
     def two_distinct_admitted_tests(self, info: ValidationInfo) -> "_ReadyPlan[Citation]":
         if self.control.test_id == self.security.test_id:
             raise ValueError("control and security tests need distinct test ids")
+        if (self.control.witness is None) != (self.security.witness is None):
+            raise ValueError("control and security must use the same observation mode")
         environment = _environment(info)
         if environment is not None:
             # SPEC-0022 precondition, admitted in code: without an executed baseline no native test is known to run.
@@ -176,6 +201,8 @@ class _ReadyPlan(Contract, Generic[Citation]):
 
 def planned_witnesses(plan: "_ReadyPlan", environment: EnvironmentEvidence) -> None:
     """SPEC-0040 admission: typed witnesses against the operator's facilities, checked without reading prose."""
+    if plan.control.witness is None and plan.security.witness is None:
+        return
     facilities = {facility.id: facility for facility in environment.witness_facilities}
     for name, spec, expected in (("control", plan.control, "occurs"), ("security", plan.security, "absent")):
         witness = spec.witness

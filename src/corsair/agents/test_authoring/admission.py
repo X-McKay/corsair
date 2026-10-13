@@ -148,8 +148,12 @@ def _imported(node: ast.Import | ast.ImportFrom) -> list[str]:
     return [node.module, *(f"{node.module}.{alias.name}" for alias in node.names)]
 
 
-def self_observation(content: str) -> tuple[AdmissionFinding, ...]:
-    """Every construct in ``content`` that observes, forges or replaces a witnessed facility, by line."""
+def self_observation(content: str, *, witness_required: bool = True) -> tuple[AdmissionFinding, ...]:
+    """Reject interpreter tampering; witness mode also excludes dependency recording doubles.
+
+    Unit observation permits native mock libraries at application dependency seams. This
+    syntax check cannot prove target execution or that a double replaces only a dependency.
+    """
     try:
         tree = ast.parse(content)
     except SyntaxError:
@@ -164,13 +168,25 @@ def self_observation(content: str) -> tuple[AdmissionFinding, ...]:
     def refuse(node: ast.AST, construct: str) -> None:
         found[(getattr(node, "lineno", 1), construct)] = None
 
+    def protected(target: str | None) -> bool:
+        if witness_required:
+            return _protected(target)
+        # Unit tests may replace an application-owned dependency reference even
+        # when it is named open or subprocess. The semantic review must establish
+        # that it is a dependency seam and the real target remains executable.
+        if not target or _unobserved(target):
+            return False
+        return target.split(".")[0] in PATCHED or any(
+            target == exact or target.startswith(exact + ".") for exact in PATCHED_EXACT)
+
+    refused_modules = MODULES if witness_required else MODULES - {"unittest.mock", "mock", "pytest_mock"}
     for node in ast.walk(tree):
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             if isinstance(node, ast.ImportFrom) and not node.level and any(a.name == "*" for a in node.names) and (
                     node.module in STAR_REFUSED or node.module in PATCHED):
                 refuse(node, f"import {node.module}.*")
             for name in _imported(node):
-                if name in MODULES or name.split(".")[0] in MODULES - {"unittest.mock"}:
+                if name in refused_modules or name.split(".")[0] in refused_modules - {"unittest.mock"}:
                     refuse(node, f"import {name}")
                 if name in {f"sys.{facility}" for facility in SYS_FACILITIES} | {
                         f"threading.{facility}" for facility in THREADING_FACILITIES}:
@@ -188,7 +204,7 @@ def self_observation(content: str) -> tuple[AdmissionFinding, ...]:
                 refuse(node, node.id)
             elif node.id in {"__builtins__", "__import__"}:
                 refuse(node, node.id)
-        elif isinstance(node, ast.arg) and node.arg == "mocker":
+        elif witness_required and isinstance(node, ast.arg) and node.arg == "mocker":
             refuse(node, "mocker fixture")
         elif isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value in NAMES:
             refuse(node, f"string {node.value!r}")
@@ -203,7 +219,7 @@ def self_observation(content: str) -> tuple[AdmissionFinding, ...]:
                     # As for patch calls, a module's own binding of a protected name is protected too:
                     # documents.open = f replaces the application's observed open as surely as builtins.open.
                     key = _key(element)
-                    if _protected(resolved) or (resolved and key in PATCHED and not _unobserved(resolved)):
+                    if protected(resolved) or (witness_required and resolved and key in PATCHED and not _unobserved(resolved)):
                         refuse(node, f"{verb} {resolved or key}")
         if isinstance(node, ast.Call):
             func = _dotted(node.func)
@@ -223,7 +239,7 @@ def self_observation(content: str) -> tuple[AdmissionFinding, ...]:
                     literal = isinstance(argument, ast.Constant) and isinstance(argument.value, str)
                     patched = argument.value if literal else _module_path(argument, aliases)
                     named = next((n.value for n in names if isinstance(n, ast.Constant) and isinstance(n.value, str)), None)
-                    if _protected(patched) or (not literal and patched and named in PATCHED and not _unobserved(patched)):
+                    if protected(patched) or (witness_required and not literal and patched and named in PATCHED and not _unobserved(patched)):
                         refuse(node, f"{func}({patched})")
                         break
                     # A computed member name hides what is patched: name = "open"; setattr(documents, name, f).
@@ -233,7 +249,7 @@ def self_observation(content: str) -> tuple[AdmissionFinding, ...]:
                         break
             elif isinstance(node.func, ast.Attribute) and node.func.attr in MUTATORS:
                 receiver = _module_path(node.func.value, aliases)
-                if _protected(receiver):
+                if protected(receiver):
                     refuse(node, f"{receiver}.{node.func.attr}()")
     return tuple(AdmissionFinding(line=line, facility=construct[:128]) for line, construct in sorted(found))
 

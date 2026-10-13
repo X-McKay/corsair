@@ -638,3 +638,61 @@ def test_prompted_output_with_leading_prose_needs_no_correction():
     assert isinstance(result.output, TestPatch) and not retries
     final = result.all_messages()[-1]
     assert final.provider_details[PROSE_KEY].strip().startswith("Both tests were discovered")
+
+
+def test_unit_observation_admits_native_dependency_double_but_preserves_interpreter_boundary():
+    content = "from unittest.mock import Mock\nfrom app import construct_query\n\ndef test_query():\n    db = Mock()\n    construct_query(db, 'hostile')\n    assert db.execute.call_args.args == ('SELECT x WHERE id = ?', ('hostile',))\n"
+    assert self_observation(content, witness_required=False) == ()
+    assert self_observation(content)  # Existing witness plans retain their anti-interference policy.
+    assert self_observation("from unittest.mock import patch\nwith patch('sys.modules', {}):\n    pass\n",
+                            witness_required=False)
+    assert self_observation("import sys\nsys.settrace(lambda *args: None)\n", witness_required=False)
+
+
+@pytest.mark.parametrize("variant, expected_exit, outcomes", [
+    ("unsafe", 1, {"test_benign_control": "passed", "test_security_preserves_query_structure": "failed"}),
+    ("safe", 0, {"test_benign_control": "passed", "test_security_preserves_query_structure": "passed"}),
+])
+def test_reviewed_native_query_construction_pair_requires_no_database(tmp_path, variant, expected_exit, outcomes):
+    """Run only repository-owned fixture bytes; native pytest receipts show the pair discriminates sources."""
+    import os
+    from pathlib import Path
+    import subprocess
+    import sys
+    import xml.etree.ElementTree as ET
+
+    fixture = Path(__file__).resolve().parents[2] / "benchmarks/fixtures/sql-query-construction"
+    (tmp_path / "queries.py").write_bytes((fixture / variant / "queries.py").read_bytes())
+    content = (fixture / "test_queries.py").read_bytes()
+    assert self_observation(content.decode(), witness_required=False) == ()
+    (tmp_path / "test_queries.py").write_bytes(content)
+    receipt = subprocess.run(
+        [sys.executable, "-m", "pytest", "-c", "/dev/null", "--noconftest", "--rootdir", ".",
+         "--import-mode=importlib", "-p", "no:cacheprovider", "--junitxml=results.xml", "test_queries.py"],
+        cwd=tmp_path, env={"PATH": os.environ["PATH"], "PYTHONPATH": ".", "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
+        capture_output=True, timeout=30,
+    )
+    assert receipt.returncode == expected_exit, receipt.stdout.decode() + receipt.stderr.decode()
+    cases = ET.parse(tmp_path / "results.xml").findall(".//testcase")
+    assert {case.attrib["name"]: "failed" if case.find("failure") is not None else "passed" for case in cases} == outcomes
+    for case in cases:
+        assert case.find("error") is None and case.find("skipped") is None
+
+
+def test_unit_dependency_references_are_allowed_while_global_facilities_stay_protected():
+    seams = (
+        "from unittest.mock import patch\nwith patch('app.open', recording_open):\n    app.load_file('x')\n",
+        "import app\ndef test_load(monkeypatch):\n    monkeypatch.setattr(app, 'open', recording_open)\n    app.load_file('x')\n",
+        "import app\napp.subprocess = recording_process\n",
+    )
+    for content in seams:
+        assert self_observation(content, witness_required=False) == ()
+        assert self_observation(content)
+    for content in (
+        "from unittest.mock import patch\nwith patch('builtins.open', recording_open):\n    pass\n",
+        "import os\nos.open = recording_open\n",
+        "import sys\nsys.modules['app'] = fake_target\n",
+    ):
+        assert self_observation(content, witness_required=False)
+    # Whether app.open is the target or its dependency is a semantic review question.
+    # Admission permits the syntax and never claims that replacing the target is valid.

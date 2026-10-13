@@ -21,6 +21,10 @@ Resolve paths from the repository root. Read `AGENTS.md`, `docs/development/READ
 3. For agent changes, select relevant evaluation dimensions from `docs/evaluation-and-acceptance.md`. Use saved inputs, frozen cases and native instrumentation; record modes, repeat counts, usage/trace coverage and regression evidence.
 4. When blocked, retain the command/native error and evidence reference, open/update the repository issue, and mark the plan blocked. Continue useful authorized work that does not depend on the missing gate. Do not add undocumented environment patches or weaken acceptance.
 
+## Investigation changes
+
+Default to exactly two native unit tests around existing real application seams, for every language/framework/CWE. Plans and authoring must identify the intended source, reported condition, benign/adversarial inputs, relevant assertions, observation boundary and dependency-double limits. A recording database or process double can establish construction behavior when the real construction logic remains exercised; integration evidence is required for engine or shell behavior. Keep semantic test-validity checks separate from fresh discovery/execution. Optional witnesses may strengthen evidence but missing low-level telemetry alone must not block a sound test. Passing generated assertions alone do not prove validity; retain review and calibration evidence. Prefer this shared contract over a new language-specific recorder.
+
 ## Validate and record
 
 - Run `make test-config` for fast repository guards. Run affected component/live/replay/evaluation checks when their boundary changes. Do not rerun Docker qualification for a documentation-only change.

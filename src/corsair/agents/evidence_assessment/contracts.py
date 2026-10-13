@@ -6,7 +6,7 @@ from typing import Annotated, Generic, Literal, TypeVar
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from corsair.core.disposition import (Admission, AssessmentEvidence, Disposition, Execution, Finding,
-                                      Fix, Limitation, ObservationPlan)
+                                      Fix, GateResult, Limitation, ObservationPlan)
 
 MAX_ITEM_CHARS = 16384
 MAX_ITEMS = 32
@@ -25,10 +25,12 @@ class EvidenceItem(Contract):
     """One frozen artifact admitted for this run; content is untrusted workload text."""
     item_id: ItemId
     kind: Literal["plan", "patch", "junit", "witness", "receipt", "stdout", "stderr",
-                  "sandbox_log", "environment"]
+                  "sandbox_log", "environment", "source", "test_validity"]
     revision: Literal["baseline", "candidate"] | None
     run: int | None = Field(default=None, ge=0)
     sha256: str = Field(pattern=r'^[0-9a-f]{64}$')
+    source_sha256: str | None = Field(default=None, pattern=r'^[0-9a-f]{64}$',
+                                     exclude_if=lambda value: value is None)
     content: str = Field(min_length=1, max_length=MAX_ITEM_CHARS)
 
     @model_validator(mode="after")
@@ -102,6 +104,16 @@ class Observation(Contract, Generic[Citation]):
     citations: tuple[Citation, ...] = Field(min_length=1, max_length=8)
 
 
+class ValidityReview(Contract, Generic[Citation]):
+    """Independent assessment of the frozen test property against one revision."""
+    revision: Literal["baseline", "candidate"]
+    source_linked: bool
+    condition_exercised: bool
+    assertions_relevant: bool
+    dependency_scope_valid: bool
+    rationale: Observation[Citation]
+
+
 class _Proposal(Contract, Generic[Citation]):
     execution: Execution
     finding: Finding
@@ -110,6 +122,7 @@ class _Proposal(Contract, Generic[Citation]):
     sandbox_observations: tuple[Observation[Citation], ...] = Field(max_length=8)
     interpretation: Observation[Citation]
     limitations: tuple[Fact, ...] = Field(min_length=1, max_length=16)
+    validity_reviews: tuple[ValidityReview[Citation], ...] = Field(default=(), max_length=2)
 
 
 class ProposedDispositionDraft(_Proposal[EvidenceReference]):
@@ -120,6 +133,8 @@ class EvidenceAssessment(_Proposal[EvidenceExcerpt]):
     """Final stage output: the proposal, the gate's ruling and the disposition that stands."""
     admission: Admission
     gate_limitations: tuple[Limitation, ...]
+    gate_result: GateResult | None = Field(default=None, exclude_if=lambda value: value is None)
+    evidence: AssessmentEvidence | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @property
     def disposition(self) -> Disposition:

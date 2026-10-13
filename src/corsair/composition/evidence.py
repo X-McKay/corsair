@@ -12,9 +12,10 @@ import re
 from corsair.agents.evidence_assessment.contracts import MAX_ITEM_CHARS, EvidenceItem
 from corsair.agents.issue_identification.contracts import IssueIdentification
 from corsair.agents.test_authoring.contracts import TestPatch
+from corsair.agents.source.contracts import SourceFile
 from corsair.agents.test_planning.contracts import PlannedWitness, ReadyTestPlan, WitnessFacility
 from corsair.core.disposition import (ClassifiedFailure, EnvironmentIdentity, ExpectedFailure, ObservationPlan,
-                                      ObservedOutcome, Revision, RunEvidence, SandboxEvent, Witness)
+                                      ObservedOutcome, Revision, RunEvidence, SandboxEvent, TestValidity, Witness)
 from corsair.ports.execution import ExecutionReceipt
 from corsair.ports.test_runner import ApprovedPatch, NativeTestRun, PatchFile, TestCaseResult, WitnessRequest
 
@@ -36,7 +37,9 @@ def observation_plan(plan: ReadyTestPlan, patch: TestPatch) -> ObservationPlan:
                                          function=plan.security.test_id.split('::')[-1],
                                          assertion_lines=patch.security_assertion_lines),
         expected_safe_behavior=plan.security_expectation.safe_behavior,
-        frozen_patch_sha256=patch.patch_sha256)
+        frozen_patch_sha256=patch.patch_sha256,
+        observation_mode="unit_test" if plan.security.observation is not None else "effect_witness",
+        test_plan_sha256=sha256(plan.model_dump_json().encode()).hexdigest())
 
 
 # The effects the operator probe records (SPEC-0033); a recorder of any other kind cannot bind a request yet.
@@ -44,7 +47,7 @@ PROBE_EFFECTS = frozenset({"file_open"})
 
 
 def witness_request(identification: IssueIdentification, envelope: WitnessRequest | None,
-                    planned: PlannedWitness, recorders: tuple[WitnessFacility, ...] = ()) -> WitnessRequest:
+                    planned: PlannedWitness | None, recorders: tuple[WitnessFacility, ...] = ()) -> WitnessRequest:
     """The operator's approved envelope, used only when the admitted identification names exactly its target
     and the plan's security witness is the effect that envelope records.
 
@@ -56,6 +59,8 @@ def witness_request(identification: IssueIdentification, envelope: WitnessReques
     Until SPEC-0040 binds the plan's subject at execution, a planned effect the probe does not record, or a
     subject other than the envelope's file, is refused here so its gates stay inconclusive.
     """
+    if planned is None:
+        raise ValueError('unit test plan does not request instrumentation')
     if identification.status != 'ready' or identification.target is None:
         raise ValueError('a witness needs a ready identification target')
     target = identification.target
@@ -114,7 +119,8 @@ def _receipt(observed: NativeTestRun) -> ExecutionReceipt | None:
 
 
 def run_evidence(observed: NativeTestRun, *, environment: EnvironmentIdentity, witness: Witness | None = None,
-                 sandbox_events: tuple[SandboxEvent, ...] | None = None) -> RunEvidence:
+                 sandbox_events: tuple[SandboxEvent, ...] | None = None,
+                 test_validity: TestValidity | None = None) -> RunEvidence:
     """One fresh native run as gate input. Delivery and completion come from the last receipt.
 
     The gate reads an empty event tuple as observed absence, so a witness is admitted only together with
@@ -140,17 +146,18 @@ def run_evidence(observed: NativeTestRun, *, environment: EnvironmentIdentity, w
         delivery=delivery, completion=completion, execution_failure=failure, patch_sha256=observed.patch_sha256,
         discovered_test_ids=observed.discovery.test_ids if observed.discovery is not None else (),
         outcomes=tuple(_outcome(case) for case in cases), witness=witness, environment=environment,
-        sandbox_events=sandbox_events or ())
+        sandbox_events=sandbox_events or (), test_validity=test_validity,
+        source_sha256=observed.workspace.source.sha256 if observed.workspace is not None else None)
 
 
 def _item(item_id: str, kind: str, content: str, revision: Revision | None = None,
-          run: int | None = None) -> EvidenceItem:
+          run: int | None = None, source_sha256: str | None = None) -> EvidenceItem:
     if len(content) > MAX_ITEM_CHARS:
         marker = f'\n[truncated by trusted code from {len(content)} characters]'
         content = content[:MAX_ITEM_CHARS - len(marker)] + marker
     content = content or '(empty)'
     return EvidenceItem(item_id=item_id, kind=kind, revision=revision, run=run,
-                        sha256=sha256(content.encode('utf-8')).hexdigest(), content=content)
+                        sha256=sha256(content.encode('utf-8')).hexdigest(), content=content, source_sha256=source_sha256)
 
 
 def _receipt_summary(observed: NativeTestRun) -> str:
@@ -168,15 +175,34 @@ def _receipt_summary(observed: NativeTestRun) -> str:
 
 def evidence_items(plan: ObservationPlan, patch: TestPatch, environment: EnvironmentIdentity,
                    runs: dict[Revision, tuple[NativeTestRun, ...]],
-                   admitted: frozenset[Revision] | set[Revision] = frozenset()) -> tuple[EvidenceItem, ...]:
+                   admitted: frozenset[Revision] | set[Revision] = frozenset(),
+                   validity: dict[Revision, TestValidity] | None = None,
+                   review_sources: dict[Revision, tuple[SourceFile, ...]] | None = None,
+                   test_plan: ReadyTestPlan | None = None, issue: str | None = None) -> tuple[EvidenceItem, ...]:
     """Frozen artifacts the assessment agent may read; revisions are named baseline and candidate only."""
     items = [_item('plan', 'plan', plan.model_dump_json(indent=2)),
              _item('environment', 'environment', environment.model_dump_json(indent=2))]
+    if review_sources is not None:
+        if test_plan is not None:
+            items.append(_item('test-plan', 'plan', test_plan.model_dump_json(indent=2)))
+        if issue is not None:
+            items.append(_item('reported-condition', 'plan', issue))
+        for revision, sources in review_sources.items():
+            if revision not in runs:
+                continue
+            for index, source in enumerate(sources):
+                items.append(_item(f'{revision}-source-{index}', 'source',
+                                   f'Path: {source.path}\n{source.content}', revision, 0,
+                                   source_sha256=(runs[revision][0].workspace.source.sha256
+                                                  if runs[revision][0].workspace is not None else None)))
     items += [_item(f'patch-{index}', 'patch', item.content) for index, item in enumerate(patch.files)]
     for revision, observed_runs in runs.items():
         for index, observed in enumerate(observed_runs):
             prefix = f'{revision}-{index}'
             items.append(_item(f'{prefix}-receipt', 'receipt', _receipt_summary(observed), revision, index))
+            if validity and revision in validity:
+                items.append(_item(f'{prefix}-test-validity', 'test_validity',
+                                   validity[revision].model_dump_json(indent=2), revision, index))
             execution = observed.execution
             if execution is not None and execution.receipt is not None and execution.receipt.stdout:
                 # The runner's wrapper prints exactly the native JUnit file on stdout.

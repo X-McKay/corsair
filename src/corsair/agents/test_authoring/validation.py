@@ -40,7 +40,7 @@ async def finalize_authoring(ctx: RunContext[AuthoringDependencies], result: Aut
         raise ModelRetry("the last run was a workspace failure: the workspace refused or failed before any test ran, "
                          "which no test edit can fix; return blocked with layer sandbox when the errors show a sandbox "
                          "refusal, otherwise unknown, and quote the observed reason")
-    if any(self_observation(content) for content in files.values()):
+    if any(self_observation(content, witness_required=plan.security.witness is not None) for content in files.values()):
         raise RuntimeError("an admitted write contains a refused construct")  # write_test_file refuses these
     patch = approved_patch(files, inputs.environment.approved_test_paths)
     if final.patch_sha256 != patch.sha256:
@@ -63,7 +63,7 @@ async def finalize_authoring(ctx: RunContext[AuthoringDependencies], result: Aut
                          f" at line {final.security.failure_line}, not through its planned {planned} assertion; an error"
                          " before the planned assertion cannot distinguish the revisions: fix the observed error and run"
                          " again, or return blocked")
-    if final.security_contradicts_witness:
+    if final.security_contradicts_witness and plan.security.witness is not None:
         # Gap 11: the gate would classify this run security_passed_with_effect; nothing the test asserts sees the effect.
         raise ModelRetry("the final run's security test passed although the operator witness recorded the target "
                          f"performing the planned effect on {plan.security.witness.subject}: its assertion cannot detect "

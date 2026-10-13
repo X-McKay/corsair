@@ -48,6 +48,14 @@ An issue can stay open while its dependent plan is blocked. A template, render, 
 5. **Validate and review:** Run the smallest meaningful suite, then affected consumers and necessary live/durable/agent evaluations. Apply the review skill; retain failed attempts, actual coverage and unknowns.
 6. **Record and hand off:** Update the living records/current index, add a handoff snapshot, and report actual outcome/next steps. Commit and publish according to user authorization. Existing design docs remain the architectural source of truth.
 
+## Maintain the unit-test approach
+
+For new and ongoing investigation work, follow the [investigation contract](../investigation-contract.md): exactly the benign control and security regression through existing real application seams. The shared observation and validity contracts apply across languages, frameworks and CWEs. Native adapters handle discovery, execution and reporting; do not introduce per-CWE verdict logic or mandatory language-specific recorders.
+
+Every investigation change explains the measured property, actual source target, assertion, dependency-double boundary and independent validity evidence. Review both a valid native test and a relevant invalid case, such as a substituted implementation, irrelevant assertion or a double that supplies the safety guard. If integration is needed, record which part of the property cannot be established at the unit seam and retain that scope in the report. Keep passing test claims distinct from independent validity review. Existing witness implementations are compatibility/supporting paths, not a template for new investigation requirements.
+
+Carry these decisions into active plans and handoffs when work resumes. The development, review, scaffold and base-image skills and PR checklist use this same contract. A documentation or prompt change is not proof of live model behavior; compare the affected agent evaluations and record qualification limits.
+
 ## Isolated agent evaluation
 
 Each agent is improved through its own loop, independent of the cluster and of other workstreams ([SPEC-0044](specs/SPEC-0044-isolated-agent-evaluation.md)):

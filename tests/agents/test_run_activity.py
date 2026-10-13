@@ -57,8 +57,8 @@ def test_a_complete_run_reports_each_stage_revision_and_the_gate_in_order(store,
         ("StageStarted", "execution", None),
         ("RevisionStarted", "baseline", None), ("RevisionEnded", "baseline", "ran"),
         ("RevisionStarted", "candidate", None), ("RevisionEnded", "candidate", "ran"),
-        ("StageEnded", "execution", "ready"), ("GateDecided", None, None),
-        *agent("assessment"), ("RunEnded", None, None)]
+        ("StageEnded", "execution", "ready"),
+        *agent("assessment"), ("GateDecided", None, None), ("RunEnded", None, None)]
     assert events[-1].verdict and events[-1].stopped_at is None
     # Each agent stage's end carries what it spent against its own caps, as its attempt records them.
     ended = {e.stage: e.usage for e in events if isinstance(e, StageEnded) and e.usage}

@@ -47,9 +47,9 @@ def run(security, sandbox_events=()):
                        witness=witness, environment=ENV, sandbox_events=sandbox_events)
 
 
-def item(item_id, kind, content, revision=None, run_index=None):
+def item(item_id, kind, content, revision=None, run_index=None, source_sha256=None):
     return EvidenceItem(item_id=item_id, kind=kind, revision=revision, run=run_index,
-                        sha256=digest(content), content=content)
+                        sha256=digest(content), content=content, source_sha256=source_sha256)
 
 
 JUNIT_FAIL = '<testcase name="test_benign_control"/>\n<testcase name="test_security_rejects_outside_read">\n<failure>test_documents.py:64: AssertionError</failure>'
@@ -291,3 +291,130 @@ def test_incomplete_baseline_repeat_preserves_cited_reproduction():
     result = assess_with(scripted(draft(execution='unknown', fix='not_verified')), data).output
     assert result.admission.admitted and result.finding == 'reproduced'
     assert 'incomplete_repeats' in {limitation.code for limitation in result.gate_limitations}
+
+
+def unit_inputs():
+    plan = PLAN.model_copy(update={'observation_mode': 'unit_test', 'test_plan_sha256': digest('test-plan')})
+    baseline = run('failed').model_copy(update={'witness': None, 'source_sha256': digest('baseline-source')})
+    candidate = run('passed').model_copy(update={'witness': None, 'source_sha256': digest('candidate-source')})
+    data = inputs(witnesses=False)
+    return data.model_copy(update={'evidence': AssessmentEvidence(plan=plan, baseline=(baseline,), candidate=(candidate,)),
+        'items': tuple(i for i in data.items if i.kind != 'plan') + (
+            item('plan', 'plan', plan.model_dump_json()),
+            item('test-plan', 'plan', 'real query seam; adversarial condition; required parameter binding'),
+            item('reported-condition', 'plan', 'reported SQL injection through user input'),
+            item('patch', 'patch', 'control calls real query function; security asserts bound parameters'),
+            item('baseline-source', 'source', 'def query(input): return "SELECT " + input', 'baseline', 0, digest('baseline-source')),
+            item('candidate-source', 'source', 'def query(input): return "SELECT ?", (input,)', 'candidate', 0, digest('candidate-source')))})
+
+
+def unit_draft(**changes):
+    reviews = [{'revision': revision, 'source_linked': True, 'condition_exercised': True,
+                'assertions_relevant': True, 'dependency_scope_valid': True,
+                'rationale': observation('Real query construction is exercised with recording dependency; assertions check binding',
+                    (f'{revision}-source', 1, 1), ('patch', 1, 1), ('plan', 1, 1), ('test-plan', 1, 1), ('reported-condition', 1, 1))}
+               for revision in ('baseline', 'candidate')]
+    return draft(**JUNIT_ONLY, validity_reviews=reviews) | changes
+
+
+def unit_assess(output, data=None, reads=None):
+    data = data or unit_inputs()
+    reads = reads or tuple(i.item_id for i in data.items)
+    agent = create_evidence_assessment_agent(scripted(output, reads=reads), output_retries=0)
+    return agent.run_sync(assessment_prompt(data), deps=AssessmentDependencies(data),
+        usage_limits=UsageLimits(request_limit=12, tool_calls_limit=10)).output
+
+
+def test_independent_unit_review_admits_without_database_witness():
+    result = unit_assess(unit_draft())
+    assert result.disposition.fix == 'verified'
+    assert result.gate_result.permitted.fix == 'verified'
+    assert len(result.validity_reviews) == 2
+    for revision in ('baseline', 'candidate'):
+        run_evidence = getattr(result.evidence, revision)[0]
+        assert run_evidence.witness is None
+        assert run_evidence.test_validity.observation_plan_sha256 == result.evidence.plan.review_digest
+        assert run_evidence.test_validity.source_sha256 == run_evidence.source_sha256
+    assert result.validity_reviews[0].rationale.citations[0].quote.startswith('def query')
+
+
+def test_missing_unit_review_remains_inconclusive():
+    result = unit_assess(unit_draft(validity_reviews=[]))
+    assert result.disposition.finding == 'inconclusive'
+    assert 'test_validity_missing' in {lim.code for lim in result.gate_limitations}
+
+
+def test_unit_review_rejects_irrelevant_assertion_and_substituted_security_logic():
+    output = unit_draft()
+    output['validity_reviews'][0] |= {'assertions_relevant': False, 'dependency_scope_valid': False}
+    result = unit_assess(output)
+    assert result.disposition.finding == 'inconclusive'
+    assert 'test_validity_unsupported' in {lim.code for lim in result.gate_limitations}
+
+
+@pytest.mark.parametrize('missing', ['patch', 'baseline-source', 'test-plan', 'reported-condition'])
+def test_unit_review_requires_read_source_patch_and_plan_citations(missing):
+    output = unit_draft()
+    review = output['validity_reviews'][0]
+    review['rationale']['citations'] = [c for c in review['rationale']['citations'] if c['item_id'] != missing]
+    with pytest.raises(UnexpectedModelBehavior):
+        unit_assess(output)
+
+
+def test_unit_review_cannot_cite_source_from_another_revision():
+    output = unit_draft()
+    output['validity_reviews'][0]['rationale']['citations'][0]['item_id'] = 'candidate-source'
+    with pytest.raises(UnexpectedModelBehavior):
+        unit_assess(output)
+
+
+def test_unit_author_cannot_choose_review_source_or_plan_identity():
+    output = unit_draft()
+    output['validity_reviews'][0]['source_sha256'] = digest('forged-source')
+    with pytest.raises(UnexpectedModelBehavior):
+        unit_assess(output)
+
+
+def test_unit_review_artifact_digest_identifies_retained_quoted_review():
+    import json
+    result = unit_assess(unit_draft())
+    retained = result.validity_reviews[0].model_dump()
+    actual = hashlib.sha256(json.dumps(retained, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+    assert result.evidence.baseline[0].test_validity.artifact_sha256 == actual
+
+
+def test_legacy_saved_assessment_deserializes_without_new_review_fields():
+    from corsair.agents.evidence_assessment.contracts import EvidenceAssessment
+    result = assess_with(scripted(draft()), inputs()).output
+    historical = result.model_dump(exclude={'gate_result', 'evidence', 'validity_reviews'})
+    restored = EvidenceAssessment.model_validate(historical)
+    assert restored.gate_result is None and restored.evidence is None
+    assert restored.validity_reviews == ()
+    assert restored.disposition == result.disposition
+
+
+def test_legacy_evidence_serialization_omits_default_review_fields():
+    plan = PLAN.model_dump()
+    assert 'observation_mode' not in plan and 'test_plan_sha256' not in plan
+    observed = run('failed').model_dump()
+    assert 'source_sha256' not in observed and 'test_validity' not in observed
+    assert ObservationPlan.model_validate(plan).observation_mode == 'effect_witness'
+    assert RunEvidence.model_validate(observed).test_validity is None
+
+
+@pytest.mark.parametrize('identity', [None, digest('forged-source')])
+def test_unit_source_citation_requires_trusted_run_identity(identity):
+    data = unit_inputs()
+    data = data.model_copy(update={'items': tuple(i.model_copy(update={'source_sha256': identity})
+        if i.item_id == 'baseline-source' else i for i in data.items)})
+    with pytest.raises(UnexpectedModelBehavior):
+        unit_assess(unit_draft(), data)
+
+
+def test_unit_review_cannot_cover_repeats_from_different_sources():
+    data = unit_inputs()
+    baseline = data.evidence.baseline
+    data = data.model_copy(update={'evidence': data.evidence.model_copy(update={
+        'baseline': baseline + (baseline[0].model_copy(update={'source_sha256': digest('other-source')}),)})})
+    with pytest.raises(UnexpectedModelBehavior):
+        unit_assess(unit_draft(), data)
