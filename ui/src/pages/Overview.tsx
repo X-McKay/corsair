@@ -7,6 +7,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { type EvaluationList, runStatus } from "../lib/data";
+import { OverviewMetrics } from "../components/OverviewMetrics";
 import { integer } from "../lib/format";
 import { Link } from "../lib/navigation";
 import {
@@ -18,7 +19,15 @@ import {
   CopyCommand,
   Notice,
 } from "../components/evidence";
-export function Overview({ data }: { data: EvaluationList }) {
+export function Overview({
+  data,
+  revision,
+  retry,
+}: {
+  data: EvaluationList;
+  revision: number;
+  retry: () => void;
+}) {
   const agents = new Set(data.runs.map((run) => run.agent));
   const live = data.runs.filter((run) => run.mode === "live").length;
   const attention = data.runs.filter(
@@ -59,6 +68,13 @@ export function Overview({ data }: { data: EvaluationList }) {
           },
         ]}
       />
+      {!!data.runs.length && (
+        <OverviewMetrics
+          revision={revision}
+          retry={retry}
+          shownWarnings={data.warnings}
+        />
+      )}
       <div className="overview-grid">
         <Panel
           title="Recent evaluations"

@@ -322,6 +322,7 @@ def test_live_metrics_missing_usage_flag_is_unknown_even_with_default_zero(root)
     (path / 'evidence/report.json').write_text(json.dumps(report))
     group = next(g for g in Evidence(root).metrics()['groups'] if g['agent'] == 'assessment')
     assert group['input_tokens'] == [] and group['output_tokens'] == []
+    assert group['total_tokens'] == []
     assert group['latency_seconds'] == [1]
     assert any('usage coverage' in w for w in group['warnings'])
 
@@ -334,3 +335,63 @@ def test_hidden_provider_settings_separate_cohorts_without_exposing_secrets(root
     assert len(groups) == 2
     assert all(g['model'] == {'model_name': 'same-model', 'system': 'openai'} for g in groups)
     assert 'SECRET' not in json.dumps(groups)
+
+
+
+def test_total_token_distribution_pairs_only_the_same_attempt(root):
+    metric_run(root, cases=[
+        {'metrics': {'input_tokens': 10}},
+        {'metrics': {'output_tokens': 20}},
+        {'attributes': {'observed_input_tokens': 0, 'observed_output_tokens': 0}},
+        {'metrics': {'input_tokens': 30, 'output_tokens': 4}},
+        {'metrics': {'input_tokens': 90, 'output_tokens': 9},
+         'attributes': {'provider_usage_present': False}}])
+    group = next(g for g in Evidence(root).metrics()['groups'] if g['agent'] == 'assessment')
+    assert group['input_tokens'] == [10, 0, 30]
+    assert group['output_tokens'] == [20, 0, 4]
+    assert group['total_tokens'] == [0, 34]
+    assert group['attempts'] == 5
+
+
+def test_agent_and_experiment_spa_routes_are_static_only(root):
+    with serving(root) as server:
+        for path in ('/agents', '/agents?agent=planning', '/experiments', '/experiments?baseline=record'):
+            status, headers, body = request(server, path)
+            assert status == 200
+            assert headers['Content-Type'] == 'text/html; charset=utf-8'
+            assert b'Corsair' in body
+        assert request(server, '/api/agents')[0] == 404
+        assert request(server, '/api/experiments')[0] == 404
+
+
+
+@pytest.mark.parametrize('failure', [BrokenPipeError, ConnectionResetError])
+@pytest.mark.parametrize('fail_on_write', [1, 2])
+def test_disconnected_client_does_not_receive_an_error_retry(failure, fail_on_write):
+    from email.message import Message
+    from types import SimpleNamespace
+    from corsair.web.server import Handler
+
+    class DisconnectedWriter:
+        writes = 0
+
+        def write(self, data):
+            self.writes += 1
+            if self.writes >= fail_on_write:
+                raise failure('Client cancelled navigation')
+            return len(data)
+
+    handler = object.__new__(Handler)
+    handler.command = 'GET'
+    handler.path = '/api/health'
+    handler.request_version = 'HTTP/1.1'
+    handler.requestline = 'GET /api/health HTTP/1.1'
+    handler.headers = Message()
+    handler.headers['Host'] = '127.0.0.1:8765'
+    handler.server = SimpleNamespace(server_port=8765)
+    handler.wfile = DisconnectedWriter()
+    handler.close_connection = False
+    handler.error = lambda *_: pytest.fail('A cancelled response must not trigger an error response')
+    handler.do_GET()
+    assert handler.wfile.writes == fail_on_write
+    assert handler.close_connection is True

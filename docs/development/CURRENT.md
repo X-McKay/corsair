@@ -1,6 +1,6 @@
 # Current work
 
-Local results UI: [SPEC-0069](specs/SPEC-0069-local-results-ui.md), [PLAN-0076](plans/PLAN-0076-local-results-ui.md). Implemented on codex/corsair-ui: read-only evaluation inspection, aggregate/per-agent metrics and native-sample distributions, runtime evidence and reference-style UI. 1791 offline tests and34 browser checks passed; [handoff](handoffs/HANDOFF-0100-local-results-ui.md).
+Local results UI: [SPEC-0069](specs/SPEC-0069-local-results-ui.md), [PLAN-0076](plans/PLAN-0076-local-results-ui.md). Implemented on codex/corsair-ui (PR #107): read-only evaluation inspection, individual agent cards, aggregate/per-agent distributions with frequency lines, explicit saved-run comparisons and runtime evidence. 1831 offline tests,17 UI unit tests and42 browser checks passed; [handoff](handoffs/HANDOFF-0101-approved-ui-design.md).
 
 Evaluation proposals: [IDEA-0009](ideas/IDEA-0009-eval-runner-measurement.md) proposes simple standalone reporting, failure accounting and reliable comparisons; [IDEA-0008](ideas/IDEA-0008-agent-release-policies.md) keeps release policies deferred. Documentation only; [publication handoff](handoffs/HANDOFF-0099-evaluation-ideas.md).
 

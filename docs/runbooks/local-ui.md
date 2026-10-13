@@ -32,9 +32,17 @@ The selected root must contain the runtime matrix and built UI; do not point it 
 
 ## Metrics
 
-Open Metrics for aggregate recorded runs/attempts and per-agent cohort tables. Select an agent or evidence mode, then a cohort, to view evaluator success, task completion, observed token totals and latency/input/output histograms. Histograms use individual native report samples, with sample counts and coverage. Live token samples require an explicit provider-usage receipt; failed-attempt telemetry is currently unavailable and remains in the denominator.
+Open **Agents** (`/agents`; `/metrics` remains an alias) for aggregate recorded runs/attempts and a separate card per agent. Filter by agent or mode and choose a recorded cohort inside each card. Evaluator success and task completion remain distinct from accuracy, which is not defined by current summaries. Expand the recorded-checks section for assertion rates, observed input/output totals and identity details.
+
+Each card shows latency and total-token histograms with smooth frequency lines through the same bin counts. Cards share axis scales; no fitted probability density is implied. Total tokens are sampled only when input and output usage were observed on the same native attempt. Live samples require explicit provider usage coverage. Missing telemetry is unavailable; measured zero is retained. The overview shows aggregate resource distributions for one provider mode at a time, keeping scripted estimates separate from live usage. Incomplete outcome counts make the coverage denominator unknown.
 
 The service reads at most 500 run summaries, 100 native reports and 20,000 case samples per metrics request; each JSON file is bounded to 4 MiB. Warnings identify missing, inconsistent, omitted or truncated evidence. Groups reflect recorded identities, not proof that every effective setting is known. No general semantic accuracy is invented: individual recorded correctness checks and their pass rates remain visible.
+
+## Compare recorded runs
+
+Open **Experiments** (`/experiments`) and select a baseline and candidate. Selection does not promote a baseline or launch work. The view shows outcome rates, retained identity differences, case-level changes and recorded efficiency means with coverage. Different or missing core identities prevent outcome deltas. Native execution mode is a separate field from wrapper provider mode.
+
+Comparisons describe saved observations: repeated attempts are not paired, partial measurements may omit failures, and current summaries do not retain every evaluator or effective provider setting. Prompt/model changes can be intentional variables, but displayed differences do not prove causality or general accuracy.
 
 ## Interpret results
 

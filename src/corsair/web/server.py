@@ -230,7 +230,7 @@ class Evidence:
                     'dataset_sha256': safe.get('dataset_sha256'), 'model': safe.get('model'),
                     'identity_digest': digest, 'runs': 0, 'measured_runs': 0,
                     'attempts': None, 'clean_attempts': None, 'task_failures': None,
-                    'latency_seconds': [], 'input_tokens': [], 'output_tokens': [],
+                    'latency_seconds': [], 'input_tokens': [], 'output_tokens': [], 'total_tokens': [],
                     'telemetry_attempts': 0, 'assertions': {},
                     'warnings': [] if complete_identity else ['Incomplete identity; this run is kept separate.']}
             group = groups[key]
@@ -285,6 +285,7 @@ class Evidence:
                 if not token_coverage:
                     group['warnings'].append('Token samples without complete provider usage coverage are excluded.')
                 if token_coverage:
+                    case_tokens = {}
                     for field in ('input_tokens', 'output_tokens'):
                         # Native metrics take precedence; attributes retain measured zero increments.
                         candidates = (metrics.get('observed_' + field), metrics.get(field),
@@ -292,7 +293,11 @@ class Evidence:
                         value = next((v for v in candidates if number(v) and v >= 0 and int(v) == v), None)
                         if value is not None:
                             group[field].append(value)
+                            case_tokens[field] = value
                             observed = True
+                    # The separate distributions can have different coverage. Only pair within this attempt.
+                    if len(case_tokens) == 2:
+                        group['total_tokens'].append(sum(case_tokens.values()))
                 if observed:
                     group['telemetry_attempts'] += 1
             if failures:
@@ -334,17 +339,21 @@ class Handler(BaseHTTPRequestHandler):
         pass  # Do not echo untrusted URLs or evidence into terminal logs.
 
     def respond(self, status: int, data: bytes, content_type: str = 'application/json'):
-        self.send_response(status)
-        self.send_header('Content-Type', content_type)
-        self.send_header('Content-Length', str(len(data)))
-        self.send_header('Cache-Control', 'no-store')
-        self.send_header('X-Content-Type-Options', 'nosniff')
-        self.send_header('Referrer-Policy', 'no-referrer')
-        self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'")
-        self.send_header('Cross-Origin-Resource-Policy', 'same-origin')
-        self.end_headers()
-        if self.command != 'HEAD':
-            self.wfile.write(data)
+        try:
+            self.send_response(status)
+            self.send_header('Content-Type', content_type)
+            self.send_header('Content-Length', str(len(data)))
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('X-Content-Type-Options', 'nosniff')
+            self.send_header('Referrer-Policy', 'no-referrer')
+            self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'")
+            self.send_header('Cross-Origin-Resource-Policy', 'same-origin')
+            self.end_headers()
+            if self.command != 'HEAD':
+                self.wfile.write(data)
+        except (BrokenPipeError, ConnectionResetError):
+            # Navigation can cancel an in-flight fetch; do not retry a response on a closed socket.
+            self.close_connection = True
 
     def error(self, status, message):
         self.respond(status, json.dumps({'error': message}).encode())
@@ -382,7 +391,7 @@ class Handler(BaseHTTPRequestHandler):
             elif path.startswith('/api/'):
                 return self.error(404, 'Unknown endpoint')
             else:
-                spa = path in ('/', '/evaluations', '/runtime', '/metrics') or (
+                spa = path in ('/', '/evaluations', '/runtime', '/metrics', '/agents', '/experiments') or (
                     len(parts) == 3 and parts[0] == 'evaluations' and parts[1] in AGENTS
                     and NAME.fullmatch(parts[2]))
                 static_parts = ('index.html',) if spa else parts

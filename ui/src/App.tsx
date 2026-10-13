@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Boxes,
   ChartColumn,
+  GitCompareArrows,
   ChevronRight,
   FlaskConical,
   LayoutDashboard,
@@ -22,6 +23,7 @@ import { Evaluations } from "./pages/Evaluations";
 import { Detail } from "./pages/EvaluationDetail";
 import { Runtime } from "./pages/Runtime";
 import { Metrics } from "./pages/Metrics";
+import { Experiments } from "./pages/Experiments";
 export function App() {
   const path = usePath();
   const [revision, setRevision] = useState(0);
@@ -62,11 +64,13 @@ export function App() {
   }, [menu]);
   const page = path.startsWith("/evaluations")
     ? "Evaluations"
-    : path === "/metrics"
-      ? "Metrics"
-      : path === "/runtime"
-        ? "Runtime readiness"
-        : "Overview";
+    : path === "/metrics" || path === "/agents"
+      ? "Agents"
+      : path === "/experiments"
+        ? "Experiments"
+        : path === "/runtime"
+          ? "Runtime readiness"
+          : "Overview";
   const parts = path.split("/").filter(Boolean);
   let detail: { agent: string; run: string } | undefined;
   if (parts[0] === "evaluations" && parts.length === 3) {
@@ -115,9 +119,14 @@ export function App() {
               icon: <FlaskConical size={18} />,
             },
             {
-              to: "/metrics",
-              label: "Metrics",
+              to: "/agents",
+              label: "Agents",
               icon: <ChartColumn size={18} />,
+            },
+            {
+              to: "/experiments",
+              label: "Experiments",
+              icon: <GitCompareArrows size={18} />,
             },
             {
               to: "/runtime",
@@ -188,8 +197,10 @@ export function App() {
         <main id="main-content" tabIndex={-1}>
           {path === "/runtime" ? (
             <Runtime revision={revision} retry={retry} />
-          ) : path === "/metrics" ? (
+          ) : path === "/agents" || path === "/metrics" ? (
             <Metrics revision={revision} retry={retry} />
+          ) : path === "/experiments" ? (
+            <Experiments revision={revision} retry={retry} />
           ) : detail ? (
             <Detail {...detail} revision={revision} retry={retry} />
           ) : path !== "/" && path !== "/evaluations" ? (
@@ -212,7 +223,7 @@ export function App() {
               {path === "/evaluations" ? (
                 <Evaluations data={data.data} />
               ) : (
-                <Overview data={data.data} />
+                <Overview data={data.data} revision={revision} retry={retry} />
               )}
             </>
           )}

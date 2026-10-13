@@ -28,3 +28,9 @@ Unit tests cover bounded projections, missing/partial/zero metrics, malformed ev
 ## Decisions and open questions
 
 Accepted scope follows the user's explicit read-only choice. Retain existing CLI execution and native evidence sources. No mocked dashboard presented as real results; synthetic browser-test fixtures stay clearly test-only. Existing report limitations remain visible. Broadening to launch work requires its own explicit execution boundary and future specification.
+
+## Approved presentation design
+
+The user approved the mock-up iteration: separate cards for each recorded agent, colocated outcomes and latency/token histograms with frequency-line overlays, an operational overview and a baseline/candidate experiment review. Each agent card selects one recorded identity cohort rather than combining incompatible results. Shared bin boundaries and frequency scales support resource comparisons; lines interpolate bin counts and do not estimate a probability density. Total-token samples require both input and output observations from the same native attempt. Accuracy stays undefined unless a future evaluator explicitly defines it.
+
+The read-only experiment view selects two saved runs without promoting a baseline. Known incompatible agent/set/provider-mode/dataset identities block deltas; changed native execution modes also block when both are recorded. Prompt/model changes are disclosed as possible experiment variables. Case-level changes describe observed evaluator success rates, with missing cases/measurements unknown, and do not establish paired-repeat significance or causality. Mean efficiency coverage remains visible. No evaluation execution or new workflow boundary is introduced.

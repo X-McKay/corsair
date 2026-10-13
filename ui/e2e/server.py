@@ -19,13 +19,15 @@ def seed(root: Path):
          {'input_tokens': 120, 'output_tokens': 40, 'task_seconds': 2.5}),
         ('assessment', '20261013T130000Z-development-live', 'live', 2, 2,
          {'input_tokens': 0, 'output_tokens': 0, 'task_seconds': 0}),
+        ('planning', '20261013T150000Z-development-scripted', 'scripted', 4, 4,
+         {'input_tokens': 110, 'output_tokens': 35, 'task_seconds': 2.0}),
         ('authoring', '20261013T140000Z-development-scripted', 'scripted', None, None, {}),
     ]
     for agent, run, mode, attempts, clean, metrics in records:
         p = root / '.runs/evals' / agent / run
         p.mkdir(parents=True)
         summary = {'identity': {'model': 'fixture-model', 'dataset_sha256': 'fixture-dataset',
-                              'prompt_version': 'test-v1', 'mode': mode, 'execution': 'synthetic observations'},
+                              'prompt_version': 'test-v2' if '150000' in run else 'test-v1', 'mode': mode, 'execution': 'synthetic observations'},
                    'efficiency_mean': metrics,
                    'efficiency_samples': {k: {'observed': attempts, 'attempts': attempts} for k in metrics},
                    'assertions': {}, 'cases': {}}

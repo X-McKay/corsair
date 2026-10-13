@@ -41,3 +41,22 @@ Final implementation evidence (2026-10-13):
 - Initial full make test-config:1782passed in108.58s. Final expanded suite result recorded in publication handoff. No live inference, Temporal server or sandbox workloads launched.
 
 The user explicitly expanded scope to aggregate/per-agent metrics and distributions, and requested the reference app aesthetic. Both are included. The read-only launch restriction remains.
+
+## Approved design iteration
+
+User approved the interactive operations, per-agent and experiment mock-ups, then requested one card per agent with stats and histogram frequency-line overlays. Implement using real saved evidence only. One card per recorded agent selects an identity cohort; never merge different settings/modes into a score. Add a read-only run comparison view with explicit missing/incompatible evidence, aggregate overview distributions, same neutral/violet theme, and native per-case total-token samples only when both input/output are observed. Preserve inspection-only scope.
+
+- [x] Implement approved cards, overview charts and recorded-run comparison.
+- [x] Check histogram math, cohort changes, missing/zero metrics, comparisons, browser layouts and contrast.
+- [x] Run offline guards, review and record final source/checks.
+
+Approved design implementation evidence (2026-10-13):
+
+- Merged main 184e609 into the UI branch (merge 65169e7) before final qualification. Existing primary-checkout edits remain untouched.
+- One independent card per recorded agent, with cohort selection, evaluator success/task completion, explicit undefined accuracy, latency and paired total-token distributions. Shared bins and frequency lines preserve counts; observed zero stays zero and incomplete denominators stay unknown.
+- Overview resource distributions separate scripted/live modes. Experiments compares explicit saved runs, blocks incompatible datasets/agents/sets/modes, and exposes recorded identity changes and incomplete telemetry. No automatic baseline or promotion.
+- Review fixed native-suite versus wrapper-mode comparison (scripted_fixture/direct_local_provider are distinct from scripted/live). Server tolerates client cancellation without a second error response.
+- Final make ui-build:17 frontend unit tests and TypeScript/Vite production build passed. Final make ui-test:42 passed,6 deliberately skipped duplicate mobile contrast checks in4.2s, including desktop/dark/mobile layouts and a populated experiment comparison.
+- First iteration browser run:37passed,5failed,6skipped. Failures came from a duplicated warning strict locator and an outdated comparison-heading assertion. Deduplicated warnings and corrected the assertion; retained cancellation trace led to a server fix. Final suite passed.
+- Final UV_CACHE_DIR=/tmp/corsair-provider-uv-cache make test-config after main merge:1831passed in112.39s, including43 focused web-server tests. Earlier pre-main-merge integration:1793passed in109.96s.
+- Actual saved scripted identification report inspected in production preview at127.0.0.1:8765/agents:1run,16attempts,16observed latency/token samples. No new live inference, Temporal server or sandbox workload. Screenshots/logs remain outside Git. Final record guards and publication are recorded in HANDOFF-0101.

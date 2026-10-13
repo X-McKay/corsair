@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import {contrastProblems} from './support/contrast';
 const planning = '/evaluations/planning/20261013T120000Z-development-scripted';
 const assessment = '/evaluations/assessment/20261013T130000Z-development-live';
 const authoring = '/evaluations/authoring/20261013T140000Z-development-scripted';
@@ -9,7 +10,7 @@ test('real API only projects safe evidence and keeps observed zero', async ({req
   const text = await response.text();
   expect(text).not.toContain('PRIVATE');
   const data = JSON.parse(text);
-  expect(data.runs).toHaveLength(3);
+  expect(data.runs).toHaveLength(4);
   expect(data.warnings).toHaveLength(1);
   expect(data.runs.find((r:any)=>r.agent==='assessment').summary.efficiency_mean.input_tokens).toBe(0);
   expect((await request.post('/api/evaluations')).status()).toBe(405);
@@ -23,7 +24,7 @@ test('overview and filters reflect local records without fabricated accuracy', a
   await expect(page.getByText(/broken-record: summary unavailable/)).toBeVisible();
   await page.goto('/evaluations');
   await page.getByLabel('Filter agent').selectOption('planning');
-  await expect(page.locator('tbody tr')).toHaveCount(1);
+  await expect(page.locator('tbody tr')).toHaveCount(2);
   await expect(page.locator('tbody')).toContainText('3/4');
   await page.getByLabel('Search evaluations').fill('no-such-run');
   await expect(page.getByRole('heading',{name:'No matching evaluations'})).toBeVisible();
@@ -87,7 +88,7 @@ test('empty and connection failure states are actionable', async ({page}) => {
 });
 
 test('visual review captures all primary screens without horizontal overflow', async ({page},testInfo) => {
-  for(const [name,url] of [['overview','/'],['evaluations','/evaluations'],['detail',planning],['runtime','/runtime'],['metrics','/metrics']]){
+  for(const [name,url] of [['overview','/'],['evaluations','/evaluations'],['detail',planning],['runtime','/runtime'],['agents','/agents'],['experiments','/experiments']]){
     await page.goto(url);
     await expect(page.locator('h1')).toBeVisible();
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
@@ -96,20 +97,54 @@ test('visual review captures all primary screens without horizontal overflow', a
 });
 
 
-test('metrics uses real native samples and separates agent cohorts', async ({page,request}) => {
+test('agent cards retain separate cohorts, paired token samples and unknowns', async ({page,request}) => {
   const response=await request.get('/api/metrics');expect(response.ok()).toBeTruthy();
   const data=await response.json();
-  const planning=data.groups.find((g:any)=>g.agent==='planning');
+  const planning=data.groups.find((g:any)=>g.agent==='planning' && g.attempts===4 && g.clean_attempts===3);
   expect(planning.latency_seconds).toEqual([0,1,2]);
-  expect(planning.input_tokens).toEqual([100,200,300]);
-  await page.goto('/metrics');
-  await expect(page.getByRole('heading',{name:'Agent metrics'})).toBeVisible();
-  await page.getByLabel('Metrics agent',{exact:true}).selectOption('planning');
-  await expect(page.getByRole('img',{name:'Task latency: 3 observed samples',exact:true})).toBeVisible();
-  await expect(page.locator('.stat').filter({hasText:'Evaluator success'}).locator('.stat-value')).toHaveText('75.0%');
-  await expect(page.locator('.stat').filter({hasText:'Observed input tokens'}).locator('.stat-value')).toHaveText('600');
+  expect(planning.total_tokens).toEqual([110,220,330]);
+  await page.goto('/agents');
+  await expect(page.getByRole('heading',{name:'Agents',exact:true})).toBeVisible();
+  await expect(page.locator('.agent-card')).toHaveCount(3);
+  const card=page.getByRole('article',{name:'planning performance'});
+  await card.getByLabel('planning cohort').selectOption(planning.id);
+  await expect(card.getByRole('img',{name:'Task latency: 3 observed samples',exact:true})).toBeVisible();
+  await expect(card.locator('.agent-stat').filter({hasText:'Evaluator success'}).locator('strong')).toHaveText('75.0%');
+  await expect(card.locator('.chart-frequency')).toHaveCount(2);
+  await expect(card.locator('.chart-frequency').first()).toHaveAttribute('d',/^M .* C /);
+  await card.locator('.agent-evidence summary').click();
+  await expect(card.locator('.agent-usage')).toContainText('600');
   await page.getByLabel('Metrics agent',{exact:true}).selectOption('assessment');
-  await expect(page.locator('.stat').filter({hasText:'Observed input tokens'}).locator('.stat-value')).toHaveText('0');
+  await expect(page.locator('.agent-card')).toHaveCount(1);
+  await page.locator('.agent-evidence summary').click();
+  await expect(page.locator('.agent-usage dd').first()).toContainText('0');
+  await expect(page.getByRole('img',{name:'Total tokens: 2 observed samples'})).toBeVisible();
   await page.getByLabel('Metrics agent',{exact:true}).selectOption('authoring');
-  await expect(page.locator('.stat').filter({hasText:'Evaluator success'}).locator('.stat-value')).toHaveText('Unavailable');
+  await expect(page.locator('.agent-stat').filter({hasText:'Evaluator success'}).locator('strong')).toHaveText('Unavailable');
+  await expect(page.getByText('No observed samples. Unknown, not zero.')).toHaveCount(2);
+  await expect(page.locator('.chart-frequency')).toHaveCount(0);
+  await page.goto('/metrics');
+  await expect(page.getByRole('heading',{name:'Agents',exact:true})).toBeVisible();
+});
+
+test('overview keeps scripted and live resource observations separate',async({page})=>{
+  await page.goto('/');
+  await expect(page.getByLabel('Overview distribution mode')).toHaveValue('live');
+  await expect(page.getByRole('img',{name:'Total tokens: 2 observed samples'})).toBeVisible();
+  await page.getByLabel('Overview distribution mode').selectOption('scripted');
+  await expect(page.getByRole('img',{name:'Total tokens: 7 observed samples'})).toBeVisible();
+  await expect(page.getByText(/Scripted token counts are fixture estimates/)).toBeVisible();
+});
+
+test('experiments show descriptive deltas and block incompatible runs',async({page},testInfo)=>{
+  await page.goto('/experiments');
+  await page.getByLabel('Baseline run',{exact:true}).selectOption('planning/20261013T120000Z-development-scripted');
+  await page.getByLabel('Candidate run',{exact:true}).selectOption('planning/20261013T150000Z-development-scripted');
+  await expect(page.getByRole('heading',{name:'What changed'})).toBeVisible();
+  await expect(page.getByText('+25 pp recorded change',{exact:true}).first()).toBeVisible();
+  await page.screenshot({path:testInfo.outputPath('comparison-populated.png'),fullPage:true});
+  if(testInfo.project.name!=='mobile')expect(await contrastProblems(page)).toEqual([]);
+  await page.getByLabel('Candidate run',{exact:true}).selectOption('assessment/20261013T130000Z-development-live');
+  await expect(page.getByText(/different agents/)).toBeVisible();
+  await expect(page.locator('.experiment-outcome').first()).toContainText('Comparison unavailable');
 });

@@ -1,0 +1,161 @@
+.experiment-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+}
+.experiment-selection {
+  align-self: stretch;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  padding: 22px;
+  min-width: 0;
+}
+.experiment-selection label {
+  display: grid;
+  gap: 5px;
+}
+.experiment-selection select {
+  width: 100%;
+  min-width: 0;
+  padding: 11px 10px;
+  font-size: 12px;
+  background: var(--card);
+  text-overflow: ellipsis;
+}
+.experiment-run-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 16px 0 8px;
+}
+.experiment-run-time {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 9px 0;
+}
+.experiment-selection-note {
+  font-size: 10px;
+  color: var(--muted);
+  margin: 12px 0 26px;
+}
+.experiment-outcomes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin: 0 0 24px;
+}
+.experiment-outcome {
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+}
+.experiment-outcome-values {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  margin: 20px 0 15px;
+}
+.experiment-outcome-values > span {
+  font-size: 25px;
+  letter-spacing: -0.5px;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.experiment-outcome-values small {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0;
+  margin-top: 5px;
+}
+.experiment-outcome-values > svg {
+  color: var(--muted);
+}
+.experiment-outcome p {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.experiment-case-totals {
+  display: flex;
+  gap: 22px;
+  margin: 20px 0 15px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.experiment-case-totals b {
+  display: block;
+  font-size: 25px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 5px;
+}
+.experiment-table {
+  table-layout: fixed;
+  min-width: 620px;
+}
+.experiment-table td {
+  overflow-wrap: anywhere;
+}
+.experiment-table code {
+  font-size: 11px;
+  white-space: pre-wrap;
+}
+.experiment-table .row-subtitle {
+  white-space: normal;
+  font-size: 9px;
+  overflow: visible;
+}
+.experiment-case-name {
+  font-weight: 550;
+}
+.experiment-panel-note {
+  padding: 16px 23px;
+  border-top: 1px solid var(--border);
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.experiment-swap:disabled {
+  opacity: 0.45;
+}
+.experiment-swap:disabled:hover {
+  background: transparent;
+}
+@media (max-width: 1100px) {
+  .experiment-outcomes {
+    grid-template-columns: 1fr;
+  }
+  .experiment-outcome-values {
+    justify-content: flex-start;
+    margin: 15px 0;
+  }
+  .experiment-case-totals {
+    margin: 15px 0;
+  }
+}
+@media (max-width: 720px) {
+  .experiment-picker {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .experiment-swap {
+    justify-self: center;
+    transform: rotate(90deg);
+  }
+  .experiment-selection {
+    padding: 18px;
+  }
+  .experiment-outcomes {
+    gap: 12px;
+  }
+  .experiment-outcome {
+    padding: 18px;
+  }
+  .experiment-table {
+    min-width: 600px;
+  }
+}

@@ -20,7 +20,7 @@ The development server binds to `127.0.0.1:5173` and proxies `/api` to the Corsa
 
 ## Structure and evidence boundaries
 
-- `src/pages/`: overview, searchable history, evaluation detail, per-agent metrics and runtime evidence.
+- `src/pages/`: overview, searchable history, evaluation detail, per-agent cards, recorded-run experiment comparisons and runtime evidence.
 - `src/components/`: shared presentational components and appearance control.
 - `src/lib/`: native navigation/fetch hooks, typed response shapes and formatting.
 - `e2e/`: browser integration tests owned by the UI boundary.
