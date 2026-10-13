@@ -42,3 +42,5 @@ Evidence and actual final command results are recorded in HANDOFF-0071. An initi
 ## Decisions and next action
 
 No shared eval runner or Makefile change, custom evaluator framework or extra tools. Preserve this independent PR's scope; root may run the bounded live comparison and record failures without tuning on exposed held-out answers. Source grounding is admitted offline only; semantic/provider qualification remains blocked. Review and handoff use the repository skills.
+
+Root integration follow-up: merged current main42a7273 into this PR branch, preserving both CURRENT entries after a documentation-only conflict. Further live planning evaluation was rejected before dispatch by automatic approval review because it interpreted host-only authorization as excluding transfer of synthetic fixtures to the configured external model endpoint. No workaround or provider retry; offline results stand.
