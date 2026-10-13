@@ -23,7 +23,7 @@ Branch `claude/repo-scale-source-tools-l7bldu` from main `334aa03`, draft PR. De
 
 ## Decisions and next steps
 
-Settled in SPEC-0038: literal search, Git line semantics, accounting from messages, explicit repository mode with no fallback. Next: planning adoption after PR #38 merges (planning's `withdraw_when_read` must be combined with `withdraw_when_spent`, and its `_run_reads` must ignore `RepeatedRead`, as `run_source_reads` does), followed by authoring and assessment with their eval sets rerun. A broader repository identification eval set (more cases and repositories) should settle the 10-call ceiling and the invented-tool rate before any qualification claim. RIG0 evidence: `/home/al/git/corsair-repo-tools/.runs/` (private).
+Settled in SPEC-0038: literal search, Git line semantics, accounting from messages, explicit repository mode with no fallback. Next: planning adoption after PR #38 merges (planning's `withdraw_when_read` must be combined with `withdraw_when_spent`, and its `_run_reads` must ignore `RepeatedRead`, as `run_source_reads` does), followed by authoring and assessment with their eval sets rerun. A broader repository identification eval set (more cases and repositories) should settle the 10-call ceiling and the invented-tool rate before any qualification claim. RIG0 evidence: `/home/al/git/corsair/.runs/repository-tools-20261013/` (private; the sibling worktree used for the run was removed).
 
 ## Continuation prompt
 
