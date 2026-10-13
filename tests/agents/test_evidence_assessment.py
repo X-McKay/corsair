@@ -12,7 +12,7 @@ from pydantic_ai.usage import UsageLimits
 from corsair.agents.evidence_assessment import assessment_prompt, create_evidence_assessment_agent
 from corsair.agents.evidence_assessment.agent import SKILL_TEXT
 from corsair.agents.evidence_assessment.contracts import AssessmentInput, EvidenceItem, ProposedDispositionDraft
-from corsair.agents.evidence_assessment.tools import AssessmentDependencies
+from corsair.agents.evidence_assessment.dependencies import AssessmentDependencies
 from corsair.core.disposition import (AssessmentEvidence, ClassifiedFailure, EnvironmentIdentity, ExpectedFailure,
                                       ObservationPlan, ObservedOutcome, RunEvidence, SandboxEvent, Witness)
 

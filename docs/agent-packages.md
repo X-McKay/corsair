@@ -1,6 +1,6 @@
 # Agent package convention
 
-Every agent under `src/corsair/agents/<role>/` places the same responsibilities in the same files, so a reader, reviewer or new agent knows where each piece lives. Accepted under [IDEA-0006](development/ideas/IDEA-0006-agent-package-convention-and-scaffolding.md) and specified by [SPEC-0052](development/specs/SPEC-0052-environment-agent-package-convention.md). The environment agent is the reference package; other agents move to it one at a time under their own plans, preserving behaviour.
+Every agent under `src/corsair/agents/<role>/` places the same responsibilities in the same files, so a reader, reviewer or new agent knows where each piece lives. Accepted under [IDEA-0006](development/ideas/IDEA-0006-agent-package-convention-and-scaffolding.md) and specified by [SPEC-0052](development/specs/SPEC-0052-environment-agent-package-convention.md). The environment agent is the reference package; evidence assessment follows it; other agents move one at a time under [PLAN-0056](development/plans/PLAN-0056-agent-package-convention.md), preserving behaviour.
 
 This is a responsibility convention, not a file generator or base class. Create a file only when its responsibility exists: a tool-free agent has no `tools/`, and an agent with no stage-specific dependencies beyond its input has no `dependencies.py`.
 
@@ -37,7 +37,7 @@ Domain helpers keep meaningful names (`frameworks.py`, `static.py`) rather than 
 
 ## Identity
 
-`tools/toolset.py` exports `TOOLSET_SHA256`: the SHA-256 of the toolset id and, in offered order, every field of each native tool definition plus its retry limit. The agent's eval suite writes it to `configuration.json` as `toolset_sha256`, and `make eval` lists it with the prompt, config and skill identity in `summary.json` and `comparison.md` (SPEC-0044). A toolset test pins the digest, so any change to what the model is offered is a deliberate, reviewed change to that test.
+`tools/toolset.py` exports `TOOLSET_SHA256`, computed by the shared `corsair.agents.toolset_identity.toolset_sha256`: the SHA-256 of the toolset id and, in offered order, every field of each native tool definition plus its retry limit. The agent's eval suite writes it to `configuration.json` as `toolset_sha256`, and `make eval` lists it with the prompt, config and skill identity in `summary.json` and `comparison.md` (SPEC-0044). A toolset test pins the digest, so any change to what the model is offered is a deliberate, reviewed change to that test.
 
 No separate manifest or cross-mode receipt layer is added; IDEA-0006 section D waits for a second consumer.
 
