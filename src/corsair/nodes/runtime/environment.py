@@ -14,7 +14,7 @@ from corsair.nodes.runtime.contracts import RuntimeRequirement, Selection, Suppo
 from corsair.nodes.runtime.matrix import Matrix
 
 # Environment agent framework table names (agents/environment/frameworks.py) per runner-table framework name.
-AGENT_FRAMEWORK = {'pytest': 'pytest', 'junit5': 'junit5'}
+AGENT_FRAMEWORK = {'pytest': 'pytest', 'junit5': 'junit5', 'junit4': 'junit4'}
 
 
 @dataclass(frozen=True)

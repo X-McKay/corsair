@@ -20,4 +20,8 @@ class NativeTest {
         assertEquals(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)),
                      HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(path))));
     }
+
+    @Test void nativeRuntime() {
+        assertEquals(17, Runtime.version().feature());
+    }
 }

@@ -62,14 +62,10 @@ def _correctable(command: tuple[str, ...], receipt: ExecutionReceipt, diagnostic
     if diagnostic.code != "setup_command_failed":
         return False
     output = (receipt.stdout[-16384:] + b"\n" + receipt.stderr[-16384:]).lower()
-    if command[0] == "mvn" and receipt.native_exit == 127:
-        return b"not found" in output or b"no such file" in output
     return bool(_pytest_prefix(command) and receipt.native_exit == 4 and b"unrecognized arguments:" in output)
 
 
 def _valid_correction(previous: tuple[str, ...], command: tuple[str, ...]) -> bool:
-    if previous[0] == "mvn":
-        return command == ("./mvnw", *previous[1:])
     prefix = _pytest_prefix(previous)
     return bool(prefix and _pytest_prefix(command) == prefix and command != previous)
 
@@ -80,7 +76,7 @@ async def run_setup_command(ctx: RunContext[EnvironmentDependencies],
     """Run one command once in the preparation sandbox under operator limits and policy.
 
     Never automatically retried. A returned correction_available permits one changed invocation
-    citing that run and explaining the correction. Other failures stop command execution."""
+    of pytest arguments under the same executable, citing that run and explaining the correction. Other failures stop command execution."""
     deps, ledger = ctx.deps, ctx.deps.ledger
     if ledger.halted:
         raise ToolFailed(ledger.halted)
@@ -98,7 +94,7 @@ async def run_setup_command(ctx: RunContext[EnvironmentDependencies],
         if correction is None or correction.run_id != previous.run_id or not correction.reason.strip():
             raise ToolFailed("Inspect the failed run and provide correction with its run_id and a specific reason.")
         if not _valid_correction(previous.command, command):
-            raise ToolFailed("Correction must change pytest arguments under the same executable, or replace mvn with ./mvnw keeping its arguments; no identical retry or other command.")
+            raise ToolFailed("Correction must change pytest arguments under the same executable; no identical retry or other command.")
         ledger.corrections_used += 1
     elif correction is not None:
         raise ToolFailed("No failed invocation is awaiting correction.")

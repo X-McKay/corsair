@@ -56,3 +56,10 @@ Frozen candidate `20261013T121409Z-development-scripted`: 16/16, compared with p
 Full offline guards: 1321 passed before the final repeat-after-recovery guard and two new regressions. Final affected suite after that change: 114 passed, one existing SDK warning. Handoff: HANDOFF-0084. No unresolved code finding from the scoped final review; exact-head CI and live correction measurement remain separate checks.
 
 Final record guards: 5 passed. The staged merge diff against old HEAD reports existing CRLF whitespace in main's benchmarks/candidate-cases.csv; that incoming main content is unchanged by this PR. The net PR diff against integrated main passes `git diff MERGE_HEAD --check`.
+
+
+## Maven correction review follow-up
+
+Accepted the review at bf15d9a: the mvn-to-wrapper exception is unnecessary on admitted Maven images and risks bypassing runtime wrapper-pin admission elsewhere. Removed it; only the bounded pytest-argument exception remains. Merged main 93a0fab, resolving the skill conflict by keeping correction guidance and PR51's junit4 framework guidance. Missing Maven with either unchanged or changed wrapper arguments is covered as a terminal refusal. Prompt identity moves to environment-v4-pytest-correction; tool description/digest updated. Earlier wrapper recovery results above are historical and superseded. No frozen dataset rewrite; the existing production FunctionModel correction tests remain the new-path coverage, distinct from the eight-case frozen eval and any live measurement.
+
+Validation on integrated main 93a0fab: full `make test-config` 1326 passed (one existing SDK warning); frozen candidate 20261013T122747Z-development-scripted 16/16 versus previous 16/16 with unchanged request/tool/command and estimated token means. Net diff against main passes whitespace checks. HANDOFF-0085 records this revision; no live qualification or merge authorization.

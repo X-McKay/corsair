@@ -251,6 +251,10 @@ def test_read_output_returns_retained_bytes_beyond_the_tail():
      b"[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0\n[INFO] BUILD SUCCESS\n", False),
     ("junit5", "org.example.WikiTest#forwards", "src/test/java/org/example/WikiTest.java", ("mvn", "-Dtest=WikiTest#forwards"),
      b"[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 1\n[INFO] BUILD SUCCESS\n", False),
+    ("junit4", "org.example.LegacyTest#forwards", "src/test/java/org/example/LegacyTest.java", ("mvn", "-o", "test", "-Dtest=LegacyTest#forwards"),
+     b"[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0\n[INFO] BUILD SUCCESS\n", True),
+    ("junit4", "org.example.LegacyTest#forwards", "src/test/java/org/example/LegacyTest.java", ("mvn", "-Dtest=LegacyTest#forwards"),
+     b"[INFO] Tests run: 1, Failures: 0, Errors: 1, Skipped: 0\n[INFO] BUILD SUCCESS\n", False),
 ])
 def test_framework_admission_is_exact(framework, test_id, path, command, output, ok):
     from corsair.agents.environment.frameworks import FRAMEWORKS, file_matches
@@ -359,7 +363,6 @@ def correction_call(command, run_id=1, reason="Correct the misspelled collection
 
 @pytest.mark.parametrize("bad,corrected,code,output", [
     (BAD_DISCOVER, DISCOVER, 4, b"pytest: error: unrecognized arguments: --collect-onyl"),
-    (("mvn", "-B", "validate"), ("./mvnw", "-B", "validate"), 127, b"mvn: not found"),
 ])
 def test_minor_invocation_correction_can_reach_ready_with_failed_receipt_retained(bad, corrected, code, output):
     execution = ScriptedExecution(DISCOVERED | {bad: (code, output, "terminal")})
@@ -441,9 +444,10 @@ def test_failed_invocation_cannot_be_repeated_after_successful_correction():
     assert execution.calls.count(BAD_DISCOVER) == 1
 
 
-def test_wrapper_correction_cannot_change_maven_arguments():
+@pytest.mark.parametrize("wrapper_args", [("validate",), ("deploy",)])
+def test_missing_maven_is_terminal_even_for_wrapper_correction(wrapper_args):
     bad = ("mvn", "validate")
     execution = ScriptedExecution({bad: (127, b"mvn: not found", "terminal")})
     blocked = {"status": "blocked", "layer": "build", "evidence": "mvn: not found", "run_ids": [1], "citations": []}
-    run(blocked, [("run_setup_command", {"command": list(bad)}), correction_call(("./mvnw", "deploy"))], execution)
+    run(blocked, [("run_setup_command", {"command": list(bad)}), correction_call(("./mvnw", *wrapper_args))], execution)
     assert execution.calls == [bad]

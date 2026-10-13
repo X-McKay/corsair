@@ -201,12 +201,26 @@ def test_selection_supported_unsupported_conflict():
     assert select(conflict, matrix).status == 'undetermined'
     java17 = detect({'pom.xml': PARENT.replace(b'1.8', b'17').replace(b'junit</groupId><artifactId>junit',
                                                                          b'org.junit.jupiter</groupId><artifactId>junit-jupiter').replace(b'4.12', b'5.14.4')}, 'java')
-    selection = select(java17, matrix)
-    assert selection.status == 'unsupported' and [n.name for n in selection.needs] == ['junit5']  # no Maven runner row yet
-    with_runner = Matrix.model_validate({**matrix.model_dump(), 'frameworks': [*matrix.model_dump()['frameworks'], {
-        'name': 'junit5', 'language': 'java', 'versions': '>=5.13', 'runner': 'x', 'images': ['temurin-17-maven'],
-        'qualification': {'records': ['SPEC-0039'], 'report': 'x'}}]})
-    assert select(java17, with_runner).status == 'supported'
+    assert select(java17, matrix).image_id == 'temurin-17-maven'
+    # Framework rows are exact versions that ran (SPEC-0045): an unrun Jupiter release is unsupported.
+    unrun = select(detect({'pom.xml': PARENT.replace(b'1.8', b'17').replace(b'junit</groupId><artifactId>junit',
+                                                                          b'org.junit.jupiter</groupId><artifactId>junit-jupiter').replace(b'4.12', b'5.13.4')}, 'java'), matrix)
+    assert unrun.status == 'unsupported' and [n.name for n in unrun.needs] == ['junit5']
+    java8 = detect({'pom.xml': PARENT}, 'java')  # source 1.8 with JUnit 4.12
+    selection = select(java8, matrix)
+    assert selection.status == 'supported' and selection.image_id == 'temurin-8-maven'
+    # JUnit 4 before 4.12 has no Vintage discovery (SPEC-0041); the JDK alone is not enough.
+    old_junit = select(detect({'pom.xml': PARENT.replace(b'4.12', b'4.8.2')}, 'java'), matrix)
+    assert old_junit.status == 'unsupported' and [n.name for n in old_junit.needs] == ['junit4']
+    # The environment agent's `junit4` ready result is admitted by the JDK 8 selection, and only there.
+    from corsair.agents.environment.contracts import ReadyEnvironment
+    from corsair.nodes.runtime.environment import check_ready
+    prepared = {'temurin-8-maven': 'docker.io/library/corsair-java8@sha256:' + '0' * 64}
+    ready = lambda framework: ReadyEnvironment.model_construct(toolchain_id='temurin-8-maven',
+                                                               toolchain_image=prepared['temurin-8-maven'], framework=framework)
+    check_ready(ready('junit4'), selection, prepared)
+    with pytest.raises(ValueError, match='not one the selection admitted'):
+        check_ready(ready('junit5'), selection, prepared)
 
 
 def test_matrix_refuses_selector_rows_and_duplicates():
@@ -449,7 +463,8 @@ def test_poetry_source_without_version_is_unread():
 def test_java_unread_pins_and_version_file_names():
     junit = ('<dependencies><dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId>'
              '<version>5.14.0</version></dependency></dependencies>')
-    matrix = Matrix.model_validate({**load().model_dump(), 'frameworks': [*load().model_dump()['frameworks'], {
+    others = [row for row in load().model_dump()['frameworks'] if row['name'] != 'junit5']
+    matrix = Matrix.model_validate({**load().model_dump(), 'frameworks': [*others, {
         'name': 'junit5', 'language': 'java', 'versions': '5.14.*', 'runner': 'x', 'images': ['temurin-17-maven'],
         'qualification': {'records': ['SPEC-0039'], 'report': 'x'}}]})
     base = '<properties><maven.compiler.release>17</maven.compiler.release></properties>'
