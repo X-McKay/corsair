@@ -19,7 +19,7 @@ Branch `claude/planner-prompt-v4-mbwx5t` (draft PR #38) from main `334aa03`. Del
 
 ## Decisions and next steps
 
-The fresh held-out set is exposed to v6; a further candidate needs a third set written and reviewed apart from its author. Al chooses between a typed witness contract (facility, event kind, expected path or argument, harmless sentinel effect, checked deterministically) and continuing the chain with the planner unqualified behind the disposition gates. The authoring stage reads its to-be-created test path in live chain runs (PLAN-0039); its prompt owner should apply the planner's approved-path wording or a typed refusal.
+The fresh held-out set is exposed to v6; a further candidate needs a third set written and reviewed apart from its author. Al chooses between a typed witness contract (drafted as SPEC-0040, design only) and continuing the chain with the planner unqualified behind the disposition gates. The authoring stage reads its to-be-created test path in live chain runs (PLAN-0039); its prompt owner should apply the planner's approved-path wording or a typed refusal.
 
 ## Continuation prompt
 

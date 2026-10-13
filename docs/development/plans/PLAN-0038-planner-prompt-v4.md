@@ -4,7 +4,7 @@ kind: plan
 title: Test planner prompt v4 and read guard
 status: blocked
 updated: 2026-10-13
-related: [PLAN-0036, PLAN-0035, PLAN-0025, SPEC-0022, SPEC-0023, ISSUE-0007]
+related: [PLAN-0036, PLAN-0035, PLAN-0025, SPEC-0022, SPEC-0023, SPEC-0040, ISSUE-0007]
 ---
 
 # Test planner prompt v4 and read guard
@@ -73,4 +73,4 @@ The fresh held-out set is frozen at `82d2c76` (SHA256 `7daba5a5…484e`): six ca
 - The fresh held-out set is now exposed to v6; any further candidate needs a third fresh set, written and reviewed apart from the prompt author, before a qualification claim.
 - Another thread's live full-chain runs (PLAN-0039, draft PR #43) saw the authoring stage read the test file it is meant to create, which ends the stage under the shared zero tool-retry policy. The planner fix here (listing approved paths as files to create) is prompt-only for planning; the authoring prompt owner should apply the same, or a typed refusal that does not end the run.
 
-Blocked: the planner is not qualified. The remaining failures are semantic judgements about what a facility records and which payload to choose, which prompt text has now moved only partly over three iterations. Next, for the user to choose: a typed witness contract (the plan names a listed facility, the event kind and the path or argument it expects, with a harmless sentinel effect), checked deterministically against the facility description and later against SPEC-0033 witness capture; or continue the chain with the planner unqualified, relying on the disposition gates that already refuse unwitnessed claims.
+Blocked: the planner is not qualified. A design for the first option is drafted as [SPEC-0040](../specs/SPEC-0040-typed-planned-witness.md) (not implemented). The remaining failures are semantic judgements about what a facility records and which payload to choose, which prompt text has now moved only partly over three iterations. Next, for the user to choose: a typed witness contract (the plan names a listed facility, the event kind and the path or argument it expects, with a harmless sentinel effect), checked deterministically against the facility description and later against SPEC-0033 witness capture; or continue the chain with the planner unqualified, relying on the disposition gates that already refuse unwitnessed claims.
