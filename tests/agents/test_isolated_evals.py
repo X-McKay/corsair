@@ -1,0 +1,116 @@
+"""Host-only authoring eval (static runner, admission facts, live scoring) and the per-agent eval command."""
+
+import json
+from uuid import uuid4
+
+import pytest
+from pydantic_ai import models
+
+from corsair.agents.source.contracts import SourceFile
+from corsair.ports.test_runner import ApprovedPatch, PatchFile
+from evals import run as eval_run
+from evals.test_authoring.admission import admission_facts, no_process_or_network, quoted_literals
+from evals.test_authoring.evaluate import FILES, ScriptedRun, ScriptedRunner, authoring_checks, dataset
+from evals.test_authoring.static_runner import StaticRunner
+
+REFERENCE = FILES["reference"]
+CONTROL, SECURITY = "test_documents.py::test_benign_control", "test_documents.py::test_security_rejects_outside_read"
+SOURCE = (SourceFile(path="documents.py", content="def read_document(root, filename):\n    return ''\n"),)
+
+
+@pytest.fixture(autouse=True)
+def no_real_requests():
+    with models.override_allow_model_requests(False):
+        yield
+
+
+def observe(content: str, path="test_documents.py", source=SOURCE):
+    patch = ApprovedPatch(files=(PatchFile(path, content.encode()),), approved_paths=(path,))
+    return StaticRunner(source).run(patch, control_test_id=CONTROL, security_test_id=SECURITY,
+                                    discovery_command=("python", "-m", "pytest", "--collect-only", "-q"), operation=uuid4())
+
+
+def test_static_runner_discovers_the_reference_pair_and_marks_execution_simulated():
+    observed = observe(REFERENCE)
+    assert observed.failure_layer is None and set(observed.discovery.test_ids) == {CONTROL, SECURITY}
+    assert observed.execution.command == ("static-host-runner", "not-executed")
+    assert [case.outcome for case in observed.execution.cases] == ["passed", "failed"]
+
+
+@pytest.mark.parametrize("content, error", [
+    ("def test_benign_control(:\n    pass\n", "SyntaxError"),
+    (REFERENCE.replace("import documents", "import documents\nimport hallucinated_helper"), "No module named 'hallucinated_helper'"),
+    (REFERENCE.replace("def test_benign_control", "def check_benign_control"), "expected exactly"),
+    (REFERENCE + "\n\ndef test_extra():\n    assert True\n", "expected exactly"),
+])
+def test_static_runner_reports_what_collection_would_refuse(content, error):
+    observed = observe(content)
+    assert observed.failure_layer == "discovery" and observed.execution is None
+    assert error in observed.discovery.errors
+
+
+def test_static_runner_refuses_files_it_cannot_analyse():
+    with pytest.raises(ValueError, match="Python test files only"):
+        observe("class SecurityTest {}", path="src/test/java/SecurityTest.java")
+
+
+def test_scripted_runner_repeats_the_last_condition_and_delegates_static_runs():
+    fake = ScriptedRunner((ScriptedRun(status="collection_error"), ScriptedRun(status="static")), StaticRunner(SOURCE))
+    patch = ApprovedPatch(files=(PatchFile("test_documents.py", REFERENCE.encode()),), approved_paths=("test_documents.py",))
+    layers = [fake.run(patch, control_test_id=CONTROL, security_test_id=SECURITY, discovery_command=("pytest",),
+                       operation=uuid4()).failure_layer for _ in range(3)]
+    assert layers == ["discovery", None, None] and fake.sources == ["injected", "static_simulated", "static_simulated"]
+
+
+def test_admission_facts_place_the_planned_input_and_refuse_process_use():
+    plan = next(c for c in dataset().cases if c.name == "reference_realization").inputs.inputs.plan
+    files = {"test_documents.py": REFERENCE}
+    assert quoted_literals(plan.security.input) == {"../outside.txt"}
+    assert all(admission_facts(plan, files, (64, 65, 66)).values())
+    swapped = REFERENCE.replace('"../outside.txt"', '"document.txt"').replace(
+        'read_document(allowed, "document.txt")\n    events', 'read_document(allowed, "../outside.txt")\n    events', 1)
+    facts = admission_facts(plan, {"test_documents.py": swapped}, (64, 65, 66))
+    assert not facts["planned_input_in_security"] and not facts["planned_input_not_in_control"]
+    assert not admission_facts(plan, files, (48,))["planned_failure_is_assert"]
+    assert not no_process_or_network("import subprocess\n") and not no_process_or_network("import os\nos.system('x')\n")
+    assert no_process_or_network(REFERENCE)
+
+
+def test_live_scoring_drops_only_the_scripted_authors_own_counts():
+    c = next(c for c in dataset().cases if c.name == "reference_realization")
+    from corsair.agents.test_authoring.contracts import TestPatch
+    output = TestPatch.model_validate({
+        "status": "patch", "files": [{"path": "test_documents.py", "content": REFERENCE}],
+        "control_test_id": CONTROL, "security_test_id": SECURITY,
+        "discovery_command": list(c.inputs.inputs.plan.discovery_command), "run_command": ["static-host-runner", "not-executed"],
+        "patch_sha256": ApprovedPatch(files=(PatchFile("test_documents.py", REFERENCE.encode()),),
+                                      approved_paths=("test_documents.py",)).sha256,
+        "security_assertion_lines": [65], "limitations": ["host"],
+        "dev_runs": [{"run": 1, "operation": "x", "status": "discovered", "discovered_test_ids": [CONTROL, SECURITY],
+                      "errors": "", "control": {"outcome": "passed"}, "security": "withheld", "run_command": [],
+                      "cleanup": "not_required",
+                      "patch_sha256": ApprovedPatch(files=(PatchFile("test_documents.py", REFERENCE.encode()),),
+                                                    approved_paths=("test_documents.py",)).sha256},
+                     {"run": 2, "operation": "y", "status": "not_run", "discovered_test_ids": [], "errors": "budget",
+                      "control": None, "security": None, "run_command": [], "cleanup": "not_required",
+                      "patch_sha256": "0" * 64}]})
+    scripted = authoring_checks(c.inputs.inputs, output, c.metadata)
+    live = authoring_checks(c.inputs.inputs, output, c.metadata, live=True)
+    assert not scripted["security_assertion_lines"] and "security_assertion_lines" not in live and "dev_runs" not in live
+    assert all(live.values())
+
+
+def test_eval_command_files_runs_and_compares_with_the_previous_and_promoted_runs(tmp_path, monkeypatch):
+    assert eval_run.main(["authoring", "--results", str(tmp_path), "--note", "first"]) == 0
+    first = json.loads((tmp_path / "authoring" / "index.jsonl").read_text().splitlines()[0])["run"]
+    record = json.loads((tmp_path / "authoring" / first / "summary.json").read_text())
+    assert record["summary"]["clean_attempts"] == record["summary"]["attempts"] == 12
+    assert record["summary"]["identity"]["prompt_version"] and record["command"]["note"] == "first"
+    assert "nothing to compare" in (tmp_path / "authoring" / first / "comparison.md").read_text()
+    eval_run.main(["authoring", "--results", str(tmp_path), "--promote", first])
+    second = record | {"run": "second"}
+    second["summary"] = record["summary"] | {"clean_attempts": 11}
+    text = eval_run.compare(second, record | {"reference_kind": "baseline"}, first)
+    assert f"Compared with {first} (baseline)" in text and "clean attempts 12/12" in text
+    with pytest.raises(SystemExit):
+        eval_run.main(["environment"])
