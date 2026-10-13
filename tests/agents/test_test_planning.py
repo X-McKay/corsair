@@ -12,13 +12,15 @@ from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import UsageLimits
 
 from corsair.agents.issue_analysis.tools import source_tools
-from corsair.agents.issue_analysis.tools.identification import identification_tools
+from corsair.agents.issue_identification.tools import identification_tools
 from corsair.agents.test_planning import (
     PlanningDependencies, ReadyTestPlan, ReadyTestPlanDraft, TestPlanningInput, UnsupportedTestPlan,
     UnsupportedTestPlanDraft, create_test_planning_agent, planning_prompt,
 )
 from corsair.agents.test_planning.skills import SKILL_TEXT
-from evals.test_planning.evaluate import EvaluationBudget, dataset, evaluate, passed, plan_checks
+from evals.test_planning.evaluate import (
+    DATASETS, MANIFESTS, RETIRED, EvaluationBudget, dataset, evaluate, passed, plan_checks,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -160,6 +162,21 @@ def edit(path, value):
     edit(("security", "implementation_call"), "open(tmp_path / 'outside.txt')"),                 # not the target
     edit(("security_expectation", "safe_behavior"), "raises some error"),                        # untyped expectation
     {k: v for k, v in reference().items() if k != "security_expectation"},                       # missing expectation
+    # SPEC-0040 typed witness admission
+    edit(("security", "witness", "facility"), "audit_socket"),                                   # unlisted facility
+    edit(("security", "witness", "effect"), "process_start"),                                    # effect not the facility kind
+    edit(("security", "witness", "expectation"), "occurs"),                                      # security must expect absence
+    edit(("control", "witness", "expectation"), "absent"),                                       # control must expect occurrence
+    edit(("security", "witness", "subject"), "/tmp/outside.txt"),                                # absolute subject
+    edit(("security", "witness", "subject"), "../outside.txt"),                                  # escapes scratch
+    edit(("security", "witness", "subject"), "allowed/document.txt"),                            # same subject as control
+    edit(("security", "witness", "subject"), "allowed//document.txt"),                           # alias of the control subject
+    edit(("security", "witness", "subject"), "./outside.txt"),                                   # noncanonical spelling
+    edit(("security_expectation", "safe_behavior"), "e"),                                        # substring, not a named exception
+    edit(("security", "witness", "subject"), "sentinel.txt"),                                    # input never aims at it
+    edit(("security_expectation", "safe_behavior"), "no_outside_open"),                          # neither no_<effect> nor named
+    {k: v for k, v in reference().items() if k != "control"} | {"control": {
+        k: v for k, v in reference()["control"].items() if k != "witness"}},                     # missing witness
 ])
 def test_finalizer_and_contract_refuse_invalid_plans(plan):
     with pytest.raises(UnexpectedModelBehavior):
@@ -276,16 +293,21 @@ def test_scratch_check_rejects_fixtures_outside_the_scratch_location():
     assert "../" in plan.security.input
 
 
-def test_heldout_cases_are_disjoint_from_development_and_pass_scripted_plumbing(tmp_path):
-    development, heldout = dataset("development"), dataset("heldout")
+@pytest.mark.parametrize("name", sorted(MANIFESTS))
+def test_heldout_cases_stay_disjoint_and_retired_sets_cannot_run_again(tmp_path, name):
+    heldout = dataset(name)
     assert len(heldout.cases) == 6 and {c.metadata.status for c in heldout.cases} == {"ready", "unsupported"}
-    shown = {source.content for c in development.cases for source in c.inputs.source_files}
-    assert not shown & {source.content for c in heldout.cases for source in c.inputs.source_files}
-    assert not {c.inputs.identification.target.symbol for c in development.cases} & {
-        c.inputs.identification.target.symbol for c in heldout.cases}
-    report = asyncio.run(evaluate(tmp_path / "heldout", EvaluationBudget(), cases="heldout"))
-    assert passed(report) and len(report.cases) == 12
-    assert report.experiment_metadata["dataset"] == "heldout"
+    for other in (dataset(n) for n in DATASETS if n != name):
+        shown = {source.content for c in other.cases for source in c.inputs.source_files}
+        assert not shown & {source.content for c in heldout.cases for source in c.inputs.source_files}
+        assert not {c.inputs.identification.target.symbol for c in other.cases} & {
+            c.inputs.identification.target.symbol for c in heldout.cases}
+    if name not in RETIRED:
+        assert all(c.inputs.environment.witness_facilities for c in heldout.cases)
+        return
+    with pytest.raises(ValueError, match="retired"):
+        asyncio.run(evaluate(tmp_path / name, EvaluationBudget(), cases=name))
+    assert not (tmp_path / name).exists()
 
 
 def test_heldout_evaluation_refuses_a_changed_case(tmp_path, monkeypatch):
@@ -294,8 +316,24 @@ def test_heldout_evaluation_refuses_a_changed_case(tmp_path, monkeypatch):
     changed.write_text((module.ROOT / module.DATASETS["heldout"]).read_text().replace("touch pwned", "touch owned", 1))
     monkeypatch.setitem(module.DATASETS, "heldout", str(changed))
     with pytest.raises(ValueError, match="frozen manifest"):
-        asyncio.run(evaluate(tmp_path / "refused", EvaluationBudget(), cases="heldout"))
-    assert not (tmp_path / "refused").exists()
+        module.check_manifest("heldout")
+
+
+def test_typed_witness_admits_absence_identifier_and_refuses_without_listed_facilities():
+    c = case()
+    plan = edit(("security_expectation", "safe_behavior"), "no_file_open")
+    assert isinstance(run(create_test_planning_agent(responding(plan)), c.inputs).output, ReadyTestPlan)
+    data = c.inputs.model_dump()
+    data["environment"]["witness_facilities"] = []
+    with pytest.raises(UnexpectedModelBehavior):
+        run(create_test_planning_agent(responding(reference()), output_retries=0), TestPlanningInput.model_validate(data))
+
+
+def test_ready_plan_is_refused_without_an_executed_baseline_test():
+    data = case().inputs.model_dump()
+    data["environment"]["baseline_test"] = None
+    with pytest.raises(UnexpectedModelBehavior):
+        run(create_test_planning_agent(responding(reference()), output_retries=0), TestPlanningInput.model_validate(data))
 
 
 @pytest.mark.parametrize("name", ["control", "security"])
