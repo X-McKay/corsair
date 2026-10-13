@@ -338,3 +338,12 @@ def test_zero_exit_with_unconfirmed_cleanup_is_a_citeable_blocker():
     assert result.receipts[0].exit_code == 0
     assert result.receipts[0].execution_error == blocked["evidence"]
     assert result.diagnostics[0].code == "cleanup_unconfirmed"
+
+
+def test_budget_refusal_does_not_invalidate_completed_successful_evidence():
+    execution = ScriptedExecution(dict(DISCOVERED))
+    calls = SETUP + [("run_setup_command", {"command": list(BASELINE)})]
+    result = run(ready(), calls, execution, budget=SetupBudget(max_commands=4)).output
+    assert result.status == "ready"
+    assert execution.calls == [INSTALL, BUILD, DISCOVER, BASELINE]
+    assert len(result.receipts) == 4

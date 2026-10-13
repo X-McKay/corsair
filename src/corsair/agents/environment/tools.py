@@ -146,9 +146,10 @@ def environment_tools() -> FunctionToolset[EnvironmentDependencies]:
             raise ToolFailed(ledger.halted)
         if len(ledger.records) >= deps.budget.max_commands:
             diagnostic = budget_blocker()
-            ledger.diagnostics.append(diagnostic)
-            ledger.halted = diagnostic.render()
-            raise ToolFailed(ledger.halted)
+            if not any(d.code == diagnostic.code for d in ledger.diagnostics):
+                ledger.diagnostics.append(diagnostic)
+            # Nothing was dispatched: preserve already-complete successful evidence.
+            raise ToolFailed(diagnostic.render())
         command = tuple(command)
         operation = deps.new_operation()
         error = None

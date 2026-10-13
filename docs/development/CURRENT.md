@@ -1,6 +1,6 @@
 # Current work
 
-Current diagnostics work: [SPEC-0052](specs/SPEC-0052-actionable-blockers.md), [PLAN-0056](plans/PLAN-0056-actionable-blockers.md), [operator guidance](../runbooks/setup-blockers.md). Runtime stop guidance and terminal setup failures implemented in isolation; 1252 full offline checks and 78 final affected checks pass; frozen environment baseline/candidate 16/16. [Handoff](handoffs/HANDOFF-0080-actionable-blockers.md). Full real-case composition and live qualification remain unchanged.
+Current diagnostics work: [SPEC-0053](specs/SPEC-0053-actionable-blockers.md), [PLAN-0057](plans/PLAN-0057-actionable-blockers.md), [operator guidance](../runbooks/setup-blockers.md). Runtime stop guidance and terminal setup failures implemented in isolation; 1252 full offline checks and 78 final affected checks pass; frozen environment baseline/candidate 16/16. [Handoff](handoffs/HANDOFF-0080-actionable-blockers.md). Full real-case composition and live qualification remain unchanged.
 
 Updated: 2026-10-12 (IDEA-0004 accepted; SPEC-0025/SPEC-0026 in-sandbox source and dependency fetch drafted; SPEC-0022 test planner implemented offline under PLAN-0025). This is a navigation index; linked plans, issues and qualification reports carry the details. Verify git/source state when resuming.
 

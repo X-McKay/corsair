@@ -1,17 +1,17 @@
 ---
-id: PLAN-0056
+id: PLAN-0057
 kind: plan
 title: Early stops and actionable setup blockers
 status: complete
 updated: 2026-10-13
-related: [SPEC-0052]
+related: [SPEC-0053]
 ---
 
 # Early stops and actionable setup blockers
 
 ## Objective and dependencies
 
-Implement SPEC-0052 on current main 4a75870 in codex/actionable-blockers. Preserve the primary checkout. Runtime selection and environment execution already expose typed failures; use them without wiring unqualified graph boundaries or copying open PR61 changes.
+Implement SPEC-0053 on current main 4a75870 in codex/actionable-blockers. Preserve the primary checkout. Runtime selection and environment execution already expose typed failures; use them without wiring unqualified graph boundaries or copying open PR61 changes.
 
 ## Steps
 
@@ -32,3 +32,7 @@ Review: finalizer refuses ready and unsupported after a halt; missing run refere
 ## Decisions and next action
 
 First stop at available deterministic evidence; preserve unknown root cause and raw private receipts. Guidance is operator-owned, no autonomous retries or policy weakening. Implement and validate runtime/environment consumers; document other producer boundaries as follow-up, not implemented coverage.
+
+Review follow-up: corrected the budget-only refusal bug with an N-successful-commands plus refused N+1 regression; prior successful readiness is preserved. Recorded the unmeasured live cost of strict terminal failures. Renumbered our spec/plan to SPEC-0053/PLAN-0057 to avoid PR62. PR62 should merge first; this branch then ports diagnostics into its split tool/dependency/finalizer modules and refreshes the toolset digest.
+
+Review validation: initial rename check caught stale spec frontmatter; corrected before publication. Budget-fix affected checks and record checks rerun together; scripted environment remains 16/16.

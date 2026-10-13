@@ -4,7 +4,7 @@ A stop means this attempt cannot establish the requested result. It is not evide
 
 ## Implemented stop points
 
-Runtime admission stops before an environment-agent input is constructed. Setup stops dispatching further commands after the first unsuccessful command, infrastructure error, uncertain delivery/completion or command-budget exhaustion. Read-only inspection remains available so the agent can cite the failure. A ready result is refused after a halt. Corrections start a new attributable attempt after the developer/operator resolves the cause; this code never retries, switches images, changes pins, expands network policy or installs credentials.
+Runtime admission stops before an environment-agent input is constructed. Setup stops dispatching further commands after the first unsuccessful command, infrastructure error, uncertain delivery/completion or command-budget exhaustion. Read-only inspection remains available so the agent can cite the failure. A ready result is refused after a dispatched-command failure halt. A budget-refused call never dispatched and does not invalidate complete successful evidence. Corrections start a new attributable attempt after the developer/operator resolves the cause; this code never retries, switches images, changes pins, expands network policy or installs credentials.
 
 | Code | What to inspect | Action and owner |
 | --- | --- | --- |
@@ -42,4 +42,4 @@ These remain follow-up producer integrations, not implemented coverage or live q
 
 Preflight should batch independent read-only checks where safe, but never probe arbitrary hosts, download repository dependencies on the host, or spend provider calls to diagnose a deterministic configuration failure. A resume must revalidate the changed dependency and its consumers, not reuse stale qualification.
 
-The runtime/environment handoff remains unconnected to the full real-case chain under G12. This change improves those existing component entry points only. It does not add a new end-to-end CLI or qualify a live OpenShell/network/provider path. [SPEC-0052](../development/specs/SPEC-0052-actionable-blockers.md) and [PLAN-0056](../development/plans/PLAN-0056-actionable-blockers.md) track implementation and checks.
+The runtime/environment handoff remains unconnected to the full real-case chain under G12. This change improves those existing component entry points only. It does not add a new end-to-end CLI or qualify a live OpenShell/network/provider path. [SPEC-0053](../development/specs/SPEC-0053-actionable-blockers.md) and [PLAN-0057](../development/plans/PLAN-0057-actionable-blockers.md) track implementation and checks.
