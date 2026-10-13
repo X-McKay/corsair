@@ -15,7 +15,7 @@ Branch `claude/planner-live-qualification-ktcy7w` from main `0d9bb5a` (PR #36); 
 
 ## Validation and blockers
 
-`make test-config`: 785 passed (one existing deprecation warning), including the SPEC-0023 held-out manifest guard. Scripted held-out plumbing: 12/12 attempts pass every check. Live runs (held-out × prompt v2 and v3, three repeats each; development × v3, two repeats) were started on RIG0 against llm.almckay.io with an 8192 response cap and 2048 thinking budget; results were not recorded before this PR merged at the user's request. No Temporal or OpenShell check ran; the kind cluster was not used.
+`make test-config`: 785 passed (one existing deprecation warning), including the SPEC-0023 held-out manifest guard. Scripted held-out plumbing: 12/12 attempts pass every check. Live runs (held-out × prompt v2 and v3, three repeats each; development × v3, two repeats) were started on RIG0 against llm.almckay.io with an 8192 response cap and 2048 thinking budget; results were not available when this PR was prepared for merge at the user's request. No Temporal or OpenShell check ran; the kind cluster was not used.
 
 ## Decisions and next steps
 
