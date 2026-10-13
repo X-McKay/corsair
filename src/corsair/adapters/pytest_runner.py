@@ -2,12 +2,12 @@
 from dataclasses import dataclass
 from uuid import UUID, uuid5
 
-from corsair.adapters.native_runner import NativeRunner, error_text
+from corsair.adapters.native_runner import NativeRunner, check_bounds, check_command, check_root, error_text
+from corsair.reports.admission import failed_count
 from corsair.nodes.witness import MAX_RECORD_BYTES, PROBE_SHA256, probe_argv
-from corsair.ports.test_runner import (MAX_TEST_ID, TEST_ID, ApprovedPatch, Discovery, Execution, PreparedWorkspace,
-                                       WitnessCapture, WitnessRequest)
+from corsair.ports.test_runner import (MAX_TEST_ID, TEST_ID, ApprovedPatch, PreparedWorkspace, WitnessCapture,
+                                       WitnessRequest)
 from corsair.reports.junit import MAX_JUNIT_BYTES, JUnitError, parse_junit
-from corsair.reports.test_observations import AdmittedTestClaims, TestClaim, WorkloadTestReport
 
 # Fixed operator script run by absolute /bin/sh (sandbox exec promises no PATH lookup): stdout is exactly
 # the JUnit file, exit status is pytest's.
@@ -17,7 +17,6 @@ WRAPPER = ('junit="$1"; shift; rm -f -- "$junit"; '
            'status=$?; cat -- "$junit" 2>/dev/null; exit $status')
 # Native tracebacks give parseable `File "...", line N, in function` frames for failure classification.
 RUN_OPTIONS = ('--tb=native',)
-CLAIM = {'passed': 'passed', 'failed': 'failed', 'error': 'failed', 'skipped': 'skipped'}
 # Fixed read-back of the probe record after execution; the path arrives only as a positional argument.
 WITNESS_READ = 'cat -- "$1"'
 
@@ -33,16 +32,11 @@ class PytestRunnerConfig:
     witness_record_path: str | None = None
 
     def __post_init__(self):
-        if (type(self.command) is not tuple or not self.command
-                or any(type(t) is not str or not t or '\0' in t for t in self.command)):
-            raise ValueError('Runner command must be nonempty string tokens')
+        check_command(self.command)
         if type(self.junit_path) is not str or not self.junit_path or '\0' in self.junit_path or self.junit_path[0] == '-':
             raise ValueError('JUnit path must be a plain operator path')
-        if type(self.workspace_root) is not str or not self.workspace_root.startswith('/') or '\0' in self.workspace_root:
-            raise ValueError('Workspace root must be an absolute operator path')
-        if not (type(self.max_junit_bytes) is int and 1 <= self.max_junit_bytes <= MAX_JUNIT_BYTES
-                and type(self.max_excerpt_chars) is int and 1 <= self.max_excerpt_chars <= 65536):
-            raise ValueError('Runner bounds outside the admitted range')
+        check_root(self.workspace_root)
+        check_bounds(self.max_junit_bytes, self.max_excerpt_chars, MAX_JUNIT_BYTES)
         record = self.witness_record_path
         if record is not None and (type(record) is not str or not record or '\0' in record or record[0] == '-'
                                    or record == self.junit_path):
@@ -72,18 +66,9 @@ class PytestRunner(NativeRunner):
             raise ValueError('Patch paths conflict with runner arguments')
 
     def _stages(self, prepared, ids, discovery_command, paths, operation, witness):
-        handle = prepared.handle
-        command = discovery_command + tuple(paths)
-        receipt, problem = self._execute(handle, command, uuid5(operation, 'discovery'))
-        if problem:
-            discovery = Discovery('execution_failure', (), self._excerpt(receipt), command, receipt)
-            return discovery, None, 'discovery', f'discovery: {problem}', None
-        found = collected(receipt.stdout)
-        if receipt.native_exit != 0 or found is None or len(found) != len(set(found)) or set(found) != set(ids):
-            discovery = Discovery('collection_error', found or (), self._excerpt(receipt), command, receipt)
-            return (discovery, None, 'discovery', f'discovery: exit {receipt.native_exit}, found {list(found or ())}',
-                    None)
-        discovery = Discovery('discovered', found, '', command, receipt)
+        discovery, stopped = self._discover(prepared.handle, discovery_command + tuple(paths), ids, operation, collected)
+        if stopped:
+            return stopped
         nonce = str(uuid5(operation, 'witness-nonce')) if witness is not None else None
         execution, layer = self._run_once(prepared, ids, frozenset(paths), uuid5(operation, 'execution'), witness, nonce)
         captured = None
@@ -119,15 +104,13 @@ class PytestRunner(NativeRunner):
                                  record_path=self._config.witness_record_path, nonce=nonce)
         argv = ('/bin/sh', '-c', WRAPPER, 'corsair-pytest', self._config.junit_path, *command, *RUN_OPTIONS, *ids)
         receipt, problem = self._execute(prepared.handle, argv, operation)
-        failure = lambda layer, detail, junit=None, status='execution_failure': (
-            Execution(status, (), junit, None, detail, argv, receipt), layer)
+        failure = lambda *args: self._failure(argv, receipt, *args)
         if problem:
             return failure('execution', f'execution: {problem}')
-        try:
-            junit = self._store.put(receipt.stdout)
-        except Exception as error:
+        junit, stored = self._store_report(receipt.stdout)
+        if stored:
             # The command completed; only retention of its JUnit bytes failed.
-            return failure('report', f'junit storage: {error_text(error)}')
+            return failure('report', f'junit storage: {stored}')
         if receipt.native_exit not in (0, 1):
             return failure('execution', f'execution: pytest exit {receipt.native_exit}', junit)
         try:
@@ -135,13 +118,7 @@ class PytestRunner(NativeRunner):
                                 max_bytes=self._config.max_junit_bytes)
         except JUnitError as error:
             return failure('report', f'report: {error}', junit, 'invalid_report')
-        if receipt.native_exit != int(any(case.outcome in ('failed', 'error') for case in cases)):
+        if receipt.native_exit != int(failed_count(cases) > 0):
             return failure('report', f'report: pytest exit {receipt.native_exit} conflicts with JUnit outcomes',
                            junit, 'invalid_report')
-        control, security = (TestClaim(test_id=case.test_id, outcome=CLAIM[case.outcome]) for case in cases)
-        report = WorkloadTestReport(schema_version='test-observations-v1', operation=str(operation),
-                                    source_sha256=prepared.source.sha256, tests_sha256=prepared.tests.sha256,
-                                    control=control, security=security)
-        claims = AdmittedTestClaims(str(operation), prepared.handle, prepared.source, prepared.tests, junit,
-                                    receipt.native_exit, report)
-        return Execution('completed', cases, junit, claims, '', argv, receipt), None
+        return self._completed(prepared, argv, receipt, cases, junit, operation)

@@ -1,8 +1,10 @@
-"""Bounded pytest JUnit XML parsing; the XML is a workload claim, never attestation."""
+"""Bounded JUnit XML parsing (pytest's report, and the reader Surefire's shares); a workload claim, never attestation."""
 import re
+from typing import Callable
 import xml.etree.ElementTree as ET
 
 from corsair.ports.test_runner import TEST_ID, FailureDetail, TestCaseResult
+from corsair.reports.admission import ReportError, admit_text, exactly, record
 
 MAX_JUNIT_BYTES = 262144
 MAX_MESSAGE_CHARS = 2048
@@ -14,7 +16,7 @@ FRAME = re.compile(r'  File "(?P<path>[^"\n]+)", line (?P<line>\d+), in (?P<func
 EXCEPTION = re.compile(r'(?P<type>[A-Za-z_][\w.]*)(?::|$)')
 
 
-class JUnitError(ValueError):
+class JUnitError(ReportError):
     pass
 
 
@@ -49,12 +51,7 @@ def _failure(kind: str, element: ET.Element, root: str, test_paths: frozenset[st
 
 def admit_xml(data: bytes, max_bytes: int) -> ET.Element:
     """Bounded UTF-8 XML without any markup declaration (so no entity expansion), parsed by the stdlib."""
-    if type(data) is not bytes or not 1 <= len(data) <= max_bytes:
-        raise JUnitError('JUnit report outside the admitted byte envelope')
-    try:
-        text = data.decode('utf-8')
-    except UnicodeError as error:
-        raise JUnitError('JUnit report is not UTF-8') from error
+    text = admit_text(data, max_bytes, 'JUnit report', JUnitError)
     # Refuse every declaration (DOCTYPE, ENTITY, ...) before expat sees it: no entity expansion.
     if re.search(r'<!(?!--|\[CDATA\[)', text):
         raise JUnitError('JUnit report contains a markup declaration')
@@ -76,22 +73,28 @@ def parse_junit(data: bytes, test_ids: tuple[str, ...], *, root: str, test_paths
     tree = admit_xml(data, max_bytes)
     if tree.tag not in ('testsuites', 'testsuite'):
         raise JUnitError('Unexpected JUnit root element')
+    failure = lambda kind, element: _failure(kind, element, root, test_paths)
+    return testcases(tree, keys, test_ids, children=CHILDREN, failure=failure, separator='::', error=JUnitError)
+
+
+def testcases(tree: ET.Element, keys: dict[tuple[str, str], str], test_ids: tuple[str, ...], *, children: set[str],
+              failure: Callable[[str, ET.Element], FailureDetail], separator: str,
+              error: type[JUnitError]) -> tuple[TestCaseResult, ...]:
+    """Every `testcase` keyed by (classname, name) must be an expected id with at most one outcome element."""
     results = {}
     for case in tree.iter('testcase'):
         test_id = keys.get((case.get('classname'), case.get('name')))
         if test_id is None:
-            raise JUnitError(f'Unexpected testcase {case.get("classname")!r}::{case.get("name")!r}')
+            raise error(f'Unexpected testcase {case.get("classname")!r}{separator}{case.get("name")!r}')
         if test_id in results:
-            raise JUnitError(f'Duplicate testcase {test_id}')
-        if any(child.tag not in CHILDREN for child in case):
-            raise JUnitError(f'Unexpected element in testcase {test_id}')
+            raise error(f'Duplicate testcase {test_id}')
+        if any(child.tag not in children for child in case):
+            raise error(f'Unexpected element in testcase {test_id}')
         marks = [child for child in case if child.tag in OUTCOMES]
         if len(marks) > 1:
-            raise JUnitError(f'Ambiguous outcome for {test_id}')
+            raise error(f'Ambiguous outcome for {test_id}')
         outcome = OUTCOMES[marks[0].tag] if marks else 'passed'
-        failure = _failure(marks[0].tag, marks[0], root, test_paths) if outcome in ('failed', 'error') else None
+        detail = failure(marks[0].tag, marks[0]) if outcome in ('failed', 'error') else None
         output = ''.join(child.text or '' for child in case if child.tag == 'system-out')
-        results[test_id] = TestCaseResult(test_id, outcome, failure, output[:MAX_OUTPUT_CHARS])
-    if set(results) != set(test_ids):
-        raise JUnitError(f'Missing testcases: {sorted(set(test_ids)-set(results))}')
-    return tuple(results[test_id] for test_id in test_ids)
+        record(results, TestCaseResult(test_id, outcome, detail, output[:MAX_OUTPUT_CHARS]), 'testcase', error)
+    return exactly(results, test_ids, 'testcases', error)
