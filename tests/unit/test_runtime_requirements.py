@@ -202,16 +202,27 @@ def test_selection_supported_unsupported_conflict():
     java17 = detect({'pom.xml': PARENT.replace(b'1.8', b'17').replace(b'junit</groupId><artifactId>junit',
                                                                          b'org.junit.jupiter</groupId><artifactId>junit-jupiter').replace(b'4.12', b'5.14.4')}, 'java')
     selection = select(java17, matrix)
-    assert selection.status == 'supported' and selection.image_id == 'temurin-17-maven'
+    assert selection.status == 'unsupported' and [n.name for n in selection.needs] == ['junit5']  # no Maven runner row yet
+    # SPEC-0045 rows, staged here until the live gate passes (a row is added only with passing evidence).
+    staged = Matrix.model_validate({**matrix.model_dump(), 'images': [*matrix.model_dump()['images'], STAGED_JDK8],
+                                    'frameworks': [*matrix.model_dump()['frameworks'], *STAGED_JUNIT]})
+    assert select(java17, staged).image_id == 'temurin-17-maven'
     java8 = detect({'pom.xml': PARENT}, 'java')  # source 1.8 with JUnit 4.12
-    selection = select(java8, matrix)
+    selection = select(java8, staged)
     assert selection.status == 'supported' and selection.image_id == 'temurin-8-maven'
     # JUnit 4 before 4.12 has no Vintage discovery (SPEC-0041); the JDK alone is not enough.
-    old_junit = select(detect({'pom.xml': PARENT.replace(b'4.12', b'4.8.2')}, 'java'), matrix)
+    old_junit = select(detect({'pom.xml': PARENT.replace(b'4.12', b'4.8.2')}, 'java'), staged)
     assert old_junit.status == 'unsupported' and [n.name for n in old_junit.needs] == ['junit4']
-    without_runner = Matrix.model_validate({**matrix.model_dump(), 'frameworks': [
-        f for f in matrix.model_dump()['frameworks'] if f['language'] != 'java']})
-    assert [n.name for n in select(java17, without_runner).needs] == ['junit5']
+
+
+STAGED_JDK8 = {'id': 'temurin-8-maven', 'language': 'java',
+               'base_image': 'docker.io/library/maven@sha256:f2cb52730ea0bde9dc8ba20e5e539d000dcdd7ab9e498d70c301fe04fbddb656',
+               'image_source': 'deploy/qualification/toolchains/java8', 'runtime': {'name': 'jdk', 'version': '8.0.504'},
+               'tools': {'maven': '3.10.0'}, 'selector': {}, 'qualification': {'records': ['SPEC-0045'], 'report': 'x'}}
+STAGED_JUNIT = [{'name': 'junit4', 'language': 'java', 'versions': '>=4.12,<4.14', 'runner': 'x', 'images': ['temurin-8-maven'],
+                 'qualification': {'records': ['SPEC-0045'], 'report': 'x'}},
+                {'name': 'junit5', 'language': 'java', 'versions': '5.14.*', 'runner': 'x', 'images': ['temurin-17-maven'],
+                 'qualification': {'records': ['SPEC-0045'], 'report': 'x'}}]
 
 
 def test_matrix_refuses_selector_rows_and_duplicates():
@@ -274,3 +285,57 @@ def test_review_findings_versions():
                      'test_framework', 'pytest').allowed == '==7.4.0'
     ci = b'jobs:\n  t:\n    strategy:\n      matrix:\n        node-version: [16.x, 18.x]\n    steps:\n      - run: npm test\n'
     assert component(detect({'package.json': b'{}', '.github/workflows/t.yml': ci}, 'javascript'), 'runtime', 'node').allowed == '16.* || 18.*'
+
+
+def test_unread_hard_constraint_is_undetermined_not_supported():
+    # Al's review of eac99a2: requires-python '>=3.13rc1' is unread, yet a 3.12.15 pin used to select CPython 3.12.15.
+    files = {'pyproject.toml': b'[project]\nrequires-python = ">=3.13rc1"\noptional-dependencies = {test = ["pytest>=9,<10"]}\n',
+             '.python-version': b'3.12.15\n'}
+    selection = select(detect(files, 'python'), load())
+    assert selection.status == 'undetermined' and 'pyproject.toml' in selection.missing[0]
+    # An unread tested alternative (a CI PyPy or dev job) does not block.
+    ci = b'jobs:\n  test:\n    strategy:\n      matrix:\n        python: ["3.12", "pypy-3.10", "3.13-dev"]\n    steps:\n      - run: pytest\n'
+    tested = detect({'pyproject.toml': b'[project]\noptional-dependencies = {test = ["pytest>=9,<10"]}\n',
+                     '.github/workflows/t.yml': ci}, 'python')
+    assert component(tested, 'runtime', 'cpython').unparsed and select(tested, load()).status == 'supported'
+    # An unread framework constraint cannot be the qualified runner when the runtime fits.
+    framework = {'pyproject.toml': b'[project]\nrequires-python = ">=3.9"\noptional-dependencies = {test = ["pytest>=9.0rc1"]}\n',
+                 'pytest.ini': b''}
+    selection = select(detect(framework, 'python'), load())
+    assert selection.status == 'undetermined' and selection.missing[0].startswith('pytest test framework declaration not understood')
+
+
+def test_poetry_lock_reads_project_metadata_not_first_package():
+    lock = (b'[[package]]\nname = "backports.zoneinfo"\nversion = "0.2.1"\npython-versions = ">=3.6,<3.10"\n\n'
+            b'[metadata]\nlock-version = "2.0"\npython-versions = ">=3.8"\ncontent-hash = "x"\n')
+    project = b'[tool.poetry.dependencies]\npython = ">=3.8"\n[tool.poetry.dev-dependencies]\npytest = "^9.0"\n'
+    requirement = detect({'pyproject.toml': project, 'poetry.lock': lock}, 'python')
+    runtime = component(requirement, 'runtime', 'cpython')
+    assert runtime.allowed == '>=3.8' and {e.line for e in runtime.evidence if e.path == 'poetry.lock'} == {8}
+    assert select(requirement, load()).status == 'supported'
+
+
+@pytest.mark.parametrize('pipfile', [b'requires = "3.12"\n', b'packages = ["pytest"]\n', b'[requires]\npython_version = 3.12\n'])
+def test_malformed_pipfile_structure_is_recorded_not_raised(pipfile):
+    requirement = detect({'Pipfile': pipfile, 'pytest.ini': b''}, 'python')
+    assert any(u.path == 'Pipfile' for c in requirement.components for u in c.unparsed)
+    assert select(requirement, load()).status == 'undetermined'
+
+
+def test_framework_rows_scoped_to_images():
+    # A framework range qualified on one image must not be claimed by another image of the same language.
+    data = load().model_dump()
+    py312 = data['images'][0]
+    py37 = {**py312, 'id': 'cpython-3.7-pytest', 'runtime': {'name': 'cpython', 'version': '3.7.17'}}
+    old = {**data['frameworks'][0], 'versions': '>=6.0,<8', 'images': ['cpython-3.7-pytest']}
+    new = {**data['frameworks'][0], 'images': ['cpython-3.12-pytest']}
+    matrix = Matrix.model_validate({**data, 'images': [py312, py37, *data['images'][1:]], 'frameworks': [new, old]})
+    wide = lambda pytest: python_project('>=3.7', pytest)
+    assert select(wide('>=9,<10'), matrix).image_id == 'cpython-3.12-pytest'
+    assert select(python_project('>=3.7,<3.8', '>=9,<10'), matrix).status == 'unsupported'  # pytest 9 not qualified on 3.7
+    assert select(python_project('>=3.7,<3.8', '==6.2.5'), matrix).image_id == 'cpython-3.7-pytest'
+    assert select(python_project('>=3.12', '==6.2.5'), matrix).status == 'unsupported'  # pytest 6 not qualified on 3.12
+    with pytest.raises(ValueError, match='duplicate framework row'):
+        Matrix.model_validate({**data, 'images': [py312, py37], 'frameworks': [new, {**old, 'images': []}]})
+    with pytest.raises(ValueError, match='not a python row'):
+        Matrix.model_validate({**data, 'frameworks': [{**old, 'images': ['temurin-17-maven']}]})

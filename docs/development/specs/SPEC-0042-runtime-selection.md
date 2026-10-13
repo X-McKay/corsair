@@ -19,14 +19,14 @@ This spec adds three things:
 - an operator-owned runtime matrix with a matcher;
 - a report over the benchmark cases.
 
-Excluded: building or qualifying new images, wiring the selection into the environment agent or the chain (G12), dependency installation (SPEC-0026), and test runners for frameworks other than pytest (G6). Execution needs no cluster, and nothing runs project code.
+It also adds the hand-off from a selection to the environment agent's input. Excluded: building or qualifying new images, wiring that hand-off into the chain or durable workflow (G12), dependency installation (SPEC-0026), and test runners for frameworks other than pytest (G6). Execution needs no cluster, and nothing runs project code.
 
 ## Boundaries and design
 
 **Detector** (`src/corsair/nodes/runtime/`).
 - `is_build_file(path)` selects the build files from a snapshot listing. `detect(files, language, parents=)` reads only those bytes and returns a `RuntimeRequirement` (or a reason string when no single language applies).
 - One module per ecosystem reads its formats as data:
-  - Python: `pyproject.toml` (requires-python, classifiers, Poetry, extras, build backend), `setup.cfg`, `setup.py` through `ast` (never executed), requirements files, `tox.ini` envlists, `Pipfile`/`Pipfile.lock`, `uv.lock`/`poetry.lock`, `.python-version`, `runtime.txt`.
+  - Python: `pyproject.toml` (requires-python, classifiers, Poetry, extras, build backend), `setup.cfg`, `setup.py` through `ast` (never executed), requirements files, `tox.ini` envlists, `Pipfile`/`Pipfile.lock`, `uv.lock` top-level `requires-python` and `poetry.lock` `[metadata]` (per-package ranges are never project constraints), `.python-version`, `runtime.txt`.
   - Java: Maven POMs with in-tree modules and supplied parent POMs. It reads properties, compiler release/target/source, enforcer `requireJavaVersion`/`requireMavenVersion`, the toolchains plugin, Surefire and JUnit 3/4/5 and TestNG dependencies. It also reads Gradle compatibility, toolchain and dependency lines, Maven and Gradle wrappers, `.java-version`/`.sdkmanrc`/`.tool-versions` and `Jenkinsfile` JDK declarations.
   - JavaScript: `package.json` engines, `packageManager`, the test script (following `npm run`) and dev dependencies; `.nvmrc`/`.node-version`; lockfile versions.
   - Ruby: gemspec `required_ruby_version` and dependencies (literal strings only), Gemfile `ruby`, `Gemfile.lock` RUBY VERSION, BUNDLED WITH and framework specs, `.ruby-version`.
@@ -59,15 +59,17 @@ Only test frameworks among registry components are matched, against runner suppo
 
 **Matrix** (`deploy/runtime-matrix.yaml`) is operator-owned, and nothing a project or agent supplies edits it.
 - `images` rows name a digest-pinned base image, the image source, the exact runtime and tool versions, and qualification evidence (record ids and a report path). The loader refuses a row without these.
-- `frameworks` rows name a framework family, the versions a Corsair runner and report parser are qualified for, the runner and its evidence.
-- Today the matrix holds the two qualified images (CPython 3.12.15; Temurin 17.0.20.1 with Maven 3.10.0) and one framework row (pytest 9.0.x). JUnit 5 is not listed because main has no Maven runner yet; PR #41 adds one.
+- `frameworks` rows name a framework family, the versions a Corsair runner and report parser are qualified for, the runner and its evidence. An optional `images` list scopes a row to the image ids its range was qualified on (empty means every image of the language), so pytest 6 to 7 on CPython 3.7 and pytest 9 on CPython 3.12 are two rows; the loader refuses two rows of one framework applying to the same image, or an `images` entry that is not a row of that language. This field is additive; existing rows are unchanged.
+- Today the matrix holds the two qualified images (CPython 3.12.15; Temurin 17.0.20.1 with Maven 3.10.0) and one framework row (pytest 9.0.x). JUnit 5 is not listed yet: PR #41's Maven runner is now on main, and its row needs the JUnit versions that runner is qualified for.
 - Configuration guards check that image rows are exactly the prepared toolchain bases and that every cited report, record and runner exists.
 - To add a row: build from a digest-pinned upstream base with hash-pinned offline contents, pass the toolchain gate for that row on a fresh node, then add the row with that evidence.
 
 **Selection** (`matrix.select`) returns a typed union:
 - `supported` names the first row in which every runtime and image tool contains the required version and at least one declared test framework overlaps a qualified runner range. Setup must then pin the framework inside that overlap.
 - `unsupported` lists the components no row provides, with their allowed sets and preferred versions, plus each rejected row's unmet checks.
-- `undetermined` names what is missing: an undeclared runtime version, conflicting declarations, an unidentified test framework, or unresolved inputs.
+- `undetermined` names what is missing: an undeclared runtime version, conflicting declarations, an unidentified test framework, unresolved inputs, or a constraint or pin the detector saw but could not read.
+
+Each unread line keeps the strength it would have had. An unread constraint or pin on the runtime or an image tool makes the result undetermined, because it could exclude the row (`requires-python = ">=3.13rc1"` beside a 3.12 pin). An unread framework constraint cannot count as the qualified runner; if the runtime fits a row and no readable framework does, the result is undetermined. Unread `tested` entries, such as CI PyPy or dev jobs and a Jenkins `buildPlugin()` default, are alternatives and do not block.
 
 There is no fallback row and no "close enough" version.
 
@@ -79,7 +81,14 @@ There is no fallback row and no "close enough" version.
 
 **No new agent** (Al's question, 2026-10-13). Runtime selection is deterministic: a parser and a set intersection. Over the 39 fetched benchmark cases, 35 resolve to a fully named requirement. Two of the four undetermined cases are Jenkins plugins whose parent POMs sit in a repository this container cannot reach, and they become deterministic once the parent is supplied. The other two have no framework at all: one package's test script exits with "no test specified", and the other runs a sanity script. Choosing a framework for those is a policy decision (an open question below), not model judgement over ambiguous files.
 
-The consumer is the existing environment agent (SPEC-0029). The selected row becomes the only entry in `EnvironmentInput.toolchains`, and an `unsupported` or `undetermined` selection stops before the agent runs. The agent keeps its current job of proposing setup and test commands inside the selected image. That wiring is part of G12 and is not built here.
+The consumer is the existing environment agent (SPEC-0029). The selected row becomes the only entry in `EnvironmentInput.toolchains`, and an `unsupported` or `undetermined` selection stops before the agent runs. The agent keeps its current job of proposing setup and test commands inside the selected image.
+
+`nodes/runtime/environment.py` is that hand-off, deterministic and without SDK types:
+- `environment_input` returns an `EnvironmentInput` whose only toolchain is the selected row, with the prepared image reference from the operator's image receipt (`prepared`, row id to `repository@sha256:...`).
+- It returns a `RuntimeStop` with the reason instead when there is no requirement, the selection is `unsupported` or `undetermined`, or the selected row has no prepared image on this node.
+- `check_ready` refuses a `ReadyEnvironment` that names another toolchain or image, or a framework the selection did not admit.
+
+Calling it from the chain and the durable workflow is part of G12 and is not built here.
 
 **Report** (`evals/benchmark/runtimes.py`):
 - `checkout` makes a blobless shallow fetch of each pinned commit (from SPEC-0037's pins file) and writes only the blobs `is_build_file` selects.
@@ -112,5 +121,6 @@ Open questions:
 - Whether to accept a Maven/Gradle wrapper pin as satisfied by an image tool of the same major version (VUL4J-6 pins Maven 3.5.0).
 - Runner qualification across framework versions (pytest older than 9, JUnit 4, TestNG, Jest, Mocha, minitest, RSpec, TAP). PR #41 starts JUnit 5.
 - Parent POM fetching moving into the SPEC-0026 dependency phase.
+- The requirement root for a module that ships inside its runtime. CVE-2023-31486 pins Debian's whole perl interpreter repository; HTTP::Tiny lives under `cpan/HTTP-Tiny/` without a build file of its own, so the case is undetermined. Either the case names that directory as its project root, or a perl core checkout is treated as building its own runtime. This is a case-definition decision, not a detector gap.
 
 The plan is [PLAN-0046](../plans/PLAN-0046-runtime-selection.md).

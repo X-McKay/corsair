@@ -51,8 +51,9 @@ class Collector:
         self.declarations.append(Declaration(kind, name, provider, strength, source, path, line, excerpt(text, line),
                                              versions, listed, reason))
 
-    def unparsed(self, kind: Kind, name: str, provider: Provider, path: str, needle: str, reason: str, line: int | None = None):
-        self.add(kind, name, provider, 'constraint', 'unparsed', path, needle, None, reason=reason, line=line)
+    def unparsed(self, kind: Kind, name: str, provider: Provider, path: str, needle: str, reason: str, line: int | None = None,
+                 strength: Strength = 'constraint'):
+        self.add(kind, name, provider, strength, 'unparsed', path, needle, None, reason=reason, line=line)
 
 
 def line_of(text: str, needle: str) -> int:
@@ -95,7 +96,7 @@ def combine(declarations: Iterable[Declaration]) -> tuple[Component, ...]:
             declared=bool(parsed), conflict=allowed.is_empty,
             evidence=tuple(Evidence(path=d.path, line=d.line, text=d.text, strength=d.strength, source=d.source,
                                     declares=str(d.versions)[:MAX_TEXT]) for d in parsed if id(d) in used)[:64],
-            unparsed=tuple(Unparsed(path=d.path, line=d.line, text=d.text, reason=d.reason[:MAX_TEXT])
+            unparsed=tuple(Unparsed(path=d.path, line=d.line, text=d.text, strength=d.strength, reason=d.reason[:MAX_TEXT])
                            for d in items if d.versions is None)[:64]))
     return tuple(components)
 

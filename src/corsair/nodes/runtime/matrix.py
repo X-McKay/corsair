@@ -54,7 +54,12 @@ class FrameworkRow(_Frozen):
     language: Language
     versions: str = Field(description='Canonical version set the runner and report parser are qualified for')
     runner: str
+    images: tuple[str, ...] = Field(default=(), description='Image ids this range was qualified on; empty means every '
+                                                            'image of the language')
     qualification: Qualification
+
+    def applies(self, row: 'ImageRow') -> bool:
+        return row.language == self.language and (not self.images or row.id in self.images)
 
     @field_validator('versions')
     @classmethod
@@ -71,7 +76,13 @@ class Matrix(_Frozen):
     @model_validator(mode='after')
     def unique(self) -> 'Matrix':
         if len({row.id for row in self.images}) != len(self.images): raise ValueError('duplicate image id')
-        if len({(f.language, f.name) for f in self.frameworks}) != len(self.frameworks): raise ValueError('duplicate framework row')
+        ids = {row.id: row for row in self.images}
+        for f in self.frameworks:
+            if any(i not in ids or ids[i].language != f.language for i in f.images):
+                raise ValueError(f'framework row {f.name} names an image that is not a {f.language} row')
+        for row in self.images:
+            names = [f.name for f in self.frameworks if f.applies(row)]
+            if len(names) != len(set(names)): raise ValueError(f'duplicate framework row for image {row.id}')
         return self
 
 
@@ -91,9 +102,18 @@ def _matched(component: Component) -> bool:
     return component.provider == 'image' or component.kind == 'test_framework'
 
 
+def _blocking(component: Component) -> str:
+    """Constraints or pins the detector saw but could not read; any of them could exclude a row that otherwise fits.
+    Unread `tested` entries are alternatives (a CI PyPy or dev job) and do not block."""
+    return '; '.join(f'{u.path}:{u.line} {u.reason}' for u in component.unparsed if u.strength != 'tested')[:200]
+
+
 def _missing(requirement: RuntimeRequirement) -> list[str]:
     missing = []
     runtimes = requirement.component('runtime')
+    missing += [f'{c.name} {c.kind.replace("_", " ")} declaration not understood: {reasons}'
+                for c in requirement.components
+                if _matched(c) and c.kind != 'test_framework' and (c.declared or c.kind != 'runtime') and (reasons := _blocking(c))]
     if not any(c.declared for c in runtimes):
         reasons = '; '.join(f'{u.path}:{u.line} {u.reason}' for c in runtimes for u in c.unparsed)[:200]
         missing.append('runtime version not declared in the build files' + (f' ({reasons})' if reasons else ''))
@@ -110,21 +130,30 @@ def select(requirement: RuntimeRequirement, matrix: Matrix) -> Selection:
     if (missing := _missing(requirement)):
         return Undetermined(status='undetermined', missing=tuple(missing)[:64])
     wanted = [c for c in requirement.components if c.declared and _matched(c)]
-    supported = {f.name: f.versions for f in matrix.frameworks if f.language == requirement.language}
+    # A framework with an unread constraint cannot count as the qualified one, and if the project's runtime fits a
+    # row but no readable framework does, the unread one might have: that is undetermined, not unsupported.
+    unread = {c.name: reasons for c in requirement.component('test_framework') if (reasons := _blocking(c))}
     rejected = []
+    runtime_fits = False
     for row in matrix.images:
         if row.language != requirement.language: continue
         provided = {('runtime', row.runtime.name): row.runtime.version,
                     **{('build_tool', k): v for k, v in row.tools.items()},
-                    **{('test_framework', k): v for k, v in supported.items()}}
-        checks = tuple(_check(c, provided.get((c.kind, c.name))) for c in wanted)
+                    **{('test_framework', f.name): f.versions for f in matrix.frameworks if f.applies(row)}}
+        checks = tuple(_check(c, None if c.kind == 'test_framework' and c.name in unread else provided.get((c.kind, c.name)))
+                       for c in wanted)
         # Every runtime and image tool must match; of the project's declared test frameworks, one qualified
         # runner suffices (its name is in `checks`), since the baseline and authored tests use that framework.
         frameworks = [check for check in checks if check.kind == 'test_framework']
-        if all(check.satisfied for check in checks if check.kind != 'test_framework') and any(f.satisfied for f in frameworks):
-            return Supported(status='supported', image_id=row.id, image=row.base_image, checks=checks)
+        if all(check.satisfied for check in checks if check.kind != 'test_framework'):
+            runtime_fits = True
+            if any(f.satisfied for f in frameworks):
+                return Supported(status='supported', image_id=row.id, image=row.base_image, checks=checks)
         unmet = [c for c in checks if not c.satisfied and c.kind != 'test_framework']
         rejected.append(Rejection(image_id=row.id, unmet=tuple(unmet + ([] if any(f.satisfied for f in frameworks) else frameworks))))
+    if runtime_fits and unread:
+        return Undetermined(status='undetermined', missing=tuple(
+            f'{name} test framework declaration not understood: {reasons}' for name, reasons in unread.items())[:64])
     unmet = {(c.kind, c.name) for c in min(rejected, key=lambda r: len(r.unmet)).unmet} if rejected else \
         {(c.kind, c.name) for c in wanted}
     needs = tuple(Need(kind=c.kind, name=c.name, allowed=c.allowed, preferred=c.preferred)
