@@ -4,8 +4,8 @@
  "inputs": {
   "detector": "sha256:6f569f15b1aec885f90f565605fe0169dd73b8c3778bac6f85158f3e2714ef10",
   "matrix": "sha256:cc26c8a2f1b18793493124594f7b9e2b4eb3322e45aa8d6ffbcda065f980de3f",
-  "pins": "sha256:25452710a9f0ee21cf7fbfa8b8ed4171ceebeda049f63bb98d88d5b1890be8c2",
-  "inventory": "sha256:4b1fc5050437935f26dc5962e140b22c852cccc1ffd6309545370fed31d8072e",
+  "pins": "sha256:ea068e2eec63dacc43b4858c39c656891e49248ea6fbc17db1845bb9a0b9bff1",
+  "inventory": "sha256:c534cf5619a2f6ba55a35697b0a54d9d0680e54a8ce340db664d3b071c20ab87",
   "parents": {
    "org.apache.commons:commons-parent:42": "sha256:cd313494c670b483ec256972af1698b330e598f807002354eb765479f604b09c",
    "org.apache.struts:struts-master:10": "sha256:4dc1ba58664d7da95b2562661dcb091dedaa431967e508dc35a92c7721fe3e26",
@@ -10448,18 +10448,451 @@
   {
    "case_id": "CVE-2023-31486",
    "language": "perl",
-   "project_root": "cpan/HTTP-Tiny",
    "revisions": {
     "baseline": {
-     "commit": "0372847c4b0aa916347c0977a90ebacd8479b3e2",
-     "status": "not_fetched"
+     "commit": "7bdf71f5bdb8d97c8554b59e339d4b82fa41954c",
+     "requirement": {
+      "language": "perl",
+      "root": ".",
+      "components": [
+       {
+        "kind": "build_tool",
+        "name": "make",
+        "provider": "image",
+        "allowed": "*",
+        "preferred": null,
+        "declared": true,
+        "conflict": false,
+        "evidence": [
+         {
+          "path": "Makefile.PL",
+          "line": 1,
+          "text": "use strict;",
+          "strength": "constraint",
+          "source": "build-file",
+          "declares": "*"
+         }
+        ],
+        "unparsed": []
+       },
+       {
+        "kind": "runtime",
+        "name": "perl",
+        "provider": "image",
+        "allowed": "5.8.* || 5.10.* || 5.12.* || 5.14.* || 5.16.* || 5.18.* || 5.20.* || 5.22.* || 5.24.* || 5.26.*",
+        "preferred": "5.26",
+        "declared": true,
+        "conflict": false,
+        "evidence": [
+         {
+          "path": "Makefile.PL",
+          "line": 4,
+          "text": "use 5.006;",
+          "strength": "constraint",
+          "source": "use-version",
+          "declares": ">=5.6"
+         },
+         {
+          "path": "Makefile.PL",
+          "line": 16,
+          "text": "\"MIN_PERL_VERSION\" => \"5.006\",",
+          "strength": "constraint",
+          "source": "MIN_PERL_VERSION",
+          "declares": ">=5.6"
+         },
+         {
+          "path": ".travis.yml",
+          "line": 9,
+          "text": "- \"5.26\"",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "5.26.*"
+         },
+         {
+          "path": ".travis.yml",
+          "line": 10,
+          "text": "- \"5.24\"",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "5.24.*"
+         },
+         {
+          "path": ".travis.yml",
+          "line": 11,
+          "text": "- \"5.22\"",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "5.22.*"
+         },
+         {
+          "path": ".travis.yml",
+          "line": 12,
+          "text": "- \"5.20\"",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "5.20.*"
+         },
+         {
+          "path": ".travis.yml",
+          "line": 13,
+          "text": "- \"5.18\"",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "5.18.*"
+         },
+         {
+          "path": ".travis.yml",
+          "line": 14,
+          "text": "- \"5.16\"",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "5.16.*"
+         },
+         {
+          "path": ".travis.yml",
+          "line": 15,
+          "text": "- \"5.14\"",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "5.14.*"
+         },
+         {
+          "path": ".travis.yml",
+          "line": 16,
+          "text": "- \"5.12\"",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "5.12.*"
+         },
+         {
+          "path": ".travis.yml",
+          "line": 17,
+          "text": "- \"5.10\"",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "5.10.*"
+         },
+         {
+          "path": ".travis.yml",
+          "line": 18,
+          "text": "- \"5.8\"",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "5.8.*"
+         }
+        ],
+        "unparsed": []
+       },
+       {
+        "kind": "test_framework",
+        "name": "tap-harness",
+        "provider": "registry",
+        "allowed": "*",
+        "preferred": null,
+        "declared": true,
+        "conflict": false,
+        "evidence": [
+         {
+          "path": "Makefile.PL",
+          "line": 40,
+          "text": "\"Test::More\" => \"0.96\",",
+          "strength": "constraint",
+          "source": "Test::More",
+          "declares": "*"
+         },
+         {
+          "path": "Makefile.PL",
+          "line": 40,
+          "text": "\"Test::More\" => \"0.96\",",
+          "strength": "constraint",
+          "source": "Test::More",
+          "declares": "*"
+         },
+         {
+          "path": "Makefile.PL",
+          "line": 1,
+          "text": "use strict;",
+          "strength": "constraint",
+          "source": "build-file",
+          "declares": "*"
+         }
+        ],
+        "unparsed": []
+       },
+       {
+        "kind": "build_tool",
+        "name": "dist-zilla",
+        "provider": "registry",
+        "allowed": "*",
+        "preferred": null,
+        "declared": true,
+        "conflict": false,
+        "evidence": [
+         {
+          "path": "dist.ini",
+          "line": 1,
+          "text": "name              = HTTP-Tiny",
+          "strength": "constraint",
+          "source": "build-file",
+          "declares": "*"
+         }
+        ],
+        "unparsed": []
+       }
+      ],
+      "files": [
+       ".travis.yml",
+       "Makefile.PL",
+       "dist.ini"
+      ],
+      "unresolved": []
+     },
+     "status": "unsupported",
+     "needs": [
+      {
+       "kind": "build_tool",
+       "name": "make",
+       "allowed": "*",
+       "preferred": null
+      },
+      {
+       "kind": "runtime",
+       "name": "perl",
+       "allowed": "5.8.* || 5.10.* || 5.12.* || 5.14.* || 5.16.* || 5.18.* || 5.20.* || 5.22.* || 5.24.* || 5.26.*",
+       "preferred": "5.26"
+      },
+      {
+       "kind": "test_framework",
+       "name": "tap-harness",
+       "allowed": "*",
+       "preferred": null
+      }
+     ],
+     "rejected": []
     },
     "fix": {
-     "commit": "1490431e40e22052f75a0b3449f1f53cbd27ba92",
-     "status": "not_fetched"
+     "commit": "77f557ef84698efeb6eed04e4a9704eaf85b741d",
+     "requirement": {
+      "language": "perl",
+      "root": ".",
+      "components": [
+       {
+        "kind": "build_tool",
+        "name": "make",
+        "provider": "image",
+        "allowed": "*",
+        "preferred": null,
+        "declared": true,
+        "conflict": false,
+        "evidence": [
+         {
+          "path": "Makefile.PL",
+          "line": 1,
+          "text": "use strict;",
+          "strength": "constraint",
+          "source": "build-file",
+          "declares": "*"
+         }
+        ],
+        "unparsed": []
+       },
+       {
+        "kind": "runtime",
+        "name": "perl",
+        "provider": "image",
+        "allowed": "5.8.* || 5.10.* || 5.12.* || 5.14.* || 5.16.* || 5.18.* || 5.20.* || 5.22.* || 5.24.* || 5.26.*",
+        "preferred": "5.26",
+        "declared": true,
+        "conflict": false,
+        "evidence": [
+         {
+          "path": "Makefile.PL",
+          "line": 4,
+          "text": "use 5.006;",
+          "strength": "constraint",
+          "source": "use-version",
+          "declares": ">=5.6"
+         },
+         {
+          "path": "Makefile.PL",
+          "line": 16,
+          "text": "\"MIN_PERL_VERSION\" => \"5.006\",",
+          "strength": "constraint",
+          "source": "MIN_PERL_VERSION",
+          "declares": ">=5.6"
+         },
+         {
+          "path": ".travis.yml",
+          "line": 9,
+          "text": "- \"5.26\"",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "5.26.*"
+         },
+         {
+          "path": ".travis.yml",
+          "line": 10,
+          "text": "- \"5.24\"",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "5.24.*"
+         },
+         {
+          "path": ".travis.yml",
+          "line": 11,
+          "text": "- \"5.22\"",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "5.22.*"
+         },
+         {
+          "path": ".travis.yml",
+          "line": 12,
+          "text": "- \"5.20\"",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "5.20.*"
+         },
+         {
+          "path": ".travis.yml",
+          "line": 13,
+          "text": "- \"5.18\"",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "5.18.*"
+         },
+         {
+          "path": ".travis.yml",
+          "line": 14,
+          "text": "- \"5.16\"",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "5.16.*"
+         },
+         {
+          "path": ".travis.yml",
+          "line": 15,
+          "text": "- \"5.14\"",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "5.14.*"
+         },
+         {
+          "path": ".travis.yml",
+          "line": 16,
+          "text": "- \"5.12\"",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "5.12.*"
+         },
+         {
+          "path": ".travis.yml",
+          "line": 17,
+          "text": "- \"5.10\"",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "5.10.*"
+         },
+         {
+          "path": ".travis.yml",
+          "line": 18,
+          "text": "- \"5.8\"",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "5.8.*"
+         }
+        ],
+        "unparsed": []
+       },
+       {
+        "kind": "test_framework",
+        "name": "tap-harness",
+        "provider": "registry",
+        "allowed": "*",
+        "preferred": null,
+        "declared": true,
+        "conflict": false,
+        "evidence": [
+         {
+          "path": "Makefile.PL",
+          "line": 40,
+          "text": "\"Test::More\" => \"0.96\",",
+          "strength": "constraint",
+          "source": "Test::More",
+          "declares": "*"
+         },
+         {
+          "path": "Makefile.PL",
+          "line": 40,
+          "text": "\"Test::More\" => \"0.96\",",
+          "strength": "constraint",
+          "source": "Test::More",
+          "declares": "*"
+         },
+         {
+          "path": "Makefile.PL",
+          "line": 1,
+          "text": "use strict;",
+          "strength": "constraint",
+          "source": "build-file",
+          "declares": "*"
+         }
+        ],
+        "unparsed": []
+       },
+       {
+        "kind": "build_tool",
+        "name": "dist-zilla",
+        "provider": "registry",
+        "allowed": "*",
+        "preferred": null,
+        "declared": true,
+        "conflict": false,
+        "evidence": [
+         {
+          "path": "dist.ini",
+          "line": 1,
+          "text": "name              = HTTP-Tiny",
+          "strength": "constraint",
+          "source": "build-file",
+          "declares": "*"
+         }
+        ],
+        "unparsed": []
+       }
+      ],
+      "files": [
+       ".travis.yml",
+       "Makefile.PL",
+       "dist.ini"
+      ],
+      "unresolved": []
+     },
+     "status": "unsupported",
+     "needs": [
+      {
+       "kind": "build_tool",
+       "name": "make",
+       "allowed": "*",
+       "preferred": null
+      },
+      {
+       "kind": "runtime",
+       "name": "perl",
+       "allowed": "5.8.* || 5.10.* || 5.12.* || 5.14.* || 5.16.* || 5.18.* || 5.20.* || 5.22.* || 5.24.* || 5.26.*",
+       "preferred": "5.26"
+      },
+      {
+       "kind": "test_framework",
+       "name": "tap-harness",
+       "allowed": "*",
+       "preferred": null
+      }
+     ],
+     "rejected": []
     }
    },
-   "status": "not_fetched",
+   "status": "unsupported",
    "revisions_agree": true
   },
   {

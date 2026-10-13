@@ -6,7 +6,6 @@ are undetermined. Offline over captured build files, except the two explicit fet
     report    detect and select for every inventory case; markdown on stdout, JSON with --json
 
 Trees are laid out as `<root>/<case dir>/<commit>/<path>`; `<case dir>` is the case id with '/' replaced by '_'.
-A case whose inventory row names a `project_root` is fetched and detected from that directory only.
 The pins file (`benchmarks/source-pins.json`, SPEC-0037) names each case's fix commit and baseline candidate.
 """
 import argparse
@@ -40,17 +39,6 @@ def case_dir(case_id: str) -> str:
     return case_id.replace('/', '_')
 
 
-def project_roots(inventory: list[dict]) -> dict[str, str]:
-    """Case id to its project root directory ('' for the repository root), as the inventory names it."""
-    return {row['case_id']: (row.get('project_root') or '').strip('/') for row in inventory}
-
-
-def under(path: str, project_root: str) -> str | None:
-    """`path` relative to `project_root`, or None when it lies outside it."""
-    if not project_root: return path
-    return path[len(project_root) + 1:] if path.startswith(project_root + '/') else None
-
-
 def revisions(pins: dict) -> list[tuple[str, str, str, str]]:
     """(case id, url, role, commit) for every acquired case: the baseline candidate and the fix."""
     rows = []
@@ -66,13 +54,11 @@ def _git(*args: str, cwd: Path, timeout: int = 600) -> subprocess.CompletedProce
                           capture_output=True, timeout=timeout, check=True)
 
 
-def checkout(pins: dict, root: Path, cases: set[str] | None, roots: dict[str, str] | None = None) -> None:
-    """Shallow blobless fetch of each commit, then fetch and write only the blobs `is_build_file` selects, relative to
-    the case's project root."""
+def checkout(pins: dict, root: Path, cases: set[str] | None) -> None:
+    """Shallow blobless fetch of each commit, then fetch and write only the blobs `is_build_file` selects."""
     root.mkdir(parents=True, exist_ok=True)
     for case_id, url, role, commit in revisions(pins):
         if cases and case_id not in cases: continue
-        project_root = (roots or {}).get(case_id, '')
         target = root / case_dir(case_id) / commit
         if target.exists(): continue
         repo = root / '.git-cache' / case_dir(case_id)
@@ -90,9 +76,7 @@ def checkout(pins: dict, root: Path, cases: set[str] | None, roots: dict[str, st
                 meta, path = entry.split(b'\t', 1)
                 mode, kind, oid = meta.split()
                 path = path.decode('utf-8', 'surrogateescape')
-                relative = under(path, project_root)
-                if kind == b'blob' and mode in (b'100644', b'100755') and relative is not None and is_build_file(relative):
-                    wanted.append((path, oid.decode()))
+                if kind == b'blob' and mode in (b'100644', b'100755') and is_build_file(path): wanted.append((path, oid.decode()))
             for start in range(0, len(wanted), 256):
                 _git('fetch', '-q', '--filter=blob:none', 'origin', *[oid for _, oid in wanted[start:start + 256]], cwd=repo)
             partial = target.with_name(target.name + '.partial')  # renamed only once every blob is written
@@ -111,12 +95,9 @@ def checkout(pins: dict, root: Path, cases: set[str] | None, roots: dict[str, st
             print(f'{case_id} {role} {commit[:12]} not fetched: {detail.decode(errors="replace").strip()[:200]}', file=sys.stderr)
 
 
-def read_tree(directory: Path, project_root: str = '') -> dict[str, bytes]:
-    """The build files under `project_root` of a fetched tree, keyed by their path relative to it."""
-    base = directory / project_root if project_root else directory
-    if not base.is_dir(): return {}
-    return {str(p.relative_to(base)): p.read_bytes() for p in sorted(base.rglob('*'))
-            if p.is_file() and is_build_file(str(p.relative_to(base)))}
+def read_tree(directory: Path) -> dict[str, bytes]:
+    return {str(p.relative_to(directory)): p.read_bytes() for p in sorted(directory.rglob('*'))
+            if p.is_file() and is_build_file(str(p.relative_to(directory)))}
 
 
 def load_parents(cache: Path | None) -> dict[str, bytes]:
@@ -164,8 +145,7 @@ def evaluate(root: Path, pins: dict, inventory: list[dict], parents: dict[str, b
     results = []
     for row in inventory:
         case_id, language = row['case_id'], row['language'].lower()
-        project_root = project_roots([row])[case_id]
-        record = dict(case_id=case_id, language=language, **({'project_root': project_root} if project_root else {}))
+        record = dict(case_id=case_id, language=language)
         pin = pinned.get(case_id)
         if pin is None:
             results.append({**record, 'status': 'not_acquired', 'detail': 'no pinned commit (SPEC-0037)'}); continue
@@ -175,7 +155,7 @@ def evaluate(root: Path, pins: dict, inventory: list[dict], parents: dict[str, b
             directory = root / case_dir(case_id) / commit
             if not directory.is_dir():
                 record['revisions'][role] = dict(commit=commit, status='not_fetched'); continue
-            requirement = detect(read_tree(directory, project_root), language, root=project_root or '.', parents=parents)
+            requirement = detect(read_tree(directory), language, parents=parents)
             if isinstance(requirement, str):
                 record['revisions'][role] = dict(commit=commit, status='undetermined', missing=[requirement]); continue
             selection = select(requirement, matrix)
@@ -271,9 +251,9 @@ def main() -> None:
     parser.add_argument('--json', type=Path)
     args = parser.parse_args()
     pins = json.loads(args.pins.read_text())
-    inventory = json.loads(INVENTORY.read_text())['cases']
-    if args.action == 'checkout': return checkout(pins, args.trees, set(args.cases or []), project_roots(inventory))
+    if args.action == 'checkout': return checkout(pins, args.trees, set(args.cases or []))
     if args.action == 'parents': return fetch_parents(args.trees, args.parents)
+    inventory = json.loads(INVENTORY.read_text())['cases']
     results = evaluate(args.trees, pins, inventory, load_parents(args.parents))
     if args.json:
         document = dict(schema_version=1, spec='SPEC-0042', inputs=inputs(args.pins, args.parents), results=results)

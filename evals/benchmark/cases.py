@@ -59,9 +59,6 @@ class InventoryCase(_Frozen):
     fixed_reference: str | None
     vulnerable_reference: str | None
     vulnerable_version_claim: str | list[str] | None = None
-    # SPEC-0042: the directory (relative to the repository) whose build files define the case's runtime, when the
-    # vulnerable component lives inside a larger repository; None means the repository root.
-    project_root: str | None = Field(default=None, pattern=r"^[\w.+-]+(/[\w.+-]+)*$")
     fixed_version_claim: str | list[str] | None
     oracle_supplied: bool
     license_status: str
@@ -69,13 +66,6 @@ class InventoryCase(_Frozen):
     runtime_qualified: bool
     qualification_status: str
     retrieved_on: str
-
-    @field_validator("project_root")
-    @classmethod
-    def relative_root(cls, value: str | None) -> str | None:
-        if value is not None and any(part in (".", "..") for part in value.split("/")):
-            raise ValueError("project_root must stay inside the repository")
-        return value
 
     @property
     def fix_commit(self) -> str | None:

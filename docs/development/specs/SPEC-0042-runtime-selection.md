@@ -80,7 +80,7 @@ There is no fallback row and no "close enough" version.
 - On RIG0, images in a family share layers and only rows that queued cases need are loaded.
 - A row's `selector` field is reserved for a later hybrid (one image per language carrying several versions, chosen by `JAVA_HOME` or interpreter path). The loader refuses selectors until such an image is qualified, and the sandbox's observed runtime version would still be checked against the selection.
 
-**No new agent** (Al's question, 2026-10-13). Runtime selection is deterministic: a parser and a set intersection. Over the 39 fetched benchmark cases, 37 resolve to a fully named requirement once the Jenkins parent POMs are supplied (PLAN-0046). The two undetermined cases have no framework at all: one package's test script exits with "no test specified", and the other runs a sanity script. Choosing a framework for those is a policy decision (an open question below), not model judgement over ambiguous files.
+**No new agent** (Al's question, 2026-10-13). Runtime selection is deterministic: a parser and a set intersection. Over the 40 fetched benchmark cases, 38 resolve to a fully named requirement once the Jenkins parent POMs are supplied (PLAN-0046). The two undetermined cases have no framework at all: one package's test script exits with "no test specified", and the other runs a sanity script. Choosing a framework for those is a policy decision (an open question below), not model judgement over ambiguous files.
 
 The consumer is the existing environment agent (SPEC-0029). The selected row becomes the only entry in `EnvironmentInput.toolchains`, and an `unsupported` or `undetermined` selection stops before the agent runs. The agent keeps its current job of proposing setup and test commands inside the selected image.
 
@@ -122,6 +122,5 @@ Open questions:
 - Whether to accept a Maven/Gradle wrapper pin as satisfied by an image tool of the same major version (VUL4J-6 pins Maven 3.5.0).
 - Runner qualification across framework versions (pytest older than 9, JUnit 4, TestNG, Jest, Mocha, minitest, RSpec, TAP). PR #41 starts JUnit 5.
 - Parent POM fetching moving into the SPEC-0026 dependency phase.
-- The requirement root for a module that ships inside its runtime. CVE-2023-31486 pins Debian's whole perl interpreter repository. Al decided (2026-10-13) that the case names `cpan/HTTP-Tiny` as its project root: an inventory row's optional `project_root` scopes which build files are fetched and read, and the requirement records that root. HTTP::Tiny has no build file of its own inside perl core (seen on RIG0), so the case stays undetermined, now for that stated reason rather than the whole repository. Resolving it needs a further case-definition change: the inventory's `repository_url` (the upstream Perl-Toolchain-Gang/HTTP-Tiny repository, which has `Makefile.PL` and `dist.ini`) with its own fix commit, or perl core treated as building its own runtime.
 
 The plan is [PLAN-0046](../plans/PLAN-0046-runtime-selection.md).
