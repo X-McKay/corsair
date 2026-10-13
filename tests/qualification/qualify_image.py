@@ -116,7 +116,12 @@ def image_cache_state(toolchain):
     build = cache / 'build.json'
     if not build.is_file():
         return f'{cache} holds an attempt without build.json; inspect and archive it, never delete it to force a rebuild'
-    receipt = json.loads(build.read_text())
+    try:
+        receipt = json.loads(build.read_text())
+    except (OSError, UnicodeDecodeError, ValueError) as error:
+        return f'{build} cannot be read as a receipt ({type(error).__name__}: {error}); inspect and archive {cache}, never delete it to force a rebuild'
+    if not isinstance(receipt, dict):
+        return f'{build} holds a {type(receipt).__name__}, not a receipt object; inspect and archive {cache}, never delete it to force a rebuild'
     if receipt.get('sources') != source_hashes(toolchain) or receipt.get('base') != BASES[toolchain] or receipt.get('trusted_control_passed') is not True:
         return f'{build} was prepared from other sources or base, or its trusted control did not pass; inspect and archive {cache}'
     return 'prepared'

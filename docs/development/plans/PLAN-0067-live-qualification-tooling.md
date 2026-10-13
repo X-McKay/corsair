@@ -27,6 +27,8 @@ Implement [SPEC-0062](../specs/SPEC-0062-live-qualification-tooling.md). Branch 
 
 Al's review at `d10dd13` (comment-type): orchestrator and evidence logic sound; before the allow file reaches RIG0, the `qualify-image *` rule admitted extra make goals and shell injection through `TOOLCHAIN`/`CASE` (confirmed with `make -n`), and the deny list lacked `kubectl delete --all` and `rm -rf /`. Fixed in the Makefile guard (one goal, allowed command-line variables only, `TOOLCHAIN` from the image directories, values through the environment), with `--eval`/`-f`/`-I`/`-e` make options denied, all five hook substrings denied, refusal of a named-but-refused evidence run, untracked files counted, and the guide's hook wording corrected; `make -n` cases added to the smoke file.
 
+PR #75 merged as `a162733`. Al's review at `801e756` (posted just before the merge, P2): a truncated or non-object retained `build.json` raised out of `Run.execute()`, so the run left no `SUMMARY.md`. Follow-up: an unreadable, malformed or non-object receipt is now an `image-build` refusal that names the retained path and keeps the cache; regression with `{`, `[]`, `null` and invalid UTF-8 asserts the summary and no image-load or gateway call (fails 4/4 without the fix).
+
 ## Decisions and next action
 
 - Network is checked before the gateway install, not after, so a failed network check leaves no unconsumed gateway.
