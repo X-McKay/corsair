@@ -19,7 +19,7 @@ AGENT_FRAMEWORK = {'pytest': 'pytest', 'junit5': 'junit5', 'junit4': 'junit4', '
 
 @dataclass(frozen=True)
 class RuntimeStop:
-    """The environment agent does not run: no qualified, prepared image fits the project."""
+    """The environment agent does not run: no matrix row with a prepared image fits the project."""
     requirement: RuntimeRequirement | str
     selection: Selection | None
     reason: str
@@ -58,15 +58,15 @@ def environment_input(requirement: RuntimeRequirement | str, selection: Selectio
         requirements = '; '.join(f'{c.kind} {c.name} {c.allowed}' for c in requirement.components)
         framework_only = all(n.kind == 'test_framework' for n in selection.needs)
         return stop(f'runtime unsupported: {detail}', 'framework_unqualified' if framework_only else 'image_unavailable',
-                    'No qualified framework runner matches.' if framework_only else 'No qualified base-image row satisfies the project.',
+                    'No framework row matches.' if framework_only else 'No matrix row satisfies the project.',
                     [f'Required components for {requirement.language}: {requirements}.',
                      'Inspect selection.needs and selection.rejected for exact version ranges and per-image mismatches; preferred versions are suggestions, not qualification.',
-                     'Qualify the framework/runner on the matching image and register its exact tested version set.' if framework_only else
-                     'Add a digest-pinned image with the required runtime/build tools; build and qualify it before registering it in deploy/runtime-matrix.yaml.',
+                     'Check the framework/runner on the matching image (image-only, then live at the milestone gate) and register its exact tested version set.' if framework_only else
+                     'Add a digest-pinned image with the required runtime/build tools; check it image-only before registering it in deploy/runtime-matrix.yaml with its evidence level.',
                      'Follow .claude/skills/corsair-base-image/SKILL.md; preserve project constraints and qualify framework support as well.'])
     if selection.image_id not in prepared:
         return stop(f'matrix row {selection.image_id} has no prepared image on this node',
-                    'image_not_prepared', f'Qualified image {selection.image_id} is not prepared on this node.',
+                    'image_not_prepared', f'Matrix row {selection.image_id} has no prepared image on this node.',
                     ['Use the existing row and toolchain preparation/load runbook; verify the node image receipt and digest.',
                      'Do not create a replacement row or use the base-image digest as the prepared application image.'])
     return EnvironmentInput(toolchains=(toolchain(selection, matrix, prepared),), **fields)

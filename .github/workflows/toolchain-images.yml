@@ -1,0 +1,54 @@
+name: Toolchain images (image-only)
+
+# Image-only tier (SPEC-0062): build each toolchain image a PR changes and run its trusted control in the container.
+# No cluster, no OpenShell: this is the evidence an `evidence: image-only` matrix row starts from, never sandbox
+# evidence. The real-case run joins this job once the shared image-case harness (consolidation PR) is on main.
+on:
+  pull_request:
+    paths:
+      - deploy/qualification/toolchains/**
+      - tests/qualification/prepare_toolchains.py
+  workflow_dispatch:
+    inputs:
+      toolchains:
+        description: Image directories to build, space separated
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  image-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.12.23"
+          python-version: "3.12"
+      - name: Select changed images
+        id: select
+        env:
+          REQUESTED: ${{ inputs.toolchains }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$REQUESTED" ]; then dirs="$REQUESTED"
+          elif git diff --name-only "$BASE_SHA"...HEAD | grep -qx 'tests/qualification/prepare_toolchains.py'; then
+            dirs=$(ls deploy/qualification/toolchains)
+          else
+            dirs=$(git diff --name-only "$BASE_SHA"...HEAD -- deploy/qualification/toolchains | cut -d/ -f4 | sort -u)
+          fi
+          for d in $dirs; do test -d "deploy/qualification/toolchains/$d" || { echo "unknown image directory: $d"; exit 1; }; done
+          echo "toolchains=$(echo $dirs)" >> "$GITHUB_OUTPUT"
+      - name: Build images and run their trusted controls
+        if: steps.select.outputs.toolchains != ''
+        env:
+          TOOLCHAINS: ${{ steps.select.outputs.toolchains }}
+        run: make toolchain-images TOOLCHAINS="$TOOLCHAINS"
+      - name: Receipts
+        if: always() && steps.select.outputs.toolchains != ''
+        run: for f in .cache/toolchains/*/build.json; do echo "== $f"; cat "$f"; done

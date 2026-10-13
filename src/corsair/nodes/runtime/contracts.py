@@ -89,6 +89,8 @@ class Supported(_Frozen):
     image_id: str
     image: str = Field(description='Base image reference with digest')
     checks: tuple[AxisCheck, ...]
+    evidence: Literal['live', 'image-only'] = Field(description='Weakest evidence of the selected image row and the '
+                                                                 'framework rows that satisfied it; only live is qualified')
 
 
 class Unsupported(_Frozen):
