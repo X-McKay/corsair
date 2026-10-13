@@ -19,6 +19,10 @@ Excluded: in-sandbox source fetch (SPEC-0025) for now, because the toolchain ima
 
 **Source.** The host capture (`GitSource`, by exact commit) is authoritative, and the qualified SPEC-0032 `OpenShellTestWorkspace` places it: fresh sandbox, empty-root check, pinned CLI upload, in-sandbox verification of every path, mode, size and SHA-256 against the capture. `prepare_source`/`release_source` are that route with no test files. In-sandbox fetch stays the target once the images carry a pinned `git` (decision card, 2026-10-13).
 
+**General across images (Al, 2026-10-13: nothing in an image beyond its language, framework and version).** The route assumes nothing in the image: the verifier is a static operator binary (`tools/workspace-verify`, Go, no cgo), uploaded into its own directory before the tree, never an interpreter the image happens to carry. It prints the same document as the Python `VERIFY` reference plus the SHA-256 of itself read through `/proc/self/exe`, and the host admits the inventory only when that equals the operator's pin of the file it uploaded. `WorkspaceConfig` takes exactly one route, `python` (the existing qualified runner workspaces) or `verifier` (`UploadedVerifier`); there is no fallback between them. `make workspace-verifier` builds it reproducibly for one Go version into `.state/tools/`.
+
+**Inventory file.** `PreparedSandbox.read_source` answers from the operator's store over the same capture, never from the sandbox, so the chain can add the agent's chosen baseline test file to the planning inventory (SPEC-0068).
+
 **Policy port.** `SandboxPolicy.apply(handle, policy, phase, operation) -> PolicyReceipt` (vendor-free, `ports/sandbox.py`). `CliPolicy` (`adapters/openshell_policy.py`) runs the pinned CLI's `policy set --wait` as the SPEC-0006 qualification does, then counts the revision only when `sandbox get` and `policy get --full`/`--rev` show it loaded and admitted on the original sandbox id. Stored but unloaded policy never counts. No retries; journaled intent and result.
 
 **Adapter.** `OpenShellPreparation` (`adapters/openshell_preparation.py`), one per case, built by operator code from: a source-workspace factory for a digest-pinned image over the case's capture, the `SandboxExecution` whose workdir is the placed root, the policy port, the identity base policy, each ecosystem's resolver binaries and the `WorkspaceBudget`. Nothing comes from the agent.
@@ -36,6 +40,8 @@ Excluded: in-sandbox source fetch (SPEC-0025) for now, because the toolchain ima
 ## Acceptance and validation
 
 Offline, with host doubles for the workspace and policy ports:
+- the uploaded verifier goes in before the tree, and an executable other than the pinned one is refused and the sandbox discarded; a binary off its pin is refused before any sandbox; exactly one verifier route is configured;
+- where Go is installed, the built verifier's report equals the Python reference's on a tree with a nested directory, a symlink, a FIFO, a truncated walk and a capped file (CI has no Go and skips it; the adapter tests use the reference as the binary's stand-in);
 - step order and operation ids;
 - each refusal keeps its layer and cleanup;
 - refusals before any sandbox need no cleanup;
@@ -44,6 +50,7 @@ Offline, with host doubles for the workspace and policy ports:
 - `CliPolicy` against a scripted stand-in binary: a load observed on the original sandbox is recorded; a failed `set`, a revision not loaded, a replacement sandbox and an unpinned binary are refused.
 
 Live, before merge (a sandbox and policy change): `make qualify-environment-preparation` on a fresh RIG0 cluster:
+- the uploaded static verifier, not the image's interpreter, verifies the placed tree;
 - the CPython 3.12 image and a captured revision holding the SPEC-0018 vulnerable module and its existing test;
 - the scripted environment model's commands run in the real sandbox, and the stage is admitted ready from their receipts;
 - both policy loads are observed;
@@ -57,4 +64,5 @@ The rest of the chain runs on the operator's sandbox runners and is recorded, no
 
 - One adapter per case, so the `Preparation` port is unchanged; `PreparationRefused` carries the layer and what was left behind.
 - Upload before fetch (decision card 2026-10-13); the in-sandbox fetch nodes stay for when images carry `git`.
+- The tree bounds stay the SPEC-0032 ones (512 entries, 4 MiB); real corpus repositories exceed them, so raising them from the operator's `WorkspaceBudget` is the next limit to lift, separately qualified.
 - Open: whether a later slice narrows to build-and-test inside the preparation sandbox once recipe phases are observed.

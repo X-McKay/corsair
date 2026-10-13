@@ -221,9 +221,16 @@ qualify-python37-case:
 	PYTHONPATH="$(CURDIR)/src:$(CURDIR)" uv run --locked python -m evals.benchmark.sources fetch --run-dir "$(CORSAIR_QUAL_RUN)-sources" --cases CVE-2021-32839 --keep --pins "$(CORSAIR_QUAL_RUN)-sources/source-pins.json"
 	CORSAIR_CASE_SOURCES="$(CORSAIR_QUAL_RUN)-sources" uv run --locked python -m pytest $(PYTEST_ROOT) tests/qualification -m python37_case --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
 
+# SPEC-0070 static workspace verifier, uploaded into every sandbox so no image needs an interpreter. Needs Go 1.22+;
+# the build is reproducible for one Go version, and adapters pin the SHA-256 of the file they read.
+.PHONY: workspace-verifier
+workspace-verifier:
+	mkdir -p .state/tools
+	cd tools/workspace-verify && CGO_ENABLED=0 go build -trimpath -ldflags=-buildid= -o $(CURDIR)/.state/tools/workspace-verify .
+
 .PHONY: qualify-environment-preparation
 # SPEC-0070: the chain's environment stage in an OpenShellPreparation sandbox (scripted model) and an operator sweep.
-qualify-environment-preparation:
+qualify-environment-preparation: workspace-verifier
 	test ! -e "$(CORSAIR_QUAL_RUN)"
 	mkdir -p "$(CORSAIR_QUAL_RUN)"
 	uv run --locked python -m pytest $(PYTEST_ROOT) tests/qualification -m environment_preparation --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"

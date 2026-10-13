@@ -24,7 +24,7 @@ from corsair.adapters.openshell import OpenShellLifecycle
 from corsair.adapters.openshell_execution import OpenShellConnection, OpenShellExecution
 from corsair.adapters.openshell_policy import CliPolicy
 from corsair.adapters.openshell_preparation import OpenShellPreparation
-from corsair.adapters.openshell_workspace import CliUpload, OpenShellTestWorkspace, WorkspaceConfig
+from corsair.adapters.openshell_workspace import CliUpload, OpenShellTestWorkspace, UploadedVerifier, WorkspaceConfig
 from corsair.agents.environment.contracts import Toolchain
 from corsair.composition.direct import StageModels, run_direct
 from corsair.nodes.runtime.contracts import RuntimeInputs
@@ -55,7 +55,7 @@ SOURCES = ['src/corsair/adapters/openshell_preparation.py', 'src/corsair/adapter
            'src/corsair/adapters/openshell_workspace.py', 'src/corsair/composition/direct.py',
            'src/corsair/nodes/phase_policy.py', 'tests/qualification/test_environment_preparation.py',
            'policies/openshell/identity.yaml', 'deploy/runtime-lock.yaml', 'deploy/runtime-matrix.yaml',
-           'pyproject.toml', 'uv.lock']
+           'tools/workspace-verify/main.go', 'tools/workspace-verify/go.mod', 'pyproject.toml', 'uv.lock']
 
 
 def setup_repository(kube, root: Path) -> tuple[Path, str]:
@@ -89,7 +89,6 @@ def test_environment_stage_in_an_openshell_preparation_sandbox(kube, adapter_gat
     for directory in dirs.values():
         directory.mkdir(mode=0o700)
     owner = uuid4()
-    workspace = WorkspaceConfig(dirs['staging'], '/tmp', 'workspace', PYTHON)
     limits = ExecutionLimits(262144, 120, 150, 512*1024*1024)
     tls = TlsConfig(ca_path=native['mtls']/'ca.crt', cert_path=native['mtls']/'tls.crt', key_path=native['mtls']/'tls.key')
     connection = OpenShellConnection(native['endpoint'], native['mtls']/'ca.crt', native['mtls']/'tls.crt', native['mtls']/'tls.key')
@@ -98,6 +97,11 @@ def test_environment_stage_in_an_openshell_preparation_sandbox(kube, adapter_gat
     base_policy = yaml.safe_load((ROOT / 'policies/openshell/identity.yaml').read_text())
     try:
         image = summary['image'] = image_receipt('python')
+        # The uploaded static verifier, not the image's interpreter: the route every image takes (make workspace-verifier).
+        verifier = ROOT / '.state' / 'tools' / 'workspace-verify'
+        summary['verifier'] = dict(path=str(verifier), sha256=hashlib.sha256(verifier.read_bytes()).hexdigest())
+        workspace = WorkspaceConfig(dirs['staging'], '/tmp', 'workspace', None, verifier=UploadedVerifier(
+            verifier, summary['verifier']['sha256'], '/tmp'))
         with (LocalArtifacts(dirs['objects'], max_bytes=4*1024*1024) as store,
               GitSource(pin(Path('/usr/bin/git')), pin(Path('/usr/bin/prlimit')), store=store, limits=SourceLimits(),
                         receipts=dirs['source-receipts']) as source,

@@ -60,21 +60,57 @@ print(json.dumps(out,sort_keys=True))
 '''
 
 
+def _canonical(path) -> bool:
+    return (type(path) is str and path.startswith('/') and not path.endswith('/') and '\0' not in path
+            and str(PurePosixPath(path)) == path and '..' not in PurePosixPath(path).parts)
+
+
+@dataclass(frozen=True)
+class UploadedVerifier:
+    """The static operator verifier (`tools/workspace-verify`, SPEC-0070), uploaded into each sandbox before the
+    tree so no image needs an interpreter. It reports its own SHA-256; the host admits no other executable."""
+    binary: Path
+    sha256: str
+    remote_parent: str
+    name: str = 'corsair-verifier'
+
+    def __post_init__(self):
+        if not isinstance(self.binary, Path) or not self.binary.is_absolute() or not _canonical(self.remote_parent):
+            raise ValueError('Absolute host binary and canonical remote parent required')
+        if type(self.sha256) is not str or len(self.sha256) != 64 or self.sha256.strip('0123456789abcdef'):
+            raise ValueError('Lowercase SHA-256 verifier pin required')
+        if type(self.name) is not str or not self.name or '/' in self.name or self.name in ('.', '..'):
+            raise ValueError('Single plain verifier directory name required')
+
+    @property
+    def remote_path(self) -> str:
+        return f'{self.remote_parent}/{self.name}/verify'
+
+
 @dataclass(frozen=True)
 class WorkspaceConfig:
-    """Operator-owned placement and bounds; the remote root becomes the runner's workspace root."""
+    """Operator-owned placement and bounds; the remote root becomes the runner's workspace root.
+
+    Exactly one verifier route: `python`, an interpreter in the image running `VERIFY`, or `verifier`, the
+    uploaded static binary that works in any image."""
     staging: Path
     remote_parent: str
     root_name: str
-    python: str
+    python: str | None
     max_files: int = FIXTURE_TREE_FILES
     max_bytes: int = MAX_TREE_BYTES
+    verifier: UploadedVerifier | None = None
 
     def __post_init__(self):
-        for path in (self.remote_parent, self.python):
-            if (type(path) is not str or not path.startswith('/') or path.endswith('/') or '\0' in path
-                    or str(PurePosixPath(path)) != path or '..' in PurePosixPath(path).parts):
+        if (self.python is None) == (self.verifier is None):
+            raise ValueError('Exactly one workspace verifier route required')
+        if self.verifier is not None and not isinstance(self.verifier, UploadedVerifier):
+            raise ValueError('Uploaded verifier configuration required')
+        for path in (self.remote_parent,) + ((self.python,) if self.python is not None else ()):
+            if not _canonical(path):
                 raise ValueError('Canonical absolute operator paths required')
+        if self.verifier is not None and (self.verifier.remote_parent, self.verifier.name) == (self.remote_parent, self.root_name):
+            raise ValueError('Verifier and workspace root must differ')
         if type(self.root_name) is not str or not self.root_name or '/' in self.root_name or self.root_name in ('.', '..'):
             raise ValueError('Single plain workspace root name required')
         if not isinstance(self.staging, Path) or not self.staging.is_absolute():
@@ -204,6 +240,13 @@ class OpenShellTestWorkspace:
             confined_path(f.path)
         self._lifecycle, self._execution, self._upload = lifecycle, execution, upload
         self._store, self._snapshot, self._config = store, snapshot, config
+        self._verifier = None
+        if config.verifier is not None:
+            # Read once and pinned here, so every sandbox receives the same bytes the host checked.
+            data = config.verifier.binary.read_bytes()
+            if hashlib.sha256(data).hexdigest() != config.verifier.sha256:
+                raise ValueError('Workspace verifier binary does not match its pin')
+            self._verifier = data
 
     def _expected(self, added: tuple[PatchFile, ...]):
         source = {f.path: (MODES[f.mode], f.artifact.size, f.artifact.sha256) for f in self._snapshot.files}
@@ -242,8 +285,10 @@ class OpenShellTestWorkspace:
         return root
 
     def _observe(self, handle: SandboxHandle, operation: UUID) -> tuple[dict, ExecutionReceipt]:
-        argv = (self._config.python, '-I', '-S', '-B', '-c', VERIFY, self._config.remote_root,
-                str(self._config.max_files), str(MAX_FILE_BYTES))
+        limits = (self._config.remote_root, str(self._config.max_files), str(MAX_FILE_BYTES))
+        verifier = self._config.verifier
+        argv = ((verifier.remote_path,) + limits if verifier is not None
+                else (self._config.python, '-I', '-S', '-B', '-c', VERIFY) + limits)
         try:
             receipt = self._execution.execute(handle, argv, operation)
         except ExecutionError as error:
@@ -258,7 +303,33 @@ class OpenShellTestWorkspace:
             observed = None
         if not isinstance(observed, dict):
             raise WorkspaceError('admission', 'verifier output is not one JSON object', 'unconfirmed', receipt)
+        if verifier is not None and observed.pop('verifier_sha256', None) != verifier.sha256:
+            raise WorkspaceError('admission', 'verifier is not the pinned executable', 'unconfirmed', receipt)
         return observed, receipt
+
+    def _deliver_verifier(self, handle: SandboxHandle, operation: UUID) -> None:
+        """Upload the pinned verifier into its own directory; never replayed, like the tree upload. Its staging
+        copy is separate from the tree's and, after a timeout, retained for the same reason."""
+        verifier, retain = self._config.verifier, False
+        base = self._config.staging / f'{operation.hex}.verifier'
+        base.mkdir(mode=0o700)
+        try:
+            local = base / verifier.name
+            local.mkdir(mode=0o700)
+            fd = os.open(local / 'verify', os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, 'wb') as stream:
+                stream.write(self._verifier)
+                stream.flush()
+                os.fchmod(stream.fileno(), 0o500)
+                os.fsync(stream.fileno())
+            try:
+                self._upload.upload(handle, local, verifier.remote_parent, operation)
+            except UploadError as error:
+                retain = error.descendants_unknown
+                raise
+        finally:
+            if not retain:
+                shutil.rmtree(base, ignore_errors=True)
 
     def _admit(self, observed: dict, files, parents) -> None:
         euid = observed.get('euid')
@@ -296,6 +367,12 @@ class OpenShellTestWorkspace:
                 self._lifecycle.wait_ready(handle, uuid5(operation, 'ready'))
             except Exception as error:
                 raise WorkspaceError('sandbox', f'{type(error).__name__}: {error}', 'unconfirmed') from error
+            if self._config.verifier is not None:
+                try:
+                    self._deliver_verifier(handle, uuid5(operation, 'verifier'))
+                except UploadError as error:
+                    retain = error.descendants_unknown  # Reported as retained staging; the verifier's copy is kept
+                    raise WorkspaceError('upload', f'verifier: {error} (delivery {error.delivery})', 'unconfirmed') from error
             before, receipt = self._observe(handle, uuid5(operation, 'absent'))
             if before != dict(exists=False, euid=before.get('euid')):
                 raise WorkspaceError('admission', 'remote workspace root exists before upload', 'unconfirmed', receipt)
