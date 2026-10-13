@@ -141,6 +141,10 @@ Limits: this is metadata, not admission (PLAN-0021). A suggested row satisfies a
 - Al's review of `7b42d2e` noted a pre-existing gap for the next detector slice: `[project] dependencies` is not read, so `pytest<8` there plus `[tool.pytest]` selects the pytest 9 image.
 - `make test-config`: 1236 passed on main `0ad9900` plus this follow-up.
 
+## Project dependencies (after #61, merged as `a459ced`)
+
+Al's review of #61 found that PEP 621 `[project] dependencies` was never read, so `dependencies = ["pytest<8"]` with `[tool.pytest.ini_options]` selected the pytest 9 image. Those entries now go through the same requirement parser as extras, so a versioned pin, a direct reference and an unparseable spec behave as elsewhere; a non-string entry or a non-list value is unread and gives undetermined. `setup.cfg` `[options] install_requires` had the same gap and is read the same way (`setup.py` already read any requirement string). `test_project_dependencies_are_read` (seven inputs; the five defect cases fail on the old code, the two controls pass on both) and `test_setup_cfg_install_requires_is_read` cover it. The report rerun gives identical results; only the detector digest changed. The seeded 52,000-document sweep raised nothing. `make test-config`: 1246 passed on main `a459ced` plus this change.
+
 ## Decisions and next action
 
 - Java strictness, framework sufficiency, missing-runtime handling and the per-version (not kitchen-sink) image choice are recorded in SPEC-0042, along with why no new agent is needed.

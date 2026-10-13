@@ -532,3 +532,26 @@ def test_nested_requirements_files_are_read():
     requirement = detect(files, 'python')
     assert component(requirement, 'test_framework', 'pytest').allowed == '<8'
     assert select(requirement, load()).status == 'unsupported'
+
+
+PROJECT = '[project]\nrequires-python = ">=3.12"\n{}\n[tool.pytest.ini_options]\n'
+
+
+@pytest.mark.parametrize('dependencies, status', [
+    ('dependencies = ["pytest<8"]', 'unsupported'),
+    ('dependencies = ["requests>=2", "pytest>=9,<10"]', 'supported'),
+    ('dependencies = ["pytest @ git+https://example.invalid/pytest.git"]', 'undetermined'),
+    ('dependencies = ["pytest<<8"]', 'undetermined'),
+    ('dependencies = [8, "requests"]', 'undetermined'),
+    ('dependencies = "pytest<8"', 'undetermined'),
+    ('dependencies = ["requests>=2"]', 'supported'),
+])
+def test_project_dependencies_are_read(dependencies, status):
+    # Al's review of #61: [project] dependencies was never read, so pytest<8 there selected the pytest 9 image.
+    requirement = detect({'pyproject.toml': PROJECT.format(dependencies).encode()}, 'python')
+    assert select(requirement, load()).status == status
+
+
+def test_setup_cfg_install_requires_is_read():
+    files = {'setup.cfg': b'[options]\npython_requires = >=3.12\ninstall_requires =\n    pytest<8\n[tool:pytest]\n'}
+    assert select(detect(files, 'python'), load()).status == 'unsupported'
