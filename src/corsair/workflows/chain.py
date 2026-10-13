@@ -53,6 +53,7 @@ with workflow.unsafe.imports_passed_through():
 REVISION_TIMEOUT = timedelta(minutes=10)
 # Detection and selection read at most 1 MiB of encoded build files in memory.
 SELECTION_TIMEOUT = timedelta(minutes=1)
+NOT_DURABLE = "The case carries setup source; the environment stage has no durable mode yet (SPEC-0068)"
 # Default for ``run_durable``: one attempt per model request or tool call, so nothing is blindly repeated.
 ACTIVITY_CONFIG: ActivityConfig = {"start_to_close_timeout": timedelta(minutes=5), "retry_policy": RetryPolicy(maximum_attempts=1)}
 
@@ -142,6 +143,10 @@ class ChainInvestigation:
             started = workflow.time()
             # Pure derivation from the stage input: the same caps the child enforces.
             limits = stage_limits(stage, inputs, request.budget)
+            if stage == "environment":
+                # SPEC-0068: the environment stage runs in direct mode only until its durable slice; never the declaration.
+                return StageAttempt(stage, None, None, (), 0.0, RecordedFailure(
+                    "EnvironmentStageNotDurable", NOT_DURABLE), limits)
             try:
                 record = await workflow.execute_child_workflow(
                     CHILDREN[stage].run, StageRequest(inputs, getattr(request.models, stage), request.budget),

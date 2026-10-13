@@ -6,7 +6,7 @@ import pytest
 from pydantic_ai import models
 
 from corsair.adapters.local_artifacts import LocalArtifacts
-from corsair.composition.direct import DECLARED_FRAMEWORK, UNOBSERVED, StageModels, run_direct
+from corsair.composition.direct import UNOBSERVED, framework_names, StageModels, run_direct
 from corsair.nodes.runtime.contracts import RuntimeInputs
 from corsair.nodes.runtime.environment import RuntimeCatalog
 from corsair.nodes.runtime.matrix import load
@@ -85,13 +85,13 @@ def test_a_framework_that_only_shares_a_prefix_is_not_admitted(run, framework):
 
 
 def test_framework_declarations_name_the_framework_and_its_major_version():
-    def names(declared):
-        m = DECLARED_FRAMEWORK.fullmatch(declared.casefold())
-        return {m['name'], m['name'] + (m['major'] or '')}
+    names = framework_names
     assert 'pytest' in names('pytest 9.0.3') and 'pytest' in names('pytest')
     assert 'junit5' in names('JUnit 5') and 'junit4' in names('JUnit 4.12') and 'junit5' in names('junit-5.10.2')
     assert 'tap-harness' in names('tap-harness') and 'tap-harness' in names('TAP-Harness 3.42')
+    assert 'junit5' in names('JUnit Jupiter 5.10') and 'junit5' in names('junit jupiter 5')
     assert 'junit5' not in names('JUnit 4.12') and 'pytest' not in names('pytest-bdd') and 'pytest' not in names('pytest-asyncio')
+    assert 'junit5' not in names('Jupiter 5') and names('py test') == set()
 
 
 def test_build_files_without_a_catalog_stop_with_the_failure_kind(run):
