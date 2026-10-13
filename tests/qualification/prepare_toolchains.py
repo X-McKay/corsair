@@ -26,7 +26,7 @@ JAVA_TESTS = ('nativeRoundtrip', 'nativeRuntime')
 PYTHONS = {'python': 'python3.12', 'python37': 'python3.7'}
 # Node toolchain directories; each fixture's package-lock.json pins every npm package by SHA-512 (SPEC-0055).
 NODES = ('node8',)
-NODE_TESTS = ('native roundtrip', 'native runtime')
+NODE_TESTS = ('nativeRoundtrip', 'nativeRuntime')
 NPM = ('/usr/local/bin/node', '/usr/local/lib/node_modules/npm/bin/npm-cli.js', '--ignore-scripts', '--no-audit', '--no-update-notifier')
 JEST = ('/usr/local/bin/node', 'node_modules/jest/bin/jest.js', '--ci')
 

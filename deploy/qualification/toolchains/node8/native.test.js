@@ -1,9 +1,9 @@
 'use strict';
 
-test('native roundtrip', () => {
+test('nativeRoundtrip', () => {
   expect(JSON.parse(JSON.stringify({ corsair: 'native' }))).toEqual({ corsair: 'native' });
 });
 
-test('native runtime', () => {
+test('nativeRuntime', () => {
   expect(process.versions.node.split('.')[0]).toBe('8');
 });

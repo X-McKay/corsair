@@ -66,15 +66,15 @@ def test_transport_error_requires_fresh_original_native_upstream_failure(fault, 
 
 def jest_json(**changes):
     report = {'success': True, 'numTotalTests': 2, 'numPassedTests': 2, 'numFailedTests': 0, 'numPendingTests': 0, 'numTodoTests': 0,
-              'testResults': [{'assertionResults': [{'fullName': 'native roundtrip', 'status': 'passed'}, {'fullName': 'native runtime', 'status': 'passed'}]}]}
+              'testResults': [{'assertionResults': [{'fullName': 'nativeRoundtrip', 'status': 'passed'}, {'fullName': 'nativeRuntime', 'status': 'passed'}]}]}
     report.update(changes)
     return json.dumps(report)
 
 
 @pytest.mark.parametrize('changes', [
     {'success': False}, {'numTotalTests': 3}, {'numPassedTests': 1, 'numFailedTests': 1}, {'numPendingTests': 1}, {'numTodoTests': 1},
-    {'testResults': [{'assertionResults': [{'fullName': 'native roundtrip', 'status': 'passed'}, {'fullName': 'other', 'status': 'passed'}]}]},
-    {'testResults': [{'assertionResults': [{'fullName': 'native roundtrip', 'status': 'passed'}, {'fullName': 'native runtime', 'status': 'pending'}]}]},
+    {'testResults': [{'assertionResults': [{'fullName': 'nativeRoundtrip', 'status': 'passed'}, {'fullName': 'other', 'status': 'passed'}]}]},
+    {'testResults': [{'assertionResults': [{'fullName': 'nativeRoundtrip', 'status': 'passed'}, {'fullName': 'nativeRuntime', 'status': 'pending'}]}]},
     {'testResults': []},
 ], ids=['unsuccessful', 'count', 'failed', 'pending', 'todo', 'wrong-name', 'case-pending', 'no-suites'])
 def test_jest_report_rejects_nonexecuted_or_wrong_tests(changes):
@@ -85,4 +85,4 @@ def test_jest_report_rejects_nonexecuted_or_wrong_tests(changes):
 
 def test_jest_report_accepts_the_fixture_tests():
     from tests.qualification.prepare_toolchains import NODE_TESTS, jest_report
-    assert jest_report(jest_json(), NODE_TESTS)['ids'] == ['native roundtrip', 'native runtime']
+    assert jest_report(jest_json(), NODE_TESTS)['ids'] == ['nativeRoundtrip', 'nativeRuntime']
