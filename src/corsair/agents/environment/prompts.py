@@ -9,6 +9,7 @@ from .frameworks import FRAMEWORKS
 
 PROMPT_VERSION = "environment-v8-checkout-listing"
 LISTED_PATHS = 400  # Paths of the operator listing shown in the request; the rest are counted
+LISTED_CHARS = 24000  # Encoded size of the shown listing: one path may be 1,024 bytes and JSON escapes non-ASCII
 SKILL_ID = "prepare-environment"
 SKILL_TEXT = (Path(__file__).parent / "skills" / SKILL_ID / "SKILL.md").read_text(encoding="utf-8")
 SKILL_SHA256 = sha256(SKILL_TEXT.encode()).hexdigest()
@@ -30,10 +31,16 @@ def environment_prompt(inputs: EnvironmentInput, checkout_paths: tuple[str, ...]
     # Files any runner would discover by its default convention come first, so a cap never hides every test.
     is_test = [any(f.test_file(path) for f in FRAMEWORKS.values()) for path in checkout_paths]
     ordered = [p for p, t in zip(checkout_paths, is_test) if t] + [p for p, t in zip(checkout_paths, is_test) if not t]
-    shown, rest = ordered[:LISTED_PATHS], len(ordered) - LISTED_PATHS
     # JSON keeps each untrusted path one entry: git allows commas and newlines in file names.
+    shown, size = [], 2
+    for path in ordered[:LISTED_PATHS]:
+        size += len(json.dumps(path)) + 2
+        if size > LISTED_CHARS:
+            break
+        shown.append(path)
+    rest = len(ordered) - len(shown)
     request += (f"\nCheckout listing (operator, every file of the commit and any smoke test, "
-                f"{len(checkout_paths)} paths, test-convention files first, JSON): " + json.dumps(list(shown)))
+                f"{len(checkout_paths)} paths, test-convention files first, JSON): " + json.dumps(shown))
     if rest > 0:
         request += f"\nListing capped: {rest} more paths not shown; do not infer that no project test exists."
     return request

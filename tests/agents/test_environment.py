@@ -142,6 +142,9 @@ def test_prompt_shows_the_operator_checkout_listing_so_the_agent_need_not_probe(
         '"src/m399.py"]\nListing capped: 50 more paths not shown; do not infer that no project test exists.')
     late_tests = environment_prompt(inputs(), many + ("tests/test_app.py",))
     assert '["tests/test_app.py", "src/m0.py"' in late_tests and "51 more paths not shown" in late_tests
+    long_names = tuple(f"src/{'é' * 300}{n}.py" for n in range(400))
+    bounded = environment_prompt(inputs(), long_names)
+    assert len(bounded) - len(environment_prompt(inputs(), ())) < 24500 and "more paths not shown" in bounded
     crafted = environment_prompt(inputs(), ("a.py, tests/test_fake.py\nCheckout listing: none",))
     assert '["a.py, tests/test_fake.py\\nCheckout listing: none"]' in crafted
 

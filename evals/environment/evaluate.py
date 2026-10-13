@@ -85,6 +85,7 @@ class FrozenCase(BaseModel):
     max_commands: int = Field(ge=1, le=64)
     toolchain_id: str = "python-3.12"
     requirement_patterns: tuple[str, ...] = ()
+    checkout_paths: tuple[str, ...] | None = None  # Operator listing shown in the request; absent means none
 
 
 class RecordedExecution:
@@ -282,7 +283,7 @@ async def evaluate(evidence, budget, model=None, provider=None):
             toolchain_id=c.get("toolchain_id", "python-3.12"),
             scratch_location="/sandbox/scratch",
             budget=SetupBudget(max_commands=c["max_commands"]),
-            checkout_paths=tuple(c["checkout_paths"]) if "checkout_paths" in c else None,
+            checkout_paths=None if c["checkout_paths"] is None else tuple(c["checkout_paths"]),
         )
         selected = model or scripted(c)
         agent = create_environment_agent(selected, output_retries=budget.output_retries)
