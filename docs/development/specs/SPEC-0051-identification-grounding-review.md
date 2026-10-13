@@ -19,7 +19,7 @@ Reuse the native PydanticAI finalizer and Pydantic contracts. Reject whitespace 
 
 ## Acceptance and validation
 
-Preserve the eight-case development corpus and compare baseline/candidate using `make eval AGENT=identification`. Add native negative cases for partial/whitespace symbols and prefix/suffix collisions, positive literal punctuation cases, repository-mode regressions and evaluator rejection of fabricated quotes at correct coordinates. The evaluator independently checks quotation against saved inline source. Run focused tests and `make test-config`. Scripted results establish plumbing; bounded same-profile provider comparisons establish exposed-case observations only. Repository live smoke, held-out semantics, durable repository mode and real application execution remain unqualified or unrun here.
+Preserve the eight-case development corpus and compare baseline/candidate using `make eval AGENT=identification`. Add native negative cases for partial/whitespace symbols and prefix/suffix collisions, positive literal punctuation cases, repository-mode regressions and evaluator rejection of fabricated quotes at correct coordinates. The evaluator re-derives quotation from saved inline source separately from finalization; it shares the reader's line-splitting convention. Run focused tests and `make test-config`. Scripted results establish plumbing; bounded same-profile provider comparisons establish exposed-case observations only. Repository live smoke, held-out semantics, durable repository mode and real application execution remain unqualified or unrun here.
 
 ## Decisions and open questions
 

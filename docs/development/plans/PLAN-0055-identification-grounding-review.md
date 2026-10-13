@@ -49,7 +49,7 @@ Required full actual `make test-config`: 1009 passed, one existing event-loop de
 
 ## Current-head review correction
 
-Independent review confirmed that Python regex \w excludes valid Unicode identifier continuation marks: a suffixed combining accent was admitted as an exact target. Literal matches now inspect adjacent characters using Python's identifier-continuation check plus Java/JavaScript $. Negative native stage tests cover combining and spacing marks; exact Unicode spellings and existing punctuation/dollar cases remain supported. This lexical rule remains conservative and is not semantic source proof. Prompt/config identity advanced to grounding-2 (planning config v4). No dataset/held-out changes or live provider calls. Earlier broad review-test attempts were interrupted after they stalled in the restricted worktree; subsequent focused checks and scripted comparisons are recorded below.
+Independent review confirmed that Python regex \w excludes valid Unicode identifier continuation marks: a suffixed combining accent was admitted as an exact target. Literal matches now inspect adjacent characters using Python's identifier-continuation check plus Java/JavaScript $. Negative native stage tests cover combining and spacing marks; exact Unicode spellings and existing punctuation/dollar cases remain supported. This lexical rule remains conservative and is not semantic source proof. Prompt/config identity advanced to grounding-2. No dataset/held-out changes or live provider calls. Earlier broad review-test attempts were interrupted after they stalled in the restricted worktree; subsequent focused checks and scripted comparisons are recorded below.
 
 Focused Unicode/identifier checks:22 passed; development scripted16/16 versus16/16, `.runs/evals/identification/20261013T100737Z-development-scripted`, unchanged estimated requests/tools/tokens. SPEC-0051 and PLAN-0055 replace this branch's previous colliding identifiers; all tracked references updated. These are new record identities, not changes to the other PR's records.
 
@@ -57,7 +57,17 @@ Final affected identification/repository and documentation/dataset guards:77 pas
 
 ## Conservative cross-language lexical follow-up
 
-Cross-review found Java/JavaScript currency symbols and format characters still accepted as partial-name suffixes. The adjacent-character guard now conservatively includes Unicode Sc and Cf categories together with Python identifier continuations; this covers currency and zero-width joiner/non-joiner suffixes while preserving complete literal spellings. It is intentionally not a parser or declaration/semantic proof. Native negative and complete-spelling checks retain existing dollar and punctuation expectations. Identities advance to grounding-3 (planning config v5). No corpus/held-out, provider or authority changes.
+Cross-review found Java/JavaScript currency symbols and format characters still accepted as partial-name suffixes. The adjacent-character guard now conservatively includes Unicode Sc and Cf categories together with Python identifier continuations; this covers currency and zero-width joiner/non-joiner suffixes while preserving complete literal spellings. It is intentionally not a parser or declaration/semantic proof. Native negative and complete-spelling checks retain existing dollar and punctuation expectations. Identities advance to grounding-3. No corpus/held-out, provider or authority changes.
 
 Focused native inline/repository identifier checks:28 passed, one existing deprecation warning. Final scripted development16/16 against16/16 at `.runs/evals/identification/20261013T101223Z-development-scripted`, unchanged estimated requests/tools/tokens.
 Full-suite repeat, live provider and runtime checks unrun for this bounded correction; earlier checks remain historical. git diff --check passed.
+
+
+Record-accuracy review (2026-10-13): CURRENT now separates the grounding-1 exposed-case
+live comparison from grounding-3 scripted-only checks. The original 1009-check result remains
+a historical grounding-1 result, not final-head qualification. Removed erroneous planning
+configuration references. The 20261013T101223Z run evaluated uncommitted grounding-3
+changes on 9b6065e, subsequently committed as e9922b7; it was not a live run.
+Current main 8606068 merged cleanly; no source behavior changed in this follow-up.
+Affected identification/repository/configuration checks: 83 passed. Frozen host-only
+Make remains 16/16 after integration. No live/provider evaluation repeated.
