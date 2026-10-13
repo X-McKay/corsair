@@ -19,7 +19,8 @@ Implement [SPEC-0067](../specs/SPEC-0067-eval-corpus-import.md) offline: copy th
 - [x] `evals/corpus/cases.py`: typed manifest, one case per topic, oracle, hygiene refusals, agent input, salted split, held-out manifest; `tests/unit/test_corpus_cases.py`.
 - [x] Corpus section in `evals/benchmark/runtimes.py report`; regenerate `benchmarks/runtime-requirements.{md,json}` on main `164a556`, then again on `1c6d26a` after #92 (outcomes printed through #92's `_outcome`, so image-only selections show as such; held-out corpus rows in the JSON reduced to counts).
 - [x] Records: this plan, SPEC-0067, CURRENT.md row.
-- [ ] Rerun the report after the rows from #94 and the Node and Ruby row PRs reach main.
+- [x] Rerun after #73 and #94 (main `26c5316`): benchmark supported 9 (live: the nine CPython 3.7 cases), supported (image-only) 9, unsupported 20, undetermined 2, not acquired 10; corpus unchanged.
+- [ ] Rerun after the Node 8 and Ruby 3.1 rows (#98, #99) reach main.
 - [ ] End-to-end follow-ups, in order, after Al's decision on undeclared runtimes and missing tests (below).
 
 ## Validation and progress

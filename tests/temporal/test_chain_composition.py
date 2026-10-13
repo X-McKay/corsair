@@ -1,6 +1,7 @@
 """Durable-chain payloads, admission and worker-side runner resolution without a Temporal service."""
 
 import asyncio
+import os
 from dataclasses import replace
 from datetime import timedelta
 from uuid import uuid4
@@ -22,11 +23,14 @@ from corsair.agents.test_authoring.dependencies import AuthoringBudget, Authorin
 from corsair.agents.test_planning.contracts import TestPlan
 from corsair.composition.direct import CompositionBudget, RecordedFailure, StageModels, run_direct
 from corsair.composition.evidence import freeze
+from corsair.nodes.runtime.contracts import MAX_INPUT_BYTES, RuntimeInputs, RuntimeOutcome
+from corsair.nodes.runtime.environment import RuntimeCatalog, runtime_inputs
+from corsair.nodes.runtime.matrix import load
 from corsair.ports.test_runner import ApprovedPatch, PatchFile
 from corsair.workflows.chain import _admit, run_durable
 from corsair.workflows.chain_runtime import (
     AuthoringPayload, AuthoringRunContext, ChainRequest, ChainResult, RevisionRequest, StageKeys, StageRecord,
-    WorkerRunner, chain_result, configure_chain, failure_record, serving, within,
+    WorkerRunner, chain_result, configure_chain, failure_record, select_runtime, serving, within,
 )
 from evals.fixture_e2e.case import (
     fixture_case, reviewed_runners, scripted_assessment, scripted_authoring, scripted_identification,
@@ -85,6 +89,42 @@ def test_revision_payloads_keep_non_utf8_bytes(direct):
         assert await roundtrip(request, RevisionRequest) == request
         raw = ApprovedPatch((PatchFile("test_x.py", b"\xff\x00"),), ("test_x.py",))
         assert (await roundtrip(request.model_copy(update={"patch": raw}), RevisionRequest)).patch == raw
+    asyncio.run(check())
+
+
+def test_runtime_stage_payloads_and_worker_activity(tmp_path):
+    """SPEC-0060: build-file bytes and the outcome cross the payload boundary; the worker's catalog answers."""
+    inputs = RuntimeInputs(files={"pyproject.toml": b'[project]\nrequires-python = ">=3.10"\n[tool.pytest.ini_options]\n',
+                                  "documents.py": b"\xff\x00"})
+    catalog = RuntimeCatalog(load(), {"cpython-3.12-pytest": "corsair-python@sha256:" + "a" * 64})
+
+    async def check():
+        request = ChainRequest(replace(fixture_case(), runtime=inputs), StageKeys("a", "b", "c", "d"), CompositionBudget())
+        assert await roundtrip(request, ChainRequest) == request
+        configure_chain({"scripted": scripted_identification()}, reviewed_runners(None, tmp_path),
+                        activity_config=ACTIVITY_CONFIG)
+        with pytest.raises(ApplicationError) as missing:
+            await select_runtime(inputs)
+        assert (missing.value.type, missing.value.non_retryable) == ("RuntimeCatalogMissing", True)
+        configure_chain({"scripted": scripted_identification()}, reviewed_runners(None, tmp_path),
+                        activity_config=ACTIVITY_CONFIG, catalog=catalog)
+        outcome = await select_runtime(inputs)
+        assert (outcome.status, outcome.image) == ("supported", catalog.prepared["cpython-3.12-pytest"])
+        assert await roundtrip(outcome, RuntimeOutcome) == outcome
+        result = ChainResult(stopped_at="runtime", reason=outcome.reason, attempts=(), runtime=outcome)
+        assert await roundtrip(result, ChainResult) == result
+        # The largest inputs `runtime_inputs` admits (one big lockfile, or thousands of long paths) still fit
+        # Temporal's default 2 MB payload limit with the case around them.
+        # The review's case: 4,000 nested pom.xml of 256 bytes with ~214-character paths (2,258,233 bytes before).
+        many = {f"pkg{i:05d}/{'x' * 900}/pom.xml": b"" for i in range(3000)}
+        modules = {f"m{i:04d}/{'y' * 200}/pom.xml": os.urandom(256) for i in range(4000)}
+        parents = {f"parents/{'z' * 200}/{i}.pom": os.urandom(4096) for i in range(64)}
+        for files, supplied in (({"poetry.lock": os.urandom(MAX_INPUT_BYTES)}, {}), (many, {}), (modules, {}),
+                                ({**many, "poetry.lock": os.urandom(700_000)}, {}), ({**modules, **many}, parents)):
+            full = runtime_inputs(files, parents=supplied)
+            assert (full.files or full.omitted) and len(full.__pydantic_serializer__.to_json(full)) <= MAX_INPUT_BYTES
+            (payload,) = await CONVERTER.encode([replace(request, case=replace(request.case, runtime=full))])
+            assert len(payload.SerializeToString()) < 2_000_000
     asyncio.run(check())
 
 

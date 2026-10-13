@@ -2,8 +2,8 @@
  "schema_version": 1,
  "spec": "SPEC-0042",
  "inputs": {
-  "detector": "sha256:647a71cd0e2e9f04420f5095da48ccbc185bf19fded2849640c4b172363e64b2",
-  "matrix": "sha256:0ed10585ddeda3f0b0ae9ab93b81eef935fbcb537abf6fd28d120a0b143cf097",
+  "detector": "sha256:50206d9a71a663d321f69f0247ee0b216c856551b89388ac0f117f0863487b0b",
+  "matrix": "sha256:1acf1c446a1bcd1688cb282e8d29749329f5d390c246e6f77538270c1357ee1e",
   "pins": "sha256:ea068e2eec63dacc43b4858c39c656891e49248ea6fbc17db1845bb9a0b9bff1",
   "inventory": "sha256:c534cf5619a2f6ba55a35697b0a54d9d0680e54a8ce340db664d3b071c20ab87",
   "corpus": "sha256:bffea64b1d72fd7a2ef1a224a4a9e76d5ebed4a47b46f62e5885f540b290a168",
@@ -4418,6 +4418,25 @@
          "satisfied": false
         }
        ]
+      },
+      {
+       "image_id": "cpython-3.7-pytest",
+       "unmet": [
+        {
+         "kind": "runtime",
+         "name": "cpython",
+         "allowed": "2.7.* || 3.3.* || 3.4.* || 3.5.* || 3.6.*",
+         "provided": "3.7.17",
+         "satisfied": false
+        },
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "allowed": "==3.0.6",
+         "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+         "satisfied": false
+        }
+       ]
       }
      ]
     }
@@ -4531,29 +4550,26 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "2.7.* || 3.4.* || 3.5.* || 3.6.* || 3.7.*",
-       "preferred": "3.7"
+       "provided": "3.7.17",
+       "satisfied": true
+      },
+      {
+       "kind": "test_framework",
+       "name": "pytest",
+       "allowed": "*",
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "2.7.* || 3.4.* || 3.5.* || 3.6.* || 3.7.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live"
     },
     "fix": {
      "commit": "71b707758851e4b622f87d9a73266e06f60aeab4",
@@ -4681,32 +4697,29 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "2.7.* || 3.4.* || 3.5.* || 3.6.* || 3.7.*",
-       "preferred": "3.7"
+       "provided": "3.7.17",
+       "satisfied": true
+      },
+      {
+       "kind": "test_framework",
+       "name": "pytest",
+       "allowed": "*",
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "2.7.* || 3.4.* || 3.5.* || 3.6.* || 3.7.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live"
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -4846,29 +4859,26 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.5.* || 3.6.* || 3.7.* || 3.8.*",
-       "preferred": "3.8"
+       "provided": "3.7.17",
+       "satisfied": true
+      },
+      {
+       "kind": "test_framework",
+       "name": "pytest",
+       "allowed": "*",
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.5.* || 3.6.* || 3.7.* || 3.8.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live"
     },
     "fix": {
      "commit": "8238a9e450ed1524e40cb3a8b0b3c00606903aeb",
@@ -5003,32 +5013,29 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.5.* || 3.6.* || 3.7.* || 3.8.*",
-       "preferred": "3.8"
+       "provided": "3.7.17",
+       "satisfied": true
+      },
+      {
+       "kind": "test_framework",
+       "name": "pytest",
+       "allowed": "*",
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.5.* || 3.6.* || 3.7.* || 3.8.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live"
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -5223,32 +5230,29 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
+      {
+       "kind": "test_framework",
+       "name": "pytest",
+       "allowed": "*",
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
+      },
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.*",
-       "preferred": "3.10"
+       "provided": "3.7.17",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live"
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -5381,29 +5385,26 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
+      {
+       "kind": "test_framework",
+       "name": "pytest",
+       "allowed": "*",
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
+      },
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-       "preferred": "3.11"
+       "provided": "3.7.17",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live"
     },
     "fix": {
      "commit": "2625ed9fc074091c531c27ffcba7902771130261",
@@ -5531,32 +5532,29 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
+      {
+       "kind": "test_framework",
+       "name": "pytest",
+       "allowed": "*",
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
+      },
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-       "preferred": "3.11"
+       "provided": "3.7.17",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live"
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -5711,42 +5709,26 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.6.* || 3.7.* || 3.8.* || 3.9.* || 3.10.*",
-       "preferred": "3.10"
+       "provided": "3.7.17",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "pytest",
        "allowed": ">=6.0.0,<7.0.0",
-       "preferred": "6.0.0"
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.6.* || 3.7.* || 3.8.* || 3.9.* || 3.10.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        },
-        {
-         "kind": "test_framework",
-         "name": "pytest",
-         "allowed": ">=6.0.0,<7.0.0",
-         "provided": "9.0.*",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live"
     },
     "fix": {
      "commit": "9c528670c455b8d948aff95ed50e22940d1ad3fc",
@@ -5896,45 +5878,29 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.6.* || 3.7.* || 3.8.* || 3.9.* || 3.10.*",
-       "preferred": "3.10"
+       "provided": "3.7.17",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "pytest",
        "allowed": ">=6.0.0,<7.0.0",
-       "preferred": "6.0.0"
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.6.* || 3.7.* || 3.8.* || 3.9.* || 3.10.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        },
-        {
-         "kind": "test_framework",
-         "name": "pytest",
-         "allowed": ">=6.0.0,<7.0.0",
-         "provided": "9.0.*",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live"
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -6111,45 +6077,29 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-       "preferred": "3.11"
+       "provided": "3.7.17",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "pytest",
        "allowed": "==7.2.0",
-       "preferred": "7.2.0"
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        },
-        {
-         "kind": "test_framework",
-         "name": "pytest",
-         "allowed": "==7.2.0",
-         "provided": "9.0.*",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live"
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -6326,45 +6276,29 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-       "preferred": "3.11"
+       "provided": "3.7.17",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "pytest",
        "allowed": "==7.2.0",
-       "preferred": "7.2.0"
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        },
-        {
-         "kind": "test_framework",
-         "name": "pytest",
-         "allowed": "==7.2.0",
-         "provided": "9.0.*",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live"
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -6524,42 +6458,26 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
       {
        "kind": "test_framework",
        "name": "pytest",
        "allowed": ">=3,<=6.2.5",
-       "preferred": "3"
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
       },
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-       "preferred": "3.11"
+       "provided": "3.7.17",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        },
-        {
-         "kind": "test_framework",
-         "name": "pytest",
-         "allowed": ">=3,<=6.2.5",
-         "provided": "9.0.*",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live"
     },
     "fix": {
      "commit": "74ea7cf7a6a27a4eeb2ae24e162bcc942a6706d5",
@@ -6714,45 +6632,29 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
       {
        "kind": "test_framework",
        "name": "pytest",
        "allowed": ">=3,<=6.2.5",
-       "preferred": "3"
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
       },
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-       "preferred": "3.11"
+       "provided": "3.7.17",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        },
-        {
-         "kind": "test_framework",
-         "name": "pytest",
-         "allowed": ">=3,<=6.2.5",
-         "provided": "9.0.*",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live"
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -6880,29 +6782,26 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
+      {
+       "kind": "test_framework",
+       "name": "pytest",
+       "allowed": "*",
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
+      },
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.6.* || 3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-       "preferred": "3.11"
+       "provided": "3.7.17",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.6.* || 3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live"
     },
     "fix": {
      "commit": "d57c4a269bba3b9a0c5bfa20292955b849006d9e",
@@ -7025,32 +6924,29 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
+      {
+       "kind": "test_framework",
+       "name": "pytest",
+       "allowed": "*",
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
+      },
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.6.* || 3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-       "preferred": "3.11"
+       "provided": "3.7.17",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.6.* || 3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live"
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
