@@ -12,8 +12,9 @@ from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import UsageLimits
 
 from corsair.agents.issue_analysis.contracts import IssueAnalysisInput
-from corsair.agents.issue_analysis.identification import SKILL_TEXT, create_issue_identification_agent, identification_prompt
-from corsair.agents.issue_analysis.identification_contracts import IssueIdentificationDraft
+from corsair.agents.issue_identification import create_issue_identification_agent, identification_prompt
+from corsair.agents.issue_identification.skills import SKILL_TEXT
+from corsair.agents.issue_identification.contracts import IssueIdentificationDraft
 from corsair.agents.issue_analysis.tools import FixtureDependencies
 from evals.issue_identification.evaluate import EvaluationBudget, dataset, evaluate, passed, scripted_model, selection_checks
 

@@ -33,7 +33,7 @@ with workflow.unsafe.imports_passed_through():
 
     from corsair.agents.evidence_assessment.contracts import AssessmentInput, EvidenceAssessment
     from corsair.agents.issue_analysis.contracts import IssueAnalysisInput
-    from corsair.agents.issue_analysis.identification_contracts import IssueIdentification
+    from corsair.agents.issue_identification.contracts import IssueIdentification
     from corsair.agents.test_authoring.contracts import AuthoringResult, TestAuthoringInput
     from corsair.agents.test_planning.contracts import TestPlan, TestPlanningInput
     from corsair.composition.direct import (

@@ -1,7 +1,5 @@
-"""Bounded saved-source windows: the tool computes EOF, the model selects a start."""
+"""Moved to `corsair.agents.issue_identification.tools` (SPEC-0052); old imports keep working."""
 
-from ...source.tools import window_source_tools
+from ...issue_identification.tools import identification_tools
 
-
-def identification_tools():
-    return window_source_tools("issue_identification_source")
+__all__ = ["identification_tools"]
