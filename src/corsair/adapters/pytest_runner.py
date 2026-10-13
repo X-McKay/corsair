@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from uuid import UUID, uuid5
 
 from corsair.adapters.native_runner import NativeRunner, check_bounds, check_command, check_root, error_text
-from corsair.reports.admission import failed_count
 from corsair.nodes.witness import MAX_RECORD_BYTES, PROBE_SHA256, probe_argv
 from corsair.ports.test_runner import (MAX_TEST_ID, TEST_ID, ApprovedPatch, PreparedWorkspace, WitnessCapture,
                                        WitnessRequest)
@@ -54,6 +53,8 @@ def collected(stdout: bytes) -> tuple[str, ...] | None:
 
 
 class PytestRunner(NativeRunner):
+    tool, report_format = 'pytest', 'JUnit'
+
     def _validate(self, patch: ApprovedPatch, ids: tuple[str, str], witness: WitnessRequest | None) -> None:
         if witness is not None and (not isinstance(witness, WitnessRequest) or self._config.witness_record_path is None):
             raise ValueError('Witness capture needs a typed request and an operator record path')
@@ -118,7 +119,4 @@ class PytestRunner(NativeRunner):
                                 max_bytes=self._config.max_junit_bytes)
         except JUnitError as error:
             return failure('report', f'report: {error}', junit, 'invalid_report')
-        if receipt.native_exit != int(failed_count(cases) > 0):
-            return failure('report', f'report: pytest exit {receipt.native_exit} conflicts with JUnit outcomes',
-                           junit, 'invalid_report')
         return self._completed(prepared, argv, receipt, cases, junit, operation)

@@ -19,8 +19,10 @@ Implement [SPEC-0065](../specs/SPEC-0065-shared-test-runner-core.md) on branch `
 - [x] `reports/admission.py`; one JUnit `testcase` reader for pytest and Surefire; TAP on the shared envelope and id checks.
 - [x] `tests/qualification/image_case.py`; Java and Perl harnesses on it (Perl now runs the commit's blobs).
 - [x] CVE-2023-31486 under Docker through the consolidated code.
-- [ ] Draft PR; CI green.
-- [ ] Jest and Minitest drivers once #83 and #84 are on main; their captures and Docker cases.
+- [x] Draft PR #89; CI green on d826b25.
+- [x] Exit agreement moved into `_completed` (review finding on #89); TAP keeps its own rule as an override.
+- [x] Jest driver after #83 merged (main 86b37ce); its 71 capture tests unchanged; `node_image_case.py` on `image_case.py`.
+- [ ] Minitest driver once #84 is on main; its captures and Docker case.
 
 ## Validation and progress
 
@@ -31,8 +33,10 @@ CVE-2023-31486 through `perl_image_case.py` on the shared harness (image `sha256
 - fixed `77f557e`: both passed, 0.85 s;
 - cleanup confirmed for both.
 
-These match the runs before the refactor. The Java harness was checked by its smoke test only: a VUL4J rerun needs the Maven setup, which the next live batch repeats.
+These match the runs before the refactor.
+
+Jest fold-in (main 86b37ce merged): Jest unit suite 71 passed unchanged; harness smoke tests 33 passed; `make test-config` 1567 passed. A Jest Docker rerun needs the Node case checkouts, which this container does not hold; the smoke test covers the harness wiring. The Java harness was checked by its smoke test only: a VUL4J rerun needs the Maven setup, which the next live batch repeats.
 
 ## Decisions and next action
 
-The per-framework checks after a run (empty report, wrapper exit 125, allowed exits) stay in each driver, because they are what genuinely differs. Next: the PR, then Jest and Minitest.
+The per-framework checks after a run (empty report, wrapper exit 125, allowed exits) stay in each driver, because they are what genuinely differs. Exit agreement is not one of them: it moved into the core so a new driver cannot skip it. Next: Minitest after #84 merges; then the environment agent's tap-harness admission as a separate PR.

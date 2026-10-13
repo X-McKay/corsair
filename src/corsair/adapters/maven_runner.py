@@ -10,7 +10,6 @@ import re
 from uuid import UUID, uuid5
 
 from corsair.adapters.native_runner import NativeRunner, check_bounds, check_command, check_root
-from corsair.reports.admission import failed_count
 from corsair.ports.test_runner import (MAX_TEST_ID, ApprovedPatch, JavaTestId, PreparedWorkspace, WitnessRequest,
                                        approved_path)
 from corsair.reports.junit import MAX_JUNIT_BYTES, JUnitError
@@ -79,6 +78,8 @@ def selection(ids: tuple[str, ...]) -> tuple[str, ...]:
 class MavenRunner(NativeRunner):
     # A goal-bearing discovery command would run test bodies (possibly other tests) before the listing.
     exact_discovery = 'Maven discovery command must equal the operator\'s goal-free Maven prefix'
+    # Maven also exits 1 for build failures; with a complete report that names a failure the two agree.
+    tool, report_format = 'maven', 'Surefire'
 
     def _validate(self, patch: ApprovedPatch, ids: tuple[str, str], witness: WitnessRequest | None) -> None:
         if witness is not None and not isinstance(witness, WitnessRequest):
@@ -148,8 +149,4 @@ class MavenRunner(NativeRunner):
                                    max_bytes=self._config.max_report_bytes)
         except JUnitError as error:
             return failure('report', f'report: {error}', junit, 'invalid_report')
-        # Maven also exits 1 for build failures; with a complete report that names a failure the two agree.
-        if receipt.native_exit != int(failed_count(cases) > 0):
-            return failure('report', f'report: maven exit {receipt.native_exit} conflicts with Surefire outcomes',
-                           junit, 'invalid_report')
         return self._completed(prepared, argv, receipt, cases, junit, operation)

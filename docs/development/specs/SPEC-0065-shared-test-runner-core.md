@@ -25,7 +25,7 @@ Not in scope: changing any runner's commands, ids, refusals or outcomes; the env
 - the exact-listing check (`_discover`): one listing run; it continues only with exit 0 and exactly the two ids, each once;
 - report retention before admission (`_store_report`);
 - the typed failure (`_failure`);
-- the control and security claims (`_completed`);
+- exit agreement and the control and security claims (`_completed`): every runner passes through it, so none can skip the check; the default rule is exit 1 exactly when a test failed or errored, and TAP overrides `_exit_agrees` with Test::More's failed count or 255 for a died file;
 - the absent-witness answer for frameworks without a probe (`_no_witness`);
 - the operator-prefix rule (`exact_discovery`);
 - the shared configuration checks (`check_command`, `check_root`, `check_bounds`).
@@ -63,7 +63,7 @@ Behaviour is preserved:
 - The fixed Perl programs are byte-identical.
 - CVE-2023-31486 under Docker through the consolidated harness and runner gives the same outcomes at both revisions.
 
-Jest and Minitest move onto the core when #83 and #84 are on main. Their capture suites must pass unchanged, and their Docker cases must reproduce.
+Jest moved onto the core after #83 merged: its capture suite (71 tests) passes unchanged and `node_image_case.py` uses the shared harness. Minitest moves when #84 is on main, on the same terms.
 
 ## Decisions and open questions
 

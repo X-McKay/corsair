@@ -13,6 +13,7 @@ from corsair.ports.execution import ExecutionReceipt, SandboxExecution
 from corsair.ports.sandbox import SandboxHandle
 from corsair.ports.test_runner import (ApprovedPatch, Discovery, Execution, NativeTestRun, PreparedWorkspace,
                                        TestCaseResult, TestWorkspace, WitnessCapture, WitnessRequest)
+from corsair.reports.admission import failed_count
 from corsair.reports.test_observations import AdmittedTestClaims, TestClaim, WorkloadTestReport
 
 # Framework outcome to workload claim: an error (the test could not complete) is a failed claim.
@@ -57,8 +58,10 @@ class NativeRunner:
 
     `exact_discovery`, when set, is the refusal for a discovery command other than the operator's own
     prefix: for frameworks whose runner builds the listing itself, any other command could run tests.
+    `tool` and `report_format` name the framework in the exit-agreement refusal.
     """
     exact_discovery: str | None = None
+    tool, report_format = 'runner', 'report'
 
     def __init__(self, workspace: TestWorkspace, execution: SandboxExecution, store: ArtifactStore, config):
         self._workspace, self._execution, self._store, self._config = workspace, execution, store, config
@@ -146,9 +149,18 @@ class NativeRunner:
     def _failure(argv, receipt, layer, detail, report=None, status='execution_failure'):
         return Execution(status, (), report, None, detail, argv, receipt), layer
 
+    @staticmethod
+    def _exit_agrees(native_exit: int, cases: tuple[TestCaseResult, ...]) -> bool:
+        """Default rule: exit 1 exactly when a test failed or errored, else 0."""
+        return native_exit == int(failed_count(cases) > 0)
+
     def _completed(self, prepared: PreparedWorkspace, argv: tuple[str, ...], receipt: ExecutionReceipt,
                    cases: tuple[TestCaseResult, ...], report: ArtifactRef, operation: UUID):
-        """Admitted outcomes become the control and security claims of this workspace."""
+        """Admitted outcomes become the control and security claims of this workspace, but only when the
+        native exit status agrees with them; every runner passes through here, so none can skip the check."""
+        if not self._exit_agrees(receipt.native_exit, cases):
+            return self._failure(argv, receipt, 'report', f'report: {self.tool} exit {receipt.native_exit} '
+                                 f'conflicts with {self.report_format} outcomes', report, 'invalid_report')
         control, security = (TestClaim(test_id=case.test_id, outcome=CLAIM[case.outcome]) for case in cases)
         claims_report = WorkloadTestReport(schema_version='test-observations-v1', operation=str(operation),
                                            source_sha256=prepared.source.sha256, tests_sha256=prepared.tests.sha256,

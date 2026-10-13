@@ -173,7 +173,8 @@ def drive(runner, case, config, patch, ids, evidence, summary):
                'container_cleanup': case.cleanup, 'failure_layer': result.failure_layer, 'detail': result.detail,
                'cleanup': result.cleanup,
                'discovery': result.discovery and {'status': result.discovery.status, 'test_ids': result.discovery.test_ids},
-               'cases': result.execution and [(c.test_id, c.outcome) for c in result.execution.cases],
+               'cases': result.execution and [(c.test_id, c.outcome, c.failure and plain(c.failure))
+                                             for c in result.execution.cases],
                'run': plain(result)}
     (evidence / 'run.json').write_text(json.dumps(summary, indent=2, default=str))
     return summary

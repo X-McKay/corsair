@@ -13,6 +13,7 @@ from uuid import uuid5
 from corsair.adapters.native_runner import NativeRunner, check_bounds, check_command, check_root
 from corsair.ports.test_runner import MAX_TEST_ID, ApprovedPatch, PerlTestId, WitnessRequest, approved_path
 from corsair.reports.junit import MAX_JUNIT_BYTES
+from corsair.reports.admission import failed_count
 from corsair.reports.tap import RESULT, TapError, parse_tap
 
 # Fixed operator scripts run by absolute /bin/sh; the root, the Perl argv and the file arrive only as positional
@@ -67,6 +68,15 @@ def listed(stdout: bytes) -> tuple[str, ...] | None:
 
 class TapRunner(NativeRunner):
     exact_discovery = 'TAP discovery command must equal the operator\'s Perl prefix'
+    tool, report_format = 'perl', 'TAP'
+
+    @staticmethod
+    def _exit_agrees(native_exit, cases):
+        # Test::More exits with the number of failed subtests, or 255 when the file died; parse_tap also
+        # checks the plan, which only the stream shows.
+        if any(case.outcome == 'error' for case in cases):
+            return native_exit == 255
+        return native_exit == failed_count(cases)
 
     def _validate(self, patch: ApprovedPatch, ids: tuple[str, str], witness: WitnessRequest | None) -> None:
         if witness is not None and not isinstance(witness, WitnessRequest):
