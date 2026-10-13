@@ -40,7 +40,8 @@ with workflow.unsafe.imports_passed_through():
 
     from .chain_runtime import (
         STAGES, ChainRequest, ChainResult, ChainRuntime, RevisionRequest, StageKeys, StageRecord, StageRequest,
-        WorkerRunner, chain_result, configure_chain, configured, execute_revision, failure_record, recorded, within,
+        WorkerRunner, chain_result, configure_chain, configured, execute_revision, failure_record, recorded, serving,
+        within,
     )
 
 # Operator-owned: the reviewed host runner bounds each subprocess at 60 s; an OpenShell runner may take longer.
@@ -178,6 +179,8 @@ async def run_durable(case: FixtureCase, models: StageModels, runners: Runners,
     configure_chain({stage: getattr(models, stage) for stage in STAGES}, runners, activity_config=activity_config,
                     ceiling=budget)
     identity = workflow_id or f"corsair-chain-{uuid4()}"
-    async with chain_worker(client, identity, **worker_options):
-        return await client.execute_workflow(ChainInvestigation.run, ChainRequest(case, StageKeys(*STAGES), budget),
+    # One configuration per process: an overlapping run_durable is refused rather than served another's models.
+    with serving():
+        async with chain_worker(client, identity, **worker_options):
+            return await client.execute_workflow(ChainInvestigation.run, ChainRequest(case, StageKeys(*STAGES), budget),
                                              id=identity, task_queue=identity, execution_timeout=execution_timeout)

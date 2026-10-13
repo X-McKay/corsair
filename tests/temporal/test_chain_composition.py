@@ -23,10 +23,10 @@ from corsair.agents.test_planning.contracts import TestPlan
 from corsair.composition.direct import CompositionBudget, RecordedFailure, StageModels, run_direct
 from corsair.composition.evidence import freeze
 from corsair.ports.test_runner import ApprovedPatch, PatchFile
-from corsair.workflows.chain import _admit
+from corsair.workflows.chain import _admit, run_durable
 from corsair.workflows.chain_runtime import (
     AuthoringPayload, AuthoringRunContext, ChainRequest, ChainResult, RevisionRequest, StageKeys, StageRecord,
-    WorkerRunner, chain_result, configure_chain, failure_record, within,
+    WorkerRunner, chain_result, configure_chain, failure_record, serving, within,
 )
 from evals.fixture_e2e.case import (
     fixture_case, reviewed_runners, scripted_assessment, scripted_authoring, scripted_identification,
@@ -115,6 +115,20 @@ def test_admission_refuses_unconfigured_keys_and_budgets_before_any_request(tmp_
     with pytest.raises(ValueError):
         configure_chain({"default": scripted_identification()}, reviewed_runners(None, tmp_path),
                         activity_config=ACTIVITY_CONFIG)
+
+
+def test_a_serving_configuration_refuses_replacement_and_overlapping_durable_runs(tmp_path):
+    runners = reviewed_runners(None, tmp_path)
+    configure_chain({"scripted": scripted_identification()}, runners, activity_config=ACTIVITY_CONFIG)
+    with serving():
+        with pytest.raises(RuntimeError):
+            configure_chain({"scripted": scripted_identification()}, runners, activity_config=ACTIVITY_CONFIG)
+        with pytest.raises(RuntimeError):
+            # Refused before any client call, so a second run never resolves through the first run's agents.
+            asyncio.run(run_durable(fixture_case(), stage_models(), runners, client=None))
+        with pytest.raises(RuntimeError), serving():
+            pass
+    configure_chain({"scripted": scripted_identification()}, runners, activity_config=ACTIVITY_CONFIG)
 
 
 def test_authoring_context_resolves_the_runner_on_the_worker_and_carries_messages(direct):

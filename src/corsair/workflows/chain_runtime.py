@@ -11,6 +11,7 @@ Activity names are frozen replay contracts.
 """
 
 import asyncio
+from contextlib import contextmanager
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Generic, Literal, TypeVar
@@ -219,10 +220,25 @@ class ChainRuntime:
 
 
 _runtime: ChainRuntime | None = None
+# Workers resolve agents and runners from the one process configuration, so it is never replaced under a live worker.
+_serving = False
 
 
 def configured() -> ChainRuntime | None:
     return _runtime
+
+
+@contextmanager
+def serving():
+    """Hold the configuration for one worker's lifetime; another configuration is refused until it closes."""
+    global _serving
+    if _serving:
+        raise RuntimeError("a chain worker in this process is already serving its configuration")
+    _serving = True
+    try:
+        yield
+    finally:
+        _serving = False
 
 
 def _unselected(messages: list[ModelMessage], info: Any) -> ModelResponse:
@@ -233,6 +249,8 @@ def configure_chain(models: Mapping[str, Model], runners: Runners, *, activity_c
                     ceiling: CompositionBudget = CompositionBudget()) -> ChainRuntime:
     """Build each stage's agent once with native durability over the operator's models, keyed for requests."""
     global _runtime
+    if _serving:
+        raise RuntimeError("the chain configuration is held by a serving worker; it cannot be replaced")
     if not models or "default" in models or not all(isinstance(model, Model) for model in models.values()):
         raise ValueError("chain models need explicit keys other than 'default' and PydanticAI Model instances")
 
