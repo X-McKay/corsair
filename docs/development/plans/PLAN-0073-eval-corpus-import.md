@@ -20,7 +20,7 @@ Implement [SPEC-0067](../specs/SPEC-0067-eval-corpus-import.md) offline: copy th
 - [x] Corpus section in `evals/benchmark/runtimes.py report`; regenerate `benchmarks/runtime-requirements.{md,json}` on main `164a556`, then again on `1c6d26a` after #92 (outcomes printed through #92's `_outcome`, so image-only selections show as such; held-out corpus rows in the JSON reduced to counts).
 - [x] Records: this plan, SPEC-0067, CURRENT.md row.
 - [x] Rerun after #73 and #94 (main `26c5316`): benchmark supported 9 (live: the nine CPython 3.7 cases), supported (image-only) 9, unsupported 20, undetermined 2, not acquired 10; corpus unchanged.
-- [ ] Rerun after the Node 8 and Ruby 3.1 rows (#98, #99) reach main.
+- [x] Rerun after the Node 8 and Ruby 3.1 rows (#98, #99) reached main: regenerated on main `7d04cf3`; benchmark supported (image-only) 9 → 15, unsupported 20 → 14; corpus section unchanged.
 - [ ] End-to-end follow-ups, in order, after Al's decision on undeclared runtimes and missing tests (below).
 
 ## Validation and progress

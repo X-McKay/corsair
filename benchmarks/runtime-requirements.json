@@ -2,8 +2,8 @@
  "schema_version": 1,
  "spec": "SPEC-0042",
  "inputs": {
-  "detector": "sha256:50206d9a71a663d321f69f0247ee0b216c856551b89388ac0f117f0863487b0b",
-  "matrix": "sha256:1acf1c446a1bcd1688cb282e8d29749329f5d390c246e6f77538270c1357ee1e",
+  "detector": "sha256:9777fdcf75890bf511d03c74fb01a07ce7d02e9eeab02b0739850a384ade0beb",
+  "matrix": "sha256:b0192f8c0959ae477fd2de1880460137a0992198b516e107705d0382df8f1c2f",
   "pins": "sha256:ea068e2eec63dacc43b4858c39c656891e49248ea6fbc17db1845bb9a0b9bff1",
   "inventory": "sha256:c534cf5619a2f6ba55a35697b0a54d9d0680e54a8ce340db664d3b071c20ab87",
   "corpus": "sha256:bffea64b1d72fd7a2ef1a224a4a9e76d5ebed4a47b46f62e5885f540b290a168",
@@ -7175,25 +7175,26 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "runtime",
-       "name": "node",
-       "allowed": "8.* || 10.* || 12.*",
-       "preferred": "12"
-      },
-      {
-       "kind": "build_tool",
-       "name": "npm",
-       "allowed": "*",
-       "preferred": null
-      },
-      {
        "kind": "test_framework",
        "name": "ava",
        "allowed": ">=2.1.0,<3",
        "preferred": "2.1.0"
       }
      ],
-     "rejected": []
+     "rejected": [
+      {
+       "image_id": "node-8.17.0-npm",
+       "unmet": [
+        {
+         "kind": "test_framework",
+         "name": "ava",
+         "allowed": ">=2.1.0,<3",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
+     ]
     },
     "fix": {
      "commit": "3039c8c07f6fdaa8b595ec869ae0895686a7a0f2",
@@ -7295,25 +7296,26 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "runtime",
-       "name": "node",
-       "allowed": "8.* || 10.* || 12.*",
-       "preferred": "12"
-      },
-      {
-       "kind": "build_tool",
-       "name": "npm",
-       "allowed": "*",
-       "preferred": null
-      },
-      {
        "kind": "test_framework",
        "name": "ava",
        "allowed": ">=2.1.0,<3",
        "preferred": "2.1.0"
       }
      ],
-     "rejected": []
+     "rejected": [
+      {
+       "image_id": "node-8.17.0-npm",
+       "unmet": [
+        {
+         "kind": "test_framework",
+         "name": "ava",
+         "allowed": ">=2.1.0,<3",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
+     ]
     }
    },
    "status": "unsupported",
@@ -7533,28 +7535,33 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "node-8.17.0-npm",
+     "image": "docker.io/library/node@sha256:c9025a77a42d87e95433337ac581c0d42810c1263f0e78802691046920d1560b",
+     "checks": [
       {
        "kind": "runtime",
        "name": "node",
        "allowed": "6.* || 7.* || 8.* || 9.* || 10.* || 11.* || 12.*",
-       "preferred": "12"
+       "provided": "8.17.0",
+       "satisfied": true
       },
       {
        "kind": "build_tool",
        "name": "npm",
        "allowed": ">=5,<7",
-       "preferred": "5"
+       "provided": "6.13.4",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "jest",
        "allowed": ">=24.8.0,<25",
-       "preferred": "24.8.0"
+       "provided": "==24.8.0 || ==24.9.0",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only"
     },
     "fix": {
      "commit": "c0711c656686e902af2cd92d6aecc8074de4d83d",
@@ -7760,31 +7767,36 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "node-8.17.0-npm",
+     "image": "docker.io/library/node@sha256:c9025a77a42d87e95433337ac581c0d42810c1263f0e78802691046920d1560b",
+     "checks": [
       {
        "kind": "runtime",
        "name": "node",
        "allowed": "6.* || 7.* || 8.* || 9.* || 10.* || 11.* || 12.*",
-       "preferred": "12"
+       "provided": "8.17.0",
+       "satisfied": true
       },
       {
        "kind": "build_tool",
        "name": "npm",
        "allowed": ">=5,<7",
-       "preferred": "5"
+       "provided": "6.13.4",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "jest",
        "allowed": ">=24.8.0,<25",
-       "preferred": "24.8.0"
+       "provided": "==24.8.0 || ==24.9.0",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only"
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -7887,28 +7899,33 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "node-8.17.0-npm",
+     "image": "docker.io/library/node@sha256:c9025a77a42d87e95433337ac581c0d42810c1263f0e78802691046920d1560b",
+     "checks": [
       {
        "kind": "build_tool",
        "name": "npm",
        "allowed": ">=5,<7",
-       "preferred": "5"
+       "provided": "6.13.4",
+       "satisfied": true
       },
       {
        "kind": "runtime",
        "name": "node",
        "allowed": "8.*",
-       "preferred": "8"
+       "provided": "8.17.0",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "jest",
        "allowed": ">=24.8.0,<25",
-       "preferred": "24.8.0"
+       "provided": "==24.8.0 || ==24.9.0",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only"
     },
     "fix": {
      "commit": "45d4a901478c6a8f396c8b959dd6cf8fd3f955b6",
@@ -8006,31 +8023,36 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "node-8.17.0-npm",
+     "image": "docker.io/library/node@sha256:c9025a77a42d87e95433337ac581c0d42810c1263f0e78802691046920d1560b",
+     "checks": [
       {
        "kind": "build_tool",
        "name": "npm",
        "allowed": ">=5,<7",
-       "preferred": "5"
+       "provided": "6.13.4",
+       "satisfied": true
       },
       {
        "kind": "runtime",
        "name": "node",
        "allowed": "8.*",
-       "preferred": "8"
+       "provided": "8.17.0",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "jest",
        "allowed": ">=24.8.0,<25",
-       "preferred": "24.8.0"
+       "provided": "==24.8.0 || ==24.9.0",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only"
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -8300,12 +8322,6 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "runtime",
-       "name": "node",
-       "allowed": "6.* || 7.* || 8.*",
-       "preferred": "8"
-      },
-      {
        "kind": "build_tool",
        "name": "yarn",
        "allowed": "1.*",
@@ -8318,7 +8334,27 @@
        "preferred": "2.1.0"
       }
      ],
-     "rejected": []
+     "rejected": [
+      {
+       "image_id": "node-8.17.0-npm",
+       "unmet": [
+        {
+         "kind": "build_tool",
+         "name": "yarn",
+         "allowed": "1.*",
+         "provided": null,
+         "satisfied": false
+        },
+        {
+         "kind": "test_framework",
+         "name": "mocha",
+         "allowed": ">=2.1.0,<3",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
+     ]
     }
    },
    "status": "unsupported",
@@ -8420,25 +8456,26 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "build_tool",
-       "name": "npm",
-       "allowed": "*",
-       "preferred": null
-      },
-      {
-       "kind": "runtime",
-       "name": "node",
-       "allowed": "4.* || 6.* || 8.*",
-       "preferred": "8"
-      },
-      {
        "kind": "test_framework",
        "name": "mocha",
        "allowed": ">=5.2.0,<6",
        "preferred": "5.2.0"
       }
      ],
-     "rejected": []
+     "rejected": [
+      {
+       "image_id": "node-8.17.0-npm",
+       "unmet": [
+        {
+         "kind": "test_framework",
+         "name": "mocha",
+         "allowed": ">=5.2.0,<6",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
+     ]
     },
     "fix": {
      "commit": "e18afbf1edcafb7add2c4c7b22abc8d6ebc2fa61",
@@ -8532,25 +8569,26 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "build_tool",
-       "name": "npm",
-       "allowed": "*",
-       "preferred": null
-      },
-      {
-       "kind": "runtime",
-       "name": "node",
-       "allowed": "4.* || 6.* || 8.*",
-       "preferred": "8"
-      },
-      {
        "kind": "test_framework",
        "name": "mocha",
        "allowed": ">=5.2.0,<6",
        "preferred": "5.2.0"
       }
      ],
-     "rejected": []
+     "rejected": [
+      {
+       "image_id": "node-8.17.0-npm",
+       "unmet": [
+        {
+         "kind": "test_framework",
+         "name": "mocha",
+         "allowed": ">=5.2.0,<6",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
+     ]
     }
    },
    "status": "unsupported",
@@ -8660,12 +8698,6 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "build_tool",
-       "name": "npm",
-       "allowed": "*",
-       "preferred": null
-      },
-      {
        "kind": "runtime",
        "name": "node",
        "allowed": "0.12.* || 4.* || 6.* || 7.*",
@@ -8678,7 +8710,27 @@
        "preferred": "4.6.0"
       }
      ],
-     "rejected": []
+     "rejected": [
+      {
+       "image_id": "node-8.17.0-npm",
+       "unmet": [
+        {
+         "kind": "runtime",
+         "name": "node",
+         "allowed": "0.12.* || 4.* || 6.* || 7.*",
+         "provided": "8.17.0",
+         "satisfied": false
+        },
+        {
+         "kind": "test_framework",
+         "name": "tape",
+         "allowed": ">=4.6.0,<5",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
+     ]
     },
     "fix": {
      "commit": "b13381281cead487cbdbfd6a69fb097ea5e456c3",
@@ -8780,12 +8832,6 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "build_tool",
-       "name": "npm",
-       "allowed": "*",
-       "preferred": null
-      },
-      {
        "kind": "runtime",
        "name": "node",
        "allowed": "0.12.* || 4.* || 6.* || 7.*",
@@ -8798,7 +8844,27 @@
        "preferred": "4.6.0"
       }
      ],
-     "rejected": []
+     "rejected": [
+      {
+       "image_id": "node-8.17.0-npm",
+       "unmet": [
+        {
+         "kind": "runtime",
+         "name": "node",
+         "allowed": "0.12.* || 4.* || 6.* || 7.*",
+         "provided": "8.17.0",
+         "satisfied": false
+        },
+        {
+         "kind": "test_framework",
+         "name": "tape",
+         "allowed": ">=4.6.0,<5",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
+     ]
     }
    },
    "status": "unsupported",
@@ -11471,28 +11537,33 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "ruby-3.1-bundler",
+     "image": "docker.io/library/ruby@sha256:91627f55e8969006aab67d15c92fb930500ff73948803da1330b8a853fecebb5",
+     "checks": [
       {
        "kind": "runtime",
        "name": "ruby",
        "allowed": ">=2.7.0",
-       "preferred": "2.7.0"
+       "provided": "3.1.7",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "minitest",
        "allowed": "==5.15.0",
-       "preferred": "5.15.0"
+       "provided": "==5.14.4 || ==5.15.0 || ==5.27.0",
+       "satisfied": true
       },
       {
        "kind": "build_tool",
        "name": "bundler",
        "allowed": "2.*",
-       "preferred": "2.3.14"
+       "provided": "2.3.27",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only"
     },
     "fix": {
      "commit": "d7aba06953f9fa789c411676b941d20df8ef73de",
@@ -11593,31 +11664,36 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "ruby-3.1-bundler",
+     "image": "docker.io/library/ruby@sha256:91627f55e8969006aab67d15c92fb930500ff73948803da1330b8a853fecebb5",
+     "checks": [
       {
        "kind": "runtime",
        "name": "ruby",
        "allowed": ">=2.7.0",
-       "preferred": "2.7.0"
+       "provided": "3.1.7",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "minitest",
        "allowed": "==5.15.0",
-       "preferred": "5.15.0"
+       "provided": "==5.14.4 || ==5.15.0 || ==5.27.0",
+       "satisfied": true
       },
       {
        "kind": "build_tool",
        "name": "bundler",
        "allowed": "2.*",
-       "preferred": "2.3.14"
+       "provided": "2.3.27",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only"
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -11782,15 +11858,29 @@
        "name": "rspec",
        "allowed": "*",
        "preferred": null
-      },
-      {
-       "kind": "build_tool",
-       "name": "bundler",
-       "allowed": "*",
-       "preferred": null
       }
      ],
-     "rejected": []
+     "rejected": [
+      {
+       "image_id": "ruby-3.1-bundler",
+       "unmet": [
+        {
+         "kind": "runtime",
+         "name": "ruby",
+         "allowed": "2.4.* || 2.5.* || 2.6.* || 2.7.*",
+         "provided": "3.1.7",
+         "satisfied": false
+        },
+        {
+         "kind": "test_framework",
+         "name": "rspec",
+         "allowed": "*",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
+     ]
     },
     "fix": {
      "commit": "25d038022c2fcad45af5b73f9d003cf38ff491f6",
@@ -11944,15 +12034,29 @@
        "name": "rspec",
        "allowed": "*",
        "preferred": null
-      },
-      {
-       "kind": "build_tool",
-       "name": "bundler",
-       "allowed": "*",
-       "preferred": null
       }
      ],
-     "rejected": []
+     "rejected": [
+      {
+       "image_id": "ruby-3.1-bundler",
+       "unmet": [
+        {
+         "kind": "runtime",
+         "name": "ruby",
+         "allowed": "2.4.* || 2.5.* || 2.6.* || 2.7.*",
+         "provided": "3.1.7",
+         "satisfied": false
+        },
+        {
+         "kind": "test_framework",
+         "name": "rspec",
+         "allowed": "*",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
+     ]
     }
    },
    "status": "unsupported",
@@ -12089,15 +12193,29 @@
        "name": "rspec",
        "allowed": ">=3.0,<4",
        "preferred": "3.0"
-      },
-      {
-       "kind": "build_tool",
-       "name": "bundler",
-       "allowed": "*",
-       "preferred": null
       }
      ],
-     "rejected": []
+     "rejected": [
+      {
+       "image_id": "ruby-3.1-bundler",
+       "unmet": [
+        {
+         "kind": "runtime",
+         "name": "ruby",
+         "allowed": ">=2.1.0,<2.2 || 2.2.* || 2.3.* || 2.4.*",
+         "provided": "3.1.7",
+         "satisfied": false
+        },
+        {
+         "kind": "test_framework",
+         "name": "rspec",
+         "allowed": ">=3.0,<4",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
+     ]
     },
     "fix": {
      "commit": "4ebedfbd11d20d03ed03a1274ed281eee62715d4",
@@ -12226,15 +12344,29 @@
        "name": "rspec",
        "allowed": ">=3.0,<4",
        "preferred": "3.0"
-      },
-      {
-       "kind": "build_tool",
-       "name": "bundler",
-       "allowed": "*",
-       "preferred": null
       }
      ],
-     "rejected": []
+     "rejected": [
+      {
+       "image_id": "ruby-3.1-bundler",
+       "unmet": [
+        {
+         "kind": "runtime",
+         "name": "ruby",
+         "allowed": ">=2.1.0,<2.2 || 2.2.* || 2.3.* || 2.4.*",
+         "provided": "3.1.7",
+         "satisfied": false
+        },
+        {
+         "kind": "test_framework",
+         "name": "rspec",
+         "allowed": ">=3.0,<4",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
+     ]
     }
    },
    "status": "unsupported",
@@ -12439,28 +12571,33 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "ruby-3.1-bundler",
+     "image": "docker.io/library/ruby@sha256:91627f55e8969006aab67d15c92fb930500ff73948803da1330b8a853fecebb5",
+     "checks": [
       {
        "kind": "runtime",
        "name": "ruby",
        "allowed": ">=2.4.0,<2.5 || 2.5.* || 2.6.* || 2.7.* || 3.0.* || 3.1.* || 3.2.* || 3.3.* || 3.4.*",
-       "preferred": "3.4"
+       "provided": "3.1.7",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "minitest",
        "allowed": ">=5.0,<6",
-       "preferred": "5.0"
+       "provided": "==5.14.4 || ==5.15.0 || ==5.27.0",
+       "satisfied": true
       },
       {
        "kind": "build_tool",
        "name": "bundler",
        "allowed": "*",
-       "preferred": null
+       "provided": "2.3.27",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only"
     },
     "fix": {
      "commit": "50caab74fa01ee8f5dbdee7bb2782126d20c6583",
@@ -12657,31 +12794,36 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "ruby-3.1-bundler",
+     "image": "docker.io/library/ruby@sha256:91627f55e8969006aab67d15c92fb930500ff73948803da1330b8a853fecebb5",
+     "checks": [
       {
        "kind": "runtime",
        "name": "ruby",
        "allowed": ">=2.4.0,<2.5 || 2.5.* || 2.6.* || 2.7.* || 3.0.* || 3.1.* || 3.2.* || 3.3.* || 3.4.*",
-       "preferred": "3.4"
+       "provided": "3.1.7",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "minitest",
        "allowed": ">=5.0,<6",
-       "preferred": "5.0"
+       "provided": "==5.14.4 || ==5.15.0 || ==5.27.0",
+       "satisfied": true
       },
       {
        "kind": "build_tool",
        "name": "bundler",
        "allowed": "*",
-       "preferred": null
+       "provided": "2.3.27",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only"
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -12830,31 +12972,36 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "ruby-3.1-bundler",
+     "image": "docker.io/library/ruby@sha256:91627f55e8969006aab67d15c92fb930500ff73948803da1330b8a853fecebb5",
+     "checks": [
       {
        "kind": "runtime",
        "name": "ruby",
        "allowed": ">=2.5.0,<2.6 || 2.6.* || 2.7.* || 3.0.* || 3.1.*",
-       "preferred": "3.1"
+       "provided": "3.1.7",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "minitest",
        "allowed": ">=5.14.4,<5.15",
-       "preferred": "5.14.4"
+       "provided": "==5.14.4 || ==5.15.0 || ==5.27.0",
+       "satisfied": true
       },
       {
        "kind": "build_tool",
        "name": "bundler",
        "allowed": "*",
-       "preferred": null
+       "provided": "2.3.27",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only"
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -13146,28 +13293,33 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "ruby-3.1-bundler",
+     "image": "docker.io/library/ruby@sha256:91627f55e8969006aab67d15c92fb930500ff73948803da1330b8a853fecebb5",
+     "checks": [
       {
        "kind": "runtime",
        "name": "ruby",
        "allowed": ">=2.7.8,<2.8 || 3.0.* || 3.1.* || 3.2.* || 3.3.*",
-       "preferred": "3.3"
+       "provided": "3.1.7",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "minitest",
        "allowed": ">=5.0,<6",
-       "preferred": "5.0"
+       "provided": "==5.14.4 || ==5.15.0 || ==5.27.0",
+       "satisfied": true
       },
       {
        "kind": "build_tool",
        "name": "bundler",
        "allowed": "*",
-       "preferred": null
+       "provided": "2.3.27",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only"
     },
     "fix": {
      "commit": "cd3e00de20ddaff34ea30f7a74a7b9dad189d1d8",
@@ -13454,31 +13606,36 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "ruby-3.1-bundler",
+     "image": "docker.io/library/ruby@sha256:91627f55e8969006aab67d15c92fb930500ff73948803da1330b8a853fecebb5",
+     "checks": [
       {
        "kind": "runtime",
        "name": "ruby",
        "allowed": ">=2.7.8,<2.8 || 3.0.* || 3.1.* || 3.2.* || 3.3.*",
-       "preferred": "3.3"
+       "provided": "3.1.7",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "minitest",
        "allowed": ">=5.0,<6",
-       "preferred": "5.0"
+       "provided": "==5.14.4 || ==5.15.0 || ==5.27.0",
+       "satisfied": true
       },
       {
        "kind": "build_tool",
        "name": "bundler",
        "allowed": "*",
-       "preferred": null
+       "provided": "2.3.27",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only"
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
