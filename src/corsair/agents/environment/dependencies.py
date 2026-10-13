@@ -51,6 +51,8 @@ class EnvironmentDependencies:
     budget: SetupBudget = SetupBudget()
     ledger: SetupLedger = field(default_factory=SetupLedger)
     new_operation: Callable[[], UUID] = uuid4
+    # SPEC-0071: the operator's listing of every file in the captured revision; None when the adapter has none.
+    checkout_paths: tuple[str, ...] | None = None
 
     def __post_init__(self):
         if self.toolchain_id not in {t.toolchain_id for t in self.inputs.toolchains}:

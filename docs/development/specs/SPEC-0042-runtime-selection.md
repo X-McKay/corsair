@@ -114,7 +114,7 @@ Live qualification of any new row stays with the toolchain gate (SPEC-0007) on a
 Defaults chosen where the work forked:
 - **Java strictness.** A Java project's compiler level selects that JDK (JDK 8 for 1.5 to 1.8) unless CI names others. The alternative, any JDK still able to compile the level, would admit most Vul4J cases on JDK 17, which is exactly the "different version" Al ruled out.
 - **Frameworks.** One supported framework suffices among those a project declares.
-- **Missing runtime.** No runtime declaration means undetermined, never the newest image.
+- **Missing runtime.** No runtime declaration means undetermined, never the newest image. Amended by [SPEC-0069](SPEC-0069-inferred-runtime.md): when nothing is declared, a range inferred from the declared test framework's own release metadata selects the newest qualified image inside it, recorded as inferred.
 - **Pins over tested sets.**
 
 Open questions:

@@ -1,0 +1,21 @@
+{
+  "corpus-python": [
+    "ih-python-cmdi",
+    "ih-python-codeinjection",
+    "ih-python-deserialization",
+    "ih-python-errorexposure",
+    "ih-python-healthcheck",
+    "ih-python-jwtnone",
+    "ih-python-massassignment",
+    "ih-python-nullderef",
+    "ih-python-openredirect",
+    "ih-python-pathtraversal",
+    "ih-python-pwhash",
+    "ih-python-queryhelper",
+    "ih-python-redos",
+    "ih-python-ssrf",
+    "ih-python-tempfile",
+    "ih-python-toctou",
+    "ih-python-xxe"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "case": "ih-python-codeinjection",
+  "language": "python",
+  "split": "development",
+  "oracle": {
+    "stopped_at": null,
+    "gate": {
+      "execution": "completed",
+      "finding": "reproduced",
+      "fix": "verified"
+    },
+    "assessment_admitted": true
+  },
+  "case_sha256": "2b6ab77809bd644ee92176c6388dd192da79c635f02bd00e424433a85f64fb36"
+}
