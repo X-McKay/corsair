@@ -7,36 +7,19 @@ workspace and execution port: a fresh copy of the checkout per run, the unchange
 execution exactly as SPEC-0041 builds them. This is image evidence for SPEC-0045, not sandbox qualification.
 """
 import argparse
-import dataclasses
-import hashlib
 import json
-import os
 from pathlib import Path
-import re
-import subprocess
 import tempfile
-import time
-from uuid import uuid4
 
-from corsair.adapters.local_artifacts import LocalArtifacts
 from corsair.adapters.maven_runner import MavenRunner, MavenRunnerConfig
-from corsair.ports.artifacts import ArtifactRef
-from corsair.ports.execution import ExecutionReceipt
-from corsair.ports.sandbox import SandboxHandle
-from corsair.ports.test_runner import ApprovedPatch, JavaTestId, PatchFile, PreparedWorkspace
-from tests.qualification.prepare_toolchains import DOCKER, LAUNCHER
+from corsair.ports.test_runner import JavaTestId
+from tests.qualification.image_case import (WORK, DockerCase, commit_tree, docker, drive, head, print_summary,
+                                            require_image_id, tests_patch, user)
+from tests.qualification.prepare_toolchains import LAUNCHER
 
-WORK, M2 = '/tmp/work', '/tmp/m2'
+M2 = '/tmp/m2'
 MVN = '/usr/share/maven/bin/mvn'
 DEPENDENCY = 'org.apache.maven.plugins:maven-dependency-plugin:3.8.1'
-
-
-def docker(*args, stdin=None, timeout=900):
-    return subprocess.run([*DOCKER, *args], input=stdin, capture_output=True, timeout=timeout, check=False)
-
-
-def user():
-    return f'{os.getuid()}:{os.getgid()}'
 
 
 def setup(image, checkout, m2, evidence):
@@ -62,123 +45,16 @@ def setup(image, checkout, m2, evidence):
     return result.returncode
 
 
-def commit_tree(checkout, destination):
-    """Write HEAD's blobs exactly as committed (regular files, executables, symlinks) into `destination`."""
-    git = ['git', '-C', str(checkout)]
-    listing = subprocess.run([*git, 'ls-tree', '-r', '-z', 'HEAD'], capture_output=True, check=True).stdout
-    entries = [line.split(b'\t', 1) for line in listing.split(b'\0') if line]
-    entries = [(*meta.split(b' '), os.fsdecode(path)) for meta, path in entries]
-    unsupported = [path for mode, kind, _, path in entries if kind != b'blob']
-    if unsupported:
-        raise SystemExit(f'{checkout}: submodules are not supported: {unsupported[:5]}')
-    batch = subprocess.run([*git, 'cat-file', '--batch'], input=b''.join(sha + b'\n' for _, _, sha, _ in entries),
-                           capture_output=True, check=True).stdout
-    offset = 0
-    for mode, _, sha, path in entries:
-        header_end = batch.index(b'\n', offset)
-        name, _, size = batch[offset:header_end].split(b' ')
-        assert name == sha, f'cat-file returned {name!r} for {sha!r}'
-        start = header_end + 1
-        data, offset = batch[start:start + int(size)], start + int(size) + 1
-        target = destination / path
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if mode == b'120000':
-            target.symlink_to(os.fsdecode(data))
-        else:
-            target.write_bytes(data)
-            target.chmod(0o755 if mode == b'100755' else 0o644)
-    return destination
-
-
-class DockerCase:
-    """One offline container; each prepare is a fresh copy of the read-only checkout plus the patch."""
-
-    def __init__(self, image, checkout, m2, commit, timeout):
-        self.image, self.checkout, self.m2, self.commit, self.timeout = image, checkout, m2, commit, timeout
-        self.container = None
-
-    def __enter__(self):
-        result = docker('run', '-d', '--network=none', '--cap-drop=ALL', '--security-opt=no-new-privileges', '--user', user(),
-                        '-e', 'HOME=/tmp', '-v', f'{self.checkout}:/src:ro', '-v', f'{self.m2}:/m2:ro', self.image,
-                        '/bin/sleep', 'infinity')
-        assert result.returncode == 0, result.stderr
-        self.container = result.stdout.decode().strip()
-        return self
-
-    def __exit__(self, *exc):
-        docker('rm', '--force', self.container)
-        absent = docker('inspect', self.container)
-        self.cleanup = 'confirmed' if absent.returncode != 0 and b'no such object' in absent.stderr.lower() else 'unconfirmed'
-
-    def handle(self, operation):
-        return SandboxHandle(self.container, 'java-image-case', 'docker', 'corsair', str(operation))
-
-    def prepare(self, patch, operation):
-        copy = docker('exec', self.container, '/bin/sh', '-ec', f'rm -rf {WORK} {M2}; cp -R /src {WORK}; cp -R /m2 {M2}')
-        assert copy.returncode == 0, copy.stderr
-        for item in patch.files:
-            written = docker('exec', '-i', self.container, '/bin/sh', '-ec', 'cat > "$1"', 'write', f'{WORK}/{item.path}',
-                             stdin=item.content)
-            assert written.returncode == 0, written.stderr
-        digest = lambda text: ArtifactRef(hashlib.sha256(text.encode()).hexdigest(), len(text))
-        return PreparedWorkspace(self.handle(operation), digest(self.commit), digest(patch.sha256), patch.sha256)
-
-    def release(self, workspace, operation):
-        return 'confirmed' if docker('exec', self.container, '/bin/rm', '-rf', WORK, M2).returncode == 0 else 'unconfirmed'
-
-    def execute(self, handle, argv, operation):
-        started, clock = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), time.monotonic()
-        # A hang (for example a vulnerable infinite loop) is a terminal-unknown failure, never retried; the
-        # container is removed with everything in it on exit.
-        try:
-            result = docker('exec', '-w', WORK, self.container, *argv, timeout=self.timeout)
-        except subprocess.TimeoutExpired as error:
-            return ExecutionReceipt(operation=str(operation), handle=handle, started_at=started,
-                                    elapsed_seconds=round(time.monotonic() - clock, 3), delivery='acknowledged',
-                                    completion='unknown', reason='timeout', stdout=error.stdout or b'',
-                                    stderr=error.stderr or b'', native_exit=None, worker_cleanup='unconfirmed')
-        return ExecutionReceipt(operation=str(operation), handle=handle, started_at=started,
-                                elapsed_seconds=round(time.monotonic() - clock, 3), delivery='acknowledged',
-                                completion='terminal_observed', reason='terminal', stdout=result.stdout,
-                                stderr=result.stderr, native_exit=result.returncode, worker_cleanup='confirmed')
-
-
-def plain(value):
-    if dataclasses.is_dataclass(value):
-        return {k: plain(v) for k, v in dataclasses.asdict(value).items()}
-    if hasattr(value, 'model_dump'):
-        return value.model_dump()
-    if isinstance(value, dict):
-        return {k: plain(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [plain(v) for v in value]
-    if isinstance(value, bytes):
-        text = value.decode('utf-8', 'replace')
-        return {'sha256': hashlib.sha256(value).hexdigest(), 'size': len(value), 'tail': text[-4000:]}
-    return value
-
-
 def run(image, checkout, m2, commit, ids, evidence, tests_from, timeout, tests_label=None):
-    item = JavaTestId.parse(ids[0])
-    path = item.source_path()
+    path = JavaTestId.parse(ids[0]).source_path()
     # The test file comes from `tests_from` (for example the fix revision's PoV test applied to the vulnerable one).
-    patch = ApprovedPatch((PatchFile(path, (Path(tests_from) / path).read_bytes()),), (path,))
+    patch = tests_patch(path, tests_from)
     config = MavenRunnerConfig(command=(MVN, '-B', '-ntp', '-o', f'-Dmaven.repo.local={M2}', f'--file={WORK}/pom.xml'),
                                workspace_root=WORK, java='/opt/java/openjdk/bin/java', console_jar=LAUNCHER)
-    # LocalArtifacts opens an existing root and never creates it.
-    (evidence / 'objects').mkdir(mode=0o700)
-    with DockerCase(image, checkout, m2, commit, timeout) as case, LocalArtifacts(evidence / 'objects', max_bytes=8 << 20) as store:
-        clock = time.monotonic()
-        result = MavenRunner(case, case, store, config).run(patch, control_test_id=ids[0], security_test_id=ids[1],
-                                                             discovery_command=config.command, operation=uuid4())
-        elapsed = round(time.monotonic() - clock, 3)
-    summary = {'image': image, 'commit': commit, 'ids': ids, 'tests_from': tests_label or str(tests_from), 'patch_sha256': patch.sha256, 'elapsed_seconds': elapsed, 'container_cleanup': case.cleanup,
-               'failure_layer': result.failure_layer, 'detail': result.detail, 'cleanup': result.cleanup,
-               'discovery': result.discovery and {'status': result.discovery.status, 'test_ids': result.discovery.test_ids},
-               'cases': result.execution and [(c.test_id, c.outcome) for c in result.execution.cases],
-               'run': plain(result)}
-    (evidence / 'run.json').write_text(json.dumps(summary, indent=2, default=str))
-    return summary
+    case = DockerCase(image, checkout, commit, timeout, kind='java-image-case', docker=docker, mounts=((m2, '/m2'),),
+                      env=('HOME=/tmp',), copies=f'cp -R /m2 {M2};', scratch=(M2,))
+    return drive(MavenRunner, case, config, patch, ids, evidence,
+                 {'image': image, 'commit': commit, 'tests_from': tests_label or str(tests_from)})
 
 
 def main():
@@ -192,14 +68,9 @@ def main():
     parser.add_argument('--timeout', type=int, default=900, help='Seconds per runner command')
     parser.add_argument('--id', action='append', default=[], help='Control then security `[module/]pkg.Class#method`')
     args = parser.parse_args()
-    # Both phases must name the same content, so a tag that could move between them is refused.
-    if not re.fullmatch(r'sha256:[0-9a-f]{64}', args.image):
-        parser.error('--image must be an image config id (sha256:<64 hex>), not a tag')
+    require_image_id(parser, args.image)
     args.evidence.mkdir(parents=True, exist_ok=False)
-    commit = subprocess.run(['git', '-C', str(args.checkout), 'rev-parse', 'HEAD'], capture_output=True, text=True,
-                            check=True).stdout.strip()
-    # The receipt names a commit, so the container gets that commit's blobs, never the worktree's bytes (which
-    # local edits, untracked files or checkout filters such as EOL conversion and `ident` can change).
+    commit = head(args.checkout)
     with tempfile.TemporaryDirectory(dir=args.evidence) as scratch:
         scratch = Path(scratch).resolve()
         tree = commit_tree(args.checkout, scratch / 'checkout')
@@ -209,11 +80,10 @@ def main():
             code = setup(args.image, tree, args.m2.resolve(), args.evidence)
             print(json.dumps({'phase': 'setup', 'commit': commit, 'exit': code}))
             raise SystemExit(code)
-        tests_commit = subprocess.run(['git', '-C', str(args.tests_from or args.checkout), 'rev-parse', 'HEAD'],
-                                      capture_output=True, text=True, check=True).stdout.strip()
+        tests_commit = head(args.tests_from or args.checkout)
         summary = run(args.image, tree, args.m2.resolve(), commit, tuple(args.id), args.evidence, tests, args.timeout,
                       tests_label=f'{(args.tests_from or args.checkout).resolve()}@{tests_commit}')
-    print(json.dumps({k: v for k, v in summary.items() if k != 'run'}, indent=2, default=str))
+    print_summary(summary)
 
 
 if __name__ == '__main__':
