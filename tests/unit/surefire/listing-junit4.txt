@@ -1,0 +1,10 @@
+JUnit Platform Suite ([engine:junit-platform-suite])
+JUnit Jupiter ([engine:junit-jupiter])
+JUnit Vintage ([engine:junit-vintage])
+LegacyTest ([engine:junit-vintage]/[runner:corsair.sample.LegacyTest])
+security ([engine:junit-vintage]/[runner:corsair.sample.LegacyTest]/[test:security(corsair.sample.LegacyTest)])
+control ([engine:junit-vintage]/[runner:corsair.sample.LegacyTest]/[test:control(corsair.sample.LegacyTest)])
+
+[         4 containers found ]
+[         2 tests found      ]
+
