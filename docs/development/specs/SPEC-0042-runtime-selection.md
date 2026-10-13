@@ -59,7 +59,7 @@ Only test frameworks among registry components are matched, against runner suppo
 
 **Matrix** (`deploy/runtime-matrix.yaml`) is operator-owned, and nothing a project or agent supplies edits it.
 - `images` rows name a digest-pinned base image, the image source, the exact runtime and tool versions, and qualification evidence (record ids and a report path). The loader refuses a row without these.
-- `frameworks` rows name a framework family, the versions a Corsair runner and report parser are qualified for, the runner and its evidence.
+- `frameworks` rows name a framework family, the versions a Corsair runner and report parser are qualified for, the runner and its evidence. An optional `images` list scopes a row to the image ids its range was qualified on (empty means every image of the language), so pytest 6 to 7 on CPython 3.7 and pytest 9 on CPython 3.12 are two rows; the loader refuses two rows of one framework applying to the same image, or an `images` entry that is not a row of that language. This field is additive; existing rows are unchanged.
 - Today the matrix holds the two qualified images (CPython 3.12.15; Temurin 17.0.20.1 with Maven 3.10.0) and one framework row (pytest 9.0.x). JUnit 5 is not listed yet: PR #41's Maven runner is now on main, and its row needs the JUnit versions that runner is qualified for.
 - Configuration guards check that image rows are exactly the prepared toolchain bases and that every cited report, record and runner exists.
 - To add a row: build from a digest-pinned upstream base with hash-pinned offline contents, pass the toolchain gate for that row on a fresh node, then add the row with that evidence.

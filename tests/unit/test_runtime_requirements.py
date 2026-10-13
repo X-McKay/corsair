@@ -304,3 +304,22 @@ def test_malformed_pipfile_structure_is_recorded_not_raised(pipfile):
     requirement = detect({'Pipfile': pipfile, 'pytest.ini': b''}, 'python')
     assert any(u.path == 'Pipfile' for c in requirement.components for u in c.unparsed)
     assert select(requirement, load()).status == 'undetermined'
+
+
+def test_framework_rows_scoped_to_images():
+    # A framework range qualified on one image must not be claimed by another image of the same language.
+    data = load().model_dump()
+    py312 = data['images'][0]
+    py37 = {**py312, 'id': 'cpython-3.7-pytest', 'runtime': {'name': 'cpython', 'version': '3.7.17'}}
+    old = {**data['frameworks'][0], 'versions': '>=6.0,<8', 'images': ['cpython-3.7-pytest']}
+    new = {**data['frameworks'][0], 'images': ['cpython-3.12-pytest']}
+    matrix = Matrix.model_validate({**data, 'images': [py312, py37, *data['images'][1:]], 'frameworks': [new, old]})
+    wide = lambda pytest: python_project('>=3.7', pytest)
+    assert select(wide('>=9,<10'), matrix).image_id == 'cpython-3.12-pytest'
+    assert select(python_project('>=3.7,<3.8', '>=9,<10'), matrix).status == 'unsupported'  # pytest 9 not qualified on 3.7
+    assert select(python_project('>=3.7,<3.8', '==6.2.5'), matrix).image_id == 'cpython-3.7-pytest'
+    assert select(python_project('>=3.12', '==6.2.5'), matrix).status == 'unsupported'  # pytest 6 not qualified on 3.12
+    with pytest.raises(ValueError, match='duplicate framework row'):
+        Matrix.model_validate({**data, 'images': [py312, py37], 'frameworks': [new, {**old, 'images': []}]})
+    with pytest.raises(ValueError, match='not a python row'):
+        Matrix.model_validate({**data, 'frameworks': [{**old, 'images': ['temurin-17-maven']}]})

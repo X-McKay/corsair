@@ -54,7 +54,12 @@ class FrameworkRow(_Frozen):
     language: Language
     versions: str = Field(description='Canonical version set the runner and report parser are qualified for')
     runner: str
+    images: tuple[str, ...] = Field(default=(), description='Image ids this range was qualified on; empty means every '
+                                                            'image of the language')
     qualification: Qualification
+
+    def applies(self, row: 'ImageRow') -> bool:
+        return row.language == self.language and (not self.images or row.id in self.images)
 
     @field_validator('versions')
     @classmethod
@@ -71,7 +76,13 @@ class Matrix(_Frozen):
     @model_validator(mode='after')
     def unique(self) -> 'Matrix':
         if len({row.id for row in self.images}) != len(self.images): raise ValueError('duplicate image id')
-        if len({(f.language, f.name) for f in self.frameworks}) != len(self.frameworks): raise ValueError('duplicate framework row')
+        ids = {row.id: row for row in self.images}
+        for f in self.frameworks:
+            if any(i not in ids or ids[i].language != f.language for i in f.images):
+                raise ValueError(f'framework row {f.name} names an image that is not a {f.language} row')
+        for row in self.images:
+            names = [f.name for f in self.frameworks if f.applies(row)]
+            if len(names) != len(set(names)): raise ValueError(f'duplicate framework row for image {row.id}')
         return self
 
 
@@ -122,14 +133,13 @@ def select(requirement: RuntimeRequirement, matrix: Matrix) -> Selection:
     # A framework with an unread constraint cannot count as the qualified one, and if the project's runtime fits a
     # row but no readable framework does, the unread one might have: that is undetermined, not unsupported.
     unread = {c.name: reasons for c in requirement.component('test_framework') if (reasons := _blocking(c))}
-    supported = {f.name: f.versions for f in matrix.frameworks if f.language == requirement.language}
     rejected = []
     runtime_fits = False
     for row in matrix.images:
         if row.language != requirement.language: continue
         provided = {('runtime', row.runtime.name): row.runtime.version,
                     **{('build_tool', k): v for k, v in row.tools.items()},
-                    **{('test_framework', k): v for k, v in supported.items()}}
+                    **{('test_framework', f.name): f.versions for f in matrix.frameworks if f.applies(row)}}
         checks = tuple(_check(c, None if c.kind == 'test_framework' and c.name in unread else provided.get((c.kind, c.name)))
                        for c in wanted)
         # Every runtime and image tool must match; of the project's declared test frameworks, one qualified
