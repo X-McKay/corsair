@@ -21,7 +21,8 @@ Implement [SPEC-0036](../specs/SPEC-0036-workspace-storage-quota.md) (bytes and 
 - [x] Operator manifests: quota class, second provisioner instance, fail-closed setup/teardown, helper image, namespace `ResourceQuota`/`LimitRange`/`ValidatingAdmissionPolicy`, gateway values overlay, workspace policy; configuration tests.
 - [x] Bootstrap step (`make workspace-storage`) that creates the preallocated XFS image and mounts it in the kind node (unrun).
 - [ ] Receipt `statfs` parsing, `storage_exhausted` attribution and host size pre-check; unit tests.
-- [ ] Live gate `make qualify-workspace-quota` on two fresh nodes (SPEC-0036 acceptance).
+- [x] Storage-stage gate written: `make qualify-workspace-quota` (`tests/qualification/test_workspace_quota.py`, plain pods, unrun).
+- [ ] Run it on two fresh nodes, then an OpenShell-stage gate (workspace policy, gateway overlay, `/tmp` denial, admission guard).
 - [ ] Rerun the SPEC-0032 workspace gate and E2E-0 on the quota class with the workspace policy.
 - [x] Benchmark case manifests, loader and report (IDEA-0005 step 1).
 - [x] Review, CURRENT.md, handoff ([HANDOFF-0058](../handoffs/HANDOFF-0058-workspace-quota-and-benchmark-cases.md)).
@@ -39,6 +40,10 @@ Implement [SPEC-0036](../specs/SPEC-0036-workspace-storage-quota.md) (bytes and 
 **Benchmark inventory**: see IDEA-0005; every claim cites source on `334aa03`.
 
 **Benchmark cases** (IDEA-0005 step 1, offline, not wired into the chain): `benchmarks/cases/jspwiki-forwarding/case.yaml` splits an agent part (neutral issue, scope, repository, baseline/candidate commits, language, build system) from an evaluator part (case id, CWE, fix reference, reference test digest, hypothesised per-revision outcomes, chain oracle left null because the file-open witness cannot observe a dispatcher choice, split null, admission, blocking gaps). `evals/benchmark/cases.py` joins all 50 inventory rows with manifests and refuses manifests that disagree with the inventory, reference tests whose digest differs, and issue text naming the case, CVE/GHSA ids or a dataset; `agent_input()` builds `IssueAnalysisInput` from the agent part only. `python -m evals.benchmark.report`: 50 cases, 1 manifest, 0 admitted; every case blocked by G1, G2b, G2c, G3, G4, G7, G10, G11, G12. Defaults for rows without a manifest are a per-language table; G7 applies to all because 40 rows have no CWE, G13 to none until a build is measured. The JSPWiki issue text is unreviewed (`issue_reviewed: false`). Reference test digest recomputed: `6ebf6244…b95d`, matching the README and PLAN-0021. `make test-config`: 888 passed.
+
+**Cluster handover attempt** (2026-10-13 05:12Z, cluster released by the witness thread): the RIG0 Remote Control session's auto-mode check refused creating a `corsair-pr39` worktree (`Modify Shared Resources`) and any kubectl/docker call against `kind-corsair` from the main checkout (`Interfere With Workloads`), so nothing ran: no image built, no class applied, no kernel facts. The `kube` fixture also requires the kubeconfig under the running checkout's own `.state/kind/`, so the gates must run from the owning checkout or one where the owner staged it.
+
+**Storage-stage gate (unrun)**: two 64Mi claims on `corsair-workspace` (inode ceiling 4,096) with non-root, read-only-root writer pods; asserts `EDQUOT`/`ENOSPC` and a file at or under 64 MiB on a 128 MiB write, empty-file creation stopped below 4,096, the second claim unaffected (8 MiB and 100 files), the backing image size unchanged and node `/var` drift under 8 MiB; cleanup confirms namespace, PVs and volume directories absent. Sizing note from the acquisition thread (PR #42): the largest fetched repository is 209 MB, so 8Gi workspaces leave room for builds.
 
 ## Decisions and next action
 
