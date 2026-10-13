@@ -92,7 +92,7 @@ def test_fixture_chain_in_fresh_sandbox_workspaces(kube, adapter_gateway, reques
     profile_path = request.config.getoption('--e2e-stage-profiles')
     profiles = json.loads(Path(profile_path).read_bytes()) if profile_path and config else None
     if profiles is not None:
-        stage_configs(config, profiles)
+        stage_configs(config, profiles, live)
     summary = dict(outcome='failed', scope='SPEC-0018 E2E-0 chain through OpenShellTestWorkspace; fixture only',
                    live_stages=list(live), stage_profiles=None, application_retries=0, stage_retries=0, runs=[],
                    witness='SPEC-0033 operator probe in the test interpreter; tamper-evident, not tamper-proof')

@@ -1,10 +1,10 @@
 ---
-id: SPEC-0065
+id: SPEC-0066
 kind: spec
 title: Configurable inference and ticket providers
 status: accepted
 updated: 2026-10-13
-related: [PLAN-0071]
+related: [PLAN-0072]
 ---
 
 # Configurable inference and ticket providers
@@ -25,4 +25,4 @@ Mock HTTP tests exercise mapping, pagination, limits, failures and no redirects/
 
 ## Decisions and open questions
 
-User authorized implementation and per-agent configuration. Use the existing model factory seam and typed inputs, not a new scheduler. Ticket capture feeds the identification input through an explicit bounded bridge; repository, revision and investigation scope remain operator-owned. See PLAN-0071.
+User authorized implementation and per-agent configuration. Use the existing model factory seam and typed inputs, not a new scheduler. Ticket capture feeds the identification input through an explicit bounded bridge; repository, revision and investigation scope remain operator-owned. See PLAN-0072.

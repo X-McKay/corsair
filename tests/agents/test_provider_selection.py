@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 import json
 
 import pytest
+from botocore.config import Config
 from httpx2 import AsyncClient, MockTransport, Response
 from pydantic import ValidationError
 from pydantic_ai import Agent, models
@@ -73,14 +74,16 @@ def test_native_openai_request_uses_selected_model_and_settings():
             assert result.output == 'ok'
     asyncio.run(go())
     assert observed[0]['model'] == 'fast-model'
-    assert observed[0]['parallel_tool_calls'] is False if 'parallel_tool_calls' in observed[0] else True
+    assert observed[0].get('parallel_tool_calls', False) is False
     assert 'chat_template_kwargs' not in observed[0] and 'thinking_token_budget' not in observed[0]
 
 
 def test_native_bedrock_converse_uses_configured_model():
     import boto3
     from botocore.stub import Stubber, ANY
-    client = boto3.client('bedrock-runtime', region_name='us-east-1', aws_access_key_id='test', aws_secret_access_key='test')
+    client = boto3.client('bedrock-runtime', region_name='us-east-1', aws_access_key_id='test', aws_secret_access_key='test',
+                          config=Config(retries={'total_max_attempts': 1}))
+    from evals.issue_analysis.evaluate import describe_model
     profile = config().resolve('planning')
     with Stubber(client) as stub:
         stub.add_response('converse', {'output': {'message': {'role': 'assistant', 'content': [{'text': 'ok'}]}},
@@ -89,6 +92,9 @@ def test_native_bedrock_converse_uses_configured_model():
                           {'modelId': profile.model_name, 'messages': ANY, 'system': [], 'inferenceConfig': {'maxTokens': 2048}})
         async def go():
             async with configured_model(profile, bedrock_client=client) as model:
+                identity = describe_model(model)
+                assert identity['system'] == 'bedrock' and identity['model_name'] == profile.model_name
+                assert identity['sdk_max_retries'] == 0
                 with models.override_allow_model_requests(True):
                     result = await Agent(model).run('hello')
                 assert result.output == 'ok'
@@ -114,7 +120,9 @@ def test_bedrock_native_tool_output_translation():
     from pydantic import BaseModel
     class Answer(BaseModel):
         count: int
-    client = boto3.client('bedrock-runtime', region_name='us-east-1', aws_access_key_id='test', aws_secret_access_key='test')
+    client = boto3.client('bedrock-runtime', region_name='us-east-1', aws_access_key_id='test', aws_secret_access_key='test',
+                          config=Config(retries={'total_max_attempts': 1}))
+    from evals.issue_analysis.evaluate import describe_model
     profile = config().resolve('planning')
     with Stubber(client) as stub:
         stub.add_response('converse', {'output': {'message': {'role': 'assistant', 'content': [
@@ -125,6 +133,9 @@ def test_bedrock_native_tool_output_translation():
              'inferenceConfig': {'maxTokens': 2048}, 'toolConfig': ANY})
         async def go():
             async with configured_model(profile, bedrock_client=client) as model:
+                identity = describe_model(model)
+                assert identity['system'] == 'bedrock' and identity['model_name'] == profile.model_name
+                assert identity['sdk_max_retries'] == 0
                 with models.override_allow_model_requests(True):
                     result = await Agent(model, output_type=Answer).run('count')
                 assert result.output.count == 2
@@ -163,7 +174,8 @@ def test_configured_credentials_checked_for_all_agents_before_client_open(monkey
 
 def test_bedrock_owned_client_has_bounded_retries_region_and_cleanup(monkeypatch):
     import boto3
-    native = boto3.client('bedrock-runtime', region_name='us-east-1', aws_access_key_id='test', aws_secret_access_key='test')
+    native = boto3.client('bedrock-runtime', region_name='us-east-1', aws_access_key_id='test', aws_secret_access_key='test',
+                          config=Config(retries={'total_max_attempts': 1}))
     seen = {}
     class Session:
         def __init__(self, profile_name):
@@ -181,3 +193,18 @@ def test_bedrock_owned_client_has_bounded_retries_region_and_cleanup(monkeypatch
     assert seen['region_name'] == 'us-east-1' and seen['service'] == 'bedrock-runtime'
     assert seen['config'].retries['total_max_attempts'] == 1
     assert seen['config'].ignore_configured_endpoint_urls and seen['closed']
+
+
+def test_e2e_cli_only_requires_profiles_for_selected_live_agents(tmp_path, monkeypatch):
+    from evals.fixture_e2e import run
+    provider = tmp_path / 'providers.json'
+    provider.write_text(InferenceConfig(models=config().models, agents={'planning': 'deep'}).model_dump_json())
+    controls = tmp_path / 'controls.json'
+    controls.write_text(json.dumps({'planning': {'response_token_limit': 4096}}))
+    monkeypatch.setattr('sys.argv', ['fixture-e2e', '--provider-config', str(provider), '--live', 'planning',
+                                   '--stage-profiles', str(controls), '--evidence', str(tmp_path / 'evidence')])
+    async def admitted(*args):
+        raise RuntimeError('configuration admitted without dispatch')
+    monkeypatch.setattr(run, 'main_async', admitted)
+    with pytest.raises(RuntimeError, match='configuration admitted without dispatch'):
+        run.main()

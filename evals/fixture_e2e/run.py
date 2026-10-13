@@ -233,7 +233,7 @@ def summary(run: DirectRun) -> dict:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence", type=Path, required=True)
-    parser.add_argument("--provider-config", type=Path, help="Explicit LocalModelConfig JSON; required with --live")
+    parser.add_argument("--provider-config", type=Path, help="Per-agent provider JSON (or legacy LocalModelConfig); required with --live")
     parser.add_argument("--stage-profiles", type=Path,
                         help="Optional JSON of per-stage request controls layered on --provider-config")
     parser.add_argument("--live", default="", help=f"Comma-separated stages to run on the provider: {','.join(STAGES)}")
@@ -249,7 +249,7 @@ def main():
         if config is None:
             parser.error("--stage-profiles needs --provider-config")
         try:
-            stage_configs(config, profiles)
+            stage_configs(config, profiles, live)
         except ValueError as exc:
             parser.error(str(exc))
     run = asyncio.run(main_async(args.evidence, live, config, profiles))

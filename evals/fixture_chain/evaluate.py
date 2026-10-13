@@ -255,7 +255,7 @@ def passed(report) -> bool:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence", type=Path, required=True)
-    parser.add_argument("--provider-config", type=Path, help="Explicit LocalModelConfig JSON; required with --live")
+    parser.add_argument("--provider-config", type=Path, help="Per-agent provider JSON (or legacy LocalModelConfig); required with --live")
     parser.add_argument("--live", default="", help=f"Comma-separated stages to run on the provider: {','.join(STAGES)}")
     parser.add_argument("--repeat", type=int, default=1)
     parser.add_argument("--temporal-address", help="Explicitly owned Temporal service; runs the durable chain")
