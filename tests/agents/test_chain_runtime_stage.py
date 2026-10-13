@@ -90,7 +90,8 @@ def test_framework_declarations_name_the_framework_and_its_major_version():
         return {m['name'], m['name'] + (m['major'] or '')}
     assert 'pytest' in names('pytest 9.0.3') and 'pytest' in names('pytest')
     assert 'junit5' in names('JUnit 5') and 'junit4' in names('JUnit 4.12') and 'junit5' in names('junit-5.10.2')
-    assert 'junit5' not in names('JUnit 4.12') and DECLARED_FRAMEWORK.fullmatch('pytest-bdd') is None
+    assert 'tap-harness' in names('tap-harness') and 'tap-harness' in names('TAP-Harness 3.42')
+    assert 'junit5' not in names('JUnit 4.12') and 'pytest' not in names('pytest-bdd') and 'pytest' not in names('pytest-asyncio')
 
 
 def test_build_files_without_a_catalog_stop_with_the_failure_kind(run):

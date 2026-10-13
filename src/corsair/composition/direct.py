@@ -323,7 +323,7 @@ async def run_direct(case: FixtureCase, models: StageModels, runners: Runners,
     return await run_chain(case, invoke, execute, select, new_operation=uuid4)
 
 
-DECLARED_FRAMEWORK = re.compile(r"(?P<name>[a-z]+)(?:[ _-]?v?(?P<major>[0-9]+)(?:\.[0-9]+)*)?")
+DECLARED_FRAMEWORK = re.compile(r"(?P<name>[a-z]+(?:-[a-z]+)*)(?:[ _-]?v?(?P<major>[0-9]+)(?:\.[0-9]+)*)?")
 
 
 def declared_mismatch(case: FixtureCase, outcome: RuntimeOutcome) -> str | None:
@@ -336,7 +336,7 @@ def declared_mismatch(case: FixtureCase, outcome: RuntimeOutcome) -> str | None:
     if case.environment.language.casefold() != language:
         return f"declared environment language {case.environment.language} is not the selected {language}"
     # A framework name with at most a version suffix: "pytest 9.0.3" names pytest, "JUnit 5" and "JUnit 4.12" name
-    # junit5 and junit4; "pytest-bdd" names no admitted framework.
+    # junit5 and junit4, "tap-harness 3.42" names tap-harness; "pytest-bdd" names no admitted framework.
     admitted = sorted(c.name for c in outcome.selection.checks if c.kind == "test_framework" and c.satisfied)
     parsed = DECLARED_FRAMEWORK.fullmatch(case.environment.framework.strip().casefold())
     names = {parsed["name"], parsed["name"] + (parsed["major"] or "")} if parsed else set()
