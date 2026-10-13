@@ -7,7 +7,7 @@ from pathlib import Path
 from .contracts import EnvironmentInput
 from .frameworks import FRAMEWORKS
 
-PROMPT_VERSION = "environment-v8-checkout-listing"
+PROMPT_VERSION = "environment-v9-optional-build"
 LISTED_PATHS = 400  # Paths of the operator listing shown in the request; the rest are counted
 LISTED_CHARS = 24000  # Encoded size of the shown listing: one path may be 1,024 bytes and JSON escapes non-ASCII
 SKILL_ID = "prepare-environment"

@@ -25,7 +25,7 @@ Excluded: any live provider, OpenShell or Temporal run; connecting the stage to 
 
 **Output.** A native discriminated union on `status`, with a model-facing draft (line references) and a final form (exact quotations, SPEC-0020):
 
-- `ReadyEnvironment`: toolchain id, `recipe` steps (phase `dependency` or `build`, command tokens, cited source), `build_command`, `discovery_command`, `framework`, `baseline_test_id`, `baseline_test_path`, `baseline_test_command`, `approved_test_paths`; trusted code adds `toolchain_image`, `language` and `runtime` from the catalog, `baseline_outcome: passed`, `scratch_location` and all `receipts`.
+- `ReadyEnvironment`: toolchain id, `recipe` steps (phase `dependency` or `build`, command tokens, cited source), `build_command` (empty when the project has nothing to build, PLAN-0089), `discovery_command`, `framework`, `baseline_test_id`, `baseline_test_path`, `baseline_test_command`, `approved_test_paths`; trusted code adds `toolchain_image`, `language` and `runtime` from the catalog, `baseline_outcome: passed`, `scratch_location` and all `receipts`.
 - `BlockedEnvironment`: `layer` (dependency, registry, tls, toolchain_version, build, discovery, sandbox, unknown), quoted `evidence`, cited `run_ids` and optional citations, plus receipts.
 - `UnsupportedEnvironment`: the unmet `requirement` with at least one citation, plus receipts.
 

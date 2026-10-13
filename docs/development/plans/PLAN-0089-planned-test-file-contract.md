@@ -2,7 +2,7 @@
 id: PLAN-0089
 kind: plan
 title: Planned test ids must name a test in their approved file
-status: complete
+status: in_progress
 updated: 2026-10-13
 related: [PLAN-0087, SPEC-0022, SPEC-0068, SPEC-0071, HANDOFF-0116]
 ---
@@ -45,3 +45,13 @@ Live product successor (campaign slot attempt-0001 of `m1-python-7b0b724`, posit
 ## Decisions and next action
 
 Planning output exhaustion (`planning produced no output: Exceeded maximum output retries`) remains a separate hypothesis; this change cannot fix it and may move a mismatch from an authoring-input refusal to a spent planning correction, both stopping before execution. Found, not changed here: on main `bfc4e52` the authoring handoff admits only pytest and Minitest ids although `static.py` reads Jest assertion lines, and TAP/JUnit have no authoring reader; that belongs to the non-Python path lane (its PR #128 adds Test::More ids). This plan is complete; the next general hypothesis (an authored test running a copy of the target) belongs to the campaign owner.
+
+## Second slice: a project with nothing to build
+
+Mechanism (campaign owner's live `ih-python-healthcheck-2` at `8679af4`, INCONCLUSIVE at environment): the project runs its tests from source, the agent left `build_command` empty, and the draft was refused with `draft.ready.build_command: Tuple should have at least 1 item`; the correction then produced reasoning with no final answer and spent the single output retry (that second half is the campaign owner's separate cross-stage hypothesis; no budget or retry changed here). The contract required a build command although no framework row needs one and nothing downstream runs it: `build_command` is only checked to have succeeded in order and hashed into `recipe_sha256`. The frozen reference recipe filled it with `python -m compileall`, so a model that did not invent a compile step was refused.
+
+Change: `build_command` may be empty, meaning the project has nothing to build; finalization then requires recipe, discovery and baseline commands in order and nothing for the build. The skill's ready rule gains one clause saying so (`environment-v9-optional-build`). A non-empty build command is still required to have succeeded in order. Discovery and the one-test baseline still have to run, so a project that does not load still fails there. Not keyed to any case, framework or language.
+
+Reproduction and transfer: a scripted environment run on the original shape (pytest, dependency install, no build) and a transfer on a different interpreted framework (Perl `tap-harness` run from source with no recipe and no build) both failed on main (2 failed) and are admitted now; the unit test that listed an empty build command as unsafe now checks an empty discovery command instead. Scripted `make eval AGENT=environment`: 16/16 before and after, assertion rows identical. Offline suite: 1973 passed. Frozen eval cases unchanged; the environment's live reference is the campaign owner's (main scored 0/16 there because it scores exact pip argv, unrelated to this field).
+
+Next: the campaign owner's live environment eval and a diagnosed `ih-python-healthcheck` successor at this change, recording whether the model was shared.

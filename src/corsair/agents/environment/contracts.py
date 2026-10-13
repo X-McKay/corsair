@@ -90,7 +90,7 @@ class _Ready(Contract, Generic[Citation]):
     status: Literal["ready"]
     toolchain_id: Identifier
     recipe: tuple[RecipeStep[Citation], ...] = Field(max_length=16)
-    build_command: Command
+    build_command: Annotated[tuple[Token, ...], Field(max_length=64, description="The repository's own build or compile command; empty when the project has nothing to build")]
     discovery_command: Command
     framework: str = Field(min_length=1, max_length=128, description="Native test framework identity, e.g. pytest or JUnit 5")
     baseline_test_id: str = Field(min_length=1, max_length=512, description="Test id exactly as printed by the discovery command")

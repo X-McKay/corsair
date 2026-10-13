@@ -66,7 +66,8 @@ async def finalize_environment(ctx: RunContext[EnvironmentDependencies], draft: 
             raise ModelRetry("baseline_test_command must target exactly baseline_test_id")
         succeeded = [rid for rid in sorted(runs) if records[rid].exit_code == 0 and records[rid].execution_error is None
                      and records[rid].delivery == "acknowledged" and records[rid].completion == "terminal_observed"]
-        required = [s.command for s in draft.recipe] + [draft.build_command, draft.discovery_command, draft.baseline_test_command]
+        required = ([s.command for s in draft.recipe] + ([draft.build_command] if draft.build_command else [])
+                    + [draft.discovery_command, draft.baseline_test_command])
         positions = _subsequence([records[rid].command for rid in succeeded], required)
         if positions is None:
             raise ModelRetry("recipe, build, discovery and baseline test commands must each have succeeded in this order in this run")

@@ -382,7 +382,7 @@ def test_framework_admission_is_exact(framework, test_id, path, command, output,
 
 @pytest.mark.parametrize("change", [
     {"approved_test_paths": ["../escape"]}, {"baseline_test_path": "/abs/test.py"}, {"approved_test_paths": ["tests/test_a.py", "tests/test_a.py"]},
-    {"build_command": []}, {"baseline_test_command": ["a\x00b"]}, {"verdict": "vulnerable"},
+    {"discovery_command": []}, {"baseline_test_command": ["a\x00b"]}, {"verdict": "vulnerable"},
 ])
 def test_draft_contract_refuses_unsafe_fields(change):
     from corsair.agents.environment.contracts import ReadyEnvironmentDraft
@@ -569,3 +569,28 @@ def test_missing_maven_is_terminal_even_for_wrapper_correction(wrapper_args):
     blocked = {"status": "blocked", "layer": "build", "evidence": "mvn: not found", "run_ids": [1], "citations": []}
     run(blocked, [("run_setup_command", {"command": list(bad)}), correction_call(("./mvnw", *wrapper_args))], execution)
     assert execution.calls == [bad]
+
+
+PERL = {"toolchain_id": "perl-5.26", "image": "registry.local/perl@sha256:" + "d" * 64, "language": "perl",
+        "runtime": "Perl 5.26.3", "tools": ["prove"]}
+
+
+@pytest.mark.parametrize("draft,calls,outcomes,toolchain", [
+    # ih-python-healthcheck-2 (2026-10-13): a project with nothing to build left build_command empty and was refused.
+    (ready(build_command=[]), [READ_CI, ("list_toolchains", {})] + [("run_setup_command", {"command": list(c)})
+                                                                  for c in (INSTALL, DISCOVER, BASELINE)],
+     DISCOVERED, "python-3.12"),
+    # Transfer: a Perl TAP project run from source, no dependency or build step at all.
+    (ready(toolchain_id="perl-5.26", recipe=[], build_command=[], framework="tap-harness",
+           discovery_command=["prove", "--dry", "-r", "t"], baseline_test_id="t/ok.t", baseline_test_path="t/ok.t",
+           baseline_test_command=["prove", "--norc", "-v", "t/ok.t"], approved_test_paths=["t/corsair_security.t"]),
+     [("run_setup_command", {"command": c}) for c in (["prove", "--dry", "-r", "t"], ["prove", "--norc", "-v", "t/ok.t"])],
+     {("prove", "--dry", "-r", "t"): (0, b"t/ok.t\n", "terminal"), ("prove", "--norc", "-v", "t/ok.t"): (0, TAP_OK, "terminal")},
+     "perl-5.26"),
+])
+def test_a_project_with_nothing_to_build_is_ready_without_a_build_command(draft, calls, outcomes, toolchain):
+    execution = ScriptedExecution(dict(outcomes))
+    result = run(draft, calls, execution, inputs=inputs(toolchains=[*inputs().model_dump()["toolchains"], PERL]),
+                 toolchain_id=toolchain).output
+    assert isinstance(result, ReadyEnvironment) and result.build_command == ()
+    assert [r.command for r in result.receipts] == [tuple(args["command"]) for name, args in calls if name == "run_setup_command"]
