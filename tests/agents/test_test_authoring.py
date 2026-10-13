@@ -614,7 +614,53 @@ def test_a_security_test_that_passes_while_the_witness_sees_the_effect_is_refuse
             run(create_test_authoring_agent(responding([*READS, write(INSENSITIVE), RUN], seen=seen), output_retries=0),
                 inputs, native)
     assert seen[0].security_contradicts_witness and seen[0].security.outcome == "passed"
-    assert seen[0].control.outcome == "passed"
+    assert seen[0].control.outcome == "passed" and seen[0].control_reached_target is True
+
+
+COPIED = """import shutil
+import sys
+from pathlib import Path
+
+
+def test_benign_control(tmp_path: Path):
+    shutil.copy(Path(__file__).parent / "documents.py", tmp_path / "documents.py")
+    sys.path.insert(0, str(tmp_path))
+    import documents
+    (tmp_path / "allowed").mkdir()
+    (tmp_path / "allowed" / "document.txt").write_text("hello")
+    assert documents.read_document(tmp_path / "allowed", "document.txt") == "hello"
+
+
+def test_security_rejects_outside_read(tmp_path: Path):
+    import documents
+    (tmp_path / "allowed").mkdir()
+    (tmp_path / "outside.txt").write_text("outside")
+    try:
+        result = documents.read_document(tmp_path / "allowed", "../outside.txt")
+    except Exception:
+        result = None
+    assert result != "outside"
+"""
+
+
+def test_a_control_that_runs_a_copy_of_the_target_is_shown_as_not_reaching_it(tmp_path):
+    """Corpus pathtraversal, 2026-10-13: tests that import a copy of the source never reach the identified target;
+    the operator witness says so for the control, the one outcome the author may see."""
+    data = case().inputs.inputs.model_dump()
+    data["plan"]["discovery_command"] = data["environment"]["discovery_command"] = list(DISCOVER)
+    data["witness"] = {"target_path": "documents.py", "target_symbol": "read_document", "effect_name": "outside.txt"}
+    inputs = TestAuthoringInput.model_validate(data)
+    root = (tmp_path / "workspace").resolve()
+    (tmp_path / "artifacts").mkdir(mode=0o700)
+    seen = []
+    with LocalArtifacts(tmp_path / "artifacts", max_bytes=1024 * 1024) as store:
+        native = PytestRunner(FixedBytesWorkspace(store, root, COPIED), ReviewedLocalExecution(root), store,
+                              PytestRunnerConfig(PREFIX, ".corsair-junit.xml", str(root),
+                                                 witness_record_path=str(tmp_path / "witness.json")))
+        with pytest.raises(UnexpectedModelBehavior):
+            run(create_test_authoring_agent(responding([*READS, write(COPIED), RUN], seen=seen), output_retries=0),
+                inputs, native)
+    assert seen[0].control.outcome == "passed" and seen[0].control_reached_target is False
 
 
 LIVE_006_PROSE = ("\n\nBoth tests were discovered and the control passed. The patch is ready.\n\n"

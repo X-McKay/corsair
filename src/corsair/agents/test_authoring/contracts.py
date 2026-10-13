@@ -118,6 +118,8 @@ class DevelopmentRun(Contract):
     security: DevelopmentOutcome | Literal["withheld"] | None
     # The security test passed while the operator witness recorded the planned effect: it cannot detect it.
     security_contradicts_witness: bool = False
+    # Whether the operator witness saw the control test call the identified target; None when it cannot say.
+    control_reached_target: bool | None = None
     run_command: tuple[str, ...] = Field(max_length=64)
     cleanup: Literal["not_required", "confirmed", "unconfirmed"]
 

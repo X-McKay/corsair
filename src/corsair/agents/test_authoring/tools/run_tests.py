@@ -35,6 +35,14 @@ def _contradicts(observed: NativeTestRun, request: WitnessRequest | None, securi
     return found is not None and found.path_reached is True and found.effect == "observed"
 
 
+def _control_reached(observed: NativeTestRun, request: WitnessRequest | None, control: TestCaseResult | None) -> bool | None:
+    """Whether the operator witness saw the control test call the identified target; None when it cannot say."""
+    if request is None or control is None:
+        return None
+    found = witness_evidence(observed.witness, request, control.test_id).witness
+    return None if found is None else found.path_reached
+
+
 def summarize(number: int, observed: NativeTestRun, *, control_id: str, security_id: str,
               reveal_security: bool, planned_failure: str | None = None,
               witness: WitnessRequest | None = None) -> DevelopmentRun:
@@ -68,6 +76,7 @@ def summarize(number: int, observed: NativeTestRun, *, control_id: str, security
         discovered_test_ids=discovery.test_ids[:64] if discovery else (), errors=errors[:EXCERPT],
         control=_outcome(cases.get(control_id)), security=security_view,
         security_contradicts_witness=_contradicts(observed, witness, security),
+        control_reached_target=_control_reached(observed, witness, cases.get(control_id)),
         run_command=execution.command if execution else (), cleanup=observed.cleanup)
 
 
