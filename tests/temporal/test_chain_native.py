@@ -17,7 +17,8 @@ from temporalio.service import RPCError
 from temporalio.worker import Replayer
 
 from corsair.adapters.local_artifacts import LocalArtifacts
-from corsair.composition.direct import CompositionBudget, StageModels, run_direct
+from corsair.agents.issue_analysis.contracts import SourceFile
+from corsair.composition.direct import CompositionBudget, SetupSource, StageModels, run_direct
 from corsair.nodes.runtime.contracts import RuntimeInputs
 from corsair.nodes.runtime.environment import RuntimeCatalog
 from corsair.nodes.runtime.matrix import load
@@ -299,4 +300,29 @@ def test_runtime_stage_stops_both_modes_before_any_child(temporal_address, reque
             "corsair.chain.select_runtime"]
         assert selections[0].activity_task_scheduled_event_attributes.retry_policy.maximum_attempts == 1
         assert not (tmp_path / "durable" / "development").exists()
+    asyncio.run(check())
+
+
+def test_environment_stage_stops_durable_mode_until_its_slice(temporal_address, request, store, tmp_path):
+    """SPEC-0068: durable mode never falls back to the declared environment for a case with setup source."""
+    case = replace(fixture_case(), runtime=RuntimeInputs(files={
+        "pyproject.toml": b'[project]\nrequires-python = ">=3.10"\n[tool.pytest.ini_options]\n'}), setup=SetupSource(
+        commit="1" * 40, source_private=False, policy_profile="setup-public",
+        source_files=(SourceFile(path="ci.yml", content="steps:\n  - run: pytest -q\n"),)))
+    catalog = RuntimeCatalog(load(), {"cpython-3.12-pytest": "corsair-python@sha256:" + "a" * 64})
+
+    async def check():
+        client = await Client.connect(temporal_address, plugins=PLUGINS)
+        identity = "corsair-chain-environment-" + str(uuid4())
+        with models.override_allow_model_requests(False):
+            durable = await asyncio.wait_for(run_durable(
+                case, stages(), runners_for(store, tmp_path / "durable"), client=client, catalog=catalog,
+                workflow_id=identity, execution_timeout=EXECUTION_TIMEOUT, workflow_runner=workflow_runner()), 60)
+        assert (durable.stopped_at, durable.runtime.status) == ("environment", "supported")
+        assert durable.reason.startswith("environment produced no output: EnvironmentStageNotDurable: ")
+        assert [a.stage for a in durable.attempts] == ["environment"]
+        saved = dict(await histories(client, identity, request.config.getoption("--temporal-evidence-dir")))
+        assert set(saved) == {identity}
+        assert [e.activity_task_scheduled_event_attributes.activity_type.name for e in scheduled(saved[identity])] == [
+            "corsair.chain.select_runtime"]
     asyncio.run(check())

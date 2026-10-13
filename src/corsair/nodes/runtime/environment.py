@@ -7,12 +7,15 @@ types.
 image receipt (`tests/qualification/prepare_toolchains.py`); a selected row without a prepared image stops too.
 """
 from dataclasses import dataclass
+from hashlib import sha256
 import json
 import re
 from typing import Mapping
 
 from corsair.agents.environment.contracts import EnvironmentInput, ReadyEnvironment, Toolchain
+from corsair.agents.test_planning.contracts import BaselineTest, EnvironmentEvidence
 from corsair.core.blockers import Blocker
+from corsair.core.disposition import EnvironmentIdentity
 from corsair.nodes.runtime.contracts import (MAX_INPUT_BYTES, Language, RuntimeInputs, RuntimeOutcome,
                                              RuntimeRequirement, Selection, Supported)
 from corsair.nodes.runtime.detect import detect, is_build_file
@@ -103,9 +106,10 @@ def _blocker(requirement: RuntimeRequirement | str, selection: Selection | None)
                     'Do not create a replacement row or use the base-image digest as the prepared application image.'])
 
 
-def runtime_outcome(requirement: RuntimeRequirement | str, selection: Selection | None,
+def runtime_outcome(requirement: RuntimeRequirement | str, selection: Selection | None, matrix: Matrix,
                     prepared: Mapping[str, str]) -> RuntimeOutcome:
-    """The typed result of selection: supported with the prepared image, or the status, reason and blocker that stop."""
+    """The typed result of selection: supported with the prepared image and its toolchain, or the status, reason
+    and blocker that stop."""
     def stop(status, reason):
         return RuntimeOutcome(status=status, requirement=None if isinstance(requirement, str) else requirement,
                               detection=requirement[:240] if isinstance(requirement, str) else None,
@@ -122,7 +126,8 @@ def runtime_outcome(requirement: RuntimeRequirement | str, selection: Selection 
     if selection.image_id not in prepared:
         return stop('not_prepared', f'matrix row {selection.image_id} has no prepared image on this node')
     return RuntimeOutcome(status='supported', requirement=requirement, detection=None, selection=selection,
-                          image=prepared[selection.image_id], reason=f'runtime supported by matrix row {selection.image_id}')
+                          image=prepared[selection.image_id], reason=f'runtime supported by matrix row {selection.image_id}',
+                          toolchain=toolchain(selection, matrix, prepared))
 
 
 def select_runtime(inputs: RuntimeInputs, catalog: RuntimeCatalog) -> RuntimeOutcome:
@@ -135,7 +140,7 @@ def select_runtime(inputs: RuntimeInputs, catalog: RuntimeCatalog) -> RuntimeOut
         requirement = f'{requirement}; {unread[0]}'[:240] if isinstance(requirement, str) else \
             requirement.model_copy(update={'unresolved': (requirement.unresolved + unread)[:64]})
     selection = None if isinstance(requirement, str) else select(requirement, catalog.matrix)
-    return runtime_outcome(requirement, selection, catalog.prepared)
+    return runtime_outcome(requirement, selection, catalog.matrix, catalog.prepared)
 
 
 def toolchain(selection: Supported, matrix: Matrix, prepared: Mapping[str, str]) -> Toolchain:
@@ -151,10 +156,10 @@ def environment_input(requirement: RuntimeRequirement | str, selection: Selectio
     agent run.
 
     `fields` are the remaining `EnvironmentInput` fields (commit, source_private, source_files, policy_profile)."""
-    outcome = runtime_outcome(requirement, selection, prepared)
+    outcome = runtime_outcome(requirement, selection, matrix, prepared)
     if outcome.status != 'supported':
         return outcome
-    return EnvironmentInput(toolchains=(toolchain(selection, matrix, prepared),), **fields)
+    return EnvironmentInput(toolchains=(outcome.toolchain,), **fields)
 
 
 def check_ready(result: ReadyEnvironment, selection: Supported, prepared: Mapping[str, str]) -> None:
@@ -164,3 +169,29 @@ def check_ready(result: ReadyEnvironment, selection: Supported, prepared: Mappin
     admitted = {AGENT_FRAMEWORK.get(c.name) for c in selection.checks if c.kind == 'test_framework' and c.satisfied}
     if result.framework not in admitted:
         raise ValueError(f'framework {result.framework!r} is not one the selection admitted ({sorted(a for a in admitted if a)})')
+
+
+def recipe_sha256(result: ReadyEnvironment) -> str:
+    """Digest of what the environment agent ran to reach ready: recipe phases and commands, then the build,
+    discovery and baseline commands, as canonical JSON."""
+    recipe = {'recipe': [[step.phase, list(step.command)] for step in result.recipe],
+              'build': list(result.build_command), 'discovery': list(result.discovery_command),
+              'baseline': list(result.baseline_test_command)}
+    return sha256(json.dumps(recipe, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+
+
+def ready_evidence(result: ReadyEnvironment, declared: EnvironmentEvidence,
+                   identity: EnvironmentIdentity) -> tuple[EnvironmentEvidence, EnvironmentIdentity]:
+    """SPEC-0068: the chain's environment from an admitted ready result. Observed fields come from the result; the
+    operator's recorders, scratch location, dependency inventory, policy revision and limits stay as declared (the
+    revisions run on the operator's runners, not in the released preparation sandbox). Raises ValueError when the
+    result does not fit the evidence contracts."""
+    evidence = EnvironmentEvidence(
+        language=result.language, runtime=result.runtime, framework=result.framework,
+        discovery_command=result.discovery_command, approved_test_paths=result.approved_test_paths,
+        baseline_test=BaselineTest(test_id=result.baseline_test_id, path=result.baseline_test_path),
+        scratch_location=declared.scratch_location, observation_facilities=declared.observation_facilities,
+        witness_facilities=declared.witness_facilities)
+    observed = identity.model_copy(update={'image_digest': result.toolchain_image.rsplit('@sha256:', 1)[1],
+                                           'recipe_sha256': recipe_sha256(result)})
+    return evidence, EnvironmentIdentity.model_validate(observed.model_dump())
