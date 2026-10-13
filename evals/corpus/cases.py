@@ -150,7 +150,8 @@ def _split(case_ids: list[str]) -> set[str]:
     return set(ranked[:len(ranked) // 4])
 
 
-def load(corpus: Path = CORPUS) -> tuple[CorpusCase, ...]:
+def load(corpus: Path = CORPUS, *, split: Literal["development", "held_out"] | None = None,
+         language: Language | None = None, case_ids: set[str] | None = None) -> tuple[CorpusCase, ...]:
     """Every topic as one case, in manifest order; refuses a pair that differs in more than location."""
     manifest = load_manifest(corpus)
     if len({entry.name for entry in manifest.cases}) != len(manifest.cases):
@@ -160,9 +161,21 @@ def load(corpus: Path = CORPUS) -> tuple[CorpusCase, ...]:
         if entry.variant.name not in {"a", "b"} or entry.variant.parts[0] != entry.language:
             raise ValueError(f"{entry.name}: variant directory {entry.variant} is not <language>/<topic>/<a|b>")
         topics[entry.variant.parent].append(entry)
+    # Select from metadata before opening any source tree. Development preparation must not inspect held-out bodies.
+    held_out = set()
+    for selected_language in {topic.parts[0] for topic in topics}:
+        held_out |= _split([f"ih-{topic.parts[0]}-{topic.name}" for topic in topics
+                            if topic.parts[0] == selected_language])
+    known = {f"ih-{topic.parts[0]}-{topic.name}" for topic in topics}
+    if case_ids is not None and case_ids - known:
+        raise ValueError("unknown corpus case ids")
     drafts = []
     for topic, entries in topics.items():
         case_id = f"ih-{topic.parts[0]}-{topic.name}"
+        selected_split = "held_out" if case_id in held_out else "development"
+        if ((split is not None and split != selected_split) or (language is not None and language != topic.parts[0])
+                or (case_ids is not None and case_id not in case_ids)):
+            continue
         verdicts = sorted(entry.truth.expected_verdict for entry in entries)
         if len(entries) == 2:
             if verdicts != ["likely_not_exploitable", "potentially_exploitable"]:
@@ -178,9 +191,6 @@ def load(corpus: Path = CORPUS) -> tuple[CorpusCase, ...]:
         for entry in filter(None, (baseline, candidate)):
             _check_visible(case_id, entry.finding, snapshot(corpus / str(entry.variant)))
         drafts.append((case_id, topic, baseline, candidate))
-    held_out = set()
-    for language in {topic.parts[0] for _, topic, _, _ in drafts}:
-        held_out |= _split([case_id for case_id, topic, _, _ in drafts if topic.parts[0] == language])
     return tuple(CorpusCase(case_id, baseline.language, topic, baseline.finding, baseline, candidate,
                             "held_out" if case_id in held_out else "development")
                  for case_id, topic, baseline, candidate in drafts)

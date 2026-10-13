@@ -52,9 +52,12 @@ def _location(repository: Path) -> str:
     return path.relative_to(REPOSITORY).as_posix() if path.is_relative_to(REPOSITORY) else path.as_uri()
 
 
-def capture(case: CorpusCase, root: Path, corpus: Path = CORPUS) -> tuple[dict, dict]:
+def capture(case: CorpusCase, root: Path, corpus: Path = CORPUS, *, materialized_id: str | None = None) -> tuple[dict, dict]:
     """Write `<root>/<case id>/{repository.git, issue.json, expected.json}`; return the issue and expected records."""
-    directory = root / case.case_id
+    name = materialized_id or case.case_id
+    if not name or Path(name).name != name or name in {".", ".."}:
+        raise ValueError("materialized id must be one directory name")
+    directory = root / name
     repository = directory / "repository.git"
     directory.mkdir(parents=True, exist_ok=True)
     if not repository.exists():
