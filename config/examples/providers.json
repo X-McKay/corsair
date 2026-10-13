@@ -1,0 +1,39 @@
+{
+  "inference": {
+    "models": {
+      "local": {
+        "provider": "vllm",
+        "base_url": "https://model.example/v1",
+        "model_name": "operator-selected-local-model",
+        "api_key_env": "CORSAIR_LOCAL_MODEL_API_KEY"
+      },
+      "compatible": {
+        "provider": "openai_compatible",
+        "base_url": "https://gateway.example/v1",
+        "model_name": "operator-selected-model",
+        "api_key_env": "CORSAIR_MODEL_API_KEY",
+        "response_token_limit": 8192
+      },
+      "bedrock": {
+        "provider": "bedrock",
+        "region": "us-east-1",
+        "model_name": "operator-selected-model-or-inference-profile-id",
+        "response_token_limit": 8192
+      }
+    },
+    "default": "local",
+    "agents": {
+      "identification": "local",
+      "repository_identification": "local",
+      "environment": "local",
+      "planning": "bedrock",
+      "authoring": "compatible",
+      "assessment": "bedrock"
+    }
+  },
+  "tickets": {
+    "provider": "github",
+    "repository": "owner/repository",
+    "token_env": "CORSAIR_GITHUB_TOKEN"
+  }
+}

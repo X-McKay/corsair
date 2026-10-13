@@ -26,6 +26,10 @@ Setup and qualification are separate commands. Failed prerequisites produce erro
 
 The remaining 1A admission commands and limitations are documented in the [admission runbook](docs/runbooks/openshell-admission.md). They install prerequisites and stage the trusted runtime probe without deploying a gateway. The [gateway runbook](docs/runbooks/openshell-gateway.md) adds an explicit node-admission-gated native installation and separate 1B probes. The [policy runbook](docs/runbooks/openshell-policy.md) stages a fixed canary artifact and runs the separately qualified native 1D matrix.
 
+## Provider configuration
+
+[Configure inference per agent and GitHub/Azure ticket capture](docs/runbooks/provider-configuration.md). Named model profiles select vLLM, OpenAI-compatible Chat Completions or Bedrock independently for each agent, with an explicit optional default. Live integration qualification remains separate.
+
 ## Agreed decisions
 
 - Deploy to Kubernetes; develop and test the complete configuration locally in kind.

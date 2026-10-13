@@ -22,7 +22,7 @@ from corsair.adapters.local_artifacts import LocalArtifacts
 from corsair.adapters.openshell import OpenShellLifecycle
 from corsair.adapters.openshell_execution import OpenShellConnection, OpenShellExecution
 from corsair.adapters.openshell_workspace import CliUpload, WorkspaceConfig
-from corsair.agents.provider import LocalModelConfig
+from corsair.inference.config import load_inference
 from corsair.ports.execution import ExecutionLimits
 from corsair.ports.sandbox import LifecycleLimits
 from deploy.openshell.artifacts import TOOLS
@@ -88,7 +88,7 @@ def test_fixture_chain_in_fresh_sandbox_workspaces(kube, adapter_gateway, reques
     repetitions = int(request.config.getoption('--e2e-runs') or 1)
     provider = request.config.getoption('--provider-config')
     assert not set(live) - set(STAGES) and 0 <= repetitions <= 6, (live, repetitions)
-    config = LocalModelConfig.model_validate_json(Path(provider).read_bytes()) if live and repetitions else None
+    config = load_inference(Path(provider)) if live and repetitions else None
     profile_path = request.config.getoption('--e2e-stage-profiles')
     profiles = json.loads(Path(profile_path).read_bytes()) if profile_path and config else None
     if profiles is not None:
