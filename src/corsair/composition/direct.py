@@ -228,8 +228,10 @@ class FixtureCase:
     environment_identity: EnvironmentIdentity
     # Operator-known digest of each revision's captured source; a run from any other source is refused.
     revision_sources: dict[Literal["baseline", "candidate"], str]
-    # Operator-approved probe target and planned effect file; without it no witness is requested.
+    # Operator-approved probe target and planned effect file; without it no witness is requested unless
+    # `witness_from_recorders` lets the environment's operator witness facilities bind one (SPEC-0073).
     witness_envelope: WitnessRequest | None = None
+    witness_from_recorders: bool = False
     # The baseline revision's build files (SPEC-0060); without them the runtime is the operator's declaration.
     runtime: RuntimeInputs | None = None
     # The baseline revision's setup source (SPEC-0068); with it the environment agent prepares the environment.
@@ -592,7 +594,9 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
                     patch=patch)
     executions = []
     try:
-        request, unrequested = witness_request(identification, case.witness_envelope, plan.security.witness), ()
+        recorders = environment.witness_facilities if case.witness_from_recorders else ()
+        request, unrequested = witness_request(identification, case.witness_envelope, plan.security.witness,
+                                               recorders), ()
     except ValueError as exc:
         # No approved envelope covers the identified target: run without a witness and say so.
         request, unrequested = None, (f"no witness requested: {exc}"[:512],)

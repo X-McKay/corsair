@@ -210,6 +210,8 @@ def build(request: IssueRequest, work: Path, images: dict[str, str], *, roots: t
         issue=issue, environment=environment, environment_identity=identity,
         # The Docker workspace digests the commit it copied (DockerCase.prepare).
         revision_sources={revision: _digest(commit) for revision, commit in commits.items()},
+        # A real issue has no per-case envelope; the framework table's recorders bind the request (SPEC-0073).
+        witness_from_recorders=True,
         runtime=runtime,
         setup=SetupSource(commit=request.revision, source_private=False, policy_profile=SETUP_POLICY, source_files=setup))
     return Investigation(request, case, catalog, framework, harness, outcome.selection.image_id, image, commits, trees,
