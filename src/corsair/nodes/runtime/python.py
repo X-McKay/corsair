@@ -10,6 +10,7 @@ from corsair.nodes.runtime.versions import VersionSyntaxError, exactly, parse_ve
 
 CLASSIFIER = re.compile(r'Programming Language :: Python :: (\d+\.\d+)$')
 REQUIREMENT = re.compile(r'^\s*(pytest)\s*(?:\[[^\]]*\])?\s*([<>=!~][^;#]*)?(?:;[^#]*)?(?:#.*)?$', re.I)
+DIRECT_PYTEST = re.compile(r'^\s*pytest\s*(?:\[[^\]]*\])?\s*@', re.I)  # PEP 508 direct reference: no version range
 TOX_ENV = re.compile(r'^py(\d)(\d+)$')
 CI_KEYS = ('python-version', 'python', 'python_version', 'py', 'python-versions')
 FRAMEWORK = ('test_framework', 'pytest', 'registry')
@@ -71,6 +72,8 @@ def _classifiers(c: Collector, path: str, values):
 def _requirement_lines(c: Collector, path: str, lines, source: str):
     for line in lines:
         if (match := REQUIREMENT.match(line)): _pytest(c, path, line.strip(), match[2], source)
+        elif DIRECT_PYTEST.match(line):  # `pytest @ git+...` may resolve to any revision
+            c.unparsed(*FRAMEWORK, path, line.strip()[:120], f'pytest direct reference {line.strip()[:60]!r} names no version range')
 
 
 def detect(c: Collector) -> None:
@@ -165,9 +168,9 @@ def detect(c: Collector) -> None:
                 if CLASSIFIER.search(node.value.strip()): _classifiers(c, 'setup.py', [node.value])
                 elif (match := REQUIREMENT.match(node.value)) and match[1].lower() == 'pytest':
                     _pytest(c, 'setup.py', node.value, match[2], 'setup.py')
-    for path in sorted(files):
+    for path in sorted(files):  # every file `is_build_file` selects under requirements/, at any depth
         name = path.rsplit('/', 1)[-1]
-        if (path.count('/') == 0 and re.fullmatch(REQUIREMENTS_FILE, name)) or re.fullmatch(r'requirements/[^/]+\.(txt|in)', path):
+        if (path.count('/') == 0 and re.fullmatch(REQUIREMENTS_FILE, name)) or re.fullmatch(r'requirements/.+\.(txt|in)', path):
             _requirement_lines(c, path, (c.text(path) or '').splitlines(), 'requirements')
     if (text := c.text('tox.ini')) is not None:
         parser = configparser.ConfigParser(interpolation=None, strict=False)
