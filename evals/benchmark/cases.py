@@ -85,8 +85,8 @@ class AgentPart(_Frozen):
     issue: str = Field(min_length=1, max_length=8192)
     scope: Literal["component", "application_path"]
     repository: str = Field(pattern=r"^https://")
-    baseline: str = Field(pattern=COMMIT.pattern)
-    candidate: str = Field(pattern=COMMIT.pattern)
+    baseline: str = Field(pattern=rf"^{COMMIT.pattern}$")
+    candidate: str = Field(pattern=rf"^{COMMIT.pattern}$")
     language: str
     build_system: str
 

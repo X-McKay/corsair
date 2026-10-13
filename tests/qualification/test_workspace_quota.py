@@ -41,8 +41,7 @@ def manifests(namespace):
                                                  'resources': {'limits': {'cpu': '500m', 'memory': '256Mi'}},
                                                  'volumeMounts': [{'name': 'w', 'mountPath': '/w'}]}],
                                  'volumes': [{'name': 'w', 'persistentVolumeClaim': {'claimName': name}}]}}
-    return [{'apiVersion': 'v1', 'kind': 'Namespace', 'metadata': {'name': namespace}},
-            claim('a'), claim('b'), pod('a'), pod('b')]
+    return [claim('a'), claim('b'), pod('a'), pod('b')]
 
 
 def shell(kube, namespace, pod, script, timeout=300):
@@ -66,8 +65,12 @@ def test_quota_class_bounds_bytes_and_inodes_and_contains_exhaustion(kube):
     path.write_text(yaml.safe_dump_all(manifests(namespace)))
     image_kib = lambda: int(node(kube, 'du', '-k', '--apparent-size', '/var/corsair-workspaces.img').split()[0])
     var_used = lambda: int(node(kube, 'df', '-k', '--output=used', '/var').split()[-1])
+    uid = None
     try:
         record['before'] = dict(image_kib=image_kib(), node_var_used_kib=var_used())
+        # `create` refuses an existing name; the UID binds cleanup to the namespace this run made.
+        kube.run('create', 'namespace', namespace)
+        uid = record['namespace_uid'] = kube.get('namespace', namespace)['metadata']['uid']
         kube.run('apply', '-f', path)
         for pod in ('a', 'b'):
             kube.run('wait', '-n', namespace, '--for=condition=Ready', f'pod/{pod}', '--timeout=180s', timeout=200)
@@ -96,8 +99,17 @@ def test_quota_class_bounds_bytes_and_inodes_and_contains_exhaustion(kube):
         assert abs(record['after']['node_var_used_kib'] - record['before']['node_var_used_kib']) < NODE_DRIFT_KIB
         record['outcome'] = 'passed'
     finally:
-        cleanup = dict(namespace_deleted=kube.run('delete', 'namespace', namespace, '--ignore-not-found', '--wait=true',
-                                                  '--timeout=180s', check=False, timeout=200).returncode == 0)
+        cleanup = dict(namespace_deleted=False)
+        current = kube.run('get', 'namespace', namespace, '--ignore-not-found', '-o', 'json', check=False).stdout.strip()
+        if uid is None:
+            cleanup['refused'] = 'namespace ownership unknown; no automatic deletion'
+        elif current and json.loads(current)['metadata']['uid'] != uid:
+            cleanup['refused'] = 'namespace identity changed; replacement not deleted'
+        elif current:
+            kube.run('delete', 'namespace', namespace, '--wait=true', '--timeout=180s', check=False, timeout=200)
+        if uid is not None and 'refused' not in cleanup:
+            cleanup['namespace_deleted'] = not kube.run('get', 'namespace', namespace, '--ignore-not-found', '-o',
+                                                        'json', check=False).stdout.strip()
         deadline = time.monotonic() + 120
         while time.monotonic() < deadline:
             left = [pv['metadata']['name'] for pv in kube.get('pv')['items']

@@ -98,3 +98,15 @@ def test_report_counts_cover_the_whole_denominator():
     assert all(0 < count <= 50 for count in report["by"]["blocking"].values())
     assert report["by"]["blocking"]["G2"] == 49  # the manifest meets G2 for JSPWiki only
     assert json.loads(json.dumps(report)) == report and "| language | Java | 10 |" in markdown(report)
+
+
+@pytest.mark.parametrize("commit", ["x" + "a" * 40, "a" * 40 + "\n", "a" * 41])
+def test_commit_fields_require_exactly_forty_hex_characters(commit):
+    from pydantic import ValidationError
+    from evals.benchmark.cases import AgentPart
+    good = dict(issue="i", scope="component", repository="https://github.com/o/r", baseline="a" * 40,
+                candidate="b" * 40, language="Java", build_system="Maven")
+    AgentPart(**good)
+    for field in ("baseline", "candidate"):
+        with pytest.raises(ValidationError):
+            AgentPart(**good | {field: commit})
