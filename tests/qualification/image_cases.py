@@ -87,7 +87,13 @@ def harness(*args):
 
 
 def outcome(run, ids):
-    cases = dict(map(tuple, run.get('cases') or []))
+    """Outcome per id from run.json `cases`: rows of (test_id, outcome) or, from #89's shared harness,
+    (test_id, outcome, failure_detail). Any other shape is a harness defect, not a test result."""
+    cases = {}
+    for row in run.get('cases') or []:
+        assert isinstance(row, (list, tuple)) and len(row) in (2, 3) and all(isinstance(v, str) for v in row[:2]), \
+            f'unexpected case row {row!r}'
+        cases[row[0]] = row[1]
     return tuple(cases.get(test_id, 'missing') for test_id in ids)
 
 
