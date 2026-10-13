@@ -1,0 +1,71 @@
+# Sandbox namespace guards for SPEC-0036. The gateway overlay places sandboxes here (server.sandboxNamespace).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshell-sandboxes
+---
+# Sum of workspace requests never exceeds the backing XFS image, so no project limit is overcommitted.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: corsair-workspace
+  namespace: openshell-sandboxes
+spec:
+  hard:
+    corsair-workspace.storageclass.storage.k8s.io/requests.storage: 16Gi
+    corsair-workspace.storageclass.storage.k8s.io/persistentvolumeclaims: "2"
+    requests.storage: 16Gi
+---
+# Root-overlay backstop: eviction after the fact, not the synchronous bound.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: corsair-ephemeral-storage
+  namespace: openshell-sandboxes
+spec:
+  limits:
+    - type: Container
+      default:
+        ephemeral-storage: 256Mi
+      defaultRequest:
+        ephemeral-storage: 64Mi
+      max:
+        ephemeral-storage: 512Mi
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: corsair-workspace-guard
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["persistentvolumeclaims", "pods"]
+  validations:
+    - expression: >-
+        request.kind.kind != 'PersistentVolumeClaim' ||
+        (has(object.spec.storageClassName) && object.spec.storageClassName == 'corsair-workspace')
+      message: sandbox workspace claims must use the corsair-workspace quota class
+    - expression: >-
+        request.kind.kind != 'PersistentVolumeClaim' ||
+        quantity(object.spec.resources.requests['storage']).compareTo(quantity('8Gi')) <= 0
+      message: sandbox workspace claims may request at most 8Gi
+    - expression: >-
+        request.kind.kind != 'Pod' ||
+        object.spec.containers.all(c, has(c.resources) && has(c.resources.limits) && 'ephemeral-storage' in c.resources.limits)
+      message: sandbox containers must carry an ephemeral-storage limit
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: corsair-workspace-guard
+spec:
+  policyName: corsair-workspace-guard
+  validationActions: [Deny]
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: openshell-sandboxes
