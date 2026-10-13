@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import time
 from uuid import uuid4
@@ -120,7 +121,7 @@ def run(image, checkout, modules, commit, ids, evidence, test_file, timeout):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('phase', choices=['setup', 'run'])
-    parser.add_argument('--image', required=True, help='Prepared node8 image config id or tag')
+    parser.add_argument('--image', required=True, help='Prepared node8 image config id (sha256:<64 hex>)')
     parser.add_argument('--checkout', required=True, type=Path, help='Clean checkout of the case at one commit')
     parser.add_argument('--modules', required=True, type=Path, help='Case dependency directory filled by setup')
     parser.add_argument('--evidence', required=True, type=Path)
@@ -128,6 +129,9 @@ def main():
     parser.add_argument('--timeout', type=int, default=600, help='Seconds per runner command')
     parser.add_argument('--id', action='append', default=[], help='Control then security `path::[suite::]name`')
     args = parser.parse_args()
+    # Both phases must name the same content, so a tag that could move between them is refused.
+    if not re.fullmatch(r'sha256:[0-9a-f]{64}', args.image):
+        parser.error('--image must be an image config id (sha256:<64 hex>), not a tag')
     args.evidence.mkdir(parents=True, exist_ok=False)
     commit = subprocess.run(['git', '-C', str(args.checkout), 'rev-parse', 'HEAD'], capture_output=True, text=True,
                             check=True).stdout.strip()

@@ -20,6 +20,7 @@ Implement [SPEC-0057](../specs/SPEC-0057-jest-runner.md) on top of the Node 8 im
 - [ ] Live: the node8 gate with the runner commands on RIG0.
 - [x] Image-only real case: CVE-2020-7730 (bestzip) through `tests/qualification/node_image_case.py` at both commits.
 - [ ] Framework row `jest` with the image row; CVE-2020-15123 (codecov-node) the same way.
+- [ ] Harness: copy the checkout's HEAD blobs as #74 does for `java_image_case.py` (its `commit_tree`) once #74 merges; the image config id is already required.
 - [ ] Mocha and AVA runners; environment `jest` admission with its own eval.
 
 ## Validation and progress
