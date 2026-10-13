@@ -18,8 +18,9 @@ Implement [SPEC-0055](../specs/SPEC-0055-node8-toolchain.md): the `node8` image,
 - [x] Read the five Node 8 cases' requirements from PR #61's report and pin upstream `node:8.17.0-buster-slim` by digest.
 - [x] Fixture with Jest 24.8.0 and a lockfile written by npm 6.13.4 on Node 8.17.0; Dockerfile, `BASES`, `NODES`, trusted control, gate, guards and selection test.
 - [x] Image-only build and gate commands in the cloud container.
-- [ ] Live on RIG0 in `/home/al/git/corsair/.worktrees/claude/toolchain-node8-iqwqim`, evidence under that worktree's `.runs`: fresh cluster, `make toolchain-images TOOLCHAINS=node8`, `make toolchain-images-load TOOLCHAINS=node8`, `make qualify-toolchain TOOLCHAINS=node8`.
-- [ ] Qualification report entry (artifact, prepared config/manifest digests, run table, failed attempts), matrix row `node-8.17.0-npm` with measured versions, CURRENT.md, handoff.
+- [ ] Live (milestone gate batch, SPEC-0062 lighter path; upgrades the row to `live`): on RIG0 in `/home/al/git/corsair/.worktrees/claude/toolchain-node8-iqwqim`, evidence under that worktree's `.runs`: fresh cluster, `make toolchain-images TOOLCHAINS=node8`, `make toolchain-images-load TOOLCHAINS=node8`, `make qualify-toolchain TOOLCHAINS=node8`.
+- [x] Matrix row `node-8.17.0-npm` (Node 8.17.0, npm 6.13.4) registered as `evidence: image-only` with the `jest` framework row; image-only evidence in PLAN-0070 (#98).
+- [ ] After the live gate: qualification report entry (artifact, prepared config/manifest digests, run table, failed attempts), row upgraded to `live`, handoff.
 - [ ] Second PR: Jest runner and report parser against real Jest 24 output, then Mocha 2/5 and AVA 2.
 
 ## Validation and progress
@@ -32,4 +33,4 @@ Docker Hub returned 429 for `docker.io/library/node@sha256:c9025a77…`, so the 
 
 ## Decisions and next action
 
-`buster-slim`, Node 8.17.0 only, Jest 24.8.0 fixture, lockfile as the hash list (see SPEC-0055). Next: when the Perl 5.26 thread hands over the cluster, Al pastes the RIG0 message in this thread.
+`buster-slim`, Node 8.17.0 only, Jest 24.8.0 fixture, lockfile as the hash list (see SPEC-0055). Under the lighter path (SPEC-0062) the row landed image-only; next: the milestone gate batch runs the node8 gate and upgrades the row to `live`.

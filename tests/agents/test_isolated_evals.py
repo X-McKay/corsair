@@ -182,3 +182,8 @@ def test_adversarial_control_literals_remain_refused_inside_nested_scopes(contro
     assert facts["planned_input_in_security"]
     assert facts["planned_failure_is_assert"]
     assert not facts["planned_input_not_in_control"]
+
+
+def test_eval_command_offers_no_retired_planning_set():
+    from evals.test_planning.evaluate import RETIRED
+    assert not RETIRED & set(eval_run.SUITES["planning"].sets)

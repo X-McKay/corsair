@@ -244,6 +244,23 @@ def test_perl526_rows_select_the_fixture_and_need_the_tap_runner():
     assert select(newer, matrix).status == 'unsupported' and 'perl' in [n.name for n in select(newer, matrix).needs]
 
 
+def test_node8_rows_select_the_jest_fixture_and_only_checked_jest_versions():
+    fixture = Path(__file__).resolve().parents[2] / 'deploy/qualification/toolchains/node8'
+    # The fixture declares no Node version, so the engines field a real case carries is added.
+    files = {name: (fixture / name).read_bytes() for name in ('package.json', 'package-lock.json')}
+    files['package.json'] = files['package.json'].replace(b'"devDependencies"', b'"engines": {"node": ">=8"},\n  "devDependencies"')
+    matrix = load()
+    selection = select(detect(files, 'javascript'), matrix)
+    assert selection.status == 'supported' and selection.image_id == 'node-8.17.0-npm' and selection.evidence == 'image-only'
+    # Without the jest framework row the image alone does not run a case.
+    bare = Matrix.model_validate({**matrix.model_dump(), 'frameworks': [f for f in matrix.model_dump()['frameworks'] if f['name'] != 'jest']})
+    selection = select(detect(files, 'javascript'), bare)
+    assert selection.status == 'unsupported' and [n.name for n in selection.needs] == ['jest']
+    # Only the Jest versions the two cases ran are admitted; a Jest 25 project is not routed here.
+    newer = {**files, 'package.json': files['package.json'].replace(b'"24.8.0"', b'"25.1.0"')}
+    assert 'jest' in [n.name for n in select(detect(newer, 'javascript'), matrix).needs]
+
+
 def test_selection_carries_the_weakest_row_evidence():
     fixture = Path(__file__).resolve().parents[2] / 'deploy/qualification/toolchains/perl526/Makefile.PL'
     requirement = detect({'Makefile.PL': fixture.read_bytes()}, 'perl')
@@ -608,6 +625,24 @@ STAGED_RUBY31 = {'id': 'ruby-3.1-bundler', 'language': 'ruby',
 STAGED_MINITEST = {'name': 'minitest', 'language': 'ruby', 'versions': '==5.14.4 || ==5.15.0 || ==5.27.0',
                    'runner': 'src/corsair/adapters/minitest_runner.py', 'images': ['ruby-3.1-bundler'],
                    'qualification': {'evidence': 'image-only', 'records': ['SPEC-0063', 'PLAN-0068'], 'report': 'x'}}
+
+
+def test_ruby_selection_admits_a_minitest_ready_result():
+    # The environment agent's `minitest` ready result is admitted by a Ruby selection that admitted the Minitest row.
+    from corsair.agents.environment.contracts import ReadyEnvironment
+    from corsair.nodes.runtime.environment import check_ready
+    requirements = json.loads((Path(__file__).resolve().parents[2] / 'benchmarks/runtime-requirements.json').read_text())
+    rack = next(RuntimeRequirement.model_validate(revision['requirement']) for r in requirements['results']
+                if r['case_id'] == 'CVE-2025-27610' for revision in r['revisions'].values() if 'requirement' in revision)
+    matrix = load().model_dump()
+    selection = select(rack, Matrix.model_validate({**matrix, 'images': [*matrix['images'], STAGED_RUBY31],
+                                                    'frameworks': [*matrix['frameworks'], STAGED_MINITEST]}))
+    prepared = {'ruby-3.1-bundler': 'docker.io/library/corsair-ruby31@sha256:' + '0' * 64}
+    ready = lambda framework: ReadyEnvironment.model_construct(toolchain_id='ruby-3.1-bundler',
+                                                               toolchain_image=prepared['ruby-3.1-bundler'], framework=framework)
+    check_ready(ready('minitest'), selection, prepared)
+    with pytest.raises(ValueError, match='not one the selection admitted'):
+        check_ready(ready('tap-harness'), selection, prepared)
 
 
 def test_ruby31_rows_select_the_four_minitest_cases_and_not_the_rspec_ones():
