@@ -377,6 +377,9 @@ def test_durable_environment_stage_without_its_ports_stops_like_direct_mode(temp
                 workflow_runner=workflow_runner()), 60)
         same_routing(direct, durable)
         assert durable.reason.startswith("environment produced no output: PreparationMissing: ")
+        # Review of #103: no sandbox was ever made, so cleanup is not "unconfirmed" in either mode.
+        assert durable.attempts[0].cleanup is direct.attempts[0].cleanup is None
+        assert durable.limitations == direct.limitations
         saved = dict(await histories(client, identity, request.config.getoption("--temporal-evidence-dir")))
         names = [e.activity_task_scheduled_event_attributes.activity_type.name for e in scheduled(saved[identity])]
         assert names == ["corsair.chain.select_runtime"] + (["corsair.chain.prepare_environment"] if environment else [])

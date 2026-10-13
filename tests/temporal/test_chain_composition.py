@@ -198,3 +198,41 @@ def test_authoring_context_resolves_the_runner_on_the_worker_and_carries_message
             payload.inputs, WorkerRunner("candidate"), payload.budget))
     with pytest.raises(RuntimeError):
         WorkerRunner("development").run()
+
+
+def test_an_oversized_environment_record_gives_up_its_messages_not_its_result(tmp_path):
+    """Review of #103: model output is bounded by usage, not bytes, so the record's messages give way before the
+    activity result crosses Temporal's payload limit; the result, usage and cleanup still return."""
+    from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
+    from pydantic_ai.models.function import FunctionModel
+
+    from corsair.agents.environment.contracts import EnvironmentInput
+    from corsair.workflows.chain_runtime import (
+        ENVIRONMENT_RECORD, MAX_RECORD_BYTES, EnvironmentRequest, run_environment,
+    )
+    from tests.agents.test_chain_environment_stage import SETUP, Sandboxes, catalog, pyproject
+
+    async def verbose(messages, info):
+        draft = {"status": "unsupported", "requirement": "CI runs pytest under tox",
+                 "citations": [{"path": ".github/workflows/ci.yml", "start_line": 5, "end_line": 5}]}
+        if len(messages) == 1:
+            return ModelResponse(parts=[TextPart("x" * (MAX_RECORD_BYTES + 1)),
+                                        ToolCallPart("read_source", {"path": ".github/workflows/ci.yml"})])
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {"draft": draft})])
+
+    outcome = asyncio.run(select_runtime_with(catalog(), pyproject(">=3.10"), tmp_path))
+    inputs = EnvironmentInput(toolchains=(outcome.toolchain,), **SETUP.model_dump())
+    sandboxes = Sandboxes({})
+    configure_chain({"environment": FunctionModel(verbose)}, reviewed_runners(None, tmp_path),
+                    activity_config=ACTIVITY_CONFIG, preparation=sandboxes)
+    with models.override_allow_model_requests(False):
+        record = asyncio.run(run_environment(EnvironmentRequest(inputs, "environment", CompositionBudget())))
+    assert (record.output.status, record.cleanup, record.failure) == ("unsupported", "confirmed", None)
+    assert record.messages == () and record.messages_omitted and record.usage.requests == 2
+    assert len(ENVIRONMENT_RECORD.dump_json(record)) <= MAX_RECORD_BYTES
+
+
+async def select_runtime_with(catalog, inputs, tmp_path):
+    configure_chain({"scripted": scripted_identification()}, reviewed_runners(None, tmp_path),
+                    activity_config=ACTIVITY_CONFIG, catalog=catalog)
+    return await select_runtime(inputs)

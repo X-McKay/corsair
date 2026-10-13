@@ -243,6 +243,7 @@ class StageAttempt:
     limits: StageLimits | None = None  # None: refused before its limits were derived
     exhausted: BudgetExhausted | None = None
     cleanup: Literal["confirmed", "unconfirmed"] | None = None  # The environment stage's sandbox; None elsewhere
+    messages_omitted: bool = False  # Durable environment stage: its record would not fit the activity payload
 
     @property
     def tool_cap_reached(self) -> bool:
@@ -380,6 +381,7 @@ UNOBSERVED = ("The witness probe runs inside the test interpreter: it is operato
               "Environment identity is the operator's declaration for both revisions, not an observed image or "
               "dependency digest.")
 UNSELECTED = "Runtime not selected from build files: the runtime is the operator's declaration."
+MESSAGES_OMITTED = "environment stage messages omitted: the encoded stage record exceeded its payload bound"
 OBSERVED_IDENTITY = ("Environment image and recipe observed by the environment stage; scratch location, dependency "
                      "inventory, policy revision and limits are the operator's declaration.",
                      "Revisions run on the operator's runners, not in the environment stage's prepared sandbox.")
@@ -489,7 +491,8 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         except ValueError as exc:
             return stop("environment", f"environment input refused: {exc}"[:2048])
         result = await _stage("environment", environment_input)
-        unconfirmed = ("environment sandbox cleanup unconfirmed",) if attempts[-1].cleanup == "unconfirmed" else ()
+        unconfirmed = ((("environment sandbox cleanup unconfirmed",) if attempts[-1].cleanup == "unconfirmed" else ())
+                       + ((MESSAGES_OMITTED,) if attempts[-1].messages_omitted else ()))
         if not isinstance(result, (ReadyEnvironment, BlockedEnvironment, UnsupportedEnvironment)):
             return stop("environment", failure_of("environment"), limitations=unconfirmed)
         prepared = result
