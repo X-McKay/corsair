@@ -136,7 +136,8 @@ def result_record(run: DirectRun) -> dict:
                    "native_exit": (e.observed.execution.receipt.native_exit
                                    if e.observed and e.observed.execution and e.observed.execution.receipt else None)}
                   for e in run.executions]
-    return {"stopped_at": run.stopped_at, "reason": run.reason, "identification": _dump(run.identification),
+    return {"stopped_at": run.stopped_at, "reason": run.reason, "runtime": _dump(run.runtime),
+            "identification": _dump(run.identification),
             "plan": _dump(run.plan), "patch": _dump(run.patch), "observation_plan": _dump(run.observation_plan),
             "executions": executions, "gate": _dump(run.gate), "assessment": _dump(run.assessment),
             "witnesses": [{"witness": _dump(w.witness), "sandbox_events": None if w.sandbox_events is None else

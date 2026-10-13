@@ -1,6 +1,6 @@
 # Early stops and setup blockers
 
-A stop means this attempt cannot establish the requested result. It is not evidence that an application issue is absent or fixed. Start with the diagnostic code, its certainty, owner and evidence reference. `Blocker.render()` provides a plain-text view; the typed object is available in `RuntimeStop.diagnostic`, `SetupRun.diagnostic` and final `BlockedEnvironment.diagnostics`. The run's command, operation ID, hashes and native stdout/stderr remain in the private setup ledger and execution receipt. Use `read_output(run_id, stream, offset)` for a focused output window; do not publish raw private logs or credential-bearing command URLs.
+A stop means this attempt cannot establish the requested result. It is not evidence that an application issue is absent or fixed. Start with the diagnostic code, its certainty, owner and evidence reference. `Blocker.render()` provides a plain-text view; the typed object is available in `RuntimeOutcome.diagnostic`, `SetupRun.diagnostic` and final `BlockedEnvironment.diagnostics`. The run's command, operation ID, hashes and native stdout/stderr remain in the private setup ledger and execution receipt. Use `read_output(run_id, stream, offset)` for a focused output window; do not publish raw private logs or credential-bearing command URLs.
 
 ## Implemented stop points
 
