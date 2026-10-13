@@ -22,7 +22,7 @@ test-config:
 	uv run --locked python -m pytest tests/configuration tests/unit tests/agents tests/temporal/test_fixture_contracts.py tests/temporal/test_issue_analysis_composition.py tests/temporal/test_chain_composition.py
 
 # One agent's isolated eval suite on the host (SPEC-0044); results under .runs/evals/<agent>/.
-# AGENT=identification|planning|authoring|assessment|chain; optional SET, PROVIDER_CONFIG, REPEAT, NOTE.
+# AGENT=identification|planning|authoring|environment|assessment|chain; optional SET, PROVIDER_CONFIG, REPEAT, NOTE.
 eval:
 	uv run --locked python -m evals.run "$(AGENT)" $(if $(SET),--set "$(SET)") $(if $(PROVIDER_CONFIG),--provider-config "$(PROVIDER_CONFIG)") $(if $(REPEAT),--repeat "$(REPEAT)") $(if $(NOTE),--note "$(NOTE)")
 
