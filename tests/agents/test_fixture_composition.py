@@ -374,6 +374,22 @@ def test_an_absence_the_control_does_not_calibrate_stays_inconclusive(store, tmp
     assert any("baseline witness not admitted: absence not calibrated" in limitation for limitation in run.limitations)
 
 
+def test_a_report_the_baseline_never_acts_on_is_not_reproduced_through_calibration(store, tmp_path):
+    """The contained variant returns without opening the outside file: no exception, only a calibrated absence."""
+    case = "not-exploitable-absent"
+    (tmp_path / "work").mkdir()
+    models = stages(identification=scripted_identification(case), planning=scripted_planning(case=case),
+                    authoring=scripted_authoring(case),
+                    assessment=scripted_assessment(finding="not_reproduced", fix="not_verified"))
+    run = asyncio.run(run_direct(fixture_case(case), models, reviewed_runners(store, tmp_path / "work", case)))
+    assert run.observation_plan.expected_safe_behavior == "no_file_open"
+    for found in run.witnesses:
+        assert (found.witness.path_reached, found.witness.effect, found.witness.safe_behavior) == (
+            True, "absent", "no_file_open")
+    assert run.gate.permitted == Disposition(execution="completed", finding="not_reproduced", fix="not_verified")
+    assert run.assessment.admission.admitted
+
+
 def test_stage_limits_are_derived_from_each_stage_input_and_recorded(store, tmp_path):
     run = compose(store, tmp_path)
     limits = {a.stage: a.limits for a in run.attempts}

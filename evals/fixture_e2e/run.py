@@ -98,8 +98,9 @@ def scripted_for(case: str, discovery: tuple[str, ...]) -> dict:
     """The scripted stage models for a fixture case; the not-exploitable case's assessor proposes the triple its
     gates permit (the security test passes on both confined revisions), so a scripted control shows it admitted."""
     models = SCRIPTED | {"identification": lambda: scripted_identification(case),
-                         "planning": lambda: scripted_planning(discovery, case)}
-    if case == "not-exploitable":
+                         "planning": lambda: scripted_planning(discovery, case),
+                         "authoring": lambda: scripted_authoring(case)}
+    if case != "exploitable":
         models["assessment"] = lambda: scripted_assessment(finding="not_reproduced", fix="not_verified")
     return models
 
@@ -163,7 +164,8 @@ def main():
     parser.add_argument("--timeout", type=int, default=120, help="With --sandbox docker: seconds per container command")
     parser.add_argument("--case", choices=tuple(CASES), default="exploitable",
                         help="exploitable: the reported traversal exists at the baseline and the candidate fixes it; "
-                             "not-exploitable: the same report, but every revision is the confined source")
+                             "not-exploitable: the same report, but every revision rejects the path with ValueError; "
+                             "not-exploitable-absent: every revision returns an empty result without opening the file")
     args = parser.parse_args()
     live = tuple(stage for stage in args.live.split(",") if stage)
     if set(live) - set(STAGES) or (live and args.provider_config is None):

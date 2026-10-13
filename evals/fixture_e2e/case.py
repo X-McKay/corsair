@@ -33,10 +33,19 @@ BASELINE_TEST = ('from pathlib import Path\n\nimport documents\n\n\ndef test_rea
                  '    (tmp_path / "note.txt").write_text("hello")\n'
                  '    assert documents.read_document(tmp_path, "note.txt") == "hello"\n')
 # Where each purpose's fresh workspace comes from, per fixture case; never visible to an agent. In the
-# not-exploitable case the issue reports the same traversal, but every revision is the confined source.
+# not-exploitable cases the issue reports the same traversal, but every revision is safe source: `fixed` rejects
+# the path with ValueError, `contained` returns an empty result without opening it (the SPEC-0040 absence route).
 CASES = {"exploitable": {"development": "vulnerable", "baseline": "vulnerable", "candidate": "fixed"},
-         "not-exploitable": {"development": "fixed", "baseline": "fixed", "candidate": "fixed"}}
+         "not-exploitable": {"development": "fixed", "baseline": "fixed", "candidate": "fixed"},
+         "not-exploitable-absent": {"development": "contained", "baseline": "contained", "candidate": "contained"}}
 VARIANTS = CASES["exploitable"]
+# The reviewed test each case's scripted author writes and the reviewed workspace admits, with the line numbers
+# of its security assertions; `contained` raises nothing, so its test asserts only that the outside content is never returned, and the operator witness records the opens.
+REVIEWED = {"not-exploitable-absent": (FIXTURE / "contained" / REVIEWED_TEST, [27])}
+
+
+def reviewed_test(case: str = "exploitable") -> tuple[Path, list[int]]:
+    return REVIEWED.get(case, (FIXTURE / REVIEWED_TEST, SECURITY_ASSERTION_LINES))
 
 
 def _digest(value: str | bytes) -> str:
@@ -76,7 +85,8 @@ def reviewed_runners(store, root: Path, case: str = "exploitable"):
     """A fresh private workspace per purpose; only the reviewed test bytes are admitted for execution."""
     def runner(purpose):
         workspace = root / purpose
-        return harness("pytest").runner(ReviewedWorkspace(store, workspace, CASES[case][purpose]), ReviewedLocalExecution(workspace),
+        return harness("pytest").runner(ReviewedWorkspace(store, workspace, CASES[case][purpose], reviewed_test(case)[0]),
+                                        ReviewedLocalExecution(workspace),
                             store, PytestRunnerConfig(PREFIX, ".corsair-junit.xml", str(workspace),
                                                       witness_record_path=".corsair-witness.json"))
     return runner
@@ -113,9 +123,15 @@ def reference_plan(discovery: tuple[str, ...] = DISCOVER, case: str = "exploitab
 
     def span(references):
         return [r | {"end_line": end} if r["path"] == "documents.py" else r for r in references]
-    return plan | {"discovery_command": list(discovery), "citations": span(plan["citations"]),
+    plan = plan | {"discovery_command": list(discovery), "citations": span(plan["citations"]),
                    **{test: plan[test] | {"source_references": span(plan[test]["source_references"])}
                       for test in ("control", "security")}}
+    if case in REVIEWED:
+        # Safe by absence: the planned safe behavior is that the outside file is never opened, however the call ends.
+        plan["security"] = plan["security"] | {"required_behavior": (
+            "The call never opens the outside file and never returns its content, however it ends")}
+        plan["security_expectation"] = plan["security_expectation"] | {"safe_behavior": "no_file_open"}
+    return plan
 
 
 def scripted_planning(discovery: tuple[str, ...] = DISCOVER, case: str = "exploitable") -> FunctionModel:
@@ -127,9 +143,10 @@ def scripted_planning(discovery: tuple[str, ...] = DISCOVER, case: str = "exploi
 SECURITY_ASSERTION_LINES = [64, 65, 66]
 
 
-def scripted_authoring() -> FunctionModel:
-    """Writes the reviewed SPEC-0018 bytes, runs them once, and returns the patch draft."""
-    reviewed = (FIXTURE / REVIEWED_TEST).read_text()
+def scripted_authoring(case: str = "exploitable") -> FunctionModel:
+    """Writes the case's reviewed test bytes, runs them once, and returns the patch draft."""
+    path, lines = reviewed_test(case)
+    reviewed = path.read_text()
     steps = [ToolCallPart("read_source", {"path": "documents.py"}), ToolCallPart("read_source", {"path": "test_existing.py"}),
              ToolCallPart("write_test_file", {"path": REVIEWED_TEST, "content": reviewed}), ToolCallPart("run_tests", {})]
 
@@ -139,7 +156,7 @@ def scripted_authoring() -> FunctionModel:
             step = steps[done]
             return ModelResponse(parts=[ToolCallPart(step.tool_name, step.args, tool_call_id=f"author-{done}")])
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {"result": {
-            "status": "patch", "security_assertion_lines": SECURITY_ASSERTION_LINES,
+            "status": "patch", "security_assertion_lines": lines,
             "limitations": ["Development runs observe discovery and the control only"]}})])
     return FunctionModel(respond)
 
