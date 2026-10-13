@@ -1,15 +1,23 @@
 """Shared native test runner orchestration: one fresh workspace, framework stages, release always runs.
 
-Framework adapters (pytest, Maven Surefire) supply id validation and the discovery/execution stages;
-this base owns workspace lifecycle, receipt completeness and never retries a command.
+Every framework (pytest, Maven Surefire, Perl TAP, ...) is a small adapter over this base. The adapter
+supplies its id grammar (`_validate`), its listing command and reader, its run command and its report
+reader; the base owns the workspace lifecycle, receipt completeness, the exact-listing check, report
+storage, exit agreement, claims and the absent-witness answer, and never retries a command.
 """
-from typing import Literal
-from uuid import UUID
+from typing import Callable, Literal
+from uuid import UUID, uuid5
 
-from corsair.ports.artifacts import ArtifactStore
+from corsair.ports.artifacts import ArtifactRef, ArtifactStore
 from corsair.ports.execution import ExecutionReceipt, SandboxExecution
 from corsair.ports.sandbox import SandboxHandle
-from corsair.ports.test_runner import ApprovedPatch, NativeTestRun, TestWorkspace, WitnessRequest
+from corsair.ports.test_runner import (MAX_TEST_ID, ApprovedPatch, Discovery, Execution, NativeTestRun,
+                                       PreparedWorkspace, TestCaseResult, TestWorkspace, WitnessCapture, WitnessRequest)
+from corsair.reports.admission import failed_count
+from corsair.reports.test_observations import AdmittedTestClaims, TestClaim, WorkloadTestReport
+
+# Framework outcome to workload claim: an error (the test could not complete) is a failed claim.
+CLAIM = {'passed': 'passed', 'failed': 'failed', 'error': 'failed', 'skipped': 'skipped'}
 
 
 def error_text(error: BaseException) -> str:
@@ -27,8 +35,55 @@ def incomplete(receipt: ExecutionReceipt, operation: UUID, handle: SandboxHandle
     return None
 
 
+def check_command(command: tuple[str, ...], minimum: int = 1,
+                  message: str = 'Runner command must be nonempty string tokens') -> None:
+    if (type(command) is not tuple or len(command) < minimum
+            or any(type(t) is not str or not t or '\0' in t for t in command)):
+        raise ValueError(message)
+
+
+def check_root(workspace_root: str) -> None:
+    if type(workspace_root) is not str or not workspace_root.startswith('/') or '\0' in workspace_root:
+        raise ValueError('Workspace root must be an absolute operator path')
+
+
+def check_bounds(max_report_bytes: int, max_excerpt_chars: int, report_limit: int) -> None:
+    if not (type(max_report_bytes) is int and 1 <= max_report_bytes <= report_limit
+            and type(max_excerpt_chars) is int and 1 <= max_excerpt_chars <= 65536):
+        raise ValueError('Runner bounds outside the admitted range')
+
+
+def check_ids(patch: ApprovedPatch, ids: tuple[str, str], witness: WitnessRequest | None, parse, grammar: str, *,
+              unit, together: str, file=lambda item: item.path) -> list:
+    """The id rule every listed-discovery framework shares, checked before any workspace exists: a typed witness
+    request, two distinct ids in the framework's grammar, each naming a file the patch itself carries, both in
+    one report unit (file or class) so exactly one report is admitted, and no patch path that reads as an option.
+    Returns the parsed ids."""
+    if witness is not None and not isinstance(witness, WitnessRequest):
+        raise ValueError('Witness capture needs a typed request')
+    try:
+        parsed = [parse(i) for i in ids]
+    except ValueError as error:
+        raise ValueError(f'Two distinct {grammar} ids are required') from error
+    paths = {item.path for item in patch.files}
+    if len(set(ids)) != 2 or any(len(i) > MAX_TEST_ID or file(item) not in paths for i, item in zip(ids, parsed)):
+        raise ValueError('Two distinct test ids declared in patch files are required')
+    if len({unit(item) for item in parsed}) != 1:
+        raise ValueError(together)
+    if any(path[0] == '-' for path in paths):
+        raise ValueError('Patch paths conflict with runner arguments')
+    return parsed
+
+
 class NativeRunner:
-    """Subclasses implement `_validate` (refuse before any workspace exists) and `_stages`."""
+    """Subclasses implement `_validate` (refuse before any workspace exists) and `_stages`.
+
+    `exact_discovery`, when set, is the refusal for a discovery command other than the operator's own
+    prefix: for frameworks whose runner builds the listing itself, any other command could run tests.
+    `tool` and `report_format` name the framework in the exit-agreement refusal.
+    """
+    exact_discovery: str | None = None
+    tool, report_format = 'runner', 'report'
 
     def __init__(self, workspace: TestWorkspace, execution: SandboxExecution, store: ArtifactStore, config):
         self._workspace, self._execution, self._store, self._config = workspace, execution, store, config
@@ -42,6 +97,8 @@ class NativeRunner:
     def run(self, patch: ApprovedPatch, *, control_test_id: str, security_test_id: str,
             discovery_command: tuple[str, ...], operation: UUID,
             witness: WitnessRequest | None = None) -> NativeTestRun:
+        if self.exact_discovery is not None and discovery_command != self._config.command:
+            raise ValueError(self.exact_discovery)
         if not isinstance(operation, UUID) or not isinstance(patch, ApprovedPatch):
             raise ValueError('Operator operation and approved patch required')
         ids = (control_test_id, security_test_id)
@@ -87,3 +144,56 @@ class NativeRunner:
         limit = self._config.max_excerpt_chars
         return (f'exit={receipt.native_exit}\nstdout:\n{receipt.stdout[:limit*4].decode("utf-8", "replace")[:limit]}'
                 f'\nstderr:\n{receipt.stderr[:limit*4].decode("utf-8", "replace")[:limit]}')
+
+    def _discover(self, handle: SandboxHandle, command: tuple[str, ...], ids: tuple[str, str], operation: UUID,
+                  read: Callable[[bytes], tuple[str, ...] | None]):
+        """Run the listing once; the run continues only when it lists exactly the two ids. Returns
+        (discovery, stage result to return on failure or None)."""
+        receipt, problem = self._execute(handle, command, uuid5(operation, 'discovery'))
+        if problem:
+            discovery = Discovery('execution_failure', (), self._excerpt(receipt), command, receipt)
+            return discovery, (discovery, None, 'discovery', f'discovery: {problem}', None)
+        found = read(receipt.stdout)
+        if receipt.native_exit != 0 or found is None or len(found) != len(set(found)) or set(found) != set(ids):
+            discovery = Discovery('collection_error', found or (), self._excerpt(receipt), command, receipt)
+            return discovery, (discovery, None, 'discovery',
+                               f'discovery: exit {receipt.native_exit}, found {list(found or ())}', None)
+        return Discovery('discovered', found, '', command, receipt), None
+
+    def _store_report(self, data: bytes) -> tuple[ArtifactRef | None, str | None]:
+        """Retain the report bytes before admitting them; only retention can fail here."""
+        try:
+            return self._store.put(data), None
+        except Exception as error:
+            return None, error_text(error)
+
+    @staticmethod
+    def _failure(argv, receipt, layer, detail, report=None, status='execution_failure'):
+        return Execution(status, (), report, None, detail, argv, receipt), layer
+
+    @staticmethod
+    def _exit_agrees(native_exit: int, cases: tuple[TestCaseResult, ...]) -> bool:
+        """Default rule: exit 1 exactly when a test failed or errored, else 0."""
+        return native_exit == int(failed_count(cases) > 0)
+
+    def _completed(self, prepared: PreparedWorkspace, argv: tuple[str, ...], receipt: ExecutionReceipt,
+                   cases: tuple[TestCaseResult, ...], report: ArtifactRef, operation: UUID):
+        """Admitted outcomes become the control and security claims of this workspace, but only when the
+        native exit status agrees with them; every runner passes through here, so none can skip the check."""
+        if not self._exit_agrees(receipt.native_exit, cases):
+            return self._failure(argv, receipt, 'report', f'report: {self.tool} exit {receipt.native_exit} '
+                                 f'conflicts with {self.report_format} outcomes', report, 'invalid_report')
+        control, security = (TestClaim(test_id=case.test_id, outcome=CLAIM[case.outcome]) for case in cases)
+        claims_report = WorkloadTestReport(schema_version='test-observations-v1', operation=str(operation),
+                                           source_sha256=prepared.source.sha256, tests_sha256=prepared.tests.sha256,
+                                           control=control, security=security)
+        claims = AdmittedTestClaims(str(operation), prepared.handle, prepared.source, prepared.tests, report,
+                                    receipt.native_exit, claims_report)
+        return Execution('completed', cases, report, claims, '', argv, receipt), None
+
+    @staticmethod
+    def _no_witness(witness: WitnessRequest | None, operation: UUID, detail: str) -> WitnessCapture | None:
+        """A framework without an operator probe runs nothing for a witness, so the gates see it absent."""
+        if witness is None:
+            return None
+        return WitnessCapture('unavailable', witness, str(uuid5(operation, 'witness-nonce')), '', b'', None, detail, None)
