@@ -139,10 +139,16 @@ class Answers:
         assert str(path) in self.good['network'], 'refused'
 
 
-def orchestrate(tmp_path, monkeypatch, answers, fail=None, case=None, prepared=False, retained_gateway=False, admission=None):
+def orchestrate(tmp_path, monkeypatch, answers, fail=None, case=None, prepared=False, retained_gateway=False, admission=None, receipt=None):
     monkeypatch.setattr(qualify_image, 'QUALIFY', tmp_path / 'qualify')
     monkeypatch.setattr(qualify_image, 'GATEWAY_STATE', tmp_path / 'openshell')
-    monkeypatch.setattr(qualify_image, 'image_cache_state', lambda toolchain: 'prepared' if prepared else 'absent')
+    if receipt is None:
+        monkeypatch.setattr(qualify_image, 'image_cache_state', lambda toolchain: 'prepared' if prepared else 'absent')
+    else:
+        # A retained cache with this build.json text, read by the real image_cache_state.
+        monkeypatch.setattr(qualify_image, 'TOOLCHAIN_CACHE', tmp_path / 'toolchains')
+        (tmp_path / 'toolchains' / 'java8').mkdir(parents=True)
+        (tmp_path / 'toolchains' / 'java8' / 'build.json').write_bytes(receipt)
     if retained_gateway:
         (tmp_path / 'openshell').mkdir()
     calls = []
@@ -189,6 +195,16 @@ def test_qualify_image_refuses_retained_state_instead_of_adopting_it(tmp_path, m
     run, stop, calls = orchestrate(tmp_path, monkeypatch, Answers(), retained_gateway=True)
     assert stop.step == 'gateway' and 'openshell-install' not in [t for t, _ in calls]
     assert 'qualify-gateway' in run.steps['gateway']['detail']
+
+
+@pytest.mark.parametrize('receipt', [b'{', b'[]', b'null', b'\xff'])
+def test_qualify_image_refuses_an_unreadable_retained_receipt_with_a_summary(tmp_path, monkeypatch, receipt):
+    run, stop, calls = orchestrate(tmp_path, monkeypatch, Answers(), receipt=receipt)
+    assert stop.step == 'image-build' and [t for t, _ in calls][-1] == 'qualify-network'
+    assert 'inspect and archive' in run.steps['image-build']['detail']
+    assert (tmp_path / 'toolchains' / 'java8' / 'build.json').exists()
+    summary = json.loads((run.root / 'summary.json').read_text())
+    assert summary['failed_step'] == 'image-build' and (run.root / 'SUMMARY.md').is_file()
 
 
 def test_qualify_image_refused_earlier_evidence_is_recorded_and_rerun(tmp_path, monkeypatch):
