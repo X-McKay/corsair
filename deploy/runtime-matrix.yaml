@@ -99,11 +99,20 @@ images:
       records: [SPEC-0058, PLAN-0063]
       report: docs/development/plans/PLAN-0063-ruby31-toolchain.md
       note: Ruby 3.1.7, Bundler 2.3.27 and bundled Minitest 5.15.0 measured in the image with no network; gate body, including the Minitest runner's argv, under plain Docker. Kind/OpenShell gate not yet run.
+# Each framework row may carry `smoke` (SPEC-0071): one trivially passing test in that framework, written beside the
+# captured commit at preparation time and used as the environment baseline only when the project has no test that
+# runs. Rows with the same name carry the same template. Never part of an image.
 frameworks:
   - name: pytest
     language: python
     versions: 9.0.*
     runner: src/corsair/adapters/pytest_runner.py
+    smoke:
+      path: tests/test_corsair_smoke.py
+      test_id: 'tests/test_corsair_smoke.py::test_environment_runs'
+      content: |
+        def test_environment_runs():
+            assert True
     images: [cpython-3.12-pytest]
     qualification:
       evidence: live
@@ -114,6 +123,12 @@ frameworks:
     language: python
     versions: ==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4
     runner: src/corsair/adapters/pytest_runner.py
+    smoke:
+      path: tests/test_corsair_smoke.py
+      test_id: 'tests/test_corsair_smoke.py::test_environment_runs'
+      content: |
+        def test_environment_runs():
+            assert True
     images: [cpython-3.7-pytest]
     qualification:
       evidence: live
@@ -124,6 +139,20 @@ frameworks:
     language: java
     versions: ==4.13.2 || ==4.12
     runner: src/corsair/adapters/maven_runner.py
+    smoke:
+      path: src/test/java/CorsairSmokeTest.java
+      test_id: 'CorsairSmokeTest#environmentRuns'
+      content: |
+        import org.junit.Test;
+
+        import static org.junit.Assert.assertTrue;
+
+        public class CorsairSmokeTest {
+            @Test
+            public void environmentRuns() {
+                assertTrue(true);
+            }
+        }
     images: [temurin-8-maven]
     qualification:
       evidence: image-only
@@ -134,6 +163,20 @@ frameworks:
     language: java
     versions: ==5.14.4
     runner: src/corsair/adapters/maven_runner.py
+    smoke:
+      path: src/test/java/CorsairSmokeTest.java
+      test_id: 'CorsairSmokeTest#environmentRuns'
+      content: |
+        import org.junit.jupiter.api.Test;
+
+        import static org.junit.jupiter.api.Assertions.assertTrue;
+
+        public class CorsairSmokeTest {
+            @Test
+            public void environmentRuns() {
+                assertTrue(true);
+            }
+        }
     images: [temurin-17-maven]
     qualification:
       evidence: live
@@ -144,6 +187,15 @@ frameworks:
     language: perl
     versions: ==1.302073
     runner: src/corsair/adapters/tap_runner.py
+    smoke:
+      path: t/corsair_smoke.t
+      test_id: 't/corsair_smoke.t'
+      content: |
+        use strict;
+        use warnings;
+        use Test::More tests => 1;
+
+        ok(1, 'environment runs');
     images: [perl-5.26-make]
     qualification:
       evidence: image-only
@@ -154,6 +206,13 @@ frameworks:
     language: javascript
     versions: ==24.8.0 || ==24.9.0
     runner: src/corsair/adapters/jest_runner.py
+    smoke:
+      path: __tests__/corsair_smoke.test.js
+      test_id: '__tests__/corsair_smoke.test.js'
+      content: |
+        test('environment runs', () => {
+          expect(true).toBe(true);
+        });
     images: [node-8.17.0-npm]
     qualification:
       evidence: image-only
@@ -164,9 +223,79 @@ frameworks:
     language: ruby
     versions: ==5.14.4 || ==5.15.0 || ==5.27.0
     runner: src/corsair/adapters/minitest_runner.py
+    smoke:
+      path: test/corsair_smoke_test.rb
+      test_id: 'test/corsair_smoke_test.rb'
+      content: |
+        require 'minitest/autorun'
+
+        class CorsairSmokeTest < Minitest::Test
+          def test_environment_runs
+            assert true
+          end
+        end
     images: [ruby-3.1-bundler]
     qualification:
       evidence: image-only
       records: [SPEC-0063, PLAN-0068]
       report: docs/development/plans/PLAN-0068-minitest-runner.md
       note: Runner scripts checked against captured Minitest 5.14.4, 5.15.0 and 5.27.0 output from the image; CVE-2025-27610 (rack, Minitest 5.27.0 resolved) through the runner under plain Docker, security test fails at 2db5cfb and passes at 50caab7.
+# SPEC-0069 inference rows: the runtime versions a test framework release supports, copied from that release's own
+# published metadata. Used only when a project's build files declare no runtime version; the selection then takes the
+# newest qualified image inside the range and records `runtime_basis: inferred` with these rows. Add a row only from
+# the release metadata it cites, never from what a project is assumed to need.
+inference:
+  - framework: pytest
+    language: python
+    versions: 9.0.*
+    runtime: cpython
+    supports: '>=3.10'
+    source: PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13)
+  - framework: pytest
+    language: python
+    versions: ==7.2.0 || ==7.4.4
+    runtime: cpython
+    supports: '>=3.7'
+    source: PyPI requires-python of pytest 7.2.0 and 7.4.4 (checked 2026-10-13)
+  - framework: pytest
+    language: python
+    versions: ==6.2.5 || ==7.0.1
+    runtime: cpython
+    supports: '>=3.6'
+    source: PyPI requires-python of pytest 6.2.5 and 7.0.1 (checked 2026-10-13)
+  - framework: pytest
+    language: python
+    versions: ==6.0.2
+    runtime: cpython
+    supports: '>=3.5'
+    source: PyPI requires-python of pytest 6.0.2 (checked 2026-10-13)
+  - framework: jest
+    language: javascript
+    versions: ==24.8.0 || ==24.9.0
+    runtime: node
+    supports: '>=6'
+    source: npm engines.node of jest 24.8.0 and 24.9.0 (checked 2026-10-13)
+  - framework: jest
+    language: javascript
+    versions: 29.*
+    runtime: node
+    supports: '>=14.15,<15 || >=16.10,<17 || >=18'
+    source: npm engines.node of jest 29.0.0 and 29.7.0, ^14.15.0 || ^16.10.0 || >=18.0.0 (checked 2026-10-13)
+  - framework: tap-harness
+    language: perl
+    versions: ==1.302073
+    runtime: perl
+    supports: '>=5.8.1'
+    source: MIN_PERL_VERSION 5.008001 in Test-More/test-more v1.302073 Makefile.PL (checked 2026-10-13)
+  - framework: minitest
+    language: ruby
+    versions: ==5.14.4 || ==5.15.0
+    runtime: ruby
+    supports: '>=2.2,<4.0'
+    source: rubygems.org required_ruby_version of minitest 5.14.4 and 5.15.0, >= 2.2, < 4.0 (checked 2026-10-13)
+  - framework: minitest
+    language: ruby
+    versions: ==5.27.0
+    runtime: ruby
+    supports: '>=3.1'
+    source: rubygems.org required_ruby_version of minitest 5.27.0, >= 3.1 (checked 2026-10-13)

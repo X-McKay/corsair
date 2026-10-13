@@ -2,10 +2,11 @@
  "schema_version": 1,
  "spec": "SPEC-0042",
  "inputs": {
-  "detector": "sha256:d127b9690a8dc471306f27bfa6b24157b4ace17cd2996989bd5d85ea72df3313",
-  "matrix": "sha256:cc26c8a2f1b18793493124594f7b9e2b4eb3322e45aa8d6ffbcda065f980de3f",
+  "detector": "sha256:4c8ef1f661bcaff87c65b11fc1f8ab87ff4ff7fc25d9c4033f789b494a74cca0",
+  "matrix": "sha256:43e05927ee8c0d68cf3c05cb84b403ccef54b06020b331fd3b27045e1581370f",
   "pins": "sha256:ea068e2eec63dacc43b4858c39c656891e49248ea6fbc17db1845bb9a0b9bff1",
   "inventory": "sha256:c534cf5619a2f6ba55a35697b0a54d9d0680e54a8ce340db664d3b071c20ab87",
+  "corpus": "sha256:0d21afaa5ef667a4237935fe3475ffc0966d8194941a99bd5a7b07fcf5b8ebed",
   "parents": {
    "org.apache.commons:commons-parent:42": "sha256:cd313494c670b483ec256972af1698b330e598f807002354eb765479f604b09c",
    "org.apache.struts:struts-master:10": "sha256:4dc1ba58664d7da95b2562661dcb091dedaa431967e508dc35a92c7721fe3e26",
@@ -166,12 +167,6 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "runtime",
-       "name": "jdk",
-       "allowed": "8.*",
-       "preferred": "8"
-      },
-      {
        "kind": "test_framework",
        "name": "junit4",
        "allowed": "4.11.*",
@@ -194,6 +189,18 @@
          "name": "junit4",
          "allowed": "4.11.*",
          "provided": null,
+         "satisfied": false
+        }
+       ]
+      },
+      {
+       "image_id": "temurin-8-maven",
+       "unmet": [
+        {
+         "kind": "test_framework",
+         "name": "junit4",
+         "allowed": "4.11.*",
+         "provided": "==4.13.2 || ==4.12",
          "satisfied": false
         }
        ]
@@ -337,12 +344,6 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "runtime",
-       "name": "jdk",
-       "allowed": "8.*",
-       "preferred": "8"
-      },
-      {
        "kind": "test_framework",
        "name": "junit4",
        "allowed": "4.11.*",
@@ -365,6 +366,18 @@
          "name": "junit4",
          "allowed": "4.11.*",
          "provided": null,
+         "satisfied": false
+        }
+       ]
+      },
+      {
+       "image_id": "temurin-8-maven",
+       "unmet": [
+        {
+         "kind": "test_framework",
+         "name": "junit4",
+         "allowed": "4.11.*",
+         "provided": "==4.13.2 || ==4.12",
          "satisfied": false
         }
        ]
@@ -528,18 +541,6 @@
        "name": "maven",
        "allowed": "3.5.0.*",
        "preferred": "3.5.0"
-      },
-      {
-       "kind": "runtime",
-       "name": "jdk",
-       "allowed": "7.* || 8.* || 9.*",
-       "preferred": "9"
-      },
-      {
-       "kind": "test_framework",
-       "name": "junit4",
-       "allowed": "4.12.*",
-       "preferred": "4.12"
       }
      ],
      "rejected": [
@@ -565,6 +566,18 @@
          "name": "junit4",
          "allowed": "4.12.*",
          "provided": null,
+         "satisfied": false
+        }
+       ]
+      },
+      {
+       "image_id": "temurin-8-maven",
+       "unmet": [
+        {
+         "kind": "build_tool",
+         "name": "maven",
+         "allowed": "3.5.0.*",
+         "provided": "3.10.0",
          "satisfied": false
         }
        ]
@@ -720,18 +733,6 @@
        "name": "maven",
        "allowed": "3.5.0.*",
        "preferred": "3.5.0"
-      },
-      {
-       "kind": "runtime",
-       "name": "jdk",
-       "allowed": "7.* || 8.* || 9.*",
-       "preferred": "9"
-      },
-      {
-       "kind": "test_framework",
-       "name": "junit4",
-       "allowed": "4.12.*",
-       "preferred": "4.12"
       }
      ],
      "rejected": [
@@ -757,6 +758,18 @@
          "name": "junit4",
          "allowed": "4.12.*",
          "provided": null,
+         "satisfied": false
+        }
+       ]
+      },
+      {
+       "image_id": "temurin-8-maven",
+       "unmet": [
+        {
+         "kind": "build_tool",
+         "name": "maven",
+         "allowed": "3.5.0.*",
+         "provided": "3.10.0",
          "satisfied": false
         }
        ]
@@ -922,12 +935,6 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "runtime",
-       "name": "jdk",
-       "allowed": "8.*",
-       "preferred": "8"
-      },
-      {
        "kind": "test_framework",
        "name": "junit5",
        "allowed": "5.4.0.*",
@@ -945,6 +952,18 @@
          "provided": "17.0.20.1",
          "satisfied": false
         },
+        {
+         "kind": "test_framework",
+         "name": "junit5",
+         "allowed": "5.4.0.*",
+         "provided": "==5.14.4",
+         "satisfied": false
+        }
+       ]
+      },
+      {
+       "image_id": "temurin-8-maven",
+       "unmet": [
         {
          "kind": "test_framework",
          "name": "junit5",
@@ -1107,12 +1126,6 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "runtime",
-       "name": "jdk",
-       "allowed": "8.*",
-       "preferred": "8"
-      },
-      {
        "kind": "test_framework",
        "name": "junit5",
        "allowed": "5.4.0.*",
@@ -1130,6 +1143,18 @@
          "provided": "17.0.20.1",
          "satisfied": false
         },
+        {
+         "kind": "test_framework",
+         "name": "junit5",
+         "allowed": "5.4.0.*",
+         "provided": "==5.14.4",
+         "satisfied": false
+        }
+       ]
+      },
+      {
+       "image_id": "temurin-8-maven",
+       "unmet": [
         {
          "kind": "test_framework",
          "name": "junit5",
@@ -1275,12 +1300,6 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "runtime",
-       "name": "jdk",
-       "allowed": "8.*",
-       "preferred": "8"
-      },
-      {
        "kind": "test_framework",
        "name": "junit4",
        "allowed": "4.8.2.*",
@@ -1303,6 +1322,18 @@
          "name": "junit4",
          "allowed": "4.8.2.*",
          "provided": null,
+         "satisfied": false
+        }
+       ]
+      },
+      {
+       "image_id": "temurin-8-maven",
+       "unmet": [
+        {
+         "kind": "test_framework",
+         "name": "junit4",
+         "allowed": "4.8.2.*",
+         "provided": "==4.13.2 || ==4.12",
          "satisfied": false
         }
        ]
@@ -1435,12 +1466,6 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "runtime",
-       "name": "jdk",
-       "allowed": "8.*",
-       "preferred": "8"
-      },
-      {
        "kind": "test_framework",
        "name": "junit4",
        "allowed": "4.8.2.*",
@@ -1463,6 +1488,18 @@
          "name": "junit4",
          "allowed": "4.8.2.*",
          "provided": null,
+         "satisfied": false
+        }
+       ]
+      },
+      {
+       "image_id": "temurin-8-maven",
+       "unmet": [
+        {
+         "kind": "test_framework",
+         "name": "junit4",
+         "allowed": "4.8.2.*",
+         "provided": "==4.13.2 || ==4.12",
          "satisfied": false
         }
        ]
@@ -1657,55 +1694,42 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "temurin-8-maven",
+     "image": "docker.io/library/maven@sha256:f2cb52730ea0bde9dc8ba20e5e539d000dcdd7ab9e498d70c301fe04fbddb656",
+     "checks": [
+      {
+       "kind": "build_tool",
+       "name": "maven",
+       "allowed": "*",
+       "provided": "3.10.0",
+       "satisfied": true
+      },
       {
        "kind": "runtime",
        "name": "jdk",
        "allowed": "7.* || 8.*",
-       "preferred": "8"
+       "provided": "8.0.504",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "junit4",
        "allowed": "4.12.*",
-       "preferred": "4.12"
+       "provided": "==4.13.2 || ==4.12",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "testng",
        "allowed": "5.1.*",
-       "preferred": "5.1"
+       "provided": null,
+       "satisfied": false
       }
      ],
-     "rejected": [
-      {
-       "image_id": "temurin-17-maven",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "jdk",
-         "allowed": "7.* || 8.*",
-         "provided": "17.0.20.1",
-         "satisfied": false
-        },
-        {
-         "kind": "test_framework",
-         "name": "junit4",
-         "allowed": "4.12.*",
-         "provided": null,
-         "satisfied": false
-        },
-        {
-         "kind": "test_framework",
-         "name": "testng",
-         "allowed": "5.1.*",
-         "provided": null,
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "f238cf4f1091be19fbcfd086b042c86a1bcaa7fc",
@@ -1887,58 +1911,45 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "temurin-8-maven",
+     "image": "docker.io/library/maven@sha256:f2cb52730ea0bde9dc8ba20e5e539d000dcdd7ab9e498d70c301fe04fbddb656",
+     "checks": [
+      {
+       "kind": "build_tool",
+       "name": "maven",
+       "allowed": "*",
+       "provided": "3.10.0",
+       "satisfied": true
+      },
       {
        "kind": "runtime",
        "name": "jdk",
        "allowed": "7.* || 8.*",
-       "preferred": "8"
+       "provided": "8.0.504",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "junit4",
        "allowed": "4.12.*",
-       "preferred": "4.12"
+       "provided": "==4.13.2 || ==4.12",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "testng",
        "allowed": "5.1.*",
-       "preferred": "5.1"
+       "provided": null,
+       "satisfied": false
       }
      ],
-     "rejected": [
-      {
-       "image_id": "temurin-17-maven",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "jdk",
-         "allowed": "7.* || 8.*",
-         "provided": "17.0.20.1",
-         "satisfied": false
-        },
-        {
-         "kind": "test_framework",
-         "name": "junit4",
-         "allowed": "4.12.*",
-         "provided": null,
-         "satisfied": false
-        },
-        {
-         "kind": "test_framework",
-         "name": "testng",
-         "allowed": "5.1.*",
-         "provided": null,
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -2126,12 +2137,6 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "runtime",
-       "name": "jdk",
-       "allowed": "8.*",
-       "preferred": "8"
-      },
-      {
        "kind": "test_framework",
        "name": "junit4",
        "allowed": "4.8.2.*",
@@ -2160,6 +2165,25 @@
          "name": "junit4",
          "allowed": "4.8.2.*",
          "provided": null,
+         "satisfied": false
+        },
+        {
+         "kind": "test_framework",
+         "name": "testng",
+         "allowed": "5.1.*",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      },
+      {
+       "image_id": "temurin-8-maven",
+       "unmet": [
+        {
+         "kind": "test_framework",
+         "name": "junit4",
+         "allowed": "4.8.2.*",
+         "provided": "==4.13.2 || ==4.12",
          "satisfied": false
         },
         {
@@ -2354,12 +2378,6 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "runtime",
-       "name": "jdk",
-       "allowed": "8.*",
-       "preferred": "8"
-      },
-      {
        "kind": "test_framework",
        "name": "junit4",
        "allowed": "4.8.2.*",
@@ -2388,6 +2406,25 @@
          "name": "junit4",
          "allowed": "4.8.2.*",
          "provided": null,
+         "satisfied": false
+        },
+        {
+         "kind": "test_framework",
+         "name": "testng",
+         "allowed": "5.1.*",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      },
+      {
+       "image_id": "temurin-8-maven",
+       "unmet": [
+        {
+         "kind": "test_framework",
+         "name": "junit4",
+         "allowed": "4.8.2.*",
+         "provided": "==4.13.2 || ==4.12",
          "satisfied": false
         },
         {
@@ -2778,55 +2815,42 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "temurin-8-maven",
+     "image": "docker.io/library/maven@sha256:f2cb52730ea0bde9dc8ba20e5e539d000dcdd7ab9e498d70c301fe04fbddb656",
+     "checks": [
+      {
+       "kind": "build_tool",
+       "name": "maven",
+       "allowed": "*",
+       "provided": "3.10.0",
+       "satisfied": true
+      },
       {
        "kind": "runtime",
        "name": "jdk",
        "allowed": "8.*",
-       "preferred": "8"
+       "provided": "8.0.504",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "junit4",
        "allowed": "4.12.*",
-       "preferred": "4.12"
+       "provided": "==4.13.2 || ==4.12",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "testng",
        "allowed": "6.8.21.*",
-       "preferred": "6.8.21"
+       "provided": null,
+       "satisfied": false
       }
      ],
-     "rejected": [
-      {
-       "image_id": "temurin-17-maven",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "jdk",
-         "allowed": "8.*",
-         "provided": "17.0.20.1",
-         "satisfied": false
-        },
-        {
-         "kind": "test_framework",
-         "name": "junit4",
-         "allowed": "4.12.*",
-         "provided": null,
-         "satisfied": false
-        },
-        {
-         "kind": "test_framework",
-         "name": "testng",
-         "allowed": "6.8.21.*",
-         "provided": null,
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "58cdbbef9c77ab2b44870f9d606593b49cde76d9",
@@ -3197,58 +3221,45 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "temurin-8-maven",
+     "image": "docker.io/library/maven@sha256:f2cb52730ea0bde9dc8ba20e5e539d000dcdd7ab9e498d70c301fe04fbddb656",
+     "checks": [
+      {
+       "kind": "build_tool",
+       "name": "maven",
+       "allowed": "*",
+       "provided": "3.10.0",
+       "satisfied": true
+      },
       {
        "kind": "runtime",
        "name": "jdk",
        "allowed": "8.*",
-       "preferred": "8"
+       "provided": "8.0.504",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "junit4",
        "allowed": "4.12.*",
-       "preferred": "4.12"
+       "provided": "==4.13.2 || ==4.12",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "testng",
        "allowed": "6.8.21.*",
-       "preferred": "6.8.21"
+       "provided": null,
+       "satisfied": false
       }
      ],
-     "rejected": [
-      {
-       "image_id": "temurin-17-maven",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "jdk",
-         "allowed": "8.*",
-         "provided": "17.0.20.1",
-         "satisfied": false
-        },
-        {
-         "kind": "test_framework",
-         "name": "junit4",
-         "allowed": "4.12.*",
-         "provided": null,
-         "satisfied": false
-        },
-        {
-         "kind": "test_framework",
-         "name": "testng",
-         "allowed": "6.8.21.*",
-         "provided": null,
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -3386,12 +3397,6 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "runtime",
-       "name": "jdk",
-       "allowed": "8.*",
-       "preferred": "8"
-      },
-      {
        "kind": "test_framework",
        "name": "junit3",
        "allowed": "3.8.2.*",
@@ -3427,6 +3432,25 @@
          "name": "junit4",
          "allowed": "4.8.2.*",
          "provided": null,
+         "satisfied": false
+        }
+       ]
+      },
+      {
+       "image_id": "temurin-8-maven",
+       "unmet": [
+        {
+         "kind": "test_framework",
+         "name": "junit3",
+         "allowed": "3.8.2.*",
+         "provided": null,
+         "satisfied": false
+        },
+        {
+         "kind": "test_framework",
+         "name": "junit4",
+         "allowed": "4.8.2.*",
+         "provided": "==4.13.2 || ==4.12",
          "satisfied": false
         }
        ]
@@ -3564,12 +3588,6 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "runtime",
-       "name": "jdk",
-       "allowed": "8.*",
-       "preferred": "8"
-      },
-      {
        "kind": "test_framework",
        "name": "junit3",
        "allowed": "3.8.2.*",
@@ -3605,6 +3623,25 @@
          "name": "junit4",
          "allowed": "4.8.2.*",
          "provided": null,
+         "satisfied": false
+        }
+       ]
+      },
+      {
+       "image_id": "temurin-8-maven",
+       "unmet": [
+        {
+         "kind": "test_framework",
+         "name": "junit3",
+         "allowed": "3.8.2.*",
+         "provided": null,
+         "satisfied": false
+        },
+        {
+         "kind": "test_framework",
+         "name": "junit4",
+         "allowed": "4.8.2.*",
+         "provided": "==4.13.2 || ==4.12",
          "satisfied": false
         }
        ]
@@ -3738,12 +3775,6 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "runtime",
-       "name": "jdk",
-       "allowed": "8.*",
-       "preferred": "8"
-      },
-      {
        "kind": "test_framework",
        "name": "junit4",
        "allowed": "4.11.*",
@@ -3766,6 +3797,18 @@
          "name": "junit4",
          "allowed": "4.11.*",
          "provided": null,
+         "satisfied": false
+        }
+       ]
+      },
+      {
+       "image_id": "temurin-8-maven",
+       "unmet": [
+        {
+         "kind": "test_framework",
+         "name": "junit4",
+         "allowed": "4.11.*",
+         "provided": "==4.13.2 || ==4.12",
          "satisfied": false
         }
        ]
@@ -3891,12 +3934,6 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "runtime",
-       "name": "jdk",
-       "allowed": "8.*",
-       "preferred": "8"
-      },
-      {
        "kind": "test_framework",
        "name": "junit4",
        "allowed": "4.11.*",
@@ -3919,6 +3956,18 @@
          "name": "junit4",
          "allowed": "4.11.*",
          "provided": null,
+         "satisfied": false
+        }
+       ]
+      },
+      {
+       "image_id": "temurin-8-maven",
+       "unmet": [
+        {
+         "kind": "test_framework",
+         "name": "junit4",
+         "allowed": "4.11.*",
+         "provided": "==4.13.2 || ==4.12",
          "satisfied": false
         }
        ]
@@ -4050,42 +4099,35 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "temurin-8-maven",
+     "image": "docker.io/library/maven@sha256:f2cb52730ea0bde9dc8ba20e5e539d000dcdd7ab9e498d70c301fe04fbddb656",
+     "checks": [
+      {
+       "kind": "build_tool",
+       "name": "maven",
+       "allowed": ">=3.0.4",
+       "provided": "3.10.0",
+       "satisfied": true
+      },
       {
        "kind": "runtime",
        "name": "jdk",
        "allowed": "8.*",
-       "preferred": "8"
+       "provided": "8.0.504",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "junit4",
        "allowed": "4.12.*",
-       "preferred": "4.12"
+       "provided": "==4.13.2 || ==4.12",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "temurin-17-maven",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "jdk",
-         "allowed": "8.*",
-         "provided": "17.0.20.1",
-         "satisfied": false
-        },
-        {
-         "kind": "test_framework",
-         "name": "junit4",
-         "allowed": "4.12.*",
-         "provided": null,
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "3dfefdec1f7b2a4ee0ef8902afdea720b1572cb3",
@@ -4204,45 +4246,38 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "temurin-8-maven",
+     "image": "docker.io/library/maven@sha256:f2cb52730ea0bde9dc8ba20e5e539d000dcdd7ab9e498d70c301fe04fbddb656",
+     "checks": [
+      {
+       "kind": "build_tool",
+       "name": "maven",
+       "allowed": ">=3.0.4",
+       "provided": "3.10.0",
+       "satisfied": true
+      },
       {
        "kind": "runtime",
        "name": "jdk",
        "allowed": "8.*",
-       "preferred": "8"
+       "provided": "8.0.504",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "junit4",
        "allowed": "4.12.*",
-       "preferred": "4.12"
+       "provided": "==4.13.2 || ==4.12",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "temurin-17-maven",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "jdk",
-         "allowed": "8.*",
-         "provided": "17.0.20.1",
-         "satisfied": false
-        },
-        {
-         "kind": "test_framework",
-         "name": "junit4",
-         "allowed": "4.12.*",
-         "provided": null,
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -4395,6 +4430,25 @@
          "satisfied": false
         }
        ]
+      },
+      {
+       "image_id": "cpython-3.7-pytest",
+       "unmet": [
+        {
+         "kind": "runtime",
+         "name": "cpython",
+         "allowed": "2.7.* || 3.3.* || 3.4.* || 3.5.* || 3.6.*",
+         "provided": "3.7.17",
+         "satisfied": false
+        },
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "allowed": "==3.0.6",
+         "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+         "satisfied": false
+        }
+       ]
       }
      ]
     }
@@ -4508,29 +4562,28 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "2.7.* || 3.4.* || 3.5.* || 3.6.* || 3.7.*",
-       "preferred": "3.7"
+       "provided": "3.7.17",
+       "satisfied": true
+      },
+      {
+       "kind": "test_framework",
+       "name": "pytest",
+       "allowed": "*",
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "2.7.* || 3.4.* || 3.5.* || 3.6.* || 3.7.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "71b707758851e4b622f87d9a73266e06f60aeab4",
@@ -4658,32 +4711,31 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "2.7.* || 3.4.* || 3.5.* || 3.6.* || 3.7.*",
-       "preferred": "3.7"
+       "provided": "3.7.17",
+       "satisfied": true
+      },
+      {
+       "kind": "test_framework",
+       "name": "pytest",
+       "allowed": "*",
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "2.7.* || 3.4.* || 3.5.* || 3.6.* || 3.7.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -4823,29 +4875,28 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.5.* || 3.6.* || 3.7.* || 3.8.*",
-       "preferred": "3.8"
+       "provided": "3.7.17",
+       "satisfied": true
+      },
+      {
+       "kind": "test_framework",
+       "name": "pytest",
+       "allowed": "*",
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.5.* || 3.6.* || 3.7.* || 3.8.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "8238a9e450ed1524e40cb3a8b0b3c00606903aeb",
@@ -4980,32 +5031,31 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.5.* || 3.6.* || 3.7.* || 3.8.*",
-       "preferred": "3.8"
+       "provided": "3.7.17",
+       "satisfied": true
+      },
+      {
+       "kind": "test_framework",
+       "name": "pytest",
+       "allowed": "*",
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.5.* || 3.6.* || 3.7.* || 3.8.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -5200,32 +5250,31 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
+      {
+       "kind": "test_framework",
+       "name": "pytest",
+       "allowed": "*",
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
+      },
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.*",
-       "preferred": "3.10"
+       "provided": "3.7.17",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -5358,29 +5407,28 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
+      {
+       "kind": "test_framework",
+       "name": "pytest",
+       "allowed": "*",
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
+      },
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-       "preferred": "3.11"
+       "provided": "3.7.17",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "2625ed9fc074091c531c27ffcba7902771130261",
@@ -5508,32 +5556,31 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
+      {
+       "kind": "test_framework",
+       "name": "pytest",
+       "allowed": "*",
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
+      },
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-       "preferred": "3.11"
+       "provided": "3.7.17",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -5688,42 +5735,28 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.6.* || 3.7.* || 3.8.* || 3.9.* || 3.10.*",
-       "preferred": "3.10"
+       "provided": "3.7.17",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "pytest",
        "allowed": ">=6.0.0,<7.0.0",
-       "preferred": "6.0.0"
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.6.* || 3.7.* || 3.8.* || 3.9.* || 3.10.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        },
-        {
-         "kind": "test_framework",
-         "name": "pytest",
-         "allowed": ">=6.0.0,<7.0.0",
-         "provided": "9.0.*",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "9c528670c455b8d948aff95ed50e22940d1ad3fc",
@@ -5873,45 +5906,31 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.6.* || 3.7.* || 3.8.* || 3.9.* || 3.10.*",
-       "preferred": "3.10"
+       "provided": "3.7.17",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "pytest",
        "allowed": ">=6.0.0,<7.0.0",
-       "preferred": "6.0.0"
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.6.* || 3.7.* || 3.8.* || 3.9.* || 3.10.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        },
-        {
-         "kind": "test_framework",
-         "name": "pytest",
-         "allowed": ">=6.0.0,<7.0.0",
-         "provided": "9.0.*",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -6088,45 +6107,31 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-       "preferred": "3.11"
+       "provided": "3.7.17",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "pytest",
        "allowed": "==7.2.0",
-       "preferred": "7.2.0"
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        },
-        {
-         "kind": "test_framework",
-         "name": "pytest",
-         "allowed": "==7.2.0",
-         "provided": "9.0.*",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -6303,45 +6308,31 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-       "preferred": "3.11"
+       "provided": "3.7.17",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "pytest",
        "allowed": "==7.2.0",
-       "preferred": "7.2.0"
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        },
-        {
-         "kind": "test_framework",
-         "name": "pytest",
-         "allowed": "==7.2.0",
-         "provided": "9.0.*",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -6501,42 +6492,28 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
       {
        "kind": "test_framework",
        "name": "pytest",
        "allowed": ">=3,<=6.2.5",
-       "preferred": "3"
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
       },
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-       "preferred": "3.11"
+       "provided": "3.7.17",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        },
-        {
-         "kind": "test_framework",
-         "name": "pytest",
-         "allowed": ">=3,<=6.2.5",
-         "provided": "9.0.*",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "74ea7cf7a6a27a4eeb2ae24e162bcc942a6706d5",
@@ -6691,45 +6668,31 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
       {
        "kind": "test_framework",
        "name": "pytest",
        "allowed": ">=3,<=6.2.5",
-       "preferred": "3"
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
       },
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-       "preferred": "3.11"
+       "provided": "3.7.17",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        },
-        {
-         "kind": "test_framework",
-         "name": "pytest",
-         "allowed": ">=3,<=6.2.5",
-         "provided": "9.0.*",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -6857,29 +6820,28 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
+      {
+       "kind": "test_framework",
+       "name": "pytest",
+       "allowed": "*",
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
+      },
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.6.* || 3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-       "preferred": "3.11"
+       "provided": "3.7.17",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.6.* || 3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "d57c4a269bba3b9a0c5bfa20292955b849006d9e",
@@ -7002,32 +6964,31 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "cpython-3.7-pytest",
+     "image": "docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b",
+     "checks": [
+      {
+       "kind": "test_framework",
+       "name": "pytest",
+       "allowed": "*",
+       "provided": "==6.0.2 || ==6.2.5 || ==7.0.1 || ==7.2.0 || ==7.4.4",
+       "satisfied": true
+      },
       {
        "kind": "runtime",
        "name": "cpython",
        "allowed": "3.6.* || 3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-       "preferred": "3.11"
+       "provided": "3.7.17",
+       "satisfied": true
       }
      ],
-     "rejected": [
-      {
-       "image_id": "cpython-3.12-pytest",
-       "unmet": [
-        {
-         "kind": "runtime",
-         "name": "cpython",
-         "allowed": "3.6.* || 3.7.* || 3.8.* || 3.9.* || 3.10.* || 3.11.*",
-         "provided": "3.12.15",
-         "satisfied": false
-        }
-       ]
-      }
-     ]
+     "evidence": "live",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -7256,25 +7217,26 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "runtime",
-       "name": "node",
-       "allowed": "8.* || 10.* || 12.*",
-       "preferred": "12"
-      },
-      {
-       "kind": "build_tool",
-       "name": "npm",
-       "allowed": "*",
-       "preferred": null
-      },
-      {
        "kind": "test_framework",
        "name": "ava",
        "allowed": ">=2.1.0,<3",
        "preferred": "2.1.0"
       }
      ],
-     "rejected": []
+     "rejected": [
+      {
+       "image_id": "node-8.17.0-npm",
+       "unmet": [
+        {
+         "kind": "test_framework",
+         "name": "ava",
+         "allowed": ">=2.1.0,<3",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
+     ]
     },
     "fix": {
      "commit": "3039c8c07f6fdaa8b595ec869ae0895686a7a0f2",
@@ -7376,25 +7338,26 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "runtime",
-       "name": "node",
-       "allowed": "8.* || 10.* || 12.*",
-       "preferred": "12"
-      },
-      {
-       "kind": "build_tool",
-       "name": "npm",
-       "allowed": "*",
-       "preferred": null
-      },
-      {
        "kind": "test_framework",
        "name": "ava",
        "allowed": ">=2.1.0,<3",
        "preferred": "2.1.0"
       }
      ],
-     "rejected": []
+     "rejected": [
+      {
+       "image_id": "node-8.17.0-npm",
+       "unmet": [
+        {
+         "kind": "test_framework",
+         "name": "ava",
+         "allowed": ">=2.1.0,<3",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
+     ]
     }
    },
    "status": "unsupported",
@@ -7614,28 +7577,35 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "node-8.17.0-npm",
+     "image": "docker.io/library/node@sha256:c9025a77a42d87e95433337ac581c0d42810c1263f0e78802691046920d1560b",
+     "checks": [
       {
        "kind": "runtime",
        "name": "node",
        "allowed": "6.* || 7.* || 8.* || 9.* || 10.* || 11.* || 12.*",
-       "preferred": "12"
+       "provided": "8.17.0",
+       "satisfied": true
       },
       {
        "kind": "build_tool",
        "name": "npm",
        "allowed": ">=5,<7",
-       "preferred": "5"
+       "provided": "6.13.4",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "jest",
        "allowed": ">=24.8.0,<25",
-       "preferred": "24.8.0"
+       "provided": "==24.8.0 || ==24.9.0",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "c0711c656686e902af2cd92d6aecc8074de4d83d",
@@ -7841,31 +7811,38 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "node-8.17.0-npm",
+     "image": "docker.io/library/node@sha256:c9025a77a42d87e95433337ac581c0d42810c1263f0e78802691046920d1560b",
+     "checks": [
       {
        "kind": "runtime",
        "name": "node",
        "allowed": "6.* || 7.* || 8.* || 9.* || 10.* || 11.* || 12.*",
-       "preferred": "12"
+       "provided": "8.17.0",
+       "satisfied": true
       },
       {
        "kind": "build_tool",
        "name": "npm",
        "allowed": ">=5,<7",
-       "preferred": "5"
+       "provided": "6.13.4",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "jest",
        "allowed": ">=24.8.0,<25",
-       "preferred": "24.8.0"
+       "provided": "==24.8.0 || ==24.9.0",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -7968,28 +7945,35 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "node-8.17.0-npm",
+     "image": "docker.io/library/node@sha256:c9025a77a42d87e95433337ac581c0d42810c1263f0e78802691046920d1560b",
+     "checks": [
       {
        "kind": "build_tool",
        "name": "npm",
        "allowed": ">=5,<7",
-       "preferred": "5"
+       "provided": "6.13.4",
+       "satisfied": true
       },
       {
        "kind": "runtime",
        "name": "node",
        "allowed": "8.*",
-       "preferred": "8"
+       "provided": "8.17.0",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "jest",
        "allowed": ">=24.8.0,<25",
-       "preferred": "24.8.0"
+       "provided": "==24.8.0 || ==24.9.0",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "45d4a901478c6a8f396c8b959dd6cf8fd3f955b6",
@@ -8087,31 +8071,38 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "node-8.17.0-npm",
+     "image": "docker.io/library/node@sha256:c9025a77a42d87e95433337ac581c0d42810c1263f0e78802691046920d1560b",
+     "checks": [
       {
        "kind": "build_tool",
        "name": "npm",
        "allowed": ">=5,<7",
-       "preferred": "5"
+       "provided": "6.13.4",
+       "satisfied": true
       },
       {
        "kind": "runtime",
        "name": "node",
        "allowed": "8.*",
-       "preferred": "8"
+       "provided": "8.17.0",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "jest",
        "allowed": ">=24.8.0,<25",
-       "preferred": "24.8.0"
+       "provided": "==24.8.0 || ==24.9.0",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -8381,12 +8372,6 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "runtime",
-       "name": "node",
-       "allowed": "6.* || 7.* || 8.*",
-       "preferred": "8"
-      },
-      {
        "kind": "build_tool",
        "name": "yarn",
        "allowed": "1.*",
@@ -8399,7 +8384,27 @@
        "preferred": "2.1.0"
       }
      ],
-     "rejected": []
+     "rejected": [
+      {
+       "image_id": "node-8.17.0-npm",
+       "unmet": [
+        {
+         "kind": "build_tool",
+         "name": "yarn",
+         "allowed": "1.*",
+         "provided": null,
+         "satisfied": false
+        },
+        {
+         "kind": "test_framework",
+         "name": "mocha",
+         "allowed": ">=2.1.0,<3",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
+     ]
     }
    },
    "status": "unsupported",
@@ -8501,25 +8506,26 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "build_tool",
-       "name": "npm",
-       "allowed": "*",
-       "preferred": null
-      },
-      {
-       "kind": "runtime",
-       "name": "node",
-       "allowed": "4.* || 6.* || 8.*",
-       "preferred": "8"
-      },
-      {
        "kind": "test_framework",
        "name": "mocha",
        "allowed": ">=5.2.0,<6",
        "preferred": "5.2.0"
       }
      ],
-     "rejected": []
+     "rejected": [
+      {
+       "image_id": "node-8.17.0-npm",
+       "unmet": [
+        {
+         "kind": "test_framework",
+         "name": "mocha",
+         "allowed": ">=5.2.0,<6",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
+     ]
     },
     "fix": {
      "commit": "e18afbf1edcafb7add2c4c7b22abc8d6ebc2fa61",
@@ -8613,25 +8619,26 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "build_tool",
-       "name": "npm",
-       "allowed": "*",
-       "preferred": null
-      },
-      {
-       "kind": "runtime",
-       "name": "node",
-       "allowed": "4.* || 6.* || 8.*",
-       "preferred": "8"
-      },
-      {
        "kind": "test_framework",
        "name": "mocha",
        "allowed": ">=5.2.0,<6",
        "preferred": "5.2.0"
       }
      ],
-     "rejected": []
+     "rejected": [
+      {
+       "image_id": "node-8.17.0-npm",
+       "unmet": [
+        {
+         "kind": "test_framework",
+         "name": "mocha",
+         "allowed": ">=5.2.0,<6",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
+     ]
     }
    },
    "status": "unsupported",
@@ -8741,12 +8748,6 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "build_tool",
-       "name": "npm",
-       "allowed": "*",
-       "preferred": null
-      },
-      {
        "kind": "runtime",
        "name": "node",
        "allowed": "0.12.* || 4.* || 6.* || 7.*",
@@ -8759,7 +8760,27 @@
        "preferred": "4.6.0"
       }
      ],
-     "rejected": []
+     "rejected": [
+      {
+       "image_id": "node-8.17.0-npm",
+       "unmet": [
+        {
+         "kind": "runtime",
+         "name": "node",
+         "allowed": "0.12.* || 4.* || 6.* || 7.*",
+         "provided": "8.17.0",
+         "satisfied": false
+        },
+        {
+         "kind": "test_framework",
+         "name": "tape",
+         "allowed": ">=4.6.0,<5",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
+     ]
     },
     "fix": {
      "commit": "b13381281cead487cbdbfd6a69fb097ea5e456c3",
@@ -8861,12 +8882,6 @@
      "status": "unsupported",
      "needs": [
       {
-       "kind": "build_tool",
-       "name": "npm",
-       "allowed": "*",
-       "preferred": null
-      },
-      {
        "kind": "runtime",
        "name": "node",
        "allowed": "0.12.* || 4.* || 6.* || 7.*",
@@ -8879,7 +8894,27 @@
        "preferred": "4.6.0"
       }
      ],
-     "rejected": []
+     "rejected": [
+      {
+       "image_id": "node-8.17.0-npm",
+       "unmet": [
+        {
+         "kind": "runtime",
+         "name": "node",
+         "allowed": "0.12.* || 4.* || 6.* || 7.*",
+         "provided": "8.17.0",
+         "satisfied": false
+        },
+        {
+         "kind": "test_framework",
+         "name": "tape",
+         "allowed": ">=4.6.0,<5",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
+     ]
     }
    },
    "status": "unsupported",
@@ -8975,28 +9010,35 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "perl-5.26-make",
+     "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+     "checks": [
       {
        "kind": "build_tool",
        "name": "make",
        "allowed": "*",
-       "preferred": null
+       "provided": "4.2.1",
+       "satisfied": true
       },
       {
        "kind": "runtime",
        "name": "perl",
        "allowed": ">=5.5.30",
-       "preferred": "5.5.30"
+       "provided": "5.26.3",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "tap-harness",
        "allowed": "*",
-       "preferred": null
+       "provided": "==1.302073",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "ae65651eab053fc6dc4590dbb863a268215c1fc5",
@@ -9078,31 +9120,38 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "perl-5.26-make",
+     "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+     "checks": [
       {
        "kind": "build_tool",
        "name": "make",
        "allowed": "*",
-       "preferred": null
+       "provided": "4.2.1",
+       "satisfied": true
       },
       {
        "kind": "runtime",
        "name": "perl",
        "allowed": ">=5.5.30",
-       "preferred": "5.5.30"
+       "provided": "5.26.3",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "tap-harness",
        "allowed": "*",
-       "preferred": null
+       "provided": "==1.302073",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -9260,28 +9309,35 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "perl-5.26-make",
+     "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+     "checks": [
       {
        "kind": "build_tool",
        "name": "make",
        "allowed": "*",
-       "preferred": null
+       "provided": "4.2.1",
+       "satisfied": true
       },
       {
        "kind": "runtime",
        "name": "perl",
        "allowed": ">=5.10.1,<5.11 || 5.12.* || 5.14.* || 5.16.* || 5.18.* || 5.20.* || 5.22.* || 5.24.* || 5.26.*",
-       "preferred": "5.26"
+       "provided": "5.26.3",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "tap-harness",
        "allowed": "*",
-       "preferred": null
+       "provided": "==1.302073",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "c16a56a9d6575ddc53d15e76d58f0ebcb0eeb149",
@@ -9428,31 +9484,38 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "perl-5.26-make",
+     "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+     "checks": [
       {
        "kind": "build_tool",
        "name": "make",
        "allowed": "*",
-       "preferred": null
+       "provided": "4.2.1",
+       "satisfied": true
       },
       {
        "kind": "runtime",
        "name": "perl",
        "allowed": ">=5.10.1,<5.11 || 5.12.* || 5.14.* || 5.16.* || 5.18.* || 5.20.* || 5.22.* || 5.24.* || 5.26.*",
-       "preferred": "5.26"
+       "provided": "5.26.3",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "tap-harness",
        "allowed": "*",
-       "preferred": null
+       "provided": "==1.302073",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -9597,22 +9660,28 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "perl-5.26-make",
+     "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+     "checks": [
       {
        "kind": "test_framework",
        "name": "tap-harness",
        "allowed": "*",
-       "preferred": null
+       "provided": "==1.302073",
+       "satisfied": true
       },
       {
        "kind": "runtime",
        "name": "perl",
        "allowed": "5.10.* || 5.12.* || 5.14.* || 5.16.* || 5.18.* || 5.20.* || 5.22.* || 5.24.* || 5.26.*",
-       "preferred": "5.26"
+       "provided": "5.26.3",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "3580f5d0874a9abf5483528f73bda9a7fd9ec7f1",
@@ -9752,25 +9821,31 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "perl-5.26-make",
+     "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+     "checks": [
       {
        "kind": "test_framework",
        "name": "tap-harness",
        "allowed": "*",
-       "preferred": null
+       "provided": "==1.302073",
+       "satisfied": true
       },
       {
        "kind": "runtime",
        "name": "perl",
        "allowed": "5.10.* || 5.12.* || 5.14.* || 5.16.* || 5.18.* || 5.20.* || 5.22.* || 5.24.* || 5.26.*",
-       "preferred": "5.26"
+       "provided": "5.26.3",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -10083,22 +10158,28 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "perl-5.26-make",
+     "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+     "checks": [
       {
        "kind": "test_framework",
        "name": "tap-harness",
        "allowed": "*",
-       "preferred": null
+       "provided": "==1.302073",
+       "satisfied": true
       },
       {
        "kind": "runtime",
        "name": "perl",
        "allowed": "5.10.* || 5.12.* || 5.14.* || 5.16.* || 5.18.* || 5.20.* || 5.22.* || 5.24.* || 5.26.* || 5.28.* || 5.30.* || 5.32.* || 5.34.* || 5.36.* || 5.38.* || 5.40.* || 5.42.*",
-       "preferred": "5.42"
+       "provided": "5.26.3",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "945d35141d94490f749640bd4390acd6a2193995",
@@ -10406,25 +10487,31 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "perl-5.26-make",
+     "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+     "checks": [
       {
        "kind": "test_framework",
        "name": "tap-harness",
        "allowed": "*",
-       "preferred": null
+       "provided": "==1.302073",
+       "satisfied": true
       },
       {
        "kind": "runtime",
        "name": "perl",
        "allowed": "5.10.* || 5.12.* || 5.14.* || 5.16.* || 5.18.* || 5.20.* || 5.22.* || 5.24.* || 5.26.* || 5.28.* || 5.30.* || 5.32.* || 5.34.* || 5.36.* || 5.38.* || 5.40.* || 5.42.*",
-       "preferred": "5.42"
+       "provided": "5.26.3",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -10647,28 +10734,35 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "perl-5.26-make",
+     "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+     "checks": [
       {
        "kind": "build_tool",
        "name": "make",
        "allowed": "*",
-       "preferred": null
+       "provided": "4.2.1",
+       "satisfied": true
       },
       {
        "kind": "runtime",
        "name": "perl",
        "allowed": "5.8.* || 5.10.* || 5.12.* || 5.14.* || 5.16.* || 5.18.* || 5.20.* || 5.22.* || 5.24.* || 5.26.*",
-       "preferred": "5.26"
+       "provided": "5.26.3",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "tap-harness",
        "allowed": "*",
-       "preferred": null
+       "provided": "==1.302073",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "77f557ef84698efeb6eed04e4a9704eaf85b741d",
@@ -10868,31 +10962,38 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "perl-5.26-make",
+     "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+     "checks": [
       {
        "kind": "build_tool",
        "name": "make",
        "allowed": "*",
-       "preferred": null
+       "provided": "4.2.1",
+       "satisfied": true
       },
       {
        "kind": "runtime",
        "name": "perl",
        "allowed": "5.8.* || 5.10.* || 5.12.* || 5.14.* || 5.16.* || 5.18.* || 5.20.* || 5.22.* || 5.24.* || 5.26.*",
-       "preferred": "5.26"
+       "provided": "5.26.3",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "tap-harness",
        "allowed": "*",
-       "preferred": null
+       "provided": "==1.302073",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -11118,28 +11219,35 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "perl-5.26-make",
+     "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+     "checks": [
       {
        "kind": "build_tool",
        "name": "make",
        "allowed": "*",
-       "preferred": null
+       "provided": "4.2.1",
+       "satisfied": true
       },
       {
        "kind": "runtime",
        "name": "perl",
        "allowed": ">=5.8.1,<5.9 || 5.10.* || 5.12.* || 5.14.* || 5.16.* || 5.18.* || 5.20.* || 5.22.* || 5.24.* || 5.26.* || 5.28.* || 5.30.* || 5.32.* || 5.34.* || 5.36.* || 5.38.* || 5.40.*",
-       "preferred": "5.40"
+       "provided": "5.26.3",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "tap-harness",
        "allowed": "*",
-       "preferred": null
+       "provided": "==1.302073",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "e9742ef85a75867cbd696860e3bf3e32b681f98d",
@@ -11360,31 +11468,38 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "perl-5.26-make",
+     "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+     "checks": [
       {
        "kind": "build_tool",
        "name": "make",
        "allowed": "*",
-       "preferred": null
+       "provided": "4.2.1",
+       "satisfied": true
       },
       {
        "kind": "runtime",
        "name": "perl",
        "allowed": ">=5.8.1,<5.9 || 5.10.* || 5.12.* || 5.14.* || 5.16.* || 5.18.* || 5.20.* || 5.22.* || 5.24.* || 5.26.* || 5.28.* || 5.30.* || 5.32.* || 5.34.* || 5.36.* || 5.38.* || 5.40.*",
-       "preferred": "5.40"
+       "provided": "5.26.3",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "tap-harness",
        "allowed": "*",
-       "preferred": null
+       "provided": "==1.302073",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -11496,28 +11611,35 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "ruby-3.1-bundler",
+     "image": "docker.io/library/ruby@sha256:91627f55e8969006aab67d15c92fb930500ff73948803da1330b8a853fecebb5",
+     "checks": [
       {
        "kind": "runtime",
        "name": "ruby",
        "allowed": ">=2.7.0",
-       "preferred": "2.7.0"
+       "provided": "3.1.7",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "minitest",
        "allowed": "==5.15.0",
-       "preferred": "5.15.0"
+       "provided": "==5.14.4 || ==5.15.0 || ==5.27.0",
+       "satisfied": true
       },
       {
        "kind": "build_tool",
        "name": "bundler",
        "allowed": "2.*",
-       "preferred": "2.3.14"
+       "provided": "2.3.27",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "d7aba06953f9fa789c411676b941d20df8ef73de",
@@ -11618,31 +11740,38 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "ruby-3.1-bundler",
+     "image": "docker.io/library/ruby@sha256:91627f55e8969006aab67d15c92fb930500ff73948803da1330b8a853fecebb5",
+     "checks": [
       {
        "kind": "runtime",
        "name": "ruby",
        "allowed": ">=2.7.0",
-       "preferred": "2.7.0"
+       "provided": "3.1.7",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "minitest",
        "allowed": "==5.15.0",
-       "preferred": "5.15.0"
+       "provided": "==5.14.4 || ==5.15.0 || ==5.27.0",
+       "satisfied": true
       },
       {
        "kind": "build_tool",
        "name": "bundler",
        "allowed": "2.*",
-       "preferred": "2.3.14"
+       "provided": "2.3.27",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -11807,15 +11936,29 @@
        "name": "rspec",
        "allowed": "*",
        "preferred": null
-      },
-      {
-       "kind": "build_tool",
-       "name": "bundler",
-       "allowed": "*",
-       "preferred": null
       }
      ],
-     "rejected": []
+     "rejected": [
+      {
+       "image_id": "ruby-3.1-bundler",
+       "unmet": [
+        {
+         "kind": "runtime",
+         "name": "ruby",
+         "allowed": "2.4.* || 2.5.* || 2.6.* || 2.7.*",
+         "provided": "3.1.7",
+         "satisfied": false
+        },
+        {
+         "kind": "test_framework",
+         "name": "rspec",
+         "allowed": "*",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
+     ]
     },
     "fix": {
      "commit": "25d038022c2fcad45af5b73f9d003cf38ff491f6",
@@ -11969,15 +12112,29 @@
        "name": "rspec",
        "allowed": "*",
        "preferred": null
-      },
-      {
-       "kind": "build_tool",
-       "name": "bundler",
-       "allowed": "*",
-       "preferred": null
       }
      ],
-     "rejected": []
+     "rejected": [
+      {
+       "image_id": "ruby-3.1-bundler",
+       "unmet": [
+        {
+         "kind": "runtime",
+         "name": "ruby",
+         "allowed": "2.4.* || 2.5.* || 2.6.* || 2.7.*",
+         "provided": "3.1.7",
+         "satisfied": false
+        },
+        {
+         "kind": "test_framework",
+         "name": "rspec",
+         "allowed": "*",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
+     ]
     }
    },
    "status": "unsupported",
@@ -12114,15 +12271,29 @@
        "name": "rspec",
        "allowed": ">=3.0,<4",
        "preferred": "3.0"
-      },
-      {
-       "kind": "build_tool",
-       "name": "bundler",
-       "allowed": "*",
-       "preferred": null
       }
      ],
-     "rejected": []
+     "rejected": [
+      {
+       "image_id": "ruby-3.1-bundler",
+       "unmet": [
+        {
+         "kind": "runtime",
+         "name": "ruby",
+         "allowed": ">=2.1.0,<2.2 || 2.2.* || 2.3.* || 2.4.*",
+         "provided": "3.1.7",
+         "satisfied": false
+        },
+        {
+         "kind": "test_framework",
+         "name": "rspec",
+         "allowed": ">=3.0,<4",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
+     ]
     },
     "fix": {
      "commit": "4ebedfbd11d20d03ed03a1274ed281eee62715d4",
@@ -12251,15 +12422,29 @@
        "name": "rspec",
        "allowed": ">=3.0,<4",
        "preferred": "3.0"
-      },
-      {
-       "kind": "build_tool",
-       "name": "bundler",
-       "allowed": "*",
-       "preferred": null
       }
      ],
-     "rejected": []
+     "rejected": [
+      {
+       "image_id": "ruby-3.1-bundler",
+       "unmet": [
+        {
+         "kind": "runtime",
+         "name": "ruby",
+         "allowed": ">=2.1.0,<2.2 || 2.2.* || 2.3.* || 2.4.*",
+         "provided": "3.1.7",
+         "satisfied": false
+        },
+        {
+         "kind": "test_framework",
+         "name": "rspec",
+         "allowed": ">=3.0,<4",
+         "provided": null,
+         "satisfied": false
+        }
+       ]
+      }
+     ]
     }
    },
    "status": "unsupported",
@@ -12464,28 +12649,35 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "ruby-3.1-bundler",
+     "image": "docker.io/library/ruby@sha256:91627f55e8969006aab67d15c92fb930500ff73948803da1330b8a853fecebb5",
+     "checks": [
       {
        "kind": "runtime",
        "name": "ruby",
        "allowed": ">=2.4.0,<2.5 || 2.5.* || 2.6.* || 2.7.* || 3.0.* || 3.1.* || 3.2.* || 3.3.* || 3.4.*",
-       "preferred": "3.4"
+       "provided": "3.1.7",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "minitest",
        "allowed": ">=5.0,<6",
-       "preferred": "5.0"
+       "provided": "==5.14.4 || ==5.15.0 || ==5.27.0",
+       "satisfied": true
       },
       {
        "kind": "build_tool",
        "name": "bundler",
        "allowed": "*",
-       "preferred": null
+       "provided": "2.3.27",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "50caab74fa01ee8f5dbdee7bb2782126d20c6583",
@@ -12682,31 +12874,38 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "ruby-3.1-bundler",
+     "image": "docker.io/library/ruby@sha256:91627f55e8969006aab67d15c92fb930500ff73948803da1330b8a853fecebb5",
+     "checks": [
       {
        "kind": "runtime",
        "name": "ruby",
        "allowed": ">=2.4.0,<2.5 || 2.5.* || 2.6.* || 2.7.* || 3.0.* || 3.1.* || 3.2.* || 3.3.* || 3.4.*",
-       "preferred": "3.4"
+       "provided": "3.1.7",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "minitest",
        "allowed": ">=5.0,<6",
-       "preferred": "5.0"
+       "provided": "==5.14.4 || ==5.15.0 || ==5.27.0",
+       "satisfied": true
       },
       {
        "kind": "build_tool",
        "name": "bundler",
        "allowed": "*",
-       "preferred": null
+       "provided": "2.3.27",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -12855,31 +13054,38 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "ruby-3.1-bundler",
+     "image": "docker.io/library/ruby@sha256:91627f55e8969006aab67d15c92fb930500ff73948803da1330b8a853fecebb5",
+     "checks": [
       {
        "kind": "runtime",
        "name": "ruby",
        "allowed": ">=2.5.0,<2.6 || 2.6.* || 2.7.* || 3.0.* || 3.1.*",
-       "preferred": "3.1"
+       "provided": "3.1.7",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "minitest",
        "allowed": ">=5.14.4,<5.15",
-       "preferred": "5.14.4"
+       "provided": "==5.14.4 || ==5.15.0 || ==5.27.0",
+       "satisfied": true
       },
       {
        "kind": "build_tool",
        "name": "bundler",
        "allowed": "*",
-       "preferred": null
+       "provided": "2.3.27",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -13171,28 +13377,35 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "ruby-3.1-bundler",
+     "image": "docker.io/library/ruby@sha256:91627f55e8969006aab67d15c92fb930500ff73948803da1330b8a853fecebb5",
+     "checks": [
       {
        "kind": "runtime",
        "name": "ruby",
        "allowed": ">=2.7.8,<2.8 || 3.0.* || 3.1.* || 3.2.* || 3.3.*",
-       "preferred": "3.3"
+       "provided": "3.1.7",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "minitest",
        "allowed": ">=5.0,<6",
-       "preferred": "5.0"
+       "provided": "==5.14.4 || ==5.15.0 || ==5.27.0",
+       "satisfied": true
       },
       {
        "kind": "build_tool",
        "name": "bundler",
        "allowed": "*",
-       "preferred": null
+       "provided": "2.3.27",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     },
     "fix": {
      "commit": "cd3e00de20ddaff34ea30f7a74a7b9dad189d1d8",
@@ -13479,31 +13692,38 @@
       ],
       "unresolved": []
      },
-     "status": "unsupported",
-     "needs": [
+     "status": "supported",
+     "image_id": "ruby-3.1-bundler",
+     "image": "docker.io/library/ruby@sha256:91627f55e8969006aab67d15c92fb930500ff73948803da1330b8a853fecebb5",
+     "checks": [
       {
        "kind": "runtime",
        "name": "ruby",
        "allowed": ">=2.7.8,<2.8 || 3.0.* || 3.1.* || 3.2.* || 3.3.*",
-       "preferred": "3.3"
+       "provided": "3.1.7",
+       "satisfied": true
       },
       {
        "kind": "test_framework",
        "name": "minitest",
        "allowed": ">=5.0,<6",
-       "preferred": "5.0"
+       "provided": "==5.14.4 || ==5.15.0 || ==5.27.0",
+       "satisfied": true
       },
       {
        "kind": "build_tool",
        "name": "bundler",
        "allowed": "*",
-       "preferred": null
+       "provided": "2.3.27",
+       "satisfied": true
       }
      ],
-     "rejected": []
+     "evidence": "image-only",
+     "runtime_basis": "declared",
+     "inferred_from": []
     }
    },
-   "status": "unsupported",
+   "status": "supported",
    "revisions_agree": true
   },
   {
@@ -13512,5 +13732,4435 @@
    "status": "not_acquired",
    "detail": "no pinned commit (SPEC-0037)"
   }
- ]
+ ],
+ "corpus": {
+  "development": [
+   {
+    "case_id": "ih-python-cmdi",
+    "language": "python",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     }
+    },
+    "status": "supported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-python-pathtraversal",
+    "language": "python",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     }
+    },
+    "status": "supported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-python-codeinjection",
+    "language": "python",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     }
+    },
+    "status": "supported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-python-deserialization",
+    "language": "python",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     }
+    },
+    "status": "supported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-python-xxe",
+    "language": "python",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     }
+    },
+    "status": "supported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-python-ssrf",
+    "language": "python",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     }
+    },
+    "status": "supported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-python-healthcheck",
+    "language": "python",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     }
+    },
+    "status": "supported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-python-queryhelper",
+    "language": "python",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     }
+    },
+    "status": "supported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-java-sqli",
+    "language": "java",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "java",
+       "root": ".",
+       "components": [
+        {
+         "kind": "build_tool",
+         "name": "maven",
+         "provider": "image",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "pom.xml",
+           "line": 1,
+           "text": "<project xmlns=\"http://maven.apache.org/POM/4.0.0\">",
+           "strength": "constraint",
+           "source": "pom",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "runtime",
+         "name": "jdk",
+         "provider": "image",
+         "allowed": "17.*",
+         "preferred": "17",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "pom.xml",
+           "line": 7,
+           "text": "<maven.compiler.release>17</maven.compiler.release>",
+           "strength": "constraint",
+           "source": "compiler-target",
+           "declares": ">=17"
+          },
+          {
+           "path": "pom.xml",
+           "line": 7,
+           "text": "<maven.compiler.release>17</maven.compiler.release>",
+           "strength": "tested",
+           "source": "derived",
+           "declares": "17.*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "junit5",
+         "provider": "registry",
+         "allowed": "5.10.2.*",
+         "preferred": "5.10.2",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "pom.xml",
+           "line": 13,
+           "text": "<artifactId>junit-jupiter</artifactId>",
+           "strength": "constraint",
+           "source": "dependency",
+           "declares": "5.10.2.*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "pom.xml"
+       ],
+       "unresolved": []
+      },
+      "status": "unsupported",
+      "needs": [
+       {
+        "kind": "test_framework",
+        "name": "junit5",
+        "allowed": "5.10.2.*",
+        "preferred": "5.10.2"
+       }
+      ],
+      "rejected": [
+       {
+        "image_id": "temurin-17-maven",
+        "unmet": [
+         {
+          "kind": "test_framework",
+          "name": "junit5",
+          "allowed": "5.10.2.*",
+          "provided": "==5.14.4",
+          "satisfied": false
+         }
+        ]
+       },
+       {
+        "image_id": "temurin-8-maven",
+        "unmet": [
+         {
+          "kind": "runtime",
+          "name": "jdk",
+          "allowed": "17.*",
+          "provided": "8.0.504",
+          "satisfied": false
+         },
+         {
+          "kind": "test_framework",
+          "name": "junit5",
+          "allowed": "5.10.2.*",
+          "provided": null,
+          "satisfied": false
+         }
+        ]
+       }
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "java",
+       "root": ".",
+       "components": [
+        {
+         "kind": "build_tool",
+         "name": "maven",
+         "provider": "image",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "pom.xml",
+           "line": 1,
+           "text": "<project xmlns=\"http://maven.apache.org/POM/4.0.0\">",
+           "strength": "constraint",
+           "source": "pom",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "runtime",
+         "name": "jdk",
+         "provider": "image",
+         "allowed": "17.*",
+         "preferred": "17",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "pom.xml",
+           "line": 7,
+           "text": "<maven.compiler.release>17</maven.compiler.release>",
+           "strength": "constraint",
+           "source": "compiler-target",
+           "declares": ">=17"
+          },
+          {
+           "path": "pom.xml",
+           "line": 7,
+           "text": "<maven.compiler.release>17</maven.compiler.release>",
+           "strength": "tested",
+           "source": "derived",
+           "declares": "17.*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "junit5",
+         "provider": "registry",
+         "allowed": "5.10.2.*",
+         "preferred": "5.10.2",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "pom.xml",
+           "line": 13,
+           "text": "<artifactId>junit-jupiter</artifactId>",
+           "strength": "constraint",
+           "source": "dependency",
+           "declares": "5.10.2.*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "pom.xml"
+       ],
+       "unresolved": []
+      },
+      "status": "unsupported",
+      "needs": [
+       {
+        "kind": "test_framework",
+        "name": "junit5",
+        "allowed": "5.10.2.*",
+        "preferred": "5.10.2"
+       }
+      ],
+      "rejected": [
+       {
+        "image_id": "temurin-17-maven",
+        "unmet": [
+         {
+          "kind": "test_framework",
+          "name": "junit5",
+          "allowed": "5.10.2.*",
+          "provided": "==5.14.4",
+          "satisfied": false
+         }
+        ]
+       },
+       {
+        "image_id": "temurin-8-maven",
+        "unmet": [
+         {
+          "kind": "runtime",
+          "name": "jdk",
+          "allowed": "17.*",
+          "provided": "8.0.504",
+          "satisfied": false
+         },
+         {
+          "kind": "test_framework",
+          "name": "junit5",
+          "allowed": "5.10.2.*",
+          "provided": null,
+          "satisfied": false
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "status": "unsupported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-java-cmdi",
+    "language": "java",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "java",
+       "root": ".",
+       "components": [
+        {
+         "kind": "build_tool",
+         "name": "maven",
+         "provider": "image",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "pom.xml",
+           "line": 1,
+           "text": "<project xmlns=\"http://maven.apache.org/POM/4.0.0\">",
+           "strength": "constraint",
+           "source": "pom",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "runtime",
+         "name": "jdk",
+         "provider": "image",
+         "allowed": "17.*",
+         "preferred": "17",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "pom.xml",
+           "line": 7,
+           "text": "<maven.compiler.release>17</maven.compiler.release>",
+           "strength": "constraint",
+           "source": "compiler-target",
+           "declares": ">=17"
+          },
+          {
+           "path": "pom.xml",
+           "line": 7,
+           "text": "<maven.compiler.release>17</maven.compiler.release>",
+           "strength": "tested",
+           "source": "derived",
+           "declares": "17.*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "junit5",
+         "provider": "registry",
+         "allowed": "5.10.2.*",
+         "preferred": "5.10.2",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "pom.xml",
+           "line": 13,
+           "text": "<artifactId>junit-jupiter</artifactId>",
+           "strength": "constraint",
+           "source": "dependency",
+           "declares": "5.10.2.*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "pom.xml"
+       ],
+       "unresolved": []
+      },
+      "status": "unsupported",
+      "needs": [
+       {
+        "kind": "test_framework",
+        "name": "junit5",
+        "allowed": "5.10.2.*",
+        "preferred": "5.10.2"
+       }
+      ],
+      "rejected": [
+       {
+        "image_id": "temurin-17-maven",
+        "unmet": [
+         {
+          "kind": "test_framework",
+          "name": "junit5",
+          "allowed": "5.10.2.*",
+          "provided": "==5.14.4",
+          "satisfied": false
+         }
+        ]
+       },
+       {
+        "image_id": "temurin-8-maven",
+        "unmet": [
+         {
+          "kind": "runtime",
+          "name": "jdk",
+          "allowed": "17.*",
+          "provided": "8.0.504",
+          "satisfied": false
+         },
+         {
+          "kind": "test_framework",
+          "name": "junit5",
+          "allowed": "5.10.2.*",
+          "provided": null,
+          "satisfied": false
+         }
+        ]
+       }
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "java",
+       "root": ".",
+       "components": [
+        {
+         "kind": "build_tool",
+         "name": "maven",
+         "provider": "image",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "pom.xml",
+           "line": 1,
+           "text": "<project xmlns=\"http://maven.apache.org/POM/4.0.0\">",
+           "strength": "constraint",
+           "source": "pom",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "runtime",
+         "name": "jdk",
+         "provider": "image",
+         "allowed": "17.*",
+         "preferred": "17",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "pom.xml",
+           "line": 7,
+           "text": "<maven.compiler.release>17</maven.compiler.release>",
+           "strength": "constraint",
+           "source": "compiler-target",
+           "declares": ">=17"
+          },
+          {
+           "path": "pom.xml",
+           "line": 7,
+           "text": "<maven.compiler.release>17</maven.compiler.release>",
+           "strength": "tested",
+           "source": "derived",
+           "declares": "17.*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "junit5",
+         "provider": "registry",
+         "allowed": "5.10.2.*",
+         "preferred": "5.10.2",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "pom.xml",
+           "line": 13,
+           "text": "<artifactId>junit-jupiter</artifactId>",
+           "strength": "constraint",
+           "source": "dependency",
+           "declares": "5.10.2.*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "pom.xml"
+       ],
+       "unresolved": []
+      },
+      "status": "unsupported",
+      "needs": [
+       {
+        "kind": "test_framework",
+        "name": "junit5",
+        "allowed": "5.10.2.*",
+        "preferred": "5.10.2"
+       }
+      ],
+      "rejected": [
+       {
+        "image_id": "temurin-17-maven",
+        "unmet": [
+         {
+          "kind": "test_framework",
+          "name": "junit5",
+          "allowed": "5.10.2.*",
+          "provided": "==5.14.4",
+          "satisfied": false
+         }
+        ]
+       },
+       {
+        "image_id": "temurin-8-maven",
+        "unmet": [
+         {
+          "kind": "runtime",
+          "name": "jdk",
+          "allowed": "17.*",
+          "provided": "8.0.504",
+          "satisfied": false
+         },
+         {
+          "kind": "test_framework",
+          "name": "junit5",
+          "allowed": "5.10.2.*",
+          "provided": null,
+          "satisfied": false
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "status": "unsupported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-java-xxe",
+    "language": "java",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "java",
+       "root": ".",
+       "components": [
+        {
+         "kind": "build_tool",
+         "name": "maven",
+         "provider": "image",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "pom.xml",
+           "line": 1,
+           "text": "<project xmlns=\"http://maven.apache.org/POM/4.0.0\">",
+           "strength": "constraint",
+           "source": "pom",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "runtime",
+         "name": "jdk",
+         "provider": "image",
+         "allowed": "8.*",
+         "preferred": "8",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "pom.xml",
+           "line": 14,
+           "text": "<maven.compiler.target>1.7</maven.compiler.target>",
+           "strength": "constraint",
+           "source": "compiler-target",
+           "declares": ">=7,<20"
+          },
+          {
+           "path": "pom.xml",
+           "line": 14,
+           "text": "<maven.compiler.target>1.7</maven.compiler.target>",
+           "strength": "tested",
+           "source": "derived",
+           "declares": "8.*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "junit4",
+         "provider": "registry",
+         "allowed": "4.12.*",
+         "preferred": "4.12",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "pom.xml",
+           "line": 20,
+           "text": "<artifactId>junit</artifactId>",
+           "strength": "constraint",
+           "source": "dependency",
+           "declares": "4.12.*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "pom.xml"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "temurin-8-maven",
+      "image": "docker.io/library/maven@sha256:f2cb52730ea0bde9dc8ba20e5e539d000dcdd7ab9e498d70c301fe04fbddb656",
+      "checks": [
+       {
+        "kind": "build_tool",
+        "name": "maven",
+        "allowed": "*",
+        "provided": "3.10.0",
+        "satisfied": true
+       },
+       {
+        "kind": "runtime",
+        "name": "jdk",
+        "allowed": "8.*",
+        "provided": "8.0.504",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "junit4",
+        "allowed": "4.12.*",
+        "provided": "==4.13.2 || ==4.12",
+        "satisfied": true
+       }
+      ],
+      "evidence": "image-only",
+      "runtime_basis": "declared",
+      "inferred_from": []
+     },
+     "candidate": {
+      "requirement": {
+       "language": "java",
+       "root": ".",
+       "components": [
+        {
+         "kind": "build_tool",
+         "name": "maven",
+         "provider": "image",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "pom.xml",
+           "line": 1,
+           "text": "<project xmlns=\"http://maven.apache.org/POM/4.0.0\">",
+           "strength": "constraint",
+           "source": "pom",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "runtime",
+         "name": "jdk",
+         "provider": "image",
+         "allowed": "8.*",
+         "preferred": "8",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "pom.xml",
+           "line": 14,
+           "text": "<maven.compiler.target>1.7</maven.compiler.target>",
+           "strength": "constraint",
+           "source": "compiler-target",
+           "declares": ">=7,<20"
+          },
+          {
+           "path": "pom.xml",
+           "line": 14,
+           "text": "<maven.compiler.target>1.7</maven.compiler.target>",
+           "strength": "tested",
+           "source": "derived",
+           "declares": "8.*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "junit4",
+         "provider": "registry",
+         "allowed": "4.12.*",
+         "preferred": "4.12",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "pom.xml",
+           "line": 20,
+           "text": "<artifactId>junit</artifactId>",
+           "strength": "constraint",
+           "source": "dependency",
+           "declares": "4.12.*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "pom.xml"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "temurin-8-maven",
+      "image": "docker.io/library/maven@sha256:f2cb52730ea0bde9dc8ba20e5e539d000dcdd7ab9e498d70c301fe04fbddb656",
+      "checks": [
+       {
+        "kind": "build_tool",
+        "name": "maven",
+        "allowed": "*",
+        "provided": "3.10.0",
+        "satisfied": true
+       },
+       {
+        "kind": "runtime",
+        "name": "jdk",
+        "allowed": "8.*",
+        "provided": "8.0.504",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "junit4",
+        "allowed": "4.12.*",
+        "provided": "==4.13.2 || ==4.12",
+        "satisfied": true
+       }
+      ],
+      "evidence": "image-only",
+      "runtime_basis": "declared",
+      "inferred_from": []
+     }
+    },
+    "status": "supported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-javascript-cmdi",
+    "language": "javascript",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "javascript",
+       "root": ".",
+       "components": [
+        {
+         "kind": "build_tool",
+         "name": "npm",
+         "provider": "image",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "package.json",
+           "line": 1,
+           "text": "{",
+           "strength": "constraint",
+           "source": "package",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "jest",
+         "provider": "registry",
+         "allowed": ">=29.7.0,<30",
+         "preferred": "29.7.0",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "package.json",
+           "line": 5,
+           "text": "\"scripts\": {\"test\": \"jest\"},",
+           "strength": "constraint",
+           "source": "test-script",
+           "declares": ">=29.7.0,<30"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "package.json"
+       ],
+       "unresolved": []
+      },
+      "status": "unsupported",
+      "needs": [
+       {
+        "kind": "runtime",
+        "name": "node",
+        "allowed": ">=14.15,<15 || >=16.10,<17 || >=18",
+        "preferred": null
+       },
+       {
+        "kind": "test_framework",
+        "name": "jest",
+        "allowed": ">=29.7.0,<30",
+        "preferred": "29.7.0"
+       }
+      ],
+      "rejected": [
+       {
+        "image_id": "node-8.17.0-npm",
+        "unmet": []
+       }
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "javascript",
+       "root": ".",
+       "components": [
+        {
+         "kind": "build_tool",
+         "name": "npm",
+         "provider": "image",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "package.json",
+           "line": 1,
+           "text": "{",
+           "strength": "constraint",
+           "source": "package",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "jest",
+         "provider": "registry",
+         "allowed": ">=29.7.0,<30",
+         "preferred": "29.7.0",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "package.json",
+           "line": 5,
+           "text": "\"scripts\": {\"test\": \"jest\"},",
+           "strength": "constraint",
+           "source": "test-script",
+           "declares": ">=29.7.0,<30"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "package.json"
+       ],
+       "unresolved": []
+      },
+      "status": "unsupported",
+      "needs": [
+       {
+        "kind": "runtime",
+        "name": "node",
+        "allowed": ">=14.15,<15 || >=16.10,<17 || >=18",
+        "preferred": null
+       },
+       {
+        "kind": "test_framework",
+        "name": "jest",
+        "allowed": ">=29.7.0,<30",
+        "preferred": "29.7.0"
+       }
+      ],
+      "rejected": [
+       {
+        "image_id": "node-8.17.0-npm",
+        "unmet": []
+       }
+      ]
+     }
+    },
+    "status": "unsupported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-perl-sqli",
+    "language": "perl",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "perl",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "tap-harness",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "cpanfile",
+           "line": 1,
+           "text": "requires 'DBI';",
+           "strength": "constraint",
+           "source": "build-file",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "cpanfile"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "perl-5.26-make",
+      "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "perl",
+        "allowed": ">=5.8.1",
+        "provided": "5.26.3",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "tap-harness",
+        "allowed": "*",
+        "provided": "==1.302073",
+        "satisfied": true
+       }
+      ],
+      "evidence": "image-only",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "tap-harness ==1.302073 supports perl >=5.8.1 (MIN_PERL_VERSION 5.008001 in Test-More/test-more v1.302073 Makefile.PL (checked 2026-10-13))"
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "perl",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "tap-harness",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "cpanfile",
+           "line": 1,
+           "text": "requires 'DBI';",
+           "strength": "constraint",
+           "source": "build-file",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "cpanfile"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "perl-5.26-make",
+      "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "perl",
+        "allowed": ">=5.8.1",
+        "provided": "5.26.3",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "tap-harness",
+        "allowed": "*",
+        "provided": "==1.302073",
+        "satisfied": true
+       }
+      ],
+      "evidence": "image-only",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "tap-harness ==1.302073 supports perl >=5.8.1 (MIN_PERL_VERSION 5.008001 in Test-More/test-more v1.302073 Makefile.PL (checked 2026-10-13))"
+      ]
+     }
+    },
+    "status": "supported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-perl-cmdi",
+    "language": "perl",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "perl",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "tap-harness",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "cpanfile",
+           "line": 1,
+           "text": "",
+           "strength": "constraint",
+           "source": "build-file",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "cpanfile"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "perl-5.26-make",
+      "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "perl",
+        "allowed": ">=5.8.1",
+        "provided": "5.26.3",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "tap-harness",
+        "allowed": "*",
+        "provided": "==1.302073",
+        "satisfied": true
+       }
+      ],
+      "evidence": "image-only",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "tap-harness ==1.302073 supports perl >=5.8.1 (MIN_PERL_VERSION 5.008001 in Test-More/test-more v1.302073 Makefile.PL (checked 2026-10-13))"
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "perl",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "tap-harness",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "cpanfile",
+           "line": 1,
+           "text": "",
+           "strength": "constraint",
+           "source": "build-file",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "cpanfile"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "perl-5.26-make",
+      "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "perl",
+        "allowed": ">=5.8.1",
+        "provided": "5.26.3",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "tap-harness",
+        "allowed": "*",
+        "provided": "==1.302073",
+        "satisfied": true
+       }
+      ],
+      "evidence": "image-only",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "tap-harness ==1.302073 supports perl >=5.8.1 (MIN_PERL_VERSION 5.008001 in Test-More/test-more v1.302073 Makefile.PL (checked 2026-10-13))"
+      ]
+     }
+    },
+    "status": "supported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-javascript-xssesm",
+    "language": "javascript",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "javascript",
+       "root": ".",
+       "components": [
+        {
+         "kind": "build_tool",
+         "name": "npm",
+         "provider": "image",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "package.json",
+           "line": 1,
+           "text": "{",
+           "strength": "constraint",
+           "source": "package",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "vitest",
+         "provider": "registry",
+         "allowed": ">=2.1.9,<3",
+         "preferred": "2.1.9",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "package.json",
+           "line": 7,
+           "text": "\"devDependencies\": {\"vitest\": \"^2.1.9\", \"typescript\": \"^5.6.3\"}",
+           "strength": "constraint",
+           "source": "test-script",
+           "declares": ">=2.1.9,<3"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "package.json"
+       ],
+       "unresolved": []
+      },
+      "status": "undetermined",
+      "missing": [
+       "runtime version not declared in the build files, and no inference row covers vitest >=2.1.9,<3"
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "javascript",
+       "root": ".",
+       "components": [
+        {
+         "kind": "build_tool",
+         "name": "npm",
+         "provider": "image",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "package.json",
+           "line": 1,
+           "text": "{",
+           "strength": "constraint",
+           "source": "package",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "vitest",
+         "provider": "registry",
+         "allowed": ">=2.1.9,<3",
+         "preferred": "2.1.9",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "package.json",
+           "line": 7,
+           "text": "\"devDependencies\": {\"vitest\": \"^2.1.9\", \"typescript\": \"^5.6.3\"}",
+           "strength": "constraint",
+           "source": "test-script",
+           "declares": ">=2.1.9,<3"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "package.json"
+       ],
+       "unresolved": []
+      },
+      "status": "undetermined",
+      "missing": [
+       "runtime version not declared in the build files, and no inference row covers vitest >=2.1.9,<3"
+      ]
+     }
+    },
+    "status": "undetermined",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-perl-xss",
+    "language": "perl",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "perl",
+       "root": ".",
+       "components": [
+        {
+         "kind": "build_tool",
+         "name": "module-build",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "Build.PL",
+           "line": 1,
+           "text": "use strict;",
+           "strength": "constraint",
+           "source": "build-file",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "tap-harness",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "Build.PL",
+           "line": 1,
+           "text": "use strict;",
+           "strength": "constraint",
+           "source": "build-file",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "Build.PL"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "perl-5.26-make",
+      "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "perl",
+        "allowed": ">=5.8.1",
+        "provided": "5.26.3",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "tap-harness",
+        "allowed": "*",
+        "provided": "==1.302073",
+        "satisfied": true
+       }
+      ],
+      "evidence": "image-only",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "tap-harness ==1.302073 supports perl >=5.8.1 (MIN_PERL_VERSION 5.008001 in Test-More/test-more v1.302073 Makefile.PL (checked 2026-10-13))"
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "perl",
+       "root": ".",
+       "components": [
+        {
+         "kind": "build_tool",
+         "name": "module-build",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "Build.PL",
+           "line": 1,
+           "text": "use strict;",
+           "strength": "constraint",
+           "source": "build-file",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "tap-harness",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "Build.PL",
+           "line": 1,
+           "text": "use strict;",
+           "strength": "constraint",
+           "source": "build-file",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "Build.PL"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "perl-5.26-make",
+      "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "perl",
+        "allowed": ">=5.8.1",
+        "provided": "5.26.3",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "tap-harness",
+        "allowed": "*",
+        "provided": "==1.302073",
+        "satisfied": true
+       }
+      ],
+      "evidence": "image-only",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "tap-harness ==1.302073 supports perl >=5.8.1 (MIN_PERL_VERSION 5.008001 in Test-More/test-more v1.302073 Makefile.PL (checked 2026-10-13))"
+      ]
+     }
+    },
+    "status": "supported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-javascript-prototypepollution",
+    "language": "javascript",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "javascript",
+       "root": ".",
+       "components": [
+        {
+         "kind": "build_tool",
+         "name": "npm",
+         "provider": "image",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "package.json",
+           "line": 1,
+           "text": "{",
+           "strength": "constraint",
+           "source": "package",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "jest",
+         "provider": "registry",
+         "allowed": ">=29.7.0,<30",
+         "preferred": "29.7.0",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "package.json",
+           "line": 5,
+           "text": "\"scripts\": {\"test\": \"jest\"},",
+           "strength": "constraint",
+           "source": "test-script",
+           "declares": ">=29.7.0,<30"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "package.json"
+       ],
+       "unresolved": []
+      },
+      "status": "unsupported",
+      "needs": [
+       {
+        "kind": "runtime",
+        "name": "node",
+        "allowed": ">=14.15,<15 || >=16.10,<17 || >=18",
+        "preferred": null
+       },
+       {
+        "kind": "test_framework",
+        "name": "jest",
+        "allowed": ">=29.7.0,<30",
+        "preferred": "29.7.0"
+       }
+      ],
+      "rejected": [
+       {
+        "image_id": "node-8.17.0-npm",
+        "unmet": []
+       }
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "javascript",
+       "root": ".",
+       "components": [
+        {
+         "kind": "build_tool",
+         "name": "npm",
+         "provider": "image",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "package.json",
+           "line": 1,
+           "text": "{",
+           "strength": "constraint",
+           "source": "package",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "jest",
+         "provider": "registry",
+         "allowed": ">=29.7.0,<30",
+         "preferred": "29.7.0",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "package.json",
+           "line": 5,
+           "text": "\"scripts\": {\"test\": \"jest\"},",
+           "strength": "constraint",
+           "source": "test-script",
+           "declares": ">=29.7.0,<30"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "package.json"
+       ],
+       "unresolved": []
+      },
+      "status": "unsupported",
+      "needs": [
+       {
+        "kind": "runtime",
+        "name": "node",
+        "allowed": ">=14.15,<15 || >=16.10,<17 || >=18",
+        "preferred": null
+       },
+       {
+        "kind": "test_framework",
+        "name": "jest",
+        "allowed": ">=29.7.0,<30",
+        "preferred": "29.7.0"
+       }
+      ],
+      "rejected": [
+       {
+        "image_id": "node-8.17.0-npm",
+        "unmet": []
+       }
+      ]
+     }
+    },
+    "status": "unsupported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-python-massassignment",
+    "language": "python",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     }
+    },
+    "status": "supported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-python-errorexposure",
+    "language": "python",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     }
+    },
+    "status": "supported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-python-tempfile",
+    "language": "python",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     }
+    },
+    "status": "supported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-javascript-cors",
+    "language": "javascript",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "javascript",
+       "root": ".",
+       "components": [
+        {
+         "kind": "build_tool",
+         "name": "npm",
+         "provider": "image",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "package.json",
+           "line": 1,
+           "text": "{",
+           "strength": "constraint",
+           "source": "package",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "jest",
+         "provider": "registry",
+         "allowed": ">=29.7.0,<30",
+         "preferred": "29.7.0",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "package.json",
+           "line": 5,
+           "text": "\"scripts\": {\"test\": \"jest\"},",
+           "strength": "constraint",
+           "source": "test-script",
+           "declares": ">=29.7.0,<30"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "package.json"
+       ],
+       "unresolved": []
+      },
+      "status": "unsupported",
+      "needs": [
+       {
+        "kind": "runtime",
+        "name": "node",
+        "allowed": ">=14.15,<15 || >=16.10,<17 || >=18",
+        "preferred": null
+       },
+       {
+        "kind": "test_framework",
+        "name": "jest",
+        "allowed": ">=29.7.0,<30",
+        "preferred": "29.7.0"
+       }
+      ],
+      "rejected": [
+       {
+        "image_id": "node-8.17.0-npm",
+        "unmet": []
+       }
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "javascript",
+       "root": ".",
+       "components": [
+        {
+         "kind": "build_tool",
+         "name": "npm",
+         "provider": "image",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "package.json",
+           "line": 1,
+           "text": "{",
+           "strength": "constraint",
+           "source": "package",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "jest",
+         "provider": "registry",
+         "allowed": ">=29.7.0,<30",
+         "preferred": "29.7.0",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "package.json",
+           "line": 5,
+           "text": "\"scripts\": {\"test\": \"jest\"},",
+           "strength": "constraint",
+           "source": "test-script",
+           "declares": ">=29.7.0,<30"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "package.json"
+       ],
+       "unresolved": []
+      },
+      "status": "unsupported",
+      "needs": [
+       {
+        "kind": "runtime",
+        "name": "node",
+        "allowed": ">=14.15,<15 || >=16.10,<17 || >=18",
+        "preferred": null
+       },
+       {
+        "kind": "test_framework",
+        "name": "jest",
+        "allowed": ">=29.7.0,<30",
+        "preferred": "29.7.0"
+       }
+      ],
+      "rejected": [
+       {
+        "image_id": "node-8.17.0-npm",
+        "unmet": []
+       }
+      ]
+     }
+    },
+    "status": "unsupported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-python-openredirect",
+    "language": "python",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     }
+    },
+    "status": "supported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-perl-responsesplitting",
+    "language": "perl",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "perl",
+       "root": ".",
+       "components": [
+        {
+         "kind": "runtime",
+         "name": "perl",
+         "provider": "image",
+         "allowed": ">=5.10",
+         "preferred": "5.10",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "cpanfile",
+           "line": 1,
+           "text": "requires 'perl', '5.010';",
+           "strength": "constraint",
+           "source": "cpanfile",
+           "declares": ">=5.10"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "tap-harness",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "cpanfile",
+           "line": 1,
+           "text": "requires 'perl', '5.010';",
+           "strength": "constraint",
+           "source": "build-file",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "cpanfile"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "perl-5.26-make",
+      "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "perl",
+        "allowed": ">=5.10",
+        "provided": "5.26.3",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "tap-harness",
+        "allowed": "*",
+        "provided": "==1.302073",
+        "satisfied": true
+       }
+      ],
+      "evidence": "image-only",
+      "runtime_basis": "declared",
+      "inferred_from": []
+     },
+     "candidate": {
+      "requirement": {
+       "language": "perl",
+       "root": ".",
+       "components": [
+        {
+         "kind": "runtime",
+         "name": "perl",
+         "provider": "image",
+         "allowed": ">=5.10",
+         "preferred": "5.10",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "cpanfile",
+           "line": 1,
+           "text": "requires 'perl', '5.010';",
+           "strength": "constraint",
+           "source": "cpanfile",
+           "declares": ">=5.10"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "tap-harness",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "cpanfile",
+           "line": 1,
+           "text": "requires 'perl', '5.010';",
+           "strength": "constraint",
+           "source": "build-file",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "cpanfile"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "perl-5.26-make",
+      "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "perl",
+        "allowed": ">=5.10",
+        "provided": "5.26.3",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "tap-harness",
+        "allowed": "*",
+        "provided": "==1.302073",
+        "satisfied": true
+       }
+      ],
+      "evidence": "image-only",
+      "runtime_basis": "declared",
+      "inferred_from": []
+     }
+    },
+    "status": "supported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-javascript-arginjection",
+    "language": "javascript",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "javascript",
+       "root": ".",
+       "components": [
+        {
+         "kind": "build_tool",
+         "name": "npm",
+         "provider": "image",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "package.json",
+           "line": 1,
+           "text": "{",
+           "strength": "constraint",
+           "source": "package",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "jest",
+         "provider": "registry",
+         "allowed": ">=29.7.0,<30",
+         "preferred": "29.7.0",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "package.json",
+           "line": 5,
+           "text": "\"scripts\": {\"test\": \"jest\"},",
+           "strength": "constraint",
+           "source": "test-script",
+           "declares": ">=29.7.0,<30"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "package.json"
+       ],
+       "unresolved": []
+      },
+      "status": "unsupported",
+      "needs": [
+       {
+        "kind": "runtime",
+        "name": "node",
+        "allowed": ">=14.15,<15 || >=16.10,<17 || >=18",
+        "preferred": null
+       },
+       {
+        "kind": "test_framework",
+        "name": "jest",
+        "allowed": ">=29.7.0,<30",
+        "preferred": "29.7.0"
+       }
+      ],
+      "rejected": [
+       {
+        "image_id": "node-8.17.0-npm",
+        "unmet": []
+       }
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "javascript",
+       "root": ".",
+       "components": [
+        {
+         "kind": "build_tool",
+         "name": "npm",
+         "provider": "image",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "package.json",
+           "line": 1,
+           "text": "{",
+           "strength": "constraint",
+           "source": "package",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "jest",
+         "provider": "registry",
+         "allowed": ">=29.7.0,<30",
+         "preferred": "29.7.0",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "package.json",
+           "line": 5,
+           "text": "\"scripts\": {\"test\": \"jest\"},",
+           "strength": "constraint",
+           "source": "test-script",
+           "declares": ">=29.7.0,<30"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "package.json"
+       ],
+       "unresolved": []
+      },
+      "status": "unsupported",
+      "needs": [
+       {
+        "kind": "runtime",
+        "name": "node",
+        "allowed": ">=14.15,<15 || >=16.10,<17 || >=18",
+        "preferred": null
+       },
+       {
+        "kind": "test_framework",
+        "name": "jest",
+        "allowed": ">=29.7.0,<30",
+        "preferred": "29.7.0"
+       }
+      ],
+      "rejected": [
+       {
+        "image_id": "node-8.17.0-npm",
+        "unmet": []
+       }
+      ]
+     }
+    },
+    "status": "unsupported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-python-jwtnone",
+    "language": "python",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     }
+    },
+    "status": "supported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-python-pwhash",
+    "language": "python",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     }
+    },
+    "status": "supported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-javascript-sessionrandom",
+    "language": "javascript",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "javascript",
+       "root": ".",
+       "components": [
+        {
+         "kind": "build_tool",
+         "name": "npm",
+         "provider": "image",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "package.json",
+           "line": 1,
+           "text": "{",
+           "strength": "constraint",
+           "source": "package",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "unknown",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": false,
+         "conflict": false,
+         "evidence": [],
+         "unparsed": [
+          {
+           "path": "package.json",
+           "line": 5,
+           "text": "\"scripts\": {\"test\": \"node --test\"}",
+           "strength": "tested",
+           "reason": "test script names no known framework"
+          }
+         ]
+        }
+       ],
+       "files": [
+        "package.json"
+       ],
+       "unresolved": []
+      },
+      "status": "undetermined",
+      "missing": [
+       "runtime version not declared in the build files",
+       "test framework not identified (package.json:5 test script names no known framework)"
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "javascript",
+       "root": ".",
+       "components": [
+        {
+         "kind": "build_tool",
+         "name": "npm",
+         "provider": "image",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "package.json",
+           "line": 1,
+           "text": "{",
+           "strength": "constraint",
+           "source": "package",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "unknown",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": false,
+         "conflict": false,
+         "evidence": [],
+         "unparsed": [
+          {
+           "path": "package.json",
+           "line": 5,
+           "text": "\"scripts\": {\"test\": \"node --test\"}",
+           "strength": "tested",
+           "reason": "test script names no known framework"
+          }
+         ]
+        }
+       ],
+       "files": [
+        "package.json"
+       ],
+       "unresolved": []
+      },
+      "status": "undetermined",
+      "missing": [
+       "runtime version not declared in the build files",
+       "test framework not identified (package.json:5 test script names no known framework)"
+      ]
+     }
+    },
+    "status": "undetermined",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-perl-adminpw",
+    "language": "perl",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "perl",
+       "root": ".",
+       "components": [
+        {
+         "kind": "runtime",
+         "name": "perl",
+         "provider": "image",
+         "allowed": ">=5.10",
+         "preferred": "5.10",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "cpanfile",
+           "line": 1,
+           "text": "requires 'perl', '5.010';",
+           "strength": "constraint",
+           "source": "cpanfile",
+           "declares": ">=5.10"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "tap-harness",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "cpanfile",
+           "line": 1,
+           "text": "requires 'perl', '5.010';",
+           "strength": "constraint",
+           "source": "build-file",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "cpanfile"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "perl-5.26-make",
+      "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "perl",
+        "allowed": ">=5.10",
+        "provided": "5.26.3",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "tap-harness",
+        "allowed": "*",
+        "provided": "==1.302073",
+        "satisfied": true
+       }
+      ],
+      "evidence": "image-only",
+      "runtime_basis": "declared",
+      "inferred_from": []
+     },
+     "candidate": {
+      "requirement": {
+       "language": "perl",
+       "root": ".",
+       "components": [
+        {
+         "kind": "runtime",
+         "name": "perl",
+         "provider": "image",
+         "allowed": ">=5.10",
+         "preferred": "5.10",
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "cpanfile",
+           "line": 1,
+           "text": "requires 'perl', '5.010';",
+           "strength": "constraint",
+           "source": "cpanfile",
+           "declares": ">=5.10"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "tap-harness",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "cpanfile",
+           "line": 1,
+           "text": "requires 'perl', '5.010';",
+           "strength": "constraint",
+           "source": "build-file",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "cpanfile"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "perl-5.26-make",
+      "image": "docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "perl",
+        "allowed": ">=5.10",
+        "provided": "5.26.3",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "tap-harness",
+        "allowed": "*",
+        "provided": "==1.302073",
+        "satisfied": true
+       }
+      ],
+      "evidence": "image-only",
+      "runtime_basis": "declared",
+      "inferred_from": []
+     }
+    },
+    "status": "supported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-c-stackoverflow",
+    "language": "c",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "status": "undetermined",
+      "missing": [
+       "no c detector or matrix row (SPEC-0042 reads python, java, javascript, ruby, perl)"
+      ]
+     },
+     "candidate": {
+      "status": "undetermined",
+      "missing": [
+       "no c detector or matrix row (SPEC-0042 reads python, java, javascript, ruby, perl)"
+      ]
+     }
+    },
+    "status": "undetermined",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-c-intoverflow",
+    "language": "c",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "status": "undetermined",
+      "missing": [
+       "no c detector or matrix row (SPEC-0042 reads python, java, javascript, ruby, perl)"
+      ]
+     },
+     "candidate": {
+      "status": "undetermined",
+      "missing": [
+       "no c detector or matrix row (SPEC-0042 reads python, java, javascript, ruby, perl)"
+      ]
+     }
+    },
+    "status": "undetermined",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-python-redos",
+    "language": "python",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     }
+    },
+    "status": "supported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-javascript-zipbomb",
+    "language": "javascript",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "javascript",
+       "root": ".",
+       "components": [
+        {
+         "kind": "build_tool",
+         "name": "npm",
+         "provider": "image",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "package.json",
+           "line": 1,
+           "text": "{",
+           "strength": "constraint",
+           "source": "package",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "unknown",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": false,
+         "conflict": false,
+         "evidence": [],
+         "unparsed": [
+          {
+           "path": "package.json",
+           "line": 5,
+           "text": "\"scripts\": {\"test\": \"node --test\"}",
+           "strength": "tested",
+           "reason": "test script names no known framework"
+          }
+         ]
+        }
+       ],
+       "files": [
+        "package.json"
+       ],
+       "unresolved": []
+      },
+      "status": "undetermined",
+      "missing": [
+       "runtime version not declared in the build files",
+       "test framework not identified (package.json:5 test script names no known framework)"
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "javascript",
+       "root": ".",
+       "components": [
+        {
+         "kind": "build_tool",
+         "name": "npm",
+         "provider": "image",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "package.json",
+           "line": 1,
+           "text": "{",
+           "strength": "constraint",
+           "source": "package",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        },
+        {
+         "kind": "test_framework",
+         "name": "unknown",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": false,
+         "conflict": false,
+         "evidence": [],
+         "unparsed": [
+          {
+           "path": "package.json",
+           "line": 5,
+           "text": "\"scripts\": {\"test\": \"node --test\"}",
+           "strength": "tested",
+           "reason": "test script names no known framework"
+          }
+         ]
+        }
+       ],
+       "files": [
+        "package.json"
+       ],
+       "unresolved": []
+      },
+      "status": "undetermined",
+      "missing": [
+       "runtime version not declared in the build files",
+       "test framework not identified (package.json:5 test script names no known framework)"
+      ]
+     }
+    },
+    "status": "undetermined",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-python-toctou",
+    "language": "python",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     }
+    },
+    "status": "supported",
+    "revisions_agree": true
+   },
+   {
+    "case_id": "ih-python-nullderef",
+    "language": "python",
+    "split": "development",
+    "revisions": {
+     "baseline": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     },
+     "candidate": {
+      "requirement": {
+       "language": "python",
+       "root": ".",
+       "components": [
+        {
+         "kind": "test_framework",
+         "name": "pytest",
+         "provider": "registry",
+         "allowed": "*",
+         "preferred": null,
+         "declared": true,
+         "conflict": false,
+         "evidence": [
+          {
+           "path": "requirements.txt",
+           "line": 1,
+           "text": "pytest",
+           "strength": "constraint",
+           "source": "requirements",
+           "declares": "*"
+          }
+         ],
+         "unparsed": []
+        }
+       ],
+       "files": [
+        "requirements.txt"
+       ],
+       "unresolved": []
+      },
+      "status": "supported",
+      "image_id": "cpython-3.12-pytest",
+      "image": "docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d",
+      "checks": [
+       {
+        "kind": "runtime",
+        "name": "cpython",
+        "allowed": ">=3.10",
+        "provided": "3.12.15",
+        "satisfied": true
+       },
+       {
+        "kind": "test_framework",
+        "name": "pytest",
+        "allowed": "*",
+        "provided": "9.0.*",
+        "satisfied": true
+       }
+      ],
+      "evidence": "live",
+      "runtime_basis": "inferred",
+      "inferred_from": [
+       "pytest 9.0.* supports cpython >=3.10 (PyPI requires-python of pytest 9.0.0 and 9.0.3 (checked 2026-10-13))"
+      ]
+     }
+    },
+    "status": "supported",
+    "revisions_agree": true
+   }
+  ],
+  "held_out": {
+   "javascript undetermined": 1,
+   "javascript unsupported": 1,
+   "perl supported (image-only, runtime inferred)": 1,
+   "python supported (runtime inferred)": 5
+  }
+ }
 }

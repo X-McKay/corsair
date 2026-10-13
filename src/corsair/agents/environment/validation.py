@@ -8,7 +8,7 @@ from corsair.agents.issue_analysis.contracts import SourceRead, SourceReference
 
 from .contracts import EnvironmentDraft, EnvironmentResult, ReadyEnvironmentDraft
 from .dependencies import EnvironmentDependencies
-from .frameworks import FRAMEWORKS, file_matches
+from .frameworks import FRAMEWORKS, file_matches, project_tests
 from .tools.read_source import READ_SOURCE_TOOL
 from .tools.run_setup_command import RUN_SETUP_COMMAND_TOOL, SetupRun
 
@@ -57,6 +57,9 @@ async def finalize_environment(ctx: RunContext[EnvironmentDependencies], draft: 
         framework = FRAMEWORKS.get(draft.framework)
         if framework is None:
             raise ModelRetry(f"framework must be one of {sorted(FRAMEWORKS)}; otherwise report unsupported")
+        smoke = next((t for t in deps.inputs.smoke_tests if t.path == draft.baseline_test_path), None)
+        if smoke is not None and (smoke.framework != draft.framework or smoke.test_id != draft.baseline_test_id):
+            raise ModelRetry(f"the supplied smoke test is the {smoke.framework} test {smoke.test_id}; use it exactly or a project test")
         if not file_matches(draft.framework, draft.baseline_test_id, draft.baseline_test_path):
             raise ModelRetry("baseline_test_path must be exactly the file the native baseline_test_id names")
         if not framework.targets(tuple(draft.baseline_test_command), draft.baseline_test_id):
@@ -70,13 +73,17 @@ async def finalize_environment(ctx: RunContext[EnvironmentDependencies], draft: 
         discovery, baseline = succeeded[positions[-2]], succeeded[positions[-1]]
         if draft.baseline_test_id.encode() not in deps.ledger.outputs[discovery][0]:
             raise ModelRetry("baseline_test_id must appear in the discovery command's output")
+        if smoke is not None and (others := project_tests(draft.framework, smoke, deps.ledger.outputs[discovery][0])):
+            raise ModelRetry(f"discovery listed project tests ({', '.join(others[:3])}); use one of them as the baseline, "
+                             "not the smoke test")
         if not framework.passed(deps.ledger.outputs[baseline][0]):
             raise ModelRetry("the baseline run must report exactly one passed test, with nothing skipped, xfailed or errored")
-        if set(draft.approved_test_paths) & {s.path for s in deps.inputs.source_files}:
-            raise ModelRetry("approved_test_paths must not name saved source files")
+        if set(draft.approved_test_paths) & {s.path for s in (*deps.inputs.source_files, *deps.inputs.smoke_tests)}:
+            raise ModelRetry("approved_test_paths must not name saved source files or the smoke test")
         toolchain = next(t for t in deps.inputs.toolchains if t.toolchain_id == deps.toolchain_id)
         values |= {"recipe": [s.model_dump() | {"source": quoted(s.source)} for s in draft.recipe],
-                   "toolchain_image": toolchain.image, "language": toolchain.language, "runtime": toolchain.runtime, "baseline_outcome": "passed", "scratch_location": deps.scratch_location}
+                   "toolchain_image": toolchain.image, "language": toolchain.language, "runtime": toolchain.runtime, "baseline_outcome": "passed", "scratch_location": deps.scratch_location,
+                   "baseline_basis": "project_test" if smoke is None else "operator_smoke"}
     else:
         if draft.status == "unsupported" and (deps.ledger.halted or deps.ledger.pending_correction is not None):
             raise ModelRetry("setup halted on an observed failure; report blocked and cite its run, not unsupported")

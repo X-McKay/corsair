@@ -13,6 +13,7 @@ and the durable chain (``corsair.workflows.chain``) binds child workflows and ac
 import asyncio
 import re
 from dataclasses import dataclass, field, replace
+from functools import partial
 from time import perf_counter
 from typing import Any, Awaitable, Callable, Literal, Protocol
 from uuid import UUID, uuid4
@@ -49,7 +50,7 @@ from corsair.nodes.runtime.environment import RuntimeCatalog, check_ready, ready
 from corsair.nodes.witness import WitnessEvidence, witness_evidence
 from corsair.ports.execution import SandboxExecution
 from corsair.ports.sandbox import SandboxHandle
-from corsair.ports.test_runner import ApprovedPatch, NativeTestRun, TestRunner, WitnessRequest
+from corsair.ports.test_runner import ApprovedPatch, NativeTestRun, PatchFile, TestRunner, WitnessRequest
 
 from .evidence import evidence_items, freeze, observation_plan, run_evidence, witness_request
 
@@ -216,7 +217,10 @@ class PreparedSandbox:
 
 class Preparation(Protocol):
     """Operator-owned sandbox lifecycle for the environment stage; adapters are chosen outside the chain."""
-    def prepare(self, toolchain: Toolchain, operation: UUID) -> PreparedSandbox: ...
+    def prepare(self, toolchain: Toolchain, operation: UUID, *, overlay: tuple[PatchFile, ...] = ()) -> PreparedSandbox:
+        """`overlay`: operator files (SPEC-0071 smoke tests) written beside the captured commit; an overlay path the
+        capture already has is refused before any sandbox is created."""
+        ...
     def release(self, sandbox: PreparedSandbox, operation: UUID) -> Literal["confirmed", "unconfirmed"]: ...
 
 
@@ -360,7 +364,8 @@ async def prepare_environment(inputs: EnvironmentInput, model: Model | None, pre
         return StageAttempt("environment", None, None, (), 0.0, PreparationMissing(NO_PREPARATION), limits)
     (selected,), operation, started = inputs.toolchains, uuid4(), perf_counter()
     try:
-        sandbox = await asyncio.to_thread(preparation.prepare, selected, operation)
+        overlay = tuple(PatchFile(t.path, t.content.encode()) for t in inputs.smoke_tests)
+        sandbox = await asyncio.to_thread(partial(preparation.prepare, overlay=overlay), selected, operation)
     except Exception as exc:
         # Nothing was handed back to release; whether a sandbox exists is the adapter's to report.
         return StageAttempt("environment", None, None, (), perf_counter() - started, exc, limits, cleanup="unconfirmed")
@@ -371,7 +376,10 @@ async def prepare_environment(inputs: EnvironmentInput, model: Model | None, pre
                                        budget=SetupBudget(max_commands=budget.setup_commands), new_operation=uuid4)
         attempt = await _invoke("environment", agent, environment_prompt(inputs), deps, limits)
         if isinstance(attempt.output, ReadyEnvironment):
-            source, refusal = captured(sandbox, attempt.output.baseline_test_path)
+            # SPEC-0071: a smoke baseline is the operator's overlay file, so its saved source is the template itself.
+            smoke = next((t for t in inputs.smoke_tests if t.path == attempt.output.baseline_test_path), None)
+            source, refusal = (SourceFile(path=smoke.path, content=smoke.content), None) if smoke else \
+                captured(sandbox, attempt.output.baseline_test_path)
             attempt = replace(attempt, baseline_source=source, baseline_refusal=refusal)
     except Exception as exc:
         attempt = StageAttempt("environment", None, None, (), perf_counter() - started, exc, limits)
@@ -414,6 +422,8 @@ UNOBSERVED = ("The witness probe runs inside the test interpreter: it is operato
               "events elsewhere are not observed.",
               "Environment identity is the operator's declaration for both revisions, not an observed image or "
               "dependency digest.")
+SMOKE_BASELINE = ("Baseline test is the operator smoke test: the project ships no test that ran. It shows that the "
+                  "runtime, framework and discovery work after setup, not that the project's own code loads.")
 UNSELECTED = "Runtime not selected from build files: the runtime is the operator's declaration."
 MESSAGES_OMITTED = "environment stage messages omitted: the encoded stage record exceeded its payload bound"
 OBSERVED_IDENTITY = ("Environment image and recipe observed by the environment stage; scratch location, dependency "
@@ -525,7 +535,8 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         if runtime is None:
             return stop("environment", "setup source needs a runtime selected from build files; the case carries none")
         try:
-            environment_input = EnvironmentInput(toolchains=(runtime.toolchain,), **case.setup.model_dump())
+            environment_input = EnvironmentInput(toolchains=(runtime.toolchain,), smoke_tests=runtime.smoke_tests,
+                                                 **case.setup.model_dump())
         except ValueError as exc:
             return stop("environment", f"environment input refused: {exc}"[:2048])
         result = await _stage("environment", environment_input)
@@ -546,6 +557,8 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         except ValueError as exc:
             return stop("environment", f"ready environment refused: {exc}"[:2048], limitations=unconfirmed)
         provenance, stage_notes = OBSERVED_IDENTITY + unconfirmed, unconfirmed
+        if result.baseline_basis == "operator_smoke":
+            provenance += (SMOKE_BASELINE,)
         # The agent chose the baseline test while the case ran; its file joins the saved inventory from the capture.
         if result.baseline_test_path not in {source.path for source in source_files}:
             baseline = attempts[-1].baseline_source
