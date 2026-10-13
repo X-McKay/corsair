@@ -15,7 +15,7 @@ from tests.qualification.support import ROOT, NetworkFixture
 from tests.qualification.gateway import native_gateway
 from tests.qualification.test_lifecycle import SdkReceipts
 from tests.qualification.test_policy import require_network, owned_sandbox, observe_policy, global_policy_observation, wait_logging_activation
-from tests.qualification.prepare_toolchains import JAVA_TESTS, LAUNCHER, PERLS, PYTHONS, SOURCE, TAP_TESTS, image_receipt, source_hashes, tap_report
+from tests.qualification.prepare_toolchains import JAVA_TESTS, JEST, LAUNCHER, NODE_TESTS, NODES, NPM, PERLS, PYTHONS, SOURCE, TAP_TESTS, image_receipt, jest_report, source_hashes, tap_report
 from corsair.adapters.maven_runner import WRAPPER, MavenRunner, MavenRunnerConfig, selection
 from corsair.reports.junit_listing import listed
 
@@ -45,7 +45,10 @@ def toolchain_gateway(kube, request):
 
 def toolchain_policy(language):
     policy = yaml.safe_load((ROOT / 'policies/openshell/identity.yaml').read_text())
-    policy['filesystem_policy']['read_only'] += ['/opt/corsair-fixture'] + ([] if language in PYTHONS or language in PERLS else ['/opt/java/openjdk', '/opt/corsair-m2', '/opt/corsair-m2.sha256', '/opt/corsair-junit', '/opt/corsair-junit.sha256'])
+    policy['filesystem_policy']['read_only'] += ['/opt/corsair-fixture'] + ([] if language in PYTHONS or language in PERLS else
+        # Node 8's Debian buster base is not merged-/usr: its loader is under /lib64; Yarn is unpacked under /opt.
+        ['/lib64', '/opt/corsair-npm', '/opt/yarn-v1.21.1'] if language in NODES else
+        ['/opt/java/openjdk', '/opt/corsair-m2', '/opt/corsair-m2.sha256', '/opt/corsair-junit', '/opt/corsair-junit.sha256'])
     return policy
 
 
@@ -72,6 +75,9 @@ def stage_project(kube, cli, sdk, name, language, record):
     project.mkdir()
     if language in PYTHONS:
         shutil.copyfile(SOURCE / language / 'test_native.py', project / 'test_native.py')
+    elif language in NODES:
+        for file in ('package.json', 'package-lock.json', 'native.test.js'):
+            shutil.copyfile(SOURCE / language / file, project / file)
     elif language in PERLS:
         shutil.copyfile(SOURCE / language / 'Makefile.PL', project / 'Makefile.PL')
         shutil.copytree(SOURCE / language / 'lib', project / 'lib')
@@ -157,6 +163,79 @@ def java_offline(sdk, name, remote, record, language):
     expect_completed(result, 1, f'Tests run: {len(JAVA_TESTS) + 1}, Failures: 1, Errors: 0, Skipped: 0')
     assert expect['expected'] in result.stdout
     record['offline_diagnostics'] = ['missing-artifact/native-Maven-prefix-resolver', 'no-discovery', 'compilation', 'assertion']
+
+
+# Exact runtime, package managers and Jest each Node toolchain image carries (upstream image and fixture lockfile).
+NODE_TOOLCHAINS = {'node8': {'versions': 'v8.17.0\n6.13.4\n1.21.1\n24.8.0\n', 'yarn': '/opt/yarn-v1.21.1/bin/yarn.js'}}
+
+
+def node_offline(sdk, name, remote, record, language):
+    expect = NODE_TOOLCHAINS[language]
+    node, npm = NPM[0], [*NPM, '--cache', '/tmp/npm']
+    # The fixture's own lockfile, installed offline from the image cache: npm checks each tarball's SHA-512 again.
+    result = execute(sdk, name, ['/bin/sh', '-ec', 'cp -R /opt/corsair-npm /tmp/npm'], remote)
+    expect_completed(result, 0, '')
+    result = execute(sdk, name, [*npm, 'ci', '--offline'], remote, timeout=120)
+    expect_completed(result, 0, 'added ')
+    result = execute(sdk, name, ['/bin/sh', '-ec', f'{node} --version; {node} {NPM[1]} --version; {node} {expect["yarn"]} --version; {node} node_modules/jest/bin/jest.js --version'], remote)
+    expect_completed(result, 0, '')
+    assert result.stdout == expect['versions'], result.stdout
+    record['versions'] = result.stdout
+    result = execute(sdk, name, [*JEST, '--json', f'--outputFile={remote}/passed.json'], remote, timeout=120)
+    expect_completed(result, 0, f'Tests:       {len(NODE_TESTS)} passed, {len(NODE_TESTS)} total')
+    passed = execute(sdk, name, ['/bin/cat', remote + '/passed.json'], '/tmp')
+    assert passed.exit_code == 0 and passed.stderr == ''
+    record.setdefault('native_reports', []).append(jest_report(passed.stdout, NODE_TESTS))
+    result = execute(sdk, name, [*npm, 'install', '--offline', '--no-save', 'corsair-qualification-missing-artifact-1e-0001@0.0.0'], remote)
+    expect_completed(result, 1, 'ENOTCACHED')
+    result = execute(sdk, name, [*JEST, 'corsair-absent-pattern'], remote)
+    expect_completed(result, 1, 'No tests found')
+    setup = execute(sdk, name, ['/bin/sh', '-ec', 'cp -R . /tmp/node-syntax; printf "test(\'syntax\', () => { invalid JavaScript; });\\n" > /tmp/node-syntax/syntax.test.js; cp -R . /tmp/node-assertion; printf "test(\'deliberate failure\', () => { expect(1).toBe(2); });\\n" > /tmp/node-assertion/assertion.test.js'], remote)
+    expect_completed(setup, 0, '')
+    result = execute(sdk, name, list(JEST), '/tmp/node-syntax', timeout=120)
+    expect_completed(result, 1, 'Test suite failed to run')
+    assert 'SyntaxError' in result.stderr
+    result = execute(sdk, name, list(JEST), '/tmp/node-assertion', timeout=120)
+    expect_completed(result, 1, f'Tests:       1 failed, {len(NODE_TESTS)} passed, {len(NODE_TESTS) + 1} total')
+    assert 'Expected: 2' in result.stderr and 'Received: 1' in result.stderr
+    record['offline_diagnostics'] = ['missing-package/npm-offline-cache', 'no-discovery', 'syntax/suite', 'assertion']
+
+
+# One small dependency-free package, pinned by the registry's SHA-512 as a project lockfile pins it.
+COLD_PACKAGE = {'name': 'is-number', 'version': '7.0.0', 'resolved': 'https://registry.npmjs.org/is-number/-/is-number-7.0.0.tgz',
+                'integrity': 'sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng=='}
+MISSING_PACKAGE = 'corsair-qualification-missing-artifact-1e-0001'
+
+
+def node_dependencies(kube, cli, sdk, name, remote, record, language):
+    """A project's registry install at setup: npm through the sandbox policy to registry.npmjs.org (SPEC-0026)."""
+    policy = toolchain_policy(language)
+    policy['network_policies'] = {'dependencies': {'name': 'fixed-native-dependencies', 'binaries': [{'path': NPM[0]}], 'endpoints': [
+        {'host': 'registry.npmjs.org', 'port': 443, 'protocol': 'rest', 'enforcement': 'enforce', 'rules': [
+            {'allow': {'method': 'GET', 'path': urlparse(COLD_PACKAGE['resolved']).path}}, {'allow': {'method': 'GET', 'path': '/' + MISSING_PACKAGE}}]},
+    ]}}
+    path = kube.evidence / (language + '-dependencies-policy.yaml')
+    path.write_text(yaml.safe_dump(policy))
+    cli('policy', 'set', name, '--policy', str(path), '--wait')
+    observe_policy(cli, name, policy, record)
+    package = {'name': 'corsair-cold', 'version': '0.0.0', 'private': True, 'dependencies': {COLD_PACKAGE['name']: COLD_PACKAGE['version']}}
+    lock = {'name': 'corsair-cold', 'version': '0.0.0', 'lockfileVersion': 1, 'requires': True,
+            'dependencies': {COLD_PACKAGE['name']: {k: COLD_PACKAGE[k] for k in ('version', 'resolved', 'integrity')}}}
+    write = f"const fs=require('fs'); fs.mkdirSync('/tmp/cold'); fs.writeFileSync('/tmp/cold/package.json', {json.dumps(json.dumps(package))}); fs.writeFileSync('/tmp/cold/package-lock.json', {json.dumps(json.dumps(lock))});"
+    result = execute(sdk, name, [NPM[0], '-e', write], remote)
+    expect_completed(result, 0, '')
+    npm = [*NPM, '--cache', '/tmp/npm-cold', '--fetch-retries=0']
+    result = execute(sdk, name, [*npm, 'ci'], '/tmp/cold', timeout=120)
+    expect_completed(result, 0, 'added 1 packages')
+    result = execute(sdk, name, [NPM[0], '-e', "const p=require('/tmp/cold/node_modules/is-number/package.json'); console.log(p.version); console.log(require.resolve('is-number', {paths: ['/tmp/cold']}))"], remote)
+    expect_completed(result, 0, '7.0.0')
+    assert result.stdout == '7.0.0\n/tmp/cold/node_modules/is-number/index.js\n'
+    result = execute(sdk, name, [*npm, 'install', '--no-save', '--no-package-lock', '--prefix', '/tmp/missing', MISSING_PACKAGE + '@0.0.0'], remote, timeout=120)
+    expect_completed(result, 1, 'E404')
+    assert '404 Not Found - GET https://registry.npmjs.org/' + MISSING_PACKAGE in result.stderr
+    assert 'policy_denied' not in result.stdout + result.stderr and 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' not in result.stdout + result.stderr and 'SELF_SIGNED' not in result.stdout + result.stderr
+    record['dependency_diagnostics'] = {'cold_install': 'is-number@7.0.0 lockfile SHA-512, npm ci from registry.npmjs.org, actual require',
+                                        'missing_package': 'permitted registry 404 through npm (E404), not a policy denial'}
 
 
 # Exact versions each Perl image carries, measured in the upstream image (core modules plus the image's GNU Make).
@@ -330,6 +409,9 @@ def toolchain_gate(kube, gateway, language):
                 if language in PYTHONS:
                     python_offline(sdk, name, remote, record, language)
                     python_dependencies(kube, gateway['cli'], sdk, name, remote, record, endpoint, pair, language)
+                elif language in NODES:
+                    node_offline(sdk, name, remote, record, language)
+                    node_dependencies(kube, gateway['cli'], sdk, name, remote, record, language)
                 elif language in PERLS:
                     perl_offline(sdk, name, remote, record, language)
                 else:
@@ -353,6 +435,11 @@ def test_native_java8_toolchain(image_kube, toolchain_gateway):
 @pytest.mark.toolchain('java')
 def test_native_java_toolchain(image_kube, toolchain_gateway):
     toolchain_gate(image_kube, toolchain_gateway, 'java')
+
+
+@pytest.mark.toolchain('node8')
+def test_native_node8_toolchain(image_kube, toolchain_gateway):
+    toolchain_gate(image_kube, toolchain_gateway, 'node8')
 
 
 @pytest.mark.toolchain('python')

@@ -19,6 +19,7 @@ BASES = {
     'java8': 'docker.io/library/maven@sha256:f2cb52730ea0bde9dc8ba20e5e539d000dcdd7ab9e498d70c301fe04fbddb656',
     'python37': 'docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b',
     'perl526': 'docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7',
+    'node8': 'docker.io/library/node@sha256:c9025a77a42d87e95433337ac581c0d42810c1263f0e78802691046920d1560b',
 }
 # Interpreter each Python toolchain directory is built for; its wheels are fetched hash-checked before an offline build.
 PYTHONS = {'python': 'python3.12', 'python37': 'python3.7'}
@@ -28,6 +29,21 @@ JAVA_TESTS = ('nativeRoundtrip', 'nativeRuntime')
 # Perl image directories: the upstream image already carries make and the core TAP harness, so nothing is fetched.
 PERLS = ('perl526',)
 TAP_TESTS = ('native_roundtrip', 'native_runtime')
+# Node toolchain directories; each fixture's package-lock.json pins every npm package by SHA-512 (SPEC-0055).
+NODES = ('node8',)
+NODE_TESTS = ('nativeRoundtrip', 'nativeRuntime')
+NPM = ('/usr/local/bin/node', '/usr/local/lib/node_modules/npm/bin/npm-cli.js', '--ignore-scripts', '--no-audit', '--no-update-notifier')
+JEST = ('/usr/local/bin/node', 'node_modules/jest/bin/jest.js', '--ci')
+
+
+def jest_report(text, expected):
+    """Jest's own --json report: every expected test ran and passed, nothing else ran."""
+    report = json.loads(text)
+    results = [a for suite in report['testResults'] for a in suite['assertionResults']]
+    assert report['success'] is True and report['numTotalTests'] == report['numPassedTests'] == len(expected)
+    assert report['numFailedTests'] == report['numPendingTests'] == report['numTodoTests'] == 0
+    assert sorted(a['fullName'] for a in results) == sorted(expected) and all(a['status'] == 'passed' for a in results)
+    return {'tests': len(results), 'ids': sorted(a['fullName'] for a in results), 'sha256': hashlib.sha256(text.encode()).hexdigest()}
 
 
 def source_hashes(language=None):
@@ -58,17 +74,21 @@ def tap_report(text, expected):
 
 def control(kube, image, language):
     cidfile = kube.evidence / (language + '-control.id')
-    command = ('cp -R /opt/corsair-fixture /tmp/project; cd /tmp/project; perl Makefile.PL; make; prove -b -v t/' if language in PERLS else
+    npm, jest = ' '.join(NPM), ' '.join(JEST)
+    command = ('cp -R /opt/corsair-fixture /tmp/project; cp -R /opt/corsair-npm /tmp/npm; cd /tmp/project; ' + npm + ' --cache /tmp/npm ci --offline >&2; ' + jest + ' --json --outputFile=/tmp/result.json >&2; cat /tmp/result.json' if language in NODES else
+               'cp -R /opt/corsair-fixture /tmp/project; cd /tmp/project; perl Makefile.PL; make; prove -b -v t/' if language in PERLS else
                'cp /opt/corsair-fixture/test_native.py /tmp/test_native.py; cd /tmp; ' + PYTHONS[language] + ' -m pytest -q test_native.py --junitxml=/tmp/result.xml; cat /tmp/result.xml' if language in PYTHONS else
                'sha256sum -c /opt/corsair-junit.sha256 >/dev/null; cd /opt/corsair-m2; sha256sum -c /opt/corsair-m2.sha256 >/dev/null; printf "CACHE-BEGIN\\n"; cat /opt/corsair-m2.sha256; printf "CACHE-END\\n"; cp -R /opt/corsair-fixture /tmp/project; cp -R /opt/corsair-m2 /tmp/m2; /usr/share/maven/bin/mvn -B -ntp -o -f /tmp/project/pom.xml -Dmaven.repo.local=/tmp/m2 test; cat /tmp/project/target/surefire-reports/TEST-corsair.NativeTest.xml')
     try:
         result = kube.native(DOCKER + ['run', '--rm', '--cidfile', str(cidfile), '--network=none', '--cap-drop=ALL', '--security-opt=no-new-privileges', '--user=10001:10001', image, '/bin/sh', '-ec', command], timeout=180)
-        if language in PERLS:
+        if language in NODES:
+            (kube.evidence / (language + '-control-report.json')).write_text(json.dumps(jest_report(result.stdout, NODE_TESTS), indent=2))
+        elif language in PERLS:
             tap_report(result.stdout, TAP_TESTS)
         else:
             assert 'tests="%d"' % (1 if language in PYTHONS else len(JAVA_TESTS)) in result.stdout and 'failures="0"' in result.stdout and 'skipped="0"' in result.stdout
             assert all(name in result.stdout for name in (('test_native_roundtrip',) if language in PYTHONS else JAVA_TESTS))
-        if language not in PYTHONS and language not in PERLS:
+        if language not in PYTHONS and language not in PERLS and language not in NODES:
             (kube.evidence / (language + '-maven-cache.sha256')).write_text(result.stdout.split('CACHE-BEGIN\n', 1)[1].split('CACHE-END\n', 1)[0])
     finally:
         cleanup = {'confirmed': False}
@@ -119,6 +139,7 @@ def main():
                 kube.native(DOCKER + ['pull', base], timeout=180)
                 # Maven's trusted preparation explicitly downloads exact pinned artifacts;
                 # its strict native checksums and complete cache hashes are retained. Python and Perl build offline.
+                # npm's trusted preparation installs only the checked-in lockfile, each tarball SHA-512 checked.
                 kube.native(DOCKER + ['build', '--network=' + ('none' if language in PYTHONS or language in PERLS else 'default'), '--pull=false', '--tag', tag, str(context)], timeout=300)
                 config = kube.native(DOCKER + ['image', 'inspect', '--format', '{{.Id}}', tag]).stdout.strip()
                 control(kube, config, language)
