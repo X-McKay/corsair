@@ -57,6 +57,31 @@ Each agent is improved through its own loop, independent of the cluster and of o
 
 A change to an agent states the baseline it was compared with and the comparison's result in its plan. A new agent ships with its eval set and a `SUITES` entry in `evals/run.py`. Agent packages follow the [agent package convention](../agent-packages.md); a suite that reports `toolset_sha256` makes any change to the offered tools visible in `comparison.md`.
 
+## Live qualification
+
+Live runs use the shared RIG0 host and its one kind cluster, so they come last and cost the most. Three tiers keep most checks off it ([SPEC-0062](specs/SPEC-0062-live-qualification-tooling.md)):
+
+| Tier | Where | Use it for | Command |
+| --- | --- | --- | --- |
+| Offline | Cloud, CI or any host | Every change. `make test-config` includes stub smoke runs of each live harness up to its first native command, so wiring bugs (a missing evidence directory, a gateway consumed by the first of several gates, an unresolved fixture, a CLI that does not parse) fail here, not on RIG0. They qualify nothing | `make test-config` |
+| Image-only | Docker on a host, no cluster | Toolchain, runner and harness changes: build the image (its trusted control runs offline in the container) and run the real case through the image-case harness. Recorded as image-only, never as sandbox evidence | `make toolchain-images TOOLCHAINS=<dir>`, then the case harness (for Maven, `tests.qualification.java_image_case`) |
+| Kind/OpenShell gate | RIG0, this checkout's own cluster | Changes to sandbox, policy or gateway code, and once before an image's matrix row lands, as one batch | `make qualify-image TOOLCHAIN=<dir> [CASE=<id>]` |
+
+`make qualify-image` runs the whole chain and stops at the first failure: tools, the cluster (created only when this checkout holds no receipt; it refuses to adopt one another checkout holds), admission and network (reused while the installer's and policy gate's own checks still accept an earlier run of this checkout on the same node and runtime lock, otherwise run fresh), image build (skipped when the prepared receipt matches the sources) and load, gateway install, the toolchain gate, then a fresh gateway and the image's `qualify-<dir>-case` target when `CASE` is given. Each step logs under `.runs/qualify/<run>/logs/`, the gate and case keep their own evidence directories, and `SUMMARY.md` there is what a RIG0 session reports. It never runs `workspace-storage` or `kind-down`, never deletes retained state and never retries. `make cluster-status` answers who holds the cluster and what can be reused, read-only. `make archive-runs` copies a worktree's `.runs` into the main checkout's `.runs/worktrees/` and checks the copy; it removes nothing.
+
+Rules for every live run:
+
+- **One paste per run.** A RIG0 paste is self-contained, runs the branch head or a frozen commit, names the worktree `/home/al/git/corsair/.worktrees/<branch>` and its `.runs`, and is written once. `git worktree add` may need Al's hand or the allow rules in [deploy/rig0/settings.local.json](../../deploy/rig0/settings.local.json), which Al reviews once and merges into RIG0's `.claude/settings.local.json`. The pre-bash hook's blocks on `mkfs`, `dd if=` and `kubectl delete namespace` stay; no make target routes around them.
+- **Merge before the gate, row after it.** An image PR merges once offline review and CI are clean: without a matrix row nothing selects its image. The matrix row lands in its own small follow-up PR carrying only the live evidence (the SUMMARY, the report rows and the row itself). No row before a passed gate.
+- **A pass counts only on the final source.** The gate records the source hashes it ran; a later change to any of them (including a merge that touches the gate harness) needs a rerun before the row lands. This is why a harness change merged into an image branch after its run costs one more RIG0 run (#51 after #55's merge), and why merging main into an image branch before its gate is cheaper than after.
+
+Standing decisions a worker does not stop to ask about:
+
+1. A replayed third-party proof test gets a Corsair-authored control copied verbatim from an unrelated upstream test in the same project, and the proof test stays byte-identical to its source.
+2. Qualification evidence lives in each checkout's own `.runs` (the gateway installer and network check accept proof only from the checkout doing the install) and is archived with `make archive-runs` before a worktree is deleted.
+3. A worker may tear down and recreate the cluster when it is idle and the worker holds it (its receipt is in the worker's checkout). Handover to another checkout is by message, and the next holder runs `make kind-down` in the previous holder's checkout.
+4. A diagnosed failure that ran no test (a collection or harness error) may run once more after the fix, recorded as its own attempt. Blind retries stay forbidden.
+
 ## Using the skills
 
 Launch the client from the repository. Codex supports repository `.agents/skills` and follows symlinked skill folders; Claude uses real project folders in `.claude/skills`. Preserve Git symlinks when cloning. Do not copy and independently edit a second skill set.

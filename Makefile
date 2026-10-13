@@ -201,6 +201,7 @@ qualify-fixture-e2e:
 # SPEC-0046: host-fetch CVE-2021-32839 into RUN-sources (pins written there, not to benchmarks/), then the pytest
 # runner on its baseline and fix commits in fresh CPython 3.7 sandboxes. Needs TOOLCHAINS=python37 images loaded.
 qualify-python37-case:
+	test -z "$(CASE)" -o "$(CASE)" = CVE-2021-32839
 	test ! -e "$(CORSAIR_QUAL_RUN)"
 	mkdir -p "$(CORSAIR_QUAL_RUN)"
 	PYTHONPATH="$(CURDIR)/src:$(CURDIR)" uv run --locked python -m evals.benchmark.sources fetch --run-dir "$(CORSAIR_QUAL_RUN)-sources" --cases CVE-2021-32839 --keep --pins "$(CORSAIR_QUAL_RUN)-sources/source-pins.json"
@@ -218,3 +219,20 @@ qualify-workspace-quota:
 	test ! -e "$(CORSAIR_QUAL_RUN)"
 	mkdir -p "$(CORSAIR_QUAL_RUN)"
 	uv run --locked python -m pytest $(PYTEST_ROOT) tests/qualification -m workspace_quota --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
+
+# One image's live chain on this checkout's own cluster: tools, cluster (created only without this checkout's receipt),
+# admission and network (reused while their gate checks pass on this node and lock), image build/load, gateway, the
+# toolchain gate, then a fresh gateway and the image's qualify-<dir>-case. Stops at the first failure; evidence and
+# SUMMARY.md under .runs/qualify/<RUN>. TOOLCHAIN=<image dir>; optional CASE, RUN, ADMISSION_RUN, NETWORK_RUN.
+.PHONY: qualify-image cluster-status archive-runs
+qualify-image:
+	test -n "$(TOOLCHAIN)"
+	PYTHONPATH="$(CURDIR)/src:$(CURDIR)" uv run --locked python -m tests.qualification.qualify_image run --toolchain "$(TOOLCHAIN)" $(if $(CASE),--case "$(CASE)") $(if $(RUN),--run "$(RUN)") $(if $(ADMISSION_RUN),--admission "$(ADMISSION_RUN)") $(if $(NETWORK_RUN),--network "$(NETWORK_RUN)")
+
+# Read-only: whether this checkout holds the cluster, what is installed, which evidence is reusable.
+cluster-status:
+	PYTHONPATH="$(CURDIR)/src:$(CURDIR)" uv run --locked python -m tests.qualification.qualify_image status
+
+# Copy this worktree's .runs into the main checkout's .runs/worktrees/ before the worktree is deleted; removes nothing.
+archive-runs:
+	PYTHONPATH="$(CURDIR)/src:$(CURDIR)" uv run --locked python -m tests.qualification.qualify_image archive $(if $(DEST),--dest "$(DEST)")
