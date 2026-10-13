@@ -29,7 +29,7 @@ Implement [SPEC-0046](../specs/SPEC-0046-cpython37-toolchain.md): a CPython 3.7 
 
 Image: `docker build --network=none` of the python37 context from `python@sha256:b53f496c…` (CPython 3.7.17, pip 23.0.1) installed the nine hash-pinned wheels; fixture control passed (`tests="1"`, `test_native_roundtrip`); syntax, no-tests and assertion exits 2, 5 and 1. `prepare_toolchains build --only python37` itself stopped at `docker pull` with Docker Hub 429 in the container; it runs on RIG0. CVE-2021-32839 host fetch in the container reproduced both #42 manifest digests exactly.
 
-`make test-config`: 997 passed before the records and the gate files were added (rerun recorded below).
+`make test-config`: 997 passed on 6be1b5f before the gate files; 1064 passed after merging main 42a7273 with everything above.
 
 ## Decisions and next action
 
