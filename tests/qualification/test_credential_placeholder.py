@@ -10,6 +10,7 @@ documented in the pinned SDK, so that step stays unqualified.
 import hashlib
 import importlib.metadata
 import json
+import re
 import secrets
 import time
 import uuid
@@ -17,7 +18,7 @@ import uuid
 from google.protobuf.json_format import MessageToDict
 import grpc
 from openshell import DeletionOutcome, SandboxClient, TlsConfig
-from openshell._proto import datamodel_pb2, openshell_pb2
+from openshell._proto import datamodel_pb2, openshell_pb2, sandbox_pb2
 import pytest
 
 from tests.qualification.credential_scan import SCAN
@@ -34,6 +35,12 @@ WORKSPACE = 'default'
 KEY = 'CORSAIR_QUAL_FAKE_TOKEN'
 PREFIX = 'corsair-fake-credential-'
 ROOTS = ('/sandbox', '/tmp', '/.openshell')
+# Unresolvable profile endpoint: 0.1.3 withholds static credentials from an endpointless profile
+# (server grpc/provider.rs `has_no_usable_endpoint`, docs providers/profiles.mdx); nothing is sent to it.
+ENDPOINT = 'corsair-qualification.invalid'
+# Upstream 0.1.3 placeholder forms (openshell-core secrets.rs): env revision, unrevisioned, or stable handle.
+PLACEHOLDER = re.compile(r'openshell:resolve:env:(v\d+_|s[0-9a-f]{64}_)?' + KEY)
+READINESS_SECONDS = 90
 SOURCES = ['tests/qualification/test_credential_placeholder.py', 'tests/qualification/credential_scan.py',
            'tests/qualification/gateway.py', 'tests/qualification/support.py', 'tests/qualification/test_recovery.py',
            'docs/development/specs/SPEC-0025-sandbox-source-fetch.md', 'policies/openshell/identity.yaml',
@@ -85,15 +92,39 @@ def profile_ids(rpc):
 
 
 def probe_profile(profile_id):
-    """Gate-owned profile: one required credential exposed as one environment variable, no endpoints.
+    """Gate-owned profile: one required bearer credential exposed as one environment variable, bound to one
+    unresolvable endpoint reachable only by the toolchain Python.
 
-    0.1.3 refuses a provider whose type names no profile in scope; no shipped profile is assumed.
+    0.1.3 refuses a provider whose type names no profile in scope; no shipped profile is assumed. cred-004 used
+    no endpoints, and 0.1.3 withholds static credentials from an endpointless profile.
     """
     return openshell_pb2.ProviderProfileImportItem(source='corsair-qualification', profile=openshell_pb2.ProviderProfile(
         id=profile_id, display_name='Corsair qualification fake credential',
         description='Random fake credential for the SPEC-0025 placeholder check',
         category=openshell_pb2.PROVIDER_PROFILE_CATEGORY_OTHER,
-        credentials=[openshell_pb2.ProviderProfileCredential(name=KEY, env_vars=[KEY], required=True)]))
+        credentials=[openshell_pb2.ProviderProfileCredential(name=KEY, env_vars=[KEY], required=True,
+                                                             auth_style='bearer', header_name='authorization')],
+        endpoints=[sandbox_pb2.NetworkEndpoint(host=ENDPOINT, port=443, protocol='rest',
+                                               access=sandbox_pb2.NETWORK_ACCESS_PRESET_READ_ONLY,
+                                               enforcement=sandbox_pb2.NETWORK_ENFORCEMENT_MODE_ENFORCE)],
+        binaries=[sandbox_pb2.NetworkBinary(path=PYTHON)]))
+
+
+def provider_readiness(rpc, scope, sandbox, provider):
+    """Read-only native readiness polls until the gateway reports the provider ready or a terminal state."""
+    observed, deadline = [], time.monotonic() + READINESS_SECONDS
+    while True:
+        status = rpc('GetSandboxProviderStatus', openshell_pb2.GetSandboxProviderStatusRequest(
+            workspace_scope=scope, sandbox=sandbox, provider=provider)).status
+        observed.append({'state': openshell_pb2.ProviderReadinessState.Name(status.state),
+                         'reason': openshell_pb2.ProviderReadinessReason.Name(status.reason),
+                         'credentials_installed': status.observed.credentials_installed,
+                         'launch_environment_installed': status.observed.launch_environment_installed,
+                         'provider_env_revision': status.observed.provider_env_revision})
+        if status.state not in (openshell_pb2.PROVIDER_READINESS_STATE_PERSISTED,
+                                openshell_pb2.PROVIDER_READINESS_STATE_PENDING) or time.monotonic() > deadline:
+            return observed
+        time.sleep(2)
 
 
 @pytest.mark.credential_placeholder
@@ -111,7 +142,7 @@ def test_provider_credential_reaches_workload_only_as_placeholder(kube, adapter_
                'profile': {'id': profile, 'import_delivery': 'unrun', 'cleanup': 'unrun'},
                'provider': {'name': provider, 'create_delivery': 'unrun', 'cleanup': 'unrun'},
                'sandbox': {'name': name, 'create_delivery': 'unrun', 'cleanup': 'unrun'},
-               'egress_substitution': 'unrun', 'internal_rpc_retry_counts': 'unknown',
+               'egress_substitution': 'unrun', 'endpoint': ENDPOINT, 'internal_rpc_retry_counts': 'unknown',
                'packages': {'openshell': importlib.metadata.version('openshell')}}
     assert summary['packages']['openshell'] == LOCK['openshell']['version'].removeprefix('v')
     mtls = native['mtls']
@@ -164,6 +195,9 @@ def test_provider_credential_reaches_workload_only_as_placeholder(kube, adapter_
             record.update(resources=resources, workspace_storage=workspace_storage(kube, pair, cr['metadata']['uid']))
             attached = rpc('ListSandboxProviders', openshell_pb2.ListSandboxProvidersRequest(workspace_scope=scope, sandbox=name))
             assert [p.metadata.name for p in attached.providers] == [provider], 'Provider not attached at creation'
+            readiness = summary['provider']['readiness'] = provider_readiness(rpc, scope, name, provider)
+            assert readiness[-1]['state'] == 'PROVIDER_READINESS_STATE_READY', \
+                f"Provider not ready: {readiness[-1]['state']} / {readiness[-1]['reason']}"
             result = sdk.call('exec', name, [PYTHON, '-I', '-c', SCAN, PREFIX, str(len(dummy)), digest, KEY, *ROOTS],
                               workspace=WORKSPACE, workdir='/tmp', no_login_shell=True, timeout_seconds=120)
             echoed = dummy in result.stdout + result.stderr
@@ -173,6 +207,7 @@ def test_provider_credential_reaches_workload_only_as_placeholder(kube, adapter_
             summary['placeholder_form'] = env.get('value') if env['present'] and not env['is_dummy'] else None
             assert env['present'], 'Provider credential not delivered to the exec environment; placeholder form unknown'
             assert not env['is_dummy'], 'Workload environment holds the raw credential'
+            assert PLACEHOLDER.fullmatch(env['value']), 'Exec environment value is not an upstream 0.1.3 placeholder'
             assert not any(p.get('matches') or p.get('env', {}).get('is_dummy') for p in seen['processes'].values()), \
                 'Raw credential found in a process environment'
             assert not any(r['matches'] for r in seen['roots'].values()), 'Raw credential found in a workload file'
