@@ -36,12 +36,12 @@ def run(agent, inputs, **kwargs):
                           usage_limits=UsageLimits(request_limit=5, tool_calls_limit=4), **kwargs)
 
 
-def responding(plan, *, reads=("documents.py", "test_existing.py")):
-    calls = []
+def responding(plan, *, reads=("documents.py", "test_existing.py"), offered=None):
+    calls, offered = [], [] if offered is None else offered
     async def respond(messages, info):
         calls.append(1)
         assert "Plan exactly one benign control" in info.instructions and SKILL_TEXT.strip() in info.instructions
-        assert [t.name for t in info.function_tools] == ["read_source"]
+        offered.append([t.name for t in info.function_tools])
         if len(calls) <= len(reads):
             return ModelResponse(parts=[ToolCallPart("read_source", {"path": reads[len(calls) - 1]})])
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {"plan": plan})])
@@ -67,6 +67,18 @@ def test_reference_plan_is_admitted_with_trusted_quotations_and_no_labels_in_pro
         assert label not in prompt
 
 
+def test_reader_is_withdrawn_only_after_every_inventory_line_was_returned_in_this_run():
+    c = case()
+    offered = []
+    run(create_test_planning_agent(responding(reference(), offered=offered)), c.inputs)
+    # Two reads cover the two-file inventory, so a third request can only plan.
+    assert offered == [["read_source"], ["read_source"], []]
+    offered.clear()
+    partial = reference() | {"citations": [{"path": "documents.py", "start_line": 3, "end_line": 4}]}
+    run(create_test_planning_agent(responding(partial, reads=("documents.py",), offered=offered)), c.inputs)
+    assert offered == [["read_source"], ["read_source"]]
+
+
 def test_unsupported_plan_needs_no_test_details_but_cannot_carry_them():
     c = case("no_baseline_test")
     draft = dict(c.metadata.reference_plan)
@@ -88,7 +100,7 @@ def test_prompt_keeps_structured_input_for_empty_inventory():
     data["source_files"] = []
     data["environment"]["baseline_test"] = None
     prompt = planning_prompt(TestPlanningInput.model_validate(data))
-    assert prompt.endswith("Saved source inventory: (empty)") and '"scope":"component"' in prompt
+    assert "Saved source inventory (the only readable paths): (empty)" in prompt and '"scope":"component"' in prompt
     assert '"environment"' in prompt and '"identification"' in prompt
 
 
@@ -229,8 +241,9 @@ def test_native_provider_wire_carries_skill_schema_and_only_reader():
         system = body["messages"][0]["content"]
         assert SKILL_TEXT.strip() in system and '"missing_capability"' in system and '"observable_witness"' in system
         assert '"quote"' not in system and '"verdict"' not in system
-        assert [t["function"]["name"] for t in body["tools"]] == ["read_source"]
         reads = ("documents.py", "test_existing.py")
+        offered = [t["function"]["name"] for t in body.get("tools", ())]
+        assert offered == ["read_source"] if len(bodies) <= len(reads) else "read_source" not in offered
         if len(bodies) <= len(reads):
             message = {"role": "assistant", "content": None, "tool_calls": [{"id": f"read{len(bodies)}", "type": "function",
                 "function": {"name": "read_source", "arguments": json.dumps({"path": reads[len(bodies) - 1]})}}]}
