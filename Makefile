@@ -21,8 +21,12 @@ kind-down:
 workspace-storage:
 	uv run --locked python deploy/kind/bootstrap.py workspace-storage
 
+# The offline suite is CPU-bound; pytest-xdist spreads it over the cores (PLAN-0085). `TEST_WORKERS=0 make test-config`
+# runs it serially; set it in the environment, since the qualify-image guard test refuses command-line variables that
+# reach its sub-make through MAKEFLAGS.
+TEST_WORKERS ?= auto
 test-config:
-	uv run --locked python -m pytest $(PYTEST_ROOT) tests/configuration tests/unit tests/agents tests/temporal/test_fixture_contracts.py tests/temporal/test_issue_analysis_composition.py tests/temporal/test_chain_composition.py
+	uv run --locked python -m pytest $(PYTEST_ROOT) -n $(TEST_WORKERS) tests/configuration tests/unit tests/agents tests/temporal/test_fixture_contracts.py tests/temporal/test_issue_analysis_composition.py tests/temporal/test_chain_composition.py
 
 # One agent's isolated eval suite on the host (SPEC-0044); results under .runs/evals/<agent>/.
 # AGENT=identification|planning|authoring|environment|assessment|chain; optional SET, PROVIDER_CONFIG, REPEAT, NOTE.
