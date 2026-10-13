@@ -1,10 +1,11 @@
 """`uv run corsair run --issue-json <file> | --id <issue id>`: one issue investigated end to end.
 
-The request (`corsair-issue-request/v1`) names the issue, the repository and its vulnerable and fixed commits; an
-issue id (`github:owner/repo#N`, `azure:org/project#N`) is captured through the ticket readers into the same request
-with the repository and commits given as flags (a GitHub issue defaults to its own repository). The
+The request (`corsair-issue-request/v1`) names the issue, the repository, its vulnerable commit and optionally the
+fix's commit; an issue id (`github:owner/repo#N`, `azure:org/project#N`) is captured through the ticket readers into
+the same request with the repository and commits given as flags (a GitHub issue defaults to its own repository). The
 system selects the runtime from the repository's own build files, prepares the environment, identifies, plans,
-authors, runs both revisions, gates and assesses. Everything a request does not carry is selected or inferred and
+authors, runs the vulnerable revision and the fixed one when given (without it no fix is verified: fix
+not_applicable), gates and assesses. Everything a request does not carry is selected or inferred and
 recorded with its basis. Today's route is image-only: the selected row's local image under plain Docker
 (`corsair.investigation.docker`), every agent stage live on the provider. A request that cannot start is recorded
 at admission with its reason before any model request; nothing is retried. Receipts, `record.json` and the summary
@@ -190,7 +191,7 @@ def main(argv: list[str] | None = None, prog: str = "corsair run") -> int:
                        "configuration's tickets source, captured read-only")
     parser.add_argument("--repository", help="With --id: https repository (default: a GitHub issue's own)")
     parser.add_argument("--revision", help="With --id: the vulnerable commit (40 hex)")
-    parser.add_argument("--fixed-revision", help="With --id: the fix's commit (40 hex)")
+    parser.add_argument("--fixed-revision", help="With --id: the fix's commit (40 hex); optional")
     parser.add_argument("--scope", choices=("component", "application_path"), help="With --id: identification scope")
     parser.add_argument("--provider-config", required=True, type=Path, help="Per-agent provider JSON")
     parser.add_argument("--images", type=Path, default=os.environ.get("CORSAIR_IMAGES"),

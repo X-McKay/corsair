@@ -179,13 +179,15 @@ def scripted_assessment(execution="completed", finding="inconclusive", fix="not_
             ordered = sorted((i for i in items if i["revision"] == revision), key=lambda i: i["kind"] != "witness")
             item = ordered[0]
             return {"item_id": item["item"], "start_line": 1, "end_line": 1}
+        # A case without a fix commit lists no candidate items; cite only the revisions that ran.
+        ran = [revision for revision in ("baseline", "candidate") if any(i["revision"] == revision for i in items)]
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {
             "execution": execution, "finding": finding, "fix": fix,
             "application_observations": [
-                {"statement": "Baseline run evidence for the planned tests", "citations": [cite("baseline")]},
-                {"statement": "Candidate run evidence for the planned tests", "citations": [cite("candidate")]}],
+                {"statement": f"{revision.capitalize()} run evidence for the planned tests",
+                 "citations": [cite(revision)]} for revision in ran],
             "sandbox_observations": [],
             "interpretation": {"statement": "No witness captured outside the test process supports a conclusion",
-                               "citations": [cite("baseline"), cite("candidate")]},
+                               "citations": [cite(revision) for revision in ran]},
             "limitations": ["The planned witness was not captured outside the test process"]})])
     return FunctionModel(respond)
