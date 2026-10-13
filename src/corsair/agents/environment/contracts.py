@@ -29,6 +29,16 @@ class Toolchain(Contract):
     tools: tuple[Annotated[str, Field(min_length=1, max_length=128)], ...] = Field(max_length=16)
 
 
+class SmokeTest(Contract):
+    """SPEC-0071: an operator test file trusted code wrote into the checkout; never the project's own code."""
+    framework: Identifier
+    path: str = Field(min_length=1, max_length=256)
+    test_id: str = Field(min_length=1, max_length=512)
+    content: str = Field(min_length=1, max_length=4096)
+
+    _path = field_validator("path")(confined_path)
+
+
 class EnvironmentInput(Contract):
     """Manifests, CI workflows and setup documentation only; never labels or oracles."""
     commit: str = Field(pattern=r"^[0-9a-f]{40}$")
@@ -36,6 +46,8 @@ class EnvironmentInput(Contract):
     source_files: tuple[SourceFile, ...] = Field(min_length=1, max_length=32)
     toolchains: tuple[Toolchain, ...] = Field(min_length=1, max_length=8)
     policy_profile: Identifier = Field(description="Read-only identity of the operator policy profile")
+    smoke_tests: tuple[SmokeTest, ...] = Field(default=(), max_length=4, description=(
+        "Operator smoke test files already written into the checkout; a baseline only when no project test runs"))
 
     @model_validator(mode="after")
     def bounded_unique(self) -> "EnvironmentInput":
@@ -45,6 +57,10 @@ class EnvironmentInput(Contract):
             raise ValueError("environment source exceeds 131072 bytes")
         if len({t.toolchain_id for t in self.toolchains}) != len(self.toolchains):
             raise ValueError("duplicate toolchain id")
+        if len({t.framework for t in self.smoke_tests}) != len(self.smoke_tests):
+            raise ValueError("duplicate smoke test framework")
+        if {t.path for t in self.smoke_tests} & {s.path for s in self.source_files}:
+            raise ValueError("a smoke test path is a saved source file")
         return self
 
 
@@ -122,6 +138,7 @@ class ReadyEnvironment(_Ready[SourceExcerpt]):
     language: str
     runtime: str
     baseline_outcome: Literal["passed"]
+    baseline_basis: Literal["project_test", "operator_smoke"] = Field(description="Trusted: whether the baseline is a project test or the operator smoke test")
     scratch_location: str
     receipts: tuple[CommandRecord, ...] = Field(min_length=1)
 
