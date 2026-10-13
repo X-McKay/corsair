@@ -1,0 +1,13 @@
+{
+  "name": "corsair-native-fixture",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Corsair toolchain gate fixture for the Node 8 image (SPEC-0055)",
+  "license": "Apache-2.0",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "24.8.0"
+  }
+}

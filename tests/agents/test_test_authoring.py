@@ -2,6 +2,7 @@
 
 import asyncio
 from dataclasses import replace
+from hashlib import sha256
 
 import pytest
 from pydantic import ValidationError
@@ -17,6 +18,7 @@ from corsair.agents.test_authoring import (
     AuthoringBudget, AuthoringDependencies, BlockedAuthoring, TestAuthoringInput, TestPatch, authoring_prompt,
     create_test_authoring_agent,
 )
+from corsair.agents.test_authoring.admission import REVIEWED_SELF_OBSERVING, self_observation
 from corsair.agents.test_authoring.skills import SKILL_TEXT
 from corsair.agents.test_authoring.static import assertion_lines, static_checks
 from corsair.ports.test_runner import NativeTestRun
@@ -289,8 +291,8 @@ def test_pytest_raises_bindings_are_assertions():
 def test_native_evals_repeat_and_preserve_receipts(tmp_path):
     evidence = tmp_path / "attempt"
     report = asyncio.run(evaluate(evidence, EvaluationBudget()))
-    assert passed(report) and len(report.cases) == 12 and len(report.case_groups()) == 6
-    assert len(list(evidence.glob("attempt-*.json"))) == 12
+    assert passed(report) and len(report.cases) == 18 and len(report.case_groups()) == 9
+    assert len(list(evidence.glob("attempt-*.json"))) == 18
     assert all(c.attributes["security_revealed"] == 0 for c in report.cases)
     assert report.experiment_metadata["runner"] == "injected_observations_and_static_host_runner"
     with pytest.raises(FileExistsError):
@@ -324,6 +326,175 @@ def _compose(inputs, root, store, reveal):
         assert failure.failure_line in patch.security_assertion_lines
     else:
         assert patch.dev_runs[0].security == "withheld"
+
+
+HOOKED = "import sys\nimport documents\n\nsys.addaudithook(lambda e, a: None)\n\n\ndef test_benign_control(tmp_path):\n    assert True\n"
+
+
+@pytest.mark.parametrize("content, facility", [
+    (HOOKED, "sys.addaudithook"),
+    ("import sys as s\ns.monitoring.use_tool_id(3, 'x')\n", "sys.monitoring"),
+    ("from sys import addaudithook as hook\nhook(print)\n", "import sys.addaudithook"),
+    ("import sys\nsys.audit('open', 'x')\n", "sys.audit"),
+    ("import sys\ngetattr(sys, 'addaudithook')(print)\n", "string 'addaudithook'"),
+    ("import threading\nthreading.settrace(print)\n", "threading.settrace"),
+    ("def test_x(monkeypatch):\n    monkeypatch.setattr('builtins.open', print)\n",
+     "monkeypatch.setattr(builtins.open)"),
+    ("import os\n\ndef test_x(monkeypatch):\n    monkeypatch.setattr(os, 'open', print)\n", "monkeypatch.setattr(os)"),
+    ("import documents\n\ndef test_x(monkeypatch):\n    monkeypatch.setattr(documents, 'open', print)\n",
+     "monkeypatch.setattr(documents)"),
+    ("from unittest import mock\n", "import unittest.mock"),
+    ("import ctypes\n", "import ctypes"),
+    ("import sys\n\ndef test_x(monkeypatch):\n    monkeypatch.setitem(sys.modules, 'documents', None)\n",
+     "monkeypatch.setitem(sys.modules)"),
+])
+def test_self_observation_is_found_by_line(content, facility):
+    findings = self_observation(content)
+    assert facility in {f.facility for f in findings} and all(f.line >= 1 for f in findings)
+
+
+def test_plain_tests_and_reviewed_bytes_are_admitted():
+    plain = ("import os\nimport sys\nfrom pathlib import Path\n\nimport documents\n\n\ndef test_x(tmp_path: Path, monkeypatch):\n"
+             "    monkeypatch.setenv('HOME', str(tmp_path))\n    monkeypatch.setitem(os.environ, 'LANG', 'C')\n"
+             "    monkeypatch.setattr(sys, 'argv', ['tool'])\n    (tmp_path / 'a').write_text('s')\n"
+             "    with open(tmp_path / 'a') as f:\n        assert f.read() == 's'\n    assert os.path.exists(tmp_path)\n")
+    assert self_observation(plain) == () and self_observation("def broken(:\n") == ()
+    assert self_observation("LABEL = 'monitoring dashboard'\n") == ()
+    # The SPEC-0018 pair predates the witness and observes opens itself; it is admitted by its reviewed digest only.
+    assert sha256(REFERENCE.encode()).hexdigest() in REVIEWED_SELF_OBSERVING and self_observation(REFERENCE) == ()
+    assert self_observation(REFERENCE + "\n")
+
+
+def test_refused_write_keeps_previous_content_and_the_author_can_act_once():
+    offered = []
+    agent = create_test_authoring_agent(responding([write(HOOKED), write(), RUN], offered=offered))
+    result, fake = run(agent, case().inputs.inputs)
+    assert isinstance(result.output, TestPatch) and len(fake.calls) == 1
+    assert [f.content for f in result.output.files] == [REFERENCE]
+    refusal = next(p.content for m in result.all_messages() for p in m.parts
+                   if isinstance(p, ToolReturnPart) and p.tool_name == "write_test_file")
+    assert refusal.status == "refused" and refusal.refusals_left == 1 and "line 4: sys.addaudithook" in refusal.reason
+    assert offered[1:4] == [ALL_TOOLS] * 3
+
+
+def test_the_author_reads_its_own_latest_admitted_write_and_absent_paths_are_typed_not_fatal():
+    read = lambda path, start=1: ToolCallPart("read_source", {"path": path, "start_line": start})
+    steps = [read("test_documents.py"), write(), write(HOOKED), read("test_documents.py"), read("test_documents.py", 999),
+             read("conftest.py"), read("../outside.txt"), RUN]
+    result, fake = run(create_test_authoring_agent(responding(steps)), case().inputs.inputs)
+    assert isinstance(result.output, TestPatch) and len(fake.calls) == 1
+    reads = [p.content for m in result.all_messages() for p in m.parts
+             if isinstance(p, ToolReturnPart) and p.tool_name == "read_source"]
+    unwritten, own, past, absent, outside = reads
+    assert unwritten.status == "not_in_source" and "not written yet" in unwritten.reason
+    # The refused write left the reference in place, and that is what the author reads back.
+    assert "\n".join(line.text for line in own.lines) == "\n".join(REFERENCE.splitlines()[:80]) and own.start_line == 1
+    assert past.status == "past_end" and f"has {len(REFERENCE.splitlines())} lines" in past.reason
+    assert absent.status == outside.status == "not_in_source" and "test_documents.py" in absent.reason
+    assert "write it again in full" in absent.reason
+
+
+def test_second_refusal_ends_blocked_at_admission():
+    offered = []
+    draft = {"status": "blocked", "layer": "unknown", "reason": "refused"}
+    agent = create_test_authoring_agent(responding([write(HOOKED), write(HOOKED)], final=draft, offered=offered))
+    result, fake = run(agent, case().inputs.inputs)
+    assert isinstance(result.output, BlockedAuthoring) and result.output.layer == "admission"
+    assert "sys.addaudithook" in result.output.reason and result.output.files == () and fake.calls == []
+    assert offered[-1] == READ_ONLY
+    # A patch draft after the refusals is overruled the same way.
+    agent = create_test_authoring_agent(responding([write(HOOKED), write(), RUN, write(HOOKED)]))
+    result, fake = run(agent, case().inputs.inputs)
+    assert isinstance(result.output, BlockedAuthoring) and result.output.layer == "admission" and len(fake.calls) == 1
+
+
+def test_tools_are_withdrawn_at_the_tool_call_cap_and_the_author_returns_its_output():
+    offered = []
+    steps = [ToolCallPart("read_source", {"path": "documents.py"}), write(), RUN, write(), RUN]
+
+    async def respond(messages, info):
+        offered.append([t.name for t in info.function_tools])
+        done = sum(isinstance(p, ToolReturnPart) for m in messages for p in m.parts)
+        if info.function_tools and done < len(steps):
+            return ModelResponse(parts=[replace(steps[done], tool_call_id=f"call-{done}")])
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {"result": PATCH})])
+    inputs = case().inputs.inputs
+    result = create_test_authoring_agent(FunctionModel(respond)).run_sync(
+        authoring_prompt(inputs), deps=AuthoringDependencies(inputs, runner()),
+        usage_limits=UsageLimits(request_limit=8, tool_calls_limit=3))
+    assert isinstance(result.output, TestPatch) and result.usage.tool_calls == 3
+    assert offered == [ALL_TOOLS, ALL_TOOLS, ALL_TOOLS, []]
+
+
+@pytest.mark.parametrize("content, facility", [
+    ("import socket as net\n\ndef test_x(monkeypatch):\n    monkeypatch.setattr(net, 'create_connection', print)\n",
+     "monkeypatch.setattr(socket)"),
+    ("import io\nio.open = lambda *a, **k: None\n", "assign io.open"),
+    ("import os as o\ndel o.system\n", "delete os.system"),
+    ("from os import path as p\np.exists = bool\n", "assign os.path.exists"),
+    ("import builtins as b\nb.__dict__['open'] = print\n", "import builtins"),
+    ("import sys\nsys.modules['documents'] = None\n", "assign sys.modules"),
+    ("import subprocess as sp\nsp.run += print\n", "assign subprocess.run"),
+    # Re-review on #49: the application's own bindings of protected names, written directly.
+    ("import documents\ndocuments.open = lambda *a, **k: None\n", "assign documents.open"),
+    ("import documents as d\ndel d.open\n", "delete documents.open"),
+    ("import documents\ndocuments.__dict__['open'] = print\n", "assign documents.__dict__"),
+    ("import documents\ndocuments.subprocess.run = print\n", "assign documents.subprocess.run"),
+    ("import documents\n\ndef test_x(monkeypatch):\n    monkeypatch.setattr(documents.os, 'open', print)\n",
+     "monkeypatch.setattr(documents.os)"),
+    # Claude review on 236bdab: string targets, references through the target module, keyword arguments.
+    ("def test_x(monkeypatch):\n    monkeypatch.setattr('app.mod.subprocess.run', print)\n",
+     "monkeypatch.setattr(app.mod.subprocess.run)"),
+    ("def test_x(monkeypatch):\n    monkeypatch.setattr('app.mod.open', print)\n", "monkeypatch.setattr(app.mod.open)"),
+    ("import app.mod as m\nm.subprocess.run = print\n", "assign app.mod.subprocess.run"),
+    ("from app.mod import os as aos\naos.system = print\n", "assign app.mod.os.system"),
+    ("def test_x(monkeypatch):\n    monkeypatch.setattr(target='os.system', value=print)\n",
+     "monkeypatch.setattr(os.system)"),
+    ("import os\n\ndef test_x(monkeypatch):\n    monkeypatch.setattr(target=os, name='system', value=print)\n",
+     "monkeypatch.setattr(os)"),
+    # Forged events and monitoring by computed name, star import or dynamic import.
+    ("import sys\ngetattr(sys, 'audit')('open', '/x', 'r')\n", "getattr()"),
+    ("import sys\ngetattr(sys, 'monitoring').use_tool_id(3, 'x')\n", "getattr()"),
+    ("import sys\nsys.__dict__['audit']('open', '/x', 'r')\n", "sys.__dict__"),
+    ("import operator\nimport sys\noperator.attrgetter('audit')(sys)\n", "operator.attrgetter()"),
+    ("from sys import *\naddaudithook(print)\n", "import sys.*"),
+    ("import importlib\nimportlib.import_module('ctypes')\n", "importlib.import_module()"),
+    ("import importlib\nimportlib.__import__('ctypes')\n", "importlib.__import__"),
+    ("import os\nvars(os)['system'] = print\n", "vars()"),
+    # Re-review on 538fb4b: member-import aliases of the dynamic functions.
+    ("from operator import attrgetter as get\nimport sys\nget('audit')(sys)('open', '/x', 'r')\n", "get()"),
+    ("from operator import methodcaller as call\nimport sys\ncall('audit', 'open')(sys)\n", "call()"),
+    ("import operator as op\nimport sys\nop.attrgetter('audit')(sys)\n", "op.attrgetter()"),
+    # Follow-up review on ecda72d: in-place mutation of a protected mapping.
+    ("import sys\nimport types\nsys.modules.update({'app.dep': types.ModuleType('app.dep')})\n", "sys.modules.update()"),
+    ("import sys\nsys.modules.setdefault('app.dep', None)\n", "sys.modules.setdefault()"),
+    ("import sys\nsys.modules.pop('app.dep')\n", "sys.modules.pop()"),
+    # Codex review on 78f1690: a computed member name, and a module reached through a local rebinding.
+    ("import documents\n\ndef test_x(monkeypatch):\n    name = 'open'\n    monkeypatch.setattr(documents, name, print)\n",
+     "monkeypatch.setattr(computed name)"),
+    ("import documents\n\ndef test_x(monkeypatch):\n    d = documents\n    monkeypatch.setattr(d, 'open', print)\n",
+     "monkeypatch.setattr(documents)"),
+    ("import documents as x\nd = x\ne = d\ne.subprocess = None\n", "assign documents.subprocess"),
+    ("import documents\n\ndef test_x(monkeypatch):\n    if (d := documents):\n        monkeypatch.setattr(d, 'open', print)\n",
+     "monkeypatch.setattr(documents)"),
+])
+def test_aliased_and_direct_patches_of_observed_facilities_are_found(content, facility):
+    """Review on #49: aliases of protected modules and plain assignments must not bypass admission."""
+    assert facility in {f.facility for f in self_observation(content)}
+
+
+def test_rebinding_a_local_name_or_setting_the_environment_is_not_a_patch():
+    assert self_observation("import os\nos.environ['LANG'] = 'C'\nopen_count = 0\n") == ()
+    assert self_observation("import documents\ndocuments.CONFIG = {}\ndocuments.os_name = 'x'\n") == ()
+    assert self_observation("import re\nimport app.mod as m\nPATTERN = re.compile('x')\nm.os.environ['LANG'] = 'C'\n") == ()
+    # Writes on local objects are not facility patches, whatever the attribute or key is called.
+    assert self_observation("c = object()\nc.open = 1\npayload = {}\npayload['os'] = 'linux'\npayload['open'] = True\n"
+                            "def test_x(monkeypatch, fake):\n    monkeypatch.setattr(fake, 'open', 1)\n") == ()
+    assert self_observation("import os\nimport app.mod as m\nos.environ.update({'A': '1'})\nm.os.environ.update({})\n") == ()
+    # Objects built by a call stay local; environment keys may be computed.
+    assert self_observation("import documents\nc = documents.Client()\nc.open = 1\n\ndef test_x(monkeypatch):\n"
+                            "    k = 'HOME'\n    monkeypatch.setitem(documents.os.environ, k, '/tmp')\n"
+                            "    monkeypatch.setattr('documents.LIMIT', k)\n") == ()
 
 
 @pytest.mark.parametrize("deferred", [

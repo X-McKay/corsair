@@ -146,6 +146,9 @@ def attempt_record(attempt) -> dict:
                                                              "detail": str(attempt.failure)[:4096]},
             "output": _dump(attempt.output) if hasattr(attempt.output, "model_dump_json") else None,
             "usage": TypeAdapter(RunUsage).dump_python(attempt.usage, mode="json"),
+            "limits": _dump(attempt.limits) if attempt.limits is not None else None,
+            "exhausted": _dump(attempt.exhausted) if attempt.exhausted is not None else None,
+            "tool_cap_reached": attempt.tool_cap_reached,
             "messages": TypeAdapter(list[ModelMessage]).dump_python(list(attempt.messages), mode="json")}
 
 
@@ -213,6 +216,9 @@ def summary(run: DirectRun) -> dict:
                                              "input_tokens": a.usage.input_tokens,
                                              "output_tokens": a.usage.output_tokens,
                                              "elapsed_seconds": round(a.elapsed_seconds, 1),
+                                             "tool_calls_limit": a.limits and a.limits.tool_calls_limit,
+                                             "exhausted": a.exhausted and a.exhausted.limit,
+                                             "tool_cap_reached": a.tool_cap_reached,
                                              "failure": None if a.failure is None else type(a.failure).__name__}
                       for index, a in enumerate(run.attempts)}}
 

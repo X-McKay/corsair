@@ -43,6 +43,10 @@ cases:
       observation_facilities: &id003
       - Python sys.addaudithook 'open' audit events recording the file paths opened during a test
       - Native JUnit XML outcomes and captured stdout per test
+      witness_facilities: &witness_facilities
+      - id: audit_open
+        kind: file_open
+        description: Python sys.addaudithook 'open' events recording each path the test process opens during the call
   metadata:
     status: ready
     symbol: read_document
@@ -52,6 +56,7 @@ cases:
     - 4
     adversarial_markers:
     - ../
+    witness_effect: file_open
     witness_markers:
     - open
     required_reads:
@@ -71,6 +76,11 @@ cases:
         input: filename 'document.txt' inside the allowed root
         required_behavior: Returns exactly the benign sentinel content
         observable_witness: An open audit event for tmp_path/allowed/document.txt is recorded during the call
+        witness:
+          facility: audit_open
+          effect: file_open
+          subject: allowed/document.txt
+          expectation: occurs
         source_references:
         - &id001
           path: documents.py
@@ -89,6 +99,11 @@ cases:
           file is never opened
         observable_witness: No open audit event for tmp_path/outside.txt is recorded during the call (application
           observation); a sandbox or policy denial is recorded separately and is not a rejection
+        witness:
+          facility: audit_open
+          effect: file_open
+          subject: outside.txt
+          expectation: absent
         source_references:
         - *id001
       security_expectation:
@@ -147,6 +162,7 @@ cases:
         path: test_existing.py
       scratch_location: The per-test pytest tmp_path directory; fixtures must not be created elsewhere
       observation_facilities: *id003
+      witness_facilities: *witness_facilities
   metadata:
     status: ready
     symbol: read_document
@@ -156,6 +172,7 @@ cases:
     - 7
     adversarial_markers:
     - ../
+    witness_effect: file_open
     witness_markers:
     - open
     required_reads:
@@ -175,6 +192,11 @@ cases:
         input: filename 'document.txt' inside the allowed root
         required_behavior: Returns exactly the benign sentinel content
         observable_witness: An open audit event for tmp_path/allowed/document.txt is recorded during the call
+        witness:
+          facility: audit_open
+          effect: file_open
+          subject: allowed/document.txt
+          expectation: occurs
         source_references:
         - &id004
           path: documents.py
@@ -193,6 +215,11 @@ cases:
           file is never opened
         observable_witness: No open audit event for tmp_path/outside.txt is recorded during the call (application
           observation); a sandbox or policy denial is recorded separately and is not a rejection
+        witness:
+          facility: audit_open
+          effect: file_open
+          subject: outside.txt
+          expectation: absent
         source_references:
         - *id004
       security_expectation:
@@ -250,6 +277,7 @@ cases:
         path: test_existing.py
       scratch_location: The per-test pytest tmp_path directory; fixtures must not be created elsewhere
       observation_facilities: *id003
+      witness_facilities: *witness_facilities
   metadata:
     status: ready
     symbol: read_document
@@ -259,6 +287,7 @@ cases:
     - 4
     adversarial_markers:
     - ../
+    witness_effect: file_open
     witness_markers:
     - open
     required_reads:
@@ -281,6 +310,11 @@ cases:
         input: filename 'document.txt' inside the allowed root
         required_behavior: Returns exactly the benign sentinel content
         observable_witness: An open audit event for tmp_path/allowed/document.txt is recorded during the call
+        witness:
+          facility: audit_open
+          effect: file_open
+          subject: allowed/document.txt
+          expectation: occurs
         source_references:
         - &id005
           path: documents.py
@@ -299,6 +333,11 @@ cases:
           file is never opened
         observable_witness: No open audit event for tmp_path/outside.txt is recorded during the call (application
           observation); a sandbox or policy denial is recorded separately and is not a rejection
+        witness:
+          facility: audit_open
+          effect: file_open
+          subject: outside.txt
+          expectation: absent
         source_references:
         - *id005
       security_expectation:
@@ -351,6 +390,7 @@ cases:
       baseline_test: null
       scratch_location: The per-test pytest tmp_path directory; fixtures must not be created elsewhere
       observation_facilities: *id003
+      witness_facilities: *witness_facilities
   metadata:
     status: unsupported
     required_reads:
@@ -401,6 +441,7 @@ cases:
         path: test_existing.py
       scratch_location: The per-test pytest tmp_path directory; fixtures must not be created elsewhere
       observation_facilities: *id003
+      witness_facilities: *witness_facilities
   metadata:
     status: unsupported
     required_reads:
@@ -455,6 +496,7 @@ cases:
         path: test_existing_previews.py
       scratch_location: The per-test pytest tmp_path directory; fixtures must not be created elsewhere
       observation_facilities: *id003
+      witness_facilities: *witness_facilities
   metadata:
     status: unsupported
     required_reads:
