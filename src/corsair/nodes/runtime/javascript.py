@@ -2,7 +2,7 @@
 import json
 import re
 
-from corsair.nodes.runtime.declarations import Collector, ci_versions
+from corsair.nodes.runtime.declarations import Collector, ci_versions, typed
 from corsair.nodes.runtime.versions import ANY, VersionSyntaxError, at_least, npm, parse_version, series, VersionSet, Interval
 
 FRAMEWORKS = ('jest', 'mocha', 'ava', 'tap', 'tape', 'jasmine', 'vitest', '@hapi/lab', 'lab', 'qunit', 'karma')
@@ -31,18 +31,22 @@ def detect(c: Collector) -> None:
         except ValueError as error:
             c.unparsed('runtime', 'node', 'image', 'package.json', '', f'invalid package.json: {error}')
             package = {}
-    engines = package.get('engines') if isinstance(package.get('engines'), dict) else {}
+    engines = typed(c, package, 'engines', dict, ('runtime', 'node', 'image'), 'package.json', '"engines"') or {}
     for name in ('node', 'npm'):
-        if isinstance(engines.get(name), str):
-            kind = 'runtime' if name == 'node' else 'build_tool'
+        kind = 'runtime' if name == 'node' else 'build_tool'
+        if (spec := typed(c, engines, name, str, (kind, name, 'image'), 'package.json', f'"{name}"')) is not None:
             try:
-                c.add(kind, name, 'image', 'constraint', 'engines', 'package.json', f'"{name}"', npm(engines[name]))
+                c.add(kind, name, 'image', 'constraint', 'engines', 'package.json', f'"{name}"', npm(spec))
             except VersionSyntaxError as error:
                 c.unparsed(kind, name, 'image', 'package.json', f'"{name}"', str(error))
-    manager = package.get('packageManager')
-    if isinstance(manager, str) and (match := re.fullmatch(r'(npm|yarn|pnpm)@(\d+(?:\.\d+){0,7})(?:\+.*)?', manager)):
-        version = parse_version(match[2])
-        c.add('build_tool', match[1], 'image', 'pinned', 'packageManager', 'package.json', '"packageManager"', series(version), listed=version)
+    manager = typed(c, package, 'packageManager', str, ('build_tool', 'package-manager', 'image'), 'package.json', '"packageManager"', 'pinned')
+    if manager is not None:
+        if (match := re.fullmatch(r'(npm|yarn|pnpm)@(\d+(?:\.\d+){0,7})(?:\+.*)?', manager)):
+            version = parse_version(match[2])
+            c.add('build_tool', match[1], 'image', 'pinned', 'packageManager', 'package.json', '"packageManager"', series(version), listed=version)
+        else:
+            c.unparsed('build_tool', 'package-manager', 'image', 'package.json', '"packageManager"',
+                       f'packageManager {manager[:40]!r} is not npm, yarn or pnpm with a numeric version', strength='pinned')
     if (lock := c.text('package-lock.json')) is not None:
         match = re.search(r'"lockfileVersion"\s*:\s*(\d+)', lock)
         if match:  # npm 5-6 write v1; npm 7+ write v2/v3 and read v1 with a rewrite
@@ -68,8 +72,10 @@ def detect(c: Collector) -> None:
 
 
 def _framework(c: Collector, package: dict) -> None:
-    scripts = package.get('scripts') if isinstance(package.get('scripts'), dict) else {}
-    dev = {**(package.get('dependencies') or {}), **(package.get('devDependencies') or {})} if isinstance(package.get('devDependencies', {}), dict) else {}
+    unknown = ('test_framework', 'unknown', 'registry')
+    scripts = typed(c, package, 'scripts', dict, unknown, 'package.json', '"scripts"') or {}
+    dev = {**(typed(c, package, 'dependencies', dict, unknown, 'package.json', '"dependencies"') or {}),
+           **(typed(c, package, 'devDependencies', dict, unknown, 'package.json', '"devDependencies"') or {})}
     # Follow `npm run x` indirections once from the test script, then look for a framework binary.
     command = str(scripts.get('test', ''))
     for name in re.findall(r'npm run ([\w:-]+)', command):
@@ -87,8 +93,11 @@ def _framework(c: Collector, package: dict) -> None:
             return
     for framework in named:
         spec = dev.get(framework)
+        if spec is not None and not isinstance(spec, str):
+            c.unparsed('test_framework', framework, 'registry', 'package.json', f'"{framework}"', f'version {spec!r} is not a string')
+            continue
         try:
-            versions = npm(spec) if isinstance(spec, str) else ANY
+            versions = npm(spec) if spec is not None else ANY
         except VersionSyntaxError:
             c.unparsed('test_framework', framework, 'registry', 'package.json', f'"{framework}"', f'version {spec!r} not a semver range')
             continue

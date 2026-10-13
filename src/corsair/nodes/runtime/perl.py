@@ -6,7 +6,7 @@ Test::Harness (`make test`/`prove`), so a recognised build file implies the TAP 
 import json
 import re
 
-from corsair.nodes.runtime.declarations import Collector, ci_versions, load_yaml
+from corsair.nodes.runtime.declarations import Collector, ci_versions, load_yaml, typed
 from corsair.nodes.runtime.versions import ANY, VersionSyntaxError, at_least, parse_version, perl, series
 
 CI_KEYS = ('perl', 'perl-version', 'perl_version', 'perl-versions')
@@ -46,11 +46,18 @@ def detect(c: Collector) -> None:
         except ValueError:
             c.unparsed('runtime', 'perl', 'image', path, '', 'invalid META')
             continue
-        prereqs = (data or {}).get('prereqs') if isinstance(data, dict) else None
-        requires = (((prereqs or {}).get('runtime') or {}).get('requires') or {}) if isinstance(prereqs, dict) else \
-            ((data or {}).get('requires') or {}) if isinstance(data, dict) else {}
-        if isinstance(requires, dict) and requires.get('perl') not in (None, '0', 0):
-            _constraint(c, path, '"perl"' if path.endswith('json') else 'perl:', str(requires['perl']), 'META')
+        perl_ = ('runtime', 'perl', 'image')
+        if data is not None and not isinstance(data, dict):
+            c.unparsed(*perl_, path, '', f'{path} is not a mapping')
+            continue
+        if data and 'prereqs' in data:  # META 2: prereqs.runtime.requires
+            runtime = typed(c, typed(c, data, 'prereqs', dict, perl_, path) or {}, 'runtime', dict, perl_, path) or {}
+            requires = typed(c, runtime, 'requires', dict, perl_, path) or {}
+        else:  # META 1.x: top-level requires
+            requires = typed(c, data, 'requires', dict, perl_, path) or {}
+        value = typed(c, requires, 'perl', (str, int, float), perl_, path, '"perl"' if path.endswith('json') else 'perl:')
+        if value not in (None, '0', 0):
+            _constraint(c, path, '"perl"' if path.endswith('json') else 'perl:', str(value), 'META')
     if builders:
         c.add('test_framework', 'tap-harness', 'registry', 'constraint', 'build-file', builders[0], '', ANY)
     for path, value, source in ci_versions(c, CI_KEYS, ('perl',)):

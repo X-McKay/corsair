@@ -56,6 +56,19 @@ class Collector:
         self.add(kind, name, provider, strength, 'unparsed', path, needle, None, reason=reason, line=line)
 
 
+def typed(c: Collector, table, key: str, expected: type | tuple[type, ...], component: tuple[Kind, str, Provider],
+          path: str, needle: str | None = None, strength: Strength = 'constraint'):
+    """`table[key]` when present with the expected type, else None. A present value of another type is recorded as
+    unparsed against `component`, so a malformed declaration blocks selection instead of disappearing."""
+    if not isinstance(table, dict) or key not in table: return None
+    value = table[key]
+    if isinstance(value, expected) and not isinstance(value, bool): return value
+    names = ' or '.join(t.__name__ for t in (expected if isinstance(expected, tuple) else (expected,)))
+    c.unparsed(*component, path, needle or key, f'{key} is {type(value).__name__} {str(value)[:40]!r}, expected {names}',
+               strength=strength)
+    return None
+
+
 def line_of(text: str, needle: str) -> int:
     """1-based line of the first occurrence of `needle`; 1 when absent (the whole file is the citation)."""
     index = text.find(needle) if needle else -1

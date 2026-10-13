@@ -35,6 +35,7 @@ It also adds the hand-off from a selection to the environment agent's input. Exc
 - YAML scalars keep their written form, so `3.10` is not read as `3.1`.
 - POMs with any markup declaration are refused before parsing.
 - Inputs are bounded: 1 MiB per file and 4,096 build files.
+- A requirement-bearing field that is present with the wrong type (`requires-python = 313`, a list where a table belongs) is recorded as unparsed against the component it would have declared, never treated as absent.
 
 **Version sets** (`versions.py`) are finite unions of intervals over numeric versions. There are parsers for PEP 440, npm semver (also used for Poetry), RubyGems, Maven ranges, Perl decimal versions and Java's `1.x` naming, plus a canonical text form (`3.8.* || 3.9.*`, `>=5,<7`) that contracts store and the matcher parses back. Pre-release and non-numeric entries (`3.12-dev`, `pypy-3.9`, `lts/*`, `jruby`) are kept as `unparsed` with the reason, never guessed.
 

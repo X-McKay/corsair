@@ -323,3 +323,73 @@ def test_framework_rows_scoped_to_images():
         Matrix.model_validate({**data, 'images': [py312, py37], 'frameworks': [new, {**old, 'images': []}]})
     with pytest.raises(ValueError, match='not a python row'):
         Matrix.model_validate({**data, 'frameworks': [{**old, 'images': ['temurin-17-maven']}]})
+
+
+def test_pipfile_full_version_narrows_the_series():
+    # Al's re-review of dbbb980: python_full_version was dropped when python_version was also present.
+    pipfile = b'[requires]\npython_version = "3.12"\npython_full_version = "3.12.14"\n[dev-packages]\npytest = ">=9,<10"\n'
+    runtime = component(detect({'Pipfile': pipfile}, 'python'), 'runtime', 'cpython')
+    assert runtime.allowed == '==3.12.14'
+    assert select(detect({'Pipfile': pipfile}, 'python'), load()).status == 'unsupported'  # the image is 3.12.15
+    pinned = detect({'Pipfile': pipfile, '.python-version': b'3.12.15\n'}, 'python')
+    assert select(pinned, load()).status == 'undetermined'  # conflicting pins
+    malformed = detect({'Pipfile': pipfile.replace(b'"3.12.14"', b'3'), '.python-version': b'3.12.15\n'}, 'python')
+    assert select(malformed, load()).status == 'undetermined'
+
+
+def test_present_malformed_values_block_instead_of_disappearing():
+    # Al's re-review: a non-string requires-python was dropped and selection reported supported.
+    files = {'pyproject.toml': b'[project]\nrequires-python = 313\n', '.python-version': b'3.12.15\n',
+             'requirements.txt': b'pytest>=9,<10\n'}
+    selection = select(detect(files, 'python'), load())
+    assert selection.status == 'undetermined' and 'requires-python is int' in selection.missing[0]
+    # Al's re-review: non-object dependencies raised TypeError; they are now recorded against the framework.
+    for dependencies in (b'["mocha"]', b'"mocha"'):
+        package = b'{"dependencies": %s, "scripts": {"test": "mocha"}, "engines": {"node": ">=8"}}' % dependencies
+        requirement = detect({'package.json': package}, 'javascript')
+        assert any('dependencies is' in u.reason for c in requirement.components for u in c.unparsed)
+    # A non-string framework version is unread, not "any version".
+    jest = detect({'package.json': b'{"devDependencies": {"jest": 24}, "scripts": {"test": "jest"}}'}, 'javascript')
+    assert not component(jest, 'test_framework', 'jest').declared
+    # Poetry's table form of a dependency is read; Perl META structure is checked.
+    poetry_table = b'[tool.poetry.dependencies]\npython = ">=3.9"\n[tool.poetry.dev-dependencies]\npytest = {version = "^9.0"}\n'
+    assert component(detect({'pyproject.toml': poetry_table}, 'python'), 'test_framework', 'pytest').allowed == '>=9.0,<10'
+    meta = detect({'Makefile.PL': b'', 'META.json': b'{"prereqs": {"runtime": [1]}}'}, 'perl')
+    assert component(meta, 'runtime', 'perl').unparsed
+
+
+def test_structurally_malformed_metadata_never_raises():
+    # Seeded sweep of valid TOML/JSON/YAML with wrong shapes through detect and select (Al's re-review asked for
+    # malformed-structure cases, not only syntax errors). A raise here would abort a whole benchmark batch.
+    import json, random
+    rng, matrix = random.Random(7), load()
+    keys = ['project', 'requires', 'packages', 'dev-packages', 'metadata', 'requires-python', 'python-versions', 'tool', 'poetry',
+            'build-system', '_meta', 'engines', 'scripts', 'dependencies', 'devDependencies', 'dev-dependencies', 'packageManager',
+            'prereqs', 'runtime', 'jobs', 'matrix', 'strategy', 'include', 'steps', 'with', 'python', 'python-version', 'node_js',
+            'perl', 'test', 'pytest', 'jest', 'version', 'python_version', 'python_full_version', 'optional-dependencies', 'node']
+    leaves = [1, 1.5, True, [], ['x'], [1, {}], 'x', '>=3', '3.12']
+
+    def value(depth):
+        r = rng.random()
+        if depth > 3 or r < 0.35: return rng.choice(leaves)
+        if r < 0.45: return [value(depth + 1) for _ in range(rng.randint(1, 2))]
+        return {rng.choice(keys): value(depth + 1) for _ in range(rng.randint(1, 3))}
+
+    def toml(v):
+        if isinstance(v, bool): return 'true' if v else 'false'
+        if isinstance(v, (int, float)): return str(v)
+        if isinstance(v, str): return json.dumps(v)
+        if isinstance(v, list): return '[' + ', '.join(toml(x) for x in v) + ']'
+        return '{' + ', '.join(f'{json.dumps(k)} = {toml(x)}' for k, x in v.items()) + '}'
+
+    targets = [('python', 'setup.py', f) for f in ('pyproject.toml', 'Pipfile', 'poetry.lock', 'uv.lock', 'Pipfile.lock', '.travis.yml',
+                                                     '.github/workflows/ci.yml')]
+    targets += [('javascript', 'package.json', f) for f in ('package.json', 'appveyor.yml')]
+    targets += [('perl', 'Makefile.PL', f) for f in ('META.json', 'META.yml')]
+    for _ in range(300):
+        doc = {rng.choice(keys): value(1) for _ in range(rng.randint(1, 3))}
+        for language, marker, path in targets:
+            body = '\n'.join(f'{json.dumps(k)} = {toml(v)}' for k, v in doc.items()) if path in ('pyproject.toml', 'Pipfile', 'poetry.lock', 'uv.lock') \
+                else json.dumps(doc)
+            requirement = detect({marker: b'{}' if marker == 'package.json' else b'', path: body.encode()}, language)
+            if not isinstance(requirement, str): select(requirement, matrix)
