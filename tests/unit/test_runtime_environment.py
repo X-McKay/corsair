@@ -46,7 +46,9 @@ def test_select_runtime_names_the_prepared_image_or_the_reason():
         'supported', PREPARED['cpython-3.12-pytest'], 'cpython-3.12-pytest')
     assert select_runtime(pyproject('<3.7'), catalog).status == 'unsupported'
     assert select_runtime(RuntimeInputs(files={'README.md': b'x'}), catalog).status == 'undetermined'
-    undeclared = select_runtime(RuntimeInputs(files={'pytest.ini': b'[pytest]\n'}), catalog)
+    inferred = select_runtime(RuntimeInputs(files={'pytest.ini': b'[pytest]\n'}), catalog)
+    assert inferred.status == 'supported' and inferred.selection.runtime_basis == 'inferred' and 'runtime inferred' in inferred.reason
+    undeclared = select_runtime(RuntimeInputs(files={'requirements.txt': b'requests\n'}), catalog)
     assert undeclared.status == 'undetermined' and undeclared.requirement is not None
 
 
