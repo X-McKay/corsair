@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .contracts import EnvironmentInput
 
-PROMPT_VERSION = "environment-v1"
+PROMPT_VERSION = "environment-v4-pytest-correction"
 SKILL_ID = "prepare-environment"
 SKILL_TEXT = (Path(__file__).parent / "skills" / SKILL_ID / "SKILL.md").read_text(encoding="utf-8")
 SKILL_SHA256 = sha256(SKILL_TEXT.encode()).hexdigest()
