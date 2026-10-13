@@ -43,3 +43,6 @@ Separate outcome-blind test-validity review from execution/result assessment usi
 
 
 Final feedback validation: **2108 passed, 6 skipped, 12 inherited warnings** in the full offline suite; added durable review-payload converter check1passed. Legacy scripted planning12/12, authoring20/20 and assessment54/54 remain clean. New frozen unit sets: planning2cases/4attempts, authoring2cases/4attempts, assessment7cases/7attempts, all clean. Earlier failed ordering/record/test-harness attempts are retained in [HANDOFF-0124](../handoffs/HANDOFF-0124-unit-review-feedback.md). Evidence retained under ignored `.runs/pr130-review-feedback/` and `.runs/evals/`. Live evaluation was rejected by automatic approval review pending explicit authorization for the configured external destination; no live semantic-quality improvement is claimed. Implementation corrections are complete; live qualification remains a separate blocked gate.
+
+
+Agent skill/tool audit: [HANDOFF-0125](../handoffs/HANDOFF-0125-unit-skill-audit.md) corrects phase-specific evidence/citation guidance and explicitly uses typed harness assertion facts in planning/authoring. No additional tools or agents needed. Affected tests253passed; frozen legacy12/20/54 and unit2/2/7 scripted cases all clean. Skill metadata and diff checks pass. Live semantic qualification remains outstanding.
