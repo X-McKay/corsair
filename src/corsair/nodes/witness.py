@@ -21,6 +21,10 @@ from corsair.ports.test_runner import WitnessCapture, WitnessRequest
 
 PROBE_SOURCE = (Path(__file__).with_name('witness_probe.py')).read_text(encoding='utf-8')
 PROBE_SHA256 = sha256(PROBE_SOURCE.encode('utf-8')).hexdigest()
+# The Perl TAP probe (SPEC-0074) writes the same record for the same gate; a capture names the probe that ran.
+PERL_PROBE_SOURCE = (Path(__file__).with_name('witness_probe.pl')).read_text(encoding='utf-8')
+PERL_PROBE_SHA256 = sha256(PERL_PROBE_SOURCE.encode('utf-8')).hexdigest()
+PROBES = frozenset({PROBE_SHA256, PERL_PROBE_SHA256})
 TOOL_ID = 4  # sys.monitoring ids 0-2 and 5 are reserved for debugger, coverage, profiler and optimizer
 MAX_RECORD_BYTES = 65536
 # Fixed bootstrap: the probe and its JSON config are the first two arguments; pytest gets the rest.
@@ -31,6 +35,13 @@ BOOTSTRAP = ('import hashlib, json, sys, types\n'
              'plugin = probe.Probe(hashlib.sha256(source.encode()).hexdigest(), config)\n'
              'import pytest\n'
              'raise SystemExit(int(pytest.main(sys.argv[3:], plugins=[plugin])))\n')
+# Fixed Perl bootstrap for `perl -e`: the probe, its JSON config and the test file are the first three arguments;
+# the file then runs as `perl FILE` would, with `$0` set to it and a die rethrown for Test::More's exit status. The
+# probe's END block is compiled before Test::More loads, so it runs last and sees the final exit status.
+PERL_BOOTSTRAP = ('my ($source, $config, $file) = splice @ARGV, 0, 3; require Digest::SHA; require JSON::PP;'
+                  ' eval "$source; END { Corsair::WitnessProbe::finish() } 1" or die $@;'
+                  ' Corsair::WitnessProbe::start(Digest::SHA::sha256_hex($source), JSON::PP::decode_json($config), $file);'
+                  ' $0 = $file; do "./$file"; die $@ if $@;')
 DENIALS = frozenset({errno.EACCES, errno.EPERM})
 TOKEN = re.compile(r'^[A-Za-z0-9_.:-]{1,128}$')
 
@@ -45,6 +56,15 @@ def probe_argv(command: tuple[str, ...], request: WitnessRequest, *, root: str, 
                          'effect_name': request.effect_name, 'record_path': record_path, 'nonce': nonce, 'tool_id': TOOL_ID}, sort_keys=True)
     at = pairs[0]
     return command[:at] + ('-c', BOOTSTRAP, PROBE_SOURCE, config) + command[at + 2:]
+
+
+def perl_probe_argv(command: tuple[str, ...], request: WitnessRequest, file: str, *, root: str, record_path: str,
+                    nonce: str) -> tuple[str, ...]:
+    """The operator Perl prefix running `file` through the probe bootstrap instead of directly."""
+    config = json.dumps({'root': root, 'target_path': request.target_path, 'target_symbol': request.target_symbol,
+                         'effect_name': request.effect_name, 'record_path': record_path, 'nonce': nonce,
+                         'file': file}, sort_keys=True)
+    return command + ('-e', PERL_BOOTSTRAP, PERL_PROBE_SOURCE, config, file)
 
 
 class _Record(BaseModel):
@@ -146,7 +166,7 @@ def witness_evidence(capture: WitnessCapture | None, request: WitnessRequest,
         return _refused('no witness was requested or captured for this run')
     if capture.status != 'captured' or capture.artifact is None:
         return _refused(f'witness unavailable: {capture.detail}'[:512])
-    if capture.request != request or capture.probe_sha256 != PROBE_SHA256:
+    if capture.request != request or capture.probe_sha256 not in PROBES:
         return _refused('witness capture used another target or probe')
     if capture.artifact.sha256 != sha256(capture.record).hexdigest():
         return _refused('witness record bytes differ from the stored artifact')
@@ -155,7 +175,7 @@ def witness_evidence(capture: WitnessCapture | None, request: WitnessRequest,
     except ValidationError as error:
         return _refused(f'witness record invalid: {error.error_count()} errors')
     if (record.schema_ != 'corsair-witness-v2' or record.nonce != capture.nonce
-            or record.plugin_sha256 != PROBE_SHA256
+            or record.plugin_sha256 != capture.probe_sha256
             or (record.target.path, record.target.symbol, record.target.effect_name)
             != (request.target_path, request.target_symbol, request.effect_name)):
         return _refused('witness record does not belong to this run, probe or target')

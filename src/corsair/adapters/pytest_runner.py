@@ -2,8 +2,8 @@
 from dataclasses import dataclass
 from uuid import UUID, uuid5
 
-from corsair.adapters.native_runner import NativeRunner, check_bounds, check_command, check_root, error_text
-from corsair.nodes.witness import MAX_RECORD_BYTES, PROBE_SHA256, probe_argv
+from corsair.adapters.native_runner import NativeRunner, check_bounds, check_command, check_root
+from corsair.nodes.witness import PROBE_SHA256, probe_argv
 from corsair.ports.test_runner import (MAX_TEST_ID, TEST_ID, ApprovedPatch, PreparedWorkspace, WitnessCapture,
                                        WitnessRequest)
 from corsair.reports.junit import MAX_JUNIT_BYTES, JUnitError, parse_junit
@@ -16,8 +16,6 @@ WRAPPER = ('junit="$1"; shift; rm -f -- "$junit"; '
            'status=$?; cat -- "$junit" 2>/dev/null; exit $status')
 # Native tracebacks give parseable `File "...", line N, in function` frames for failure classification.
 RUN_OPTIONS = ('--tb=native',)
-# Fixed read-back of the probe record after execution; the path arrives only as a positional argument.
-WITNESS_READ = 'cat -- "$1"'
 
 
 @dataclass(frozen=True)
@@ -74,28 +72,12 @@ class PytestRunner(NativeRunner):
         execution, layer = self._run_once(prepared, ids, frozenset(paths), uuid5(operation, 'execution'), witness, nonce)
         captured = None
         if witness is not None:
-            captured = (self._read_witness(prepared, witness, nonce, uuid5(operation, 'witness'))
+            captured = (self._read_witness(prepared, witness, nonce, uuid5(operation, 'witness'),
+                                           self._config.witness_record_path, PROBE_SHA256)
                         if execution.status == 'completed' else
                         WitnessCapture('unavailable', witness, nonce, PROBE_SHA256, b'', None,
                                        f'execution {execution.status}; record not read', None))
         return discovery, execution, layer, execution.detail, captured
-
-    def _read_witness(self, prepared: PreparedWorkspace, request: WitnessRequest, nonce: str,
-                      operation: UUID) -> WitnessCapture:
-        """One fixed read of the probe record; never retried, and a missing or oversized record is unavailable."""
-        argv = ('/bin/sh', '-c', WITNESS_READ, 'corsair-witness', self._config.witness_record_path)
-        unavailable = lambda detail, receipt=None: WitnessCapture('unavailable', request, nonce, PROBE_SHA256, b'',
-                                                                  None, detail[:2048], receipt)
-        receipt, problem = self._execute(prepared.handle, argv, operation)
-        if problem:
-            return unavailable(f'read: {problem}', receipt)
-        if receipt.native_exit != 0 or not receipt.stdout or len(receipt.stdout) > MAX_RECORD_BYTES:
-            return unavailable(f'read: exit {receipt.native_exit}, {len(receipt.stdout)} bytes', receipt)
-        try:
-            artifact = self._store.put(receipt.stdout)
-        except Exception as error:
-            return unavailable(f'record storage: {error_text(error)}', receipt)
-        return WitnessCapture('captured', request, nonce, PROBE_SHA256, receipt.stdout, artifact, '', receipt)
 
     def _run_once(self, prepared: PreparedWorkspace, ids: tuple[str, str], test_paths: frozenset[str], operation: UUID,
                   witness: WitnessRequest | None = None, nonce: str | None = None):

@@ -6,7 +6,8 @@ from uuid import uuid4, uuid5
 import pytest
 
 from corsair.adapters.local_artifacts import LocalArtifacts
-from corsair.adapters.pytest_runner import WITNESS_READ, WRAPPER, PytestRunner, PytestRunnerConfig
+from corsair.adapters.native_runner import WITNESS_READ
+from corsair.adapters.pytest_runner import WRAPPER, PytestRunner, PytestRunnerConfig
 from corsair.nodes.witness import MAX_RECORD_BYTES, PROBE_SHA256, probe_argv
 from corsair.ports.execution import ExecutionError, ExecutionReceipt
 from corsair.ports.sandbox import SandboxHandle

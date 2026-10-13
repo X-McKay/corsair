@@ -20,6 +20,9 @@ NESTED_SKIP = re.compile(r'\s+(?:ok \d+.*#\s*skip\b|1\.\.0\s*#\s*skip\b).*', re.
 NESTED_TODO = re.compile(r'\s+(?:not )?ok \d+.*#\s*todo\b.*', re.IGNORECASE)
 LOCATION = re.compile(r'\s*#\s+at (?P<path>\S+) line (?P<line>\d+)\.')
 DIAG = re.compile(r'\s*# ?(?P<text>.*)')
+# A failed Test::More assertion raises nothing: its native report is TAP's `not ok`, named as the failure type so the
+# gate can match the planned assertion as it matches an exception type (SPEC-0074).
+FAILED = 'not_ok'
 NO_TESTS = re.compile(r'No tests run for subtest "(?P<name>.*)"')
 
 
@@ -32,12 +35,13 @@ def _failure(kind, name, lines, test_paths):
     path = line = None
     for text in lines:
         match = LOCATION.fullmatch(text)
-        if match and match['path'] in test_paths:
-            path, line = match['path'], int(match['line'])
+        # Perl names a file as it was loaded: `./t/x.t` (a `do` of the file, as the witness bootstrap runs it) is t/x.t.
+        if match and match['path'].removeprefix('./') in test_paths:
+            path, line = match['path'].removeprefix('./'), int(match['line'])
             break
     message = '\n'.join(match['text'] if (match := DIAG.fullmatch(text)) else text for text in lines
                         if text.strip() and not NESTED_RESULT.fullmatch(text) and not text.strip().startswith('1..'))
-    return FailureDetail(kind, 'die' if kind == 'error' else None, path, name, line, message[:MAX_MESSAGE_CHARS])
+    return FailureDetail(kind, 'die' if kind == 'error' else FAILED, path, name, line, message[:MAX_MESSAGE_CHARS])
 
 
 def parse_tap(data: bytes, test_ids: tuple[str, ...], *, exit_status: int, test_paths: frozenset[str],

@@ -5,7 +5,9 @@ from uuid import uuid4, uuid5
 
 import pytest
 
+from corsair.adapters.native_runner import WITNESS_READ
 from corsair.adapters.tap_runner import LISTER, WRAPPER, TapRunner, TapRunnerConfig, listed
+from corsair.nodes.witness import PERL_PROBE_SHA256, perl_probe_argv
 from corsair.ports.test_runner import ApprovedPatch, PatchFile, PerlTestId, WitnessRequest
 from corsair.reports.tap import TapError, parse_tap
 from tests.unit.test_pytest_runner import Scripted, Workspace, store  # noqa: F401  (fixture)
@@ -87,11 +89,11 @@ def test_the_lister_names_subtests_and_refuses_tests_outside_them():
     assert EXITS['syntaxerr']['list_exit'] != 0 and EXITS['bail']['list_exit'] != 0
 
 
-def run(store, name, *steps, witness=None, discovery=PERL):
+def run(store, name, *steps, witness=None, discovery=PERL, record=None):
     path = f't/{name}.t'
     patch = ApprovedPatch((PatchFile(path, (CAPTURES / f'{name}.t').read_bytes()),), (path,))
     workspace, execution = Workspace(store, ROOT), Scripted(*steps)
-    runner = TapRunner(workspace, execution, store, TapRunnerConfig(PERL, ROOT))
+    runner = TapRunner(workspace, execution, store, TapRunnerConfig(PERL, ROOT, witness_record_path=record))
     operation = uuid4()
     result = runner.run(patch, control_test_id=ids(name)[0], security_test_id=ids(name)[1], discovery_command=discovery,
                         operation=operation, witness=witness)
@@ -124,11 +126,32 @@ def test_a_hidden_outcome_is_retained_but_not_admitted(store):
     assert result.execution.claims is None and store.get(result.execution.junit) == tap('todo')
 
 
-def test_witness_requests_are_unavailable_without_running_anything(store):
-    witness = WitnessRequest('lib/HTTP/Tiny.pm', 'HTTP.Tiny.new', 'effect.txt')
-    result, execution, *_ = run(store, 'pass', ((CAPTURES / 'pass.list').read_bytes(), 0), (tap('pass'), 0),
-                                witness=witness)
-    assert result.witness.status == 'unavailable' and len(execution.calls) == 2
+RECORD = '/tmp/corsair-witness.json'
+WITNESS = WitnessRequest('lib/HTTP/Tiny.pm', 'HTTP.Tiny.new', 'effect.txt')
+
+
+def test_a_witness_runs_the_file_through_the_probe_and_reads_its_record_once(store):
+    record = b'{"schema": "corsair-witness-v2"}'
+    result, execution, _, operation = run(store, 'fail', ((CAPTURES / 'fail.list').read_bytes(), 0), (tap('fail'), 1),
+                                          (record, 0), witness=WITNESS, record=RECORD)
+    nonce = str(uuid5(operation, 'witness-nonce'))
+    probed = perl_probe_argv(PERL, WITNESS, 't/fail.t', root=ROOT, record_path=RECORD, nonce=nonce)
+    assert [call[0] for call in execution.calls][1:] == [
+        ('/bin/sh', '-c', WRAPPER, 'corsair-tap', ROOT, *probed), ('/bin/sh', '-c', WITNESS_READ, 'corsair-witness', RECORD)]
+    assert result.execution.status == 'completed' and result.witness.status == 'captured'
+    assert (result.witness.probe_sha256, result.witness.nonce, result.witness.record) == (PERL_PROBE_SHA256, nonce, record)
+    assert store.get(result.witness.artifact) == record
+
+
+def test_a_witness_is_not_read_after_a_failed_execution_and_needs_an_operator_record_path(store):
+    result, execution, *_ = run(store, 'pass', ((CAPTURES / 'pass.list').read_bytes(), 0), (tap('pass'), 1),
+                                witness=WITNESS, record=RECORD)
+    assert result.execution.status == 'invalid_report' and result.witness.status == 'unavailable'
+    assert len(execution.calls) == 2
+    with pytest.raises(ValueError, match='record path'):
+        run(store, 'pass', witness=WITNESS)
+    with pytest.raises(ValueError):
+        TapRunnerConfig(PERL, ROOT, witness_record_path=f'{ROOT}/witness.json')
 
 
 @pytest.mark.parametrize('command', [('perl', '-Ilib'), ('/usr/local/bin/perl', '-e', '1'), ('/usr/local/bin/perl', '-I/abs')])

@@ -1,15 +1,17 @@
 """Deterministic Python AST facts about authored tests; structure, not proof of test semantics.
 
 `assertion_lines` reads each test in its own language: a Jest id (`path.js::[suite::]name`) through
-`javascript.py`, a Minitest id (`path.rb::Class#method`) through `ruby.py`, every other id as a pytest node id here. Another language adds its id grammar and reader to
+`javascript.py`, a Minitest id (`path.rb::Class#method`) through `ruby.py`, a Test::More subtest id
+(`path.t#name`) through `perl.py`, every other id as a pytest node id here. Another language adds its id grammar and reader to
 `LANGUAGES`.
 """
 
 import ast
 
-from corsair.ports.test_runner import JS_TEST_ID, RubyTestId
+from corsair.ports.test_runner import JS_TEST_ID, PERL_TEST_ID, PerlTestId, RubyTestId
 
 from . import javascript
+from .perl import perl_assertion_lines
 from .ruby import ruby_assertion_lines
 
 SKIP_NAMES = {"skip", "skipif", "xfail", "importorskip"}
@@ -99,9 +101,17 @@ def ruby_lines(content: str, test_id: str) -> tuple[int, ...]:
     return lines
 
 
+def perl_lines(content: str, test_id: str) -> tuple[int, ...]:
+    """A Test::More subtest id (`path.t#name`) through `perl.py`."""
+    lines = perl_assertion_lines(content, PerlTestId.parse(test_id).name)
+    if not lines:
+        raise ValueError(f"{test_id} has no assertion")
+    return lines
+
+
 # Each language's test id grammar and its reader; any other id is a pytest node id.
 LANGUAGES = ((lambda test_id: JS_TEST_ID.fullmatch(test_id) is not None, javascript.assertion_lines),
-             (_ruby_id, ruby_lines))
+             (_ruby_id, ruby_lines), (lambda test_id: PERL_TEST_ID.fullmatch(test_id) is not None, perl_lines))
 
 
 def assertion_lines(content: str, test_id: str) -> tuple[int, ...]:

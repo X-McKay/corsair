@@ -122,7 +122,7 @@ def workspace(harness: Harness, image: str, tree: Path, dependencies: Path, comm
     dependencies setup installed."""
     mounts = ((dependencies, DEPENDENCIES),) + (((overlay, OVERLAY),) if overlay else ())
     return DockerCase(image, tree, commit, timeout, kind="investigation-run", docker=docker, evidence=evidence,
-                      mounts=mounts, env=("HOME=/tmp",),
+                      mounts=mounts, env=("HOME=/tmp", *harness.env),
                       copies=(f"cp -R {OVERLAY}/. {WORK}/; " if overlay else "")
                       + f"cp -R {DEPENDENCIES}/{harness.dependencies} {WORK}/;")
 

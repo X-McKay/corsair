@@ -4,14 +4,16 @@ The project's own test file runs unchanged under the image's Perl. TAP has no li
 loads the file with Test::More's `subtest` replaced by a recorder: subtest names are listed and no subtest
 body runs, while file-level code still runs, as pytest's collection imports a module (SPEC-0061).
 Execution runs the file once with stdout and stderr merged, the stream Test::More writes its TAP and
-diagnostics to; `reports/tap.py` admits it.
+diagnostics to; `reports/tap.py` admits it. With a witness request the file runs through the operator Perl probe
+(SPEC-0074), whose record is read back by one fixed command, as the pytest probe's is.
 """
 from dataclasses import dataclass
 import re
 from uuid import uuid5
 
 from corsair.adapters.native_runner import NativeRunner, check_bounds, check_command, check_ids, check_root
-from corsair.ports.test_runner import ApprovedPatch, PerlTestId, WitnessRequest, approved_path
+from corsair.nodes.witness import PERL_PROBE_SHA256, perl_probe_argv
+from corsair.ports.test_runner import ApprovedPatch, PerlTestId, WitnessCapture, WitnessRequest, approved_path
 from corsair.reports.junit import MAX_JUNIT_BYTES
 from corsair.reports.admission import failed_count
 from corsair.reports.tap import RESULT, TapError, parse_tap
@@ -42,6 +44,7 @@ class TapRunnerConfig:
     workspace_root: str
     max_report_bytes: int = MAX_JUNIT_BYTES
     max_excerpt_chars: int = 4096
+    witness_record_path: str | None = None  # Where the operator Perl probe writes its record (SPEC-0074)
 
     def __post_init__(self):
         check_command(self.command)
@@ -53,6 +56,10 @@ class TapRunnerConfig:
             approved_path(token[2:])
         check_root(self.workspace_root)
         check_bounds(self.max_report_bytes, self.max_excerpt_chars, MAX_JUNIT_BYTES)
+        record = self.witness_record_path
+        if record is not None and (type(record) is not str or not record.startswith('/') or '\0' in record
+                                   or record.startswith(self.workspace_root.rstrip('/') + '/')):
+            raise ValueError('Witness record path must be an absolute operator path outside the workspace')
 
 
 def listed(stdout: bytes) -> tuple[str, ...] | None:
@@ -82,6 +89,8 @@ class TapRunner(NativeRunner):
         # One TAP stream per file; both subtests in one file keep exactly one stream to admit.
         check_ids(patch, ids, witness, PerlTestId.parse, '`path/to/file.t#subtest`', unit=lambda item: item.path,
                   together='Control and security tests must be subtests of one file')
+        if witness is not None and self._config.witness_record_path is None:
+            raise ValueError('Witness capture needs an operator record path')
 
     def _discovery_argv(self, file: str) -> tuple[str, ...]:
         return ('/bin/sh', '-c', WRAPPER, 'corsair-tap-discover', self._config.workspace_root,
@@ -93,11 +102,26 @@ class TapRunner(NativeRunner):
         discovery, stopped = self._discover(prepared.handle, self._discovery_argv(file), ids, operation, read)
         if stopped:
             return stopped
-        execution, layer = self._run_once(prepared, ids, file, frozenset(paths), uuid5(operation, 'execution'))
-        return discovery, execution, layer, execution.detail, self._no_witness(witness, operation, 'no Perl witness probe')
+        nonce = str(uuid5(operation, 'witness-nonce')) if witness is not None else None
+        execution, layer = self._run_once(prepared, ids, file, frozenset(paths), uuid5(operation, 'execution'),
+                                          witness, nonce)
+        captured = None
+        if witness is not None:
+            record = self._config.witness_record_path
+            captured = (self._read_witness(prepared, witness, nonce, uuid5(operation, 'witness'), record,
+                                           PERL_PROBE_SHA256)
+                        if execution.status == 'completed' else
+                        WitnessCapture('unavailable', witness, nonce, PERL_PROBE_SHA256, b'', None,
+                                       f'execution {execution.status}; record not read', None))
+        return discovery, execution, layer, execution.detail, captured
 
-    def _run_once(self, prepared, ids, file, test_paths, operation):
-        argv = ('/bin/sh', '-c', WRAPPER, 'corsair-tap', self._config.workspace_root, *self._config.command, file)
+    def _run_once(self, prepared, ids, file, test_paths, operation, witness=None, nonce=None):
+        # With a witness the file runs through the probe bootstrap; its TAP stream and exit status are the file's.
+        command = self._config.command if witness is None else perl_probe_argv(
+            self._config.command, witness, file, root=self._config.workspace_root,
+            record_path=self._config.witness_record_path, nonce=nonce)
+        argv = ('/bin/sh', '-c', WRAPPER, 'corsair-tap', self._config.workspace_root, *command,
+                *(() if witness is not None else (file,)))
         receipt, problem = self._execute(prepared.handle, argv, operation)
         if problem:
             return self._failure(argv, receipt, 'execution', f'execution: {problem}')

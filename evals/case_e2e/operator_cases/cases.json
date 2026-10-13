@@ -1,0 +1,152 @@
+{
+  "perl-notes": {
+    "note": "Synthetic cpanfile project: a write through a 3-argument open of a lexical handle; the positive development example.",
+    "issue": {
+      "title": "Path traversal in save",
+      "body": "lib/Notes.pm save writes a note to a caller-supplied name inside the notes directory. Check whether ../ names escape it."
+    },
+    "test": [
+      "t/corsair_notes.t",
+      "corsair_notes.t"
+    ],
+    "control": "t/corsair_notes.t#test_control",
+    "security": "t/corsair_notes.t#test_security",
+    "target": [
+      "lib/Notes.pm",
+      "save"
+    ],
+    "effect": "sentinel.txt",
+    "failure_type": "not_ok",
+    "assertion_lines": [
+      16
+    ],
+    "expected": {
+      "execution": "completed",
+      "finding": "reproduced",
+      "fix": "verified"
+    }
+  },
+  "perl-pages": {
+    "note": "Synthetic Makefile.PL transfer: a read through a 2-argument bareword open, a qualified symbol reached through an exported alias, other subtest names.",
+    "issue": {
+      "title": "Arbitrary file read in page",
+      "body": "lib/Site/Pages.pm page builds a file path from the requested page name. Check whether a name can read files outside the pages root."
+    },
+    "test": [
+      "t/pages.t",
+      "pages.t"
+    ],
+    "control": "t/pages.t#control_page",
+    "security": "t/pages.t#security_page",
+    "target": [
+      "lib/Site/Pages.pm",
+      "Site.Pages.page"
+    ],
+    "effect": "secret.html",
+    "failure_type": "not_ok",
+    "assertion_lines": [
+      19
+    ],
+    "expected": {
+      "execution": "completed",
+      "finding": "reproduced",
+      "fix": "verified"
+    }
+  },
+  "ih-perl-cmdi": {
+    "note": "Corpus development topic. Its effect is a process start, which no operator recorder records yet, so the gate stays inconclusive although the tests tell the revisions apart.",
+    "corpus": "ih-perl-cmdi",
+    "test": [
+      "t/corsair_cmdi.t",
+      "corsair_cmdi.t"
+    ],
+    "control": "t/corsair_cmdi.t#test_control",
+    "security": "t/corsair_cmdi.t#test_security",
+    "target": [
+      "lib/Runner.pm",
+      "run"
+    ],
+    "effect": "sentinel.txt",
+    "failure_type": "not_ok",
+    "assertion_lines": [
+      12
+    ],
+    "expected": {
+      "execution": "completed",
+      "finding": "inconclusive",
+      "fix": "not_verified"
+    }
+  },
+  "ih-perl-adminpw": {
+    "note": "Corpus development topic; a credential check has no file or process effect to record, so the gate stays inconclusive.",
+    "corpus": "ih-perl-adminpw",
+    "test": [
+      "t/corsair_adminpw.t",
+      "corsair_adminpw.t"
+    ],
+    "control": "t/corsair_adminpw.t#test_control",
+    "security": "t/corsair_adminpw.t#test_security",
+    "target": [
+      "lib/Auth.pm",
+      "authenticate"
+    ],
+    "effect": "sentinel.txt",
+    "failure_type": "not_ok",
+    "assertion_lines": [
+      11
+    ],
+    "expected": {
+      "execution": "completed",
+      "finding": "inconclusive",
+      "fix": "not_verified"
+    }
+  },
+  "ih-perl-responsesplitting": {
+    "note": "Corpus development topic; a returned header string has no file or process effect to record, so the gate stays inconclusive.",
+    "corpus": "ih-perl-responsesplitting",
+    "test": [
+      "t/corsair_responsesplitting.t",
+      "corsair_responsesplitting.t"
+    ],
+    "control": "t/corsair_responsesplitting.t#test_control",
+    "security": "t/corsair_responsesplitting.t#test_security",
+    "target": [
+      "lib/Responder.pm",
+      "redirect_headers"
+    ],
+    "effect": "sentinel.txt",
+    "failure_type": "not_ok",
+    "assertion_lines": [
+      12
+    ],
+    "expected": {
+      "execution": "completed",
+      "finding": "inconclusive",
+      "fix": "not_verified"
+    }
+  },
+  "ih-perl-sqli": {
+    "note": "Corpus development topic whose cpanfile needs DBI and DBD::SQLite from CPAN: proves setup with registry access (not run in the cloud container, which has no registry route for setup containers). No recorder covers a query, so the gate stays inconclusive.",
+    "corpus": "ih-perl-sqli",
+    "test": [
+      "t/corsair_sqli.t",
+      "corsair_sqli.t"
+    ],
+    "control": "t/corsair_sqli.t#test_control",
+    "security": "t/corsair_sqli.t#test_security",
+    "target": [
+      "lib/UserDao.pm",
+      "get_user"
+    ],
+    "effect": "sentinel.txt",
+    "failure_type": "not_ok",
+    "assertion_lines": [
+      17
+    ],
+    "expected": {
+      "execution": "completed",
+      "finding": "inconclusive",
+      "fix": "not_verified"
+    }
+  }
+}

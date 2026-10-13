@@ -15,6 +15,7 @@ from typing import Any
 from corsair.adapters.docker_image import WORK
 from corsair.adapters.jest_runner import JestRunner, JestRunnerConfig
 from corsair.adapters.pytest_runner import PytestRunner, PytestRunnerConfig
+from corsair.adapters.tap_runner import TapRunner, TapRunnerConfig
 from corsair.agents.test_planning.contracts import WitnessFacility
 
 
@@ -26,6 +27,7 @@ class Harness:
     dependencies: str | None = None  # Tree-relative directory setup fills, copied into every run's workspace
     lockfiles: tuple[str, ...] = ()  # What the installed dependencies are bound to (with the image and commit)
     registry_env: tuple[str, ...] = ()  # Host variables passed to setup when set (a proxy and its CA file)
+    env: tuple[str, ...] = ()  # Fixed NAME=value pairs every run container gets (where installed dependencies load from)
     scratch_location: str = ""
     observation_facilities: tuple[str, ...] = ()
     witness_facilities: tuple[WitnessFacility, ...] = ()
@@ -45,6 +47,11 @@ PYTEST = ("/usr/bin/env", "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1", "PYTHONDONTWRITEBY
           "/usr/local/bin/python3", "-m", "pytest", "-c", "/dev/null", "--rootdir", ".", "--noconftest",
           "--import-mode=importlib", "-p", "no:cacheprovider", "--basetemp", "/tmp/corsair-scratch")
 
+# The project's CPAN dependencies from its own manifests (cpanfile, Makefile.PL or Build.PL) with the upstream image's
+# cpanm, which carries its own cpanfile reader; already satisfied requirements (core modules) fetch nothing and no
+# project test runs (--notest).
+CPANM_SETUP = ("if [ -f cpanfile ] || [ -f Makefile.PL ] || [ -f Build.PL ]; then /usr/local/bin/cpanm --notest "
+               "--no-man-pages --installdeps --local-lib-contained .corsair-deps .; fi; mkdir -p .corsair-deps")
 HARNESSES: dict[str, Harness] = {
     # The fixture and the OpenShell route build their own pytest config (reviewed workspace) from the same runner.
     "pytest": Harness(
@@ -71,6 +78,25 @@ HARNESSES: dict[str, Harness] = {
         registry_env=("HTTPS_PROXY", "https_proxy", "NODE_EXTRA_CA_CERTS"),
         scratch_location="A fresh directory the test creates under os.tmpdir(); fixtures must not be created elsewhere",
         observation_facilities=("Native Jest JSON report: outcome, failure message and failing line per test",)),
+    # Test::More subtests of one .t file, run by the image's Perl with the project's lib; installed CPAN dependencies
+    # load through PERL5LIB, which (unlike -I) adds their architecture directories.
+    "tap-harness": Harness(
+        runner=TapRunner,
+        config=TapRunnerConfig(command=("/usr/local/bin/perl", "-Ilib"), workspace_root=WORK,
+                               witness_record_path="/tmp/corsair-witness.json"),
+        setup=("/bin/sh", "-ec", CPANM_SETUP), dependencies=".corsair-deps",
+        lockfiles=("cpanfile", "cpanfile.snapshot", "Makefile.PL", "Build.PL"),
+        registry_env=("HTTP_PROXY", "http_proxy", "HTTPS_PROXY", "https_proxy", "SSL_CERT_FILE"),
+        env=(f"PERL5LIB={WORK}/.corsair-deps/lib/perl5",),
+        scratch_location="A fresh directory the test creates with File::Temp tempdir; fixtures must not be created elsewhere",
+        observation_facilities=(
+            "Native TAP stream: outcome, failure location and diagnostics per top-level subtest; a failed Test::More "
+            "assertion is reported with failure type not_ok and a subtest that dies with die",
+            "Operator witness probe, not test code: calls, returns, dies and file opens attributed to the identified "
+            "target sub during each top-level subtest"),
+        witness_facilities=(WitnessFacility(
+            id="perl_open", kind="file_open",
+            description="Perl CORE::GLOBAL::open override recording each path the target opens during the subtest"),)),
 }
 
 

@@ -11,11 +11,14 @@ from uuid import UUID, uuid5
 from corsair.ports.artifacts import ArtifactRef, ArtifactStore
 from corsair.ports.execution import ExecutionReceipt, SandboxExecution
 from corsair.ports.sandbox import SandboxHandle
+from corsair.nodes.witness import MAX_RECORD_BYTES
 from corsair.ports.test_runner import (MAX_TEST_ID, ApprovedPatch, Discovery, Execution, NativeTestRun,
                                        PreparedWorkspace, TestCaseResult, TestWorkspace, WitnessCapture, WitnessRequest)
 from corsair.reports.admission import failed_count
 from corsair.reports.test_observations import AdmittedTestClaims, TestClaim, WorkloadTestReport
 
+# Fixed read-back of a probe record after execution; the path arrives only as a positional argument.
+WITNESS_READ = 'cat -- "$1"'
 # Framework outcome to workload claim: an error (the test could not complete) is a failed claim.
 CLAIM = {'passed': 'passed', 'failed': 'failed', 'error': 'failed', 'skipped': 'skipped'}
 
@@ -185,6 +188,23 @@ class NativeRunner:
         claims = AdmittedTestClaims(str(operation), prepared.handle, prepared.source, prepared.tests, report,
                                     receipt.native_exit, claims_report)
         return Execution('completed', cases, report, claims, '', argv, receipt), None
+
+    def _read_witness(self, prepared: PreparedWorkspace, request: WitnessRequest, nonce: str, operation: UUID,
+                      record_path: str, probe_sha256: str) -> WitnessCapture:
+        """One fixed read of the probe record; never retried, and a missing or oversized record is unavailable."""
+        argv = ('/bin/sh', '-c', WITNESS_READ, 'corsair-witness', record_path)
+        unavailable = lambda detail, receipt=None: WitnessCapture('unavailable', request, nonce, probe_sha256, b'',
+                                                                  None, detail[:2048], receipt)
+        receipt, problem = self._execute(prepared.handle, argv, operation)
+        if problem:
+            return unavailable(f'read: {problem}', receipt)
+        if receipt.native_exit != 0 or not receipt.stdout or len(receipt.stdout) > MAX_RECORD_BYTES:
+            return unavailable(f'read: exit {receipt.native_exit}, {len(receipt.stdout)} bytes', receipt)
+        try:
+            artifact = self._store.put(receipt.stdout)
+        except Exception as error:
+            return unavailable(f'record storage: {error_text(error)}', receipt)
+        return WitnessCapture('captured', request, nonce, probe_sha256, receipt.stdout, artifact, '', receipt)
 
     @staticmethod
     def _no_witness(witness: WitnessRequest | None, operation: UUID, detail: str) -> WitnessCapture | None:

@@ -33,6 +33,8 @@ The earlier unpublished campaign used PLAN-0085, which now identifies the merged
 
 Documentation publication based on `e84a2bb`. Main's source was checked for the absent corpus campaign module and existing candidate-free build refusal. Corpus scope remains 42 topics / 82 configurations; repeated attempts do not increase breadth. No new model, Docker or corpus run and no accuracy gain are claimed. Documentation guards passed 5 tests; the full current-main offline suite passed 1,965 tests with one skip and 11 deprecation warnings in 58.98 s. `git diff --check` passed. Details are recorded in HANDOFF-0113.
 
+Lane 4 (2026-10-13, [PLAN-0088](PLAN-0088-perl-product-route.md)): Perl is complete on the image-only route through setup, execution, report admission, a Perl `file_open` witness and the gate. Under plain Docker, two synthetic Perl projects reach completed / reproduced / verified with operator tests and no model. Corpus `ih-perl-cmdi`, `ih-perl-adminpw` and `ih-perl-responsesplitting` run cleanly but stay inconclusive: their effects (process start, credential check, header string) have no recorder in any language. `ih-perl-sqli` and `ih-perl-xss` need CPAN and were not run. No live or accuracy claim.
+
 ## Decisions and next action
 
 Start with the runbook and source verification, then up to three isolated worker lanes: shared approved-path contract, candidate-free product support, and one JavaScript or Perl execution/evidence slice. One coordinator initially owns live Docker/model dispatch. Use actual available agent capabilities; no specific desktop app is required.

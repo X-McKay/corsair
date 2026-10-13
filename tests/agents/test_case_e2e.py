@@ -14,6 +14,7 @@ from corsair.adapters.jest_runner import JestRunner
 from corsair.adapters.local_artifacts import LocalArtifacts
 from corsair.agents.environment.contracts import Toolchain
 from corsair.investigation.build import Refused, build, repository_of
+from corsair.adapters.tap_runner import TapRunner
 from corsair.investigation.frameworks import HARNESSES, NoHarness, harness
 from corsair.investigation.request import IssueRequest
 from corsair.nodes.runtime.contracts import AxisCheck, Supported
@@ -140,6 +141,28 @@ def test_the_runner_is_the_selected_framework_rows_entry_in_one_table():
         harness("minitest")
     with pytest.raises(ValueError, match="admitted 0 framework rows"):
         framework_row(node.model_copy(update={"checks": (jest.model_copy(update={"satisfied": False}),)}), matrix)
+
+
+def test_a_perl_request_builds_with_the_tap_harness_entry(tmp_path):
+    """A cpanfile project selects the Perl row and the table's tap-harness entry (SPEC-0074), with no language branch."""
+    repo = tmp_path / "sources/perl"
+    (repo / "lib/Store").mkdir(parents=True)
+    git(repo, "init", "-q")
+    git(repo, "config", "user.email", "t@example.invalid")
+    git(repo, "config", "user.name", "t")
+    (repo / "cpanfile").write_text("requires 'perl', '5.010';\n")
+    (repo / "lib/Store/Files.pm").write_text("package Store::Files;\nsub put { open(my $f, '>', $_[0]) }\n1;\n")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "c")
+    commit = git(repo, "rev-parse", "HEAD")
+    row = "perl-5.26-make"
+    issue = {"provider": "manual", "title": "Path traversal", "body": "lib/Store/Files.pm put writes a caller path."}
+    built = build(request(repo, commit, commit, issue=issue), tmp_path / "trees", {row: CONFIG},
+                  roots=(tmp_path / "sources",))
+    assert (built.row, built.framework.name, built.harness.runner) == (row, "tap-harness", TapRunner)
+    assert [f.id for f in built.case.environment.witness_facilities] == ["perl_open"]
+    assert built.harness.env == ("PERL5LIB=/tmp/work/.corsair-deps/lib/perl5",)
+    assert "cpanm" in built.harness.setup_script and built.harness.config.witness_record_path
 
 
 def test_a_toolchain_language_is_not_a_fixed_list():
