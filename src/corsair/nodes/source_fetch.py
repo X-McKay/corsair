@@ -18,10 +18,11 @@ from corsair.ports.sandbox import SandboxHandle
 HOST = r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+'
 SHA1 = '[0-9a-f]{40}'
 
-# Positional parameters: $1 shell, $2 git, $3 workdir, $4 url, $5 commit, $6 placeholder variable name.
+# Positional parameters: $1 shell, $2 git, $3 workdir, $4 url, $5 commit, $6 placeholder variable name,
+# $7 '1' when the operator skips symlink and submodule entries (SPEC-0037), else empty.
 # Variable data is never interpolated into the script text. Recipe refusals exit 65 (source content or
 # workdir) or 66 (credential placeholder absent); any other nonzero exit is the fetch or hosting service.
-PREAMBLE = r'''sh=$1 git=$2 dir=$3 url=$4 commit=$5 name=$6
+PREAMBLE = r'''sh=$1 git=$2 dir=$3 url=$4 commit=$5 name=$6 skip=${7:-}
 export LC_ALL=C GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0 GIT_LFS_SKIP_SMUDGE=1
 g() { "$git" -c core.hooksPath=/dev/null -c protocol.allow=never -c protocol.https.allow=always \
   -c transfer.fsckObjects=true -c submodule.recurse=false -c core.autocrlf=false -c core.symlinks=false \
@@ -46,23 +47,25 @@ g "$@" fetch --depth=1 --no-tags "$url" "$commit" >&2
 # Raw blobs only: no checkout, so no .gitattributes eol/ident/encoding transformation applies.
 MATERIALIZE_PART = r'''cd -- "$dir"
 [ "$(ls -A)" = .git ] || fail 65 'workdir holds more than the fetched repository'
-if g ls-tree -r --full-tree "$commit" | cut -d' ' -f1,2 | grep -qvx -e '100644 blob' -e '100755 blob'; then
+if [ "$skip" = 1 ]; then set -- -e '120000 blob' -e '160000 commit'; else set --; fi
+if g ls-tree -r --full-tree "$commit" | cut -d' ' -f1,2 | grep -qvx -e '100644 blob' -e '100755 blob' "$@"; then
   fail 65 'only regular blobs admitted; symlinks and submodules refused'
 fi
 g ls-tree -rz --full-tree "$commit" > .git/corsair-tree
 xargs -0 "$sh" -euc '
-git=$1; shift; tab=$(printf "\t")
+git=$1 skip=$2; shift 2; tab=$(printf "\t")
 for rec; do
   meta=${rec%%"$tab"*}; path=${rec#*"$tab"}
   case $meta in
     "100644 blob "*) perm=644 ;;
     "100755 blob "*) perm=755 ;;
+    "120000 blob "*|"160000 commit "*) [ "$skip" = 1 ] || exit 255; continue ;;
     *) exit 255 ;;
   esac
   case $path in */*) mkdir -p -- "${path%/*}" ;; esac
   "$git" cat-file blob "${meta##* }" > "$path"
   chmod "$perm" -- "$path"
-done' corsair-materialize "$git" < .git/corsair-tree
+done' corsair-materialize "$git" "$skip" < .git/corsair-tree
 rm -f .git/corsair-tree
 g update-ref --no-deref HEAD "$commit" >&2
 '''
@@ -77,11 +80,26 @@ for p; do
   printf "%s %s %s %s %s\n" "$hex" "$kind" "$mode" "$size" "$sum"
 done' corsair-inventory {} + > .git/corsair-inventory
 sort .git/corsair-inventory > .git/corsair-sorted
+: > .git/corsair-skip
+if [ "$skip" = 1 ]; then
+  # What Git records for the skipped entries; the inventory below shows none of them reached the workdir.
+  g ls-tree -rz --full-tree HEAD | xargs -0 "$sh" -euc '
+tab=$(printf "\t")
+for rec; do
+  meta=${rec%%"$tab"*}; path=${rec#*"$tab"}
+  case $meta in
+    "120000 blob "*|"160000 commit "*)
+      hex=$(printf %s "$path" | od -An -v -tx1 | tr -d " \n")
+      printf "%s %s %s\n" "$hex" "${meta%% *}" "${meta##* }" ;;
+  esac
+done' corsair-skipped | sort > .git/corsair-skip
+fi
 count=$(wc -l < .git/corsair-sorted)
 printf 'corsair-source-fetch v1\nhead %s\ntree %s\n' "$head" "$tree"
+while read -r hex mode object; do printf 'skip %s %s %s\n' "$mode" "$object" "$hex"; done < .git/corsair-skip
 while read -r hex kind mode size sum; do printf 'entry %s %s %s %s %s\n' "$kind" "$mode" "$size" "$sum" "$hex"; done < .git/corsair-sorted
 printf 'end %s\n' $count
-rm -f .git/corsair-inventory .git/corsair-sorted
+rm -f .git/corsair-inventory .git/corsair-sorted .git/corsair-skip
 '''
 FETCH_SCRIPT = PREAMBLE + FETCH_PART + MATERIALIZE_PART + INVENTORY_PART
 MATERIALIZE_SCRIPT = PREAMBLE + MATERIALIZE_PART + INVENTORY_PART
@@ -104,6 +122,7 @@ class FetchRecipe:
     workdir: str
     max_inventory_entries: int
     allowed_hosts: frozenset[str]
+    skip_nonregular: bool = False  # must match the host capture's choice; admission compares the skipped entries
 
     def __post_init__(self):
         for path in (self.shell, self.git, self.transport, self.workdir): absolute(path)
@@ -112,6 +131,7 @@ class FetchRecipe:
         if (type(self.allowed_hosts) is not frozenset or not self.allowed_hosts
                 or not all(isinstance(h, str) and re.fullmatch(HOST, h) for h in self.allowed_hosts)):
             raise ValueError('Nonempty frozenset of lowercase repository hosts required')
+        if type(self.skip_nonregular) is not bool: raise ValueError('Explicit skip choice required')
 
 
 @dataclass(frozen=True)
@@ -154,7 +174,7 @@ def fetch_command(recipe: FetchRecipe, target: FetchTarget) -> tuple[str, ...]:
     if target.host not in recipe.allowed_hosts: raise ValueError('Repository host not operator-allowed')
     name = target.credential.env_name if target.credential else ''
     return (recipe.shell, '-euc', FETCH_SCRIPT, 'corsair-source-fetch', recipe.shell, recipe.git, recipe.workdir,
-            target.url, target.commit, name)
+            target.url, target.commit, name, '1' if recipe.skip_nonregular else '')
 
 
 @dataclass(frozen=True)
@@ -171,8 +191,10 @@ class FetchInventory:
     head: str
     tree: str
     entries: tuple[FetchEntry, ...]
+    skipped: tuple[tuple[str, str, str], ...] = ()  # (path, mode, object) Git records for skipped entries
 
 
+SKIP = re.compile(r'skip (120000|160000) ([0-9a-f]{40}) ((?:[0-9a-f]{2})+)')
 ENTRY = re.compile(r'entry ([fdlo]) ([0-7]{3,4}) (-|0|[1-9][0-9]*) (-|[0-9a-f]{64}) ((?:[0-9a-f]{2})+)')
 
 
@@ -185,8 +207,19 @@ def parse_fetch_receipt(stdout: bytes, max_entries: int) -> FetchInventory:
     head, tree, end = re.fullmatch(f'head ({SHA1})', lines[1]), re.fullmatch(f'tree ({SHA1})', lines[2]), re.fullmatch('end (0|[1-9][0-9]*)', lines[-1])
     if lines[0] != 'corsair-source-fetch v1' or not head or not tree or not end:
         raise ValueError('Malformed receipt identity or trailer')
+    body, skipped, previous = lines[3:-1], [], ''
+    while body and body[0].startswith('skip '):
+        match = SKIP.fullmatch(body.pop(0))
+        if not match: raise ValueError('Malformed skip line')
+        mode, obj, hexpath = match.groups()
+        if hexpath <= previous: raise ValueError('Skip lines not strictly sorted or duplicated')
+        previous = hexpath
+        try: path = bytes.fromhex(hexpath).decode('utf8')
+        except UnicodeDecodeError: raise ValueError('UTF8 path required') from None
+        confined_path(path)
+        skipped.append((path, mode, obj))
     entries, previous = [], ''
-    for line in lines[3:-1]:
+    for line in body:
         match = ENTRY.fullmatch(line)
         if not match: raise ValueError('Malformed inventory line')
         kind, mode, size, digest, hexpath = match.groups()
@@ -199,7 +232,7 @@ def parse_fetch_receipt(stdout: bytes, max_entries: int) -> FetchInventory:
         confined_path(path)
         entries.append(FetchEntry(kind, mode, None if size == '-' else int(size), None if digest == '-' else digest, path))
     if int(end[1]) != len(entries): raise ValueError('Inventory count mismatch')
-    return FetchInventory(head[1], tree[1], tuple(entries))
+    return FetchInventory(head[1], tree[1], tuple(entries), tuple(skipped))
 
 
 class SourceFetchRefused(RuntimeError):
@@ -283,6 +316,9 @@ def admit_fetch(receipt: ExecutionReceipt, snapshot: SourceSnapshot, recipe: Fet
     except ValueError as error: raise SourceFetchRefused('source_admission', str(error), receipt) from error
     refuse = lambda reason: SourceFetchRefused('source_admission', reason, receipt)
     if (inventory.head, inventory.tree) != (snapshot.commit, snapshot.tree): raise refuse('commit or tree differs from capture')
+    if snapshot.skipped and not recipe.skip_nonregular: raise ValueError('Capture skipped entries; the recipe must skip them too')
+    if set(inventory.skipped) != {(s.path, s.mode, s.object) for s in snapshot.skipped}:
+        raise refuse('skipped entries differ from capture')
     expected = {f.path: (f.mode[3:], f.artifact.size, f.artifact.sha256) for f in snapshot.files}
     directories = {'/'.join(p.split('/')[:n]) for p in expected for n in range(1, p.count('/') + 1)}
     files, seen = {}, set()
