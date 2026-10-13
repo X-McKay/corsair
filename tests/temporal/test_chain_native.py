@@ -269,7 +269,7 @@ def test_chain_dataset_scores_the_durable_chain_like_direct_mode(temporal_addres
     assert len(report.cases) == len(dataset().cases) and passed(report)
 
 
-@pytest.mark.parametrize("requires,prepared,status", [(">=3.7,<3.12", True, "unsupported"), (">=3.10", False, None)])
+@pytest.mark.parametrize("requires,prepared,status", [(">=3.8,<3.12", True, "unsupported"), (">=3.10", False, None)])
 def test_runtime_stage_stops_both_modes_before_any_child(temporal_address, request, store, tmp_path, requires, prepared,
                                                          status):
     """SPEC-0060: one select_runtime activity, scheduled once; unsupported or no catalog ends the run there."""
