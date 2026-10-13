@@ -188,6 +188,7 @@ def test_budget_is_operator_owned_and_enforced():
     blocked = {"status": "blocked", "layer": "unknown", "evidence": "budget exhausted before setup completed", "run_ids": [], "citations": []}
     result = run(blocked, calls, execution, budget=SetupBudget(max_commands=2)).output
     assert len(execution.calls) == 2 and len(result.receipts) == 2
+    assert result.diagnostics[0].code == "setup_budget"
     with pytest.raises(ValueError):
         SetupBudget(max_commands=0)
 
@@ -205,7 +206,7 @@ def test_blocked_must_cite_observed_failure_for_attributed_layer():
     with pytest.raises(UnexpectedModelBehavior):
         run(registry, calls, ScriptedExecution())  # the cited run succeeded
     with pytest.raises(UnexpectedModelBehavior):
-        run(registry | {"layer": "sandbox", "run_ids": []}, calls, ScriptedExecution({INSTALL: denied}))  # no halt
+        run(registry | {"layer": "sandbox", "run_ids": []}, calls, ScriptedExecution({INSTALL: denied}))  # failed command must be cited even after a halt
 
 
 def test_unsupported_toolchain_is_grounded_and_runs_nothing():
@@ -282,3 +283,58 @@ def test_pytest_admission_reads_a_genuine_summary(tmp_path, body, ok):
     run_ = subprocess.run([sys.executable, "-m", "pytest", "-c", "/dev/null", "--rootdir", ".", "-q", "-p", "no:cacheprovider",
                            "test_genuine.py::test_genuine"], cwd=tmp_path, capture_output=True, timeout=60)
     assert run_.returncode == 0 and FRAMEWORKS["pytest"].passed(run_.stdout) is ok
+
+
+@pytest.mark.parametrize("output,code", [
+    (b"ERROR: No matching distribution found for absent==7", "dependency_resolution"),
+    (b"Connection timed out", "connectivity"),
+    (b"certificate verify failed", "tls_trust"),
+    (b"403 Forbidden", "registry_access"),
+    (b"compile error", "setup_command_failed"),
+])
+def test_failure_stops_all_later_commands_and_returns_trusted_guidance(output, code):
+    execution = ScriptedExecution({INSTALL: (1, output, "terminal")})
+    blocked = {"status": "blocked", "layer": "unknown", "evidence": output.decode(), "run_ids": [1], "citations": []}
+    # Scripted model deliberately attempts the build after failure: the execution port must never see it.
+    result = run(blocked, SETUP[:3] + [("run_setup_command", {"command": list(BUILD)})], execution).output
+    assert execution.calls == [INSTALL]
+    assert result.diagnostics[0].code == code
+    assert result.diagnostics[0].actions and result.diagnostics[0].evidence
+    with pytest.raises(UnexpectedModelBehavior):
+        run(ready(), SETUP, ScriptedExecution({INSTALL: (1, output, "terminal")}))
+
+
+def test_model_cannot_supply_operator_diagnostics():
+    from corsair.agents.environment.contracts import BlockedEnvironmentDraft
+    with pytest.raises(ValidationError):
+        BlockedEnvironmentDraft.model_validate({"status": "blocked", "layer": "unknown", "evidence": "x",
+                                               "run_ids": [], "citations": [], "diagnostics": []})
+
+
+def test_a_halt_cannot_be_hidden_as_unsupported():
+    unsupported = {"status": "unsupported", "requirement": "different toolchain needed",
+                   "citations": [{"path": ".github/workflows/ci.yml", "start_line": 4, "end_line": 4}]}
+    with pytest.raises(UnexpectedModelBehavior):
+        run(unsupported, SETUP[:3], ScriptedExecution({INSTALL: (1, b"build failed", "terminal")}))
+
+
+def test_retained_output_can_still_be_read_after_halt():
+    output = b"No matching distribution found for example-missing==1"
+    blocked = {"status": "blocked", "layer": "dependency", "evidence": output.decode(), "run_ids": [1], "citations": []}
+    execution = ScriptedExecution({INSTALL: (1, output, "terminal")})
+    result = run(blocked, SETUP[:3] + [("read_output", {"run_id": 1, "stream": "stdout", "offset": 0})], execution)
+    assert result.output.diagnostics[0].code == "dependency_resolution"
+    assert execution.calls == [INSTALL]
+
+
+def test_zero_exit_with_unconfirmed_cleanup_is_a_citeable_blocker():
+    class UnconfirmedCleanup(ScriptedExecution):
+        def execute(self, handle, command, operation):
+            return replace(super().execute(handle, command, operation), worker_cleanup="unconfirmed")
+    blocked = {"status": "blocked", "layer": "sandbox", "evidence": "Execution worker cleanup is unconfirmed.",
+               "run_ids": [1], "citations": []}
+    execution = UnconfirmedCleanup()
+    result = run(blocked, SETUP[:3], execution).output
+    assert result.receipts[0].exit_code == 0
+    assert result.receipts[0].execution_error == blocked["evidence"]
+    assert result.diagnostics[0].code == "cleanup_unconfirmed"

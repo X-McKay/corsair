@@ -8,6 +8,8 @@ digests are never model-authored: the deterministic inventory node records them.
 
 from typing import Annotated, Generic, Literal, Union
 
+from corsair.core.blockers import Blocker
+
 from pydantic import Field, field_validator, model_validator
 
 from corsair.agents.issue_analysis.contracts import (Citation, Contract, Fact, SourceExcerpt, SourceFile,
@@ -125,6 +127,7 @@ class ReadyEnvironment(_Ready[SourceExcerpt]):
 
 
 class BlockedEnvironment(_Blocked[SourceExcerpt]):
+    diagnostics: tuple[Blocker, ...] = ()
     receipts: tuple[CommandRecord, ...]
 
 

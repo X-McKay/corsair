@@ -17,6 +17,9 @@ from corsair.agents.issue_analysis.contracts import Contract, SourceExcerpt, Sou
 from corsair.ports.execution import ExecutionError, ExecutionReceipt, SandboxExecution
 from corsair.ports.sandbox import SandboxHandle
 
+from corsair.core.blockers import Blocker
+from .diagnostics import budget_blocker, setup_blocker
+
 from .contracts import Command, CommandRecord, EnvironmentInput, Toolchain
 
 READ_SOURCE_TOOL = "read_source"
@@ -42,6 +45,7 @@ class SetupLedger:
     records: list[CommandRecord] = field(default_factory=list)
     outputs: dict[int, tuple[bytes, bytes]] = field(default_factory=dict)
     halted: str | None = None
+    diagnostics: list[Blocker] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -79,6 +83,7 @@ class ToolchainCatalog(Contract):
 
 
 class SetupRun(Contract):
+    diagnostic: Blocker | None = None
     run_id: int
     delivery: str
     completion: str
@@ -135,12 +140,15 @@ def environment_tools() -> FunctionToolset[EnvironmentDependencies]:
                                 command: Annotated[Command, Field(description="Argument tokens executed directly, without a shell unless the first tokens invoke one")]) -> SetupRun:
         """Run one command once in the preparation sandbox under operator limits and policy.
 
-        Never retried. If delivery is unknown, no further command can run."""
+        Never retried. After any unsuccessful command, no further command can run; inspect the diagnostic and retained output."""
         deps, ledger = ctx.deps, ctx.deps.ledger
         if ledger.halted:
             raise ToolFailed(ledger.halted)
         if len(ledger.records) >= deps.budget.max_commands:
-            raise ToolFailed("operator setup command budget exhausted")
+            diagnostic = budget_blocker()
+            ledger.diagnostics.append(diagnostic)
+            ledger.halted = diagnostic.render()
+            raise ToolFailed(ledger.halted)
         command = tuple(command)
         operation = deps.new_operation()
         error = None
@@ -150,12 +158,17 @@ def environment_tools() -> FunctionToolset[EnvironmentDependencies]:
             # Journal loss or unconfirmed cleanup can accompany exit 0; the run is still failed evidence.
             receipt, error = failure.receipt, str(failure)
         run_id = len(ledger.records) + 1
+        diagnostic = setup_blocker(receipt, run_id, error)
+        # A native infrastructure failure can accompany exit zero or empty output.
+        # Give the finalizer a trusted, citeable error without copying private native detail.
+        if diagnostic and diagnostic.certainty == "observed" and not error:
+            error = diagnostic.summary
         ledger.records.append(_record(run_id, command, receipt, error))
         ledger.outputs[run_id] = (receipt.stdout, receipt.stderr)
-        if error or receipt.delivery != "acknowledged" or receipt.completion != "terminal_observed":
-            ledger.halted = (f"run {run_id} delivery {receipt.delivery}, completion {receipt.completion}, "
-                             f"execution error {error}: no further commands")
-        return SetupRun(run_id=run_id, delivery=receipt.delivery, completion=receipt.completion,
+        if diagnostic:
+            ledger.diagnostics.append(diagnostic)
+            ledger.halted = diagnostic.render() + "\nNo further setup commands in this attempt."
+        return SetupRun(diagnostic=diagnostic, run_id=run_id, delivery=receipt.delivery, completion=receipt.completion,
                         exit_code=receipt.native_exit, failure_layer=receipt.failure_layer, execution_error=error,
                         stdout_bytes=len(receipt.stdout), stderr_bytes=len(receipt.stderr),
                         stdout_tail=receipt.stdout[-OUTPUT_TAIL_BYTES:].decode("utf-8", "replace"),

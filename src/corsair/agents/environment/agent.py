@@ -16,7 +16,7 @@ from .frameworks import FRAMEWORKS, file_matches
 from .contracts import EnvironmentDraft, EnvironmentInput, EnvironmentResult, ReadyEnvironmentDraft
 from .tools import READ_SOURCE_TOOL, RUN_SETUP_COMMAND_TOOL, TOOL_RETRIES, EnvironmentDependencies, SetupRun, environment_tools
 
-PROMPT_VERSION = "environment-v1"
+PROMPT_VERSION = "environment-v2-blockers"
 SKILL_ID = "prepare-environment"
 SKILL_TEXT = (Path(__file__).parent / "skills" / SKILL_ID / "SKILL.md").read_text()
 SKILL_SHA256 = sha256(SKILL_TEXT.encode()).hexdigest()
@@ -72,7 +72,7 @@ def create_environment_agent(model: Model, *, output_retries: int = 1) -> Agent[
         values = draft.model_dump() | {"receipts": [r.model_dump() for r in deps.ledger.records]}
         if draft.status == "ready":
             if deps.ledger.halted:
-                raise ModelRetry("a command had an unknown outcome or an execution error; report blocked, not ready")
+                raise ModelRetry("setup has halted after a command failure, unknown outcome or budget limit; report blocked, not ready")
             if draft.toolchain_id != deps.toolchain_id:
                 raise ModelRetry("ready requires the preparation sandbox's toolchain")
             framework = FRAMEWORKS.get(draft.framework)
@@ -99,14 +99,20 @@ def create_environment_agent(model: Model, *, output_retries: int = 1) -> Agent[
             values |= {"recipe": [s.model_dump() | {"source": quoted(s.source)} for s in draft.recipe],
                        "toolchain_image": toolchain.image, "language": toolchain.language, "runtime": toolchain.runtime, "baseline_outcome": "passed", "scratch_location": deps.scratch_location}
         else:
+            if draft.status == "unsupported" and deps.ledger.halted:
+                raise ModelRetry("setup halted on an observed failure; report blocked and cite its run, not unsupported")
             values["citations"] = [quoted(c) for c in draft.citations]
             if draft.status == "blocked":
+                values["diagnostics"] = [d.model_dump() for d in deps.ledger.diagnostics]
                 if set(draft.run_ids) - set(runs):
                     raise ModelRetry("blocked run_ids must name commands run in this run")
                 failed = [rid for rid in draft.run_ids if records[rid].exit_code != 0 or records[rid].execution_error
                           or records[rid].delivery != "acknowledged" or records[rid].completion != "terminal_observed"]
                 if draft.run_ids and not failed:
                     raise ModelRetry("blocked evidence must cite at least one failed command")
+                if not draft.run_ids and any(r.exit_code != 0 or r.execution_error or r.delivery != "acknowledged"
+                                            or r.completion != "terminal_observed" for r in records.values()):
+                    raise ModelRetry("cite the failed command run_ids; do not hide an observed failure behind a generic halt")
                 if not draft.run_ids and (draft.layer not in ("sandbox", "unknown") or not (
                         deps.ledger.halted or len(deps.ledger.records) >= deps.budget.max_commands)):
                     raise ModelRetry("blocked without cited runs requires a halt or an exhausted budget and layer sandbox or unknown")
