@@ -205,16 +205,21 @@ def test_provider_credential_reaches_workload_only_as_placeholder(kube, adapter_
                 record['cleanup_error'] = {'type': type(error).__name__, 'detail': str(error)}
             try:
                 if summary['provider']['create_delivery'] != 'unrun':
-                    # Delivery may be unknown: the name is unique to this run, so a provider by that name is ours.
                     summary['provider']['cleanup'] = 'unconfirmed'
-                    if provider in provider_names(rpc):
-                        current = rpc('GetProvider', openshell_pb2.GetProviderRequest(workspace_scope=scope, name=provider)).provider
-                        assert provider_id in (None, current.metadata.id), 'Provider identity replaced; refusing delete'
-                        deleted = rpc('DeleteProvider', openshell_pb2.DeleteProviderRequest(
-                            workspace_scope=scope, name=provider, request_id=str(uuid.uuid4())))
-                        summary['provider']['deletion_outcome'] = openshell_pb2.DeletionOutcome.Name(deleted.outcome)
-                    assert provider not in provider_names(rpc), 'Provider still listed after deletion'
-                    summary['provider']['cleanup'] = 'confirmed (native list; gateway storage not inspected)'
+                    if provider_id is None:
+                        # Delivery unknown: no immutable ID proves a provider by this name is ours; never delete it.
+                        summary['provider']['cleanup'] = ('unconfirmed: create delivery unknown; provider listed'
+                                                          if provider in provider_names(rpc) else
+                                                          'unconfirmed: create delivery unknown; not listed')
+                    else:
+                        if provider in provider_names(rpc):
+                            current = rpc('GetProvider', openshell_pb2.GetProviderRequest(workspace_scope=scope, name=provider)).provider
+                            assert current.metadata.id == provider_id, 'Provider identity replaced; refusing delete'
+                            deleted = rpc('DeleteProvider', openshell_pb2.DeleteProviderRequest(
+                                workspace_scope=scope, name=provider, request_id=str(uuid.uuid4())))
+                            summary['provider']['deletion_outcome'] = openshell_pb2.DeletionOutcome.Name(deleted.outcome)
+                        assert provider not in provider_names(rpc), 'Provider still listed after deletion'
+                        summary['provider']['cleanup'] = 'confirmed (native list; gateway storage not inspected)'
             except Exception as error:
                 errors.append(error)
                 summary['provider']['cleanup_error'] = {'type': type(error).__name__, 'detail': str(error)}

@@ -14,6 +14,7 @@ from hashlib import sha256
 import json
 from pathlib import Path
 import sys
+import threading
 
 import logfire
 from pydantic import BaseModel, TypeAdapter
@@ -69,6 +70,14 @@ class Journal:
     with its purpose and operation, independently of what any agent later reads."""
     def __init__(self, runners):
         self.runners, self.entries = runners, []
+        self._idle = threading.Condition()
+        self._running = 0
+
+    def drain(self, seconds: float) -> bool:
+        """Wait for runner calls still in flight, e.g. a development run whose stage timed out in its worker
+        thread; True when none remain. Their entries are only complete once they return."""
+        with self._idle:
+            return self._idle.wait_for(lambda: self._running == 0, timeout=seconds)
 
     def __call__(self, purpose):
         inner = self.runners(purpose)
@@ -78,15 +87,22 @@ class Journal:
             def run(self, patch, *, control_test_id, security_test_id, discovery_command, operation):
                 entry = {"purpose": purpose, "operation": str(operation), "patch_sha256": patch.sha256,
                          "observed": None, "failure": None}
-                journal.entries.append(entry)
+                with journal._idle:
+                    journal.entries.append(entry)
+                    journal._running += 1
                 try:
                     observed = inner.run(patch, control_test_id=control_test_id, security_test_id=security_test_id,
                                          discovery_command=discovery_command, operation=operation)
                 except BaseException as exc:
                     entry["failure"] = encode(exc)
                     raise
-                entry["observed"] = encode(observed)
-                return observed
+                else:
+                    entry["observed"] = encode(observed)
+                    return observed
+                finally:
+                    with journal._idle:
+                        journal._running -= 1
+                        journal._idle.notify_all()
         return Recorded()
 
 
@@ -122,7 +138,7 @@ def attempt_record(attempt) -> dict:
 
 
 async def record_run(evidence: Path, live: tuple[str, ...], config: LocalModelConfig | None, case: FixtureCase,
-                     runners, runner: dict) -> DirectRun:
+                     runners, runner: dict, drain_seconds: float = 900) -> DirectRun:
     """Run one composition into an existing private evidence directory and keep every receipt.
 
     ``runner`` describes the operator's execution route for configuration.json.
@@ -146,8 +162,11 @@ async def record_run(evidence: Path, live: tuple[str, ...], config: LocalModelCo
         try:
             run = await run_direct(case, StageModels(**selected), journal, budget)
         finally:
+            # A timed-out stage leaves its runner call finishing in a worker thread; keep its observation.
+            drained = await asyncio.to_thread(journal.drain, drain_seconds)
             with (evidence / "native-runs.json").open("x") as destination:
-                json.dump(journal.entries, destination, indent=2)
+                json.dump(journal.entries if drained else journal.entries + [{"in_flight_after_seconds": drain_seconds}],
+                          destination, indent=2)
     for index, attempt in enumerate(run.attempts):
         with (evidence / f"attempt-{index}-{attempt.stage}.json").open("x") as destination:
             json.dump(attempt_record(attempt), destination, indent=2)

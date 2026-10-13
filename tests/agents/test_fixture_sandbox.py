@@ -140,3 +140,24 @@ def test_record_run_keeps_the_sandbox_route_and_environment(store, tmp_path):
     assert [e["purpose"] for e in json.loads((evidence / "native-runs.json").read_text())] == [
         "development", "baseline", "candidate"]
     assert cli.summary(run)["gate"] == {"execution": "completed", "finding": "inconclusive", "fix": "not_verified"}
+
+
+def test_journal_drains_a_runner_call_still_running_after_its_stage():
+    """A stage timeout leaves the runner call finishing in a worker thread; its observation is kept."""
+    import threading
+    from types import SimpleNamespace
+    release = threading.Event()
+
+    class Slow:
+        def run(self, patch, **kwargs):
+            release.wait(5)
+            return {"cleanup": "confirmed"}
+    journal = cli.Journal(lambda purpose: Slow())
+    patch = SimpleNamespace(sha256="0" * 64)
+    worker = threading.Thread(target=journal("development").run, args=(patch,),
+                              kwargs=dict(control_test_id="a", security_test_id="b", discovery_command=(), operation="x"))
+    worker.start()
+    assert not journal.drain(0.05) and journal.entries[0]["observed"] is None
+    release.set()
+    assert journal.drain(5) and journal.entries[0]["observed"] == {"cleanup": "confirmed"}
+    worker.join()
