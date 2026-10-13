@@ -11,6 +11,8 @@ A worker process calls ``configure_chain`` (``chain_runtime``) and then ``chain_
 does both for an in-process worker and takes the same arguments as ``run_direct``.
 """
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import timedelta
 from typing import Any, ClassVar
 from uuid import uuid4
@@ -161,13 +163,19 @@ class ChainInvestigation:
 WORKFLOWS = (ChainInvestigation, IdentificationStage, PlanningStage, AuthoringStage, AssessmentStage)
 
 
-def chain_worker(client: Client, task_queue: str, **options: Any) -> Worker:
-    """A worker for every chain workflow, each stage agent's native activities and the revision activity."""
+@asynccontextmanager
+async def chain_worker(client: Client, task_queue: str, **options: Any) -> AsyncIterator[Worker]:
+    """A running worker for every chain workflow, each stage agent's native activities and the revision activity.
+
+    It holds the process configuration while it runs, so ``configure_chain`` and another chain worker are refused
+    until it stops: admission, authoring runners and revision activities never resolve a replaced configuration."""
     runtime = configured()
     if runtime is None:
         raise ValueError("configure_chain must run before a chain worker is built")
-    return Worker(client, task_queue=task_queue, workflows=list(WORKFLOWS), activities=[execute_revision],
-                  plugins=[AgentPlugin(agent) for agent in runtime.agents.values()], **options)
+    with serving():
+        async with Worker(client, task_queue=task_queue, workflows=list(WORKFLOWS), activities=[execute_revision],
+                          plugins=[AgentPlugin(agent) for agent in runtime.agents.values()], **options) as worker:
+            yield worker
 
 
 async def run_durable(case: FixtureCase, models: StageModels, runners: Runners,
@@ -180,7 +188,6 @@ async def run_durable(case: FixtureCase, models: StageModels, runners: Runners,
                     ceiling=budget)
     identity = workflow_id or f"corsair-chain-{uuid4()}"
     # One configuration per process: an overlapping run_durable is refused rather than served another's models.
-    with serving():
-        async with chain_worker(client, identity, **worker_options):
-            return await client.execute_workflow(ChainInvestigation.run, ChainRequest(case, StageKeys(*STAGES), budget),
+    async with chain_worker(client, identity, **worker_options):
+        return await client.execute_workflow(ChainInvestigation.run, ChainRequest(case, StageKeys(*STAGES), budget),
                                              id=identity, task_queue=identity, execution_timeout=execution_timeout)

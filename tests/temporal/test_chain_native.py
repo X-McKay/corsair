@@ -197,6 +197,13 @@ def test_parent_admission_refusal_closes_before_any_child(temporal_address, requ
         configure_chain({stage: getattr(models_, stage) for stage in STAGES},
                         runners_for(store, tmp_path / "work"), activity_config=ACTIVITY_CONFIG)
         async with chain_worker(client, identity, workflow_runner=workflow_runner()):
+            # The standalone worker holds its configuration: replacing it or a second worker is refused while it runs.
+            with pytest.raises(RuntimeError):
+                configure_chain({stage: getattr(models_, stage) for stage in STAGES},
+                                runners_for(store, tmp_path / "other"), activity_config=ACTIVITY_CONFIG)
+            with pytest.raises(RuntimeError):
+                async with chain_worker(client, identity + "-second", workflow_runner=workflow_runner()):
+                    pass
             handle = await client.start_workflow(ChainInvestigation.run, ChainRequest(fixture_case(), keys, budget),
                                                  id=identity, task_queue=identity, execution_timeout=EXECUTION_TIMEOUT)
             with pytest.raises(WorkflowFailureError) as failure:
