@@ -7,7 +7,7 @@ Unrecorded commands receive a synthetic exit 126 refusal, recorded separately in
 attempt receipt as `unrecorded_commands`; this is not an observed operator-policy denial.
 Even equivalent command spellings are unrecorded unless they match exactly. Live scores
 therefore measure adherence to curated argv, not general setup judgement. Unknown delivery halts the production tool ledger.
-The command budget remains operator owned. Eight frozen development cases cover Python,
+Command and setup-correction budgets remain operator owned. Attempt receipts now record `setup_corrections` separately from output-schema corrections and preserve an unresolved correction run ID. The eight frozen cases do not exercise the new invocation corrections; production FunctionModel trajectories in tests/agents/test_environment.py cover their admission/refusal, and live recovery frequency and side effects remain unmeasured. Eight frozen development cases cover Python,
 Java/Maven, registry/TLS/build failure, unsupported runtime, unknown delivery with attempted
 follow-up, and budget exhaustion. README injection is untrusted source.
 
