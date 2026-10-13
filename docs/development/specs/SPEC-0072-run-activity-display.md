@@ -4,7 +4,7 @@ kind: spec
 title: Run activity in the terminal
 status: draft
 updated: 2026-10-13
-related: [SPEC-0043, SPEC-0068, PLAN-0079, PLAN-0080]
+related: [SPEC-0043, SPEC-0068, PLAN-0080]
 ---
 
 # Run activity in the terminal
@@ -32,9 +32,15 @@ and persisting the events.
   `on_output_validate_error`). It hands every value on unchanged and re-raises every error. It is attached only
   when someone observes, so unobserved runs, evals and baselines keep their exact code path. No streaming is
   switched on (`event_stream_handler` would change the provider call to a streamed one).
-- Text is cleaned once, when the event is made: control characters and escape sequences are removed (repository
-  and model text cannot drive the terminal), credential-shaped values and arguments under secret-like names are
-  masked, and long text is cut. Provider configuration is never an event.
+- Reporting never changes a run: `run_chain` builds an event only when an observer is attached, and an observer
+  or event that raises is ignored, in the chain and in the `Activity` hooks.
+- Text is cleaned once, when the event is made: control characters, escape sequences and bidi marks are removed
+  (repository and model text cannot drive or reorder the terminal); long text is cut; credentials are masked:
+  values after secret-like names (`API_KEY=…`, `password: …`, `Authorization: …`), URL userinfo, `Bearer`/`Basic`
+  credentials and credential-shaped `token`/`Digest` values, well-known key prefixes (`AKIA`, `ghp_`, `glpat-`,
+  `sk-`, …) and private key blocks; tool arguments under secret-like names are masked whole. The environment
+  agent's setup commands are free text, so this is where leaks would otherwise appear. Provider configuration is
+  never an event.
 - `corsair.adapters.terminal.TerminalDisplay` (rich 15.0.0, pinned) is the view. On a terminal it shows a
   colored log under a live status line (stage, turn, budget spent, running tool). Elsewhere (a pipe, a log
   file, `TERM=dumb`) it prints plain UTC-timestamped lines with no colors, cursor movement or wrapping;
@@ -47,7 +53,9 @@ Offline (`tests/agents/test_run_activity.py`): a complete scripted chain reports
 the gate in order, with per-stage spend equal to each attempt's receipt; a stopped run reports its stage and
 reason and nothing after; `observing` reaches only runs inside it; the hooks report turns, tool outcomes
 (ok, retry, error), argument and output retries and model errors while the run's output and message history
-are unchanged; hostile text loses its control sequences and credentials; the plain and terminal views render the
+are unchanged; hostile text loses its control sequences, bidi marks and credentials (header values, `NAME=value` pairs,
+URL userinfo, key prefixes, private keys) while ordinary text about tokens and limits is kept; a failing
+observer leaves the run unchanged; the plain and terminal views render the
 same events.
 
 ## Decisions and open questions
