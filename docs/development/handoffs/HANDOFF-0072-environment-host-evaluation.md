@@ -40,3 +40,7 @@ are not zero. Missing report comparisons are unavailable rather than falsely zer
 Root review corrected evaluator outcome leakage from policy identity: all inputs now use
 setup-public and fixture ids stay in HostInput, never agent prompts. Manifest renewed;
 post-correction16/16 passed, final focused65 passed. Live requests remain unrun.
+
+Follow-up cross-review closes inverted unsupported-runtime eval false positive using curated
+oracle-only wording patterns. Fresh manifest, Make16/16 with15 assertions and focused71 passed.
+Root full suite997 passed at preceding6f35dd3. Semantic wording coverage is deliberately bounded.

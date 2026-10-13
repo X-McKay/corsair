@@ -20,3 +20,7 @@ application test discovery/execution, dependency closure, sandbox replay or dura
 The cases are development fixtures adapted from existing contract tests, not captured benchmark
 observations or a held-out semantic validation set. Fresh benchmark observations and independently
 written held-out cases are required before prompt tuning or runtime admission.
+
+Unsupported-runtime truth has bounded evaluator-only wording anchors for required and prepared
+versions. An inverted claim fails even with correct source quotations. This is a curated semantic
+regression, not validation of arbitrary natural-language requirements.

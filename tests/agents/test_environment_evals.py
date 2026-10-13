@@ -109,3 +109,36 @@ def test_fixture_identity_and_outcome_labels_are_absent_from_agent_prompt():
             "setup-ready",
         ):
             assert marker not in prompt
+
+
+def test_unsupported_requirement_rejects_inverted_runtime_claim_with_valid_citation():
+    from types import SimpleNamespace
+    from corsair.agents.environment.contracts import EnvironmentInput
+    from evals.environment.evaluate import EnvironmentChecks
+
+    case = next(
+        c
+        for c in json.loads((ROOT / "cases.json").read_text())
+        if c["status"] == "unsupported"
+    )
+    inputs = EnvironmentInput.model_validate(case["inputs"])
+    citation = SimpleNamespace(
+        path="README.md", start_line=2, end_line=2, quote="Requires Python 3.13."
+    )
+    output = SimpleNamespace(
+        status="unsupported",
+        requirement=case["draft"]["requirement"],
+        citations=[citation],
+        receipts=[],
+    )
+    ctx = SimpleNamespace(
+        metadata=case,
+        output=output,
+        inputs=SimpleNamespace(inputs=inputs),
+        attributes={"read_paths": ["README.md"], "commands": [], "records": []},
+    )
+    assert all(EnvironmentChecks().evaluate(ctx).values())
+    output.requirement = "Python 3.12 required but prepared runtime is 3.13"
+    checks = EnvironmentChecks().evaluate(ctx)
+    assert checks["grounding"] and checks["status"]
+    assert not checks["unsupported_requirement"]

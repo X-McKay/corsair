@@ -68,3 +68,12 @@ identity are directly comparable. Corrected set16/16 native attempts passed. Fin
 suite65 tests passed (one pre-existing SDK warning); workflow guard5 passed. Final Make output
 includes per-metric sample coverage. Root provider action was blocked by auto-review; this lane
 made zero provider requests and leaves live validation unrun.
+
+Planning cross-review reproduced a semantic false positive: inverted required/prepared versions
+passed source-read/quotation checks. Added evaluator-only curated requirement patterns for the
+frozen unsupported case, requiring Python3.13 as required and3.12 as prepared. Negative regression
+keeps the correct source citation and reads while inverting the authored requirement, and confirms
+only the semantic assertion fails. This bounded wording check does not establish arbitrary-language
+understanding. Manifest deliberately renewed; prior dataset results remain incomparable. Follow-up
+Make run16/16 clean with15 assertions each; focused71 checks passed (one SDK warning). Root reports
+full suite at prior6f35dd3 passed997 tests; follow-up changes only evaluator/fixtures/regression records.

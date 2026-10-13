@@ -554,7 +554,11 @@
     "status": "unsupported",
     "layer": null,
     "max_commands": 12,
-    "name": "unsupported-toolchain"
+    "name": "unsupported-toolchain",
+    "requirement_patterns": [
+      "(?i)\\bPython\\s+3\\.13\\s+(?:is\\s+)?required\\b",
+      "(?i)\\bprepared\\s+(?:runtime\\s+)?(?:is\\s+)?3\\.12\\b"
+    ]
   },
   {
     "inputs": {

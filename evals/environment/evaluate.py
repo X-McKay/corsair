@@ -5,6 +5,7 @@ import asyncio
 from dataclasses import dataclass
 from hashlib import sha256
 import json
+import re
 from pathlib import Path
 from time import perf_counter
 from uuid import uuid4
@@ -81,6 +82,7 @@ class FrozenCase(BaseModel):
     layer: str | None
     max_commands: int = Field(ge=1, le=64)
     toolchain_id: str = "python-3.12"
+    requirement_patterns: tuple[str, ...] = ()
 
 
 class RecordedExecution:
@@ -158,6 +160,13 @@ class EnvironmentChecks(Evaluator):
         )
         return {
             "status": output.status == c["status"],
+            # Curated development-case wording anchors, not arbitrary-language truth.
+            "unsupported_requirement": output.status != "unsupported"
+            or bool(c.get("requirement_patterns"))
+            and all(
+                re.search(pattern, output.requirement) is not None
+                for pattern in c["requirement_patterns"]
+            ),
             "setup_identity": output.status != "ready"
             or all(
                 getattr(output, key) == c["draft"][key]
