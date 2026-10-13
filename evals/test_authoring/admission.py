@@ -12,7 +12,10 @@ from corsair.agents.test_authoring.static import _function
 from corsair.agents.test_planning.contracts import ReadyTestPlan
 
 PROCESS_OR_NETWORK = frozenset({"subprocess", "socket", "ssl", "urllib", "http", "requests", "httpx", "aiohttp",
-                                "ftplib", "smtplib", "telnetlib", "ctypes", "multiprocessing", "pty"})
+                                "ftplib", "smtplib", "telnetlib", "ctypes", "multiprocessing", "pty", "importlib",
+                                "runpy", "asyncio", "concurrent"})
+# Dynamic forms that could reach any of the above without a visible import.
+DYNAMIC_CALLS = frozenset({"__import__", "eval", "exec", "compile", "getattr"})
 OS_PROCESS_CALLS = frozenset({"system", "popen", "spawnl", "spawnv", "execv", "execve", "execl", "fork", "startfile"})
 QUOTED = re.compile(r"'([^']+)'|\"([^\"]+)\"")
 
@@ -29,7 +32,8 @@ def no_process_or_network(content: str) -> bool:
     """No process creation, raw network or foreign-function use anywhere in the file.
 
     os process calls are refused through any binding of os (``import os as x``) and when imported by name
-    (``from os import system``), not only as the literal ``os.system``.
+    (``from os import system``), not only as the literal ``os.system``; dynamic imports, eval/exec/compile
+    and getattr are refused outright, since they could reach any of these without a visible import.
     """
     tree = ast.parse(content)
     os_names = {"os"}
@@ -43,6 +47,9 @@ def no_process_or_network(content: str) -> bool:
                 return False
             if node.module == "os" and any(a.name in OS_PROCESS_CALLS or a.name == "*" for a in node.names):
                 return False
+    if any(isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in DYNAMIC_CALLS
+           for node in ast.walk(tree)):
+        return False
     return not any(isinstance(node, ast.Attribute) and node.attr in OS_PROCESS_CALLS
                    and isinstance(node.value, ast.Name) and node.value.id in os_names for node in ast.walk(tree))
 

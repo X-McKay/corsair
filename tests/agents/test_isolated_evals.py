@@ -76,6 +76,9 @@ def test_admission_facts_place_the_planned_input_and_refuse_process_use():
     assert not no_process_or_network("from os import system\nsystem('echo x')\n")
     assert not no_process_or_network("import os as operating_system\noperating_system.system('echo x')\n")
     assert no_process_or_network("from os import path\nimport os as o\no.getcwd()\n")
+    for dynamic in ("__import__('subprocess').run(['id'])\n", "import importlib\nimportlib.import_module('socket')\n",
+                    "import os\ngetattr(os, 'system')('id')\n", "exec('import subprocess')\n"):
+        assert not no_process_or_network(dynamic), dynamic
     assert no_process_or_network(REFERENCE)
 
 
