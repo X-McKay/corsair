@@ -135,6 +135,8 @@ def run(image, checkout, m2, commit, ids, evidence, tests_from, timeout):
     patch = ApprovedPatch((PatchFile(path, (Path(tests_from) / path).read_bytes()),), (path,))
     config = MavenRunnerConfig(command=(MVN, '-B', '-ntp', '-o', f'-Dmaven.repo.local={M2}', f'--file={WORK}/pom.xml'),
                                workspace_root=WORK, java='/opt/java/openjdk/bin/java', console_jar=LAUNCHER)
+    # LocalArtifacts opens an existing root and never creates it.
+    (evidence / 'objects').mkdir(mode=0o700)
     with DockerCase(image, checkout, m2, commit, timeout) as case, LocalArtifacts(evidence / 'objects', max_bytes=8 << 20) as store:
         clock = time.monotonic()
         result = MavenRunner(case, case, store, config).run(patch, control_test_id=ids[0], security_test_id=ids[1],
