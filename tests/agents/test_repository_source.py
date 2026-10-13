@@ -305,3 +305,8 @@ def test_smoke_case_keeps_oracles_out_of_agent_inputs():
     assert all(selection_checks(case.inputs, output, case.metadata).values())
     wrong = output.model_copy(update={"target": output.target.model_copy(update={"symbol": "doGet"})})
     assert not selection_checks(case.inputs, wrong, case.metadata)["target_selection"]
+
+
+def test_live_run_scores_the_selection():
+    from evals.repository_identification.evaluate import LiveBudget, MatchesRepositorySelection, live_evaluators
+    assert any(isinstance(evaluator, MatchesRepositorySelection) for evaluator in live_evaluators(LiveBudget()))

@@ -167,6 +167,11 @@ class LiveBudget(BaseModel):
     output_retries: int = Field(default=1, ge=0, le=1, strict=True)
 
 
+def live_evaluators(budget: LiveBudget) -> list[Evaluator]:
+    return [MatchesRepositorySelection(), NoUnknownToolAttempts(), ProviderUsageCoverage(),
+            MaxModelRequests(max_requests=budget.request_limit), MaxToolCalls(max_calls=budget.tool_calls_limit)]
+
+
 async def live(evidence: Path, tree: SourceTree, model, budget: LiveBudget, limits: RepositoryLimits):
     logfire.configure(send_to_logfire=False, console=False)
     corpus = dataset()
@@ -175,8 +180,7 @@ async def live(evidence: Path, tree: SourceTree, model, budget: LiveBudget, limi
                 "budget": budget.model_dump(), "repository_limits": asdict(limits), "task_retries": 0, "max_concurrency": 1,
                 "dataset_sha256": sha256((ROOT / "cases.yaml").read_bytes()).hexdigest()}
     (evidence / "configuration.json").write_text(json.dumps(metadata, indent=2))
-    corpus.evaluators.extend([NoUnknownToolAttempts(), ProviderUsageCoverage(),
-                              MaxModelRequests(max_requests=budget.request_limit), MaxToolCalls(max_calls=budget.tool_calls_limit)])
+    corpus.evaluators.extend(live_evaluators(budget))
 
     async def task(inputs: RepositoryIssueInput):
         attempt = evidence / f"attempt-{uuid4()}.json"
@@ -232,6 +236,8 @@ def main():
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--provider-config", type=Path, help="LocalModelConfig JSON; required for live")
     args = parser.parse_args()
+    # LocalArtifacts and GitSource require absolute operator paths.
+    args.evidence, args.repository = args.evidence.absolute(), args.repository.absolute()
     if args.evidence.exists() or args.evidence.is_symlink():
         parser.error("evidence path already exists")
     if (args.mode == "live") != (args.provider_config is not None):

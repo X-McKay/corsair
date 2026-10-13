@@ -15,14 +15,15 @@ Branch `claude/repo-scale-source-tools-l7bldu` from main `334aa03`, draft PR. De
 
 ## Validation and blockers
 
-- Offline: `tests/agents/test_repository_source.py` 20 passed; existing identification suite unchanged and passing. Full `make test-config` count recorded in PLAN-0042.
+- Offline: `tests/agents/test_repository_source.py` 21 passed; existing identification suite unchanged and passing; `make test-config` 874 passed (853 on main). CI `offline-guards` green on the first push.
 - Measurement on JSPWiki f140a2a4 in the container (full bare clone, `GitSource` capture 19.3 s): 1,723 files, 1,471 readable text files; probe of seven tool calls returned 7,944 B of the 131,072 B run budget, and the repeated window returned a 248 B notice. Details in PLAN-0042.
-- Live smoke on the local model: unrun at this snapshot.
+- Live smoke on RIG0 (Qwen3.6-35B-A3B-NVFP4, three repeats of the JSPWiki case, details in PLAN-0042): 2/3 completed and selected `doGet` in `WikiServlet.java` 88–101. Rescored offline from the stored report with `selection_checks`: status, scope, report identity, target selection and source range all true on both. Attempt 1 failed by calling a nonexistent `status` tool after eight calls. Completed attempts used all 10 allowed tool calls, about 22 KB of the 128 KiB budget, one `RepeatedRead` each. Not qualified: one case.
+- Harness defects found by that run and fixed: the live dataset lacked the selection evaluator, and a relative `--evidence` path failed `LocalArtifacts`'s absolute-root check.
 - Not run: durable mode (unsupported by design for now), other stages, any OpenShell or cluster gate (not needed).
 
 ## Decisions and next steps
 
-Settled in SPEC-0038: literal search, Git line semantics, accounting from messages, explicit repository mode with no fallback. Next: live smoke on RIG0; then planning adoption after PR #38 merges (planning's `withdraw_when_read` must be combined with `withdraw_when_spent`, and its `_run_reads` must ignore `RepeatedRead`, as `run_source_reads` does), followed by authoring and assessment with their eval sets rerun.
+Settled in SPEC-0038: literal search, Git line semantics, accounting from messages, explicit repository mode with no fallback. Next: planning adoption after PR #38 merges (planning's `withdraw_when_read` must be combined with `withdraw_when_spent`, and its `_run_reads` must ignore `RepeatedRead`, as `run_source_reads` does), followed by authoring and assessment with their eval sets rerun. A broader repository identification eval set (more cases and repositories) should settle the 10-call ceiling and the invented-tool rate before any qualification claim. RIG0 evidence: `/home/al/git/corsair-repo-tools/.runs/` (private).
 
 ## Continuation prompt
 
