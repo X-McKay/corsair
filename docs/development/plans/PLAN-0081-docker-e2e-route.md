@@ -34,11 +34,12 @@ environment stage and Docker revision runners. This plan reuses them; it adds no
 - [x] Offline tests with a fake docker CLI (`tests/agents/test_fixture_docker.py`): an authored (non-reviewed) patch
   runs in an offline container and the container is removed; every stage runs and records itself unqualified; the
   route refuses to start without the row's local image.
-- [ ] Never the host network for the setup container and the environment stage's sandbox: the Node thread lands it
-  on #109 (`registry_access`); this branch takes that commit.
+- [x] `corsair run --sandbox docker` (the default and, for now, only choice); `configuration.json` records
+  `sandbox: docker`, `qualification: unqualified`.
+- [x] Never the host network for the setup container and the environment stage's sandbox: landed on #109 (3d1ba4b,
+  bridge only, setup egress recorded unenforced), merged here.
+- [x] Python on the `corsair run` Docker route: #109's pytest entry (2548980) with pip setup and the witness probe.
 - [ ] First live proof on RIG0 (fixture case, all stages live, Docker), when the model is free.
-- [ ] Python on the `corsair investigate` Docker route: a pytest harness entry with setup and witness recorders
-  (PLAN-0079's last step) so the corpus cases run there too.
 
 ## Validation and progress
 
@@ -51,6 +52,7 @@ environment stage and Docker revision runners. This plan reuses them; it adds no
   assessment admitted (`completed / inconclusive / not_verified`), workspace cleanup confirmed, no container left.
   Evidence stays in the cloud container (not committed).
 - `tests/agents/test_fixture_docker.py` 3 passed; with the fixture sandbox, composition and case e2e tests 39 passed.
+- `make test-config` before merging #109's 3d1ba4b: 1782 passed. After the merge: case e2e and Docker route tests 15 passed.
 
 ## Decisions and next action
 
