@@ -81,6 +81,7 @@ class ProbeRecord(_Record):
     target: _Target
     tool_registered: bool
     intact: bool
+    unsupported: str | None = Field(max_length=256)
     tests: dict[str, _TestRecord] = Field(max_length=16)
 
 
@@ -111,11 +112,13 @@ def witness_evidence(capture: WitnessCapture | None, request: WitnessRequest,
         record = ProbeRecord.model_validate_json(capture.record)
     except ValidationError as error:
         return _refused(f'witness record invalid: {error.error_count()} errors')
-    if (record.schema_ != 'corsair-witness-v1' or record.nonce != capture.nonce
+    if (record.schema_ != 'corsair-witness-v2' or record.nonce != capture.nonce
             or record.plugin_sha256 != PROBE_SHA256
             or (record.target.path, record.target.symbol, record.target.effect_name)
             != (request.target_path, request.target_symbol, request.effect_name)):
         return _refused('witness record does not belong to this run, probe or target')
+    if record.unsupported is not None:
+        return _refused(f'witness probe unsupported on this runtime: {record.unsupported}')
     if not (record.tool_registered and record.intact):
         return _refused('witness probe was not registered or its monitoring changed during the run')
     test = record.tests.get(security_test_id)
