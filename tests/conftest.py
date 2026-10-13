@@ -6,6 +6,7 @@ def pytest_addoption(parser):
     parser.addoption("--context", help="Explicit kind-corsair context")
     parser.addoption("--evidence-dir", help="New host-owned evidence directory")
     parser.addoption("--network-evidence", help="Successful exact-node CNI receipts required by policy qualification")
+    parser.addoption("--toolchain", action="append", help="Run only toolchain gates whose images are all named (repeatable)")
     parser.addoption("--temporal-address", help="Operator-owned local fixture service host:port")
     parser.addoption("--temporal-evidence-dir", help="Ignored destination for native histories")
     parser.addoption("--provider-config", help="Explicit LocalModelConfig JSON for live fixture E2E stages")

@@ -19,7 +19,9 @@ Branch `claude/planner-typed-witness-abcjvt`, PR #44 against `main` (main merged
 
 ## Decisions and next steps
 
-The third held-out set is exposed. Next bounded actions: build the plan-derived witness request and control calibration (SPEC-0040); add deterministic checks for the recurring prose defects (test id prefix and baseline-name collision, exception type only when required, scratch-anchored adversarial paths, a correction message that keeps citations). A further planner candidate needs a fourth held-out set written apart from its author. Merge #44 on Al's "merge" once CI is green and mergeable.
+The third held-out set is exposed. Next bounded actions: build the plan-derived witness request and control calibration (SPEC-0040); add deterministic checks for the recurring prose defects (test id prefix and baseline-name collision, exception type only when required, scratch-anchored adversarial paths, a correction message that keeps citations). A further planner candidate needs a fourth held-out set written apart from its author.
+
+Merge decision (Al, 2026-10-13 12:16Z, "Lets merge both of these"): #44 merges to main unqualified, without further live inference. The plan-based witness binding, the four text-defect checks above and a fourth held-out set move to a follow-up. Until that follow-up runs, the planner on main is unqualified at development 11/12 and held-out 17/18. Merging main brought in the planner's grounding admission (target-anchor coverage, identifier-boundary implementation calls), so the merged prompt is `test-planning-v7-grounding-3` with `test-planning-config-v5`; that combination has offline checks only and no live run, so the 11/12 and 17/18 results above are for `test-planning-v7`. Also for the follow-up: a regression that pins the candidate-only `no_file_open` mapping, and the SPEC-0033 limits for a lazy reader and an unjoined worker thread.
 
 ## Continuation prompt
 

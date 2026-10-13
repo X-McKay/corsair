@@ -26,7 +26,7 @@ from corsair.agents.provider import LocalModelConfig, local_model
 from corsair.agents.source.contracts import SourceRead
 from corsair.agents.source.tools import READ_SOURCE_TOOL
 from corsair.agents.test_planning.agent import (
-    CONFIG_VERSION, PROMPT_VERSION, TOOLSET_ID, PlanningDependencies, create_test_planning_agent, planning_prompt,
+    CONFIG_VERSION, PROMPT_VERSION, TOOLSET_ID, PlanningDependencies, _symbol_occurs, create_test_planning_agent, planning_prompt,
 )
 from corsair.agents.test_planning.contracts import ReadyTestPlan, TestPlanningInput, UnsupportedTestPlan
 from corsair.agents.test_planning.skills import SKILL_SHA256
@@ -86,7 +86,7 @@ def plan_checks(inputs: TestPlanningInput, output: PlanOutput, oracle: PlanOracl
         "contract": all(spec.test_path in environment.approved_test_paths for spec in specs)
                     and output.discovery_command == environment.discovery_command
                     and output.control.test_id != output.security.test_id,
-        "implementation_call": oracle.symbol is not None and all(oracle.symbol in spec.implementation_call for spec in specs),
+        "implementation_call": oracle.symbol is not None and all(_symbol_occurs(oracle.symbol, spec.implementation_call) for spec in specs),
         "adversarial_input": any(m in output.security.input for m in oracle.adversarial_markers)
                              and not any(m in output.control.input for m in oracle.adversarial_markers),
         "witness": any(m in lowered(output.security.observable_witness) for m in oracle.witness_markers),

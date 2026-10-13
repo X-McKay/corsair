@@ -1,7 +1,9 @@
 """Operator witness probe for one pytest run; loaded by the runner's bootstrap, never by workload code.
 
 Standard library and pytest hooks only: the bytes travel to the test interpreter as an argument and must
-run on any admitted CPython 3.12+. Native ``sys.monitoring`` events attribute calls, returns and unwinds to
+load on any admitted CPython (3.7+) and pytest (old-style hook wrapper, no ``pytest.ExitCode``). Observation
+needs CPython 3.12+ (``sys.monitoring``; audit hooks are 3.8+ and ``co_qualname`` 3.11+): on an older runtime the
+probe registers nothing, lets the run proceed and writes a record naming the runtime as unsupported. Native ``sys.monitoring`` events attribute calls, returns and unwinds to
 the identified target function; native audit ``open`` events and raised ``OSError``s count only when the
 target is on the calling stack and only during a test's call phase. Opens of the planned file on another
 thread during the call phase are counted separately (``offstack_planned``), since they cannot be attributed
@@ -17,7 +19,7 @@ import threading
 
 import pytest
 
-SCHEMA = 'corsair-witness-v1'
+SCHEMA = 'corsair-witness-v2'
 TOOL_NAME = 'corsair-witness'
 MAX_OPENS = 32
 MAX_CALLS = 32
@@ -41,7 +43,7 @@ class Probe:
         self.record = {'schema': SCHEMA, 'nonce': config['nonce'], 'plugin_sha256': plugin_sha256,
                        'target': {'path': config['target_path'], 'symbol': self.symbol,
                                   'effect_name': self.effect_name},
-                       'tool_registered': False, 'intact': False, 'tests': {}}
+                       'tool_registered': False, 'intact': False, 'unsupported': None, 'tests': {}}
         self.active = None
         self.test_thread = None
         # Keyed by identity with the code object kept alive: equal code objects from other files or
@@ -49,8 +51,11 @@ class Probe:
         self.known = {}
         self.files = {}
         self.raised = []
-        monitoring = sys.monitoring
         self.tool = config['tool_id']
+        monitoring = getattr(sys, 'monitoring', None)
+        if monitoring is None:
+            self.record['unsupported'] = 'CPython {}.{}.{} has no sys.monitoring (3.12+)'.format(*sys.version_info[:3])
+            return
         events = monitoring.events
         self.events = events.PY_START | events.PY_RETURN | events.PY_UNWIND | events.RAISE
         try:
@@ -163,7 +168,8 @@ class Probe:
             test['truncated'] = True
 
     # pytest hook: only the call phase is observed, so fixtures and teardown never count.
-    @pytest.hookimpl(wrapper=True)
+    # Old-style wrapper: new-style ``wrapper=True`` needs pluggy 1.1+, which older pytest releases may not have.
+    @pytest.hookimpl(hookwrapper=True)
     def pytest_runtest_call(self, item):
         tests = self.record['tests']
         if item.nodeid not in tests and len(tests) < MAX_TESTS:
@@ -172,7 +178,7 @@ class Probe:
         self.test_thread = threading.get_ident()
         self.active = item.nodeid if item.nodeid in tests else None
         try:
-            return (yield)
+            yield
         finally:
             if self.active is not None:
                 tests[self.active]['complete'] = True
@@ -181,11 +187,10 @@ class Probe:
 
     def pytest_sessionfinish(self, session, exitstatus):
         self.active = None
-        monitoring = sys.monitoring
-        self.record['intact'] = bool(self.record['tool_registered']
-                                     and monitoring.get_tool(self.tool) == TOOL_NAME
-                                     and monitoring.get_events(self.tool) == self.events)
         if self.record['tool_registered']:
+            monitoring = sys.monitoring
+            self.record['intact'] = (monitoring.get_tool(self.tool) == TOOL_NAME
+                                     and monitoring.get_events(self.tool) == self.events)
             monitoring.set_events(self.tool, 0)
         data = json.dumps(self.record, sort_keys=True).encode()
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0)
@@ -193,7 +198,7 @@ class Probe:
             descriptor = os.open(self.config['record_path'], flags, 0o600)
         except OSError:
             # Something else created the record path: the run itself fails rather than offering that file.
-            session.exitstatus = pytest.ExitCode.INTERNAL_ERROR
+            session.exitstatus = 3  # pytest's internal-error status; ``pytest.ExitCode`` is pytest 5+
             return
         with os.fdopen(descriptor, 'wb') as stream:
             stream.write(data)

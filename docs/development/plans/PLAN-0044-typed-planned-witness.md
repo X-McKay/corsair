@@ -62,3 +62,5 @@ Independent review of the 12 ready held-out plans and 5 unsupported results (by 
 - Candidate deterministic checks from the review (not implemented, each needs its own evidence): test ids prefixed by their approved test path and distinct from the baseline test; a security `failure_type`/`safe_behavior` exception only when the issue or source names one, else `no_<effect>`; adversarial file inputs anchored at the scratch location; correction messages for the baseline refusal that say to cite the read source.
 
 Next: composition binding from the plan and control calibration (SPEC-0040), and the deterministic checks above, before another planner candidate.
+
+Merged unqualified on Al's decision (2026-10-13 12:16Z): the plan-based witness binding, the four text-defect checks and a fourth held-out set move to a follow-up; the planner on main stays unqualified at development 11/12 and held-out 17/18 (prompt v7). The merge with main makes the prompt `test-planning-v7-grounding-3` (config v5), checked offline only (HANDOFF-0062).
