@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import tempfile
 import time
 from uuid import uuid4
 
@@ -23,7 +24,7 @@ from corsair.ports.artifacts import ArtifactRef
 from corsair.ports.execution import ExecutionReceipt
 from corsair.ports.sandbox import SandboxHandle
 from corsair.ports.test_runner import ApprovedPatch, JsTestId, PatchFile, PreparedWorkspace
-from tests.qualification.java_image_case import docker, plain, user
+from tests.qualification.java_image_case import commit_tree, docker, plain, user
 from tests.qualification.prepare_toolchains import NPM
 
 WORK = '/tmp/work'
@@ -122,7 +123,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('phase', choices=['setup', 'run'])
     parser.add_argument('--image', required=True, help='Prepared node8 image config id (sha256:<64 hex>)')
-    parser.add_argument('--checkout', required=True, type=Path, help='Clean checkout of the case at one commit')
+    parser.add_argument('--checkout', required=True, type=Path, help='Checkout of the case; its HEAD commit is what runs')
     parser.add_argument('--modules', required=True, type=Path, help='Case dependency directory; setup creates it and refuses an existing one')
     parser.add_argument('--evidence', required=True, type=Path)
     parser.add_argument('--test-file', type=Path, help='Test file placed at the ids\' path as the patch')
@@ -135,14 +136,18 @@ def main():
     args.evidence.mkdir(parents=True, exist_ok=False)
     commit = subprocess.run(['git', '-C', str(args.checkout), 'rev-parse', 'HEAD'], capture_output=True, text=True,
                             check=True).stdout.strip()
-    if args.phase == 'setup':
-        # A fresh directory per setup: copying into an existing tree would mix two commits' dependency closures.
-        args.modules.mkdir(parents=True, exist_ok=False)
-        code = setup(args.image, args.checkout.resolve(), args.modules.resolve(), args.evidence)
-        print(json.dumps({'phase': 'setup', 'commit': commit, 'exit': code}))
-        raise SystemExit(code)
-    summary = run(args.image, args.checkout.resolve(), args.modules.resolve(), commit, tuple(args.id), args.evidence,
-                  args.test_file.resolve(), args.timeout)
+    # The receipt names a commit, so the container gets that commit's blobs, never the worktree's bytes (as #74 does
+    # for the Java harness).
+    with tempfile.TemporaryDirectory(dir=args.evidence) as scratch:
+        tree = commit_tree(args.checkout, Path(scratch).resolve() / 'checkout')
+        if args.phase == 'setup':
+            # A fresh directory per setup: copying into an existing tree would mix two commits' dependency closures.
+            args.modules.mkdir(parents=True, exist_ok=False)
+            code = setup(args.image, tree, args.modules.resolve(), args.evidence)
+            print(json.dumps({'phase': 'setup', 'commit': commit, 'exit': code}))
+            raise SystemExit(code)
+        summary = run(args.image, tree, args.modules.resolve(), commit, tuple(args.id), args.evidence,
+                      args.test_file.resolve(), args.timeout)
     print(json.dumps({k: v for k, v in summary.items() if k != 'run'}, indent=2, default=str))
 
 

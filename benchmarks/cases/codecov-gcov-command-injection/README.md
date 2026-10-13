@@ -5,4 +5,4 @@
 - `corsair_control`: `upload` with `dump`, detection and report search disabled, and an empty scratch directory as `gcov-root` returns the given token and no files; it passes at both commits.
 - `corsair_security`: the same call with `gcov-root` carrying `; touch <marker>; true`; the test asserts the marker was not created. At the baseline the shell runs the injected command, so the assertion fails; at the fix nothing is created.
 
-Run image-only with `tests/qualification/node_image_case.py` (SPEC-0057, PLAN-0064): `setup` installs the project's lockfile with `npm ci --ignore-scripts` per commit, `run` drives `JestRunner` offline with ids `test/corsair.test.js::corsair_control` and `test/corsair.test.js::corsair_security`.
+Run image-only with `tests/qualification/node_image_case.py` (SPEC-0057, PLAN-0069): `setup` installs the project's lockfile with `npm ci --ignore-scripts` per commit, `run` drives `JestRunner` offline with ids `test/corsair.test.js::corsair_control` and `test/corsair.test.js::corsair_security`.

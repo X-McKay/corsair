@@ -1,5 +1,5 @@
 ---
-id: PLAN-0064
+id: PLAN-0069
 kind: plan
 title: Jest test runner and report parser
 status: in_progress
@@ -21,7 +21,7 @@ Implement [SPEC-0057](../specs/SPEC-0057-jest-runner.md) on top of the Node 8 im
 - [x] Image-only real case: CVE-2020-7730 (bestzip) through `tests/qualification/node_image_case.py` at both commits.
 - [x] Image-only real case: CVE-2020-15123 (codecov-node) the same way.
 - [ ] Framework row `jest` with the image row.
-- [ ] Harness: copy the checkout's HEAD blobs as #74 does for `java_image_case.py` (its `commit_tree`) once #74 merges; the image config id is already required.
+- [x] Harness guards as #74: an image config id, the checkout's HEAD blobs (`commit_tree`) rather than worktree bytes, and a fresh dependency directory per setup.
 - [ ] Mocha and AVA runners; environment `jest` admission with its own eval.
 
 ## Validation and progress
@@ -31,6 +31,9 @@ Implement [SPEC-0057](../specs/SPEC-0057-jest-runner.md) on top of the Node 8 im
 Real case, image-only, same local image: CVE-2020-7730 (nfriedly/node-bestzip) with the Corsair-written `benchmarks/cases/bestzip-command-injection/corsair.spec.js` as the patch. `setup` (`npm ci --ignore-scripts` from each commit's own lockfile, through the container proxy) exit 0 at both commits; the case's own Jest is 24.8.0. `run` offline (`--network=none`, capabilities dropped), one container per commit: baseline `fcea252e` discovered both ids, control passed, security failed (`Error` at `test/corsair.spec.js:23`, function `corsair_security`), 10.7 s; fix `45d4a901` discovered both, both passed, 10.6 s; container cleanup confirmed both times. Evidence stayed in the cloud container (not retained); the RIG0 batch repeats it with evidence under the worktree's `.runs`.
 
 Second real case, image-only, same image (config id `sha256:744310a4…`): CVE-2020-15123 (codecov/codecov-node) with `benchmarks/cases/codecov-gcov-command-injection/corsair.test.js`. `setup` exit 0 at both commits; the case's own Jest is 24.9.0. Baseline `5f6cc62d` discovered both ids, control passed, security failed (`Error` at `test/corsair.test.js:27`, function `corsair_security`: the injected `touch` ran), 10.6 s; fix `c0711c65` both passed, 10.5 s; container cleanup confirmed both times. A first test version omitted `gcov-exec`/`gcov-args`; `sanitizeVar` threw on the missing option before the gcov command was built, so the baseline security test passed without reaching the sink. The control now asserts the gcov command was built (`debug` names the root). Evidence not retained, as above.
+
+
+After #74's guards were adopted (image config id, committed tree, fresh dependency directory), the codecov case was rerun the same way in fresh directories: baseline control passed and security failed, fix both passed, cleanup confirmed.
 
 ## Decisions and next action
 

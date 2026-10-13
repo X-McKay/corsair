@@ -5,4 +5,4 @@
 - `corsair_control`: the pure-JavaScript `nodeZip` path writes a non-empty archive of `test/fixtures/file.txt`; it passes at both commits.
 - `corsair_security`: `nativeZip` with a destination carrying `; touch <marker>; true`; the test asserts the marker file was not created. At the baseline the shell runs the injected command (the `zip` binary itself need not exist), so the assertion fails; at the fix `spawn` passes the destination as one argument and nothing is created.
 
-Run image-only with `tests/qualification/node_image_case.py` (SPEC-0057, PLAN-0064): `setup` installs the project's lockfile with `npm ci --ignore-scripts` per commit, `run` drives `JestRunner` offline with ids `test/corsair.spec.js::corsair_control` and `test/corsair.spec.js::corsair_security`.
+Run image-only with `tests/qualification/node_image_case.py` (SPEC-0057, PLAN-0069): `setup` installs the project's lockfile with `npm ci --ignore-scripts` per commit, `run` drives `JestRunner` offline with ids `test/corsair.spec.js::corsair_control` and `test/corsair.spec.js::corsair_security`.
