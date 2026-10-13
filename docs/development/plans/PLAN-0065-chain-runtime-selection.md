@@ -33,4 +33,4 @@ All in this cloud container, 2026-10-13, no cluster or model server:
 
 ## Decisions and next action
 
-Defaults chosen where the work forked (SPEC-0060): baseline-revision build files only; `not_prepared` kept apart from `unsupported`; the operator's declared identity must name the selected image. Next after this plan: the environment stage in the chain (G12).
+Defaults chosen where the work forked (SPEC-0060): baseline-revision build files only; `not_prepared` kept apart from `unsupported`; the operator's declared identity must name the selected image. Next after this plan: the environment stage in the chain (G12). Merge order (Al's review of `993de00`): #63 also edits `nodes/runtime/environment.py` (structured blockers on `RuntimeStop`); whichever lands second carries those blockers into `RuntimeOutcome` and keeps both test sets. The handoff was renumbered HANDOFF-0090 because #70 uses HANDOFF-0083.
