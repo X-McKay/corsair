@@ -173,12 +173,16 @@ class ChainInvestigation:
                     start_to_close_timeout=timedelta(seconds=limits.timeout_seconds) + PREPARATION_MARGIN,
                     retry_policy=RetryPolicy(maximum_attempts=1))
             except ActivityError as exc:
-                # Unknown how far it got: usage and messages were not observed, and the sandbox may still exist.
-                return StageAttempt("environment", None, None, (), workflow.time() - started, recorded(exc), limits,
-                                    cleanup="unconfirmed")
+                # Usage and messages were not observed. A worker without the ports refuses before any sandbox exists;
+                # otherwise it is unknown how far the stage got, and a sandbox may still exist.
+                failure = recorded(exc)
+                cleanup = None if failure.kind == PreparationMissing.__name__ else "unconfirmed"
+                return StageAttempt("environment", None, None, (), workflow.time() - started, failure, limits,
+                                    cleanup=cleanup)
             failure = record.failure and RecordedFailure(record.failure.kind, record.failure.message)
             return StageAttempt("environment", record.output, record.usage, record.messages, record.elapsed_seconds,
-                                failure, limits, record.exhausted, record.cleanup)
+                                failure, limits, record.exhausted, record.cleanup, record.messages_omitted,
+                                record.baseline_source, record.baseline_refusal)
 
         async def execute(revision, patch, **run):
             try:

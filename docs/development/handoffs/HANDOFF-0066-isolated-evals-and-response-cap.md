@@ -17,7 +17,7 @@ PR #95 admits 24576 and 32768 response caps and a 300 s timeout in `LocalModelCo
 
 ## Validation and blockers
 
-Server probe on RIG0, no other model user: `max_model_len` 131072; a 32768-token response finished at the length limit after 234.8 s. `make test-config` 1619 passed after merging main `164a556`; CI green. Unrun: every cap-32768 live run. They need Al to paste the run block from the isolated-evals thread into the RIG0 session, and they need the model unshared (the #49 witness thread waits for "model free").
+Server probe on RIG0, no other model user: `max_model_len` 131072; a 32768-token response finished at the length limit after 234.8 s. `make test-config` 1619 passed after merging main `164a556`; CI green. Update 2026-10-13 17:23Z: the cap-32768 runs for authoring, planning development and assessment development are done and recorded in PLAN-0048; still unrun are assessment held_out (interrupted to free the model for end-to-end runs), planning heldout3 and chain, plus the assessment thinking-budget trial PLAN-0048 proposes. They need the model unshared.
 
 ## Decisions and next steps
 
@@ -26,5 +26,5 @@ Al chose to raise the cap before tuning prompts. The cap-32768 runs are new base
 ## Continuation prompt
 
 ```text
-Read AGENTS.md, docs/development/CURRENT.md, PLAN-0048, SPEC-0044 and this handoff. On RIG0, with the model unshared, run the cap-32768 evals listed in PLAN-0048 with a provider config setting response_token_limit 32768 and timeout_seconds 300, NOTE="cap 32768, unshared". Compare each with the cap-16384 baseline, promote unshared runs, record aggregates (no held-out case names) in PLAN-0048, update CURRENT.md and write a new handoff. Then tell the #49 thread the model is free.
+Read AGENTS.md, docs/development/CURRENT.md, PLAN-0048, SPEC-0044 and this handoff. On RIG0, with the model unshared, run the remaining cap-32768 evals listed in PLAN-0048 (do not repeat finished ones) with a provider config setting response_token_limit 32768 and timeout_seconds 300, NOTE="cap 32768, unshared". Compare each with the cap-16384 baseline, promote unshared runs, record aggregates (no held-out case names) in PLAN-0048, update CURRENT.md and write a new handoff. Then tell the #49 thread the model is free.
 ```
