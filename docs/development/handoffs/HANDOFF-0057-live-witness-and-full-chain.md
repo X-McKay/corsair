@@ -25,7 +25,7 @@ Blocking the fully live chain: (1) agents reading the test file they are meant t
 
 ## Decisions and next steps
 
-The RIG0 worktree is on local branch `live-witness-20261013` (= `334aa03`) with `live-cred-20261013` at `3efa446`; nothing committed there. The OpenShell gateway is uninstalled (last gate's teardown); the kind cluster is up and free. Next: the user decides item (2); planner and source-tool owners take item (1); then rerun the profiled live chain.
+The RIG0 worktree is on local branch `live-witness-20261013` (= `334aa03`) with `live-cred-20261013` at `3efa446`; nothing committed there. The OpenShell gateway is uninstalled (last gate's teardown); the kind cluster is up and free. RIG0 layout (user, 2026-10-13): no new sibling worktrees under `/home/al/git`; new worktrees go under `/home/al/git/corsair/.worktrees/<branch>` (git-ignored) and run evidence under `/home/al/git/corsair/.runs`. Once this PR merges, move `/home/al/git/corsair-live-e2e/.runs` content into `/home/al/git/corsair/.runs` and remove that worktree with `git worktree remove`; its `.state/` (kind kubeconfig and owner records) must be restaged into the new location first, since the qualification fixtures read it from the running worktree. Next: the user decides item (2); planner and source-tool owners take item (1); then rerun the profiled live chain.
 
 ## Continuation prompt
 
