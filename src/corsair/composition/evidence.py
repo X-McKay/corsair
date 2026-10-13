@@ -7,7 +7,6 @@ record for that run is admitted (SPEC-0033); otherwise ``witness=None``.
 
 from hashlib import sha256
 import json
-from pathlib import PurePosixPath
 import re
 
 from corsair.agents.evidence_assessment.contracts import MAX_ITEM_CHARS, EvidenceItem
@@ -57,7 +56,9 @@ def witness_request(identification: IssueIdentification, envelope: WitnessReques
         raise ValueError('the identified target is outside the operator witness envelope')
     if planned.effect != 'file_open':
         raise ValueError(f'the planned {planned.effect} witness is not recorded by the operator probe')
-    if PurePosixPath(planned.subject).name != envelope.effect_name:
+    # The probe matches a plain file name, so only that exact subject is represented; a directory-prefixed
+    # subject names another path and is refused until execution binds the whole subject.
+    if planned.subject != envelope.effect_name:
         raise ValueError('the planned witness subject is not the operator witness envelope effect')
     return envelope
 

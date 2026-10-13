@@ -282,6 +282,13 @@ def _process_start_planning():
     return _reads_then(["documents.py", "test_existing.py"], lambda info: {"plan": plan})
 
 
+def _security_subject_planning(subject):
+    from evals.fixture_e2e.case import DISCOVER, _reads_then, reference_plan
+    plan = reference_plan(DISCOVER)
+    plan["security"] = plan["security"] | {"witness": plan["security"]["witness"] | {"subject": subject}}
+    return _reads_then(["documents.py", "test_existing.py"], lambda info: {"plan": plan})
+
+
 def test_a_planned_witness_the_envelope_does_not_record_runs_without_a_witness(store, tmp_path):
     """SPEC-0040 kinds without a recorder, or another subject, never borrow the envelope's file-open evidence."""
     from corsair.agents.test_planning.contracts import WitnessFacility
@@ -289,13 +296,15 @@ def test_a_planned_witness_the_envelope_does_not_record_runs_without_a_witness(s
     process = WitnessFacility(id="audit_exec", kind="process_start", description="Process start audit events")
     environment = base.environment.model_copy(update={
         "witness_facilities": base.environment.witness_facilities + (process,)})
-    cases = {
-        "the planned process_start witness is not recorded by the operator probe":
-            (replace(base, environment=environment), stages(planning=_process_start_planning())),
-        "the planned witness subject is not the operator witness envelope effect":
-            (replace(base, witness_envelope=WitnessRequest("documents.py", "read_document", "other.txt")), stages()),
-    }
-    for index, (reason, (case, models_)) in enumerate(cases.items()):
+    unbound = "the planned process_start witness is not recorded by the operator probe"
+    other = "the planned witness subject is not the operator witness envelope effect"
+    cases = [
+        (unbound, replace(base, environment=environment), stages(planning=_process_start_planning())),
+        (other, replace(base, witness_envelope=WitnessRequest("documents.py", "read_document", "other.txt")), stages()),
+        # A directory-prefixed subject with the envelope's file name is another path, not the envelope's effect.
+        (other, base, stages(planning=_security_subject_planning("different/outside.txt"))),
+    ]
+    for index, (reason, case, models_) in enumerate(cases):
         (tmp_path / f"work{index}").mkdir()
         run = asyncio.run(run_direct(case, models_, reviewed_runners(store, tmp_path / f"work{index}")))
         assert run.stopped_at is None and all(e.observed.witness is None for e in run.executions)

@@ -21,7 +21,7 @@ Implement [SPEC-0040](../specs/SPEC-0040-typed-planned-witness.md) so the planne
 - [x] Third held-out set (`--cases heldout3`) written by one agent and independently reviewed and corrected by another, neither the prompt author nor the person running it; frozen by manifest before any provider run (the earlier planner thread's writer stopped before writing a case; this set was written fresh).
 - [x] Admission: a ready plan is refused when `environment.baseline_test` is null (the SPEC-0022 precondition, previously a prompt rule only), after development showed a ready plan on the no-baseline case.
 - [x] Live on RIG0, each once, no retries: development × v7 (2 repeats); third held-out × final candidate (3 repeats). Not qualified (below).
-- [x] Review fixes (PR #44): the composition requests the operator envelope only when the plan's security witness is a `file_open` on the envelope's file, so an unrecorded kind or another subject stays inconclusive; `file_open` subjects must be written canonically so the distinct-subject rule compares files, not spellings.
+- [x] Review fixes (PR #44): the composition requests the operator envelope only when the plan's security witness is a `file_open` whose subject is exactly the envelope's file (a directory-prefixed alias is another path and is refused), so an unrecorded kind or another subject stays inconclusive; `file_open` subjects must be written canonically so the distinct-subject rule compares files, not spellings.
 - [ ] Composition binding from the plan and control calibration (SPEC-0040): not started; the interim refusal above stands in for it.
 - [x] Records, `CURRENT.md`, HANDOFF-0062.
 
