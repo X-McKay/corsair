@@ -38,3 +38,11 @@ After #74's guards were adopted (image config id, committed tree, fresh dependen
 ## Decisions and next action
 
 One file, identifier titles, never-matching-pattern listing (SPEC-0057). Next: the live gate, then the framework row.
+
+Consolidation (Al, 2026-10-13: generalize across languages and frameworks; one refactor PR after the runners merge, not per-PR rework). Parts of this PR that move into shared code:
+
+- Listing: `JestRunner._stages` (list, compare exactly to the two ids, then one execution) is the same shape as Maven's; only the listing argv and `reports/jest.py:listed` differ, so a framework driver supplies `listing_argv`, `parse_listing`, `execution_argv` and `parse_report`, and the stage order, exact-match check and exit-code consistency (`_run_once`) become shared.
+- Report admission: `admit_json` (bounded UTF-8, no duplicate keys) sits beside `junit.admit_xml`; the per-id rules (exactly one result per expected id, anything else only skipped or pending, outcome and failure consistent) and the frame-to-patch-path location in `_failure` repeat `junit.py`/`surefire.py` and become one admission layer with per-format readers and per-language frame patterns.
+- Image-case script: `node_image_case.py` already imports `docker`, `user`, `plain` and `commit_tree` from `java_image_case.py`; `DockerCase`, `run` and `main` differ only in the dependency mount (`/modules` vs the Maven repository), the setup command and the runner class, so one script takes those from a per-language table.
+- Ids: `JsTestId` stays per language (grammar), behind one parse entry point keyed by framework.
+
