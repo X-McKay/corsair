@@ -355,7 +355,7 @@ def test_a_repository_committed_in_the_checkout_is_named_relative_to_it(clone, t
     assert record("manual:x", tmp_path, refused=str(refused.value))["label"] == "UNABLE_TO_RUN"
 
 
-def test_an_agent_stage_that_stops_on_its_budget_is_inconclusive(tmp_path):
+def test_an_agent_stage_that_stops_on_its_budget_or_never_answers_is_inconclusive(tmp_path):
     from corsair.composition.direct import DirectRun, StageAttempt
     from corsair.investigation.results import record
     from pydantic_ai.exceptions import UsageLimitExceeded
@@ -369,6 +369,16 @@ def test_an_agent_stage_that_stops_on_its_budget_is_inconclusive(tmp_path):
                              BudgetExhausted.model_construct(stage="environment", limit="timeout_seconds", cap=240,
                                                              limits=limits))
     assert record("manual:x", tmp_path, run=DirectRun(stopped_at="environment", attempts=(timed_out,),
+                                                      reason="x"))["label"] == "ERROR"
+    # A stage whose answer never validated ran and did not answer: INCONCLUSIVE, the last refusal beneath.
+    from pydantic_ai.exceptions import UnexpectedModelBehavior
+    unanswered = UnexpectedModelBehavior("Exceeded maximum output retries (1)")
+    unanswered.__cause__ = ValueError("planning answer was thinking only, no JSON")
+    item = record("manual:x", tmp_path, run=DirectRun(stopped_at="planning", attempts=(
+        StageAttempt("planning", None, None, (), 1.0, unanswered),), reason="planning failed"))
+    assert (item["label"], item["last_refusal"]) == ("INCONCLUSIVE", "planning answer was thinking only, no JSON")
+    malformed = StageAttempt("planning", None, None, (), 1.0, UnexpectedModelBehavior("Received empty model response"))
+    assert record("manual:x", tmp_path, run=DirectRun(stopped_at="planning", attempts=(malformed,),
                                                       reason="x"))["label"] == "ERROR"
     crashed = StageAttempt("environment", None, None, (), 1.0, ConnectionError("provider unreachable"))
     assert record("manual:x", tmp_path, run=DirectRun(stopped_at="environment", attempts=(crashed,),

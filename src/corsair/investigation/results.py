@@ -7,7 +7,7 @@ from pathlib import Path
 
 from pydantic_ai.exceptions import UsageLimitExceeded
 
-from corsair.composition.direct import DirectRun
+from corsair.composition.direct import DirectRun, RecordedFailure
 
 from .build import Investigation
 from .docker import SETUP_NETWORK
@@ -30,9 +30,9 @@ LABELS = ("LIKELY_EXPLOITABLE", "LIKELY_NOT_EXPLOITABLE", "INCONCLUSIVE", "UNABL
 
 def headline(stopped_at: str | None, gate: dict | None, *, failed: bool = False, exhausted: bool = False,
              error: bool = False) -> str:
-    """The run's label. `exhausted`: an agent stage ran and stopped on its budget without an answer (the question
-    stays open: INCONCLUSIVE); `failed`: the stage that ended the run raised otherwise (provider, timeout, harness);
-    `error`: the run itself crashed."""
+    """The run's label. `exhausted`: an agent stage ran and stopped without an answer, on its budget or because its
+    answer never validated (the question stays open: INCONCLUSIVE); `failed`: the stage that ended the run raised
+    otherwise (provider, timeout, harness); `error`: the run itself crashed."""
     if error:
         return "ERROR"
     if exhausted:
@@ -56,6 +56,20 @@ def _exhausted(attempt) -> bool:
     return isinstance(attempt.failure, UsageLimitExceeded)
 
 
+# PydanticAI's message when a stage's answer failed validation on every output retry.
+UNANSWERED = "Exceeded maximum output retries"
+
+
+def _unanswered(attempt) -> str | None:
+    """Why the stage's last answer was refused, when the stage ran and its answer never validated (the model kept
+    answering, just not in the contract); None otherwise."""
+    failure = attempt.failure
+    kind = failure.kind if isinstance(failure, RecordedFailure) else type(failure).__name__
+    if kind != "UnexpectedModelBehavior" or UNANSWERED not in str(failure):
+        return None
+    return " ".join(str(failure.__cause__ or failure).split())[:1024]
+
+
 def _usage(run: DirectRun) -> dict:
     return {f"{index}-{a.stage}": {"requests": a.usage.requests if a.usage else None,
                                    "input_tokens": a.usage.input_tokens if a.usage else None,
@@ -71,6 +85,7 @@ def record(label: str, evidence: Path, *, investigation: Investigation | None = 
     traceback is `error.txt` beside the record); otherwise `run` is the chain's result."""
     environment = run.environment if run is not None else None
     ending = [a for a in run.attempts if a.stage == run.stopped_at] if run is not None else []
+    refusal = next((why for a in ending if (why := _unanswered(a))), None)
     gate = run.gate.permitted.model_dump() if run is not None and run.gate else None
     final, basis = gate, "gate" if gate else None
     if run is not None and run.assessment is not None:
@@ -100,7 +115,8 @@ def record(label: str, evidence: Path, *, investigation: Investigation | None = 
         "baseline_basis": getattr(environment, "baseline_basis", None),
         "label": headline("admission" if run is None else run.stopped_at, final,
                           failed=any(a.failure is not None for a in ending),
-                          exhausted=any(_exhausted(a) for a in ending), error=error is not None),
+                          exhausted=any(_exhausted(a) for a in ending) or refusal is not None,
+                          error=error is not None),
         # Which disposition the label follows: the assessment's standing disposition when the assessment ran (its
         # proposal if admitted, else the gate's), otherwise the gate's own result.
         "label_basis": basis,
@@ -109,6 +125,8 @@ def record(label: str, evidence: Path, *, investigation: Investigation | None = 
         "stopped_at": (crashed_in or "admission") if run is None else run.stopped_at,
         "crashed": error is not None,
         "reason": (error or refused) if run is None else run.reason,
+        # A stage whose answer never validated: its last refused answer's error, under the stage and reason.
+        "last_refusal": refusal,
         "gate": gate,
         "traceback": str(evidence / "error.txt") if error is not None else None,
         "outcomes": outcomes, "usage": {} if run is None else _usage(run), "cleanup": cleanup,
@@ -131,7 +149,8 @@ def summary_line(item: dict) -> str:
         state = f"{gate.get('execution')} · {gate.get('finding')} · {gate.get('fix')}; {outcome}"
     else:
         verb = "crashed in" if item.get("crashed") else "stopped at"
-        state = f"{verb} {item['stopped_at']}: {item['reason']}".replace("\n", " ")[:400]
+        refusal = f"; last refusal: {item['last_refusal']}" if item.get("last_refusal") else ""
+        state = f"{verb} {item['stopped_at']}: {item['reason']}{refusal}".replace("\n", " ")[:400]
     cleanup = "confirmed" if item["cleanup"] and all(v in ("confirmed", None, "not_run") for v in item["cleanup"].values()) \
         else ("unconfirmed" if item["cleanup"] else "none needed")
     return f"{head}: {item['label']}; {state} — {chosen}; {requests} model requests; cleanup {cleanup}; {item['evidence']}"
