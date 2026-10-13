@@ -1,4 +1,5 @@
 """Native 1E fixed projects; no application adapter or finding-validation claim."""
+import copy
 import hashlib
 import ipaddress
 import json
@@ -11,10 +12,12 @@ import pytest
 import yaml
 
 from tests.qualification.support import ROOT, NetworkFixture
-from tests.qualification.gateway import gateway
+from tests.qualification.gateway import native_gateway
 from tests.qualification.test_lifecycle import SdkReceipts
 from tests.qualification.test_policy import require_network, owned_sandbox, observe_policy, global_policy_observation, wait_logging_activation
-from tests.qualification.prepare_toolchains import PYTHONS, SOURCE, image_receipt, source_hashes
+from tests.qualification.prepare_toolchains import JAVA_TESTS, LAUNCHER, PYTHONS, SOURCE, image_receipt, source_hashes
+from corsair.adapters.maven_runner import WRAPPER, MavenRunner, MavenRunnerConfig, selection
+from corsair.reports.junit_listing import listed
 
 # Exact interpreter and pytest each Python toolchain image carries (its requirements.txt pins).
 PYTHON_TOOLCHAINS = {'python': ('/usr/local/bin/python3.12', (3, 12), '9.0.3'),
@@ -22,14 +25,27 @@ PYTHON_TOOLCHAINS = {'python': ('/usr/local/bin/python3.12', (3, 12), '9.0.3'),
 
 
 @pytest.fixture
+def image_kube(kube, request):
+    """Per-image evidence: each gate writes under `<evidence>/<test name>/`, so one run of all toolchain gates keeps
+    every image's receipts apart."""
+    view = copy.copy(kube)
+    view.evidence = kube.evidence / request.node.name
+    view.evidence.mkdir(mode=0o700)
+    return view
+
+
+@pytest.fixture(scope='module')
 def toolchain_gateway(kube, request):
+    """One installed gateway for every selected image: its teardown uninstalls it, so a per-test gateway would leave
+    the second gate without one. Its controls and cleanup receipts are at the run's top level."""
     require_network(kube, request.config.getoption('--network-evidence'))
-    return request.getfixturevalue('gateway')
+    with native_gateway(kube) as value:
+        yield value
 
 
 def toolchain_policy(language):
     policy = yaml.safe_load((ROOT / 'policies/openshell/identity.yaml').read_text())
-    policy['filesystem_policy']['read_only'] += ['/opt/corsair-fixture'] + ([] if language in PYTHONS else ['/opt/java/openjdk', '/opt/corsair-m2', '/opt/corsair-m2.sha256'])
+    policy['filesystem_policy']['read_only'] += ['/opt/corsair-fixture'] + ([] if language in PYTHONS else ['/opt/java/openjdk', '/opt/corsair-m2', '/opt/corsair-m2.sha256', '/opt/corsair-junit', '/opt/corsair-junit.sha256'])
     return policy
 
 
@@ -57,8 +73,8 @@ def stage_project(kube, cli, sdk, name, language, record):
     if language in PYTHONS:
         shutil.copyfile(SOURCE / language / 'test_native.py', project / 'test_native.py')
     else:
-        shutil.copyfile(SOURCE / 'java/pom.xml', project / 'pom.xml')
-        shutil.copytree(SOURCE / 'java/src', project / 'src')
+        shutil.copyfile(SOURCE / language / 'pom.xml', project / 'pom.xml')
+        shutil.copytree(SOURCE / language / 'src', project / 'src')
     cwd = sdk.call('exec', name, ['/bin/pwd'], workspace='default', no_login_shell=True, timeout_seconds=20)
     assert cwd.exit_code == 0 and cwd.stderr == '' and cwd.stdout.startswith('/') and cwd.stdout.count('\n') == 1
     remote = cwd.stdout.rstrip('\n') + '/' + project.name
@@ -100,29 +116,60 @@ def python_offline(sdk, name, remote, record, language='python'):
     record['offline_diagnostics'] = ['syntax/collection', 'no-discovery', 'assertion']
 
 
-def java_offline(sdk, name, remote, record):
-    result = execute(sdk, name, ['/bin/sh', '-ec', 'cd /opt/corsair-m2; sha256sum -c /opt/corsair-m2.sha256 >/dev/null; cp -R /opt/corsair-m2 /tmp/m2; /opt/java/openjdk/bin/javac -version; /usr/share/maven/bin/mvn -version'], remote)
+# Per-image expectations: the same fixture shape and diagnostics, the image's own JDK and JUnit generation.
+JAVA = {
+    'java': {'javac': 'javac 17.', 'runtime': 'Java version: 17.', 'expected': 'expected: <1> but was: <2>',
+             'assertion': 'package corsair; import org.junit.jupiter.api.Test; import static org.junit.jupiter.api.Assertions.assertEquals; class AssertionTest { @Test void deliberateFailure() { assertEquals(1, 2); } }',
+             'engine': 'junit-jupiter'},
+    'java8': {'javac': 'javac 1.8.0_', 'runtime': 'Java version: 1.8.0_', 'expected': 'expected:<1> but was:<2>',
+              'assertion': 'package corsair; import org.junit.Test; import static org.junit.Assert.assertEquals; public class AssertionTest { @Test public void deliberateFailure() { assertEquals(1, 2); } }',
+              'engine': 'junit-vintage'},
+}
+FIXTURE_IDS = tuple('corsair.NativeTest#' + name for name in JAVA_TESTS)
+
+
+def java_offline(sdk, name, remote, record, language):
+    expect = JAVA[language]
+    result = execute(sdk, name, ['/bin/sh', '-ec', 'sha256sum -c /opt/corsair-junit.sha256 >/dev/null; cd /opt/corsair-m2; sha256sum -c /opt/corsair-m2.sha256 >/dev/null; cp -R /opt/corsair-m2 /tmp/m2; /opt/java/openjdk/bin/javac -version 2>&1; /usr/share/maven/bin/mvn -version'], remote)
     expect_completed(result, 0, 'Apache Maven 3.10.0')
-    assert 'javac 17.' in result.stdout and 'Java version: 17.' in result.stdout
+    assert expect['javac'] in result.stdout and expect['runtime'] in result.stdout
     record['versions'] = result.stdout
     mvn = ['/usr/share/maven/bin/mvn', '-B', '-ntp', '-o', '-Dmaven.repo.local=/tmp/m2']
     result = execute(sdk, name, mvn + ['test'], remote)
-    expect_completed(result, 0, 'Tests run: 1, Failures: 0, Errors: 0, Skipped: 0')
-    report(sdk, name, remote + '/target/surefire-reports/TEST-corsair.NativeTest.xml', [('corsair.NativeTest', 'nativeRoundtrip')], record)
+    expect_completed(result, 0, f'Tests run: {len(JAVA_TESTS)}, Failures: 0, Errors: 0, Skipped: 0')
+    report(sdk, name, remote + '/target/surefire-reports/TEST-corsair.NativeTest.xml', [('corsair.NativeTest', n) for n in JAVA_TESTS], record)
+    java_runner_commands(sdk, name, remote, record, expect['engine'])
     result = execute(sdk, name, mvn + ['-Pmissing-artifact', 'test'], remote)
     expect_completed(result, 1, 'absent-artifact')
     assert 'DependencyResolutionException' in result.stdout
     assert 'prefixes: Path corsair/qualification/absent-artifact/0.0.0/absent-artifact-0.0.0.jar NOT allowed from central' in result.stdout
     result = execute(sdk, name, mvn + ['-Dtest=AbsentTest', 'test'], remote)
     expect_completed(result, 1, 'No tests matching pattern')
-    setup = execute(sdk, name, ['/bin/sh', '-ec', 'cp -R . /tmp/java-syntax; printf "package corsair; class SyntaxTest { invalid Java; }\\n" > /tmp/java-syntax/src/test/java/corsair/SyntaxTest.java; cp -R . /tmp/java-assertion; printf "package corsair; import org.junit.jupiter.api.Test; import static org.junit.jupiter.api.Assertions.assertEquals; class AssertionTest { @Test void deliberateFailure() { assertEquals(1, 2); } }\\n" > /tmp/java-assertion/src/test/java/corsair/AssertionTest.java'], remote)
+    setup = execute(sdk, name, ['/bin/sh', '-ec', 'cp -R . /tmp/java-syntax; printf "package corsair; class SyntaxTest { invalid Java; }\\n" > /tmp/java-syntax/src/test/java/corsair/SyntaxTest.java; cp -R . /tmp/java-assertion; printf "%s\\n" "$1" > /tmp/java-assertion/src/test/java/corsair/AssertionTest.java', 'corsair-setup', expect['assertion']], remote)
     expect_completed(setup, 0, '')
     result = execute(sdk, name, mvn + ['test'], '/tmp/java-syntax')
     expect_completed(result, 1, 'COMPILATION ERROR')
     result = execute(sdk, name, mvn + ['test'], '/tmp/java-assertion')
-    expect_completed(result, 1, 'Tests run: 2, Failures: 1, Errors: 0, Skipped: 0')
-    assert 'expected: <1> but was: <2>' in result.stdout
+    expect_completed(result, 1, f'Tests run: {len(JAVA_TESTS) + 1}, Failures: 1, Errors: 0, Skipped: 0')
+    assert expect['expected'] in result.stdout
     record['offline_diagnostics'] = ['missing-artifact/native-Maven-prefix-resolver', 'no-discovery', 'compilation', 'assertion']
+
+
+def java_runner_commands(sdk, name, remote, record, engine):
+    """The Maven runner's own discovery and execution argv (SPEC-0041) on the fixture, offline in the sandbox."""
+    config = MavenRunnerConfig(command=('/usr/share/maven/bin/mvn', '-B', '-ntp', '-o', '-Dmaven.repo.local=/tmp/m2', f'--file={remote}/pom.xml'),
+                               workspace_root=remote, java='/opt/java/openjdk/bin/java', console_jar=LAUNCHER)
+    runner = MavenRunner(None, None, None, config)
+    listing = execute(sdk, name, list(runner._discovery_argv(FIXTURE_IDS)), remote, timeout=120)
+    expect_completed(listing, 0, f'[engine:{engine}]')
+    found = listed(listing.stdout.encode())
+    assert found is not None and sorted(found) == sorted(('corsair.NativeTest', n) for n in JAVA_TESTS), listing.stdout
+    report_path = runner._report(FIXTURE_IDS)
+    argv = ['/bin/sh', '-c', WRAPPER, 'corsair-maven', report_path, *config.command, *selection(FIXTURE_IDS), 'test']
+    result = execute(sdk, name, argv, remote, timeout=120)
+    assert result.exit_code == 0, result.stderr[-2000:]
+    record.setdefault('native_reports', []).append(native_report(result.stdout, [('corsair.NativeTest', n) for n in JAVA_TESTS]))
+    record['runner_commands'] = {'listing': found, 'listing_sha256': hashlib.sha256(listing.stdout.encode()).hexdigest(), 'engine': engine}
 
 
 def native_events(logs):
@@ -211,32 +258,32 @@ def python_dependencies(kube, cli, sdk, name, remote, record, endpoint, pair, la
 
 
 
-@pytest.mark.toolchain('java', 'python')
-def test_native_python_and_java_toolchains(kube, toolchain_gateway):
-    gateway = toolchain_gateway
-    sources = ['tests/qualification/test_toolchains.py', 'tests/qualification/prepare_toolchains.py', 'tests/qualification/test_policy.py', 'tests/qualification/test_lifecycle.py', 'tests/qualification/gateway.py', 'tests/qualification/support.py', 'policies/openshell/identity.yaml', 'deploy/runtime-lock.yaml', 'pyproject.toml', 'uv.lock']
-    (kube.evidence / 'toolchain-source-hashes.json').write_text(json.dumps(dict(source_hashes(), **{p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest() for p in sources}), indent=2))
+def toolchain_gate(kube, gateway, language):
+    """One image's gate, into its own evidence subdirectory; select one image by its test node id."""
+    assert not (kube.evidence / 'toolchain.json').exists(), 'Another toolchain gate already wrote this evidence directory'
+    sources = ['tests/qualification/test_toolchains.py', 'tests/qualification/prepare_toolchains.py', 'tests/qualification/test_policy.py', 'tests/qualification/test_lifecycle.py', 'tests/qualification/gateway.py', 'tests/qualification/support.py', 'src/corsair/adapters/maven_runner.py', 'src/corsair/reports/junit_listing.py', 'policies/openshell/identity.yaml', 'deploy/runtime-lock.yaml', 'pyproject.toml', 'uv.lock']
+    (kube.evidence / 'toolchain-source-hashes.json').write_text(json.dumps(dict(source_hashes(language), **{p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest() for p in sources}), indent=2))
     summary = {'outcome': 'failed', 'sandboxes': [], 'internal_retry_counts': 'unknown'}
     endpoint = NetworkFixture(kube, 'toolchain-endpoint')
     attempted = False
     mtls = gateway['mtls']
     with SandboxClient(gateway['endpoint'], tls=TlsConfig(ca_path=mtls / 'ca.crt', cert_path=mtls / 'tls.crt', key_path=mtls / 'tls.key'), timeout=60) as client:
         sdk = SdkReceipts(client, kube.evidence)
+        summary['image'] = language
         try:
             summary['global_policy'] = global_policy_observation(gateway['cli']('policy', 'get', '--global', '--full', '-o', 'json', check=False))
             attempted = True
             endpoint.setup()
-            for language in ('java', 'python'):
-                image = image_receipt(language)
-                record = {'language': language, 'artifact': image}
-                summary['sandboxes'].append(record)
-                with owned_sandbox(kube, gateway['cli'], sdk, image, toolchain_policy(language), record) as (name, pair):
-                    remote = stage_project(kube, gateway['cli'], sdk, name, language, record)
-                    if language == 'python':
-                        python_offline(sdk, name, remote, record)
-                        python_dependencies(kube, gateway['cli'], sdk, name, remote, record, endpoint, pair)
-                    else:
-                        java_offline(sdk, name, remote, record)
+            image = image_receipt(language)
+            record = {'language': language, 'artifact': image}
+            summary['sandboxes'].append(record)
+            with owned_sandbox(kube, gateway['cli'], sdk, image, toolchain_policy(language), record) as (name, pair):
+                remote = stage_project(kube, gateway['cli'], sdk, name, language, record)
+                if language in PYTHONS:
+                    python_offline(sdk, name, remote, record, language)
+                    python_dependencies(kube, gateway['cli'], sdk, name, remote, record, endpoint, pair, language)
+                else:
+                    java_offline(sdk, name, remote, record, language)
             assert all(r['outcome'] == 'passed' and r['cleanup_confirmed'] for r in summary['sandboxes'])
             summary['outcome'] = 'passed'
         finally:
@@ -248,35 +295,22 @@ def test_native_python_and_java_toolchains(kube, toolchain_gateway):
                 (kube.evidence / 'toolchain.json').write_text(json.dumps(summary, indent=2))
 
 
+@pytest.mark.toolchain('java8')
+def test_native_java8_toolchain(image_kube, toolchain_gateway):
+    toolchain_gate(image_kube, toolchain_gateway, 'java8')
+
+
+@pytest.mark.toolchain('java')
+def test_native_java_toolchain(image_kube, toolchain_gateway):
+    toolchain_gate(image_kube, toolchain_gateway, 'java')
+
+
+@pytest.mark.toolchain('python')
+def test_native_python_toolchain(image_kube, toolchain_gateway):
+    toolchain_gate(image_kube, toolchain_gateway, 'python')
+
+
 @pytest.mark.toolchain('python37')
-def test_native_python37_toolchain(kube, toolchain_gateway):
+def test_native_python37_toolchain(image_kube, toolchain_gateway):
     """The CPython 3.7 image through the same offline, diagnostic and dependency checks as the 3.12 image."""
-    gateway = toolchain_gateway
-    sources = ['tests/qualification/test_toolchains.py', 'tests/qualification/prepare_toolchains.py', 'tests/qualification/test_policy.py', 'tests/qualification/test_lifecycle.py', 'tests/qualification/gateway.py', 'tests/qualification/support.py', 'policies/openshell/identity.yaml', 'deploy/runtime-lock.yaml', 'pyproject.toml', 'uv.lock']
-    (kube.evidence / 'python37-source-hashes.json').write_text(json.dumps(dict(source_hashes('python37'), **{p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest() for p in sources}), indent=2))
-    summary = {'outcome': 'failed', 'sandboxes': [], 'internal_retry_counts': 'unknown'}
-    endpoint = NetworkFixture(kube, 'toolchain-endpoint-37')
-    attempted = False
-    mtls = gateway['mtls']
-    with SandboxClient(gateway['endpoint'], tls=TlsConfig(ca_path=mtls / 'ca.crt', cert_path=mtls / 'tls.crt', key_path=mtls / 'tls.key'), timeout=60) as client:
-        sdk = SdkReceipts(client, kube.evidence)
-        try:
-            summary['global_policy'] = global_policy_observation(gateway['cli']('policy', 'get', '--global', '--full', '-o', 'json', check=False))
-            attempted = True
-            endpoint.setup()
-            image = image_receipt('python37')
-            record = {'language': 'python37', 'artifact': image}
-            summary['sandboxes'].append(record)
-            with owned_sandbox(kube, gateway['cli'], sdk, image, toolchain_policy('python37'), record) as (name, pair):
-                remote = stage_project(kube, gateway['cli'], sdk, name, 'python37', record)
-                python_offline(sdk, name, remote, record, 'python37')
-                python_dependencies(kube, gateway['cli'], sdk, name, remote, record, endpoint, pair, 'python37')
-            assert record['outcome'] == 'passed' and record['cleanup_confirmed']
-            summary['outcome'] = 'passed'
-        finally:
-            summary['observed_sdk_calls'] = sdk.counter
-            try:
-                if attempted:
-                    endpoint.cleanup()
-            finally:
-                (kube.evidence / 'python37-toolchain.json').write_text(json.dumps(summary, indent=2))
+    toolchain_gate(image_kube, toolchain_gateway, 'python37')

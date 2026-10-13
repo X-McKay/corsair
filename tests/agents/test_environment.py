@@ -250,6 +250,10 @@ def test_read_output_returns_retained_bytes_beyond_the_tail():
      b"[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0\n[INFO] BUILD SUCCESS\n", False),
     ("junit5", "org.example.WikiTest#forwards", "src/test/java/org/example/WikiTest.java", ("mvn", "-Dtest=WikiTest#forwards"),
      b"[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 1\n[INFO] BUILD SUCCESS\n", False),
+    ("junit4", "org.example.LegacyTest#forwards", "src/test/java/org/example/LegacyTest.java", ("mvn", "-o", "test", "-Dtest=LegacyTest#forwards"),
+     b"[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0\n[INFO] BUILD SUCCESS\n", True),
+    ("junit4", "org.example.LegacyTest#forwards", "src/test/java/org/example/LegacyTest.java", ("mvn", "-Dtest=LegacyTest#forwards"),
+     b"[INFO] Tests run: 1, Failures: 0, Errors: 1, Skipped: 0\n[INFO] BUILD SUCCESS\n", False),
 ])
 def test_framework_admission_is_exact(framework, test_id, path, command, output, ok):
     from corsair.agents.environment.frameworks import FRAMEWORKS, file_matches
