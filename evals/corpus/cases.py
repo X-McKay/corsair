@@ -83,7 +83,7 @@ class Entry(_Frozen):
 
     @property
     def variant(self) -> PurePosixPath:
-        """The variant directory relative to the corpus root, such as `python/sqli/a`."""
+        """The variant directory relative to the corpus root, such as `python/cmdi/a`."""
         return PurePosixPath(self.finding.repo_url.removeprefix("eval-corpus/"))
 
 
@@ -228,6 +228,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Corpus case loader (SPEC-0067)")
     parser.add_argument("--freeze-held-out", action="store_true", help="rewrite held_out.json; the only way to change it")
     parser.add_argument("--tree-digest", action="store_true", help="print the copied corpus digest for SOURCE.md")
+    parser.add_argument("--compare", type=Path, metavar="EVAL_CORPUS",
+                        help="an upstream checkout's eval-corpus/ at the SOURCE.md commit; exit 1 unless it digests the same")
     args = parser.parse_args()
     if args.freeze_held_out: freeze_held_out()
     if args.tree_digest: print(tree_digest())
+    if args.compare:
+        upstream, copy = tree_digest(args.compare), tree_digest()
+        print(f"upstream {upstream}\ncopy     {copy}")
+        raise SystemExit(0 if upstream == copy else 1)

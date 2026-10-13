@@ -49,7 +49,7 @@ def _copy(tmp_path: Path) -> Path:
 
 def test_a_label_word_in_a_variant_is_refused(tmp_path):
     target = _copy(tmp_path)
-    module = target / "python/sqli/b/app.py"
+    module = target / "python/cmdi/b/app.py"
     module.write_text(module.read_text() + "\n# parameterised, so this is safe\n")
     with pytest.raises(ValueError, match="label words"):
         load(target)
@@ -66,9 +66,9 @@ def test_a_pair_whose_findings_differ_beyond_location_is_refused(tmp_path):
 
 def test_symlinks_in_a_variant_are_refused(tmp_path):
     target = _copy(tmp_path)
-    (target / "python/sqli/a/link").symlink_to("/etc/hostname")
+    (target / "python/cmdi/a/link").symlink_to("/etc/hostname")
     with pytest.raises(ValueError, match="symlink"):
-        snapshot(target / "python/sqli/a")
+        snapshot(target / "python/cmdi/a")
 
 
 def test_held_out_split_is_a_quarter_per_language_and_matches_its_manifest():
@@ -90,7 +90,7 @@ def test_development_records_never_cite_a_held_out_corpus_case():
 def test_runtime_report_covers_every_corpus_case_and_hides_held_out_names():
     report = json.loads((ROOT / "benchmarks/runtime-requirements.json").read_text())
     loaded = load()
-    assert len(report["corpus"]) == len(loaded)
-    named = {r["case_id"] for r in report["corpus"] if r["case_id"]}
-    assert named == {c.case_id for c in loaded if c.split == "development"}
+    named = [r["case_id"] for r in report["corpus"]["development"]]
+    assert named == [c.case_id for c in loaded if c.split == "development"]
+    assert sum(report["corpus"]["held_out"].values()) == sum(c.split == "held_out" for c in loaded)
     assert report["inputs"]["corpus"] == "sha256:" + cases.sha256((CORPUS / "manifest.json").read_bytes()).hexdigest()

@@ -9,6 +9,14 @@ Vul4J dataset attribution (CC-BY-4.0); Vul4J's GPL-3.0 code is not included.
 Tree digest (`python -m evals.corpus.cases --tree-digest`, every file but this one):
 `0d21afaa5ef667a4237935fe3475ffc0966d8194941a99bd5a7b07fcf5b8ebed`
 
+To check the copy against upstream independently (no file here is trusted for it):
+
+```sh
+git clone https://github.com/X-McKay/infosec-harness /tmp/ih && git -C /tmp/ih checkout 52aa2ac64f3d81139b609f18890ac52950d02933
+PYTHONPATH=src:. .venv/bin/python -m evals.corpus.cases --compare /tmp/ih/eval-corpus   # exit 0: identical
+diff -r --exclude=SOURCE.md /tmp/ih/eval-corpus benchmarks/corpus/infosec-harness        # no output
+```
+
 Do not edit these files in place. A corpus change is made upstream and copied again with a new
 commit and digest here. `README.md` and `manifest.json` hold the answer key, and `verification/`
 holds tests that assert each variant's behaviour: all three are evaluator-only and never enter an
