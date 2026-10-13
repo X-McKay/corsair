@@ -15,7 +15,7 @@ A cross-thread snapshot taken at about 18:30Z. Each PR's own HANDOFF carries its
 
 - **The chain runs end to end.** On the fixture, all four model stages ran live on `llm.almckay.io` through plain Docker. That route is risk-accepted and unqualified (#113). Three of the six Docker runs reached the right verdict (LIKELY_EXPLOITABLE). The other three failed because of the author's choice of security test, or because the assessment over-claimed. #117 fixes most of that.
 - **Corpus accuracy is unmeasured.** Only one of the 42 corpus cases has run: `ih-python-pathtraversal`, through `corsair run`. It stopped at the environment stage with ERROR, before any finding. No corpus case has a result to compare with its `expected.json`.
-- **Only one live LIKELY_NOT_EXPLOITABLE outcome exists.** At 18:36Z the not-exploitable fixture ran fully live on Docker and reached not_reproduced, with the assessment and both witnesses admitted (thread report). That is one run of one fixture, and no corpus negative has run. Twice the assessment proposed not_reproduced without the evidence for it, and only the gate stopped it. A correct negative verdict is the least-tested outcome Corsair has, and the most damaging one to get wrong. See [Validating accuracy across the corpus](#validating-accuracy-across-the-corpus-and-likely_not_exploitable-outcomes).
+- **No LIKELY_NOT_EXPLOITABLE outcome has been produced by a live run.** Every finding so far was reproduced or inconclusive. Twice the assessment proposed not_reproduced without the evidence for it, and only the gate stopped it. A correct negative verdict is the least-tested outcome Corsair has, and the most damaging one to get wrong. See [Validating accuracy across the corpus](#validating-accuracy-across-the-corpus-and-likely_not_exploitable-outcomes).
 - **The product entry point is not on main yet.** That covers `corsair run` (#109), the labels (#109), the terminal display (#112), the Docker route (#113), runtime inference and the cohort (#115), and the verdict-gap fixes (#117). See the PR board for each one's state.
 
 ## Verified state
@@ -67,7 +67,6 @@ All model stages ran live on `llm.almckay.io`, with nobody else on the model. Ru
 | live-005 | Docker | reproduced/not_verified, admitted at that level. The test did not expect the fix's `ValueError`. | 9 / 30 / 57 / 64 | same tarball |
 | live-006 | Docker | Stopped at authoring. There was prose before the JSON and the one correction was rejected. The test could not fail ("file unchanged"). | author 70 | same tarball |
 | ih-python-pathtraversal-1 | `corsair run`, Docker, #109 `e90a8e3` merged with #115 (merge `cecc10d`) | **ERROR, stopped at environment**: environment budget exhausted, `total_tokens_limit 48000 (derived from 1 read windows and 13 work calls)`, 10 model requests in 13.5 s. The runtime row `cpython-3.12-pytest` was inferred, pytest was installed on both revisions, and cleanup was confirmed. | — | RIG0 `.worktrees/first-corpus-case/.runs/investigations/ih-python-pathtraversal-1` (not yet in the shared folder) |
-| negative fixture, live | `corsair`'s not-exploitable fixture variant, Docker, all model stages live (thread "Reproducing not-exploitable verdicts") | **not_reproduced, assessment and both witnesses admitted (LIKELY_NOT_EXPLOITABLE)**. This is the first live negative outcome, at 18:36Z (thread report). | — | RIG0, under the run thread's worktree (thread report) |
 
 On RIG0 the Docker batch lives under `/home/al/git/corsair/.worktrees/docker-route-live/.runs/fixture-e2e-docker/`. The tarball copies scripted-001 and live-001 to live-006 with provider fields redacted.
 
@@ -104,7 +103,7 @@ Live Docker runs reached the right verdict 3 times out of 6 (live-001 to live-00
 | C1 | The environment agent is not shown the file inventory or where the operator's smoke test is, so it probes for absent files | corpus case | Chain thread (thread report) |
 | C2 | The environment token cap derived from "1 read window" (48,000) is too small, at about 4.8k input tokens per request | corpus case | Not yet assigned |
 | C3 | A model stage that stops on its budget is labelled ERROR. The coordinator asked for INCONCLUSIVE, per Al's table. | corpus case | #109 (asked of the Node thread at 18:26Z) |
-| C4 | #115 enforces the smoke-test rule over the operator's checkout listing (`source_paths`) and refuses a missing listing. No production adapter supplies that listing yet, so with #109 and #115 both on main, every smoke baseline on the Docker route is refused. | #115 review on #118 | #109, as the Docker file-list hand-over commit (thread report) |
+| C4 | Under Docker, the file list the environment agent needs for #115's smoke check (a whole-repository test listing) is not handed over from the Docker preparation | corpus case, #115 review | #109, as a Docker file-list hand-over commit (thread report) |
 
 The gap numbers follow the chat. Gaps 6 to 11 are described in detail in HANDOFF-0102 on #117.
 
@@ -120,7 +119,7 @@ The gap numbers follow the chat. Gaps 6 to 11 are described in detail in HANDOFF
 | #115 runtime inference, smoke test, corpus-python cohort | merged | Merged to main as `5890a31` at 18:35Z on Al's "Merge 115". All 17 cohort repositories are minimal: `app.py`, `requirements.txt` and an empty tests folder. |
 | #116 OpenShell preparation adapter (draft) | `81f6039` | Review clean. Waits on the live gate `make qualify-environment-preparation CORSAIR_NETWORK_RUN=<dir>` on RIG0 (Go 1.21+), after the Docker batch, on Al's word |
 | #117 verdict gaps (draft) | `ab3b3d5` | Review clean (thread report). Gaps 6 to 9 are fixed; 10 and 11 are still open. Offline suite 1798 passed and scripted evals are clean (thread report). Live evals were not run, and the new probe digest is unqualified until `make qualify-witness`. |
-| Coming | — | The `--id` path as its own PR (Node thread, local `f3824b8`). The not-exploitable fixture variant, corpus negative cases and commands (thread "Reproducing not-exploitable verdicts", branch `claude/not-exploitable-verdicts`): the scripted host run and the scripted Docker control both admit not_reproduced, and its first fully live Docker run reached not_reproduced with the assessment and both witnesses admitted at 18:36Z (thread reports). Fix-free runs (no fixed revision gives fix `not_applicable`; Node thread). |
+| Coming | — | The `--id` path as its own PR (Node thread, local `f3824b8`). The not-exploitable fixture variant, corpus negative cases and commands (thread "Reproducing not-exploitable verdicts", branch `claude/not-exploitable-verdicts`): the scripted host run and the scripted Docker control both admit not_reproduced, and the first live run is in progress (thread reports). Fix-free runs (no fixed revision gives fix `not_applicable`; Node thread). |
 | #118 this record | — | Merges on Al's 18:27 word once CI is green. |
 | Outside today's e2e | — | #107 (Codex local results UI). Dependabot #71, #72, #78 to #81 and #114. |
 
@@ -131,7 +130,7 @@ Al asked (18:27Z) for the record to stress two needs. Accuracy must be validated
 ### Why this matters most
 
 - A wrong LIKELY_NOT_EXPLOITABLE tells an analyst to drop a real vulnerability. Corsair can make no worse error.
-- Exactly one live run has produced a not_reproduced finding: the not-exploitable fixture on Docker at 18:36Z, with the assessment and both witnesses admitted (thread report). Every other live finding is reproduced or inconclusive.
+- No live run has produced a not_reproduced finding yet. Every live finding so far is reproduced or inconclusive.
 - The assessment agent has already over-claimed not_reproduced twice (run 2 and live-002). Each time, only the deterministic gate refused it.
 - The fixture batch tested only the exploitable direction. Today's 3 of 6 Docker runs says nothing about negatives.
 
@@ -190,7 +189,7 @@ Report negatives and positives as separate rates, because 3 of 6 on the exploita
 These steps follow the existing approach (stage order, runner core, required witness, matrix rows). Each step's runs go in the run ledger with evidence paths.
 
 1. **Prerequisites.** Land #117, including items 10 and 11. Fix C1 and C2 in the environment stage, and land C4. Land #109 with C3, then #113 and #115. Land the fix-free runs PR (Al's 18:34Z choice).
-2. **Negative fixture.** The thread "Reproducing not-exploitable verdicts" is building a not-exploitable fixture variant. Its scripted host run and its scripted Docker control both admit not_reproduced, and its first fully live Docker run reached not_reproduced at 18:36Z, with the assessment and both witnesses admitted (thread reports). That is the first live LIKELY_NOT_EXPLOITABLE outcome. Run it fully live on the Docker route five times, interleaved with five runs of the exploitable fixture, so the same agent versions face both. Bar: 5 of 5 LIKELY_NOT_EXPLOITABLE admitted and zero LIKELY_EXPLOITABLE on the negative, with no regression on the positive.
+2. **Negative fixture.** The thread "Reproducing not-exploitable verdicts" is building a not-exploitable fixture variant. Its scripted host run and its scripted Docker control both admit not_reproduced, and the first live run was in progress at 18:35Z (thread reports). Run it fully live on the Docker route five times, interleaved with five runs of the exploitable fixture, so the same agent versions face both. Bar: 5 of 5 LIKELY_NOT_EXPLOITABLE admitted and zero LIKELY_EXPLOITABLE on the negative, with no regression on the positive.
 3. **Python negatives as they stand.** `ih-python-healthcheck` and `ih-python-queryhelper`, once the fix-free runs PR lands.
 4. **Reverse mapping for Python.** Generate the 15 development Python pairs reversed, with the not-exploitable variant as the baseline and an expected not_reproduced outcome. The corpus thread does this as an extension of SPEC-0067 with its own frozen `expected.json` files. Run them alongside the 15 forward pairs, which give the exploitable direction and fix verification. That makes 32 Python development cases: about 17 negative and 15 positive.
 5. **Other languages, as runners and rows exist.** JavaScript (7 development topics), then Perl (5), Java (3) and C (2), forward and reversed.
@@ -201,8 +200,8 @@ These steps follow the existing approach (stage order, runner core, required wit
 
 - This record was not checked by any command beyond `git` and the GitHub reads above. The run results are thread reports, backed by the tarballs where cited. The corpus case evidence exists only on RIG0.
 - Every Docker run is **unqualified (risk accepted)**. No `evidence: live` qualification follows from them.
-- Blockers: #109's owed fixes come before its merge and #113's. #117's items 10 and 11 gate the verdict rate. C1 and C2 stopped the one corpus case run so far at environment. Whether they stop the other 41 is unknown until those cases run. C4 is structural: no production adapter supplies the checkout listing yet, so every smoke baseline on the Docker route would be refused (review on #118).
-- Corpus accuracy has not been measured: 1 of 42 cases ran, and it ended ERROR at environment. Negative accuracy rests on one live fixture run (not_reproduced, admitted, 18:36Z), and the current mapping has only two negative cases, both of which need the fix-free runs PR (Al chose it at 18:34Z). See the section above.
+- Blockers: #109's owed fixes come before its merge and #113's. #117's items 10 and 11 gate the verdict rate. C1 and C2 stop every corpus case at environment until they are fixed.
+- Corpus accuracy has not been measured: 1 of 42 cases ran, and it ended ERROR at environment. Negative accuracy has not been measured at all: no live not_reproduced so far, and the current mapping has only two negative cases, both of which need the fix-free runs PR (Al chose it at 18:34Z). See the section above.
 
 ## Decisions and next steps
 
