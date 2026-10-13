@@ -34,9 +34,10 @@ from corsair.agents.test_authoring.tools import AuthoringBudget, AuthoringDepend
 from corsair.agents.test_planning.agent import PlanningDependencies, create_test_planning_agent, planning_prompt
 from corsair.agents.test_planning.contracts import EnvironmentEvidence, ReadyTestPlan, TestPlanningInput
 from corsair.core.disposition import AssessmentEvidence, EnvironmentIdentity, GateResult, ObservationPlan, assess
-from corsair.ports.test_runner import ApprovedPatch, NativeTestRun, TestRunner
+from corsair.nodes.witness import WitnessEvidence, witness_evidence
+from corsair.ports.test_runner import ApprovedPatch, NativeTestRun, TestRunner, WitnessRequest
 
-from .evidence import evidence_items, freeze, observation_plan, run_evidence
+from .evidence import evidence_items, freeze, observation_plan, run_evidence, witness_request
 
 Stage = Literal["identification", "planning", "authoring", "execution", "assessment"]
 AgentStage = Literal["identification", "planning", "authoring", "assessment"]
@@ -90,6 +91,8 @@ class FixtureCase:
     environment_identity: EnvironmentIdentity
     # Operator-known digest of each revision's captured source; a run from any other source is refused.
     revision_sources: dict[Literal["baseline", "candidate"], str]
+    # Operator-approved probe target and planned effect file; without it no witness is requested.
+    witness_envelope: WitnessRequest | None = None
 
 
 @dataclass(frozen=True)
@@ -123,6 +126,7 @@ class DirectRun:
     executions: tuple[FrozenExecution, ...] = ()
     gate: GateResult | None = None
     assessment: EvidenceAssessment | None = None
+    witnesses: tuple[WitnessEvidence, ...] = ()
     limitations: tuple[str, ...] = field(default=())
 
 
@@ -140,8 +144,8 @@ StageInvoker = Callable[[AgentStage, Any], Awaitable[StageAttempt]]
 
 class RevisionExecutor(Protocol):
     async def __call__(self, revision: Literal["baseline", "candidate"], patch: ApprovedPatch, *, control_test_id: str,
-                       security_test_id: str, discovery_command: tuple[str, ...],
-                       operation: UUID) -> NativeTestRun: ...
+                       security_test_id: str, discovery_command: tuple[str, ...], operation: UUID,
+                       witness: WitnessRequest | None = None) -> NativeTestRun: ...
 
 
 AGENTS = {"identification": create_issue_identification_agent, "planning": create_test_planning_agent,
@@ -174,10 +178,10 @@ async def _invoke(stage: Stage, agent: Agent[Any, Any], prompt: str, deps: Any, 
 
 
 # Recorded on every run that reaches the gates, because nothing below observes them.
-UNOBSERVED = ("No execution node captures the planned witness outside the test process, so every run's witness "
-              "is absent and the gates cannot admit a reproduced finding or a verified fix.",
-              "Sandbox policy and resource events are not observed by this composition; their absence is unknown, "
-              "not evidence that none occurred.",
+UNOBSERVED = ("The witness probe runs inside the test interpreter: it is operator-owned and tamper-evident, not "
+              "tamper-proof against hostile test code.",
+              "Sandbox events are observed only as permission errors raised on the witness path; policy or resource "
+              "events elsewhere are not observed.",
               "Environment identity is the operator's declaration for both revisions, not an observed image or "
               "dependency digest.")
 
@@ -249,12 +253,18 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         return stop("execution", f"patch not frozen: {exc}"[:2048], identification=identification, plan=plan,
                     patch=patch)
     executions = []
+    try:
+        request, unrequested = witness_request(identification, case.witness_envelope), ()
+    except ValueError as exc:
+        # No approved envelope covers the identified target: run without a witness and say so.
+        request, unrequested = None, (f"no witness requested: {exc}"[:512],)
     for revision in ("baseline", "candidate"):
         operation, observed, failure = new_operation(), None, None
         try:
             observed = await execute(revision, frozen, control_test_id=plan.control.test_id,
                                      security_test_id=plan.security.test_id,
-                                     discovery_command=plan.discovery_command, operation=operation)
+                                     discovery_command=plan.discovery_command, operation=operation,
+                                     witness=request)
         except Exception as exc:
             # A refused request (bad ids or patch) dispatched nothing; it is recorded, never retried.
             failure = exc
@@ -275,14 +285,25 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
 
     identity = case.environment_identity
     runs = {e.revision: (e.observed,) for e in executions}
-    evidence = AssessmentEvidence(plan=expected, baseline=(run_evidence(runs["baseline"][0], environment=identity),),
-                                  candidate=(run_evidence(runs["candidate"][0], environment=identity),))
+    witnesses = {e.revision: (witness_evidence(e.observed.witness, request, plan.security.test_id) if request else
+                              WitnessEvidence(None, None, "no witness was requested or captured for this run"))
+                 for e in executions}
+    done["witnesses"] = tuple(witnesses.values())
+
+    def gate_run(revision):
+        found = witnesses[revision]
+        return run_evidence(runs[revision][0], environment=identity, witness=found.witness,
+                            sandbox_events=found.sandbox_events)
+    evidence = AssessmentEvidence(plan=expected, baseline=(gate_run("baseline"),), candidate=(gate_run("candidate"),))
     gate = assess(evidence)
-    limitations = UNOBSERVED + tuple(f"{e.revision} workspace cleanup {e.observed.cleanup}"
-                                     for e in executions if e.observed.cleanup != "confirmed")
+    limitations = UNOBSERVED + unrequested + tuple(f"{revision} witness not admitted: {found.reason}"
+                                     for revision, found in witnesses.items() if found.witness is None) + tuple(
+        f"{e.revision} workspace cleanup {e.observed.cleanup}" for e in executions if e.observed.cleanup != "confirmed")
     try:
         assessment_input = AssessmentInput(scope=issue.scope, evidence=evidence,
-                                           items=evidence_items(expected, patch, identity, runs))
+                                           items=evidence_items(expected, patch, identity, runs, admitted={
+                                               revision for revision, found in witnesses.items()
+                                               if found.witness is not None}))
     except ValueError as exc:
         return stop("assessment", f"assessment input refused: {exc}"[:2048], gate=gate, limitations=limitations,
                     **done)

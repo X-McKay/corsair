@@ -34,7 +34,9 @@ from corsair.core.disposition import (AssessmentEvidence, Disposition, Environme
                                       SandboxEvent, Witness, assess)
 from corsair.ports.execution import ExecutionReceipt
 from corsair.ports.sandbox import SandboxHandle
-from corsair.ports.test_runner import Discovery, Execution, NativeTestRun
+from corsair.nodes.witness import PROBE_SHA256, witness_evidence
+from corsair.ports.artifacts import ArtifactRef
+from corsair.ports.test_runner import Discovery, Execution, NativeTestRun, WitnessCapture, WitnessRequest
 from corsair.reports.junit import parse_junit
 from evals.fixture_e2e.case import (fixture_case, reviewed_runners, scripted_assessment, scripted_authoring,
                                     scripted_identification, scripted_planning)
@@ -48,10 +50,8 @@ WORKSPACE = "/workspace"
 SITE = "/usr/lib/python3.12/site-packages"
 CONTROL = f"{REVIEWED_TEST}::test_benign_control"
 SECURITY = f"{REVIEWED_TEST}::test_security_rejects_outside_read"
-# Digest of the SPEC-0033 witness_probe.py whose record format is mirrored here as text
-# (claude/witness-capture-mqx96l at 391682e); nothing from that branch is imported.
-PROBE_SHA256 = "2c2c8b5e2138b8e635cd0eb041c080ddbe6fdfdce9352abd224bbf964b720dcf"
-DENIALS = (1, 13)  # EPERM, EACCES
+# The operator envelope the E2E-0 case approves; witness items are mapped by the real SPEC-0033 node.
+ENVELOPE = WitnessRequest("documents.py", "read_document", "outside.txt")
 Revision = Literal["baseline", "candidate"]
 Variant = Literal["vulnerable", "fixed"]
 
@@ -181,7 +181,8 @@ def chain(*transforms: Callable[[str], str]) -> Callable[[str], str]:
 
 
 def _test_record(entered=1, exits=(None,), opens=(), os_errors=()) -> dict:
-    return {"entered": entered, "exits": list(exits), "opens": list(opens), "os_errors": list(os_errors),
+    opens = [{"path": path, "planned": path.rsplit("/", 1)[-1] == ENVELOPE.effect_name} for path in opens]
+    return {"entered": entered, "exits": list(exits), "opens": opens, "os_errors": list(os_errors),
             "truncated": False, "complete": True}
 
 
@@ -251,20 +252,20 @@ def native_run(run: Run, operation: UUID) -> NativeTestRun:
 def probe_record(security: dict, nonce: str) -> dict:
     """The SPEC-0033 ``corsair-witness-v1`` record the operator probe writes for one run."""
     return {"schema": "corsair-witness-v1", "nonce": nonce, "plugin_sha256": PROBE_SHA256,
-            "target": {"path": "documents.py", "symbol": "read_document"}, "tool_registered": True, "intact": True,
+            "target": {"path": ENVELOPE.target_path, "symbol": ENVELOPE.target_symbol,
+                       "effect_name": ENVELOPE.effect_name}, "tool_registered": True, "intact": True,
             "tests": {CONTROL: CONTROL_RECORD, SECURITY: security}}
 
 
 def witness_of(record: dict) -> Witness:
-    """The gate witness the SPEC-0033 mapping derives from an admitted record's security call phase."""
-    test = record["tests"][SECURITY]
-    denials = [e for e in test["os_errors"] if e["errno"] in DENIALS]
-    effect = ("unknown" if test["opens"] and len(denials) < len(test["os_errors"])
-              else "observed" if test["opens"] else "absent")
-    exits = set(test["exits"])
-    only = next(iter(exits)) if test["entered"] and not test["truncated"] and len(exits) == 1 else None
-    return Witness(artifact_sha256=sha256(json.dumps(record, sort_keys=True).encode()).hexdigest(),
-                   path_reached=test["entered"] > 0 or bool(test["opens"]), effect=effect, safe_behavior=only)
+    """The gate witness the SPEC-0033 node maps from this record; a refused record is a builder error."""
+    data = json.dumps(record, sort_keys=True).encode()
+    capture = WitnessCapture("captured", ENVELOPE, record["nonce"], PROBE_SHA256, data,
+                             ArtifactRef(sha256(data).hexdigest(), len(data)), "", None)
+    mapped = witness_evidence(capture, ENVELOPE, SECURITY)
+    if mapped.witness is None:
+        raise ValueError(f"probe record refused: {mapped.reason}")
+    return mapped.witness
 
 
 def _item(item_id: str, kind: str, content: str, revision: Revision | None = None, run: int | None = None):

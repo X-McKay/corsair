@@ -38,7 +38,8 @@ from corsair.composition.direct import (
     AGENTS, AgentStage, CompositionBudget, DirectRun, FixtureCase, Purpose, RecordedFailure, Runners, Stage,
 )
 from corsair.core.disposition import GateResult, ObservationPlan
-from corsair.ports.test_runner import ApprovedPatch, NativeTestRun
+from corsair.nodes.witness import WitnessEvidence
+from corsair.ports.test_runner import ApprovedPatch, NativeTestRun, WitnessRequest
 
 I = TypeVar("I")
 O = TypeVar("O")
@@ -85,6 +86,7 @@ class RevisionRequest(BaseModel):
     security_test_id: str
     discovery_command: tuple[str, ...]
     operation: UUID
+    witness: WitnessRequest | None = None
 
 
 class RevisionRun(BaseModel):
@@ -133,6 +135,7 @@ class ChainResult:
     executions: tuple[ExecutionRecord, ...] = ()
     gate: GateResult | None = None
     assessment: EvidenceAssessment | None = None
+    witnesses: tuple[WitnessEvidence, ...] = ()
     limitations: tuple[str, ...] = ()
 
 
@@ -161,7 +164,8 @@ def chain_result(run: DirectRun) -> ChainResult:
         identification=run.identification, plan=run.plan, patch=run.patch, observation_plan=run.observation_plan,
         executions=tuple(ExecutionRecord(revision=e.revision, operation=e.operation, observed=e.observed,
                                          failure=failure(e.failure)) for e in run.executions),
-        gate=run.gate, assessment=run.assessment, limitations=run.limitations)
+        gate=run.gate, assessment=run.assessment, witnesses=run.witnesses,
+        limitations=run.limitations)
 
 
 def within(budget: CompositionBudget, ceiling: CompositionBudget) -> bool:
@@ -277,5 +281,5 @@ async def execute_revision(request: RevisionRequest) -> RevisionRun:
     observed = await asyncio.to_thread(
         runner.run, request.patch, control_test_id=request.control_test_id,
         security_test_id=request.security_test_id, discovery_command=request.discovery_command,
-        operation=request.operation)
+        operation=request.operation, witness=request.witness)
     return RevisionRun(observed=observed)

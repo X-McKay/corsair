@@ -12,7 +12,7 @@ Native Pydantic Evals over the whole E2E-0 composition ([SPEC-0031](../../docs/d
 | `both_fixed` | fixed → fixed | completed / inconclusive / not_verified | completed / not_reproduced / not_verified |
 | `source_absent` | issue without `documents.py` | stops at identification | unchanged |
 
-On main no execution node captures the witness, so every completed variant stops at the same gate triple and the dataset does not yet discriminate between variants; each oracle records `with_witness` and the `witness_dependent` fields that change.
+Every revision run carries the SPEC-0033 operator probe, so the gate admits a reproduced finding or verified fix only from an admitted witness, and the variants are discriminated by it.
 
 The task builds a `FixtureCase` like `evals/fixture_e2e/case.py` with the case's mapping and its own runner factory over `ReviewedWorkspace`/`ReviewedLocalExecution`, then awaits the injected composition `run(case, models, runners, budget)`, `run_direct` by default; durable mode passes another coroutine with the same signature. Assertions: `stopped_as_expected`, `gate_matches`, `assessment_admitted`, `proposal_matches_gate`; per-stage requests, tool calls, tokens, output corrections and elapsed seconds are recorded as attributes.
 

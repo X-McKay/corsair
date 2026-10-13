@@ -1,4 +1,4 @@
-name: fixture-chain-v1
+name: fixture-chain-v2
 cases:
 - name: vulnerable_to_fixed
   inputs:
@@ -11,16 +11,9 @@ cases:
     stopped_at: null
     gate:
       execution: completed
-      finding: inconclusive
-      fix: not_verified
-    assessment_admitted: true
-    with_witness:
-      execution: completed
       finding: reproduced
       fix: verified
-    witness_dependent:
-    - finding
-    - fix
+    assessment_admitted: true
   expected_output: null
   evaluators: []
 - name: fixed_to_vulnerable
@@ -34,15 +27,9 @@ cases:
     stopped_at: null
     gate:
       execution: completed
-      finding: inconclusive
-      fix: not_verified
-    assessment_admitted: true
-    with_witness:
-      execution: completed
       finding: not_reproduced
       fix: not_verified
-    witness_dependent:
-    - finding
+    assessment_admitted: true
   expected_output: null
   evaluators: []
 - name: both_vulnerable
@@ -56,15 +43,9 @@ cases:
     stopped_at: null
     gate:
       execution: completed
-      finding: inconclusive
-      fix: not_verified
-    assessment_admitted: true
-    with_witness:
-      execution: completed
       finding: reproduced
       fix: not_verified
-    witness_dependent:
-    - finding
+    assessment_admitted: true
   expected_output: null
   evaluators: []
 - name: both_fixed
@@ -78,15 +59,9 @@ cases:
     stopped_at: null
     gate:
       execution: completed
-      finding: inconclusive
-      fix: not_verified
-    assessment_admitted: true
-    with_witness:
-      execution: completed
       finding: not_reproduced
       fix: not_verified
-    witness_dependent:
-    - finding
+    assessment_admitted: true
   expected_output: null
   evaluators: []
 - name: source_absent
@@ -100,8 +75,6 @@ cases:
     stopped_at: identification
     gate: null
     assessment_admitted: null
-    with_witness: null
-    witness_dependent: []
   expected_output: null
   evaluators: []
 evaluators: []

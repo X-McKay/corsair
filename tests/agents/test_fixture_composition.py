@@ -16,6 +16,7 @@ from corsair.agents.test_authoring.contracts import BlockedAuthoring, TestPatch
 from corsair.composition.direct import UNOBSERVED, StageModels, run_direct
 from corsair.composition.evidence import freeze, observation_plan, run_evidence
 from corsair.core.disposition import AssessmentEvidence, Disposition, Witness, assess
+from corsair.ports.test_runner import WitnessRequest
 from evals.fixture_e2e.case import (
     SECURITY_ASSERTION_LINES, fixture_case, reviewed_runners, scripted_assessment, scripted_authoring,
     scripted_identification, scripted_planning,
@@ -44,9 +45,20 @@ def stages(**overrides):
     return StageModels(**(values | overrides))
 
 
-def compose(store, root, **overrides):
+class WithoutWitness:
+    """An execution node that captures no witness: the probe request is dropped before the runner."""
+    def __init__(self, runner):
+        self.runner = runner
+
+    def run(self, patch, *, witness=None, **values):
+        return self.runner.run(patch, **values)
+
+
+def compose(store, root, witnessed=True, **overrides):
     (root / "work").mkdir()
-    return asyncio.run(run_direct(fixture_case(), stages(**overrides), reviewed_runners(store, root / "work")))
+    runners = reviewed_runners(store, root / "work")
+    factory = runners if witnessed else (lambda purpose: WithoutWitness(runners(purpose)))
+    return asyncio.run(run_direct(fixture_case(), stages(**overrides), factory))
 
 
 def prompts(run):
@@ -55,7 +67,7 @@ def prompts(run):
 
 
 def test_stages_compose_to_a_gate_verdict_that_stays_inconclusive_without_a_witness(store, tmp_path):
-    run = compose(store, tmp_path)
+    run = compose(store, tmp_path, witnessed=False)
     assert (run.stopped_at, run.reason) == (None, "complete")
     assert [a.stage for a in run.attempts] == ["identification", "planning", "authoring", "assessment"]
     assert all(a.failure is None for a in run.attempts)
@@ -89,34 +101,41 @@ def test_stages_compose_to_a_gate_verdict_that_stays_inconclusive_without_a_witn
         ("witness_missing", "baseline"), ("witness_missing", "candidate"), ("no_valid_run", "baseline"),
         ("baseline_not_reproduced", "candidate")}
     assert run.assessment.admission.admitted and run.assessment.disposition == gate.permitted
-    assert run.limitations == UNOBSERVED
+    assert run.limitations == UNOBSERVED + tuple(f"{revision} witness not admitted: no witness was requested or "
+                                                 "captured for this run" for revision in ("baseline", "candidate"))
 
     # Agents never see which variant is which.
     assert not any(label in prompt for prompt in prompts(run) for label in ("vulnerable", "fixed"))
 
 
 def test_an_over_claim_is_rejected_and_the_gate_verdict_stands(store, tmp_path):
-    run = compose(store, tmp_path, assessment=scripted_assessment(finding="reproduced", fix="verified"))
+    run = compose(store, tmp_path, witnessed=False,
+                  assessment=scripted_assessment(finding="reproduced", fix="verified"))
     admission = run.assessment.admission
     assert not admission.admitted and admission.disposition == run.gate.permitted
     assert admission.rejections == ("finding reproduced exceeds permitted inconclusive",
                                     "fix verified exceeds permitted not_verified")
 
 
-def test_the_witness_is_the_only_missing_gate_input(store, tmp_path):
-    """Gate check only: a witness the execution node would capture is supplied here, never by the composition."""
-    run = compose(store, tmp_path)
-    baseline, candidate = (e.observed for e in run.executions)
-    identity = fixture_case().environment_identity
-    reached = Witness(artifact_sha256="0" * 64, path_reached=True, effect="observed")
-    rejected = Witness(artifact_sha256="1" * 64, path_reached=True, effect="absent", safe_behavior="ValueError")
-    evidence = AssessmentEvidence(plan=run.observation_plan,
-                                  baseline=(run_evidence(baseline, environment=identity, witness=reached, sandbox_events=()),),
-                                  candidate=(run_evidence(candidate, environment=identity, witness=rejected,
-                                                          sandbox_events=()),))
-    result = assess(evidence)
-    assert result.permitted == Disposition(execution="completed", finding="reproduced", fix="verified")
-    assert result.limitations == ()
+def test_the_probe_witness_lets_the_gate_reach_reproduced_and_verified(store, tmp_path):
+    """The real operator probe runs in both revisions' interpreters; its records are the only new gate input."""
+    run = compose(store, tmp_path, assessment=scripted_assessment(finding="reproduced", fix="verified"))
+    baseline, candidate = (w.witness for w in run.witnesses)
+    assert (baseline.path_reached, baseline.effect, baseline.safe_behavior) == (True, "observed", None)
+    assert (candidate.path_reached, candidate.effect, candidate.safe_behavior) == (True, "absent", "ValueError")
+    for execution, found in zip(run.executions, run.witnesses):
+        captured = execution.observed.witness
+        assert found.sandbox_events == () and captured.status == "captured"
+        assert baseline is not None and store.get(captured.artifact) == captured.record
+        assert captured.receipt.operation == str(uuid5(execution.operation, "witness"))
+    gate = run.gate
+    assert gate.permitted == Disposition(execution="completed", finding="reproduced", fix="verified")
+    assert {(r.revision, r.classification) for r in gate.runs} == {("baseline", "reproduces"), ("candidate", "safe")}
+    assert gate.limitations == () and run.limitations == UNOBSERVED
+    assert run.assessment.admission.admitted and run.assessment.disposition == gate.permitted
+    # The assessor may read each record as its own item; the variant names never reach it.
+    assert any("baseline-0-witness (kind witness" in prompt for prompt in prompts(run))
+    assert not any(label in prompt for prompt in prompts(run) for label in ("vulnerable", "fixed"))
 
 
 def test_handoff_builders_refuse_a_patch_that_is_not_this_plan(store, tmp_path):
@@ -215,3 +234,18 @@ def test_journal_keeps_a_refused_development_run(store, tmp_path):
     observed = entry["observed"]
     assert observed["failure_layer"] == "workspace" and observed["cleanup"] == "unconfirmed"
     assert "reviewed SPEC-0018" in observed["detail"]
+
+
+@pytest.mark.parametrize("envelope, reason", [
+    (None, "the operator approved no witness envelope for this case"),
+    (WitnessRequest("documents.py", "other_function", "outside.txt"),
+     "the identified target is outside the operator witness envelope")])
+def test_a_target_outside_the_operator_envelope_runs_without_a_witness(store, tmp_path, envelope, reason):
+    """No conclusive witness outside an operator-approved target and effect; the chain still completes."""
+    (tmp_path / "work").mkdir()
+    case = replace(fixture_case(), witness_envelope=envelope)
+    run = asyncio.run(run_direct(case, stages(), reviewed_runners(store, tmp_path / "work")))
+    assert run.stopped_at is None and all(e.observed.witness is None for e in run.executions)
+    assert run.gate.permitted == Disposition(execution="completed", finding="inconclusive", fix="not_verified")
+    assert f"no witness requested: {reason}" in run.limitations
+    assert not any("witness (kind witness" in prompt for prompt in prompts(run))

@@ -4,7 +4,7 @@ kind: spec
 title: Assessment and chain evaluation sets with durable chain mode
 status: draft
 updated: 2026-10-13
-related: [IDEA-0004, SPEC-0013, SPEC-0015, SPEC-0018, SPEC-0023, SPEC-0027, SPEC-0030, SPEC-0031, PLAN-0029, PLAN-0031, PLAN-0037]
+related: [IDEA-0004, SPEC-0013, SPEC-0015, SPEC-0018, SPEC-0023, SPEC-0027, SPEC-0030, SPEC-0031, SPEC-0033, PLAN-0029, PLAN-0031, PLAN-0037]
 ---
 
 # Assessment and chain evaluation sets with durable chain mode

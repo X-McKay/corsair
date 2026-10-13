@@ -58,9 +58,6 @@ class ChainOracle(BaseModel):
     stopped_at: Stage | None
     gate: Disposition | None
     assessment_admitted: bool | None
-    # The gate triple once SPEC-0033 witness capture lands; only these fields are expected to change.
-    with_witness: Disposition | None = None
-    witness_dependent: tuple[Literal["finding", "fix"], ...] = ()
 
 
 class StageEfficiency(BaseModel):
@@ -126,7 +123,8 @@ def chain_runners(store, root: Path, revisions: dict[Purpose, Variant]):
     def runner(purpose):
         workspace = root / purpose
         return PytestRunner(ReviewedWorkspace(store, workspace, revisions[purpose]), ReviewedLocalExecution(workspace),
-                            store, PytestRunnerConfig(PREFIX, ".corsair-junit.xml", str(workspace)))
+                            store, PytestRunnerConfig(PREFIX, ".corsair-junit.xml", str(workspace),
+                                                      witness_record_path=".corsair-witness.json"))
     return runner
 
 
