@@ -66,6 +66,7 @@ Launch the client from the repository. Codex supports repository `.agents/skills
 | Plan/implement/resume | `$corsair-development` | `/corsair-development` |
 | Review design/code/evidence | `$corsair-review` | `/corsair-review` |
 | Prepare continuation | `$corsair-handoff` | `/corsair-handoff` |
+| Add or register a toolchain base image | `$corsair-base-image` | `/corsair-base-image` |
 
 Clients can also select skills from their descriptions. If an already-running session does not discover newly added skills, start a fresh session or explicitly read the `SKILL.md` file. Missing symlink support should be fixed in the checkout, not by maintaining duplicated instructions. Claude imports `AGENTS.md` through `@AGENTS.md`; Codex reads it natively.
 
