@@ -107,7 +107,11 @@ def test_admission_refuses_unconfigured_keys_and_budgets_before_any_request(tmp_
     cases = [(("other",), ceiling, "ModelKeyNotAdmitted"), (("scripted",), over, "BudgetNotAdmitted"),
              (("scripted",), ceiling.model_copy(update={"dev_runs": 4}), "BudgetNotAdmitted"),
              (("scripted",), ceiling.model_copy(update={"output_retries": 0}), "BudgetNotAdmitted"),
-             (("scripted",), ceiling.model_copy(update={"admission_refusals": 2}), "BudgetNotAdmitted")]
+             (("scripted",), ceiling.model_copy(update={"admission_refusals": 2}), "BudgetNotAdmitted"),
+             # Codex review on 78f1690: the derivation terms are operator-owned like the caps.
+             *((("scripted",), ceiling.model_copy(update={"authoring": ceiling.authoring.model_copy(
+                 update={term: getattr(ceiling.authoring, term) + 1})}), "BudgetNotAdmitted")
+               for term in ("slack_tool_calls", "tokens_per_request"))]
     for keys, budget, kind in cases:
         with pytest.raises(ApplicationError) as refusal:
             _admit(keys, budget)

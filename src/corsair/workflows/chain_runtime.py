@@ -176,8 +176,9 @@ def chain_result(run: DirectRun) -> ChainResult:
 
 
 def within(budget: CompositionBudget, ceiling: CompositionBudget) -> bool:
-    """Every stage cap at most the operator's; output retries are fixed when the agents are built."""
-    caps = ("request_limit", "tool_calls_limit", "total_tokens_limit", "timeout_seconds")
+    """Every stage cap and derivation term at most the operator's; output retries are fixed when the agents are built."""
+    caps = ("request_limit", "tool_calls_limit", "total_tokens_limit", "timeout_seconds", "slack_tool_calls",
+            "tokens_per_request")
     return (isinstance(budget, CompositionBudget) and budget.dev_runs <= ceiling.dev_runs
             and budget.admission_refusals <= ceiling.admission_refusals
             and budget.output_retries == ceiling.output_retries

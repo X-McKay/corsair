@@ -78,6 +78,16 @@ def _aliases(tree: ast.Module) -> dict[str, str]:
         elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
             for alias in node.names:
                 bound[alias.asname or alias.name] = f"{node.module}.{alias.name}"
+    # Simple local rebindings resolve too: target = documents; target.open = f writes documents.open.
+    rebinds = [(node.targets[0] if isinstance(node, ast.Assign) else node.target, node.value) for node in ast.walk(tree)
+               if (isinstance(node, ast.Assign) and len(node.targets) == 1) or (
+                   isinstance(node, (ast.AnnAssign, ast.NamedExpr)) and node.value is not None)]
+    rebinds = [(target.id, value) for target, value in rebinds if isinstance(target, ast.Name)]
+    for _ in range(len(rebinds)):  # Each pass resolves at least one more link of a chain; d = d.child stays bounded.
+        resolved = {name: path for name, value in rebinds if (path := _module_path(value, bound))}
+        if all(bound.get(name) == path for name, path in resolved.items()):
+            break
+        bound.update(resolved)
     return bound
 
 
@@ -215,6 +225,11 @@ def self_observation(content: str) -> tuple[AdmissionFinding, ...]:
                     named = next((n.value for n in names if isinstance(n, ast.Constant) and isinstance(n.value, str)), None)
                     if _protected(patched) or (not literal and patched and named in PATCHED and not _unobserved(patched)):
                         refuse(node, f"{func}({patched})")
+                        break
+                    # A computed member name hides what is patched: name = "open"; setattr(documents, name, f).
+                    if name in {"setattr", "delattr"} and not literal and names and named is None and not _unobserved(
+                            patched):
+                        refuse(node, f"{func}(computed name)")
                         break
             elif isinstance(node.func, ast.Attribute) and node.func.attr in MUTATORS:
                 receiver = _module_path(node.func.value, aliases)

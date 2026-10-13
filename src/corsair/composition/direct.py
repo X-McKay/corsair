@@ -134,20 +134,22 @@ def cap_reached(limits: StageLimits | None, usage: RunUsage | None) -> bool:
     return limits is not None and usage is not None and usage.tool_calls >= limits.tool_calls_limit
 
 
-def exhaustion(stage: "AgentStage", limits: StageLimits,
-               failure: BaseException | None) -> BudgetExhausted | None:
+def exhaustion(stage: "AgentStage", limits: StageLimits, failure: BaseException | None, *,
+               deadline: bool = False) -> BudgetExhausted | None:
     """Which cap ended a stage that returned no output; None when it failed for another reason.
 
     Only the native limit errors are evidence of a cap: a call to a tool withdrawn at the cap is refused by
     PydanticAI as UsageLimitExceeded naming tool_calls_limit. Every other failure, an UnexpectedModelBehavior
     after the cap included (spent output retries or a malformed provider response), keeps its own
-    classification; whether the cap was reached is recorded separately as tool_cap_reached.
+    classification; whether the cap was reached is recorded separately as tool_cap_reached. A TimeoutError is
+    the stage's ``timeout_seconds`` only when ``deadline`` says the stage's own deadline fired: a provider, tool
+    or activity timeout inside the stage stays that layer's failure.
     """
     if failure is None:
         return None
     kind = failure.kind if isinstance(failure, RecordedFailure) else type(failure).__name__
     limit: Limit | None = None
-    if kind == "TimeoutError":
+    if kind == "TimeoutError" and deadline:
         limit = "timeout_seconds"
     elif kind == "UsageLimitExceeded":
         limit = next((name for name in ("tool_calls_limit", "total_tokens_limit", "request_limit")
@@ -263,14 +265,15 @@ def stage_call(stage: AgentStage, inputs: Any, budget: CompositionBudget, runner
 async def _invoke(stage: AgentStage, agent: Agent[Any, Any], prompt: str, deps: Any, limits: StageLimits) -> StageAttempt:
     usage, messages, output, failure = RunUsage(), [], None, None
     started = perf_counter()
+    deadline = asyncio.timeout(limits.timeout_seconds)
     try:
         with capture_run_messages() as messages:
-            async with asyncio.timeout(limits.timeout_seconds):
+            async with deadline:
                 output = (await agent.run(prompt, deps=deps, usage=usage, usage_limits=limits.usage_limits())).output
     except Exception as exc:
         failure = exc
     return StageAttempt(stage, output, usage, tuple(messages), perf_counter() - started, failure, limits,
-                        exhaustion(stage, limits, failure))
+                        exhaustion(stage, limits, failure, deadline=deadline.expired()))
 
 
 # Recorded on every run that reaches the gates, because nothing below observes them.

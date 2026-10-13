@@ -313,7 +313,10 @@ def test_a_stage_ending_on_its_cap_is_a_typed_budget_exhaustion(store, tmp_path)
     assert (authoring.exhausted.limit, authoring.exhausted.cap) == ("request_limit", 2)
     assert run.reason.startswith("authoring budget exhausted: request_limit 2 (derived from 2 read windows")
     assert exhaustion("planning", authoring.limits, ValueError("x")) is None
-    assert exhaustion("planning", authoring.limits, RecordedFailure("TimeoutError", "late")).limit == \
+    # Codex review on 78f1690: only the stage's own deadline is its timeout budget; a provider, tool or activity
+    # timeout inside the stage keeps its own classification.
+    assert exhaustion("planning", authoring.limits, RecordedFailure("TimeoutError", "late")) is None
+    assert exhaustion("planning", authoring.limits, RecordedFailure("TimeoutError", "late"), deadline=True).limit == \
         "timeout_seconds"
 
 

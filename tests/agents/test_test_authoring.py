@@ -469,6 +469,14 @@ def test_tools_are_withdrawn_at_the_tool_call_cap_and_the_author_returns_its_out
     ("import sys\nimport types\nsys.modules.update({'app.dep': types.ModuleType('app.dep')})\n", "sys.modules.update()"),
     ("import sys\nsys.modules.setdefault('app.dep', None)\n", "sys.modules.setdefault()"),
     ("import sys\nsys.modules.pop('app.dep')\n", "sys.modules.pop()"),
+    # Codex review on 78f1690: a computed member name, and a module reached through a local rebinding.
+    ("import documents\n\ndef test_x(monkeypatch):\n    name = 'open'\n    monkeypatch.setattr(documents, name, print)\n",
+     "monkeypatch.setattr(computed name)"),
+    ("import documents\n\ndef test_x(monkeypatch):\n    d = documents\n    monkeypatch.setattr(d, 'open', print)\n",
+     "monkeypatch.setattr(documents)"),
+    ("import documents as x\nd = x\ne = d\ne.subprocess = None\n", "assign documents.subprocess"),
+    ("import documents\n\ndef test_x(monkeypatch):\n    if (d := documents):\n        monkeypatch.setattr(d, 'open', print)\n",
+     "monkeypatch.setattr(documents)"),
 ])
 def test_aliased_and_direct_patches_of_observed_facilities_are_found(content, facility):
     """Review on #49: aliases of protected modules and plain assignments must not bypass admission."""
@@ -483,6 +491,10 @@ def test_rebinding_a_local_name_or_setting_the_environment_is_not_a_patch():
     assert self_observation("c = object()\nc.open = 1\npayload = {}\npayload['os'] = 'linux'\npayload['open'] = True\n"
                             "def test_x(monkeypatch, fake):\n    monkeypatch.setattr(fake, 'open', 1)\n") == ()
     assert self_observation("import os\nimport app.mod as m\nos.environ.update({'A': '1'})\nm.os.environ.update({})\n") == ()
+    # Objects built by a call stay local; environment keys may be computed.
+    assert self_observation("import documents\nc = documents.Client()\nc.open = 1\n\ndef test_x(monkeypatch):\n"
+                            "    k = 'HOME'\n    monkeypatch.setitem(documents.os.environ, k, '/tmp')\n"
+                            "    monkeypatch.setattr('documents.LIMIT', k)\n") == ()
 
 
 @pytest.mark.parametrize("deferred", [

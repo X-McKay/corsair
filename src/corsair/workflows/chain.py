@@ -20,6 +20,7 @@ from uuid import uuid4
 from temporalio import workflow
 from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError, ApplicationError, ChildWorkflowError
+from temporalio.exceptions import TimeoutError as TemporalTimeoutError
 from temporalio.workflow import ActivityConfig
 
 with workflow.unsafe.imports_passed_through():
@@ -144,8 +145,10 @@ class ChainInvestigation:
             except ChildWorkflowError as exc:
                 # Timed out or failed without returning: usage and messages were not observed here.
                 failure = recorded(exc)
+                # Only the child's own execution timeout is the stage deadline.
                 return StageAttempt(stage, None, None, (), workflow.time() - started, failure, limits,
-                                    exhaustion(stage, limits, failure))
+                                    exhaustion(stage, limits, failure,
+                                               deadline=isinstance(exc.cause, TemporalTimeoutError)))
             failure = record.failure and RecordedFailure(record.failure.kind, record.failure.message)
             return StageAttempt(stage, record.output, record.usage, record.messages, workflow.time() - started,
                                 failure, limits, exhaustion(stage, limits, failure))
