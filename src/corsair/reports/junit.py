@@ -47,12 +47,8 @@ def _failure(kind: str, element: ET.Element, root: str, test_paths: frozenset[st
     return FailureDetail(kind, exception_type, path, function, line, message[:MAX_MESSAGE_CHARS])
 
 
-def parse_junit(data: bytes, test_ids: tuple[str, ...], *, root: str, test_paths: frozenset[str],
-                max_bytes: int = MAX_JUNIT_BYTES) -> tuple[TestCaseResult, ...]:
-    """Exactly one testcase per expected id, in the given order; anything else is invalid.
-
-    `root` is the operator-known absolute workspace directory, stripped from native frame paths.
-    """
+def admit_xml(data: bytes, max_bytes: int) -> ET.Element:
+    """Bounded UTF-8 XML without any markup declaration (so no entity expansion), parsed by the stdlib."""
     if type(data) is not bytes or not 1 <= len(data) <= max_bytes:
         raise JUnitError('JUnit report outside the admitted byte envelope')
     try:
@@ -62,13 +58,22 @@ def parse_junit(data: bytes, test_ids: tuple[str, ...], *, root: str, test_paths
     # Refuse every declaration (DOCTYPE, ENTITY, ...) before expat sees it: no entity expansion.
     if re.search(r'<!(?!--|\[CDATA\[)', text):
         raise JUnitError('JUnit report contains a markup declaration')
+    try:
+        return ET.fromstring(data)
+    except ET.ParseError as error:
+        raise JUnitError(f'Malformed JUnit report: {error}') from error
+
+
+def parse_junit(data: bytes, test_ids: tuple[str, ...], *, root: str, test_paths: frozenset[str],
+                max_bytes: int = MAX_JUNIT_BYTES) -> tuple[TestCaseResult, ...]:
+    """Exactly one testcase per expected id, in the given order; anything else is invalid.
+
+    `root` is the operator-known absolute workspace directory, stripped from native frame paths.
+    """
     keys = {junit_key(test_id): test_id for test_id in test_ids}
     if len(keys) != len(test_ids):
         raise JUnitError('Expected test ids are ambiguous in JUnit')
-    try:
-        tree = ET.fromstring(data)
-    except ET.ParseError as error:
-        raise JUnitError(f'Malformed JUnit report: {error}') from error
+    tree = admit_xml(data, max_bytes)
     if tree.tag not in ('testsuites', 'testsuite'):
         raise JUnitError('Unexpected JUnit root element')
     results = {}
