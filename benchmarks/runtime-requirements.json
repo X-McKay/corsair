@@ -1,6 +1,29 @@
 {
  "schema_version": 1,
  "spec": "SPEC-0042",
+ "inputs": {
+  "detector": "sha256:a1553ecfc8e92ec75da095e436e1e941b093d3c3f867cebf07cf887573b478fd",
+  "matrix": "sha256:cc26c8a2f1b18793493124594f7b9e2b4eb3322e45aa8d6ffbcda065f980de3f",
+  "pins": "sha256:25452710a9f0ee21cf7fbfa8b8ed4171ceebeda049f63bb98d88d5b1890be8c2",
+  "inventory": "sha256:8d0f8159580d0a38fb9c6806f5f32aa9f73ceee046b55451e55a2a211fc521c8",
+  "parents": {
+   "org.apache.commons:commons-parent:42": "sha256:cd313494c670b483ec256972af1698b330e598f807002354eb765479f604b09c",
+   "org.apache.struts:struts-master:10": "sha256:4dc1ba58664d7da95b2562661dcb091dedaa431967e508dc35a92c7721fe3e26",
+   "org.apache.struts:struts-master:9": "sha256:0d4cf46b44157cf23e5d7f4cce01c073bd8bb775913b7f7ad971f2b5f4fe3fe7",
+   "org.apache:apache:10": "sha256:802feece72852dafcbd0a425a60367c72c5cb9b6ea5aae59481128569189daf9",
+   "org.apache:apache:16": "sha256:9f85ff2fd7d6cb3097aa47fb419ee7f0ebe869109f98aba9f4eca3f49e74a40e",
+   "org.apache:apache:17": "sha256:398044b74b5a719326be218ae08124e5e2f3318ab5d78fe199d504efc2e0d43f",
+   "org.apache:apache:18": "sha256:7831307285fd475bbc36b20ae38e7882f11c3153b1d5930f852d44eda8f33c17",
+   "org.apache:apache:21": "sha256:af10c108da014f17cafac7b52b2b4b5a3a1c18265fa2af97a325d9143537b380",
+   "org.codehaus.plexus:plexus:3.3.1": "sha256:6ec96f889bc29250f90b167c14e547f1b05aa23565c63f9079595befbde816bb",
+   "org.jenkins-ci.plugins:plugin:1.596.1": "sha256:b757e360f04d6b80b0ad77ae3d01b2f2c72386dde367e3f1fb4e26450e4e8d90",
+   "org.jenkins-ci.plugins:plugin:2.15": "sha256:9a9f71879d60bded1fceb13b7b7ab1b6a8da9953848e90573a48bea7b221c60c",
+   "org.jenkins-ci:jenkins:1.34": "sha256:fb50e73a310686517d73f81de7f327f1af8c00e6db1180e1a7a6ef4ac3c99a5c",
+   "org.jvnet.hudson.plugins:analysis-pom:1.63": "sha256:0797dcd90cb6a2fd346df23add7f6290afdf7f8891761786c87c0ff62f274971",
+   "org.sonatype.forge:forge-parent:10": "sha256:c14fb9c32b59cc03251f609416db7c0cff01f811edcccb4f6a865d6e7046bd0b",
+   "org.sonatype.spice:spice-parent:17": "sha256:9151f9a5b33ec36ee8778842fc56144fb0242d39cbcc42061b053b8909969bdf"
+  }
+ },
  "results": [
   {
    "case_id": "VUL4J-2",

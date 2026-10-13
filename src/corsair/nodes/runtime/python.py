@@ -49,6 +49,9 @@ def _pytest(c: Collector, path: str, needle: str, spec: str | None, source: str)
 def _spec(c: Collector, table: dict, path: str) -> str | None:
     """The pytest requirement in a Pipfile or Poetry dependency table: a string, or a table's `version` string."""
     value = typed(c, table, 'pytest', (str, dict), FRAMEWORK, path, 'pytest')
+    if isinstance(value, dict) and 'version' not in value:  # a git, path or url source: its version is not declared
+        c.unparsed(*FRAMEWORK, path, 'pytest', f'pytest from a {"/".join(sorted(value))[:40]} source names no version')
+        return None
     return typed(c, value, 'version', str, FRAMEWORK, path, 'pytest') if isinstance(value, dict) else value
 
 
@@ -114,7 +117,8 @@ def detect(c: Collector) -> None:
         for name in list(groups):
             for entry in typed(c, groups, name, list, FRAMEWORK, here) or []:
                 if isinstance(entry, str): _requirement_lines(c, here, [entry], 'dependency-groups')
-                elif not (isinstance(entry, dict) and set(entry) == {'include-group'} and entry['include-group'] in groups):
+                elif not (isinstance(entry, dict) and set(entry) == {'include-group'} and isinstance(entry['include-group'], str)
+                                 and entry['include-group'] in groups):
                     c.unparsed(*FRAMEWORK, here, name, f'dependency-groups {name!r} entry {str(entry)[:40]!r} is not a requirement or include-group')
         uv = typed(c, tool, 'uv', dict, FRAMEWORK, here, '[tool.uv') or {}
         uv_dev = typed(c, uv, 'dev-dependencies', list, FRAMEWORK, here) or []

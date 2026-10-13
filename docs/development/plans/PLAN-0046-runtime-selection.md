@@ -26,7 +26,7 @@ Implement [SPEC-0042](../specs/SPEC-0042-runtime-selection.md) offline: detect e
 
 ## Validation and progress
 
-Offline: `make test-config` passed 892 checks on the original base (853 plus 37 runtime unit checks, 4 of them for the hand-off, and 2 matrix guards), 999 after merging main at `c8f3964` (with #41, #45 and #46), 1004 after the review fixes (5 more checks), 1024 after merging main at `8c29e16` (with #42), 1036 after merging `6be1b5f` (with #47), 1084 after merging `42a7273` (with #39), 1085 with image-scoped framework rows, 1088 after the second review's first three fixes, 1093 after merging `f6a87d6` (#58), and 1100 after the remaining seven threads.
+Offline: `make test-config` passed 892 checks on the original base (853 plus 37 runtime unit checks, 4 of them for the hand-off, and 2 matrix guards), 999 after merging main at `c8f3964` (with #41, #45 and #46), 1004 after the review fixes (5 more checks), 1024 after merging main at `8c29e16` (with #42), 1036 after merging `6be1b5f` (with #47), 1084 after merging `42a7273` (with #39), 1085 with image-scoped framework rows, 1088 after the second review's first three fixes, 1093 after merging `f6a87d6` (#58), 1100 after the remaining seven threads, 1174 after merging `8606068` (#57), and 1179 after the include-group fix and the Poetry source nit.
 
 Report run in the cloud container on 2026-10-13, against the pins file from PR #42's branch `claude/benchmark-repo-fetch-g6cnts` (head `4167369`):
 
@@ -121,6 +121,11 @@ The same re-review (posted from Al's account) added seven threads, all fixed wit
 - one unresolved version among a framework family's dependencies makes that family unread;
 - SPEC-0042's benchmark counts and the CURRENT.md row now match the report and say the hand-off is not yet called.
 The package.json `dependencies` thread repeated the earlier finding fixed in `20d34b6`.
+
+Al's re-review of `f61e948` confirmed those fixes and found one more: a PEP 735 `include-group` whose value is a list or table raised `TypeError` (unhashable) during the group-membership test instead of recording an unread entry. The value must now be a string naming an existing group; anything else is an unparsed pytest constraint, so selection is undetermined. Four parametrised checks (list, table, number, unknown name) cover it, two of which fail on the old code, and the malformed-metadata sweep now generates `dependency-groups`/`include-group` keys.
+The same review's nit is also taken: a Poetry `pytest = {git = ...}` (or path/url) entry with no `version` is an unread pytest constraint rather than any version. The report rerun over the stored trees gives identical results; only the detector digest in `inputs` changed.
+
+From the same review's non-blocking notes: the report JSON now carries an `inputs` header with SHA-256 digests of the detector source, the matrix, the pins file, the inventory and each supplied parent POM, so a rerun (for example on RIG0) can be compared input by input; results are unchanged. Not changed: requirement lines with environment markers (`pytest<5; python_version<"3"` beside `pytest>=8; python_version>="3"`) still intersect into a conflict and give undetermined. That fails closed; evaluating markers against each candidate row is left for when a benchmark case needs it (none of the 39 does).
 
 The CPython 3.7 image thread pointed out that per-language framework rows would let a 3.7 image claim pytest 9 (qualified only on 3.12) and the reverse. Framework rows took an `images` scope, with a selection check over two scoped pytest rows and loader refusals for overlap and foreign image ids; both toolchain threads were told by cross-session message.
 
