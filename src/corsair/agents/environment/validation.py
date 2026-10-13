@@ -89,6 +89,11 @@ async def finalize_environment(ctx: RunContext[EnvironmentDependencies], draft: 
             raise ModelRetry("the baseline run must report exactly one passed test, with nothing skipped, xfailed or errored")
         if set(draft.approved_test_paths) & {s.path for s in (*deps.inputs.source_files, *deps.inputs.smoke_tests)}:
             raise ModelRetry("approved_test_paths must not name saved source files or the smoke test")
+        if folders := [path for path in draft.approved_test_paths if not framework.test_file(path)]:
+            raise ModelRetry(f"approved_test_paths must be new test files {draft.framework} discovers by its default "
+                             f"convention, not directories or other files: {', '.join(folders[:3])}")
+        if deps.checkout_paths is not None and (existing := set(draft.approved_test_paths) & set(deps.checkout_paths)):
+            raise ModelRetry(f"approved_test_paths must be new files, not existing ones: {', '.join(sorted(existing)[:3])}")
         toolchain = next(t for t in deps.inputs.toolchains if t.toolchain_id == deps.toolchain_id)
         values |= {"recipe": [s.model_dump() | {"source": quoted(s.source)} for s in draft.recipe],
                    "toolchain_image": toolchain.image, "language": toolchain.language, "runtime": toolchain.runtime, "baseline_outcome": "passed", "scratch_location": deps.scratch_location,

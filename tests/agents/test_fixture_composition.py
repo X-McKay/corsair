@@ -426,7 +426,9 @@ def test_a_stage_ending_on_its_cap_is_a_typed_budget_exhaustion(store, tmp_path)
     assert run.stopped_at == "authoring" and authoring.output is None
     assert isinstance(authoring.exhausted, BudgetExhausted)
     assert (authoring.exhausted.limit, authoring.exhausted.cap) == ("request_limit", 2)
-    assert run.reason.startswith("authoring budget exhausted: request_limit 2 (derived from 2 read windows")
+    # The test's ceiling of 2 requests is below the derivation, and the reason says so (first corpus case review).
+    assert run.reason.startswith("authoring budget exhausted: request_limit 2 (the operator's ceiling, below the "
+                                 "derivation from 2 read windows")
     assert exhaustion("planning", authoring.limits, ValueError("x")) is None
     # Codex review on 78f1690: only the stage's own deadline is its timeout budget; a provider, tool or activity
     # timeout inside the stage keeps its own classification.
@@ -478,3 +480,13 @@ def test_an_attempt_records_reaching_its_tool_cap_whatever_ended_it(store, tmp_p
     (tmp_path / "work").mkdir()
     run = asyncio.run(run_direct(fixture_case(), stages(), reviewed_runners(store, tmp_path / "work"), budget))
     assert run.attempts[-1].tool_cap_reached and not run.attempts[0].tool_cap_reached
+
+
+def test_a_stop_on_an_operator_ceiling_says_so_not_derived():
+    """First corpus case (2026-10-13): the token cap came from the ceiling, while the reason said it was derived."""
+    from corsair.composition.direct import StageBudget
+    limits = StageBudget(request_limit=16, tool_calls_limit=20, total_tokens_limit=48000, timeout_seconds=240,
+                         tokens_per_request=8000).limits(1, 13, 1)
+    assert (limits.total_tokens_limit, limits.ceilings) == (48000, ("request_limit", "total_tokens_limit"))
+    assert StageBudget(request_limit=16, tool_calls_limit=20, total_tokens_limit=128000, timeout_seconds=240,
+                       tokens_per_request=8000).limits(1, 13, 1).ceilings == ("request_limit",)
