@@ -362,3 +362,12 @@ def test_read_tool_refuses_an_oversized_line_instead_of_returning_it():
     model, _ = scripted([("read_source", {"path": "big.py"})], ready())
     with pytest.raises(UnexpectedModelBehavior, match="read_source"):
         run(model, deps)
+
+
+@pytest.mark.parametrize('symbol', ['getForward', 'ForwardPage', ' '])
+def test_repository_finalizer_refuses_partial_and_whitespace_symbols(symbol):
+    draft = ready()
+    draft['target']['symbol'] = symbol
+    model, _ = scripted([('read_source', {'path': 'core/src/main/java/org/example/url/UrlConstructor.java'})], draft)
+    with pytest.raises(UnexpectedModelBehavior):
+        run(model)

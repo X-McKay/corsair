@@ -116,3 +116,9 @@ def test_commit_fields_require_exactly_forty_hex_characters(commit):
 def test_unmeasured_execution_limits_stay_visible_in_the_report():
     blocked = counts(load())["by"]["blocking"]
     assert blocked["G13"] == 50
+
+
+def test_identification_corpus_uses_the_reviewed_issue_text():
+    corpus = yaml.safe_load((CASES.parents[1] / "evals/repository_identification/cases.yaml").read_text())
+    jspwiki = next(e for e in load() if e.manifest and e.manifest.evaluator.case_id == "VUL4J-18")
+    assert corpus["cases"][0]["inputs"]["issue"] == jspwiki.manifest.agent.issue
