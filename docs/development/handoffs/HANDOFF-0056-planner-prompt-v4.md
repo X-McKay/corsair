@@ -15,7 +15,7 @@ Branch `claude/planner-prompt-v4-mbwx5t` (draft PR #38) from main `334aa03`. Del
 
 ## Validation and blockers
 
-`make test-config` 854 passed at `5ed852b` (853 on main plus 1); `tests/configuration` and `tests/agents/test_test_planning.py` 132 passed after the held-out freeze. Live on RIG0 (`/home/al/git/corsair-pr38`, evidence `.runs/planner-v4-20261013/`, git-ignored; local model, 8192 cap, 2048 thinking), each run once: development v4 12/12, v5 11/12, v6 12/12; v6 fresh held-out 13/18, v6 first (exposed) held-out 15/18 with one error. Mechanical failures (re-reads, unlisted reads, length cap) did not occur in any of the 60 live attempts. Blocker: semantic defects on held-out plans (wrong status on one case 3/3, witnesses the facility contradicts, outcome forecasts, development identifiers carried over, harmful payloads), attributed in PLAN-0038. The kind cluster was not used.
+`make test-config` 854 passed at `5ed852b` (853 on main plus 1); `tests/configuration` and `tests/agents/test_test_planning.py` 132 passed after the held-out freeze. Live on RIG0 (`/home/al/git/corsair-pr38`, evidence `.runs/planner-v4-20261013/`, git-ignored; local model, 8192 cap, 2048 thinking), each run once: development v4 12/12, v5 11/12, v6 12/12; v6 fresh held-out 13/18, v6 first (exposed) held-out 15/18 with one error. Mechanical failures (re-reads, unlisted reads, length cap) did not occur in any of the 72 live attempts (three development runs of 12, two held-out runs of 18). Blocker: semantic defects on held-out plans (wrong status on one case 3/3, witnesses the facility contradicts, outcome forecasts, development identifiers carried over, harmful payloads), attributed in PLAN-0038. The kind cluster was not used.
 
 ## Decisions and next steps
 
