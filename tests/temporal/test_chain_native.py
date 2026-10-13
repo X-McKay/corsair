@@ -237,3 +237,18 @@ def test_an_over_budget_or_timed_out_stage_closes_attributably(temporal_address,
         assert child == (EventType.EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT if kind == "TimeoutError"
                          else EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED)
     asyncio.run(check())
+
+
+def test_chain_dataset_scores_the_durable_chain_like_direct_mode(temporal_address, request, tmp_path):
+    from evals.fixture_chain.evaluate import dataset, evaluate, passed
+
+    async def check():
+        client = await Client.connect(temporal_address, plugins=PLUGINS)
+
+        async def durable(case, stage_models, runners, budget):
+            return await run_durable(case, stage_models, runners, budget, client=client,
+                                     execution_timeout=EXECUTION_TIMEOUT)
+        with models.override_allow_model_requests(False):
+            return await evaluate(tmp_path / "evidence", mode="durable", run=durable)
+    report = asyncio.run(check())
+    assert len(report.cases) == len(dataset().cases) and passed(report)

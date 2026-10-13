@@ -20,8 +20,10 @@ import logfire
 from pydantic import BaseModel, ConfigDict, TypeAdapter
 from pydantic_ai import models
 from pydantic_ai.messages import RetryPromptPart
+from pydantic_ai.durable_exec.temporal import PydanticAIPlugin
 from pydantic_evals import Dataset, set_eval_attribute
 from pydantic_evals.evaluators import Evaluator
+from temporalio.client import Client
 
 from corsair.adapters.local_artifacts import LocalArtifacts
 from corsair.adapters.pytest_runner import PytestRunner, PytestRunnerConfig
@@ -34,6 +36,8 @@ from evals.fixture_e2e.case import (BASELINE_TEST, _reads_then, fixture_case, sc
                                     scripted_identification, scripted_planning)
 from evals.fixture_e2e.reviewed import FIXTURE, PREFIX, ReviewedLocalExecution, ReviewedWorkspace
 from evals.fixture_e2e.run import STAGES, VERSIONS, Journal, attempt_record, result_record
+from corsair.workflows.chain import run_durable
+from corsair.workflows.chain_runtime import ChainResult, FailureRecord
 from evals.issue_analysis.evaluate import describe_model, record_count
 
 ROOT = Path(__file__).parent
@@ -62,10 +66,11 @@ class ChainOracle(BaseModel):
 class StageEfficiency(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     stage: Stage
-    requests: int
-    tool_calls: int
-    input_tokens: int
-    output_tokens: int
+    # None when the stage's usage was not returned (a durable child that timed out): unknown, not zero.
+    requests: int | None
+    tool_calls: int | None
+    input_tokens: int | None
+    output_tokens: int | None
     output_corrections: int
     elapsed_seconds: float
     failure: str | None
@@ -139,17 +144,25 @@ def scripted_stages(inputs: ChainInput, oracle: ChainOracle) -> dict[str, object
             "assessment": scripted_assessment(gate.execution, gate.finding, gate.fix)}
 
 
-def outcome(run: DirectRun) -> ChainOutcome:
+def _failure(failure) -> str | None:
+    if failure is None:
+        return None
+    kind = failure.kind if isinstance(failure, FailureRecord) else type(failure).__name__
+    return f"{kind}: {failure.message if isinstance(failure, FailureRecord) else failure}"[:2048]
+
+
+def outcome(run: DirectRun | ChainResult) -> ChainOutcome:
     assessment = run.assessment
     return ChainOutcome(
         stopped_at=run.stopped_at, reason=run.reason, gate=run.gate.permitted if run.gate else None,
         proposal=Disposition(execution=assessment.execution, finding=assessment.finding, fix=assessment.fix)
         if assessment else None, admitted=assessment.admission.admitted if assessment else None,
         stages=tuple(StageEfficiency(
-            stage=a.stage, requests=a.usage.requests, tool_calls=a.usage.tool_calls, input_tokens=a.usage.input_tokens,
-            output_tokens=a.usage.output_tokens, elapsed_seconds=a.elapsed_seconds,
+            stage=a.stage, requests=a.usage and a.usage.requests, tool_calls=a.usage and a.usage.tool_calls,
+            input_tokens=a.usage and a.usage.input_tokens, output_tokens=a.usage and a.usage.output_tokens,
+            elapsed_seconds=a.elapsed_seconds,
             output_corrections=sum(isinstance(part, RetryPromptPart) for m in a.messages for part in m.parts),
-            failure=None if a.failure is None else f"{type(a.failure).__name__}: {a.failure}"[:2048])
+            failure=_failure(a.failure))
             for a in run.attempts))
 
 
@@ -195,15 +208,24 @@ async def evaluate(evidence: Path, budget: CompositionBudget = CompositionBudget
             finally:
                 with (directory / "native-runs.json").open("x") as destination:
                     json.dump(journal.entries, destination, indent=2)
-        for index, attempt in enumerate(result.attempts):
-            with (directory / f"attempt-{index}-{attempt.stage}.json").open("x") as destination:
-                json.dump(attempt_record(attempt), destination, indent=2)
-        with (directory / "result.json").open("x") as destination:
-            json.dump(result_record(result), destination, indent=2)
+        if isinstance(result, DirectRun):
+            for index, attempt in enumerate(result.attempts):
+                with (directory / f"attempt-{index}-{attempt.stage}.json").open("x") as destination:
+                    json.dump(attempt_record(attempt), destination, indent=2)
+            with (directory / "result.json").open("x") as destination:
+                json.dump(result_record(result), destination, indent=2)
+        else:
+            # Durable results are typed records already: attempts, messages, executions and failures together.
+            with (directory / "result.json").open("xb") as destination:
+                destination.write(TypeAdapter(ChainResult).dump_json(result, indent=2))
         summary = outcome(result)
         for stage in summary.stages:
             for key in ("requests", "tool_calls", "input_tokens", "output_tokens", "output_corrections"):
-                record_count(f"{stage.stage}_{key}", getattr(stage, key))
+                value = getattr(stage, key)
+                if value is None:
+                    set_eval_attribute(f"{stage.stage}_{key}", None)
+                else:
+                    record_count(f"{stage.stage}_{key}", value)
             set_eval_attribute(f"{stage.stage}_elapsed_seconds", round(stage.elapsed_seconds, 3))
         return summary
 
@@ -226,6 +248,7 @@ def main():
     parser.add_argument("--provider-config", type=Path, help="Explicit LocalModelConfig JSON; required with --live")
     parser.add_argument("--live", default="", help=f"Comma-separated stages to run on the provider: {','.join(STAGES)}")
     parser.add_argument("--repeat", type=int, default=1)
+    parser.add_argument("--temporal-address", help="Explicitly owned Temporal service; runs the durable chain")
     args = parser.parse_args()
     live = tuple(stage for stage in args.live.split(",") if stage)
     if set(live) - set(STAGES) or (live and args.provider_config is None):
@@ -237,7 +260,14 @@ def main():
     async def go():
         async with AsyncExitStack() as stack:
             model = await stack.enter_async_context(local_model(config)) if live else None
-            return await evaluate(args.evidence, live=live, model=model, config=config, repeat=args.repeat)
+            if args.temporal_address is None:
+                return await evaluate(args.evidence, live=live, model=model, config=config, repeat=args.repeat)
+            client = await Client.connect(args.temporal_address, plugins=[PydanticAIPlugin()])
+
+            async def durable(case, stage_models, runners, budget):
+                return await run_durable(case, stage_models, runners, budget, client=client)
+            return await evaluate(args.evidence, mode="durable", run=durable, live=live, model=model, config=config,
+                                  repeat=args.repeat)
     report = asyncio.run(go())
     report.print(include_input=True, include_output=False)
     if not passed(report):
