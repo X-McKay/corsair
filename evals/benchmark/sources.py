@@ -2,7 +2,8 @@
 
 `resolve` is offline and covers all inventory rows: a case either names one repository URL and exact fix commit, or
 is reported unresolved with the reason. `fetch` acquires resolved cases into a new private run directory, then tries
-the unchanged `GitSource` capture of the fix and its first parent at the largest admitted ceilings, and merges one
+a `GitSource` capture of the fix and its single parent (symlinks and submodule links skipped and listed, the run's
+format-only fsck allowance applied to capture too), and merges one
 record per case into the committed pins file. The first parent is recorded as the baseline candidate only; whether it
 is the vulnerable revision is a case-admission question (PLAN-0021), not something a fetch shows.
 
@@ -28,9 +29,9 @@ REPOSITORY = Path(__file__).resolve().parents[2]
 INVENTORY = REPOSITORY / 'benchmarks/candidate-cases.json'
 PINS = REPOSITORY / 'benchmarks/source-pins.json'
 HOSTS = frozenset({'github.com', 'salsa.debian.org'})
-# Largest ceilings `SourceLimits` admits; a refusal here is the G2b/G3 size finding, not a fetch failure.
-CAPTURE = SourceLimits(max_files=4096, max_file_bytes=16*1024*1024, max_total_bytes=64*1024*1024, wall_seconds=60,
-                       cpu_seconds=30)
+# Capture ceilings sized from the measured trees (largest: 6,733 files, 54 MB); a refusal is recorded, not hidden.
+CAPTURE = SourceLimits(max_files=16384, max_file_bytes=16*1024*1024, max_total_bytes=128*1024*1024,
+                       wall_seconds=300, cpu_seconds=120)
 
 COMMIT_URL = re.compile(r'https://(?P<host>[a-z0-9.-]+)/(?P<path>[A-Za-z0-9._~/-]+?)/(?:-/)?commit/'
                         r'(?P<commit>[0-9a-f]{40})(?P<patch>\.patch)?')
@@ -90,13 +91,17 @@ def case_dir(run: Path, case_id: str) -> Path:
     return run/case_id.replace('/', '_')
 
 
-def _capture(repo: str, commit: str, directory: Path) -> dict:
+def _capture(repo: str, commit: str, directory: Path, fsck_ignore: frozenset[str]) -> dict:
     with LocalArtifacts(_private(directory/f'objects-{commit}'), max_bytes=CAPTURE.max_file_bytes) as store, \
             GitSource(_pin('/usr/bin/git'), _pin('/usr/bin/prlimit'), store=store, limits=CAPTURE,
-                      receipts=_private(directory/f'capture-{commit}')) as source:
+                      receipts=_private(directory/f'capture-{commit}'), fsck_ignore=fsck_ignore,
+                      skip_nonregular=True) as source:
         try:
             snapshot = source.capture(Path(repo), commit, uuid4())
-            return dict(outcome='completed', files=len(snapshot.files), manifest=asdict(snapshot.manifest))
+            skipped = json.loads(store.get(snapshot.manifest)).get('skipped', [])
+            return dict(outcome='completed', files=len(snapshot.files), manifest=asdict(snapshot.manifest),
+                        skipped=[f"{item['kind']} {item['path']}" for item in skipped],
+                        fsck_ignore=sorted(fsck_ignore))
         except SourceCaptureError as error:
             return dict(outcome='refused', layer=error.receipt.get('layer'), detail=str(error))
 
@@ -130,8 +135,9 @@ def fetch(requests: list[SourceRequest], run: Path, transport: HostTransport, li
             record.update(outcome='acquired', **result,
                           baseline_candidate=single.commit if single else None)
             if capture and not source.shallow:
-                record['capture'] = {'commit': _capture(source.repository, source.commit, directory)}
-                if single: record['capture']['first_parent'] = _capture(source.repository, single.commit, directory)
+                capture_one = lambda commit: _capture(source.repository, commit, directory, limits.fsck_warn)
+                record['capture'] = {'commit': capture_one(source.commit)}
+                if single: record['capture']['first_parent'] = capture_one(single.commit)
             records[request.case_id] = record
             print(f'{request.case_id}: acquired {source.repository_bytes} bytes, {source.tree.regular_files} files',
                   file=sys.stderr)

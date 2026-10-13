@@ -14,15 +14,12 @@ import subprocess
 import time
 from uuid import UUID
 
-from corsair.adapters.git_source import Executable, confined_path, git_hash
+from corsair.adapters.git_source import FORMAT_ONLY_FSCK, Executable, confined_path, git_hash
 from corsair.adapters.receipts import ReceiptDirectory
 from corsair.nodes.source_fetch import HOST, FetchTarget
 
 PIN_REF = 'refs/corsair/pinned'
 GIB = 1024**3
-# Git fsck message ids that concern only the formatting of historical commit and tree objects. Old history in
-# several benchmark repositories carries them; the object hashes still verify. An operator may downgrade only these.
-FORMAT_ONLY_FSCK = frozenset({'badTimezone', 'missingSpaceBeforeEmail', 'zeroPaddedFilemode'})
 
 
 @dataclass(frozen=True)

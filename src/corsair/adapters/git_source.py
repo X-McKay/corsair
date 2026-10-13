@@ -34,6 +34,12 @@ class Executable:
                 raise ValueError('Native executable digest mismatch')
 
 
+# Git fsck message ids that concern only the formatting of historical commit and tree objects; their object hashes
+# still verify. SPEC-0037 lets an operator accept exactly these in old benchmark history, recorded, never by default.
+FORMAT_ONLY_FSCK = frozenset({'badTimezone', 'missingSpaceBeforeEmail', 'zeroPaddedFilemode'})
+NONREGULAR_MODES = {'120000': 'symlink', '160000': 'submodule'}
+
+
 @dataclass(frozen=True)
 class SourceLimits:
     max_files: int = 128
@@ -45,9 +51,9 @@ class SourceLimits:
 
     def __post_init__(self):
         if (any(type(v) is not int or v <= 0 for v in asdict(self).values())
-                or self.max_files > 4096 or self.max_file_bytes > 16*1024*1024
-                or self.max_total_bytes > 64*1024*1024 or self.wall_seconds > 60
-                or self.memory_bytes != 512*1024*1024 or self.cpu_seconds > 30):
+                or self.max_files > 65536 or self.max_file_bytes > 16*1024*1024
+                or self.max_total_bytes > 256*1024*1024 or self.wall_seconds > 600
+                or self.memory_bytes != 512*1024*1024 or self.cpu_seconds > 300):
             raise ValueError('Bounded operator source limits required')
 
 
@@ -70,8 +76,15 @@ def git_hash(kind, data):
 
 class GitSource:
     def __init__(self, git: Executable, prlimit: Executable, *, store: ArtifactStore,
-                 limits: SourceLimits, receipts: Path):
+                 limits: SourceLimits, receipts: Path, fsck_ignore: frozenset[str] = frozenset(),
+                 skip_nonregular: bool = False):
+        """`fsck_ignore` (SPEC-0037) accepts only FORMAT_ONLY_FSCK ids; `skip_nonregular` leaves symlinks and
+        submodule links out of the snapshot and lists them in the manifest. Both default off and are recorded."""
+        if (type(fsck_ignore) is not frozenset or not fsck_ignore <= FORMAT_ONLY_FSCK
+                or type(skip_nonregular) is not bool):
+            raise ValueError('Only format-only fsck message ids and an explicit skip choice admitted')
         git.verify(); prlimit.verify()
+        self._fsck_ignore, self._skip_nonregular = fsck_ignore, skip_nonregular
         self._git_executable, self._prlimit = git, prlimit
         self._store, self._limits = store, limits
         self._journal = ReceiptDirectory(receipts)
@@ -85,7 +98,9 @@ class GitSource:
         argv = [str(self._prlimit.path), f'--as={self._limits.memory_bytes}:{self._limits.memory_bytes}',
                 f'--cpu={self._limits.cpu_seconds}:{self._limits.cpu_seconds}', '--',
                 str(self._git_executable.path), '-c', 'core.hooksPath=/dev/null', '-c', 'protocol.allow=never',
-                '-c', 'core.fsmonitor=false', '-C', str(repo), *args]
+                '-c', 'core.fsmonitor=false',
+                *(item for message in sorted(self._fsck_ignore) for item in ('-c', f'fsck.{message}=ignore')),
+                '-C', str(repo), *args]
         # Do not inherit caller GIT_*, credentials, transport helpers or config.
         env = {'PATH':'/usr/bin:/bin', 'LANG':'C', 'LC_ALL':'C', 'GIT_CONFIG_NOSYSTEM':'1',
                'GIT_CONFIG_GLOBAL':'/dev/null', 'GIT_NO_REPLACE_OBJECTS':'1', 'GIT_TERMINAL_PROMPT':'0'}
@@ -147,7 +162,8 @@ class GitSource:
         started = time.monotonic(); deadline = started+self._limits.wall_seconds
         receipt = dict(operation=str(operation), commit=commit, outcome='unknown', started_at=datetime.now(timezone.utc).isoformat(),
                        elapsed_seconds=0.0, layer='receipt_storage', native_calls=[], admitted_artifacts=[], snapshot=None,
-                       limits=asdict(self._limits), git=asdict(self._git_executable), prlimit=asdict(self._prlimit))
+                       limits=asdict(self._limits), git=asdict(self._git_executable), prlimit=asdict(self._prlimit),
+                       fsck_ignore=sorted(self._fsck_ignore), skip_nonregular=self._skip_nonregular, skipped=[])
         for key in ('git','prlimit'): receipt[key]['path'] = str(receipt[key]['path'])
         try: self._journal.write(operation, 'intent', receipt)
         except Exception as error:
@@ -170,29 +186,30 @@ class GitSource:
             tree_line = commit_data.split(b'\n',1)[0]
             if not re.fullmatch(b'tree [0-9a-f]{40}', tree_line): raise ValueError('Unsupported native commit tree')
             tree = tree_line[5:].decode()
-            entries = native(['ls-tree','-rz','--full-tree',tree], self._limits.max_files*1100)
+            # Long listing: sizes come from the tree walk, so each admitted blob costs one native call, not two.
+            entries = native(['ls-tree','-rlz','--full-tree',tree], self._limits.max_files*1200)
             receipt['layer'] = 'source_admission'
             if entries and not entries.endswith(b'\0'): raise ValueError('Incomplete native tree list')
             records = entries[:-1].split(b'\0') if entries else []
-            if len(records) > self._limits.max_files: raise ValueError('Source file count exceeded')
-            selected = []; paths = set()
+            selected = []; paths = set(); skipped = receipt['skipped']
             for record in records:
                 metadata, path_bytes = record.split(b'\t',1)
-                mode, kind, blob = metadata.decode('ascii').split(' ')
+                mode, kind, blob, size_text = metadata.decode('ascii').split()
                 path = path_bytes.decode('utf8'); confined_path(path)
+                if (self._skip_nonregular and mode in NONREGULAR_MODES and kind == ('commit' if mode == '160000' else 'blob')
+                        and re.fullmatch('[0-9a-f]{40}',blob)):
+                    skipped.append(dict(path=path,mode=mode,kind=NONREGULAR_MODES[mode],object=blob)); continue
                 if mode not in ('100644','100755') or kind!='blob' or not re.fullmatch('[0-9a-f]{40}',blob):
                     raise ValueError('Only regular source blobs admitted; symlinks/submodules refused')
+                if not re.fullmatch('0|[1-9][0-9]*',size_text): raise ValueError('Unsupported Git object size')
                 if path in paths or any('/'.join(path.split('/')[:n]) in paths for n in range(1,len(path.split('/')))):
                     raise ValueError('Duplicate/colliding source path')
-                paths.add(path); selected.append((path,mode,blob))
+                paths.add(path); selected.append((path,mode,blob,int(size_text)))
+            if len(selected) > self._limits.max_files: raise ValueError('Source file count exceeded')
             if any('/'.join(p.split('/')[:n]) in paths for p in paths for n in range(1,len(p.split('/')))):
                 raise ValueError('Colliding source paths')
             files = []; total = 0
-            for path,mode,blob in selected:
-                receipt['layer'] = 'native_source'
-                size_data = native(['cat-file','-s',blob],32)
-                if not re.fullmatch(b'[0-9]+\n',size_data): raise ValueError('Unsupported Git object size')
-                size = int(size_data)
+            for path,mode,blob,size in selected:
                 receipt['layer'] = 'source_admission'
                 if size > self._limits.max_file_bytes or total+size > self._limits.max_total_bytes:
                     raise ValueError('Source byte budget exceeded')
@@ -203,7 +220,10 @@ class GitSource:
                 ref = self._store.put(data, expected_sha256=hashlib.sha256(data).hexdigest())
                 receipt['admitted_artifacts'].append(asdict(ref)); files.append(SourceFile(path,mode,blob,ref)); total += size
             receipt['layer'] = 'artifact_storage'
-            manifest_bytes = (json.dumps(dict(version=1,commit=commit,tree=tree,files=[asdict(f) for f in files]),sort_keys=True,separators=(',',':'))+'\n').encode()
+            # Skipped entries are listed only when present, so manifests of regular-only trees are unchanged.
+            manifest_value = dict(version=1,commit=commit,tree=tree,files=[asdict(f) for f in files])
+            if skipped: manifest_value['skipped'] = skipped
+            manifest_bytes = (json.dumps(manifest_value,sort_keys=True,separators=(',',':'))+'\n').encode()
             manifest = self._store.put(manifest_bytes)
             receipt['admitted_artifacts'].append(asdict(manifest))
             snapshot = SourceSnapshot(commit,tree,tuple(files),manifest)
