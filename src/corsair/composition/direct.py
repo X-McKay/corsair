@@ -91,7 +91,7 @@ class CompositionBudget(Contract):
     authoring: StageBudget = StageBudget(request_limit=32, tool_calls_limit=28, total_tokens_limit=262144,
                                          timeout_seconds=900, slack_tool_calls=2, tokens_per_request=12000)
     assessment: StageBudget = StageBudget(request_limit=32, tool_calls_limit=28, total_tokens_limit=262144,
-                                          timeout_seconds=600, tokens_per_request=10000)
+                                          timeout_seconds=600, slack_tool_calls=3, tokens_per_request=10000)
     dev_runs: int = Field(default=3, strict=True, ge=1, le=5)
     output_retries: int = Field(default=1, strict=True, ge=0, le=1)
     admission_refusals: int = Field(default=1, strict=True, ge=0, le=2)

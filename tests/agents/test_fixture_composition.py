@@ -283,8 +283,8 @@ def test_stage_limits_are_derived_from_each_stage_input_and_recorded(store, tmp_
     assert (limits["identification"].read_windows, limits["identification"].tool_calls_limit) == (2, 4)
     assert (limits["planning"].read_windows, limits["planning"].tool_calls_limit) == (2, 4)
     assert (limits["authoring"].work_tool_calls, limits["authoring"].tool_calls_limit) == (10, 14)
-    assert limits["assessment"].read_windows >= 9 and limits["assessment"].tool_calls_limit == \
-        limits["assessment"].read_windows + 2
+    assert limits["assessment"].read_windows == 9 and limits["assessment"].tool_calls_limit == \
+        limits["assessment"].read_windows + 3
     for attempt in run.attempts:
         assert attempt.exhausted is None and attempt.usage.tool_calls <= attempt.limits.tool_calls_limit
         assert attempt.limits.request_limit == attempt.limits.tool_calls_limit + 3
