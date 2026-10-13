@@ -115,9 +115,13 @@ def test_runtime_stage_payloads_and_worker_activity(tmp_path):
         assert await roundtrip(result, ChainResult) == result
         # The largest inputs `runtime_inputs` admits (one big lockfile, or thousands of long paths) still fit
         # Temporal's default 2 MB payload limit with the case around them.
+        # The review's case: 4,000 nested pom.xml of 256 bytes with ~214-character paths (2,258,233 bytes before).
         many = {f"pkg{i:05d}/{'x' * 900}/pom.xml": b"" for i in range(3000)}
-        for files in ({"poetry.lock": os.urandom(MAX_INPUT_BYTES)}, many, {**many, "poetry.lock": os.urandom(700_000)}):
-            full = runtime_inputs(files)
+        modules = {f"m{i:04d}/{'y' * 200}/pom.xml": os.urandom(256) for i in range(4000)}
+        parents = {f"parents/{'z' * 200}/{i}.pom": os.urandom(4096) for i in range(64)}
+        for files, supplied in (({"poetry.lock": os.urandom(MAX_INPUT_BYTES)}, {}), (many, {}), (modules, {}),
+                                ({**many, "poetry.lock": os.urandom(700_000)}, {}), ({**modules, **many}, parents)):
+            full = runtime_inputs(files, parents=supplied)
             assert (full.files or full.omitted) and len(full.__pydantic_serializer__.to_json(full)) <= MAX_INPUT_BYTES
             (payload,) = await CONVERTER.encode([replace(request, case=replace(request.case, runtime=full))])
             assert len(payload.SerializeToString()) < 2_000_000

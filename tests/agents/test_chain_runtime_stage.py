@@ -6,7 +6,7 @@ import pytest
 from pydantic_ai import models
 
 from corsair.adapters.local_artifacts import LocalArtifacts
-from corsair.composition.direct import UNOBSERVED, StageModels, run_direct
+from corsair.composition.direct import DECLARED_FRAMEWORK, UNOBSERVED, StageModels, run_direct
 from corsair.nodes.runtime.contracts import RuntimeInputs
 from corsair.nodes.runtime.environment import RuntimeCatalog
 from corsair.nodes.runtime.matrix import load
@@ -74,6 +74,23 @@ def test_a_declared_environment_off_the_selection_ends_the_run(run):
                     runtime=pyproject('>=3.10'))
     assert run(junit, catalog=catalog()).reason == ('declared environment framework JUnit 4.12 is not one the selection '
                                                    'admitted (pytest)')
+
+
+@pytest.mark.parametrize('framework', ['pytest-bdd', 'pytest-not-a-framework', 'pytestx', 'py test'])
+def test_a_framework_that_only_shares_a_prefix_is_not_admitted(run, framework):
+    case = replace(fixture_case(), environment=fixture_case().environment.model_copy(update={'framework': framework}),
+                   runtime=pyproject('>=3.10'))
+    assert run(case, catalog=catalog()).reason == (f'declared environment framework {framework} is not one the '
+                                                   'selection admitted (pytest)')
+
+
+def test_framework_declarations_name_the_framework_and_its_major_version():
+    def names(declared):
+        m = DECLARED_FRAMEWORK.fullmatch(declared.casefold())
+        return {m['name'], m['name'] + (m['major'] or '')}
+    assert 'pytest' in names('pytest 9.0.3') and 'pytest' in names('pytest')
+    assert 'junit5' in names('JUnit 5') and 'junit4' in names('JUnit 4.12') and 'junit5' in names('junit-5.10.2')
+    assert 'junit5' not in names('JUnit 4.12') and DECLARED_FRAMEWORK.fullmatch('pytest-bdd') is None
 
 
 def test_build_files_without_a_catalog_stop_with_the_failure_kind(run):

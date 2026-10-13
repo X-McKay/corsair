@@ -323,6 +323,9 @@ async def run_direct(case: FixtureCase, models: StageModels, runners: Runners,
     return await run_chain(case, invoke, execute, select, new_operation=uuid4)
 
 
+DECLARED_FRAMEWORK = re.compile(r"(?P<name>[a-z]+)(?:[ _-]?v?(?P<major>[0-9]+)(?:\.[0-9]+)*)?")
+
+
 def declared_mismatch(case: FixtureCase, outcome: RuntimeOutcome) -> str | None:
     """Why the operator's declared environment is not the selected row's prepared image, if it is not."""
     digest = outcome.image.rsplit("@sha256:", 1)[1]
@@ -332,10 +335,12 @@ def declared_mismatch(case: FixtureCase, outcome: RuntimeOutcome) -> str | None:
                 f"{outcome.selection.image_id} image {outcome.image}")
     if case.environment.language.casefold() != language:
         return f"declared environment language {case.environment.language} is not the selected {language}"
-    # "pytest 9.0.3" -> "pytest903", "JUnit 5" -> "junit5": the declaration must name a framework the row admitted.
-    declared = re.sub(r"[^a-z0-9]", "", case.environment.framework.casefold())
+    # A framework name with at most a version suffix: "pytest 9.0.3" names pytest, "JUnit 5" and "JUnit 4.12" name
+    # junit5 and junit4; "pytest-bdd" names no admitted framework.
     admitted = sorted(c.name for c in outcome.selection.checks if c.kind == "test_framework" and c.satisfied)
-    if not any(declared.startswith(name) for name in admitted):
+    parsed = DECLARED_FRAMEWORK.fullmatch(case.environment.framework.strip().casefold())
+    names = {parsed["name"], parsed["name"] + (parsed["major"] or "")} if parsed else set()
+    if not names & set(admitted):
         return f"declared environment framework {case.environment.framework} is not one the selection admitted ({', '.join(admitted)})"
     return None
 

@@ -34,7 +34,7 @@ Excluded: running the environment agent inside the chain and mapping its `ReadyE
 
 - `EnvironmentIdentity.image_digest` must equal the digest of the selected row's prepared image;
 - `EnvironmentEvidence.language` must name the selected row's language (case-insensitive).
-- `EnvironmentEvidence.framework` must name a test framework the selection admitted (lower-cased, punctuation and spaces removed, then a prefix match: `pytest 9.0.3` names `pytest`, `JUnit 4.12` names `junit4`; review of `993de00`).
+- `EnvironmentEvidence.framework` must name a test framework the selection admitted: a name with at most a version suffix, read as the name or the name plus its major version (`pytest 9.0.3` names `pytest`, `JUnit 4.12` names `junit4`, `JUnit 5` names `junit5`). An earlier prefix match also admitted `pytest-bdd` and `pytest-not-a-framework` (merge review of #73); those now stop.
 
 A mismatch stops at `runtime`: the run would otherwise execute on an image the selection did not choose. `DirectRun.runtime` and `ChainResult.runtime` carry the outcome in every case that reaches selection.
 
