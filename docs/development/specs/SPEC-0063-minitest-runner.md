@@ -4,7 +4,7 @@ kind: spec
 title: Minitest runner and report parser
 status: draft
 updated: 2026-10-13
-related: [SPEC-0042, SPEC-0039, SPEC-0041, PLAN-0068]
+related: [SPEC-0042, SPEC-0039, SPEC-0041, SPEC-0058, PLAN-0068]
 ---
 
 # Minitest runner and report parser
