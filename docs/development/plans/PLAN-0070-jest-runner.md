@@ -22,7 +22,8 @@ Implement [SPEC-0057](../specs/SPEC-0057-jest-runner.md) on top of the Node 8 im
 - [x] Image-only real case: CVE-2020-15123 (codecov-node) the same way.
 - [ ] Framework row `jest` with the image row.
 - [x] Harness guards as #74: an image config id, the checkout's HEAD blobs (`commit_tree`) rather than worktree bytes, and a fresh dependency directory per setup; setup writes a receipt (commit, image, `package-lock.json` SHA-256, exit 0) beside `node_modules` and `run` refuses a directory whose receipt does not match its own commit, image and lockfile, recording the receipt in `run.json`.
-- [ ] Mocha and AVA runners; environment `jest` admission with its own eval.
+- [ ] Mocha and AVA runners.
+- [x] Environment `jest` admission (see note below); live environment eval pending.
 
 ## Validation and progress
 
@@ -34,6 +35,8 @@ Second real case, image-only, same image (config id `sha256:744310a4…`): CVE-2
 
 
 After #74's guards were adopted (image config id, committed tree, fresh dependency directory), the codecov case was rerun the same way in fresh directories: baseline control passed and security failed, fix both passed, cleanup confirmed.
+
+2026-10-13, environment-agent admission of `jest` and `minitest` (branch from main 165afac), generalised with `tap-harness` as file-unit frameworks in `agents/environment/frameworks.py`: the baseline id is one plain repository-relative test file, one rule (`OneFile`) checks that the baseline command runs exactly that file under the runner with no filtering, listing or code-loading option, and each framework reads its own result. Jest needs `--json --runTestsByPath` and admits the JSON report only with one suite, every test passed and no pending, todo or failed test; Minitest needs `ruby` (or `bundle exec ruby`) on the one file without `-n/--name/-e/--exclude` and exactly one summary line with at least one run and no failure, error or skip. Checked against output captured offline in the `node8` (Jest 24.8.0) and `ruby31` (Minitest 5.15.0) images (`tests/agents/framework_outputs/`); prompt `environment-v6-file-unit-frameworks`; `make eval AGENT=environment` scripted 16/16; live eval waits for the model server.
 
 ## Decisions and next action
 

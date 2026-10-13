@@ -22,7 +22,8 @@ Implement [SPEC-0063](../specs/SPEC-0063-minitest-runner.md) on main after the `
 - [x] Docker harness refuses image tags and dirty checkouts or overlay directories, as #74 does for Java.
 - [x] Image-only real case under Docker: CVE-2025-27610 (rack) at both commits through `tests/qualification/ruby_image_case.py`.
 - [ ] Sandbox run of a real case in the batch before the framework row lands (process of 2026-10-13: image PRs and runners are checked image-only; the kind gate is reserved for sandbox changes and the batch before a row).
-- [ ] `minitest` admission in the environment agent (assessed against its eval baseline), skill text, matrix rows in an evidence-only PR after the gate, handoff.
+- [x] `minitest` admission in the environment agent and skill text (see note below); live environment eval pending.
+- [ ] Matrix rows in an evidence-only PR after the gate, handoff.
 
 ## Validation and progress
 
@@ -42,6 +43,8 @@ Implement [SPEC-0063](../specs/SPEC-0063-minitest-runner.md) on main after the `
 2026-10-13, Codex and review findings at 344cb6b: (1) non-string `class`/`name`/`outcome` raised `TypeError` past the typed result; reproduced (4 new tests failed), fixed, 49 unit tests pass. (2) Discovery accepted helper-defined or inherited `test_*` methods when the patch reopens or subclasses a repository class; reproduced under Docker (listing returned `ReopenedTest#test_from_helper` and `ChildTest#test_inherited`), fixed by keeping only methods whose `source_location` is the loaded patch file; after the fix only the patch's methods list, so discovery refuses. (3) The harness now checks the bundle's `Gemfile.lock` against setup's digest before the run container starts; a tampered lock is refused. Rack rerun at both commits and the gate's Ruby steps under Docker: unchanged outcomes.
 
 Not run: sanitize CVE-2023-36823 (the benchmark records only its fix revision), sinatra CVE-2024-21510, Rails CVE-2023-22794 (component directory and database setup still to check).
+
+2026-10-13, environment-agent admission of `jest` and `minitest` (branch from main 165afac), generalised with `tap-harness` as file-unit frameworks in `agents/environment/frameworks.py`: the baseline id is one plain repository-relative test file, one rule (`OneFile`) checks that the baseline command runs exactly that file under the runner with no filtering, listing or code-loading option, and each framework reads its own result. Jest needs `--json --runTestsByPath` and admits the JSON report only with one suite, every test passed and no pending, todo or failed test; Minitest needs `ruby` (or `bundle exec ruby`) on the one file without `-n/--name/-e/--exclude` and exactly one summary line with at least one run and no failure, error or skip. Checked against output captured offline in the `node8` (Jest 24.8.0) and `ruby31` (Minitest 5.15.0) images (`tests/agents/framework_outputs/`); prompt `environment-v6-file-unit-frameworks`; `make eval AGENT=environment` scripted 16/16; live eval waits for the model server.
 
 ## Decisions and next action
 
