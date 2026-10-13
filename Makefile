@@ -1,4 +1,4 @@
-.PHONY: tools kind-up kind-down test-config qualify-network admission-artifacts admission-install qualify-admission openshell-install qualify-gateway qualify-lifecycle policy-image policy-image-load qualify-policy
+.PHONY: tools kind-up kind-down test-config eval eval-baseline qualify-network admission-artifacts admission-install qualify-admission openshell-install qualify-gateway qualify-lifecycle policy-image policy-image-load qualify-policy
 export UV_CACHE_DIR ?= $(CURDIR)/.cache/uv
 ifndef CORSAIR_QUAL_RUN
 CORSAIR_QUAL_RUN := .runs/network-$(shell date -u +%Y%m%dT%H%M%S)
@@ -20,6 +20,14 @@ workspace-storage:
 
 test-config:
 	uv run --locked python -m pytest tests/configuration tests/unit tests/agents tests/temporal/test_fixture_contracts.py tests/temporal/test_issue_analysis_composition.py tests/temporal/test_chain_composition.py
+
+# One agent's isolated eval suite on the host (SPEC-0044); results under .runs/evals/<agent>/.
+# AGENT=identification|planning|authoring|assessment|chain; optional SET, PROVIDER_CONFIG, REPEAT, NOTE.
+eval:
+	uv run --locked python -m evals.run "$(AGENT)" $(if $(SET),--set "$(SET)") $(if $(PROVIDER_CONFIG),--provider-config "$(PROVIDER_CONFIG)") $(if $(REPEAT),--repeat "$(REPEAT)") $(if $(NOTE),--note "$(NOTE)")
+
+eval-baseline:
+	uv run --locked python -m evals.run "$(AGENT)" --promote "$(RUN)"
 
 qualify-network:
 	test ! -e "$(CORSAIR_QUAL_RUN)"
