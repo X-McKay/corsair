@@ -25,11 +25,12 @@ import yaml
 from corsair.agents.provider import LocalModelConfig, local_model
 from corsair.agents.source.contracts import SourceRead
 from corsair.agents.source.tools import READ_SOURCE_TOOL
-from corsair.agents.test_planning.agent import (
-    CONFIG_VERSION, PROMPT_VERSION, TOOLSET_ID, PlanningDependencies, _symbol_occurs, create_test_planning_agent, planning_prompt,
-)
+from corsair.agents.test_planning.agent import CONFIG_VERSION, create_test_planning_agent
 from corsair.agents.test_planning.contracts import ReadyTestPlan, TestPlanningInput, UnsupportedTestPlan
-from corsair.agents.test_planning.skills import SKILL_SHA256
+from corsair.agents.test_planning.dependencies import PlanningDependencies
+from corsair.agents.test_planning.prompts import PROMPT_VERSION, SKILL_SHA256, planning_prompt
+from corsair.agents.test_planning.tools import TOOLSET_ID, TOOLSET_SHA256
+from corsair.agents.test_planning.validation import _symbol_occurs
 from evals.issue_analysis.evaluate import describe_model, record_count
 from evals.issue_analysis.live import NoUnknownToolAttempts, ProviderUsageCoverage, message_counts, output_tool_names
 
@@ -174,7 +175,7 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, case
     metadata = {"mode": "scripted_fixture" if scripted else "direct_local_provider",
                 "model": describe_model(actual_model), "weights_identity": "not_applicable" if scripted else "unknown",
                 "prompt_version": PROMPT_VERSION, "config_version": CONFIG_VERSION, "skill_sha256": SKILL_SHA256,
-                "toolset_id": TOOLSET_ID, "budget": budget.model_dump(), "task_retries": 0, "max_concurrency": 1,
+                "toolset_id": TOOLSET_ID, "toolset_sha256": TOOLSET_SHA256, "budget": budget.model_dump(), "task_retries": 0, "max_concurrency": 1,
                 "dataset": cases, "dataset_sha256": sha256((ROOT / DATASETS[cases]).read_bytes()).hexdigest(),
                 "provider": provider,
                 "output_contract": "ReadyTestPlan | UnsupportedTestPlan",
