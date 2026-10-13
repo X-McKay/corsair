@@ -87,14 +87,15 @@ def scripted_identification() -> FunctionModel:
         "target": {"symbol": "read_document", "source": {"path": "documents.py", "start_line": 3, "end_line": 4}}})
 
 
-def reference_plan() -> dict:
+def reference_plan(discovery: tuple[str, ...] = DISCOVER) -> dict:
     cases = yaml.safe_load((REPOSITORY / "evals/test_planning/cases.yaml").read_text())["cases"]
     plan = next(c for c in cases if c["name"] == "path_traversal_unguarded")["metadata"]["reference_plan"]
-    return plan | {"discovery_command": list(DISCOVER)}
+    return plan | {"discovery_command": list(discovery)}
 
 
-def scripted_planning() -> FunctionModel:
-    return _reads_then(["documents.py", "test_existing.py"], lambda info: {"plan": reference_plan()})
+def scripted_planning(discovery: tuple[str, ...] = DISCOVER) -> FunctionModel:
+    """The reference plan for the environment whose discovery command is ``discovery``."""
+    return _reads_then(["documents.py", "test_existing.py"], lambda info: {"plan": reference_plan(discovery)})
 
 
 # Assertion lines of test_security_rejects_outside_read in the reviewed bytes, as the authoring dataset records.

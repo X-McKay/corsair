@@ -1,9 +1,9 @@
 """Run one E2E-0 direct composition over the SPEC-0018 pair and keep every stage receipt.
 
-Stages not named in --live use scripted plumbing models. Execution always uses the reviewed host
+Stages not named in --live use scripted plumbing models. This CLI executes on the reviewed host
 workspace, which admits only the reviewed SPEC-0018 test bytes: a live author's own test code is
-refused before it reaches an interpreter, so a fully live run ends at authoring until the sandbox
-test workspace exists. Existing evidence directories are refused.
+refused before it reaches an interpreter. The live gate `make qualify-fixture-e2e` runs the same
+`record_run` over the OpenShell test workspace instead. Existing evidence directories are refused.
 """
 import argparse
 import asyncio
@@ -28,7 +28,7 @@ from corsair.agents.test_authoring import agent as authoring
 from corsair.agents.test_authoring.skills import SKILL_SHA256 as AUTHORING_SKILL
 from corsair.agents.test_planning import agent as planning
 from corsair.agents.test_planning.skills import SKILL_SHA256 as PLANNING_SKILL
-from corsair.composition.direct import CompositionBudget, DirectRun, StageModels, run_direct
+from corsair.composition.direct import CompositionBudget, DirectRun, FixtureCase, StageModels, run_direct
 from evals.issue_analysis.evaluate import describe_model
 
 from .case import (fixture_case, reviewed_runners, scripted_assessment, scripted_authoring, scripted_identification,
@@ -121,14 +121,17 @@ def attempt_record(attempt) -> dict:
             "messages": TypeAdapter(list[ModelMessage]).dump_python(list(attempt.messages), mode="json")}
 
 
-async def main_async(evidence: Path, live: tuple[str, ...], config: LocalModelConfig | None) -> DirectRun:
-    evidence.mkdir(parents=True, exist_ok=False)
+async def record_run(evidence: Path, live: tuple[str, ...], config: LocalModelConfig | None, case: FixtureCase,
+                     runners, runner: dict) -> DirectRun:
+    """Run one composition into an existing private evidence directory and keep every receipt.
+
+    ``runner`` describes the operator's execution route for configuration.json.
+    """
     logfire.configure(send_to_logfire=False, console=False)
-    (evidence / "work").mkdir(mode=0o700)
-    (evidence / "artifacts").mkdir(mode=0o700)
     async with AsyncExitStack() as stack:
         model = await stack.enter_async_context(local_model(config)) if live else None
-        selected = {stage: model if stage in live else SCRIPTED[stage]() for stage in STAGES}
+        scripted = SCRIPTED | {"planning": lambda: scripted_planning(case.environment.discovery_command)}
+        selected = {stage: model if stage in live else scripted[stage]() for stage in STAGES}
         budget = CompositionBudget()
         (evidence / "configuration.json").write_text(json.dumps({
             "mode": "direct", "live_stages": list(live), "budget": budget.model_dump(),
@@ -136,12 +139,12 @@ async def main_async(evidence: Path, live: tuple[str, ...], config: LocalModelCo
             "models": {stage: describe_model(selected[stage]) for stage in STAGES},
             "versions": {stage: dict(zip(("prompt_version", "config_version", "skill_sha256"), VERSIONS[stage]))
                          for stage in STAGES},
-            "runner": "reviewed_host_workspace", "witness_capture": "none",
-            "source": {"python": sys.version}}, indent=2))
-        store = stack.enter_context(LocalArtifacts(evidence / "artifacts", max_bytes=4 * 1024 * 1024))
-        journal = Journal(reviewed_runners(store, evidence / "work"))
+            "runner": runner, "witness_capture": "none",
+            "environment": _dump(case.environment), "environment_identity": _dump(case.environment_identity),
+            "revision_sources": case.revision_sources, "source": {"python": sys.version}}, indent=2))
+        journal = Journal(runners)
         try:
-            run = await run_direct(fixture_case(), StageModels(**selected), journal, budget)
+            run = await run_direct(case, StageModels(**selected), journal, budget)
         finally:
             with (evidence / "native-runs.json").open("x") as destination:
                 json.dump(journal.entries, destination, indent=2)
@@ -151,6 +154,28 @@ async def main_async(evidence: Path, live: tuple[str, ...], config: LocalModelCo
     with (evidence / "result.json").open("x") as destination:
         json.dump(result_record(run), destination, indent=2)
     return run
+
+
+async def main_async(evidence: Path, live: tuple[str, ...], config: LocalModelConfig | None) -> DirectRun:
+    """Reviewed host workspace: only the reviewed SPEC-0018 test bytes execute."""
+    evidence.mkdir(parents=True, exist_ok=False)
+    (evidence / "work").mkdir(mode=0o700)
+    (evidence / "artifacts").mkdir(mode=0o700)
+    with LocalArtifacts(evidence / "artifacts", max_bytes=4 * 1024 * 1024) as store:
+        return await record_run(evidence, live, config, fixture_case(), reviewed_runners(store, evidence / "work"),
+                                {"route": "reviewed_host_workspace"})
+
+
+def summary(run: DirectRun) -> dict:
+    gate = run.gate.permitted.model_dump() if run.gate else None
+    proposal = run.assessment.admission.model_dump(mode="json") if run.assessment else None
+    return {"stopped_at": run.stopped_at, "reason": run.reason, "gate": gate, "admission": proposal,
+            "usage": {f"{index}-{a.stage}": {"requests": a.usage.requests, "tool_calls": a.usage.tool_calls,
+                                             "input_tokens": a.usage.input_tokens,
+                                             "output_tokens": a.usage.output_tokens,
+                                             "elapsed_seconds": round(a.elapsed_seconds, 1),
+                                             "failure": None if a.failure is None else type(a.failure).__name__}
+                      for index, a in enumerate(run.attempts)}}
 
 
 def main():
@@ -166,14 +191,8 @@ def main():
         parser.error("evidence directory already exists")
     config = LocalModelConfig.model_validate_json(args.provider_config.read_bytes()) if args.provider_config else None
     run = asyncio.run(main_async(args.evidence, live, config))
-    gate = run.gate.permitted.model_dump() if run.gate else None
-    proposal = run.assessment.admission.model_dump(mode="json") if run.assessment else None
-    print(json.dumps({"stopped_at": run.stopped_at, "reason": run.reason, "gate": gate, "admission": proposal,
-                      "usage": {a.stage: {"requests": a.usage.requests, "tool_calls": a.usage.tool_calls,
-                                          "input_tokens": a.usage.input_tokens, "output_tokens": a.usage.output_tokens,
-                                          "elapsed_seconds": round(a.elapsed_seconds, 1)} for a in run.attempts},
-                      "config_sha256": sha256((args.evidence / "configuration.json").read_bytes()).hexdigest()},
-                     indent=2))
+    print(json.dumps(summary(run) | {
+        "config_sha256": sha256((args.evidence / "configuration.json").read_bytes()).hexdigest()}, indent=2))
 
 
 if __name__ == "__main__":
