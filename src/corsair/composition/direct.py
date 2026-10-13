@@ -451,12 +451,15 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
     attempts: list[StageAttempt] = []
     issue, environment, identity = case.issue, case.environment, case.environment_identity
     runtime, selected, prepared, provenance = None, (UNSELECTED,), None, UNOBSERVED[2:]
+    # What the environment stage could not confirm or keep; every later stop carries it.
+    stage_notes: tuple[str, ...] = ()
 
     async def _stage(stage: AgentStage, inputs: Any) -> Any:
         attempts.append(await invoke(stage, inputs))
         return attempts[-1].output
 
     def stop(stage: Stage, reason: str, **values) -> DirectRun:
+        values.setdefault("limitations", stage_notes)
         return DirectRun(stopped_at=stage, reason=reason, attempts=tuple(attempts), runtime=runtime,
                          environment=prepared, **values)
 
@@ -507,7 +510,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
             environment, identity = ready_evidence(result, case.environment, case.environment_identity)
         except ValueError as exc:
             return stop("environment", f"ready environment refused: {exc}"[:2048], limitations=unconfirmed)
-        provenance = OBSERVED_IDENTITY + unconfirmed
+        provenance, stage_notes = OBSERVED_IDENTITY + unconfirmed, unconfirmed
 
     identification = await _stage("identification", issue)
     if not isinstance(identification, IssueIdentification):

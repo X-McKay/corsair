@@ -90,8 +90,8 @@ def run(tmp_path):
     (tmp_path / 'artifacts').mkdir(mode=0o700)
     (tmp_path / 'work').mkdir()
 
-    def go(case, environment=None, **options):
-        stage_models = StageModels(identification=scripted_identification(), planning=scripted_planning(),
+    def go(case, environment=None, identification=None, **options):
+        stage_models = StageModels(identification=identification or scripted_identification(), planning=scripted_planning(),
                                    authoring=scripted_authoring(), assessment=scripted_assessment(),
                                    environment=environment)
         with LocalArtifacts(tmp_path / 'artifacts', max_bytes=1024 * 1024) as store, models.override_allow_model_requests(False):
@@ -189,3 +189,14 @@ def test_an_agent_discovery_command_reaches_no_runner_unless_the_plan_carries_it
     result = run(case(), environment_model([BUILD, other, BASELINE], ready_draft(discovery_command=list(other))),
                  catalog=catalog(), preparation=Sandboxes(OK | {other: (0, f'{BASELINE_ID}\n')}))
     assert result.stopped_at == 'planning' and result.executions == () and result.gate is None
+
+
+def test_a_later_stop_keeps_what_the_environment_stage_could_not_confirm(run):
+    """Codex on #106: a stop after a ready environment still reports its unconfirmed cleanup."""
+    async def abstain(messages, info):
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {
+            "status": "missing_information", "scope": "component", "target": None, "reason": "Not in the saved source"})])
+    result = run(case(), environment_model([BUILD, DISCOVER, BASELINE], ready_draft()), FunctionModel(abstain),
+                 catalog=catalog(), preparation=Sandboxes(OK, cleanup='unconfirmed'))
+    assert result.stopped_at == 'identification'
+    assert result.limitations == ('environment sandbox cleanup unconfirmed',)
