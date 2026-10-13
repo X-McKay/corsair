@@ -1,0 +1,43 @@
+# Operator-owned runtime matrix (SPEC-0042). Each row is one sandbox image and the exact runtime, tools and test
+# frameworks it was qualified with. Selection reads this file only; agents and project files never edit it.
+# Adding a row: build the image from a digest-pinned upstream base with hash-pinned offline contents, run the
+# toolchain gate for that row on a fresh node, record the report, then add the row with that evidence. A row
+# without qualification evidence is refused by the loader. Rows are tried in order; the first that satisfies
+# every component of a requirement is selected. `selector` is reserved for an image carrying several runtimes
+# (the hybrid in SPEC-0042) and must stay empty until such an image is qualified.
+# `frameworks` lists the test framework versions a Corsair runner and report parser are qualified for; the
+# framework itself is the project's own dependency, installed during setup, so a project version range must
+# overlap the qualified range and setup then pins a version inside the overlap.
+schema_version: 1
+images:
+  - id: cpython-3.12-pytest
+    language: python
+    base_image: docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d
+    image_source: deploy/qualification/toolchains/python
+    runtime: {name: cpython, version: 3.12.15}
+    tools: {}
+    selector: {}
+    qualification:
+      records: [SPEC-0007, PLAN-0008]
+      report: docs/qualification/openshell-toolchains.md
+      note: Toolchain gate qualified CPython 3.12.15 with pytest 9.0.2; the image source pins pytest 9.0.3 since PR #30.
+  - id: temurin-17-maven
+    language: java
+    base_image: docker.io/library/maven@sha256:5394efaabc436795b507ca400aaf86311db03543072e0e87ae66c595965d4aed
+    image_source: deploy/qualification/toolchains/java
+    runtime: {name: jdk, version: 17.0.20.1}
+    tools: {maven: 3.10.0}
+    selector: {}
+    qualification:
+      records: [SPEC-0007, PLAN-0008]
+      report: docs/qualification/openshell-toolchains.md
+      note: Temurin 17.0.20.1, Maven 3.10.0 and JUnit Jupiter 5.14.4 under Surefire 3.6.0, offline closure in the image.
+frameworks:
+  - name: pytest
+    language: python
+    versions: 9.0.*
+    runner: src/corsair/adapters/pytest_runner.py
+    qualification:
+      records: [SPEC-0028, PLAN-0027, SPEC-0032, PLAN-0032]
+      report: docs/qualification/openshell-test-workspace.md
+      note: pytest runner and JUnit report parser exercised with pytest 9.0.x only (reviewed SPEC-0018 pair).
