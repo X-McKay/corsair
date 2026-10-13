@@ -25,11 +25,21 @@ class SourceFile:
 
 
 @dataclass(frozen=True)
+class SkippedEntry:
+    """A symlink or submodule link the operator chose to leave out of a snapshot (SPEC-0037)."""
+    path: str
+    mode: str
+    kind: str
+    object: str
+
+
+@dataclass(frozen=True)
 class SourceSnapshot:
     commit: str
     tree: str
     files: tuple[SourceFile, ...]
     manifest: ArtifactRef
+    skipped: tuple[SkippedEntry, ...] = ()
 
 
 class ArtifactStore(Protocol):

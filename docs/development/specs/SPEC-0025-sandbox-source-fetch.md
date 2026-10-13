@@ -3,8 +3,8 @@ id: SPEC-0025
 kind: spec
 title: In-sandbox pinned source fetch
 status: draft
-updated: 2026-10-12
-related: [IDEA-0004, ISSUE-0006, SPEC-0006, SPEC-0010, SPEC-0011, SPEC-0012, SPEC-0026, PLAN-0021]
+updated: 2026-10-13
+related: [IDEA-0004, ISSUE-0006, SPEC-0006, SPEC-0010, SPEC-0011, SPEC-0012, SPEC-0026, PLAN-0021, SPEC-0037]
 ---
 
 # In-sandbox pinned source fetch
@@ -50,3 +50,5 @@ This spec does not qualify dependency resolution, builds, test discovery or any 
 ## Decisions and open questions
 
 The user chose in-sandbox fetch over host-to-sandbox tree upload, then resolved the open questions on 2026-10-12: Azure DevOps is assumed to serve fetch by exact commit; private repositories are allowed with the PAT held by OpenShell's credential proxy; dependencies come from standard public registries under SPEC-0026, which does not admit registry egress for private source until a constrained acquisition design is qualified. Default choices made here: shallow fetch by exact SHA, host capture stays authoritative, discard and recreate instead of retrying in place, no fallback to a workload-visible token. Admission blockers before any live run: a qualified storage enforcement mechanism (above). Remaining verification before any private-repository run: confirm provider placeholder substitution and endpoint binding in the pinned OpenShell 0.1.3 sandbox image or a live 0.1.3 sandbox.
+
+2026-10-13: [SPEC-0037](SPEC-0037-host-source-acquisition.md) adds a default-off operator choice to skip symlink and submodule entries, matched against the host capture's recorded skipped entries; offline only.

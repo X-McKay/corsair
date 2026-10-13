@@ -26,7 +26,7 @@ Implement [SPEC-0042](../specs/SPEC-0042-runtime-selection.md) offline: detect e
 
 ## Validation and progress
 
-Offline: `make test-config` passed 892 checks on the original base (853 plus 37 runtime unit checks, 4 of them for the hand-off, and 2 matrix guards), 999 after merging main at `c8f3964` (with #41, #45 and #46), and 1004 after the review fixes (5 more checks).
+Offline: `make test-config` passed 892 checks on the original base (853 plus 37 runtime unit checks, 4 of them for the hand-off, and 2 matrix guards), 999 after merging main at `c8f3964` (with #41, #45 and #46), 1004 after the review fixes (5 more checks), and 1024 after merging main at `8c29e16` (with #42).
 
 Report run in the cloud container on 2026-10-13, against the pins file from PR #42's branch `claude/benchmark-repo-fetch-g6cnts` (head `4167369`):
 
@@ -105,7 +105,7 @@ Al's GitHub review of `eac99a2` found three P2 issues, each reproduced and fixed
 - `poetry.lock`'s first `[[package]]` `python-versions` was read as the project range. Both lockfiles are now parsed as TOML: `[metadata] python-versions` for Poetry, top-level `requires-python` for uv;
 - a valid TOML Pipfile with `requires = "3.12"` raised `AttributeError`. Pipfile tables are type-checked and recorded as unparsed. A wider sweep of 10 build-file names per language against structurally wrong but valid TOML, JSON and YAML found no other crash.
 
-The report rerun after these fixes changed no outcome; the JSON gains each unread line's strength.
+The report rerun after these fixes changed no outcome; the JSON gains each unread line's strength. PR #42 has since merged; main's `benchmarks/source-pins.json` differs from the pins used here only in CVE-2023-31486's URL and note, a case this container cannot fetch, so the report stands.
 
 Limits: this is metadata, not admission (PLAN-0021). A suggested row satisfies a case's runtime declarations, not its dependency closure or tests.
 
