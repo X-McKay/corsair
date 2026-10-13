@@ -48,6 +48,8 @@ Before this plan each suite had its own CLI, its own evidence path convention an
 
 Unrun: any live run (step 4 needs RIG0 and llm.almckay.io); sandbox replay; environment eval.
 
+Output cap (2026-10-13, Al chose "raise the cap" before tuning prompts): live runs at the 16384-token cap failed mostly on truncation. All 31 planning/assessment truncations were 16384 reasoning tokens with no answer, taking 114–123 s, and the reasoning was largely repetitive (one sample: 176 distinct lines of 1395). Server probe on RIG0 with no other model user: `max_model_len` 131072; `max_tokens` 32768 accepted, `finish_reason=length` at 32768 completion tokens after 234.8 s (~140 tok/s). `LocalModelConfig` now admits 24576 and 32768 and a timeout up to 300 s, and the planning, authoring and assessment eval deadlines and token ceilings leave room for one full-cap response. Cap-16384 runs stay promoted as the reference; the cap-32768 reruns are new baselines whose comparison lists the changed provider and budget. If the loops persist at 32768, try a thinking budget or disabled thinking next.
+
 ## Decisions and next action
 
 - The audit-hook check is the authoring stage's own admission rule from the parallel prompt work; the eval reuses it once merged instead of keeping a copy.
