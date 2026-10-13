@@ -36,8 +36,12 @@ Excluded: process-start, socket and other effect kinds (the same gap exists for 
   access only in the setup container, no project test run. cpanm carries its own cpanfile reader, so a project whose
   requirements are all core fetches nothing. Run containers get `PERL5LIB=/tmp/work/.corsair-deps/lib/perl5` through
   a new `Harness.env` field. Unlike `-I`, `PERL5LIB` also adds the architecture directories XS modules install into.
-  Lockfiles bound into the dependency identity are `cpanfile`, `cpanfile.snapshot`, `Makefile.PL` and `Build.PL`.
-  The image is unchanged.
+  The dependency identity binds the files cpanm reads: `cpanfile`, `Makefile.PL` and `Build.PL`. These declare
+  requirements but pin no versions. cpanm resolves each one against CPAN at setup time, so two setups at different
+  times can install different versions. This is the same as an unpinned `requirements.txt` and unlike `npm ci`.
+  Carton's `cpanfile.snapshot` would pin versions, but cpanm ignores it and the image has no Carton, so it is not
+  bound. A requirement the project declares, such as a newer Test::More, is installed into `.corsair-deps`, and
+  `PERL5LIB` puts it ahead of the image's copy. The image is unchanged.
 - **Witness recorder `perl_open` (`file_open`).** `nodes/witness_probe.pl` writes the same `corsair-witness-v2`
   record as the Python probe, so `witness_evidence`, calibration and the gate are shared. The only changes there:
   a capture names its probe digest, which must be one of the operator probes (`PROBES`), and the record's digest
@@ -51,6 +55,12 @@ Excluded: process-start, socket and other effect kinds (the same gap exists for 
     test file opens the planned file itself, and as `offstack_planned` otherwise.
   - Ignored: pipe, dup and in-memory opens.
   - Not observed: child processes, `sysopen`, XS code, and calls through code references taken before the subtest.
+    Subs installed as `*name = sub {...}` are not wrapped either, because their GV is `__ANON__`.
+  - Not transparent: inside the wrapped target, `caller` sees the probe's wrapper frames. `(caller(0))[0]` is
+    `Corsair::WitnessProbe`, where an unprobed run shows the test's package. Only Carp is told to skip them. A target
+    that branches on its caller can behave differently in a witness run. The Python probe (`sys.monitoring`) has no
+    such effect. An uplevel shim over `CORE::GLOBAL::caller` would hide the frames, but it costs more probe code
+    than the rare caller-checking target warrants. The difference is documented instead.
   - Tamper evidence: the record is `intact` only if the overrides and wrappers are still in place at the end. It
     is written once, with `O_EXCL|O_NOFOLLOW`, to an operator path outside the workspace. If that path already
     exists, the run exits 3.

@@ -85,7 +85,7 @@ HARNESSES: dict[str, Harness] = {
         config=TapRunnerConfig(command=("/usr/local/bin/perl", "-Ilib"), workspace_root=WORK,
                                witness_record_path="/tmp/corsair-witness.json"),
         setup=("/bin/sh", "-ec", CPANM_SETUP), dependencies=".corsair-deps",
-        lockfiles=("cpanfile", "cpanfile.snapshot", "Makefile.PL", "Build.PL"),
+        lockfiles=("cpanfile", "Makefile.PL", "Build.PL"),  # what cpanm reads; it ignores Carton's cpanfile.snapshot
         registry_env=("HTTP_PROXY", "http_proxy", "HTTPS_PROXY", "https_proxy", "SSL_CERT_FILE"),
         env=(f"PERL5LIB={WORK}/.corsair-deps/lib/perl5",),
         scratch_location="A fresh directory the test creates with File::Temp tempdir; fixtures must not be created elsewhere",
