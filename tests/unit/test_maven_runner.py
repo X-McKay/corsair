@@ -144,7 +144,7 @@ def test_operator_config_is_bounded(config):
 
 
 @pytest.mark.parametrize('command', [MVN + ('test-compile',), ('mvn', '-q', 'test', '-DskipTests')])
-def test_environment_discovery_command_is_recorded_not_run(store, command):
+def test_environment_discovery_command_is_accepted_not_run(store, command):
     # The runner builds its own listing, so the environment's discovery command is carried, never run: the argv
     # executed and the result are those of the operator prefix. An empty command is still refused.
     expected, executed, *_ = run(store, (LISTED, 0), (BASELINE, 1))

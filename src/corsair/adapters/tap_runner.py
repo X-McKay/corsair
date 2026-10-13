@@ -67,6 +67,7 @@ def listed(stdout: bytes) -> tuple[str, ...] | None:
 
 
 class TapRunner(NativeRunner):
+    # The environment's discovery command is accepted and not run: the listing is always built from the operator prefix.
     tool, report_format = 'perl', 'TAP'
 
     @staticmethod

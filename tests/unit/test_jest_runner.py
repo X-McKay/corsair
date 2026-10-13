@@ -130,7 +130,7 @@ def test_operator_paths_are_bounded(root, report):
 
 
 @pytest.mark.parametrize('command', [JEST + ('--listTests',), ('npx', 'jest', '--listTests')])
-def test_environment_discovery_command_is_recorded_not_run(store, command):
+def test_environment_discovery_command_is_accepted_not_run(store, command):
     # The runner builds its own listing, so the environment's discovery command is carried, never run: the argv
     # executed and the result are those of the operator prefix. An empty command is still refused.
     expected, executed, *_ = run(store, (LISTED, 0), (BASELINE, 1))

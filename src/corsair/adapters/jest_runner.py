@@ -59,7 +59,7 @@ def selection(ids: tuple[str, ...]) -> tuple[str, ...]:
 
 
 class JestRunner(NativeRunner):
-    # The admitted discovery command must be exactly the operator's prefix: anything else could run tests.
+    # The environment's discovery command is accepted and not run: the listing is always built from the operator prefix.
     tool, report_format = 'jest', 'Jest'
 
     def _validate(self, patch: ApprovedPatch, ids: tuple[str, str], witness: WitnessRequest | None) -> None:

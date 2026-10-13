@@ -177,7 +177,7 @@ def test_operator_config_is_bounded(command):
 
 
 @pytest.mark.parametrize('command', [('find', 'test', '-name', '*_test.rb'), RUBY + (TEST_PATH,)])
-def test_environment_discovery_command_is_recorded_not_run(store, command):
+def test_environment_discovery_command_is_accepted_not_run(store, command):
     # The runner builds its own listing, so the environment's discovery command is carried, never run: the argv
     # executed and the result are those of the operator prefix. An empty command is still refused.
     steps = ((listing('test_control', 'test_fixed'), 0), (capture('5.15.0', 'pass.json'), 0))

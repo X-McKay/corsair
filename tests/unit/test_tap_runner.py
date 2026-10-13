@@ -138,7 +138,7 @@ def test_operator_prefix_is_an_absolute_perl_with_relative_includes_only(command
 
 
 @pytest.mark.parametrize('command', [('prove', '--dry', '-b', 't/'), ('/usr/local/bin/perl',)])
-def test_environment_discovery_command_is_recorded_not_run(store, command):
+def test_environment_discovery_command_is_accepted_not_run(store, command):
     # The runner builds its own listing, so the environment's discovery command is carried, never run: the argv
     # executed and the result are those of the operator prefix. An empty command is still refused.
     steps = (((CAPTURES / 'fail.list').read_bytes(), 0), (tap('fail'), 1))
