@@ -1,0 +1,41 @@
+# IDEA-0005 step 1 manifest. Only `agent` may reach an agent; `evaluator` holds labels and oracles.
+# Sources: README.md beside this file, PLAN-0021 and benchmarks/candidate-cases.json. Not admitted; nothing has run.
+agent:
+  # Drafted from the README's description of the forward-page decision; not yet independently reviewed (G10).
+  issue: |
+    JSPWiki's WikiServlet chooses where to forward an incoming GET request from the request path.
+    A report says that a request whose path names a resource under the web application root, rather
+    than a wiki page, is forwarded to that resource instead of the normal wiki page endpoint.
+    Determine whether the request path can steer the servlet's forward target away from the wiki
+    page view, and under which preconditions.
+  # The draft test calls WikiServlet.doGet directly and observes only the dispatcher choice.
+  scope: component
+  repository: https://github.com/apache/jspwiki
+  # The fix's sole parent; the README calls it the candidate vulnerable source. Execution has not confirmed it.
+  baseline: f140a2a4371735ad24d04a1d78c6e1d9ceaed76f
+  candidate: 88d89d6523802c044cfcb7930cba40d8eeb21da2
+  language: Java
+  build_system: Maven
+evaluator:
+  case_id: VUL4J-18
+  cwe: CWE-22
+  fix_reference: https://github.com/apache/jspwiki/commit/88d89d6523802c044cfcb7930cba40d8eeb21da2
+  issue_reviewed: false
+  reference_test:
+    path: BenchmarkWikiServletForwardingTest.java
+    sha256: 6ebf62443a54fc98b0d3f3680d4aa0fde239888db10bc8b5158026faa369b95d
+    placement: jspwiki-main/src/test/java/org/apache/wiki/BenchmarkWikiServletForwardingTest.java
+  expected:
+    # Evaluator hypotheses from the README; zero executions so far.
+    basis: hypothesis
+    revisions:
+      baseline: {control: passed, security: failed}
+      candidate: {control: passed, security: passed}
+    # Unknown: the witness observes file opens only and the recording dispatcher opens nothing (G7).
+    chain: null
+  # Unknown: no repository-separated development/held-out split has been frozen.
+  split: null
+  admission: not_admitted
+  # G2 is met by this manifest. G2c remains: the complete bare fetch and GitSource capture were private and
+  # manual, nothing in the repository acquires source. G13 stays until a build is measured; G9 does not apply.
+  blocking: [G2b, G2c, G3, G4, G5, G6, G7, G8, G10, G11, G12, G13, G15]

@@ -6,6 +6,7 @@ The caller also owns sandbox creation, provider attachment and network narrowing
 """
 from dataclasses import dataclass
 import re
+import shutil
 from urllib.parse import urlsplit
 from uuid import UUID
 
@@ -250,6 +251,50 @@ class SourceFetchAdmission:
     total_bytes: int
     elapsed_seconds: float
     operation: str
+
+
+@dataclass(frozen=True)
+class WorkspaceBudget:
+    """Operator-owned pre-flight storage budget while no per-workspace quota is qualified (SPEC-0036 deferred).
+
+    `workspace_bytes` is the gateway's configured workspace claim size; the captured tree may use at most a
+    quarter of it, leaving the rest for `.git` and builds. `node_path` is where the node's storage lives on this
+    host, and the run starts only if a full workspace still leaves `reserve_bytes` free there. This bounds
+    neither bytes nor inodes during the run; it refuses cases that cannot fit and nodes already short of space.
+    """
+    workspace_bytes: int
+    reserve_bytes: int
+    node_path: str
+
+    def __post_init__(self):
+        absolute(self.node_path)
+        for value in (self.workspace_bytes, self.reserve_bytes):
+            if type(value) is not int or not 1 << 20 <= value <= 1 << 40: raise ValueError('Bounded byte budget required')
+
+
+class WorkspaceBudgetRefused(RuntimeError):
+    """Raised before any sandbox exists; nothing to discard."""
+
+    def __init__(self, layer: str, reason: str):
+        self.layer, self.reason = layer, reason
+        super().__init__(f'{layer}: {reason}')
+
+
+def admit_workspace_budget(snapshot: SourceSnapshot, budget: WorkspaceBudget, free_bytes: int) -> int:
+    """Refuse a case that cannot fit the workspace or a node short of space; return the tree size."""
+    if type(free_bytes) is not int or free_bytes < 0: raise ValueError('Measured free bytes required')
+    tree_bytes = sum(f.artifact.size for f in snapshot.files)
+    if tree_bytes * 4 > budget.workspace_bytes:
+        raise WorkspaceBudgetRefused('sandbox', f'storage_budget: tree {tree_bytes} bytes exceeds a quarter of '
+                                                f'the {budget.workspace_bytes}-byte workspace')
+    if free_bytes < budget.workspace_bytes + budget.reserve_bytes:
+        raise WorkspaceBudgetRefused('host', f'storage_budget: {free_bytes} bytes free at {budget.node_path}, '
+                                             f'need {budget.workspace_bytes + budget.reserve_bytes}')
+    return tree_bytes
+
+
+def node_free_bytes(budget: WorkspaceBudget) -> int:
+    return shutil.disk_usage(budget.node_path).free
 
 
 def _secret_free(receipt, secrets):
