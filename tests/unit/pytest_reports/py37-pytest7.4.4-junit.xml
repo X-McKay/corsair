@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite errors="0" failures="1" hostname="ccae25aa5a02" name="pytest" skipped="0" tests="2" time="0.030" timestamp="2026-10-13T09:37:59.386408"><testcase classname="tests.test_case" name="test_control" time="0.003"><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="tests.test_case.TestSecurity" name="test_security" time="0.003"><failure message="AssertionError: assert 'x' == 'never'&#10;  - never&#10;  + x">Traceback (most recent call last):
+  File "/usr/local/lib/python3.7/site-packages/_pytest/runner.py", line 341, in from_call
+    result: Optional[TResult] = func()
+  File "/usr/local/lib/python3.7/site-packages/_pytest/runner.py", line 262, in &lt;lambda&gt;
+    lambda: ihook(item=item, **kwds), when=when, reraise=reraise
+  File "/usr/local/lib/python3.7/site-packages/pluggy/_hooks.py", line 433, in __call__
+    return self._hookexec(self.name, self._hookimpls, kwargs, firstresult)
+  File "/usr/local/lib/python3.7/site-packages/pluggy/_manager.py", line 112, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+  File "/usr/local/lib/python3.7/site-packages/pluggy/_callers.py", line 155, in _multicall
+    return outcome.get_result()
+  File "/usr/local/lib/python3.7/site-packages/pluggy/_result.py", line 108, in get_result
+    raise exc.with_traceback(exc.__traceback__)
+  File "/usr/local/lib/python3.7/site-packages/pluggy/_callers.py", line 80, in _multicall
+    res = hook_impl.function(*args)
+  File "/usr/local/lib/python3.7/site-packages/_pytest/runner.py", line 177, in pytest_runtest_call
+    raise e
+  File "/usr/local/lib/python3.7/site-packages/_pytest/runner.py", line 169, in pytest_runtest_call
+    item.runtest()
+  File "/usr/local/lib/python3.7/site-packages/_pytest/python.py", line 1792, in runtest
+    self.ihook.pytest_pyfunc_call(pyfuncitem=self)
+  File "/usr/local/lib/python3.7/site-packages/pluggy/_hooks.py", line 433, in __call__
+    return self._hookexec(self.name, self._hookimpls, kwargs, firstresult)
+  File "/usr/local/lib/python3.7/site-packages/pluggy/_manager.py", line 112, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+  File "/usr/local/lib/python3.7/site-packages/pluggy/_callers.py", line 116, in _multicall
+    raise exception.with_traceback(exception.__traceback__)
+  File "/usr/local/lib/python3.7/site-packages/pluggy/_callers.py", line 80, in _multicall
+    res = hook_impl.function(*args)
+  File "/usr/local/lib/python3.7/site-packages/_pytest/python.py", line 194, in pytest_pyfunc_call
+    result = testfunction(**testargs)
+  File "/w/tests/test_case.py", line 14, in test_security
+    assert target.read(str(tmp_path), "outside.txt") == "never"
+AssertionError: assert 'x' == 'never'
+  - never
+  + x</failure><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase></testsuite></testsuites>

@@ -37,7 +37,7 @@ def test_version_or_exit_failure_cannot_substitute_for_successful_execution(resu
         expect_completed(result, 0, '1 passed')
 
 
-@pytest.mark.parametrize('detail', ['http.client.RemoteDisconnected: Remote end closed connection without response', 'TimeoutError: timed out'])
+@pytest.mark.parametrize('detail', ['http.client.RemoteDisconnected: Remote end closed connection without response', 'TimeoutError: timed out', 'socket.timeout: timed out'])
 @pytest.mark.parametrize('fault', ['no-event', 'old-event', 'other-sandbox', 'policy-denial', 'unrelated-error', 'wrong-destination', 'missing-event-id'])
 def test_transport_error_requires_fresh_original_native_upstream_failure(fault, detail):
     from tests.qualification.test_toolchains import expect_registry_unavailable

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite errors="0" failures="1" hostname="cc250bd3b8e4" name="pytest" skipped="0" tests="2" time="0.027" timestamp="2026-10-13T09:37:55.012023"><testcase classname="tests.test_case" name="test_control" time="0.003"><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="tests.test_case.TestSecurity" name="test_security" time="0.002"><failure message="AssertionError: assert 'x' == 'never'&#10;  - never&#10;  + x">Traceback (most recent call last):
+  File "/w/tests/test_case.py", line 14, in test_security
+    assert target.read(str(tmp_path), "outside.txt") == "never"
+AssertionError: assert 'x' == 'never'
+  - never
+  + x</failure><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase></testsuite></testsuites>
