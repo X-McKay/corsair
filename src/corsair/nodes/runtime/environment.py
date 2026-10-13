@@ -1,6 +1,7 @@
 """SPEC-0042 hand-off to the environment agent (SPEC-0029) and SPEC-0060 runtime stage of the chain: the selected
-matrix row becomes the agent's only toolchain, an unselected requirement stops before the agent runs, and a ready
-result is checked against the selection. Deterministic; no model, sandbox or SDK types.
+matrix row becomes the agent's only toolchain, an unselected requirement stops before the agent runs with a
+structured blocker, and a ready result is checked against the selection. Deterministic; no model, sandbox or SDK
+types.
 
 `prepared` maps a matrix row id to the prepared image reference (`repository@sha256:...`) from the operator's
 image receipt (`tests/qualification/prepare_toolchains.py`); a selected row without a prepared image stops too.
@@ -10,8 +11,10 @@ import re
 from typing import Mapping
 
 from corsair.agents.environment.contracts import EnvironmentInput, ReadyEnvironment, Toolchain
-from corsair.nodes.runtime.contracts import RuntimeInputs, RuntimeOutcome, RuntimeRequirement, Selection, Supported
-from corsair.nodes.runtime.detect import detect
+from corsair.core.blockers import Blocker
+from corsair.nodes.runtime.contracts import (MAX_INPUT_BYTES, Language, RuntimeInputs, RuntimeOutcome,
+                                             RuntimeRequirement, Selection, Supported)
+from corsair.nodes.runtime.detect import detect, is_build_file
 from corsair.nodes.runtime.matrix import Matrix, select
 
 # Environment agent framework table names (agents/environment/frameworks.py) per runner-table framework name.
@@ -32,30 +35,85 @@ class RuntimeCatalog:
                 raise ValueError(f'prepared image for {row!r} is not a digest-pinned image of a matrix row')
 
 
+def runtime_inputs(files: Mapping[str, bytes], language: Language | None = None, *,
+                   parents: Mapping[str, bytes] | None = None, root: str = '.') -> RuntimeInputs:
+    """The case's runtime inputs from a snapshot's files: build files only, smallest first within
+    `MAX_INPUT_BYTES` after the parent POMs; anything left out is named in `omitted`, deterministically."""
+    parents = dict(parents or {})
+    budget = MAX_INPUT_BYTES - sum(len(v) for v in parents.values())
+    if budget < 0:
+        raise ValueError(f'parent POMs alone exceed {MAX_INPUT_BYTES} bytes')
+    kept, omitted = {}, []
+    for path in sorted((p for p in files if is_build_file(p)), key=lambda p: (len(files[p]), p)):
+        if len(files[path]) <= budget:
+            kept[path], budget = files[path], budget - len(files[path])
+        else:
+            omitted.append(path)
+    return RuntimeInputs(files=kept, language=language, parents=parents, root=root, omitted=tuple(sorted(omitted))[:64])
+
+
+def _blocker(requirement: RuntimeRequirement | str, selection: Selection | None) -> Blocker:
+    """Operator or developer guidance for a stop (SPEC-0060 carrying #63's structured blockers)."""
+    evidence = tuple(f'{e.path}:{e.line}' for c in requirement.components for e in (*c.evidence, *c.unparsed)) \
+        if isinstance(requirement, RuntimeRequirement) else ()
+
+    def blocker(code, summary, actions, owner='operator'):
+        return Blocker(code=code, summary=summary, certainty='observed', owner=owner, actions=tuple(actions),
+                       evidence=evidence)
+    if isinstance(requirement, str) or selection is None:
+        return blocker('runtime_undetermined', 'No actionable runtime selection is available.',
+                       ['Inspect the project root and saved build files; resolve missing or unread declarations before selecting an image.',
+                        'Run runtime detection and selection again; do not choose a default or nearby runtime.'], 'developer')
+    if selection.status == 'undetermined':
+        return blocker('runtime_undetermined', 'Runtime declarations are missing, conflicting or unread.',
+                       ['Inspect selection.missing and the cited source declarations.',
+                        'Supply the missing metadata or correct parser/input support; rerun selection before adding an image.'], 'developer')
+    if selection.status == 'unsupported':
+        requirements = '; '.join(f'{c.kind} {c.name} {c.allowed}' for c in requirement.components)
+        framework_only = all(n.kind == 'test_framework' for n in selection.needs)
+        return blocker('framework_unqualified' if framework_only else 'image_unavailable',
+                       'No qualified framework runner matches.' if framework_only else 'No qualified base-image row satisfies the project.',
+                       [f'Required components for {requirement.language}: {requirements}.',
+                        'Inspect selection.needs and selection.rejected for exact version ranges and per-image mismatches; preferred versions are suggestions, not qualification.',
+                        'Qualify the framework/runner on the matching image and register its exact tested version set.' if framework_only else
+                        'Add a digest-pinned image with the required runtime/build tools; build and qualify it before registering it in deploy/runtime-matrix.yaml.',
+                        'Follow .claude/skills/corsair-base-image/SKILL.md; preserve project constraints and qualify framework support as well.'])
+    return blocker('image_not_prepared', f'Qualified image {selection.image_id} is not prepared on this node.',
+                   ['Use the existing row and toolchain preparation/load runbook; verify the node image receipt and digest.',
+                    'Do not create a replacement row or use the base-image digest as the prepared application image.'])
+
+
 def runtime_outcome(requirement: RuntimeRequirement | str, selection: Selection | None,
                     prepared: Mapping[str, str]) -> RuntimeOutcome:
-    """The typed result of selection: supported with the prepared image, or the status and reason that stop."""
+    """The typed result of selection: supported with the prepared image, or the status, reason and blocker that stop."""
+    def stop(status, reason):
+        return RuntimeOutcome(status=status, requirement=None if isinstance(requirement, str) else requirement,
+                              detection=requirement[:240] if isinstance(requirement, str) else None,
+                              selection=selection, image=None, reason=reason[:2048],
+                              diagnostic=_blocker(requirement, selection))
     if isinstance(requirement, str):
-        return RuntimeOutcome(status='undetermined', requirement=None, detection=requirement[:240], selection=None,
-                              image=None, reason=f'no runtime requirement: {requirement}'[:2048])
+        return stop('undetermined', f'no runtime requirement: {requirement}')
     if selection is None:
-        return RuntimeOutcome(status='undetermined', requirement=requirement, detection=None, selection=None,
-                              image=None, reason='no runtime requirement: not selected')
+        return stop('undetermined', 'no runtime requirement: not selected')
     if selection.status != 'supported':
         detail = '; '.join(f'{n.name} {n.preferred or n.allowed}' for n in selection.needs) if selection.status == 'unsupported' \
             else '; '.join(selection.missing)
-        return RuntimeOutcome(status=selection.status, requirement=requirement, detection=None, selection=selection,
-                              image=None, reason=f'runtime {selection.status}: {detail}'[:2048])
+        return stop(selection.status, f'runtime {selection.status}: {detail}')
     if selection.image_id not in prepared:
-        return RuntimeOutcome(status='not_prepared', requirement=requirement, detection=None, selection=selection,
-                              image=None, reason=f'matrix row {selection.image_id} has no prepared image on this node')
+        return stop('not_prepared', f'matrix row {selection.image_id} has no prepared image on this node')
     return RuntimeOutcome(status='supported', requirement=requirement, detection=None, selection=selection,
                           image=prepared[selection.image_id], reason=f'runtime supported by matrix row {selection.image_id}')
 
 
 def select_runtime(inputs: RuntimeInputs, catalog: RuntimeCatalog) -> RuntimeOutcome:
-    """Detect, select and resolve the prepared image: the chain's runtime stage in every mode."""
+    """Detect, select and resolve the prepared image: the chain's runtime stage in every mode. A build file the
+    case omitted for size is an unresolved input, so the selection is undetermined rather than guessed."""
     requirement = detect(inputs.files, inputs.language, root=inputs.root, parents=inputs.parents)
+    if inputs.omitted:
+        unread = tuple(f'{path} omitted from the chain inputs (over {MAX_INPUT_BYTES} bytes in total), not read'[:240]
+                       for path in inputs.omitted)
+        requirement = f'{requirement}; {unread[0]}'[:240] if isinstance(requirement, str) else \
+            requirement.model_copy(update={'unresolved': (requirement.unresolved + unread)[:64]})
     selection = None if isinstance(requirement, str) else select(requirement, catalog.matrix)
     return runtime_outcome(requirement, selection, catalog.prepared)
 
@@ -69,7 +127,8 @@ def toolchain(selection: Supported, matrix: Matrix, prepared: Mapping[str, str])
 
 def environment_input(requirement: RuntimeRequirement | str, selection: Selection | None, matrix: Matrix,
                       prepared: Mapping[str, str], **fields) -> EnvironmentInput | RuntimeOutcome:
-    """The agent input with exactly the selected toolchain, or the outcome that replaces the agent run.
+    """The agent input with exactly the selected toolchain, or the outcome (with its blocker) that replaces the
+    agent run.
 
     `fields` are the remaining `EnvironmentInput` fields (commit, source_private, source_files, policy_profile)."""
     outcome = runtime_outcome(requirement, selection, prepared)

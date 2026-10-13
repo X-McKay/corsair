@@ -1,6 +1,7 @@
 """Durable-chain payloads, admission and worker-side runner resolution without a Temporal service."""
 
 import asyncio
+import os
 from dataclasses import replace
 from datetime import timedelta
 from uuid import uuid4
@@ -22,7 +23,7 @@ from corsair.agents.test_authoring.dependencies import AuthoringBudget, Authorin
 from corsair.agents.test_planning.contracts import TestPlan
 from corsair.composition.direct import CompositionBudget, RecordedFailure, StageModels, run_direct
 from corsair.composition.evidence import freeze
-from corsair.nodes.runtime.contracts import RuntimeInputs, RuntimeOutcome
+from corsair.nodes.runtime.contracts import MAX_INPUT_BYTES, RuntimeInputs, RuntimeOutcome
 from corsair.nodes.runtime.environment import RuntimeCatalog
 from corsair.nodes.runtime.matrix import load
 from corsair.ports.test_runner import ApprovedPatch, PatchFile
@@ -112,6 +113,10 @@ def test_runtime_stage_payloads_and_worker_activity(tmp_path):
         assert await roundtrip(outcome, RuntimeOutcome) == outcome
         result = ChainResult(stopped_at="runtime", reason=outcome.reason, attempts=(), runtime=outcome)
         assert await roundtrip(result, ChainResult) == result
+        # The largest admitted build-file set still fits Temporal's default 2 MB payload limit with the case around it.
+        full = RuntimeInputs(files={"poetry.lock": os.urandom(MAX_INPUT_BYTES)})
+        (payload,) = await CONVERTER.encode([replace(request, case=replace(request.case, runtime=full))])
+        assert len(payload.SerializeToString()) < 2_000_000
     asyncio.run(check())
 
 

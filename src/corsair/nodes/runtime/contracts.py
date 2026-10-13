@@ -9,6 +9,8 @@ from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from corsair.core.blockers import Blocker
+
 Language = Literal['python', 'java', 'javascript', 'ruby', 'perl']
 Kind = Literal['runtime', 'build_tool', 'test_framework']
 Strength = Literal['constraint', 'tested', 'pinned']
@@ -105,14 +107,27 @@ class Undetermined(_Frozen):
 Selection = Annotated[Union[Supported, Unsupported, Undetermined], Field(discriminator='status')]
 
 
+# Raw bytes of build files and parent POMs one case may carry. Base64 makes that about 1.4 MB, which leaves the
+# rest of the chain request well inside Temporal's default 2 MB payload limit; larger inputs are omitted by name.
+MAX_INPUT_BYTES = 1 << 20
+
+
 class RuntimeInputs(_Frozen):
     """SPEC-0060 operator input: the baseline revision's build files, never shown to an agent. Bytes cross a
-    Temporal payload as base64 so non-UTF-8 content survives."""
+    Temporal payload as base64 so non-UTF-8 content survives; `omitted` names build files left out to stay within
+    `MAX_INPUT_BYTES`, which selection reports as unresolved (so undetermined) in every mode."""
     model_config = ConfigDict(extra='forbid', frozen=True, ser_json_bytes='base64', val_json_bytes='base64')
     files: dict[str, bytes] = Field(description='Project-relative path to bytes from the captured snapshot')
     language: Language | None = None
     parents: dict[str, bytes] = Field(default_factory=dict, description='Operator-supplied Maven parent POMs')
     root: str = Field(default='.', max_length=512)
+    omitted: tuple[str, ...] = Field(default=(), max_length=64, description='Build files left out for size')
+
+    @model_validator(mode='after')
+    def bounded(self) -> 'RuntimeInputs':
+        if sum(len(v) for v in (*self.files.values(), *self.parents.values())) > MAX_INPUT_BYTES:
+            raise ValueError(f'runtime inputs exceed {MAX_INPUT_BYTES} bytes; omit the largest build files by name')
+        return self
 
 
 class RuntimeOutcome(_Frozen):
@@ -124,11 +139,12 @@ class RuntimeOutcome(_Frozen):
     image: str | None = Field(pattern=r'^[^@\s]+@sha256:[0-9a-f]{64}$', max_length=512,
                               description="The selected row's prepared image on this node")
     reason: str = Field(max_length=2048)
+    diagnostic: Blocker | None = Field(default=None, description='Operator or developer guidance; absent only when supported')
 
     @model_validator(mode='after')
     def consistent(self) -> 'RuntimeOutcome':
         supported = isinstance(self.selection, Supported)
-        if (self.status == 'supported') != (self.image is not None) or \
+        if (self.status == 'supported') != (self.image is not None) or (self.status == 'supported') != (self.diagnostic is None) or \
                 (self.status in ('supported', 'not_prepared')) != supported or (self.requirement is None) == (self.detection is None):
             raise ValueError('runtime outcome fields disagree with its status')
         return self

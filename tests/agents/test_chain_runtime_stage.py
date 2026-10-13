@@ -58,6 +58,7 @@ def test_an_unselected_runtime_ends_the_run_before_any_stage(run, tmp_path, inpu
     result = run(replace(fixture_case(), runtime=inputs), catalog=catalog() if prepared else RuntimeCatalog(load(), {}))
     assert (result.stopped_at, result.runtime.status) == ('runtime', status)
     assert result.reason.startswith(reason) and result.reason == result.runtime.reason
+    assert result.runtime.diagnostic is not None
     assert result.attempts == () and result.executions == () and result.gate is None
     assert not any((tmp_path / 'work').iterdir())
 
