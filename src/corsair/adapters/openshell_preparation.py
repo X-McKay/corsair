@@ -8,6 +8,7 @@ is operator configuration; nothing comes from the agent.
 """
 from collections.abc import Callable, Mapping
 from dataclasses import asdict
+from functools import partial
 import json
 from pathlib import Path
 from typing import Literal, Protocol
@@ -22,13 +23,14 @@ from corsair.nodes.source_fetch import WorkspaceBudget, WorkspaceBudgetRefused, 
 from corsair.ports.artifacts import ArtifactStore, SourceSnapshot
 from corsair.ports.execution import SandboxExecution
 from corsair.ports.sandbox import PolicyError, SandboxHandle, SandboxPolicy
+from corsair.ports.test_runner import PatchFile
 
 Cleanup = Literal['confirmed', 'unconfirmed']
 
 
 class SourceWorkspace(Protocol):
     """`OpenShellTestWorkspace` over one captured revision and one image."""
-    def prepare_source(self, operation: UUID) -> SandboxHandle: ...
+    def prepare_source(self, operation: UUID, added: tuple[PatchFile, ...] = ()) -> SandboxHandle: ...
     def release_source(self, handle: SandboxHandle, operation: UUID) -> Cleanup: ...
 
 
@@ -52,9 +54,16 @@ class OpenShellPreparation:
     def __enter__(self): return self
     def __exit__(self, *args): self._journal.close()
 
-    def prepare(self, toolchain: Toolchain, operation: UUID) -> PreparedSandbox:
+    def prepare(self, toolchain: Toolchain, operation: UUID, *, overlay: tuple[PatchFile, ...] = ()) -> PreparedSandbox:
+        """`overlay`: SPEC-0071 operator files (smoke tests) placed and verified with the captured source."""
         if not isinstance(operation, UUID):
             raise ValueError('Operation must be a UUID')
+        added = {}
+        for item in overlay:  # PatchFile already confines each path.
+            if item.path in self._files or item.path in added:
+                raise PreparationRefused('admission', f'overlay path {item.path} is already in the commit',
+                                         'not_required')
+            added[item.path] = item
         try:
             dependency = dependency_policy(self._base, toolchain.language, self._resolvers.get(toolchain.language, ()),
                                            private_source=self._private)
@@ -72,7 +81,7 @@ class OpenShellPreparation:
         except Exception as error:
             raise PreparationRefused('host', f'journal: {type(error).__name__}: {error}'[:2048], 'not_required') from error
         try:
-            handle = workspace.prepare_source(uuid5(operation, 'source'))
+            handle = workspace.prepare_source(uuid5(operation, 'source'), tuple(added.values()))
         except WorkspaceError as error:
             # The workspace discarded its own sandbox and says whether that was confirmed.
             self._record(operation, 'unconfirmed' if error.cleanup == 'unconfirmed' else 'confirmed')
@@ -88,10 +97,16 @@ class OpenShellPreparation:
             self._record(operation, cleanup)  # So `sweep` does not delete it a second time.
             raise PreparationRefused(layer, f'{type(error).__name__}: {error}'[:2048], cleanup) from error
         self._live[handle.id] = workspace
-        return PreparedSandbox(self._execution, handle, self._scratch, self._read_source)
+        # SPEC-0071: the complete listing of what the operator placed, from the capture and overlay, never the
+        # sandbox's view; placement admits at most the workspace's bounded tree, so it is never truncated.
+        paths = tuple(sorted(self._files.keys() | added.keys()))
+        return PreparedSandbox(self._execution, handle, self._scratch, partial(self._read_source, added),
+                               source_paths=lambda: paths)
 
-    def _read_source(self, path: str) -> bytes | None:
-        """The captured bytes of one file of the revision placed in the sandbox, from the operator's store."""
+    def _read_source(self, overlay: Mapping[str, PatchFile], path: str) -> bytes | None:
+        """One placed file's bytes from the operator's store or overlay, never from the sandbox."""
+        if path in overlay:
+            return overlay[path].content
         artifact = self._files.get(path)
         return None if artifact is None else self._store.get(artifact)
 

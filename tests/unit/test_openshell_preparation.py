@@ -12,6 +12,7 @@ from corsair.agents.environment.contracts import Toolchain
 from corsair.composition.direct import PreparationRefused
 from corsair.nodes.source_fetch import WorkspaceBudget
 from corsair.ports.sandbox import PolicyError, PolicyReceipt, SandboxHandle
+from corsair.ports.test_runner import PatchFile
 from tests.unit.test_source_fetch import FILES, snapshot
 
 IMAGE = 'docker.io/library/corsair-python@sha256:' + 'a' * 64
@@ -31,8 +32,9 @@ class Workspaces:
         self.images.append(image)
         return self
 
-    def prepare_source(self, operation):
+    def prepare_source(self, operation, added=()):
         self.log.append(('place', operation))
+        self.added = added
         if 'place' in self.fail:
             raise self.fail['place']
         return HANDLE
@@ -133,7 +135,7 @@ def test_the_intent_is_journaled_before_any_sandbox_is_created(make, tmp_path):
     adapter, log, workspaces, _ = make()
     operation, seen = uuid4(), []
 
-    def lost(source_operation):
+    def lost(source_operation, added=()):
         seen.extend(p.name for p in adapter._receipts.iterdir())
         raise SystemExit('worker lost')
     workspaces.prepare_source = lost
@@ -193,3 +195,30 @@ def test_the_baseline_file_is_read_from_the_capture_not_the_sandbox(make):
     entries = len(log)
     assert sandbox.read_source('src/a/b.txt') == b'b\r\n' and sandbox.read_source('missing.py') is None
     assert len(log) == entries  # No sandbox step ran to answer it.
+
+
+SMOKE = PatchFile('tests/test_corsair_smoke.py', b'def test_corsair_smoke():\n    assert True\n')
+
+
+def test_the_smoke_test_overlay_is_placed_and_listed_with_the_capture(make):
+    """SPEC-0071 on OpenShell: the overlay goes in with the source, and the listing is the complete placed tree."""
+    adapter, _, workspaces, _ = make()
+    sandbox = adapter.prepare(TOOLCHAIN, uuid4(), overlay=(SMOKE,))
+    assert workspaces.added == (SMOKE,)
+    assert sandbox.source_paths() == ('README', 'bin/run', 'src/a/b.txt', 'tests/test_corsair_smoke.py')
+    assert sandbox.read_source(SMOKE.path) == SMOKE.content and sandbox.read_source('README') == b'hello\n'
+
+
+def test_without_an_overlay_the_listing_is_the_capture(make):
+    adapter, _, workspaces, _ = make()
+    assert adapter.prepare(TOOLCHAIN, uuid4()).source_paths() == ('README', 'bin/run', 'src/a/b.txt')
+    assert workspaces.added == ()
+
+
+@pytest.mark.parametrize('overlay', [(PatchFile('README', b'x'),), (SMOKE, SMOKE)])
+def test_an_overlay_the_capture_already_has_is_refused_before_any_sandbox(make, overlay):
+    adapter, log, workspaces, _ = make()
+    with pytest.raises(PreparationRefused) as refused:
+        adapter.prepare(TOOLCHAIN, uuid4(), overlay=overlay)
+    assert (refused.value.layer, refused.value.cleanup) == ('admission', 'not_required')
+    assert log == [] and workspaces.images == []

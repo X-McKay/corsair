@@ -1,0 +1,15 @@
+{
+  "case": "ih-python-massassignment",
+  "language": "python",
+  "split": "development",
+  "oracle": {
+    "stopped_at": null,
+    "gate": {
+      "execution": "completed",
+      "finding": "reproduced",
+      "fix": "verified"
+    },
+    "assessment_admitted": true
+  },
+  "case_sha256": "e192f481a1a4c9f9d4340c1e3eca898a50e9b1b971b6b0197c8c86b615140c20"
+}

@@ -357,11 +357,12 @@ class OpenShellTestWorkspace:
         handle = self._place(patch.files, operation)
         return PreparedWorkspace(handle, self._snapshot.manifest, tests, patch.sha256)
 
-    def prepare_source(self, operation: UUID) -> SandboxHandle:
-        """A fresh sandbox holding exactly the captured source and nothing else (SPEC-0070 environment stage)."""
-        if not isinstance(operation, UUID):
-            raise ValueError('Operator operation required')
-        return self._place((), operation)
+    def prepare_source(self, operation: UUID, added: tuple[PatchFile, ...] = ()) -> SandboxHandle:
+        """A fresh sandbox holding exactly the captured source plus any operator overlay files (SPEC-0070, SPEC-0071
+        smoke tests), each verified the same way, and nothing else."""
+        if not isinstance(operation, UUID) or not all(isinstance(f, PatchFile) for f in added):
+            raise ValueError('Operator operation and overlay files required')
+        return self._place(tuple(added), operation)
 
     def _place(self, added: tuple[PatchFile, ...], operation: UUID) -> SandboxHandle:
         files, parents = self._expected(added)

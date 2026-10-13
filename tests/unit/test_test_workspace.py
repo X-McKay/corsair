@@ -125,6 +125,14 @@ def test_prepare_delivers_source_and_patch_and_admits_exact_tree(store, tmp_path
     assert adapter.release(prepared, operation) == 'confirmed' and lifecycle.calls[-1] == ('delete', uuid5(operation, 'release'))
 
 
+def test_prepare_source_places_overlay_files_read_only_beside_the_source(store, tmp_path):
+    """SPEC-0071: an operator smoke test goes in with the captured source and is verified the same way."""
+    adapter, (lifecycle, verifier, upload), config = workspace(store, tmp_path)
+    adapter.prepare_source(uuid4(), (PatchFile('tests/test_corsair_smoke.py', b'def test_s(): pass\n'),))
+    assert modes(Path(config.remote_root)) == {'pkg': 0o700, 'pkg/app.py': 0o400, 'tests': 0o700,
+                                               'tests/test_corsair_smoke.py': 0o400, 'tool.sh': 0o500}
+
+
 def test_prepare_source_places_exactly_the_captured_source(store, tmp_path):
     """SPEC-0070: the environment stage's sandbox holds the captured source and no tests, verified the same way."""
     adapter, (lifecycle, verifier, upload), config = workspace(store, tmp_path)
