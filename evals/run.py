@@ -1,6 +1,6 @@
 """One command per agent: run its eval suite on the host and file the result for comparison (SPEC-0044).
 
-    make eval AGENT=planning [SET=heldout2] [PROVIDER_CONFIG=<LocalModelConfig.json>] [REPEAT=3] [NOTE=...]
+    make eval AGENT=planning [SET=heldout3] [PROVIDER_CONFIG=<LocalModelConfig.json>] [REPEAT=3] [NOTE=...]
     make eval-baseline AGENT=planning RUN=<run id>
 
 Each suite keeps its own CLI and native report; this wrapper only chooses an evidence directory, runs the
@@ -49,7 +49,7 @@ SUITES: dict[str, Suite] = {
     "identification": Suite("evals.issue_identification.evaluate", {"development": ()}, repeat=False),
     "planning": Suite("evals.test_planning.evaluate", {
         "development": ("--cases", "development"), "heldout": ("--cases", "heldout"),
-        "heldout2": ("--cases", "heldout2")}),
+        "heldout2": ("--cases", "heldout2"), "heldout3": ("--cases", "heldout3")}),
     "authoring": Suite("evals.test_authoring.evaluate", {"development": ()},
                        note="runs answered by injected observations or the static host runner; tests are not executed"),
     "assessment": Suite("evals.evidence_assessment.evaluate", {
