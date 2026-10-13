@@ -15,6 +15,19 @@ STAGES = ("admission", "runtime", "environment", "identification", "planning", "
           "complete")
 
 
+# The headline label (corpus vocabulary) from the gate's finding; any early stop is INCONCLUSIVE. The eval match
+# keeps comparing the three-part result, never this label.
+LABELS = {"reproduced": "LIKELY_EXPLOITABLE", "not_reproduced": "LIKELY_NOT_EXPLOITABLE",
+          "refuted_in_scope": "LIKELY_NOT_EXPLOITABLE", "inconclusive": "INCONCLUSIVE"}
+
+
+def headline(stopped_at: str | None, gate: dict | None) -> str:
+    """LIKELY_EXPLOITABLE, LIKELY_NOT_EXPLOITABLE or INCONCLUSIVE for one run's record."""
+    if stopped_at is not None or not gate:
+        return "INCONCLUSIVE"
+    return LABELS[gate["finding"]]
+
+
 def _usage(run: DirectRun) -> dict:
     return {f"{index}-{a.stage}": {"requests": a.usage.requests if a.usage else None,
                                    "input_tokens": a.usage.input_tokens if a.usage else None,
@@ -54,6 +67,8 @@ def record(label: str, evidence: Path, *, investigation: Investigation | None = 
         "stopped_at": "admission" if run is None else run.stopped_at,
         "reason": refused if run is None else run.reason,
         "gate": run.gate.permitted.model_dump() if run is not None and run.gate else None,
+        "label": headline("admission" if run is None else run.stopped_at,
+                       run.gate.permitted.model_dump() if run is not None and run.gate else None),
         "outcomes": outcomes, "usage": {} if run is None else _usage(run), "cleanup": cleanup,
         "evidence": str(evidence)}
 
@@ -76,7 +91,7 @@ def summary_line(item: dict) -> str:
         state = f"stopped at {item['stopped_at']}: {item['reason']}".replace("\n", " ")[:400]
     cleanup = "confirmed" if item["cleanup"] and all(v in ("confirmed", None, "not_run") for v in item["cleanup"].values()) \
         else ("unconfirmed" if item["cleanup"] else "none needed")
-    return f"{head}: {state} — {chosen}; {requests} model requests; cleanup {cleanup}; {item['evidence']}"
+    return f"{head}: {item['label']}; {state} — {chosen}; {requests} model requests; cleanup {cleanup}; {item['evidence']}"
 
 
 def with_expected(item: dict, case: str, expected) -> dict:

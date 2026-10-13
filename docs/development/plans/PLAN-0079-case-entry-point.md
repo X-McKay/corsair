@@ -50,6 +50,10 @@ stages reached per cohort. Esprima stays for JavaScript assertion lines (Al kept
 - [x] `corsair` console script (`[project.scripts]`, uv_build backend, `src/corsair` a namespace package), `corsair run` in `corsair.investigate`, `make investigate ISSUE_JSON=` a wrapper: request, record and summary line, receipts under a new
   private evidence directory; `corsair.investigation.results` record incl. reserved `baseline_basis`
   ("project" | "operator_smoke"), cohort roll-up.
+- [x] Headline label first in the record and summary line (`results.headline`, one table): gate finding
+  reproduced -> LIKELY_EXPLOITABLE; not_reproduced or refuted_in_scope -> LIKELY_NOT_EXPLOITABLE; inconclusive, or any
+  early stop -> INCONCLUSIVE; the three-part result and stop reason follow. The eval match still compares the
+  three-part result.
 - [x] `evals/case_e2e`: a case becomes its issue request (manual issue, `file://` clone under
   `CORSAIR_CASE_SOURCES`) plus `expected.json` the entry never reads; `run.py` (`make run CASE=`), `evaluate.py`
   (`make eval AGENT=chain SET=jest`), `cohorts.yaml`.

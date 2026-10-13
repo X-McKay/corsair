@@ -209,7 +209,7 @@ def test_records_summary_lines_and_the_cohort_roll_up(tmp_path):
     refused = record("manual:abc", tmp_path, refused="runtime undetermined: no engines")
     assert (refused["reached"], refused["reason"], refused["selected"], refused["usage"]) == (
         "admission", "runtime undetermined: no engines", None, {})
-    assert summary_line(refused).startswith("manual:abc: stopped at admission: runtime undetermined")
+    assert summary_line(refused).startswith("manual:abc: INCONCLUSIVE; stopped at admission: runtime undetermined")
     oracle = ChainOracle(stopped_at="planning", gate=None, assessment_admitted=None)
     stopped = record("manual:def", tmp_path, run=DirectRun(stopped_at="planning", reason="no witness recorder", attempts=()))
     planning = with_expected(stopped, "CVE-2", oracle)
@@ -265,3 +265,15 @@ def test_the_sandbox_reads_the_baseline_file_from_the_capture_never_the_sandbox(
     assert captured_file(tree, "tests/test_corsair_smoke.py", overlay).startswith(b"def test_environment_runs")
     assert captured_file(tree, "link.js") is None and captured_file(tree, "../outside.js") is None
     assert captured_file(tree, "missing.js") is None
+
+
+@pytest.mark.parametrize("finding, expected", [("reproduced", "LIKELY_EXPLOITABLE"),
+                                               ("not_reproduced", "LIKELY_NOT_EXPLOITABLE"),
+                                               ("refuted_in_scope", "LIKELY_NOT_EXPLOITABLE"),
+                                               ("inconclusive", "INCONCLUSIVE")])
+def test_the_headline_label_follows_the_gate_finding(finding, expected):
+    from corsair.investigation.results import headline as label
+    gate = {"execution": "completed", "finding": finding, "fix": "verified"}
+    assert label(None, gate) == expected
+    # Any early stop is inconclusive whatever a gate said.
+    assert label("assessment", gate) == label("admission", None) == "INCONCLUSIVE"
