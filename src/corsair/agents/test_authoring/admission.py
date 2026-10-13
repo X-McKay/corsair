@@ -35,7 +35,10 @@ UNOBSERVED_TARGETS = {"os.environ"}
 PATCHED_EXACT = {"sys.modules"}
 PATCH_CALLS = {"setattr", "delattr", "setitem", "delitem", "patch"}
 # Keyword spellings of a patch call's target and name: monkeypatch.setattr(target=os, name="system", value=f).
-PATCH_KEYWORDS = {"target", "name", "obj", "dic"}
+PATCH_KEYWORDS = {"target", "obj", "dic"}
+NAME_KEYWORDS = {"name"}
+# In-place mutators of a protected mapping: sys.modules.update({...}) swaps imported modules like an assignment.
+MUTATORS = {"update", "setdefault", "pop", "popitem", "clear", "__setitem__", "__delitem__"}
 # Names whose string form is only useful to reach the facilities above dynamically.
 NAMES = SYS_FACILITIES - {"audit", "monitoring"} | {"settrace_all_threads", "setprofile_all_threads", "__builtins__"}
 
@@ -92,6 +95,14 @@ def _unobserved(target: str | None) -> bool:
         return False
     padded = f".{target}."
     return any(f".{allowed}." in padded for allowed in UNOBSERVED_TARGETS)
+
+
+def _module_path(node: ast.AST, aliases: dict[str, str]) -> str | None:
+    """The resolved path of an expression rooted in an imported name; None for local objects (c.open, payload['os'])."""
+    dotted = _dotted(node)
+    if dotted is None or dotted.partition(".")[0] not in aliases:
+        return None
+    return _resolved(node, aliases)
 
 
 def _protected(target: str | None) -> bool:
@@ -178,11 +189,11 @@ def self_observation(content: str) -> tuple[AdmissionFinding, ...]:
             for target in targets:
                 for element in (target.elts if isinstance(target, (ast.Tuple, ast.List)) else [target]):
                     written = _written(element)
-                    resolved = _resolved(written, aliases) if written is not None else None
+                    resolved = _module_path(written, aliases) if written is not None else None
                     # As for patch calls, a module's own binding of a protected name is protected too:
                     # documents.open = f replaces the application's observed open as surely as builtins.open.
                     key = _key(element)
-                    if _protected(resolved) or (key in PATCHED and not _unobserved(resolved)):
+                    if _protected(resolved) or (resolved and key in PATCHED and not _unobserved(resolved)):
                         refuse(node, f"{verb} {resolved or key}")
         if isinstance(node, ast.Call):
             func = _dotted(node.func)
@@ -195,13 +206,20 @@ def self_observation(content: str) -> tuple[AdmissionFinding, ...]:
                 refuse(node, f"{func}()")
             if name in PATCH_CALLS:
                 # monkeypatch.setattr(os, "open", f), setattr(builtins, ...), monkeypatch.setattr("builtins.open", f),
-                # a patch of any module's own "open" name, and the same in keyword form.
-                for argument in [*node.args[:2], *(k.value for k in node.keywords if k.arg in PATCH_KEYWORDS)]:
-                    patched = argument.value if isinstance(argument, ast.Constant) and isinstance(
-                        argument.value, str) else _resolved(argument, aliases)
-                    if _protected(patched):
+                # a patch of an imported module's own "open" name, and the same in keyword form.
+                targets = [*node.args[:1], *(k.value for k in node.keywords if k.arg in PATCH_KEYWORDS)]
+                names = [*node.args[1:2], *(k.value for k in node.keywords if k.arg in NAME_KEYWORDS)]
+                for argument in targets:
+                    literal = isinstance(argument, ast.Constant) and isinstance(argument.value, str)
+                    patched = argument.value if literal else _module_path(argument, aliases)
+                    named = next((n.value for n in names if isinstance(n, ast.Constant) and isinstance(n.value, str)), None)
+                    if _protected(patched) or (not literal and patched and named in PATCHED and not _unobserved(patched)):
                         refuse(node, f"{func}({patched})")
                         break
+            elif isinstance(node.func, ast.Attribute) and node.func.attr in MUTATORS:
+                receiver = _module_path(node.func.value, aliases)
+                if _protected(receiver):
+                    refuse(node, f"{receiver}.{node.func.attr}()")
     return tuple(AdmissionFinding(line=line, facility=construct[:128]) for line, construct in sorted(found))
 
 

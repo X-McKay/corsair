@@ -342,7 +342,7 @@ HOOKED = "import sys\nimport documents\n\nsys.addaudithook(lambda e, a: None)\n\
      "monkeypatch.setattr(builtins.open)"),
     ("import os\n\ndef test_x(monkeypatch):\n    monkeypatch.setattr(os, 'open', print)\n", "monkeypatch.setattr(os)"),
     ("import documents\n\ndef test_x(monkeypatch):\n    monkeypatch.setattr(documents, 'open', print)\n",
-     "monkeypatch.setattr(open)"),
+     "monkeypatch.setattr(documents)"),
     ("from unittest import mock\n", "import unittest.mock"),
     ("import ctypes\n", "import ctypes"),
     ("import sys\n\ndef test_x(monkeypatch):\n    monkeypatch.setitem(sys.modules, 'documents', None)\n",
@@ -465,6 +465,10 @@ def test_tools_are_withdrawn_at_the_tool_call_cap_and_the_author_returns_its_out
     ("from operator import attrgetter as get\nimport sys\nget('audit')(sys)('open', '/x', 'r')\n", "get()"),
     ("from operator import methodcaller as call\nimport sys\ncall('audit', 'open')(sys)\n", "call()"),
     ("import operator as op\nimport sys\nop.attrgetter('audit')(sys)\n", "op.attrgetter()"),
+    # Follow-up review on ecda72d: in-place mutation of a protected mapping.
+    ("import sys\nimport types\nsys.modules.update({'app.dep': types.ModuleType('app.dep')})\n", "sys.modules.update()"),
+    ("import sys\nsys.modules.setdefault('app.dep', None)\n", "sys.modules.setdefault()"),
+    ("import sys\nsys.modules.pop('app.dep')\n", "sys.modules.pop()"),
 ])
 def test_aliased_and_direct_patches_of_observed_facilities_are_found(content, facility):
     """Review on #49: aliases of protected modules and plain assignments must not bypass admission."""
@@ -475,6 +479,10 @@ def test_rebinding_a_local_name_or_setting_the_environment_is_not_a_patch():
     assert self_observation("import os\nos.environ['LANG'] = 'C'\nopen_count = 0\n") == ()
     assert self_observation("import documents\ndocuments.CONFIG = {}\ndocuments.os_name = 'x'\n") == ()
     assert self_observation("import re\nimport app.mod as m\nPATTERN = re.compile('x')\nm.os.environ['LANG'] = 'C'\n") == ()
+    # Writes on local objects are not facility patches, whatever the attribute or key is called.
+    assert self_observation("c = object()\nc.open = 1\npayload = {}\npayload['os'] = 'linux'\npayload['open'] = True\n"
+                            "def test_x(monkeypatch, fake):\n    monkeypatch.setattr(fake, 'open', 1)\n") == ()
+    assert self_observation("import os\nimport app.mod as m\nos.environ.update({'A': '1'})\nm.os.environ.update({})\n") == ()
 
 
 @pytest.mark.parametrize("deferred", [
