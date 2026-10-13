@@ -2,7 +2,7 @@
 id: PLAN-0089
 kind: plan
 title: Planned test ids must name a test in their approved file
-status: in_progress
+status: complete
 updated: 2026-10-13
 related: [PLAN-0087, SPEC-0022, SPEC-0068, SPEC-0071, HANDOFF-0116]
 ---
@@ -54,4 +54,9 @@ Change: `build_command` may be empty, meaning the project has nothing to build; 
 
 Reproduction and transfer: a scripted environment run on the original shape (pytest, dependency install, no build) and a transfer on a different interpreted framework (Perl `tap-harness` run from source with no recipe and no build) both failed on main (2 failed) and are admitted now; the unit test that listed an empty build command as unsafe now checks an empty discovery command instead. Scripted `make eval AGENT=environment`: 16/16 before and after, assertion rows identical. Offline suite: 1973 passed. Frozen eval cases unchanged; the environment's live reference is the campaign owner's (main scored 0/16 there because it scores exact pip argv, unrelated to this field).
 
-Next: the campaign owner's live environment eval and a diagnosed `ih-python-healthcheck` successor at this change, recording whether the model was shared.
+Live comparison (campaign owner on RIG0, model not shared, one attempt each; evidence in the owner's worktree, not published):
+
+- Environment development set at `a7c059f`: 0/16 clean, the same as the main reference (`20261013T213158Z`). Status 9/13 to 7/12, layer 6/13 to 7/12, task failures 3 to 4, all `Exceeded maximum output retries`. Identity changed only in `prompt_version` and the skill digest. Read as no measurable change at n=16. What this eval cannot measure: `required_commands` and `command_policy` score exact argv and stayed 0 on both sides, and no frozen case has a project with nothing to build, so the clause's own effect is invisible to it.
+- `ih-python-healthcheck-3` at `5c268c4` (a measurement-only merge of `a7c059f` with `8679af4`, because this branch alone lacks #123 and refuses the fix-free request at admission): INCONCLUSIVE at planning after 11 requests. Environment returned ready in 6 requests with no correction, where attempt 2 stopped at environment. Planning correctly returned unsupported: the CWE-89 concern needs an observation of the database call, and the only witness facility records file opens. The remaining stop is a missing witness capability, not an agent error and not this contract.
+
+This slice is complete; the missing database-call witness is recorded as a capability gap for the campaign, not as work in this plan.

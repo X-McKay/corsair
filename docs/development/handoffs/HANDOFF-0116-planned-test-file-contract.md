@@ -26,3 +26,7 @@ Keep planning output exhaustion as its own hypothesis. The authoring handoff sti
 ```text
 Read AGENTS.md, docs/development/CURRENT.md, PLAN-0087, PLAN-0089 and this handoff. Verify the branch or merged commit carrying names_test_in in src/corsair/ports/test_runner.py. As the single live-inference user, run `make eval AGENT=planning PROVIDER_CONFIG=<operator file>` at that commit and compare with the promoted planning baseline; then run the next ih-python-pathtraversal attempt through `corsair run` on Docker. Record stage, stop reason and whether planning stopped on output exhaustion (separate hypothesis) or on the id/path rule. Update PLAN-0089, CURRENT.md and write a new handoff.
 ```
+
+## Addendum: empty build step and live results
+
+Slice two of PLAN-0089 (`a7c059f`, PR #129) lets the environment's `build_command` be empty when a project has nothing to build. The live planning comparison for slice one was 10/12 vs 11/12, and its failures fall before the new rule. The pathtraversal successor was INCONCLUSIVE because the authored test imported a copy of the target. The live environment eval was 0/16 on both sides, because it scores exact argv. `ih-python-healthcheck-3` passed environment without correction and stopped correctly at planning on a missing database-call witness. Next actions belong to the campaign owner: authored tests that run a copy of the target, reasoning-only output after the single correction, and the database-call witness gap. PLAN-0089 is complete.
