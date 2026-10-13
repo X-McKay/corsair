@@ -28,6 +28,8 @@ from corsair.ports.tickets import TicketSnapshot
 from .frameworks import Harness, NoHarness, harness as harness_for
 from .request import IssueRequest
 
+# The checkout a relative repository path is resolved against (committed corpus repositories).
+CHECKOUT = Path(__file__).resolve().parents[3]
 # A local image's config id in reference form: image-only evidence names the image Docker ran, not a registry manifest.
 LOCAL = "local/corsair-{row}@{config}"
 SETUP_POLICY = "setup-public"
@@ -124,9 +126,15 @@ def named_files(text: str, tree: Path, paths: list[str]) -> tuple[SourceFile, ..
     return _bounded(_readable(tree, sorted({p for p in named if p in present})), SOURCE_FILES, SOURCE_BYTES)
 
 
-def _acquire(repository: str, commits: dict[str, str], work: Path, roots: tuple[Path, ...], acquisition) -> dict[str, Path]:
+def _acquire(repository: str, commits: dict[str, str], work: Path, roots: tuple[Path, ...], acquisition,
+             checkout: Path = CHECKOUT) -> dict[str, Path]:
     """Each revision's tree as its commit records it."""
-    if repository.startswith("file://"):
+    if not repository.startswith(("file://", "https://")):
+        source = (checkout / repository).resolve()
+        if not source.is_relative_to(checkout.resolve()):
+            raise Refused(f"{repository} escapes the checkout")
+        clones = dict.fromkeys(commits, source)
+    elif repository.startswith("file://"):
         source = local_repository(repository, roots)
         clones = dict.fromkeys(commits, source)
     else:
@@ -159,7 +167,7 @@ def _acquire(repository: str, commits: dict[str, str], work: Path, roots: tuple[
 
 def build(request: IssueRequest, work: Path, images: dict[str, str], *, roots: tuple[Path, ...] = (),
           acquisition=None, matrix: Matrix | None = None, timeout: int = 600,
-          default_scope: str = "component") -> Investigation:
+          default_scope: str = "component", checkout: Path = CHECKOUT) -> Investigation:
     """Chain input for one request; `images` maps matrix row ids to the operator's local image config ids, `roots`
     are the allowed local repository roots and `acquisition` a `GitAcquisition` for https repositories."""
     repository, repository_basis = repository_of(request)
@@ -168,7 +176,7 @@ def build(request: IssueRequest, work: Path, images: dict[str, str], *, roots: t
     if request.fixed_revision is None:
         raise Refused("the request names no fixed revision (a vulnerable-only run is not built yet)")
     commits = {"baseline": request.revision, "candidate": request.fixed_revision}
-    trees = _acquire(repository, commits, work, roots, acquisition)
+    trees = _acquire(repository, commits, work, roots, acquisition, checkout)
     baseline = trees["baseline"]
     paths = sorted(p.relative_to(baseline).as_posix() for p in baseline.rglob("*") if p.is_file() and not p.is_symlink())
     runtime = runtime_inputs({p: (baseline / p).read_bytes() for p in paths if is_build_file(p)})

@@ -83,7 +83,7 @@ def test_an_issue_request_holds_the_issue_and_commits_and_nothing_an_operator_ow
             request(repo, baseline, candidate, **{field: value})
     with pytest.raises(ValidationError, match="exact 40-hex commits"):
         request(repo, "main", candidate)
-    with pytest.raises(ValidationError, match="plain https URL or a file:// path"):
+    with pytest.raises(ValidationError, match="plain https URL, a file:// path or a path inside the checkout"):
         request(repo, baseline, candidate, repository="ssh://git@example.invalid/demo")
 
 
@@ -298,3 +298,23 @@ def test_a_crashed_run_is_recorded_as_error_with_its_reason(tmp_path):
     crashed = record("manual:abc", tmp_path, error="DockerError: daemon not reachable")
     assert (crashed["label"], crashed["reason"]) == ("ERROR", "DockerError: daemon not reachable")
     assert summary_line(crashed).startswith("manual:abc: ERROR; stopped at admission: DockerError")
+
+
+def test_a_repository_committed_in_the_checkout_is_named_relative_to_it(clone, tmp_path):
+    repo, baseline, candidate, _ = clone
+    checkout = tmp_path / "sources"
+    built = build(request(repo, baseline, candidate, repository="clone"), tmp_path / "rel", {NODE: CONFIG},
+                  checkout=checkout)
+    assert built.repository == "clone" and "execSync" in (built.trees["baseline"] / "lib/run.js").read_text()
+    for escape in ("../clone", "/abs/clone", "~/clone", "a/../../clone"):
+        with pytest.raises(ValidationError, match="inside the checkout"):
+            request(repo, baseline, candidate, repository=escape)
+    (checkout / "out").symlink_to(tmp_path)
+    with pytest.raises(Refused, match="escapes the checkout"):
+        build(request(repo, baseline, candidate, repository="out/elsewhere"), tmp_path / "esc", {NODE: CONFIG},
+              checkout=checkout)
+    # A request without a fixed revision cannot run yet: an admission stop, UNABLE_TO_RUN.
+    from corsair.investigation.results import record
+    with pytest.raises(Refused, match="names no fixed revision") as refused:
+        build(request(repo, baseline, None, repository="clone"), tmp_path / "nofix", {NODE: CONFIG}, checkout=checkout)
+    assert record("manual:x", tmp_path, refused=str(refused.value))["label"] == "UNABLE_TO_RUN"
