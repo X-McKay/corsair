@@ -1,9 +1,11 @@
 """Environment instructions, skill and typed-input request rendering; no labels, discovery or external calls."""
 
 from hashlib import sha256
+import json
 from pathlib import Path
 
 from .contracts import EnvironmentInput
+from .frameworks import FRAMEWORKS
 
 PROMPT_VERSION = "environment-v8-checkout-listing"
 LISTED_PATHS = 400  # Paths of the operator listing shown in the request; the rest are counted
@@ -25,6 +27,13 @@ def environment_prompt(inputs: EnvironmentInput, checkout_paths: tuple[str, ...]
                 "is answered absent.")
     if checkout_paths is None:
         return request + "\nNo operator listing of the checkout was supplied."
-    shown, rest = checkout_paths[:LISTED_PATHS], len(checkout_paths) - LISTED_PATHS
-    return (request + f"\nCheckout listing (operator, every file of the commit and any smoke test, "
-            f"{len(checkout_paths)} paths): " + ", ".join(shown) + (f", and {rest} more" if rest > 0 else ""))
+    # Files any runner would discover by its default convention come first, so a cap never hides every test.
+    is_test = [any(f.test_file(path) for f in FRAMEWORKS.values()) for path in checkout_paths]
+    ordered = [p for p, t in zip(checkout_paths, is_test) if t] + [p for p, t in zip(checkout_paths, is_test) if not t]
+    shown, rest = ordered[:LISTED_PATHS], len(ordered) - LISTED_PATHS
+    # JSON keeps each untrusted path one entry: git allows commas and newlines in file names.
+    request += (f"\nCheckout listing (operator, every file of the commit and any smoke test, "
+                f"{len(checkout_paths)} paths, test-convention files first, JSON): " + json.dumps(list(shown)))
+    if rest > 0:
+        request += f"\nListing capped: {rest} more paths not shown; do not infer that no project test exists."
+    return request
