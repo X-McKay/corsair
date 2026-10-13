@@ -1,22 +1,25 @@
 ---
 id: PLAN-0079
 kind: plan
-title: Benchmark case entry point, cohort eval and runner from the selected framework
+title: Issue entry point, benchmark cases and cohorts on it, runner from the selected framework
 status: in_progress
 updated: 2026-10-13
-related: [SPEC-0060, SPEC-0068, SPEC-0057, PLAN-0070, IDEA-0005]
+related: [SPEC-0060, SPEC-0068, SPEC-0057, SPEC-0037, SPEC-0038, SPEC-0040, PLAN-0070, IDEA-0005]
 ---
 
-# Benchmark case entry point, cohort eval and runner from the selected framework
+# Issue entry point, benchmark cases and cohorts on it, runner from the selected framework
 
 ## Objective and dependencies
 
-Turn a benchmark case id into chain input and run it, for any language whose framework has a case harness, without
-changing `run_chain`'s stage order or the runtime selector (SPEC-0060, SPEC-0068). Kick-off shape agreed in the
-project on 2026-10-13: `make eval AGENT=chain SET=<cohort>` for cohorts on the existing eval wrapper (indexed,
-compared, promotable), `make run CASE=<id>` for one case (diagnosis, never a baseline), each case once with a fresh
-run directory and no retries, a case that cannot start recorded before any model request, one result line per case
-and a per-language roll-up of the stages reached. Al kept the approach (no tree-sitter, esprima stays).
+A user supplies an issue as JSON (later also an issue id) and the system runs it end to end; benchmark cases and
+cohorts call the same entry. `run_chain`'s stage order and the runtime selector stay as they are (SPEC-0060,
+SPEC-0068). Kick-off shape agreed in the project on 2026-10-13 (Al: "a user can provide either an issue ID or a
+json-representation of the issue"; "designed in a general way to work across languages, and we don't have to bake
+any information or logic into specific images"): `corsair investigate --issue-json <file>` is the product command;
+`make run CASE=<id>` (diagnosis, never a baseline) and `make eval AGENT=chain SET=<cohort>` (indexed, compared,
+promotable) both go through it; each case once with a fresh run directory and no retries; a request that cannot start
+is recorded at admission before any model request; one record and summary line per issue, a per-language roll-up of
+stages reached per cohort. Esprima stays for JavaScript assertion lines (Al kept the approach).
 
 ## Steps
 
@@ -24,48 +27,65 @@ and a per-language roll-up of the stages reached. Al kept the approach (no tree-
   `static.py` dispatches by test id grammar through a `LANGUAGES` table and keeps Python's `ast` reader.
 - [x] `framework_row(selection, matrix)`: the one framework row the selection admitted on its image; refuses zero or
   several.
-- [x] `evals/case_e2e/frameworks.py`: harness table keyed by framework name (Jest first) with runner, runner config,
-  dependency setup, workspace, scratch, observation facilities and witness recorders (none outside Python, so such
-  cases stop at planning). A framework with no row is refused before any model request.
-- [x] `evals/case_e2e/case.py`: manifest by case id or directory plus a local clone, each commit's own blobs,
-  runtime inputs from the baseline's build files, setup source and issue source from manifest `setup_paths` and
-  `source_paths` (new optional `AgentPart` fields), `revision_sources` = SHA-256 of the commit the Docker workspace
-  copies.
-- [x] `evals/case_e2e/docker.py`: environment stage sandbox (selected image, baseline tree, registry access during
-  setup only) and offline runners, a fresh container per runner with the revision's own dependencies installed once
-  per commit (`DockerCase` gains a `network` option, `commit_tree` any commit).
-- [x] `record_run` takes the case's stages, scripted models, runtime catalog and preparation; fixture defaults kept.
-- [x] `evals/case_e2e/run.py` (`make run CASE=`), `evaluate.py` (`make eval AGENT=chain SET=jest`),
-  `results.py` (result line incl. reserved `baseline_basis`, roll-up), `cohorts.yaml`.
-- [x] Manifests for CVE-2020-15123 (codecov-node) and CVE-2020-7730 (bestzip); issue text not yet owner-reviewed.
+- [x] `corsair.investigation.request`: `corsair-issue-request/v1` with a captured ticket (`TicketSnapshot`) or a
+  `manual` issue (title, body), repository (https, or `file://` under an operator-allowed root; a GitHub issue
+  defaults to its own repository), exact vulnerable and fixed commits, optional scope and untrusted PoV. Runtime,
+  framework, runner, witness target, budgets, policy, images, labels and oracles are not fields; extra fields are
+  refused.
+- [x] `corsair.investigation.frameworks`: the one table keyed by framework row name. An entry gives runner and its
+  image-only config, one generic setup argv run with registry access (`npm ci --ignore-scripts` for Jest), the
+  dependency directory and the lockfiles binding it, scratch and observation facilities, witness recorders (none
+  outside Python, so such issues stop at planning). Code never branches on a language; `Toolchain.language` is a
+  pattern-checked string, not a fixed list.
+- [x] `corsair.investigation.build`: acquisition at the exact commits (`file://` roots, or SPEC-0037
+  `GitAcquisition` on allowed hosts), each commit's own blobs, runtime inputs from the baseline's build files, setup
+  source = build and CI files within the environment stage's bounds, issue source = files the issue names (refused
+  when none: repository-scale identification, SPEC-0038, is not in the chain), `revision_sources` = SHA-256 of the
+  commit the Docker workspace copies.
+- [x] `corsair.investigation.docker`: generic dependency install (one container per commit from the table's setup,
+  receipt bound to commit, image and lockfile digests), the environment stage's sandbox on the selected image, and
+  offline runners with a fresh container each. `corsair.adapters.docker_image` holds the shared Docker helpers;
+  `corsair.composition.receipts` the receipts (moved from `evals/fixture_e2e/run.py`, re-exported there).
+- [x] `corsair.investigate` (`make investigate ISSUE_JSON=`): request, record and summary line, receipts under a new
+  private evidence directory; `corsair.investigation.results` record incl. reserved `baseline_basis`
+  ("project" | "operator_smoke"), cohort roll-up.
+- [x] `evals/case_e2e`: a case becomes its issue request (manual issue, `file://` clone under
+  `CORSAIR_CASE_SOURCES`) plus `expected.json` the entry never reads; `run.py` (`make run CASE=`), `evaluate.py`
+  (`make eval AGENT=chain SET=jest`), `cohorts.yaml`.
+- [x] Manifests for CVE-2020-15123 (codecov-node) and CVE-2020-7730 (bestzip); issue text names the vulnerable file,
+  not yet owner-reviewed.
 - [ ] Baseline test in the planner's saved inventory (finding below); chain thread's call.
-- [ ] Ruby (Minitest) and Maven (JUnit) harness rows from their threads; pytest row.
+- [ ] `--issue github:owner/repo#N | azure:org/project#N` through the existing ticket readers; ticket-source list.
+- [ ] Ref resolution (branch or default branch to a commit) and vulnerable-only runs (no fixed commit).
+- [ ] Ruby (Minitest), Maven (JUnit) and pytest image-only entries from their threads; operator smoke test.
 - [ ] First live cohort when the model is free and Al says go.
 
 ## Validation and progress
 
-2026-10-13, cloud container, main fa1b19c plus this branch. `make test-config`: 1774 passed (at 68d4ee1, before the
-kick-off changes); `tests/agents/test_case_e2e.py` 9 passed, `tests/configuration/test_benchmark_cases.py` and
-`tests/agents/test_javascript_assertions.py` passed.
+2026-10-13, cloud container, main fa1b19c plus this branch. `tests/agents/test_case_e2e.py` 11 passed (request
+schema, build from a throwaway clone, admission refusals, framework table, language not a list, the two cases as
+request plus expectation, environment stage in the run record, framework mismatch, records and roll-up, a cohort
+case refused before any model); `make test-config` 1779 passed. The environment agent's offered toolset digest
+changed (`list_toolchains` now offers `language` as a pattern-checked string, not seven fixed values), repinned to
+`75f1363f…`; scripted `make eval AGENT=environment` 16/16 clean. Its live baseline needs a rerun on the new digest.
 
-No-model Docker check of the case command on CVE-2020-15123 with the local node8 image (config id
-`sha256:744310a4…`), scripted stages, real Docker ports: both commits' dependencies installed (`npm ci
---ignore-scripts`), runtime selected `node-8.17.0-npm` with `jest` (image-only), the environment stage's sandbox ran
-`npm ci` (exit 0, 645 packages), a build check, `jest --listTests` and `test/services/travis.test.js` through
-`--json --runTestsByPath`; the ready environment was admitted (framework `jest`, cleanup confirmed). A first attempt
-picked `test/git.test.js` as baseline, which exits 1 outside a git checkout; the agent was refused ready, as it
-should be. Scripted identification then targeted `upload` in `lib/codecov.js`.
+No-model Docker check through `run_case` and `investigate` on CVE-2020-15123 with the local node8 image (config id
+`sha256:744310a4…`), scripted stages, real Docker ports: both commits' dependencies installed by the table's setup,
+runtime selected `node-8.17.0-npm` with `jest` (image-only), the environment stage's sandbox ran `npm ci`, a build
+check, `jest --listTests` and `test/services/travis.test.js` through `--json --runTestsByPath`; the ready
+environment was admitted (framework `jest`, `baseline_basis` "project", cleanup confirmed). An earlier attempt picked
+`test/git.test.js` as baseline, which exits 1 outside a git checkout; the agent was refused ready, as it should be.
 
 Finding: the run stopped at planning input, "the baseline test file must be in the saved inventory". The
-environment stage chooses the baseline test at run time, but the planner's source inventory is the case's fixed
-issue source, so every real case whose baseline test is not listed in `source_paths` stops there. Fixing it means
-the chain adding the admitted baseline test file to the planner's source after the environment stage, which is
-`run_chain`'s routing; raised with the coordinator rather than changed here. Evidence stayed in the cloud
-container.
+environment stage chooses the baseline test at run time, but the planner's source inventory is the fixed issue
+source, so every real issue whose baseline test file the issue does not name stops there. Fixing it means the chain
+adding the admitted baseline test file to the planner's source after the environment stage, which is `run_chain`'s
+routing; with the chain thread. Evidence stayed in the cloud container.
 
 ## Decisions and next action
 
-Esprima for JavaScript assertion lines, as agreed before the brainstorm (Al kept the approach). The runner is picked
-from the runtime selection before the chain; the environment stage can only confirm that framework, since its own
-admission and `check_ready` refuse any other. Next: the chain thread decides how the admitted baseline test reaches
-the planner's inventory; then the Ruby and Maven harness rows, and a live `jest` cohort on Al's go.
+Esprima for JavaScript assertion lines. The runner is picked from the runtime selection before the chain; the
+environment stage can only confirm that framework, since its own admission and `check_ready` refuse any other.
+Images stay plain pinned upstream runtimes; per-framework facts live in the one table. Next: the chain thread decides
+how the admitted baseline test reaches the planner's inventory; then the issue-id path and the other frameworks'
+image-only entries, and a live `jest` cohort on Al's go.

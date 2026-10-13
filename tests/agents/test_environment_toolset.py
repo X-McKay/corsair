@@ -2,8 +2,9 @@
 
 from corsair.agents.environment.tools import TOOLSET_SHA256, environment_tools, toolset_sha256
 
-# SPEC-0053 adds explicit bounded correction arguments and guidance after the SPEC-0052 split.
-OFFERED_SHA256 = "5bdc3e1fff20f9280103e2facc581ae7006ae899810788d97b7a09de22975017"
+# SPEC-0053 adds explicit bounded correction arguments and guidance after the SPEC-0052 split; PLAN-0079 offers a
+# toolchain's language as the matrix row's pattern-checked name instead of a fixed list.
+OFFERED_SHA256 = "75f1363f62dbfd89c765dc3acd6856726d6241858824d80744e349775aa586a8"
 
 
 def test_toolset_offers_exactly_the_registered_tools_in_order():

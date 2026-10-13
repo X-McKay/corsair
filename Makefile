@@ -17,7 +17,7 @@ kind-down:
 	uv run --locked python deploy/kind/bootstrap.py down
 
 # SPEC-0036 workspace quota class on the owned node (proposed, unqualified).
-.PHONY: workspace-storage run
+.PHONY: workspace-storage investigate run
 workspace-storage:
 	uv run --locked python deploy/kind/bootstrap.py workspace-storage
 
@@ -32,8 +32,13 @@ eval:
 eval-baseline:
 	uv run --locked python -m evals.run "$(AGENT)" --promote "$(RUN)"
 
-# One benchmark case through the chain for diagnosis, never a baseline (evals/case_e2e); cohorts use
-# `make eval AGENT=chain SET=<cohort>`. Needs CORSAIR_CASE_SOURCES and CORSAIR_CASE_IMAGES.
+# One issue end to end from a corsair-issue-request/v1 file (src/corsair/investigate.py); prepared local images
+# from CORSAIR_IMAGES. Extra flags (--repository-host, --local-root) go in INVESTIGATE_ARGS.
+investigate:
+	PYTHONPATH=src uv run --locked python -m corsair.investigate --issue-json "$(ISSUE_JSON)" --provider-config "$(PROVIDER_CONFIG)" $(INVESTIGATE_ARGS)
+
+# One benchmark case through `investigate` for diagnosis, never a baseline (evals/case_e2e); cohorts use
+# `make eval AGENT=chain SET=<cohort>`. Needs CORSAIR_CASE_SOURCES and CORSAIR_IMAGES.
 run:
 	PYTHONPATH=src:. uv run --locked python -m evals.case_e2e.run --case "$(CASE)" --provider-config "$(PROVIDER_CONFIG)"
 

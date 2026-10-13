@@ -1,11 +1,11 @@
-"""A cohort of benchmark cases through the chain (image-only Docker ports, every agent stage live); no LLM judge.
+"""A cohort of benchmark cases through the issue entry; no LLM judge.
 
 `make eval AGENT=chain SET=<cohort>` runs it through the eval wrapper, so runs are indexed, compared and promoted like
-every other suite. Each case runs once with a fresh run directory, never retried; a case that cannot start is
-recorded with its reason before any model request. One result line per case is appended to `results.jsonl` and
-printed as the case finishes; `cohort.json` and `cohort.md` count the cases reaching each stage per language.
-Clones come from `CORSAIR_CASE_SOURCES` (`<dir>/<case id>/repo`, the layout evals/benchmark/sources.py uses) and
-prepared local images from the JSON file `CORSAIR_CASE_IMAGES` (`{"<row id>": "sha256:<config id>"}`).
+every other suite. Each case becomes its issue request plus expected outcome and runs once through
+`corsair.investigate` in a fresh run directory, never retried; a request that cannot start is recorded at admission
+before any model request. One case record is appended to `cases.jsonl` and its summary line printed as each case
+finishes; `cohort.json` and `cohort.md` count the cases reaching each stage per language. Clones come from
+`CORSAIR_CASE_SOURCES` (`<dir>/<case id>/repo`) and prepared local images from `CORSAIR_IMAGES`.
 """
 import argparse
 import asyncio
@@ -23,13 +23,13 @@ from pydantic_evals.evaluators import Evaluator
 import yaml
 
 from corsair.inference.config import InferenceConfig, inference_config, load_inference
-from evals.benchmark.sources import case_dir
-from evals.fixture_e2e.run import AGENT_STAGES, VERSION_FIELDS, VERSIONS
+from corsair.composition.receipts import AGENT_STAGES, VERSION_FIELDS, VERSIONS
+from corsair.investigate import images
+from corsair.investigation.results import STAGES, cohort_summary, markdown
 from evals.issue_analysis.evaluate import record_count
 
-from .case import CaseRefused, entry
-from .results import STAGES, cohort_summary, markdown, result_line
-from .run import images, prepare_case, run_case
+from .case import entry
+from .run import run_case
 
 ROOT = Path(__file__).parent
 COHORTS = ROOT / "cohorts.yaml"
@@ -52,7 +52,7 @@ class CaseOutcome(BaseModel):
 
 class CaseChecks(Evaluator[CaseInput, CaseOutcome, None]):
     def evaluate(self, ctx):
-        checks = {"started": ctx.output.reached != "case", "stage_reached": STAGES.index(ctx.output.reached)}
+        checks = {"started": ctx.output.reached != "admission", "stage_reached": STAGES.index(ctx.output.reached)}
         if ctx.output.matches_expected is not None:
             checks["matches_expected"] = ctx.output.matches_expected
         return checks
@@ -92,41 +92,30 @@ async def evaluate(evidence: Path, name: str, sources: Path, prepared_images: di
     (evidence / "configuration.json").write_text(json.dumps(metadata, indent=2))
     dataset = Dataset[CaseInput, CaseOutcome, None](name=name, cases=[Case(name=case, inputs=CaseInput(case=case)) for case in cases],
                                                      evaluators=[CaseChecks()])
-    lines = []
+    items = []
 
     async def task(inputs: CaseInput) -> CaseOutcome:
         directory = evidence / f"run-{uuid4()}"
-        directory.mkdir(mode=0o700)
         set_eval_attribute("receipts", str(directory))
-        found = entry(inputs.case)
-        expected = found.manifest.evaluator.expected
-        context = dict(case_id=found.inventory.case_id, language=found.inventory.language,
-                       expected=expected.chain if expected else None, evidence=directory)
-        try:
-            prepared = prepare_case(inputs.case, case_dir(sources, found.inventory.case_id) / "repo", directory,
-                                    prepared_images, timeout)
-        except CaseRefused as refused:
-            line = result_line(**context, refused=str(refused))
-        else:
-            run = await run_case(prepared, directory, config, timeout, models=models)
-            line = result_line(**context, prepared=prepared, run=run)
-            for key, usage in line["usage"].items():
-                for metric in ("requests", "input_tokens", "output_tokens"):
-                    if usage[metric] is None:
-                        set_eval_attribute(f"{key}_{metric}", None)
-                    else:
-                        record_count(f"{key.split('-', 1)[1]}_{metric}", usage[metric])
-        lines.append(line)
-        with (evidence / "results.jsonl").open("a") as destination:
-            destination.write(json.dumps(line, default=str) + "\n")
-        print(json.dumps({k: line[k] for k in ("case", "reached", "reason", "matches_expected", "evidence")}), flush=True)
-        return CaseOutcome(reached=line["reached"], stopped_at=line["stopped_at"], reason=line["reason"][:2048],
-                           matches_expected=line["matches_expected"])
+        item = await asyncio.to_thread(run_case, inputs.case, directory, sources, prepared_images, config=config,
+                                       models=models, timeout=timeout)
+        for key, usage in item["usage"].items():
+            for metric in ("requests", "input_tokens", "output_tokens"):
+                if usage[metric] is None:
+                    set_eval_attribute(f"{key}_{metric}", None)
+                else:
+                    record_count(f"{key.split('-', 1)[1]}_{metric}", usage[metric])
+        items.append(item)
+        with (evidence / "cases.jsonl").open("a") as destination:
+            destination.write(json.dumps(item, default=str) + "\n")
+        print(item["summary"], flush=True)
+        return CaseOutcome(reached=item["reached"], stopped_at=item["stopped_at"], reason=(item["reason"] or "")[:2048],
+                           matches_expected=item["matches_expected"])
 
     report = await dataset.evaluate(task, max_concurrency=1, retry_task=None, metadata=metadata, progress=False)
     with (evidence / "report.json").open("xb") as destination:
         destination.write(TypeAdapter(type(report)).dump_json(report, indent=2))
-    summary = cohort_summary(lines)
+    summary = cohort_summary(items)
     (evidence / "cohort.json").write_text(json.dumps(summary, indent=2))
     (evidence / "cohort.md").write_text(markdown(summary))
     return report, summary
@@ -144,13 +133,13 @@ def main():
         parser.error("each case runs once per eval run; start another run instead of repeating")
     if args.provider_config is None:
         parser.error("a case cohort has no scripted stages: pass PROVIDER_CONFIG")
-    missing = [name for name in ("CORSAIR_CASE_SOURCES", "CORSAIR_CASE_IMAGES") if not os.environ.get(name)]
+    missing = [name for name in ("CORSAIR_CASE_SOURCES", "CORSAIR_IMAGES") if not os.environ.get(name)]
     if missing:
         parser.error(f"set {', '.join(missing)}")
     if args.evidence.exists() or args.evidence.is_symlink():
         parser.error("evidence directory already exists")
     try:
-        prepared_images = images(Path(os.environ["CORSAIR_CASE_IMAGES"]))
+        prepared_images = images(Path(os.environ["CORSAIR_IMAGES"]))
         cohort(args.cohort)
     except ValueError as exc:
         parser.error(str(exc))
