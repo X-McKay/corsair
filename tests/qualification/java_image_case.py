@@ -12,7 +12,9 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
+import tempfile
 import time
 from uuid import uuid4
 
@@ -58,6 +60,34 @@ def setup(image, checkout, m2, evidence):
     (evidence / 'setup.stdout').write_bytes(result.stdout)
     (evidence / 'setup.stderr').write_bytes(result.stderr)
     return result.returncode
+
+
+def commit_tree(checkout, destination):
+    """Write HEAD's blobs exactly as committed (regular files, executables, symlinks) into `destination`."""
+    git = ['git', '-C', str(checkout)]
+    listing = subprocess.run([*git, 'ls-tree', '-r', '-z', 'HEAD'], capture_output=True, check=True).stdout
+    entries = [line.split(b'\t', 1) for line in listing.split(b'\0') if line]
+    entries = [(*meta.split(b' '), os.fsdecode(path)) for meta, path in entries]
+    unsupported = [path for mode, kind, _, path in entries if kind != b'blob']
+    if unsupported:
+        raise SystemExit(f'{checkout}: submodules are not supported: {unsupported[:5]}')
+    batch = subprocess.run([*git, 'cat-file', '--batch'], input=b''.join(sha + b'\n' for _, _, sha, _ in entries),
+                           capture_output=True, check=True).stdout
+    offset = 0
+    for mode, _, sha, path in entries:
+        header_end = batch.index(b'\n', offset)
+        name, _, size = batch[offset:header_end].split(b' ')
+        assert name == sha, f'cat-file returned {name!r} for {sha!r}'
+        start = header_end + 1
+        data, offset = batch[start:start + int(size)], start + int(size) + 1
+        target = destination / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if mode == b'120000':
+            target.symlink_to(os.fsdecode(data))
+        else:
+            target.write_bytes(data)
+            target.chmod(0o755 if mode == b'100755' else 0o644)
+    return destination
 
 
 class DockerCase:
@@ -128,7 +158,7 @@ def plain(value):
     return value
 
 
-def run(image, checkout, m2, commit, ids, evidence, tests_from, timeout):
+def run(image, checkout, m2, commit, ids, evidence, tests_from, timeout, tests_label=None):
     item = JavaTestId.parse(ids[0])
     path = item.source_path()
     # The test file comes from `tests_from` (for example the fix revision's PoV test applied to the vulnerable one).
@@ -142,7 +172,7 @@ def run(image, checkout, m2, commit, ids, evidence, tests_from, timeout):
         result = MavenRunner(case, case, store, config).run(patch, control_test_id=ids[0], security_test_id=ids[1],
                                                              discovery_command=config.command, operation=uuid4())
         elapsed = round(time.monotonic() - clock, 3)
-    summary = {'image': image, 'commit': commit, 'ids': ids, 'tests_from': str(tests_from), 'patch_sha256': patch.sha256, 'elapsed_seconds': elapsed, 'container_cleanup': case.cleanup,
+    summary = {'image': image, 'commit': commit, 'ids': ids, 'tests_from': tests_label or str(tests_from), 'patch_sha256': patch.sha256, 'elapsed_seconds': elapsed, 'container_cleanup': case.cleanup,
                'failure_layer': result.failure_layer, 'detail': result.detail, 'cleanup': result.cleanup,
                'discovery': result.discovery and {'status': result.discovery.status, 'test_ids': result.discovery.test_ids},
                'cases': result.execution and [(c.test_id, c.outcome) for c in result.execution.cases],
@@ -154,24 +184,35 @@ def run(image, checkout, m2, commit, ids, evidence, tests_from, timeout):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('phase', choices=['setup', 'run'])
-    parser.add_argument('--image', required=True, help='Prepared toolchain image config id or tag')
-    parser.add_argument('--checkout', required=True, type=Path, help='Clean checkout of the case at one commit')
+    parser.add_argument('--image', required=True, help='Prepared toolchain image config id (sha256:<64 hex>)')
+    parser.add_argument('--checkout', required=True, type=Path, help='Checkout of the case; its HEAD commit is what runs')
     parser.add_argument('--m2', required=True, type=Path, help='Case Maven repository filled by setup')
     parser.add_argument('--evidence', required=True, type=Path)
-    parser.add_argument('--tests-from', type=Path, help='Checkout supplying the test file (default: --checkout)')
+    parser.add_argument('--tests-from', type=Path, help='Checkout whose HEAD supplies the test file (default: --checkout)')
     parser.add_argument('--timeout', type=int, default=900, help='Seconds per runner command')
     parser.add_argument('--id', action='append', default=[], help='Control then security `[module/]pkg.Class#method`')
     args = parser.parse_args()
+    # Both phases must name the same content, so a tag that could move between them is refused.
+    if not re.fullmatch(r'sha256:[0-9a-f]{64}', args.image):
+        parser.error('--image must be an image config id (sha256:<64 hex>), not a tag')
     args.evidence.mkdir(parents=True, exist_ok=False)
     commit = subprocess.run(['git', '-C', str(args.checkout), 'rev-parse', 'HEAD'], capture_output=True, text=True,
                             check=True).stdout.strip()
-    if args.phase == 'setup':
-        args.m2.mkdir(parents=True, exist_ok=True)
-        code = setup(args.image, args.checkout.resolve(), args.m2.resolve(), args.evidence)
-        print(json.dumps({'phase': 'setup', 'commit': commit, 'exit': code}))
-        raise SystemExit(code)
-    summary = run(args.image, args.checkout.resolve(), args.m2.resolve(), commit, tuple(args.id), args.evidence,
-                  (args.tests_from or args.checkout).resolve(), args.timeout)
+    # The receipt names a commit, so the container gets that commit's blobs, never the worktree's bytes (which
+    # local edits, untracked files or checkout filters such as EOL conversion and `ident` can change).
+    with tempfile.TemporaryDirectory(dir=args.evidence) as scratch:
+        scratch = Path(scratch).resolve()
+        tree = commit_tree(args.checkout, scratch / 'checkout')
+        tests = commit_tree(args.tests_from, scratch / 'tests') if args.tests_from else tree
+        if args.phase == 'setup':
+            args.m2.mkdir(parents=True, exist_ok=True)
+            code = setup(args.image, tree, args.m2.resolve(), args.evidence)
+            print(json.dumps({'phase': 'setup', 'commit': commit, 'exit': code}))
+            raise SystemExit(code)
+        tests_commit = subprocess.run(['git', '-C', str(args.tests_from or args.checkout), 'rev-parse', 'HEAD'],
+                                      capture_output=True, text=True, check=True).stdout.strip()
+        summary = run(args.image, tree, args.m2.resolve(), commit, tuple(args.id), args.evidence, tests, args.timeout,
+                      tests_label=f'{(args.tests_from or args.checkout).resolve()}@{tests_commit}')
     print(json.dumps({k: v for k, v in summary.items() if k != 'run'}, indent=2, default=str))
 
 

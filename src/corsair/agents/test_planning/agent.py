@@ -22,7 +22,7 @@ from .skills import SKILL_ID, SKILL_TEXT
 # PROMPT_VERSION covers everything the model sees (instructions, skill, rendered user
 # prompt, tool and output schema text); CONFIG_VERSION covers budgets, instrumentation
 # and provider composition.
-PROMPT_VERSION = "test-planning-v6-grounding-3"
+PROMPT_VERSION = "test-planning-v7-grounding-3"
 CONFIG_VERSION = "test-planning-config-v6"
 TOOLSET_ID = "test_planning_source"
 INSTRUCTIONS = """Plan exactly one benign control test and one security regression test for the identified concern at the authorized scope, or return an unsupported plan.

@@ -17,6 +17,11 @@ cases:
           input: filename 'document.txt' inside the allowed root
           required_behavior: Returns exactly the benign sentinel content
           observable_witness: An open audit event for tmp_path/allowed/document.txt is recorded during the call
+          witness:
+            facility: audit_open
+            effect: file_open
+            subject: allowed/document.txt
+            expectation: occurs
           source_references:
           - path: documents.py
             start_line: 3
@@ -35,6 +40,11 @@ cases:
             file is never opened
           observable_witness: No open audit event for tmp_path/outside.txt is recorded during the call (application
             observation); a sandbox or policy denial is recorded separately and is not a rejection
+          witness:
+            facility: audit_open
+            effect: file_open
+            subject: outside.txt
+            expectation: absent
           source_references:
           - path: documents.py
             start_line: 3
@@ -94,6 +104,10 @@ cases:
         observation_facilities:
         - Python sys.addaudithook 'open' audit events recording the file paths opened during a test
         - Native JUnit XML outcomes and captured stdout per test
+        witness_facilities:
+        - id: audit_open
+          kind: file_open
+          description: Python sys.addaudithook 'open' events recording each path the test process opens during the call
   metadata:
     script:
     - &id001
@@ -127,6 +141,11 @@ cases:
           input: filename 'document.txt' inside the allowed root
           required_behavior: Returns exactly the benign sentinel content
           observable_witness: An open audit event for tmp_path/allowed/document.txt is recorded during the call
+          witness:
+            facility: audit_open
+            effect: file_open
+            subject: allowed/document.txt
+            expectation: occurs
           source_references:
           - path: documents.py
             start_line: 3
@@ -146,6 +165,11 @@ cases:
             file is never opened
           observable_witness: No open audit event for tmp_path/outside.txt is recorded during the call (application
             observation); a sandbox or policy denial is recorded separately and is not a rejection
+          witness:
+            facility: audit_open
+            effect: file_open
+            subject: outside.txt
+            expectation: absent
           source_references:
           - path: documents.py
             start_line: 3
@@ -208,6 +232,10 @@ cases:
         observation_facilities:
         - Python sys.addaudithook 'open' audit events recording the file paths opened during a test
         - Native JUnit XML outcomes and captured stdout per test
+        witness_facilities:
+        - id: audit_open
+          kind: file_open
+          description: Python sys.addaudithook 'open' events recording each path the test process opens during the call
   metadata:
     script:
     - *id001
@@ -236,6 +264,11 @@ cases:
           input: filename 'document.txt' inside the allowed root
           required_behavior: Returns exactly the benign sentinel content
           observable_witness: An open audit event for tmp_path/allowed/document.txt is recorded during the call
+          witness:
+            facility: audit_open
+            effect: file_open
+            subject: allowed/document.txt
+            expectation: occurs
           source_references:
           - path: documents.py
             start_line: 3
@@ -254,6 +287,11 @@ cases:
             file is never opened
           observable_witness: No open audit event for tmp_path/outside.txt is recorded during the call (application
             observation); a sandbox or policy denial is recorded separately and is not a rejection
+          witness:
+            facility: audit_open
+            effect: file_open
+            subject: outside.txt
+            expectation: absent
           source_references:
           - path: documents.py
             start_line: 3
@@ -313,6 +351,10 @@ cases:
         observation_facilities:
         - Python sys.addaudithook 'open' audit events recording the file paths opened during a test
         - Native JUnit XML outcomes and captured stdout per test
+        witness_facilities:
+        - id: audit_open
+          kind: file_open
+          description: Python sys.addaudithook 'open' events recording each path the test process opens during the call
   metadata:
     script:
     - write: broken
@@ -344,6 +386,11 @@ cases:
           input: filename 'document.txt' inside the allowed root
           required_behavior: Returns exactly the benign sentinel content
           observable_witness: An open audit event for tmp_path/allowed/document.txt is recorded during the call
+          witness:
+            facility: audit_open
+            effect: file_open
+            subject: allowed/document.txt
+            expectation: occurs
           source_references:
           - path: documents.py
             start_line: 3
@@ -362,6 +409,11 @@ cases:
             file is never opened
           observable_witness: No open audit event for tmp_path/outside.txt is recorded during the call (application
             observation); a sandbox or policy denial is recorded separately and is not a rejection
+          witness:
+            facility: audit_open
+            effect: file_open
+            subject: outside.txt
+            expectation: absent
           source_references:
           - path: documents.py
             start_line: 3
@@ -423,6 +475,10 @@ cases:
         observation_facilities:
         - Python sys.addaudithook 'open' audit events recording the file paths opened during a test
         - Native JUnit XML outcomes and captured stdout per test
+        witness_facilities:
+        - id: audit_open
+          kind: file_open
+          description: Python sys.addaudithook 'open' events recording each path the test process opens during the call
   metadata:
     script:
     - *id001
@@ -451,6 +507,11 @@ cases:
           input: filename 'document.txt' inside the allowed root
           required_behavior: Returns exactly the benign sentinel content
           observable_witness: An open audit event for tmp_path/allowed/document.txt is recorded during the call
+          witness:
+            facility: audit_open
+            effect: file_open
+            subject: allowed/document.txt
+            expectation: occurs
           source_references:
           - path: documents.py
             start_line: 3
@@ -469,6 +530,11 @@ cases:
             file is never opened
           observable_witness: No open audit event for tmp_path/outside.txt is recorded during the call (application
             observation); a sandbox or policy denial is recorded separately and is not a rejection
+          witness:
+            facility: audit_open
+            effect: file_open
+            subject: outside.txt
+            expectation: absent
           source_references:
           - path: documents.py
             start_line: 3
@@ -528,6 +594,10 @@ cases:
         observation_facilities:
         - Python sys.addaudithook 'open' audit events recording the file paths opened during a test
         - Native JUnit XML outcomes and captured stdout per test
+        witness_facilities:
+        - id: audit_open
+          kind: file_open
+          description: Python sys.addaudithook 'open' events recording each path the test process opens during the call
   metadata:
     script:
     - *id001
@@ -561,6 +631,11 @@ cases:
           input: filename 'document.txt' inside the allowed root
           required_behavior: Returns exactly the benign sentinel content
           observable_witness: An open audit event for tmp_path/allowed/document.txt is recorded during the call
+          witness:
+            facility: audit_open
+            effect: file_open
+            subject: allowed/document.txt
+            expectation: occurs
           source_references:
           - path: documents.py
             start_line: 3
@@ -579,6 +654,11 @@ cases:
             file is never opened
           observable_witness: No open audit event for tmp_path/outside.txt is recorded during the call (application
             observation); a sandbox or policy denial is recorded separately and is not a rejection
+          witness:
+            facility: audit_open
+            effect: file_open
+            subject: outside.txt
+            expectation: absent
           source_references:
           - path: documents.py
             start_line: 3
@@ -638,6 +718,10 @@ cases:
         observation_facilities:
         - Python sys.addaudithook 'open' audit events recording the file paths opened during a test
         - Native JUnit XML outcomes and captured stdout per test
+        witness_facilities:
+        - id: audit_open
+          kind: file_open
+          description: Python sys.addaudithook 'open' events recording each path the test process opens during the call
   metadata:
     script:
     - *id001
@@ -668,6 +752,11 @@ cases:
           input: filename 'document.txt' inside the allowed root
           required_behavior: Returns exactly the benign sentinel content
           observable_witness: An open audit event for tmp_path/allowed/document.txt is recorded during the call
+          witness:
+            facility: audit_open
+            effect: file_open
+            subject: allowed/document.txt
+            expectation: occurs
           source_references:
           - path: documents.py
             start_line: 3
@@ -686,6 +775,11 @@ cases:
             file is never opened
           observable_witness: No open audit event for tmp_path/outside.txt is recorded during the call (application
             observation); a sandbox or policy denial is recorded separately and is not a rejection
+          witness:
+            facility: audit_open
+            effect: file_open
+            subject: outside.txt
+            expectation: absent
           source_references:
           - path: documents.py
             start_line: 3
@@ -745,6 +839,10 @@ cases:
         observation_facilities:
         - Python sys.addaudithook 'open' audit events recording the file paths opened during a test
         - Native JUnit XML outcomes and captured stdout per test
+        witness_facilities:
+        - id: audit_open
+          kind: file_open
+          description: Python sys.addaudithook 'open' events recording each path the test process opens during the call
   metadata:
     script:
     - write: self_observing
@@ -777,6 +875,11 @@ cases:
           input: filename 'document.txt' inside the allowed root
           required_behavior: Returns exactly the benign sentinel content
           observable_witness: An open audit event for tmp_path/allowed/document.txt is recorded during the call
+          witness:
+            facility: audit_open
+            effect: file_open
+            subject: allowed/document.txt
+            expectation: occurs
           source_references:
           - path: documents.py
             start_line: 3
@@ -795,6 +898,11 @@ cases:
             file is never opened
           observable_witness: No open audit event for tmp_path/outside.txt is recorded during the call (application
             observation); a sandbox or policy denial is recorded separately and is not a rejection
+          witness:
+            facility: audit_open
+            effect: file_open
+            subject: outside.txt
+            expectation: absent
           source_references:
           - path: documents.py
             start_line: 3
@@ -854,6 +962,10 @@ cases:
         observation_facilities:
         - Python sys.addaudithook 'open' audit events recording the file paths opened during a test
         - Native JUnit XML outcomes and captured stdout per test
+        witness_facilities:
+        - id: audit_open
+          kind: file_open
+          description: Python sys.addaudithook 'open' events recording each path the test process opens during the call
   metadata:
     script:
     - write: self_observing
@@ -883,6 +995,11 @@ cases:
           input: filename 'document.txt' inside the allowed root
           required_behavior: Returns exactly the benign sentinel content
           observable_witness: An open audit event for tmp_path/allowed/document.txt is recorded during the call
+          witness:
+            facility: audit_open
+            effect: file_open
+            subject: allowed/document.txt
+            expectation: occurs
           source_references:
           - path: documents.py
             start_line: 3
@@ -901,6 +1018,11 @@ cases:
             file is never opened
           observable_witness: No open audit event for tmp_path/outside.txt is recorded during the call (application
             observation); a sandbox or policy denial is recorded separately and is not a rejection
+          witness:
+            facility: audit_open
+            effect: file_open
+            subject: outside.txt
+            expectation: absent
           source_references:
           - path: documents.py
             start_line: 3
@@ -960,6 +1082,10 @@ cases:
         observation_facilities:
         - Python sys.addaudithook 'open' audit events recording the file paths opened during a test
         - Native JUnit XML outcomes and captured stdout per test
+        witness_facilities:
+        - id: audit_open
+          kind: file_open
+          description: Python sys.addaudithook 'open' events recording each path the test process opens during the call
   metadata:
     script:
     - write: broken
