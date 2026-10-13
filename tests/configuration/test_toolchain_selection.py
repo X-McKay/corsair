@@ -21,6 +21,7 @@ def collect(*names):
     (('python37',), ['test_native_python37_toolchain']),
     (('java8',), ['test_native_java8_toolchain']),
     (('ruby31',), ['test_native_ruby31_toolchain']),
+    (('node8',), ['test_native_node8_toolchain']),
     (('perl526',), ['test_native_perl526_toolchain']),
     (('java', 'python'), ['test_native_java_toolchain', 'test_native_python_toolchain']),
     (('python', 'java', 'python37'), ['test_native_java_toolchain', 'test_native_python_toolchain', 'test_native_python37_toolchain']),
