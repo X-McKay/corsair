@@ -1,0 +1,56 @@
+"""SPEC-0042 hand-off to the environment agent (SPEC-0029): the selected matrix row becomes the agent's only
+toolchain, an unselected requirement stops before the agent runs, and a ready result is checked against the
+selection. Deterministic; no model, sandbox or SDK types.
+
+`prepared` maps a matrix row id to the prepared image reference (`repository@sha256:...`) from the operator's
+image receipt (`tests/qualification/prepare_toolchains.py`); a selected row without a prepared image stops too.
+"""
+from dataclasses import dataclass
+from typing import Mapping
+
+from corsair.agents.environment.contracts import EnvironmentInput, ReadyEnvironment, Toolchain
+from corsair.nodes.runtime.contracts import RuntimeRequirement, Selection, Supported
+from corsair.nodes.runtime.matrix import Matrix
+
+# Environment agent framework table names (agents/environment/frameworks.py) per runner-table framework name.
+AGENT_FRAMEWORK = {'pytest': 'pytest', 'junit5': 'junit5'}
+
+
+@dataclass(frozen=True)
+class RuntimeStop:
+    """The environment agent does not run: no qualified, prepared image fits the project."""
+    requirement: RuntimeRequirement | str
+    selection: Selection | None
+    reason: str
+
+
+def toolchain(selection: Supported, matrix: Matrix, prepared: Mapping[str, str]) -> Toolchain:
+    row = next(r for r in matrix.images if r.id == selection.image_id)
+    return Toolchain(toolchain_id=row.id, image=prepared[row.id], language=row.language,
+                     runtime=f'{row.runtime.name} {row.runtime.version}',
+                     tools=tuple(f'{name} {version}' for name, version in sorted(row.tools.items())))
+
+
+def environment_input(requirement: RuntimeRequirement | str, selection: Selection | None, matrix: Matrix,
+                      prepared: Mapping[str, str], **fields) -> EnvironmentInput | RuntimeStop:
+    """The agent input with exactly the selected toolchain, or the stop that replaces the agent run.
+
+    `fields` are the remaining `EnvironmentInput` fields (commit, source_private, source_files, policy_profile)."""
+    if isinstance(requirement, str) or selection is None:
+        return RuntimeStop(requirement, selection, 'no runtime requirement: ' + (requirement if isinstance(requirement, str) else 'not selected'))
+    if selection.status != 'supported':
+        detail = '; '.join(f'{n.name} {n.preferred or n.allowed}' for n in selection.needs) if selection.status == 'unsupported' \
+            else '; '.join(selection.missing)
+        return RuntimeStop(requirement, selection, f'runtime {selection.status}: {detail}')
+    if selection.image_id not in prepared:
+        return RuntimeStop(requirement, selection, f'matrix row {selection.image_id} has no prepared image on this node')
+    return EnvironmentInput(toolchains=(toolchain(selection, matrix, prepared),), **fields)
+
+
+def check_ready(result: ReadyEnvironment, selection: Supported, prepared: Mapping[str, str]) -> None:
+    """Refuse a ready environment that left the selected image or used a framework the selection did not admit."""
+    if result.toolchain_id != selection.image_id or result.toolchain_image != prepared[selection.image_id]:
+        raise ValueError('ready environment does not use the selected toolchain image')
+    admitted = {AGENT_FRAMEWORK.get(c.name) for c in selection.checks if c.kind == 'test_framework' and c.satisfied}
+    if result.framework not in admitted:
+        raise ValueError(f'framework {result.framework!r} is not one the selection admitted ({sorted(a for a in admitted if a)})')
