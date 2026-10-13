@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="corsair.sample.DocumentsTest" time="0.14" tests="2" errors="0" skipped="0" failures="1" flakes="0">
+  <properties>
+  </properties>
+  <testcase name="refusesTraversalOutsideRoot" classname="corsair.sample.DocumentsTest" time="0.085">
+    <failure message="resolved outside the root: /srv/secret.txt ==&gt; expected: &lt;true&gt; but was: &lt;false&gt;" type="org.opentest4j.AssertionFailedError"><![CDATA[org.opentest4j.AssertionFailedError: resolved outside the root: /srv/secret.txt ==> expected: <true> but was: <false>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertTrue.failNotTrue(AssertTrue.java:63)
+	at org.junit.jupiter.api.AssertTrue.assertTrue(AssertTrue.java:42)
+	at org.junit.jupiter.api.Assertions.assertTrue(Assertions.java:191)
+	at corsair.sample.DocumentsTest.refusesTraversalOutsideRoot(DocumentsTest.java:21)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+]]></failure>
+    <system-out><![CDATA[SECURITY_RESOLVED=/srv/secret.txt
+]]></system-out>
+  </testcase>
+  <testcase name="readsOrdinaryDocument" classname="corsair.sample.DocumentsTest" time="0.005">
+    <system-out><![CDATA[CONTROL_RESOLVED=/srv/documents/report.txt
+]]></system-out>
+  </testcase>
+</testsuite>

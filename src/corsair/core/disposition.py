@@ -11,7 +11,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Sha256 = Annotated[str, Field(pattern=r'^[0-9a-f]{64}$')]
-TestId = Annotated[str, Field(min_length=1, max_length=128, pattern=r'^[A-Za-z0-9_./:\[\]-]+$')]
+TestId = Annotated[str, Field(min_length=1, max_length=128, pattern=r'^[A-Za-z0-9_./:#\[\]-]+$')]
 Token = Annotated[str, Field(min_length=1, max_length=128, pattern=r'^[A-Za-z0-9_.:-]+$')]
 
 Execution = Literal['completed', 'blocked', 'failed', 'unknown', 'unsupported']

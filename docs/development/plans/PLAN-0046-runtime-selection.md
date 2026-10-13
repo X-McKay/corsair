@@ -26,7 +26,7 @@ Implement [SPEC-0042](../specs/SPEC-0042-runtime-selection.md) offline: detect e
 
 ## Validation and progress
 
-Offline: `make test-config` passed 892 checks, which is main's 853 plus 37 runtime unit checks (4 of them for the hand-off) and 2 matrix guards.
+Offline: `make test-config` passed 892 checks on the original base (853 plus 37 runtime unit checks, 4 of them for the hand-off, and 2 matrix guards), and 999 after merging main at `c8f3964` (with #41, #45 and #46).
 
 Report run in the cloud container on 2026-10-13, against the pins file from PR #42's branch `claude/benchmark-repo-fetch-g6cnts` (head `4167369`):
 
