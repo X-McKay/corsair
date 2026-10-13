@@ -11,7 +11,7 @@ related: [SPEC-0058, SPEC-0042, PLAN-0046, PLAN-0049, PLAN-0050]
 
 ## Objective and dependencies
 
-Implement [SPEC-0058](../specs/SPEC-0058-ruby31-toolchain.md) with the `corsair-base-image` skill. Branch `claude/toolchain-ruby31-6f6z4l` stacks on 62d35f2, the merge of the JDK 8 (#51, per-image preparation and gates) and CPython 3.7 (#55, `TOOLCHAINS`/`--toolchain` selection) branches that the Perl 5.26 thread (#65) also stacks on; the Ruby diff is the commits after 62d35f2. Live steps need RIG0 and the shared kind cluster, in the order JDK 8, CPython 3.7, #49's live chain, Perl 5.26, Node 8, then this thread.
+Implement [SPEC-0058](../specs/SPEC-0058-ruby31-toolchain.md) with the `corsair-base-image` skill. Branch `claude/toolchain-ruby31-6f6z4l` builds on the JDK 8 (#51, per-image preparation and gates) and CPython 3.7 (#55, `TOOLCHAINS`/`--toolchain` selection) work; both are merged and main is merged in (93a0fab), so the PR diff is the Ruby change only. Live steps need RIG0 and the shared kind cluster, in the order JDK 8, CPython 3.7, #49's live chain, Perl 5.26, Node 8, then this thread.
 
 ## Steps
 
@@ -31,7 +31,7 @@ Implement [SPEC-0058](../specs/SPEC-0058-ruby31-toolchain.md) with the `corsair-
 - `Gemfile.lock` written by `bundle lock --local` in the pinned image. `docker build --network=none` passed; the trusted control's command printed both tests and `2 runs, 4 assertions, 0 failures, 0 errors, 0 skips`.
 - `ruby_offline` (the gate's sandbox sequence) ran end to end against the image with `docker run --read-only --tmpfs /tmp --user 10001` and a writable workspace mount, every assertion passing except the `GEM_HOME` write check, where Docker's read-only root gives `Read-only file system` instead of Landlock's `Permission denied`; the gate keeps the sandbox expectation (`expect_permission_denied`, as in the policy gate).
 - With `BUNDLE_PATH` set, Bundler no longer sees the bundled Minitest (`Could not find minitest-5.15.0 in locally installed gems`): projects install their own Minitest during setup.
-- `make test-config`: 1259 passed (includes the collection-only selection test with the `ruby31` row).
+- `make test-config`: 1259 passed on the stacked branch, 1279 after merging main at 93a0fab (includes the collection-only selection test with the `ruby31` row).
 
 ## Decisions and next action
 
