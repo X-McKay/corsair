@@ -38,6 +38,7 @@ its approved file, read by the TAP assertion reader added here. No second id-pat
 - [x] Docker proof through product ports with operator tests (`evals/case_e2e/operator_tests.py`, committed cases).
 - [x] Compare frozen scripted evaluations against main.
 - [x] RIG0 replay of all six committed cases, sqli with CPAN setup: all matched (below).
+- [x] Live attempt `ih-perl-cmdi`: INCONCLUSIVE at environment (generic correction blocker, below).
 - [ ] Live: the same corpus topics through `corsair run` with the local model (RIG0), once lane ordering allows.
 - [ ] Next capability: a process-start recorder (spec first), so cmdi-like topics can be decided.
 
@@ -89,6 +90,19 @@ are from the row's digest-pinned base. All six committed cases matched their exp
 Evidence is at `.runs/perl-operator-1` under that worktree. No matrix change follows. The row pins the base image,
 and `CORSAIR_IMAGES` names the locally built image per host. Pinning one shared built image would need a published
 image, which is an operator decision outside this lane.
+
+Live attempt (operator run relayed 2026-10-13 22:15Z; preserved, unqualified). `corsair run` of `ih-perl-cmdi` at
+`c8eba1d`, with the model not shared and the local RIG0 `perl526` image `sha256:ce3853…`. Cleanup was confirmed. The
+result was INCONCLUSIVE at the environment stage, after 9 model requests:
+- The first draft was refused on its schema: recipe steps 0 and 1 had `source.end_line` 0, which must be at least 1.
+- The correction cited `cpanfile:1-1` without a successful `read_source` of that file. That spent the single output
+  retry.
+- Nothing past the environment stage ran, so Perl smoke-baseline admission and live Test::More subtests remain
+  unexercised.
+
+Evidence is under the RIG0 worktree at `.runs/investigations/ih-perl-cmdi-1`. Nothing Perl-specific changes for this
+result. A second, different refusal arriving after the one allowed correction is the generic blocker seen across
+four topics. The campaign owner is taking it as the next measured hypothesis.
 
 Interpretation: setup, discovery, one execution, TAP admission, exit agreement, the witness record and the gate now
 carry Perl end to end. The two synthetic cases show a decisive evidence-backed disposition is reachable. The corpus

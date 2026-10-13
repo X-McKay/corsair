@@ -30,7 +30,9 @@ related: [SPEC-0074, PLAN-0088, PLAN-0087, ISSUE-0008]
   recorder in any language.
 - **RIG0 replay.** At `c8eba1d`, all six committed cases matched their expectation on RIG0's own `perl526` build
   (`sha256:ce3853861371…`), sqli included. Its setup installed DBI from CPAN. Details are in PLAN-0088.
-- **Not done.** No live model run, no OpenShell gate and no accuracy claim. Matrix rows are unchanged: the Perl rows
+- **Live attempt.** `ih-perl-cmdi` at `c8eba1d` stopped INCONCLUSIVE at the environment stage, on the generic
+  second-refusal blocker. It is recorded in PLAN-0088 and is not a Perl defect.
+- **Not done.** No qualified live model run, no OpenShell gate and no accuracy claim. Matrix rows are unchanged: the Perl rows
   stay `image-only`.
 
 ## Validation and blockers
