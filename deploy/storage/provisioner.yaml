@@ -1,0 +1,131 @@
+# Second instance of kind's pinned local-path provisioner serving only corsair-workspace (SPEC-0036).
+# kind's own `standard` class and provisioner are left unchanged.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: corsair-workspace-storage
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: corsair-workspace-provisioner
+  namespace: corsair-workspace-storage
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: corsair-workspace-provisioner
+  namespace: corsair-workspace-storage
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create", "patch", "update", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: corsair-workspace-provisioner
+  namespace: corsair-workspace-storage
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: corsair-workspace-provisioner
+subjects:
+  - kind: ServiceAccount
+    name: corsair-workspace-provisioner
+    namespace: corsair-workspace-storage
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: corsair-workspace-provisioner
+rules:
+  - apiGroups: [""]
+    resources: ["nodes", "persistentvolumeclaims", "configmaps", "pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "create", "patch", "update", "delete"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: corsair-workspace-provisioner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: corsair-workspace-provisioner
+subjects:
+  - kind: ServiceAccount
+    name: corsair-workspace-provisioner
+    namespace: corsair-workspace-storage
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: corsair-workspace-provisioner
+  namespace: corsair-workspace-storage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: corsair-workspace-provisioner
+  template:
+    metadata:
+      labels:
+        app: corsair-workspace-provisioner
+    spec:
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Equal
+          effect: NoSchedule
+      serviceAccountName: corsair-workspace-provisioner
+      containers:
+        - name: provisioner
+          image: docker.io/kindest/local-path-provisioner@sha256:fdb5360219dcca6acc7967326f9e04c89b038e2c1e924463b2a41cad2dc752ab
+          imagePullPolicy: IfNotPresent
+          command:
+            - local-path-provisioner
+            - --debug
+            - start
+            - --provisioner-name
+            - corsair.local/workspace-quota
+            - --configmap-name
+            - corsair-workspace-config
+            - --service-account-name
+            - corsair-workspace-provisioner
+            - --helper-image
+            - corsair-workspace-helper:local
+            - --config
+            - /etc/config/config.json
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/config/
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: CONFIG_MOUNT_PATH
+              value: /etc/config/
+      volumes:
+        - name: config-volume
+          configMap:
+            name: corsair-workspace-config
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: corsair-workspace
+provisioner: corsair.local/workspace-quota
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete
+allowVolumeExpansion: false

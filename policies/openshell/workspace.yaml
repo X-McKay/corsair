@@ -1,0 +1,10 @@
+# Operator-owned workspace policy (SPEC-0036): the identity policy without /tmp, so the
+# quota-bound /sandbox workdir is the only writable byte store. No provider or network grants.
+version: 1
+filesystem_policy:
+  include_workdir: true
+  read_only: [/bin, /usr, /lib, /proc, /dev/urandom, /etc, /var/log]
+  read_write: [/dev/null]
+landlock:
+  compatibility: hard_requirement
+network_policies: {}

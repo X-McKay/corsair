@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: helper-pod
+spec:
+  priorityClassName: system-node-critical
+  tolerations:
+    - operator: Exists
+      effect: NoSchedule
+    - operator: Exists
+      effect: NoExecute
+  containers:
+    - name: helper-pod
+      image: corsair-workspace-helper:local
+      imagePullPolicy: Never
+      # quotactl on the loop device needs the device node; privilege is confined to this operator helper.
+      securityContext:
+        privileged: true
