@@ -133,6 +133,7 @@ dev = [
     { name = "pydantic-evals", extra = ["logfire"] },
     { name = "pytest" },
     { name = "pyyaml" },
+    { name = "rich" },
     { name = "temporalio" },
 ]
 
@@ -146,6 +147,7 @@ dev = [
     { name = "pydantic-evals", extras = ["logfire"], specifier = "==2.55.0" },
     { name = "pytest", specifier = "==9.0.3" },
     { name = "pyyaml", specifier = "==6.0.3" },
+    { name = "rich", specifier = "==15.0.0" },
     { name = "temporalio", specifier = "==1.34.0" },
 ]
 
