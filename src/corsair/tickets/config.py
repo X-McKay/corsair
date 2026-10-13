@@ -1,6 +1,6 @@
 """Read-only source selection and bounded capture settings."""
 from typing import Annotated, Literal
-from pydantic import Field
+from pydantic import Field, field_validator
 from corsair.inference.config import EnvName, Frozen
 
 
@@ -14,6 +14,14 @@ class GitHubConfig(TicketLimits):
     provider: Literal['github']
     repository: str = Field(pattern=r'^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$')
     token_env: EnvName | None = None
+
+
+    @field_validator('repository')
+    @classmethod
+    def no_dot_segments(cls, value):
+        if any(part in ('.', '..') for part in value.split('/')):
+            raise ValueError('repository owner/name cannot be dot segments')
+        return value
 
 
 class AzureConfig(TicketLimits):

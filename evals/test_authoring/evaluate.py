@@ -228,8 +228,9 @@ class EvaluationBudget(BaseModel):
     repeat: int = Field(default=2, ge=1, le=5, strict=True)
     request_limit: int = Field(default=10, ge=1, le=12, strict=True)
     tool_calls_limit: int = Field(default=9, ge=0, le=10, strict=True)
-    total_tokens_limit: int = Field(default=64000, ge=1, le=128000, strict=True)
-    task_seconds: int = Field(default=300, ge=1, le=600, strict=True)
+    # Room for one full 32768-token response (~235 s on the local server) beside the rest of the attempt.
+    total_tokens_limit: int = Field(default=128000, ge=1, le=262144, strict=True)
+    task_seconds: int = Field(default=900, ge=1, le=1800, strict=True)
     output_retries: int = Field(default=1, ge=0, le=1, strict=True)
     dev_runs: int = Field(default=3, ge=1, le=5, strict=True)
 

@@ -227,30 +227,56 @@ def test_selection_supported_unsupported_conflict():
         check_ready(ready('junit5'), selection, prepared)
 
 
-# SPEC-0056 image row, staged here until its live gate passes; runtime and make are what the image measured.
-STAGED_PERL526 = {'id': 'perl-5.26-make', 'language': 'perl',
-                  'base_image': 'docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7',
-                  'image_source': 'deploy/qualification/toolchains/perl526', 'runtime': {'name': 'perl', 'version': '5.26.3'},
-                  'tools': {'make': '4.2.1'}, 'selector': {}, 'qualification': {'records': ['SPEC-0056'], 'report': 'x'}}
-
-
-def test_perl526_row_meets_runtime_and_make_and_waits_for_a_tap_runner():
+def test_perl526_rows_select_the_fixture_and_need_the_tap_runner():
     fixture = Path(__file__).resolve().parents[2] / 'deploy/qualification/toolchains/perl526/Makefile.PL'
     requirement = detect({'Makefile.PL': fixture.read_bytes()}, 'perl')
-    matrix = load().model_dump()
-    staged = Matrix.model_validate({**matrix, 'images': [*matrix['images'], STAGED_PERL526]})
-    # No Corsair runner and report parser for TAP yet, so no framework row: the image alone does not run a case.
-    selection = select(requirement, staged)
+    matrix = load()
+    selection = select(requirement, matrix)
+    assert selection.status == 'supported' and selection.image_id == 'perl-5.26-make' and selection.evidence == 'image-only'
+    # Without the tap-harness framework row the image alone does not run a case.
+    bare = Matrix.model_validate({**matrix.model_dump(), 'frameworks': [f for f in matrix.model_dump()['frameworks'] if f['name'] != 'tap-harness']})
+    selection = select(requirement, bare)
     assert selection.status == 'unsupported' and [n.name for n in selection.needs] == ['tap-harness']
-    assert [check.name for check in selection.rejected[0].unmet] == ['tap-harness']
-    # The SPEC-0061 row: Test::More 1.302073 (core in the image) writes the TAP that `tap_runner.py` admits.
-    runner = {'name': 'tap-harness', 'language': 'perl', 'versions': '==1.302073', 'runner': 'src/corsair/adapters/tap_runner.py',
-              'images': ['perl-5.26-make'], 'qualification': {'records': ['SPEC-0056', 'SPEC-0061'], 'report': 'x'}}
-    selection = select(requirement, Matrix.model_validate({**staged.model_dump(), 'frameworks': [*matrix['frameworks'], runner]}))
-    assert selection.status == 'supported' and selection.image_id == 'perl-5.26-make'
     # A project that needs a newer Perl is not routed to 5.26.
     newer = detect({'Makefile.PL': fixture.read_bytes().replace(b"'5.026'", b"'5.028'")}, 'perl')
-    assert select(newer, staged).status == 'unsupported' and 'perl' in [n.name for n in select(newer, staged).needs]
+    assert select(newer, matrix).status == 'unsupported' and 'perl' in [n.name for n in select(newer, matrix).needs]
+
+
+def test_selection_carries_the_weakest_row_evidence():
+    fixture = Path(__file__).resolve().parents[2] / 'deploy/qualification/toolchains/perl526/Makefile.PL'
+    requirement = detect({'Makefile.PL': fixture.read_bytes()}, 'perl')
+    data = load().model_dump()
+    for row in (*data['images'], *data['frameworks']): row['qualification']['evidence'] = 'live'
+    assert select(requirement, Matrix.model_validate(data)).evidence == 'live'
+    # A live image with an image-only framework row, and the reverse, are both image-only.
+    next(f for f in data['frameworks'] if f['name'] == 'tap-harness')['qualification']['evidence'] = 'image-only'
+    assert select(requirement, Matrix.model_validate(data)).evidence == 'image-only'
+    next(f for f in data['frameworks'] if f['name'] == 'tap-harness')['qualification']['evidence'] = 'live'
+    next(i for i in data['images'] if i['id'] == 'perl-5.26-make')['qualification']['evidence'] = 'image-only'
+    assert select(requirement, Matrix.model_validate(data)).evidence == 'image-only'
+
+
+def test_benchmark_report_counts_image_only_apart():
+    from evals.benchmark.runtimes import markdown
+    def record(case, evidence=None):
+        revision = {'status': 'supported', 'image_id': 'perl-5.26-make', **({'evidence': evidence} if evidence else {})}
+        return {'case_id': case, 'language': 'perl', 'status': 'supported', 'revisions': {'baseline': revision}}
+    mixed = record('d', 'live')
+    mixed['revisions']['fix'] = {'status': 'supported', 'image_id': 'perl-5.26-make', 'evidence': 'image-only'}
+    assert '| d | perl | supported (image-only) |' in markdown([mixed])
+    report = markdown([record('a', 'live'), record('b', 'image-only'), record('c')])
+    assert '| b | perl | supported (image-only) |' in report
+    assert 'Outcomes: supported 1, supported (evidence unrecorded) 1, supported (image-only) 1' in report
+
+
+def test_rows_state_their_evidence():
+    data = load().model_dump()
+    del data['images'][0]['qualification']['evidence']
+    with pytest.raises(ValueError, match='evidence'): Matrix.model_validate(data)
+    data = load().model_dump()
+    data['images'][0]['qualification']['evidence'] = 'docker'
+    with pytest.raises(ValueError): Matrix.model_validate(data)
+
 
 def test_matrix_refuses_selector_rows_and_duplicates():
     data = load().model_dump()
@@ -495,7 +521,7 @@ def test_java_unread_pins_and_version_file_names():
     others = [row for row in load().model_dump()['frameworks'] if row['name'] != 'junit5']
     matrix = Matrix.model_validate({**load().model_dump(), 'frameworks': [*others, {
         'name': 'junit5', 'language': 'java', 'versions': '5.14.*', 'runner': 'x', 'images': ['temurin-17-maven'],
-        'qualification': {'records': ['SPEC-0039'], 'report': 'x'}}]})
+        'qualification': {'evidence': 'live', 'records': ['SPEC-0039'], 'report': 'x'}}]})
     base = '<properties><maven.compiler.release>17</maven.compiler.release></properties>'
     assert select(detect({'pom.xml': pom(base + junit)}, 'java'), matrix).status == 'supported'
     # Al's re-review: an unreadable or undefined toolchains JDK pin was dropped and 17 was selected.
@@ -577,10 +603,10 @@ def test_setup_cfg_install_requires_is_read():
 STAGED_RUBY31 = {'id': 'ruby-3.1-bundler', 'language': 'ruby',
                  'base_image': 'docker.io/library/ruby@sha256:91627f55e8969006aab67d15c92fb930500ff73948803da1330b8a853fecebb5',
                  'image_source': 'deploy/qualification/toolchains/ruby31', 'runtime': {'name': 'ruby', 'version': '3.1.7'},
-                 'tools': {'bundler': '2.3.27'}, 'selector': {}, 'qualification': {'records': ['SPEC-0058'], 'report': 'x'}}
+                 'tools': {'bundler': '2.3.27'}, 'selector': {}, 'qualification': {'evidence': 'image-only', 'records': ['SPEC-0058'], 'report': 'x'}}
 STAGED_MINITEST = {'name': 'minitest', 'language': 'ruby', 'versions': '==5.14.4 || ==5.15.0 || ==5.27.0',
                    'runner': 'src/corsair/adapters/minitest_runner.py', 'images': ['ruby-3.1-bundler'],
-                   'qualification': {'records': ['SPEC-0063', 'PLAN-0068'], 'report': 'x'}}
+                   'qualification': {'evidence': 'image-only', 'records': ['SPEC-0063', 'PLAN-0068'], 'report': 'x'}}
 
 
 def test_ruby31_rows_select_the_four_minitest_cases_and_not_the_rspec_ones():

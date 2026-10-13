@@ -40,7 +40,13 @@ def test_github_paginates_on_own_origin_and_maps_to_shared_input(monkeypatch):
     assert snapshot.provider == 'github' and snapshot.revision == NOW
     assert 'private-test-token' not in snapshot.model_dump_json()
     inputs = identification_input(snapshot, scope='component', source_files=())
-    assert inputs.issue == 'Reported behavior\n\nInvestigate the parser.\n\ncomment 1\n\ncomment 2'
+    assert 'Reported behavior' in inputs.issue and 'comment 1' not in inputs.issue
+    discussion = identification_input(snapshot, scope='component', source_files=(), include_comments=True).issue
+    parsed = json.loads(discussion.split('\n', 1)[1])
+    assert parsed['comments'][0]['author'] == 'reader'
+    assert parsed['comments'][0]['body'] == 'comment 1'
+    assert parsed['comments'][0]['role'] == 'unverified participant'
+    assert parsed['comments'][0]['format'] == 'markdown'
     assert inputs.fixture_id == snapshot.digest
 
 
@@ -156,3 +162,40 @@ def test_capture_output_is_exclusive_private_and_digested(tmp_path, monkeypatch)
     assert stat.S_IMODE(output.stat().st_mode) == 0o600
     with pytest.raises(FileExistsError):
         asyncio.run(cli.capture(config, 7, output))
+
+
+@pytest.mark.parametrize('repository', ['../repo', 'owner/..', './repo', 'owner/.'])
+def test_github_repository_rejects_dot_segments(repository):
+    with pytest.raises(ValueError):
+        GitHubConfig(provider='github', repository=repository)
+
+
+def test_azure_comment_edit_without_revision_change_is_refused(monkeypatch):
+    monkeypatch.setenv('AZURE_TOKEN', 'test')
+    calls = 0
+    item = {'id': 7, 'rev': 3, 'fields': {'System.Title': 'Finding', 'System.State': 'Active', 'System.ChangedDate': NOW}}
+    def respond(request):
+        nonlocal calls
+        if not request.url.path.endswith('/comments'):
+            return Response(200, json=item)
+        calls += 1
+        return Response(200, json={'comments': [{'id': 1, 'text': f'edit {calls}', 'modifiedDate': NOW}]})
+    with pytest.raises(TicketError) as error:
+        capture(AzureConfig(provider='azure_devops', organization='org', project='project', token_env='AZURE_TOKEN'), respond)
+    assert error.value.code == 'changed_during_capture'
+
+
+def test_failed_capture_releases_reserved_output(tmp_path, monkeypatch):
+    from contextlib import asynccontextmanager
+    from types import SimpleNamespace
+    from corsair.tickets import capture as cli
+    @asynccontextmanager
+    async def fail(config):
+        raise TicketError('github', 'transport', 'Check connectivity.')
+        yield
+    monkeypatch.setattr(cli, 'ticket_source', fail)
+    path = tmp_path / 'ticket.json'
+    for _ in range(2):
+        with pytest.raises(TicketError):
+            asyncio.run(cli.capture(SimpleNamespace(tickets=object()), 1, path))
+        assert not path.exists()

@@ -158,15 +158,15 @@ def test_e2e_stage_profiles_resolve_provider_per_agent_and_reject_cross_provider
 
 def test_configured_credentials_checked_for_all_agents_before_client_open(monkeypatch):
     c = config().model_dump()
-    c['models']['fast']['api_key_env'] = 'ABSENT_MODEL_TOKEN'
-    monkeypatch.delenv('ABSENT_MODEL_TOKEN', raising=False)
+    c['models']['fast']['api_key_env'] = 'CORSAIR_MODEL_API_KEY'
+    monkeypatch.delenv('CORSAIR_MODEL_API_KEY', raising=False)
     @asynccontextmanager
     async def fail(_):
         pytest.fail('must not create any client before preflight')
         yield
     monkeypatch.setattr('corsair.inference.models.configured_model', fail)
     async def go():
-        with pytest.raises(ValueError, match='ABSENT_MODEL_TOKEN'):
+        with pytest.raises(ValueError, match='CORSAIR_MODEL_API_KEY'):
             async with agent_models(InferenceConfig.model_validate(c), ['planning', 'authoring']):
                 pass
     asyncio.run(go())
@@ -208,3 +208,24 @@ def test_e2e_cli_only_requires_profiles_for_selected_live_agents(tmp_path, monke
     monkeypatch.setattr(run, 'main_async', admitted)
     with pytest.raises(RuntimeError, match='configuration admitted without dispatch'):
         run.main()
+
+
+@pytest.mark.parametrize('provider,allowed', [('vllm', 'CORSAIR_LOCAL_MODEL_API_KEY'),
+                                              ('openai_compatible', 'CORSAIR_MODEL_API_KEY')])
+def test_model_credentials_cannot_reference_ticket_or_ambient_secrets(provider, allowed):
+    from corsair.inference.config import MODEL_CONFIG
+    base = dict(provider=provider, base_url='https://model.example/v1', model_name='model')
+    assert MODEL_CONFIG.validate_python(base | {'api_key_env': allowed}).api_key_env == allowed
+    for name in ('CORSAIR_GITHUB_TOKEN', 'AWS_SECRET_ACCESS_KEY', 'PATH'):
+        with pytest.raises(ValidationError):
+            MODEL_CONFIG.validate_python(base | {'api_key_env': name})
+
+
+def test_larger_local_limits_survive_legacy_and_named_profile_loading():
+    from corsair.inference.config import inference_config
+    from corsair.agents.provider import LocalModelConfig
+    for cap in (24576, 32768):
+        legacy = LocalModelConfig(server='vllm', base_url='https://local.example/v1', model_name='model',
+                                  timeout_seconds=300, response_token_limit=cap)
+        named = inference_config(legacy).resolve('authoring')
+        assert named.timeout_seconds == 300 and named.response_token_limit == cap

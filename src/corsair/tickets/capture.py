@@ -12,12 +12,22 @@ from .source import ticket_source
 async def capture(config, ticket_id, output):
     if config.tickets is None:
         raise ValueError('configure the tickets section before capture')
-    # Reserve exclusively before any request. A failed capture leaves an empty file, never a partial snapshot.
+    # Reserve exclusively before dispatch; remove only our own reservation on failure.
     fd = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(fd, 'w') as destination:
-        async with ticket_source(config.tickets) as source:
-            snapshot = await source.capture(ticket_id)
-        json.dump({'snapshot': snapshot.model_dump(mode='json'), 'sha256': snapshot.digest}, destination, indent=2)
+    identity = os.fstat(fd)
+    try:
+        with os.fdopen(fd, 'w') as destination:
+            async with ticket_source(config.tickets) as source:
+                snapshot = await source.capture(ticket_id)
+            json.dump({'snapshot': snapshot.model_dump(mode='json'), 'sha256': snapshot.digest}, destination, indent=2)
+    except BaseException:
+        try:
+            current = os.stat(output, follow_symlinks=False)
+            if (current.st_dev, current.st_ino) == (identity.st_dev, identity.st_ino):
+                os.unlink(output)
+        except FileNotFoundError:
+            pass
+        raise
     return snapshot
 
 

@@ -19,15 +19,15 @@ class Frozen(BaseModel):
 class VllmConfig(LocalModelConfig):
     provider: Literal['vllm'] = 'vllm'
     server: Literal['vllm'] = 'vllm'
-    api_key_env: EnvName | None = None
+    api_key_env: Literal["CORSAIR_LOCAL_MODEL_API_KEY"] | None = None
 
 
 class OpenAIConfig(Frozen):
     provider: Literal['openai_compatible']
     base_url: str
     model_name: str = Field(min_length=1, max_length=256)
-    api_key_env: EnvName | None = None
-    timeout_seconds: float = Field(default=60, gt=0, le=240)
+    api_key_env: Literal["CORSAIR_MODEL_API_KEY"] | None = None
+    timeout_seconds: float = Field(default=60, gt=0, le=300)
     response_token_limit: int = Field(default=2048, ge=1, le=65536)
     temperature: float | None = Field(default=None, ge=0, le=2)
 
@@ -46,7 +46,7 @@ class BedrockConfig(Frozen):
     model_name: str = Field(min_length=1, max_length=256)
     region: str = Field(pattern=r'^[a-z]{2}(?:-[a-z]+)+-\d+$')
     aws_profile: str | None = Field(default=None, min_length=1)
-    timeout_seconds: float = Field(default=60, gt=0, le=240)
+    timeout_seconds: float = Field(default=60, gt=0, le=300)
     response_token_limit: int = Field(default=2048, ge=1, le=65536)
     temperature: float | None = Field(default=None, ge=0, le=2)
 
