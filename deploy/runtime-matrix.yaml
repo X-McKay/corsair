@@ -87,6 +87,18 @@ images:
       records: [SPEC-0055, PLAN-0062, SPEC-0057, PLAN-0070]
       report: docs/development/plans/PLAN-0070-jest-runner.md
       note: Node 8.17.0 and npm 6.13.4 measured in the image with no network; the gate body and its Jest fixture passed under plain Docker. Yarn 1.21.1 ships in the upstream image but no case has run with it. Kind/OpenShell gate not yet run.
+  - id: ruby-3.1-bundler
+    language: ruby
+    base_image: docker.io/library/ruby@sha256:91627f55e8969006aab67d15c92fb930500ff73948803da1330b8a853fecebb5
+    image_source: deploy/qualification/toolchains/ruby31
+    runtime: {name: ruby, version: 3.1.7}
+    tools: {bundler: 2.3.27}
+    selector: {}
+    qualification:
+      evidence: image-only
+      records: [SPEC-0058, PLAN-0063]
+      report: docs/development/plans/PLAN-0063-ruby31-toolchain.md
+      note: Ruby 3.1.7, Bundler 2.3.27 and bundled Minitest 5.15.0 measured in the image with no network; gate body, including the Minitest runner's argv, under plain Docker. Kind/OpenShell gate not yet run.
 frameworks:
   - name: pytest
     language: python
@@ -148,3 +160,13 @@ frameworks:
       records: [SPEC-0057, PLAN-0070]
       report: docs/development/plans/PLAN-0070-jest-runner.md
       note: Jest 24.8.0 (CVE-2020-7730, bestzip) and 24.9.0 (CVE-2020-15123, codecov-node) through the Jest runner under plain Docker; each security test fails at its baseline and passes at its fix.
+  - name: minitest
+    language: ruby
+    versions: ==5.14.4 || ==5.15.0 || ==5.27.0
+    runner: src/corsair/adapters/minitest_runner.py
+    images: [ruby-3.1-bundler]
+    qualification:
+      evidence: image-only
+      records: [SPEC-0063, PLAN-0068]
+      report: docs/development/plans/PLAN-0068-minitest-runner.md
+      note: Runner scripts checked against captured Minitest 5.14.4, 5.15.0 and 5.27.0 output from the image; CVE-2025-27610 (rack, Minitest 5.27.0 resolved) through the runner under plain Docker, security test fails at 2db5cfb and passes at 50caab7.
