@@ -2,7 +2,7 @@
 id: PLAN-0056
 kind: plan
 title: Agent package convention and cascade
-status: in_progress
+status: complete
 updated: 2026-10-13
 related: [SPEC-0052, IDEA-0006, SPEC-0044, HANDOFF-0076, HANDOFF-0077, HANDOFF-0078]
 ---
