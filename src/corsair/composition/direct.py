@@ -12,7 +12,7 @@ and the durable chain (``corsair.workflows.chain``) binds child workflows and ac
 
 import asyncio
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from time import perf_counter
 from typing import Any, Awaitable, Callable, Literal, Protocol
 from uuid import UUID, uuid4
@@ -23,10 +23,14 @@ from pydantic_ai.messages import ModelMessage
 from pydantic_ai.models import Model
 from pydantic_ai.usage import RunUsage, UsageLimits
 
+from corsair.agents.environment.agent import create_environment_agent, environment_prompt
+from corsair.agents.environment.contracts import (BlockedEnvironment, EnvironmentInput, ReadyEnvironment, Toolchain,
+                                                  UnsupportedEnvironment)
+from corsair.agents.environment.dependencies import EnvironmentDependencies, SetupBudget
 from corsair.agents.evidence_assessment.agent import assessment_prompt, create_evidence_assessment_agent
 from corsair.agents.evidence_assessment.contracts import WINDOW_LINES, AssessmentInput, EvidenceAssessment
 from corsair.agents.evidence_assessment.dependencies import AssessmentDependencies
-from corsair.agents.issue_analysis.contracts import IssueAnalysisInput
+from corsair.agents.issue_analysis.contracts import IssueAnalysisInput, SourceFile
 from corsair.agents.issue_identification import create_issue_identification_agent, identification_prompt
 from corsair.agents.issue_identification.contracts import IssueIdentification
 from corsair.agents.issue_analysis.tools import FixtureDependencies
@@ -41,14 +45,16 @@ from corsair.agents.test_planning.prompts import planning_prompt
 from corsair.agents.test_planning.contracts import EnvironmentEvidence, ReadyTestPlan, TestPlanningInput
 from corsair.core.disposition import AssessmentEvidence, EnvironmentIdentity, GateResult, ObservationPlan, assess
 from corsair.nodes.runtime.contracts import RuntimeInputs, RuntimeOutcome
-from corsair.nodes.runtime.environment import RuntimeCatalog, select_runtime
+from corsair.nodes.runtime.environment import RuntimeCatalog, check_ready, ready_evidence, select_runtime
 from corsair.nodes.witness import WitnessEvidence, witness_evidence
+from corsair.ports.execution import SandboxExecution
+from corsair.ports.sandbox import SandboxHandle
 from corsair.ports.test_runner import ApprovedPatch, NativeTestRun, TestRunner, WitnessRequest
 
 from .evidence import evidence_items, freeze, observation_plan, run_evidence, witness_request
 
-Stage = Literal["runtime", "identification", "planning", "authoring", "execution", "assessment"]
-AgentStage = Literal["identification", "planning", "authoring", "assessment"]
+Stage = Literal["runtime", "environment", "identification", "planning", "authoring", "execution", "assessment"]
+AgentStage = Literal["environment", "identification", "planning", "authoring", "assessment"]
 Purpose = Literal["development", "baseline", "candidate"]
 
 
@@ -91,6 +97,10 @@ class StageBudget(Contract):
 
 
 class CompositionBudget(Contract):
+    # The environment agent's isolated eval budget (evals/environment EvaluationBudget), not wider (SPEC-0068).
+    environment: StageBudget = StageBudget(request_limit=16, tool_calls_limit=20, total_tokens_limit=48000,
+                                           timeout_seconds=240, tokens_per_request=8000)
+    setup_commands: int = Field(default=12, strict=True, ge=1, le=16)
     identification: StageBudget = StageBudget(request_limit=20, tool_calls_limit=16, total_tokens_limit=128000,
                                               timeout_seconds=300, tokens_per_request=8000)
     planning: StageBudget = StageBudget(request_limit=20, tool_calls_limit=16, total_tokens_limit=160000,
@@ -110,7 +120,7 @@ Limit = Literal["request_limit", "tool_calls_limit", "total_tokens_limit", "time
 class BudgetExhausted(Contract):
     """The typed outcome of a stage that ended on one of its own caps instead of returning its output."""
     status: Literal["budget_exhausted"] = "budget_exhausted"
-    stage: Literal["identification", "planning", "authoring", "assessment"]
+    stage: Literal["environment", "identification", "planning", "authoring", "assessment"]
     limit: Limit
     cap: float
     limits: StageLimits
@@ -123,6 +133,9 @@ def _windows(contents, window: int = READ_LINE_LIMIT) -> int:
 def stage_limits(stage: "AgentStage", inputs: Any, budget: "CompositionBudget") -> StageLimits:
     """Caps from the task: each readable input once in tool windows, plus the stage's own work calls."""
     match stage:
+        case "environment":
+            # Each setup source once, list_toolchains once, and every setup command the operator admits.
+            reads, work = _windows(source.content for source in inputs.source_files), budget.setup_commands + 1
         case "identification" | "planning":
             reads, work = _windows(source.content for source in inputs.source_files), 0
         case "authoring":
@@ -173,11 +186,34 @@ class StageModels:
     planning: Model
     authoring: Model
     assessment: Model
+    environment: Model | None = None  # Needed only by cases that carry setup source (SPEC-0068)
 
 
 class Runners(Protocol):
     """Operator-owned: a fresh-workspace runner for authoring development runs and for each frozen revision."""
     def __call__(self, purpose: Purpose) -> TestRunner: ...
+
+
+class SetupSource(Contract):
+    """SPEC-0068: the agent-visible setup source of the baseline revision; never labels or oracles."""
+    commit: str = Field(pattern=r"^[0-9a-f]{40}$")
+    source_private: bool
+    source_files: tuple[SourceFile, ...] = Field(min_length=1, max_length=32)
+    policy_profile: str = Field(min_length=1, max_length=128, pattern=r"^[a-z0-9][a-z0-9._-]*$")
+
+
+@dataclass(frozen=True)
+class PreparedSandbox:
+    """A sandbox of one prepared toolchain image, live until the preparation port releases it."""
+    execution: SandboxExecution
+    handle: SandboxHandle
+    scratch_location: str
+
+
+class Preparation(Protocol):
+    """Operator-owned sandbox lifecycle for the environment stage; adapters are chosen outside the chain."""
+    def prepare(self, toolchain: Toolchain, operation: UUID) -> PreparedSandbox: ...
+    def release(self, sandbox: PreparedSandbox, operation: UUID) -> Literal["confirmed", "unconfirmed"]: ...
 
 
 @dataclass(frozen=True)
@@ -192,6 +228,8 @@ class FixtureCase:
     witness_envelope: WitnessRequest | None = None
     # The baseline revision's build files (SPEC-0060); without them the runtime is the operator's declaration.
     runtime: RuntimeInputs | None = None
+    # The baseline revision's setup source (SPEC-0068); with it the environment agent prepares the environment.
+    setup: SetupSource | None = None
 
 
 @dataclass(frozen=True)
@@ -204,6 +242,7 @@ class StageAttempt:
     failure: BaseException | None
     limits: StageLimits | None = None  # None: refused before its limits were derived
     exhausted: BudgetExhausted | None = None
+    cleanup: Literal["confirmed", "unconfirmed"] | None = None  # The environment stage's sandbox; None elsewhere
 
     @property
     def tool_cap_reached(self) -> bool:
@@ -234,6 +273,7 @@ class DirectRun:
     witnesses: tuple[WitnessEvidence, ...] = ()
     limitations: tuple[str, ...] = field(default=())
     runtime: RuntimeOutcome | None = None
+    environment: ReadyEnvironment | BlockedEnvironment | UnsupportedEnvironment | None = None
 
 
 class RecordedFailure(Exception):
@@ -255,19 +295,29 @@ class RuntimeCatalogMissing(ValueError):
     """The same failure kind in every mode: the durable activity raises it as an ApplicationError type."""
 
 
+NO_PREPARATION = "The case carries setup source but no environment model or sandbox preparation is configured"
+
+
+class PreparationMissing(ValueError):
+    """A case needs the environment stage and the mode has no environment model or sandbox preparation."""
+
+
 class RevisionExecutor(Protocol):
     async def __call__(self, revision: Literal["baseline", "candidate"], patch: ApprovedPatch, *, control_test_id: str,
                        security_test_id: str, discovery_command: tuple[str, ...], operation: UUID,
                        witness: WitnessRequest | None = None) -> NativeTestRun: ...
 
 
-AGENTS = {"identification": create_issue_identification_agent, "planning": create_test_planning_agent,
+AGENTS = {"environment": create_environment_agent, "identification": create_issue_identification_agent,
+          "planning": create_test_planning_agent,
           "authoring": create_test_authoring_agent, "assessment": create_evidence_assessment_agent}
 
 
 def stage_call(stage: AgentStage, inputs: Any, budget: CompositionBudget, runner: TestRunner | None) -> tuple[str, Any]:
     """Prompt and dependencies for one stage; the mode supplies the authoring stage's development runner."""
     match stage:
+        case "environment":
+            raise ValueError("the environment stage's dependencies hold a live sandbox; the mode builds them")
         case "identification":
             return identification_prompt(inputs), FixtureDependencies(inputs)
         case "planning":
@@ -301,14 +351,22 @@ UNOBSERVED = ("The witness probe runs inside the test interpreter: it is operato
               "Environment identity is the operator's declaration for both revisions, not an observed image or "
               "dependency digest.")
 UNSELECTED = "Runtime not selected from build files: the runtime is the operator's declaration."
+OBSERVED_IDENTITY = ("Environment image and recipe observed by the environment stage; scratch location, dependency "
+                     "inventory, policy revision and limits are the operator's declaration.",
+                     "Revisions run on the operator's runners, not in the environment stage's prepared sandbox.")
 
 
 async def run_direct(case: FixtureCase, models: StageModels, runners: Runners,
-                     budget: CompositionBudget = CompositionBudget(), *, catalog: RuntimeCatalog | None = None) -> DirectRun:
+                     budget: CompositionBudget = CompositionBudget(), *, catalog: RuntimeCatalog | None = None,
+                     preparation: Preparation | None = None) -> DirectRun:
     """One E2E-0 investigation over a baseline and candidate revision; never retries a stage.
 
-    ``catalog`` is the operator's runtime matrix and prepared images; a case with build files needs it."""
+    ``catalog`` is the operator's runtime matrix and prepared images; a case with build files needs it.
+    ``preparation`` prepares the environment stage's sandbox; a case with setup source needs it and
+    ``models.environment``."""
     async def invoke(stage: AgentStage, inputs: Any) -> StageAttempt:
+        if stage == "environment":
+            return await environment_stage(inputs)
         agent = AGENTS[stage](getattr(models, stage), output_retries=budget.output_retries)
         prompt, deps = stage_call(stage, inputs, budget, runners("development") if stage == "authoring" else None)
         return await _invoke(stage, agent, prompt, deps, stage_limits(stage, inputs, budget))
@@ -320,10 +378,47 @@ async def run_direct(case: FixtureCase, models: StageModels, runners: Runners,
         if catalog is None:
             raise RuntimeCatalogMissing(NO_CATALOG)
         return select_runtime(inputs, catalog)
+
+    async def environment_stage(inputs: EnvironmentInput) -> StageAttempt:
+        limits = stage_limits("environment", inputs, budget)
+        if preparation is None or models.environment is None:
+            return StageAttempt("environment", None, None, (), 0.0, PreparationMissing(NO_PREPARATION), limits)
+        (selected,), operation, started = inputs.toolchains, uuid4(), perf_counter()
+        try:
+            sandbox = await asyncio.to_thread(preparation.prepare, selected, operation)
+        except Exception as exc:
+            # Nothing was handed back to release; whether a sandbox exists is the adapter's to report.
+            return StageAttempt("environment", None, None, (), perf_counter() - started, exc, limits, cleanup="unconfirmed")
+        try:
+            agent = AGENTS["environment"](models.environment, output_retries=budget.output_retries)
+            deps = EnvironmentDependencies(inputs=inputs, execution=sandbox.execution, handle=sandbox.handle,
+                                           toolchain_id=selected.toolchain_id, scratch_location=sandbox.scratch_location,
+                                           budget=SetupBudget(max_commands=budget.setup_commands), new_operation=uuid4)
+            attempt = await _invoke("environment", agent, environment_prompt(inputs), deps, limits)
+        except Exception as exc:
+            attempt = StageAttempt("environment", None, None, (), perf_counter() - started, exc, limits)
+        finally:
+            try:
+                cleanup = await asyncio.to_thread(preparation.release, sandbox, operation)
+            except Exception:
+                cleanup = "unconfirmed"
+        return replace(attempt, cleanup="confirmed" if cleanup == "confirmed" else "unconfirmed")
     return await run_chain(case, invoke, execute, select, new_operation=uuid4)
 
 
+# Spellings of an admitted framework's name that the grammar below cannot read: "JUnit Jupiter 5.10" is JUnit 5.
+FRAMEWORK_ALIASES = (("junit jupiter", "junit"),)
 DECLARED_FRAMEWORK = re.compile(r"(?P<name>[a-z]+(?:-[a-z]+)*)(?:[ _-]?v?(?P<major>[0-9]+)(?:\.[0-9]+)*)?")
+
+
+def framework_names(declared: str) -> set[str]:
+    """The framework ids a declaration can name: its name, and its name with its major version; none when the
+    declaration is not a name with at most a version suffix."""
+    declared = declared.strip().casefold()
+    declared = next((name + declared[len(alias):] for alias, name in FRAMEWORK_ALIASES if declared.startswith(alias)),
+                    declared)
+    parsed = DECLARED_FRAMEWORK.fullmatch(declared)
+    return {parsed["name"], parsed["name"] + (parsed["major"] or "")} if parsed else set()
 
 
 def declared_mismatch(case: FixtureCase, outcome: RuntimeOutcome) -> str | None:
@@ -338,9 +433,7 @@ def declared_mismatch(case: FixtureCase, outcome: RuntimeOutcome) -> str | None:
     # A framework name with at most a version suffix: "pytest 9.0.3" names pytest, "JUnit 5" and "JUnit 4.12" name
     # junit5 and junit4, "tap-harness 3.42" names tap-harness; "pytest-bdd" names no admitted framework.
     admitted = sorted(c.name for c in outcome.selection.checks if c.kind == "test_framework" and c.satisfied)
-    parsed = DECLARED_FRAMEWORK.fullmatch(case.environment.framework.strip().casefold())
-    names = {parsed["name"], parsed["name"] + (parsed["major"] or "")} if parsed else set()
-    if not names & set(admitted):
+    if not framework_names(case.environment.framework) & set(admitted):
         return f"declared environment framework {case.environment.framework} is not one the selection admitted ({', '.join(admitted)})"
     return None
 
@@ -349,15 +442,16 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
                     new_operation: Callable[[], UUID]) -> DirectRun:
     """Mode-independent routing: each stage at most once, revisions once each, gates over frozen evidence."""
     attempts: list[StageAttempt] = []
-    issue, environment = case.issue, case.environment
-    runtime, selected = None, (UNSELECTED,)
+    issue, environment, identity = case.issue, case.environment, case.environment_identity
+    runtime, selected, prepared, provenance = None, (UNSELECTED,), None, UNOBSERVED[2:]
 
     async def _stage(stage: AgentStage, inputs: Any) -> Any:
         attempts.append(await invoke(stage, inputs))
         return attempts[-1].output
 
     def stop(stage: Stage, reason: str, **values) -> DirectRun:
-        return DirectRun(stopped_at=stage, reason=reason, attempts=tuple(attempts), runtime=runtime, **values)
+        return DirectRun(stopped_at=stage, reason=reason, attempts=tuple(attempts), runtime=runtime,
+                         environment=prepared, **values)
 
     def failure_of(stage: Stage) -> str:
         exhausted = attempts[-1].exhausted
@@ -377,9 +471,35 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
             return stop("runtime", f"runtime selection failed: {kind}: {exc}"[:2048])
         if runtime.status != "supported":
             return stop("runtime", runtime.reason)
-        if (mismatch := declared_mismatch(case, runtime)):
+        if case.setup is None and (mismatch := declared_mismatch(case, runtime)):
             return stop("runtime", mismatch[:2048])
         selected = ("Runtime selected from the baseline revision's build files; the candidate's were not read.",)
+
+    if case.setup is not None:
+        # SPEC-0068: the environment agent prepares the selected toolchain; its admitted result replaces the declaration.
+        if runtime is None:
+            return stop("environment", "setup source needs a runtime selected from build files; the case carries none")
+        try:
+            environment_input = EnvironmentInput(toolchains=(runtime.toolchain,), **case.setup.model_dump())
+        except ValueError as exc:
+            return stop("environment", f"environment input refused: {exc}"[:2048])
+        result = await _stage("environment", environment_input)
+        unconfirmed = ("environment sandbox cleanup unconfirmed",) if attempts[-1].cleanup == "unconfirmed" else ()
+        if not isinstance(result, (ReadyEnvironment, BlockedEnvironment, UnsupportedEnvironment)):
+            return stop("environment", failure_of("environment"), limitations=unconfirmed)
+        prepared = result
+        if isinstance(result, BlockedEnvironment):
+            codes = ", ".join(d.code for d in result.diagnostics)
+            return stop("environment", (f"environment blocked at {result.layer}: {result.evidence}"
+                                        + (f" ({codes})" if codes else ""))[:2048], limitations=unconfirmed)
+        if isinstance(result, UnsupportedEnvironment):
+            return stop("environment", f"environment unsupported: {result.requirement}"[:2048], limitations=unconfirmed)
+        try:
+            check_ready(result, runtime.selection, {runtime.selection.image_id: runtime.image})
+            environment, identity = ready_evidence(result, case.environment, case.environment_identity)
+        except ValueError as exc:
+            return stop("environment", f"ready environment refused: {exc}"[:2048], limitations=unconfirmed)
+        provenance = OBSERVED_IDENTITY + unconfirmed
 
     identification = await _stage("identification", issue)
     if not isinstance(identification, IssueIdentification):
@@ -447,7 +567,6 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
     if problems:
         return stop("execution", "; ".join(problems)[:2048], **done)
 
-    identity = case.environment_identity
     runs = {e.revision: (e.observed,) for e in executions}
     def witness_of(e):
         if not request:
@@ -465,7 +584,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
                             sandbox_events=found.sandbox_events)
     evidence = AssessmentEvidence(plan=expected, baseline=(gate_run("baseline"),), candidate=(gate_run("candidate"),))
     gate = assess(evidence)
-    limitations = UNOBSERVED + selected + unrequested + tuple(f"{revision} witness not admitted: {found.reason}"
+    limitations = UNOBSERVED[:2] + provenance + selected + unrequested + tuple(f"{revision} witness not admitted: {found.reason}"
                                      for revision, found in witnesses.items() if found.witness is None) + tuple(
         f"{e.revision} workspace cleanup {e.observed.cleanup}" for e in executions if e.observed.cleanup != "confirmed")
     try:
@@ -480,4 +599,4 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
     if not isinstance(assessment, EvidenceAssessment):
         return stop("assessment", failure_of("assessment"), gate=gate, limitations=limitations, **done)
     return DirectRun(stopped_at=None, reason="complete", attempts=tuple(attempts), gate=gate, assessment=assessment,
-                     limitations=limitations, runtime=runtime, **done)
+                     limitations=limitations, runtime=runtime, environment=prepared, **done)

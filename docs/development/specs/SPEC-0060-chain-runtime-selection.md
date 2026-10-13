@@ -55,6 +55,6 @@ Live qualification is not part of this spec: a live chain over a real case also 
 
 - Selection reads the baseline revision's build files only. Both revisions run on the one selected image (the environment identity is shared); a fix that changes its runtime declaration is not detected here. Selecting both and requiring the same row is a candidate follow-up.
 - The case's language is the operator's when given; otherwise the detector needs exactly one ecosystem at the root.
-- Next: the environment stage (G12) consumes `environment_input` for a supported outcome and replaces the operator's `EnvironmentEvidence` with the mapped `ReadyEnvironment`; the identity check above then compares an observed image rather than a declared one.
+- Next ([SPEC-0068](SPEC-0068-chain-environment-stage.md)): the environment stage (G12) consumes `environment_input` for a supported outcome and replaces the operator's `EnvironmentEvidence` with the mapped `ReadyEnvironment`; the identity check above then compares an observed image rather than a declared one.
 
 The plan is [PLAN-0065](../plans/PLAN-0065-chain-runtime-selection.md).

@@ -59,7 +59,9 @@ def test_catalog_refuses_unpinned_or_unknown_prepared_images(prepared):
 def test_outcome_fields_must_agree_with_the_status():
     supported = select_runtime(RuntimeInputs(files={'pyproject.toml': b'[project]\nrequires-python = ">=3.10"\n[tool.pytest.ini_options]\n'}),
                                RuntimeCatalog(load(), PREPARED))
-    for wrong in (dict(image=None), dict(status='unsupported'), dict(detection='x')):
+    assert (supported.toolchain.toolchain_id, supported.toolchain.image) == ('cpython-3.12-pytest', supported.image)
+    other = supported.toolchain.model_dump() | {'image': 'other@sha256:' + 'b' * 64}
+    for wrong in (dict(image=None), dict(status='unsupported'), dict(detection='x'), dict(toolchain=other)):
         with pytest.raises(ValueError):
             RuntimeOutcome.model_validate(supported.model_dump() | wrong)
     data = RuntimeInputs(files={'pom.xml': b'\xff\xfe'}, language='java')
