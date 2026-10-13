@@ -1,21 +1,21 @@
 """Deterministic admission facts about an authored patch, scored by the eval only (SPEC-0044).
 
 Structure, not proof of test semantics: they flag patches that could not be valid evidence whatever
-they would do when executed. The audit-hook rule belongs to the authoring stage's own admission check
-(the "author stays out of the witness" work, PLAN-0047 on its own branch) and is not duplicated here.
+they would do when executed. The audit-hook and patch rules belong to the authoring stage's own admission check
+(SPEC-0043); the eval scores that same check (``stage_admitted``) rather than a copy of it.
 """
 
 import ast
 import re
 
+from corsair.agents.test_authoring.admission import DYNAMIC_CALLS, self_observation
 from corsair.agents.test_authoring.static import _executable, _function
 from corsair.agents.test_planning.contracts import ReadyTestPlan
 
 PROCESS_OR_NETWORK = frozenset({"subprocess", "socket", "ssl", "urllib", "http", "requests", "httpx", "aiohttp",
                                 "ftplib", "smtplib", "telnetlib", "ctypes", "multiprocessing", "pty", "importlib",
                                 "runpy", "asyncio", "concurrent"})
-# Dynamic forms that could reach any of the above without a visible import.
-DYNAMIC_CALLS = frozenset({"__import__", "eval", "exec", "compile", "getattr"})
+# Dynamic forms that could reach any of the above without a visible import: the stage admission check's own set.
 OS_PROCESS_CALLS = frozenset({"system", "popen", "spawnl", "spawnle", "spawnlp", "spawnlpe",
                                 "spawnv", "spawnve", "spawnvp", "spawnvpe",
                                 "posix_spawn", "posix_spawnp", "execv", "execve", "execvp", "execvpe",
@@ -82,7 +82,8 @@ def admission_facts(plan: ReadyTestPlan, files: dict[str, str], security_lines: 
         security = _function(security_tree, plan.security.test_id)
     except (SyntaxError, ValueError):
         return {"admission_parses": False}
-    facts = {"no_process_or_network": all(no_process_or_network(content) for content in files.values())}
+    facts = {"no_process_or_network": all(no_process_or_network(content) for content in files.values()),
+             "stage_admitted": not any(self_observation(content) for content in files.values())}
     adversarial = quoted_literals(plan.security.input) - quoted_literals(plan.control.input)
     if adversarial:
         # The literal occurs in the security body outside deferred scopes; this does not prove dataflow.

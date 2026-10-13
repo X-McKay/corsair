@@ -157,11 +157,20 @@ async def measure(tree: SourceTree, case_inputs: RepositoryIssueInput, limits: R
             "output": result.output.model_dump(mode="json")}
 
 
+def repository_tool_calls(limits: RepositoryLimits, discovery_calls: int = 4, slack: int = 2) -> int:
+    """SPEC-0043: the reads the run byte budget allows at full read size, plus listing/search calls and slack.
+
+    Under the default limits that is 8 reads + 4 + 2 = 14; PLAN-0042's two correct JSPWiki runs used all
+    10 of the old flat cap."""
+    return -(-limits.run_bytes // limits.read_bytes) + discovery_calls + slack
+
+
 class LiveBudget(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     repeat: int = Field(default=3, ge=1, le=5, strict=True)
-    request_limit: int = Field(default=12, ge=1, le=16, strict=True)
-    tool_calls_limit: int = Field(default=10, ge=1, le=14, strict=True)
+    # Tool calls plus the output request, one output correction and one spare.
+    request_limit: int = Field(default=repository_tool_calls(RepositoryLimits()) + 3, ge=1, le=32, strict=True)
+    tool_calls_limit: int = Field(default=repository_tool_calls(RepositoryLimits()), ge=1, le=28, strict=True)
     total_tokens_limit: int = Field(default=160000, ge=1, le=256000, strict=True)
     task_seconds: int = Field(default=300, ge=1, le=600, strict=True)
     output_retries: int = Field(default=1, ge=0, le=1, strict=True)

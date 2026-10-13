@@ -45,7 +45,11 @@ ROOT = Path(__file__).parent
 REPOSITORY = ROOT.parents[1]
 # The reviewed SPEC-0018 realization; scripted plumbing writes it, never a model.
 FILES = {"reference": (REPOSITORY / "benchmarks/fixtures/path-traversal/test_documents.py").read_text(),
-         "broken": "import pytest\nimport documents\n\ndef test_benign_control(:\n    pass\n"}
+         "broken": "import pytest\nimport documents\n\ndef test_benign_control(:\n    pass\n",
+         # What live authors wrote in PLAN-0039: their own audit hook beside the operator witness.
+         "self_observing": ("import sys\nimport documents\n\nOPENS = []\nsys.addaudithook(lambda event, args: "
+                            "OPENS.append(args[0]) if event == 'open' else None)\n\n\ndef test_benign_control(tmp_path):\n"
+                            "    (tmp_path / 'd.txt').write_text('x')\n    assert documents.read_document(tmp_path, 'd.txt') == 'x'\n")}
 AuthoringOutput = TestPatch | BlockedAuthoring
 
 
@@ -88,6 +92,8 @@ class ScriptedRunner:
     def run(self, patch: ApprovedPatch, *, control_test_id: str, security_test_id: str,
             discovery_command: tuple[str, ...], operation: UUID, witness=None) -> NativeTestRun:
         self.calls.append(patch.sha256)
+        if not self.runs:
+            raise ValueError("the case scripts no development run; give it a runner_runs entry for live authors")
         scripted = self.runs[min(len(self.calls), len(self.runs)) - 1]
         self.sources.append("static_simulated" if scripted.status == "static" else "injected")
         if scripted.status == "static":
@@ -175,6 +181,8 @@ def scripted_model(inputs: TestAuthoringInput, oracle: AuthoringOracle) -> Funct
     for step in oracle.script:
         if "write" in step:
             steps.append(ToolCallPart(WRITE_TOOL, {"path": plan.security.test_path, "content": FILES[step["write"]]}))
+        elif "read" in step:
+            steps.append(ToolCallPart(READ_SOURCE_TOOL, {"path": step["read"]}))
         else:
             steps.append(ToolCallPart(RUN_TOOL, {}))
 
@@ -185,7 +193,9 @@ def scripted_model(inputs: TestAuthoringInput, oracle: AuthoringOracle) -> Funct
         draft = ({"status": "patch", "security_assertion_lines": list(oracle.security_assertion_lines),
                   "limitations": ["Development runs observe buildability and discovery, not the security outcome"]}
                  if oracle.status == "patch" else
-                 {"status": "blocked", "layer": oracle.layer, "reason": "The observed development runs did not admit the planned tests"})
+                 # Trusted code assigns the admission layer; the model-facing draft cannot name it.
+                 {"status": "blocked", "layer": "unknown" if oracle.layer == "admission" else oracle.layer,
+                  "reason": "The observed development runs did not admit the planned tests"})
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {"result": draft})])
     return FunctionModel(respond)
 
@@ -193,6 +203,14 @@ def scripted_model(inputs: TestAuthoringInput, oracle: AuthoringOracle) -> Funct
 def tool_order(messages: list[ModelMessage]) -> list[str]:
     return [part.tool_name for message in messages if isinstance(message, ModelResponse)
             for part in message.parts if isinstance(part, ToolCallPart)]
+
+
+def unread_sources(messages: list[ModelMessage]) -> int:
+    """read_source calls answered not_in_source or past_end: typed answers the stage survived."""
+    return sum(1 for message in messages if isinstance(message, ModelRequest) for part in message.parts
+               if isinstance(part, ToolReturnPart) and part.tool_name == READ_SOURCE_TOOL and part.outcome == "success"
+               and (part.content.get("status") if isinstance(part.content, dict) else getattr(part.content, "status", None))
+               in ("not_in_source", "past_end"))
 
 
 def security_revealed(messages: list[ModelMessage]) -> int:
@@ -270,6 +288,7 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, prov
                        "response_ids": [m.provider_response_id for m in responses],
                        "runner_calls": runner.calls, "runner_sources": runner.sources, "tool_order": tool_order(messages),
                        "security_revealed": security_revealed(messages),
+                       "unread_sources": unread_sources(messages),
                        "messages": TypeAdapter(list[ModelMessage]).dump_python(messages, mode="json"),
                        **message_counts(messages, known_tools)}
             with attempt.open("x") as destination:
@@ -282,7 +301,8 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, prov
             set_eval_attribute("provider_usage_present", receipt["provider_usage_present"])
             for key, value in (("requests", usage.requests), ("tool_calls", usage.tool_calls),
                                ("input_tokens", usage.input_tokens), ("output_tokens", usage.output_tokens),
-                               ("dev_runs", len(runner.calls)), ("output_corrections", receipt["output_corrections"])):
+                               ("dev_runs", len(runner.calls)), ("output_corrections", receipt["output_corrections"]),
+                               ("unread_sources", receipt["unread_sources"])):
                 record_count("observed_" + key, value)
 
     report = await corpus.evaluate(task, repeat=budget.repeat, max_concurrency=1, retry_task=None, metadata=metadata, progress=False)
