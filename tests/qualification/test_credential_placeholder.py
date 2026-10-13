@@ -23,7 +23,8 @@ from tests.qualification.credential_scan import SCAN
 from tests.qualification.gateway import inspect_identity, wait_resource_absent, workspace_storage
 from tests.qualification.prepare_toolchains import image_receipt
 from tests.qualification.support import LOCK, ROOT
-from tests.qualification.test_adapter_lifecycle import adapter_gateway
+from tests.qualification.gateway import gateway  # noqa: F401 (fixture)
+from tests.qualification.test_adapter_lifecycle import adapter_gateway  # noqa: F401 (fixture)
 from tests.qualification.test_lifecycle import SdkReceipts
 from tests.qualification.test_recovery import PYTHON, recovery_spec
 from tests.qualification.test_test_workspace import sandboxes_absent
