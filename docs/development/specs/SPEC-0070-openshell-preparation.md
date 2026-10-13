@@ -70,6 +70,7 @@ The rest of the chain runs on the operator's sandbox runners and is recorded, no
 
 - One adapter per case, so the `Preparation` port is unchanged; `PreparationRefused` carries the layer and what was left behind.
 - Upload before fetch (decision card 2026-10-13); the in-sandbox fetch nodes stay for when images carry `git`.
-- Accepted for now (review of `dfd4a29`): `CliPolicy`, like `CliUpload`, hashes the pinned CLI and then runs it by path; the adapter imports `PreparationRefused` from `composition.direct`, where the `Preparation` port itself lives.
+- Accepted (review of `dfd4a29`): `CliPolicy`, like `CliUpload`, hashes the pinned CLI and then runs it by path. The pin catches a wrong or stale operator binary; it is not a boundary against someone who can write the operator's host, who could equally replace the Python environment that runs the check.
+- The `Preparation` port (`PreparedSandbox`, `PreparationRefused`, `Preparation`) lives in `corsair.ports.preparation`, so the adapter imports no composition code; `composition.direct` re-exports it for existing callers.
 - The tree bounds stay the SPEC-0032 ones (512 entries, 4 MiB); real corpus repositories exceed them, so raising them from the operator's `WorkspaceBudget` is the next limit to lift, separately qualified.
 - Open: whether a later slice narrows to build-and-test inside the preparation sandbox once recipe phases are observed.

@@ -17,7 +17,7 @@ from uuid import UUID, uuid4, uuid5
 from corsair.adapters.openshell_workspace import WorkspaceError
 from corsair.adapters.receipts import ReceiptDirectory
 from corsair.agents.environment.contracts import Toolchain
-from corsair.composition.direct import PreparationRefused, PreparedSandbox
+from corsair.ports.preparation import PreparationRefused, PreparedSandbox
 from corsair.nodes.phase_policy import dependency_policy
 from corsair.nodes.source_fetch import WorkspaceBudget, WorkspaceBudgetRefused, admit_workspace_budget, node_free_bytes
 from corsair.ports.artifacts import ArtifactStore, SourceSnapshot
