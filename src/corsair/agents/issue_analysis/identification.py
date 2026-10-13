@@ -3,6 +3,7 @@
 from hashlib import sha256
 from pathlib import Path
 import re
+import unicodedata
 from typing import Literal, Protocol
 
 from pydantic_ai import Agent, ModelRetry, RunContext
@@ -17,8 +18,8 @@ from .identification_contracts import IssueIdentification, IssueIdentificationDr
 from .tools import READ_SOURCE_TOOL, TOOL_RETRIES, FixtureDependencies
 from .tools.identification import identification_tools
 
-PROMPT_VERSION = "issue-identification-v3-grounding-2"
-CONFIG_VERSION = "issue-identification-config-v3-grounding-2"
+PROMPT_VERSION = "issue-identification-v3-grounding-3"
+CONFIG_VERSION = "issue-identification-config-v3-grounding-3"
 SKILL_ID = "identify-issue"
 SKILL_TEXT = (Path(__file__).parent / "skills" / SKILL_ID / "SKILL.md").read_text()
 SKILL_SHA256 = sha256(SKILL_TEXT.encode()).hexdigest()
@@ -50,9 +51,9 @@ def identification_prompt(inputs: IssueAnalysisInput) -> str:
 
 
 def _symbol_occurs(symbol: str, text: str) -> bool:
-    """Literal occurrence bounded by Unicode identifier continuations and Java/JS '$'."""
+    """Literal occurrence with conservative Python/Java/JS identifier boundaries."""
     def continuation(char: str) -> bool:
-        return char == "$" or ("_" + char).isidentifier()
+        return ("_" + char).isidentifier() or unicodedata.category(char) in {"Sc", "Cf"}
 
     return any((match.start() == 0 or not continuation(text[match.start() - 1]))
                and (match.end() == len(text) or not continuation(text[match.end()]))

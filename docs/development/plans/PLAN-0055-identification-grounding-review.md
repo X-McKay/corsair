@@ -54,3 +54,10 @@ Independent review confirmed that Python regex \w excludes valid Unicode identif
 Focused Unicode/identifier checks:22 passed; development scripted16/16 versus16/16, `.runs/evals/identification/20261013T100737Z-development-scripted`, unchanged estimated requests/tools/tokens. SPEC-0051 and PLAN-0055 replace this branch's previous colliding identifiers; all tracked references updated. These are new record identities, not changes to the other PR's records.
 
 Final affected identification/repository and documentation/dataset guards:77 passed, one existing event-loop deprecation warning. git diff --check passed. Live candidate rerun and full-suite repeat unrun; prior full-suite source remains separately recorded.
+
+## Conservative cross-language lexical follow-up
+
+Cross-review found Java/JavaScript currency symbols and format characters still accepted as partial-name suffixes. The adjacent-character guard now conservatively includes Unicode Sc and Cf categories together with Python identifier continuations; this covers currency and zero-width joiner/non-joiner suffixes while preserving complete literal spellings. It is intentionally not a parser or declaration/semantic proof. Native negative and complete-spelling checks retain existing dollar and punctuation expectations. Identities advance to grounding-3 (planning config v5). No corpus/held-out, provider or authority changes.
+
+Focused native inline/repository identifier checks:28 passed, one existing deprecation warning. Final scripted development16/16 against16/16 at `.runs/evals/identification/20261013T101223Z-development-scripted`, unchanged estimated requests/tools/tokens.
+Full-suite repeat, live provider and runtime checks unrun for this bounded correction; earlier checks remain historical. git diff --check passed.
