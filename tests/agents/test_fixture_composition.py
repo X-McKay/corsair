@@ -229,7 +229,7 @@ def test_checked_in_stage_profiles_admit_per_stage_reasoning_budgets():
     configs = cli.stage_configs(base, profiles)
     assert {stage: (c.response_token_limit, c.thinking_token_budget) for stage, c in configs.items()} == {
         "identification": (8192, None), "planning": (8192, 2048), "authoring": (8192, 2048),
-        "assessment": (16384, None)}
+        "assessment": (16384, 2048)}
     assert all(c.model_dump(exclude=cli.PROFILE_FIELDS) == base.model_dump(exclude=cli.PROFILE_FIELDS)
                for c in configs.values())
     assert model_settings(configs["planning"])["extra_body"] == {"thinking_token_budget": 2048}

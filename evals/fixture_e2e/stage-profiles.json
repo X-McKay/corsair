@@ -2,5 +2,5 @@
   "identification": {"response_token_limit": 8192},
   "planning": {"response_token_limit": 8192, "thinking_token_budget": 2048},
   "authoring": {"response_token_limit": 8192, "thinking_token_budget": 2048},
-  "assessment": {"response_token_limit": 16384}
+  "assessment": {"response_token_limit": 16384, "thinking_token_budget": 2048}
 }
