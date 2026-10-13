@@ -10,11 +10,13 @@ from pydantic_ai.models.function import FunctionModel
 
 from corsair.adapters.local_artifacts import LocalArtifacts
 from corsair.agents.issue_analysis.contracts import SourceFile
-from corsair.composition.direct import (OBSERVED_IDENTITY, UNOBSERVED, PreparedSandbox, SetupSource, StageModels,
-                                        run_direct)
+from corsair.composition.direct import (OBSERVED_IDENTITY, SMOKE_BASELINE, UNOBSERVED, PreparedSandbox, SetupSource,
+                                        StageModels, run_direct)
 from corsair.nodes.runtime.contracts import RuntimeInputs
 from corsair.nodes.runtime.environment import RuntimeCatalog, recipe_sha256
 from corsair.nodes.runtime.matrix import load
+
+SMOKE_TESTS = {f.name: f.smoke for f in load().frameworks}
 from corsair.ports.execution import ExecutionReceipt
 from corsair.ports.sandbox import SandboxHandle
 from evals.fixture_e2e.case import (fixture_case, reviewed_runners, scripted_assessment, scripted_authoring,
@@ -66,12 +68,13 @@ class Sandboxes:
         self.observations, self.cleanup, self.refuse = observations, cleanup, refuse
         # The operator's capture of the revision placed in the sandbox; by default the fixture's saved source.
         self.capture = {f.path: f.content.encode() for f in fixture_case().issue.source_files} if capture is None else capture
-        self.prepared, self.released, self.commands = [], [], []
+        self.prepared, self.released, self.commands, self.overlays = [], [], [], []
 
-    def prepare(self, toolchain, operation):
+    def prepare(self, toolchain, operation, *, overlay=()):
         if self.refuse:
             raise RuntimeError('sandbox admission refused')
         self.prepared.append(toolchain)
+        self.overlays.append(overlay)
         return PreparedSandbox(self, SandboxHandle(id='prep', name='prep', workspace='corsair', owner='test',
                                                    creation_operation=str(operation)), '/sandbox/scratch',
                                self.capture.get)
@@ -125,6 +128,35 @@ def test_an_admitted_ready_environment_replaces_the_declaration(run):
     planned = str(next(a for a in result.attempts if a.stage == 'planning').messages)
     assert fixture_case().environment.scratch_location in planned and '/sandbox/scratch' not in planned
     assert UNOBSERVED[2] not in result.limitations
+    # SPEC-0071: the smoke test is offered beside the capture even when a project test is the baseline.
+    assert [[(f.path, f.content) for f in o] for o in sandboxes.overlays] == [
+        [(SMOKE_TESTS['pytest'].path, SMOKE_TESTS['pytest'].content.encode())]]
+    assert ready.baseline_basis == 'project_test' and SMOKE_BASELINE not in result.limitations
+
+
+def test_a_project_without_tests_runs_on_the_operator_smoke_test(run):
+    smoke = SMOKE_TESTS['pytest']
+    baseline = PREFIX + ('-q', smoke.test_id)
+    observations = {BUILD: (0, ''), DISCOVER: (0, f'{smoke.test_id}\n1 test collected\n'), baseline: (0, '1 passed in 0.01s\n')}
+    draft = ready_draft(baseline_test_id=smoke.test_id, baseline_test_path=smoke.path, baseline_test_command=list(baseline))
+    result = run(case(), environment_model([BUILD, DISCOVER, baseline], draft), catalog=catalog(),
+                 preparation=Sandboxes(observations))
+    assert (result.stopped_at, result.reason) == (None, 'complete')
+    assert result.environment.baseline_basis == 'operator_smoke' and SMOKE_BASELINE in result.limitations
+    # Planning sees the smoke file as the baseline file in its inventory; identification never does.
+    assert smoke.path in str(next(a for a in result.attempts if a.stage == 'planning').messages)
+    assert smoke.path not in str(next(a for a in result.attempts if a.stage == 'identification').messages)
+
+
+def test_a_baseline_on_the_smoke_path_must_be_the_smoke_test(run):
+    smoke = SMOKE_TESTS['pytest']
+    other = smoke.path + '::test_something_else'
+    baseline = PREFIX + ('-q', other)
+    observations = {BUILD: (0, ''), DISCOVER: (0, f'{other}\n'), baseline: (0, '1 passed in 0.01s\n')}
+    draft = ready_draft(baseline_test_id=other, baseline_test_path=smoke.path, baseline_test_command=list(baseline))
+    result = run(case(), environment_model([BUILD, DISCOVER, baseline], draft), catalog=catalog(),
+                 preparation=Sandboxes(observations))
+    _stopped_before_identification(result)
 
 
 def test_unconfirmed_sandbox_cleanup_is_a_limitation(run):

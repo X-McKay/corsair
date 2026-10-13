@@ -1,0 +1,15 @@
+{
+  "case": "ih-python-toctou",
+  "language": "python",
+  "split": "development",
+  "oracle": {
+    "stopped_at": null,
+    "gate": {
+      "execution": "completed",
+      "finding": "reproduced",
+      "fix": "verified"
+    },
+    "assessment_admitted": true
+  },
+  "case_sha256": "67a416585b56dbe219bf374b84ae80474a43788ad5845e2adb986157e34ec2e2"
+}
