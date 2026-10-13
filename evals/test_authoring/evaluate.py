@@ -6,7 +6,7 @@ runs are answered by injected observations or the static host runner (SPEC-0044)
 
 import argparse
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -47,6 +47,8 @@ ROOT = Path(__file__).parent
 REPOSITORY = ROOT.parents[1]
 # The reviewed SPEC-0018 realization; scripted plumbing writes it, never a model.
 FILES = {"reference": (REPOSITORY / "benchmarks/fixtures/path-traversal/test_documents.py").read_text(),
+         # An absence plan (no_file_open) realized as the skill asks: catch around the call, assert on what it returned.
+         "absence": (ROOT / "absence_realization.py").read_text(),
          "broken": "import pytest\nimport documents\n\ndef test_benign_control(:\n    pass\n",
          # What live authors wrote in PLAN-0039: their own audit hook beside the operator witness.
          "self_observing": ("import sys\nimport documents\n\nOPENS = []\nsys.addaudithook(lambda event, args: "
@@ -61,6 +63,8 @@ class ScriptedRun(BaseModel):
     status: Literal["discovered", "collection_error", "static"]
     control: Literal["passed", "failed"] = "passed"
     security: Literal["passed", "failed", "skipped"] = "failed"
+    # The failed security test's reported type; another type than the plan's is an error before the assertion.
+    security_failure: str = "AssertionError"
 
 
 class AuthoringCase(BaseModel):
@@ -110,10 +114,11 @@ class ScriptedRunner:
         ids = (control_test_id, security_test_id)
         failure = FailureDetail("failure", "AssertionError", security_test_id.split("::")[0],
                                 security_test_id.split("::")[-1], 64, "AssertionError: scripted")
+        security = replace(failure, type=scripted.security_failure, message=f"{scripted.security_failure}: scripted")
         cases = (TestCaseResult(control_test_id, scripted.control,
                                 failure if scripted.control == "failed" else None, ""),
                  TestCaseResult(security_test_id, scripted.security,
-                                failure if scripted.security == "failed" else None, ""))
+                                security if scripted.security == "failed" else None, ""))
         execution = Execution("completed", cases, None, None, "", ("sh", "-c", "scripted"), None)
         return NativeTestRun(str(operation), patch.sha256, None,
                              Discovery("discovered", ids, "", discovery_command, None), execution, "confirmed", None, "")
@@ -130,7 +135,9 @@ def authoring_checks(inputs: TestAuthoringInput, output: AuthoringOutput, oracle
     plan, approved = inputs.plan, inputs.environment.approved_test_paths
     files = {item.path: item.content for item in output.files}
     symbol = plan.control.implementation_call.split("(")[0].split(".")[-1]
-    statics = [static_checks(files.get(spec.test_path, ""), spec.test_id, symbol) for spec in (plan.control, plan.security)]
+    absence = plan.security.test_id if plan.security_expectation.safe_behavior.startswith("no_") else None
+    statics = [static_checks(files.get(spec.test_path, ""), spec.test_id, symbol, absence_test=absence)
+               for spec in (plan.control, plan.security)]
     checks |= {
         "contract": set(files) <= set(approved) and output.control_test_id == plan.control.test_id
                     and output.security_test_id == plan.security.test_id

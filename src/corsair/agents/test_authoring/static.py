@@ -88,8 +88,13 @@ def _name(node: ast.AST) -> str | None:
     return node.attr if isinstance(node, ast.Attribute) else node.id if isinstance(node, ast.Name) else None
 
 
-def static_checks(content: str, test_id: str, target_symbol: str) -> dict[str, bool]:
-    """Structural evaluation facts; target calls exclude deferred bodies, without proving reachability or semantics."""
+def static_checks(content: str, test_id: str, target_symbol: str, *, absence_test: str | None = None) -> dict[str, bool]:
+    """Structural evaluation facts; target calls exclude deferred bodies, without proving reachability or semantics.
+
+    ``absence_test`` names the security test of an absence plan (safe behavior ``no_<effect>``): it catches broadly
+    around the planned call, since the target may avoid the effect by raising, so a broad handler inside that one
+    test is the skill's shape, not swallowing.
+    """
     try:
         tree = ast.parse(content)
         function = _function(tree, test_id)
@@ -97,6 +102,10 @@ def static_checks(content: str, test_id: str, target_symbol: str) -> dict[str, b
         return {"parses_and_defines_test": False}
     nodes = list(ast.walk(tree))
     body = _executable(function)
+    try:
+        allowed = set(map(id, ast.walk(_function(tree, absence_test)))) if absence_test else set()
+    except ValueError:
+        allowed = set()
     return {
         "parses_and_defines_test": True,
         "calls_target": any(isinstance(n, ast.Call) and _name(n.func) == target_symbol for n in body),
@@ -109,7 +118,8 @@ def static_checks(content: str, test_id: str, target_symbol: str) -> dict[str, b
             for n in nodes),
         "no_skip": not any(isinstance(n, (ast.Attribute, ast.Name)) and _name(n) in SKIP_NAMES for n in nodes),
         "no_swallowing_except": not any(
-            isinstance(n, ast.ExceptHandler) and (n.type is None or _name(n.type) in {"Exception", "BaseException"})
+            isinstance(n, ast.ExceptHandler) and id(n) not in allowed
+            and (n.type is None or _name(n.type) in {"Exception", "BaseException"})
             for n in nodes),
         "no_constant_assert": not any(isinstance(n, ast.Assert) and isinstance(n.test, ast.Constant) for n in nodes),
         "has_assertion": bool(_checks(tree, function)),

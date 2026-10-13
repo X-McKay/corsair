@@ -27,8 +27,12 @@ def _outcome(case: TestCaseResult | None) -> DevelopmentOutcome | None:
 
 
 def summarize(number: int, observed: NativeTestRun, *, control_id: str, security_id: str,
-              reveal_security: bool) -> DevelopmentRun:
-    """What the author may see: discovery, compile/collection errors and the control; never the security verdict by default."""
+              reveal_security: bool, planned_failure: str | None = None) -> DevelopmentRun:
+    """What the author may see: discovery, compile/collection errors and the control; never the security verdict by default.
+
+    A security failure of another type than ``planned_failure`` is shown: the test broke before its planned
+    assertion (a fixture or call error), which is a test-code problem on any revision, not a verdict.
+    """
     discovery, execution = observed.discovery, observed.execution
     status: str = {"workspace": "workspace_failure", "discovery": "collection_error",
                    "execution": "execution_failure", "report": "report_failure", None: "discovered"}[observed.failure_layer]
@@ -39,7 +43,9 @@ def summarize(number: int, observed: NativeTestRun, *, control_id: str, security
     if security is not None and not reveal_security:
         # A setup error or skip means the body did not run validly and says nothing about the planned
         # assertion; only the pass/fail verdict is withheld.
-        security_view = _outcome(security) if security.outcome in ("error", "skipped") else "withheld"
+        broken = security.outcome == "failed" and planned_failure is not None and (
+            security.failure is None or security.failure.type != planned_failure)
+        security_view = _outcome(security) if security.outcome in ("error", "skipped") or broken else "withheld"
     else:
         security_view = _outcome(security)
     errors = (discovery.errors if discovery else "") or (execution.detail if execution else "") or observed.detail
@@ -87,4 +93,5 @@ def run_tests(ctx: RunContext[AuthoringDependencies]) -> DevelopmentRun:
     if observed.operation != str(operation) or observed.patch_sha256 != patch.sha256:
         raise RuntimeError("runner returned an observation for a different operation or patch")
     return summarize(number, observed, control_id=plan.control.test_id, security_id=plan.security.test_id,
-                     reveal_security=deps.budget.reveal_security_outcome)
+                     reveal_security=deps.budget.reveal_security_outcome,
+                     planned_failure=plan.security_expectation.failure_type)

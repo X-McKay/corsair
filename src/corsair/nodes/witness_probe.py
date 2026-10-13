@@ -7,7 +7,10 @@ probe registers nothing, lets the run proceed and writes a record naming the run
 the identified target function; native audit ``open`` events and raised ``OSError``s count only when the
 target is on the calling stack and only during a test's call phase. Opens of the planned file off the target's
 stack during the call phase, on another thread or after the target was first entered, are counted separately
-(``offstack_planned``), since they cannot be attributed to the target but may be its effect; child processes are not observed. The record is written once, after the
+(``offstack_planned``), since they cannot be attributed to the target but may be its effect; child processes are not observed.
+A planned-file open the running test function makes itself, directly or only through the standard library's
+file-I/O modules (a test checking the fixture after the call), is the test's own read: it is counted apart
+(``body_planned``) and never as the target's effect. The record is written once, after the
 session, to an operator path; the host maps it to the gate's witness. It runs inside the test interpreter,
 so it is tamper-evident (its own tool registration, events and the operator nonce are checked), not
 tamper-proof against hostile test code.
@@ -24,6 +27,8 @@ TOOL_NAME = 'corsair-witness'
 MAX_OPENS = 32
 MAX_CALLS = 32
 MAX_TESTS = 16
+# Standard-library modules a test's own file read passes through between the test function and ``open``.
+IO_MODULES = frozenset({'io', '_pyio', 'codecs', 'os', 'pathlib', 'pathlib._local', 'pathlib._abc'})
 
 
 def _name(value):
@@ -46,6 +51,7 @@ class Probe:
                        'tool_registered': False, 'intact': False, 'unsupported': None, 'tests': {}}
         self.active = None
         self.test_thread = None
+        self.test_code = None
         # Keyed by identity with the code object kept alive: equal code objects from other files or
         # qualnames compare equal, so an equality-keyed cache would let a lookalike pass as the target.
         self.known = {}
@@ -91,6 +97,16 @@ class Probe:
         # Only the import system's own source and bytecode reads (io.open_code called directly from an
         # importlib loader frame) are excluded; code a module body runs during import still counts.
         return frame.f_code.co_filename.startswith(('<frozen importlib', '<frozen zipimport'))
+
+    def _test_body(self, frame):
+        """Whether the open comes from the running test function itself, through standard file-I/O frames only."""
+        while frame is not None:
+            name = frame.f_globals.get('__name__')
+            module = sys.modules.get(name) if name in IO_MODULES else None
+            if module is None or getattr(module, '__dict__', None) is not frame.f_globals:
+                return self.test_code is not None and frame.f_code is self.test_code
+            frame = frame.f_back
+        return False
 
     def _planned(self, path):
         if not isinstance(path, str):
@@ -158,9 +174,13 @@ class Probe:
         if not self._on_stack(frame):
             # Another thread's open of the planned file, or one on the test thread once the target has been
             # entered, may be the target's effect moved off its stack (a worker, executor or event-loop callback).
-            # Only the test body's reads before the first call are not counted.
+            # The test body's reads before the first call are not counted; its own direct reads after it are
+            # counted apart, since a deferred effect always has a frame other than the test's and file I/O.
             if self._planned(path) and (threading.get_ident() != self.test_thread or test['entered']):
-                test['offstack_planned'] += 1
+                if threading.get_ident() == self.test_thread and self._test_body(frame):
+                    test['body_planned'] += 1
+                else:
+                    test['offstack_planned'] += 1
             return
         if len(test['opens']) < MAX_OPENS:
             test['opens'].append({'path': str(path)[:512] if isinstance(path, (str, int)) else None,
@@ -175,8 +195,9 @@ class Probe:
         tests = self.record['tests']
         if item.nodeid not in tests and len(tests) < MAX_TESTS:
             tests[item.nodeid] = {'entered': 0, 'exits': [], 'opens': [], 'os_errors': [], 'truncated': False,
-                                  'complete': False, 'offstack_planned': 0}
+                                  'complete': False, 'offstack_planned': 0, 'body_planned': 0}
         self.test_thread = threading.get_ident()
+        self.test_code = getattr(getattr(item, 'obj', None), '__code__', None)
         self.active = item.nodeid if item.nodeid in tests else None
         try:
             yield
@@ -184,6 +205,7 @@ class Probe:
             if self.active is not None:
                 tests[self.active]['complete'] = True
             self.active = None
+            self.test_code = None
             self.raised.clear()
 
     def pytest_sessionfinish(self, session, exitstatus):

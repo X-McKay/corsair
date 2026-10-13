@@ -45,6 +45,15 @@ async def finalize_authoring(ctx: RunContext[AuthoringDependencies], result: Aut
         raise ModelRetry("the final run's control must pass; otherwise return blocked")
     if final.security is None or (final.security != "withheld" and final.security.outcome in ("error", "skipped")):
         raise ModelRetry("the final run's security test must run without a setup error or skip; otherwise return blocked")
+    planned = plan.security_expectation.failure_type
+    if (final.security != "withheld" and final.security.outcome == "failed"
+            and final.security.failure_type != planned):
+        # Gap 9 (Docker run live-002): an error in the test body before the planned assertion fails the same way on
+        # every revision, so the test cannot distinguish them.
+        raise ModelRetry(f"the final run's security test failed with {final.security.failure_type or 'an unclassified error'}"
+                         f" at line {final.security.failure_line}, not through its planned {planned} assertion; an error"
+                         " before the planned assertion cannot distinguish the revisions: fix the observed error and run"
+                         " again, or return blocked")
     try:
         assertion_lines(files[plan.control.test_path], plan.control.test_id)
         security_lines = assertion_lines(files[plan.security.test_path], plan.security.test_id)

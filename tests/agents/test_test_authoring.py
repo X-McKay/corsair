@@ -217,6 +217,19 @@ def test_skipped_security_is_shown_and_refuses_a_patch_by_default():
     assert isinstance(result.output, BlockedAuthoring)
 
 
+def test_a_security_error_before_the_planned_assertion_is_shown_and_refuses_a_patch():
+    """Docker run live-002: the security test wrote into a directory it never created and raised FileNotFoundError."""
+    seen = []
+    broken = {"status": "discovered", "security": "failed", "security_failure": "FileNotFoundError"}
+    with pytest.raises(UnexpectedModelBehavior):
+        run(create_test_authoring_agent(responding([write(), RUN], seen=seen), output_retries=0), case().inputs.inputs,
+            runner(broken))
+    assert seen[0].security.outcome == "failed" and seen[0].security.failure_type == "FileNotFoundError"
+    (result, _) = run(create_test_authoring_agent(responding([write(), RUN, write(), RUN])), case().inputs.inputs,
+                      runner(broken, {"status": "discovered"}))
+    assert isinstance(result.output, TestPatch) and result.output.dev_runs[-1].security == "withheld"
+
+
 def test_security_outcome_is_withheld_unless_the_operator_reveals_it():
     seen = []
     run(create_test_authoring_agent(responding([write(), RUN], seen=seen)), case().inputs.inputs)
@@ -272,6 +285,15 @@ def test_static_checks_flag_hollow_tests(edit, check):
     assert not static_checks(edit(REFERENCE), SECURITY, "read_document")[check]
 
 
+def test_a_broad_catch_is_the_absence_plan_shape_only_in_the_security_test():
+    broad = REFERENCE.replace("except ValueError as error:", "except Exception as error:")
+    assert static_checks(broad, SECURITY, "read_document", absence_test=SECURITY)["no_swallowing_except"]
+    assert not static_checks(broad, SECURITY, "read_document")["no_swallowing_except"]
+    control = REFERENCE.replace("def test_benign_control(files):\n", "def test_benign_control(files):\n    try:\n        pass\n    except Exception:\n        pass\n")
+    assert control != REFERENCE
+    assert not static_checks(control, SECURITY, "read_document", absence_test=SECURITY)["no_swallowing_except"]
+
+
 def test_assertion_lines_belong_to_the_named_function():
     assert assertion_lines(REFERENCE, SECURITY) == (52, 60, 64, 65, 66)
     with pytest.raises(ValueError):
@@ -302,8 +324,8 @@ def test_pytest_raises_bindings_are_assertions():
 def test_native_evals_repeat_and_preserve_receipts(tmp_path):
     evidence = tmp_path / "attempt"
     report = asyncio.run(evaluate(evidence, EvaluationBudget()))
-    assert passed(report) and len(report.cases) == 18 and len(report.case_groups()) == 9
-    assert len(list(evidence.glob("attempt-*.json"))) == 18
+    assert passed(report) and len(report.cases) == 20 and len(report.case_groups()) == 10
+    assert len(list(evidence.glob("attempt-*.json"))) == 20
     assert all(c.attributes["security_revealed"] == 0 for c in report.cases)
     assert report.experiment_metadata["runner"] == "injected_observations_and_static_host_runner"
     with pytest.raises(FileExistsError):

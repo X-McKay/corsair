@@ -133,6 +133,20 @@ CASES = {
         ('completed', 'reproduced', 'not_verified'), {'witness_unsupported'}),
     'candidate_pass_without_witness': ((REPRO,), (run('passed', witness=None),),
                                        ('completed', 'reproduced', 'not_verified'), {'witness_missing'}),
+    # Live run 2: the security test passed on the baseline although the target opened the planned file, and
+    # failed on the candidate with the target's own rejection; it cannot distinguish the revisions.
+    'security_passes_while_effect_observed': (
+        (run('passed', witness=Witness(artifact_sha256=digest('w'), path_reached=True, effect='observed')),),
+        (run(failure=PLANNED_FAILURE.model_copy(update={'exception_type': 'ValueError', 'line': 15}),
+             witness=Witness(artifact_sha256=digest('w'), path_reached=True, effect='absent',
+                             safe_behavior='ValueError')),),
+        ('completed', 'inconclusive', 'not_verified'),
+        {'security_passed_with_effect', 'security_failed_with_safe_witness', 'no_valid_run',
+         'baseline_not_reproduced'}),
+    'planned_assertion_fails_on_safe_behavior': (
+        (REPRO,), (run(witness=Witness(artifact_sha256=digest('w'), path_reached=True, effect='absent',
+                                       safe_behavior='ValueError')),),
+        ('completed', 'reproduced', 'not_verified'), {'security_failed_with_safe_witness', 'candidate_not_safe'}),
 }
 
 
