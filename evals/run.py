@@ -29,8 +29,9 @@ import sys
 
 REPOSITORY = Path(__file__).resolve().parents[1]
 RESULTS = REPOSITORY / ".runs" / "evals"
-IDENTITY = ("prompt_version", "config_version", "skill_sha256", "model", "dataset", "dataset_sha256", "mode",
-            "runner", "execution", "budget")
+# Top-level suite identity; the chain nests per-stage prompt/config/skill under "versions" and names its live stages.
+IDENTITY = ("prompt_version", "config_version", "skill_sha256", "versions", "live_stages", "composition", "model",
+            "dataset", "dataset_sha256", "mode", "runner", "execution", "budget")
 
 
 @dataclass(frozen=True)

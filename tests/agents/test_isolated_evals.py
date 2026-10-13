@@ -73,6 +73,9 @@ def test_admission_facts_place_the_planned_input_and_refuse_process_use():
     assert not facts["planned_input_in_security"] and not facts["planned_input_not_in_control"]
     assert not admission_facts(plan, files, (48,))["planned_failure_is_assert"]
     assert not no_process_or_network("import subprocess\n") and not no_process_or_network("import os\nos.system('x')\n")
+    assert not no_process_or_network("from os import system\nsystem('echo x')\n")
+    assert not no_process_or_network("import os as operating_system\noperating_system.system('echo x')\n")
+    assert no_process_or_network("from os import path\nimport os as o\no.getcwd()\n")
     assert no_process_or_network(REFERENCE)
 
 
@@ -120,3 +123,18 @@ def test_author_witness_hooks_are_counted_as_a_score():
     from evals.test_authoring.admission import witness_hooks
     assert witness_hooks(REFERENCE) == 1 and witness_hooks("import sys\nsys.monitoring.use_tool_id(1, 'x')\n") == 1
     assert witness_hooks("def test_x():\n    assert 1 == 1\n") == 0
+
+
+def test_chain_identity_carries_per_stage_versions_and_live_stages(tmp_path):
+    def chain_run(planning_prompt, live):
+        evidence = tmp_path / f"{planning_prompt}-{len(live)}"
+        evidence.mkdir()
+        (evidence / "configuration.json").write_text(json.dumps({
+            "mode": "direct", "live_stages": live, "model": "scripted",
+            "versions": {"planning": {"prompt_version": planning_prompt, "config_version": "c", "skill_sha256": "s"}}}))
+        (evidence / "report.json").write_text(json.dumps({"cases": [], "failures": []}))
+        return {"agent": "chain", "run": evidence.name, "summary": eval_run.summarize(evidence)}
+    before, after = chain_run("test-planning-v6", []), chain_run("test-planning-v7", ["planning"])
+    assert before["summary"]["identity"] != after["summary"]["identity"]
+    text = eval_run.compare(after, before | {"reference_kind": "baseline"}, before["run"])
+    assert "`versions`" in text and "test-planning-v7" in text and "`live_stages`" in text

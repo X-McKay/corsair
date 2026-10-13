@@ -26,16 +26,25 @@ def _strings(node: ast.AST) -> list[str]:
 
 
 def no_process_or_network(content: str) -> bool:
-    """No process creation, raw network or foreign-function use anywhere in the file."""
-    for node in ast.walk(ast.parse(content)):
-        if isinstance(node, ast.Import) and any(a.name.split(".")[0] in PROCESS_OR_NETWORK for a in node.names):
-            return False
-        if isinstance(node, ast.ImportFrom) and node.module and node.module.split(".")[0] in PROCESS_OR_NETWORK:
-            return False
-        if isinstance(node, ast.Attribute) and node.attr in OS_PROCESS_CALLS and isinstance(node.value, ast.Name) \
-                and node.value.id == "os":
-            return False
-    return True
+    """No process creation, raw network or foreign-function use anywhere in the file.
+
+    os process calls are refused through any binding of os (``import os as x``) and when imported by name
+    (``from os import system``), not only as the literal ``os.system``.
+    """
+    tree = ast.parse(content)
+    os_names = {"os"}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            if any(a.name.split(".")[0] in PROCESS_OR_NETWORK for a in node.names):
+                return False
+            os_names |= {a.asname for a in node.names if a.name == "os" and a.asname}
+        if isinstance(node, ast.ImportFrom) and node.module and not node.level:
+            if node.module.split(".")[0] in PROCESS_OR_NETWORK:
+                return False
+            if node.module == "os" and any(a.name in OS_PROCESS_CALLS or a.name == "*" for a in node.names):
+                return False
+    return not any(isinstance(node, ast.Attribute) and node.attr in OS_PROCESS_CALLS
+                   and isinstance(node.value, ast.Name) and node.value.id in os_names for node in ast.walk(tree))
 
 
 WITNESS_HOOKS = frozenset({"addaudithook", "settrace", "setprofile", "monitoring"})
