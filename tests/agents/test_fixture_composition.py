@@ -14,7 +14,7 @@ from pydantic_ai.models.function import FunctionModel
 from corsair.adapters.local_artifacts import LocalArtifacts
 from corsair.agents.test_authoring.contracts import BlockedAuthoring, TestPatch
 from corsair.composition.direct import (
-    UNOBSERVED, BudgetExhausted, CompositionBudget, RecordedFailure, StageModels, exhaustion, run_direct,
+    UNOBSERVED, UNSELECTED, BudgetExhausted, CompositionBudget, RecordedFailure, StageModels, exhaustion, run_direct,
 )
 from corsair.composition.evidence import freeze, observation_plan, run_evidence
 from corsair.core.disposition import AssessmentEvidence, Disposition, Witness, assess
@@ -103,7 +103,7 @@ def test_stages_compose_to_a_gate_verdict_that_stays_inconclusive_without_a_witn
         ("witness_missing", "baseline"), ("witness_missing", "candidate"), ("no_valid_run", "baseline"),
         ("baseline_not_reproduced", "candidate")}
     assert run.assessment.admission.admitted and run.assessment.disposition == gate.permitted
-    assert run.limitations == UNOBSERVED + tuple(f"{revision} witness not admitted: no witness was requested or "
+    assert run.limitations == UNOBSERVED + (UNSELECTED,) + tuple(f"{revision} witness not admitted: no witness was requested or "
                                                  "captured for this run" for revision in ("baseline", "candidate"))
 
     # Agents never see which variant is which.
@@ -134,7 +134,7 @@ def test_the_probe_witness_lets_the_gate_reach_reproduced_and_verified(store, tm
     gate = run.gate
     assert gate.permitted == Disposition(execution="completed", finding="reproduced", fix="verified")
     assert {(r.revision, r.classification) for r in gate.runs} == {("baseline", "reproduces"), ("candidate", "safe")}
-    assert gate.limitations == () and run.limitations == UNOBSERVED
+    assert gate.limitations == () and run.limitations == UNOBSERVED + (UNSELECTED,)
     assert run.assessment.admission.admitted and run.assessment.disposition == gate.permitted
     # The assessor may read each record as its own item; the variant names never reach it.
     assert any("baseline-0-witness (kind witness" in prompt for prompt in prompts(run))

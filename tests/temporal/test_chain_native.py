@@ -1,6 +1,7 @@
 """Durable E2E-0 chain against direct mode on the reviewed SPEC-0018 pair, under an owned native service."""
 
 import asyncio
+from dataclasses import replace
 from pathlib import Path
 from uuid import uuid4
 
@@ -17,6 +18,9 @@ from temporalio.worker import Replayer
 
 from corsair.adapters.local_artifacts import LocalArtifacts
 from corsair.composition.direct import CompositionBudget, StageModels, run_direct
+from corsair.nodes.runtime.contracts import RuntimeInputs
+from corsair.nodes.runtime.environment import RuntimeCatalog
+from corsair.nodes.runtime.matrix import load
 from corsair.workflows.chain import ACTIVITY_CONFIG, WORKFLOWS, ChainInvestigation, chain_worker, run_durable
 from corsair.workflows.chain_runtime import STAGES, ChainRequest, StageKeys, configure_chain
 from evals.fixture_e2e.case import (
@@ -263,3 +267,36 @@ def test_chain_dataset_scores_the_durable_chain_like_direct_mode(temporal_addres
             return await evaluate(tmp_path / "evidence", mode="durable", run=durable)
     report = asyncio.run(check())
     assert len(report.cases) == len(dataset().cases) and passed(report)
+
+
+@pytest.mark.parametrize("requires,prepared,status", [(">=3.8,<3.12", True, "unsupported"), (">=3.10", False, None)])
+def test_runtime_stage_stops_both_modes_before_any_child(temporal_address, request, store, tmp_path, requires, prepared,
+                                                         status):
+    """SPEC-0060: one select_runtime activity, scheduled once; unsupported or no catalog ends the run there."""
+    case = replace(fixture_case(), runtime=RuntimeInputs(files={
+        "pyproject.toml": f'[project]\nrequires-python = "{requires}"\n[tool.pytest.ini_options]\n'.encode()}))
+    catalog = RuntimeCatalog(load(), {"cpython-3.12-pytest": "corsair-python@sha256:" + "a" * 64}) if prepared else None
+
+    async def check():
+        client = await Client.connect(temporal_address, plugins=PLUGINS)
+        identity = "corsair-chain-runtime-" + str(uuid4())
+        with models.override_allow_model_requests(False):
+            direct = await run_direct(case, stages(), runners_for(store, tmp_path / "direct"), catalog=catalog)
+            durable = await asyncio.wait_for(run_durable(
+                case, stages(), runners_for(store, tmp_path / "durable"), client=client, catalog=catalog,
+                workflow_id=identity, execution_timeout=EXECUTION_TIMEOUT, workflow_runner=workflow_runner()), 60)
+        same_routing(direct, durable)
+        assert durable.stopped_at == "runtime" and durable.attempts == () and durable.runtime == direct.runtime
+        if status:
+            assert durable.runtime.status == status and durable.reason == direct.reason
+        else:
+            assert durable.runtime is None
+            assert durable.reason.startswith("runtime selection failed: RuntimeCatalogMissing: The case carries")
+        saved = dict(await histories(client, identity, request.config.getoption("--temporal-evidence-dir")))
+        assert set(saved) == {identity}
+        selections = scheduled(saved[identity])
+        assert [e.activity_task_scheduled_event_attributes.activity_type.name for e in selections] == [
+            "corsair.chain.select_runtime"]
+        assert selections[0].activity_task_scheduled_event_attributes.retry_policy.maximum_attempts == 1
+        assert not (tmp_path / "durable" / "development").exists()
+    asyncio.run(check())
