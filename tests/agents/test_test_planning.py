@@ -249,3 +249,37 @@ def test_native_provider_wire_carries_skill_schema_and_only_reader():
             assert all(plan_checks(c.inputs, result.output, c.metadata).values())
     asyncio.run(exercise())
     assert client.is_closed and len(bodies) == 3
+
+
+def test_scratch_check_rejects_fixtures_outside_the_scratch_location():
+    c = case()
+    plan = run(create_test_planning_agent(responding(reference())), c.inputs).output
+    assert plan_checks(c.inputs, plan, c.metadata)["scratch"]
+    for escape in ("Create tmp_path.parent / 'outside.txt' with a sentinel", "Write /tmp/outside.txt",
+                   "Create ~/outside.txt", "Use the parent directory: Path(tmp_path).parent / 'x'"):
+        security = plan.security.model_copy(update={"fixture_setup": (*plan.security.fixture_setup, escape)})
+        assert not plan_checks(c.inputs, plan.model_copy(update={"security": security}), c.metadata)["scratch"], escape
+    # The adversarial input itself may name a parent path; only fixture setup is confined.
+    assert "../" in plan.security.input
+
+
+def test_heldout_cases_are_disjoint_from_development_and_pass_scripted_plumbing(tmp_path):
+    development, heldout = dataset("development"), dataset("heldout")
+    assert len(heldout.cases) == 6 and {c.metadata.status for c in heldout.cases} == {"ready", "unsupported"}
+    shown = {source.content for c in development.cases for source in c.inputs.source_files}
+    assert not shown & {source.content for c in heldout.cases for source in c.inputs.source_files}
+    assert not {c.inputs.identification.target.symbol for c in development.cases} & {
+        c.inputs.identification.target.symbol for c in heldout.cases}
+    report = asyncio.run(evaluate(tmp_path / "heldout", EvaluationBudget(), cases="heldout"))
+    assert passed(report) and len(report.cases) == 12
+    assert report.experiment_metadata["dataset"] == "heldout"
+
+
+def test_heldout_evaluation_refuses_a_changed_case(tmp_path, monkeypatch):
+    import evals.test_planning.evaluate as module
+    changed = tmp_path / "cases-heldout.yaml"
+    changed.write_text((module.ROOT / module.DATASETS["heldout"]).read_text().replace("touch pwned", "touch owned", 1))
+    monkeypatch.setitem(module.DATASETS, "heldout", str(changed))
+    with pytest.raises(ValueError, match="frozen manifest"):
+        asyncio.run(evaluate(tmp_path / "refused", EvaluationBudget(), cases="heldout"))
+    assert not (tmp_path / "refused").exists()
