@@ -2,9 +2,9 @@
 id: PLAN-0069
 kind: plan
 title: Maven artifact hash lists for the Java toolchain images
-status: in_progress
+status: complete
 updated: 2026-10-13
-related: [SPEC-0064, PLAN-0049, HANDOFF-0067]
+related: [SPEC-0064, PLAN-0049, HANDOFF-0067, HANDOFF-0095]
 ---
 
 # Maven artifact hash lists for the Java toolchain images
@@ -20,7 +20,7 @@ Implement SPEC-0064 for the `java` and `java8` images. Based on main after PR #5
 - [x] Offline guard in `make test-config`; base-image skill rule updated.
 - [x] Compare with #51's retained RIG0 inventories (same artifacts and hashes).
 - [x] `tests/qualification/image_cases.py`: per-image real-case table for CI (VUL4J-6 on `java8`), offline guard.
-- [ ] CI (Al, 2026-10-13: "Lets run it in CI", replacing the RIG0 paste): #92's image-only job builds both images from the checked-in files; one generic step runs `image_cases.py` over every built image directory (a directory without `CASES` entries is a no-op; each case names its language's harness in `LANGUAGES`), so VUL4J-6 fix and vulnerable run through `java_image_case` whenever `java8` is built.
+- [x] CI (Al, 2026-10-13: "Lets run it in CI", replacing the RIG0 paste): #92's image-only job builds both images from the checked-in files; a generic step ran `image_cases.py` over the built images (VUL4J-6 fix and vulnerable through `java_image_case`); removed after the runs below on Al's deferral.
 
 ## Validation and progress
 
@@ -40,4 +40,4 @@ Al chose CI over the RIG0 paste and over host networking in the cloud container 
 
 CI at 1533f85 (run 38418907217, GitHub-hosted runner): both images built from the checked-in files and passed their list checks and trusted controls (java config `sha256:d19c552d…`, java8 `sha256:b596b440…`). VUL4J-6 on java8: setup passed for both revisions; control passed on both; the PoV errored `TestTimedOutException` after 6000 ms on both, so the fix revision did not pass and the case did not discriminate. Cause, not a flake: the fixed loop in `X0017_StrongEncryptionHeader.parseCentralDirectoryFormat` still runs rcount = 3,924,130,135 iterations (the fix widens the counter to `long`, it does not bound the count), which takes 4.9 to 5.9 s in isolation under JDK 8 in this container, against the PoV's own 6 s timeout. The same inputs passed one run earlier at 8d4b4d4 (run 38418216549: fix control and PoV passed, vulnerable PoV timed out, cleanup confirmed on both), and RIG0 passed it (8.8 s for the whole fix run): the fix-side verdict follows the runner's CPU speed. The PoV is upstream's and stays byte-identical, so the fix revision's result depends on CPU speed. Decision with Al: how CI should cover the case.
 
-Next: #92's job is on main and runs `image_cases.py` for the built images (first CI run failed before any case ran: the harness subprocess could not import `corsair` because the project is not an installed package; fixed by passing `src` on PYTHONPATH). Attach its results here and in the PR, then the handoff. The images' gate receipts change with this source, so #51's live gate evidence names the old source; the next milestone gate covers them.
+CI results: the image-only job built both images against their lists on every run. VUL4J-6 discriminated at 8d4b4d4 (run 38418216549) and facb56e (run 38421307556, evidence artifact 11826903012); at 1533f85 the fix revision timed out as described above. The first run at 672b35e failed before any case ran: the harness subprocess could not import `corsair` (the project is not an installed package), fixed by passing `src` on PYTHONPATH. Al gave the merge word (2026-10-13 15:38Z, "merge all six"), then deferred real cases in CI "until we're able to successfully get some end-to-end runs on the board" (15:43Z): the case step and its evidence upload are removed from the workflow; the job still builds each changed image against its list and runs its control. `image_cases.py` stays for manual runs (`PYTHONPATH=src:. uv run --locked python -m tests.qualification.image_cases java8 --evidence <dir>` after `make toolchain-images TOOLCHAINS=java8`). The fix-side timeout question is moot until cases return to CI. See [HANDOFF-0095](../handoffs/HANDOFF-0095-maven-artifact-hash-lists.md).

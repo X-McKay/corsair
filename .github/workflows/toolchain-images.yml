@@ -2,7 +2,7 @@ name: Toolchain images (image-only)
 
 # Image-only tier (SPEC-0062): build each toolchain image a PR changes and run its trusted control in the container.
 # No cluster, no OpenShell: this is the evidence an `evidence: image-only` matrix row starts from, never sandbox
-# evidence. A built image with entries in tests/qualification/image_cases.py CASES then runs those real cases.
+# evidence. Real cases (tests/qualification/image_cases.py) are not run here until end-to-end runs exist (Al, 2026-10-13).
 on:
   pull_request:
     paths:
@@ -52,21 +52,3 @@ jobs:
       - name: Receipts
         if: always() && steps.select.outputs.toolchains != ''
         run: for f in .cache/toolchains/*/build.json; do echo "== $f"; cat "$f"; done
-      # Real cases (tests/qualification/image_cases.py CASES) for every selected image; images without cases are a no-op.
-      - name: Real cases on the built images
-        if: steps.select.outputs.toolchains != ''
-        env:
-          TOOLCHAINS: ${{ steps.select.outputs.toolchains }}
-        run: uv run --locked python -m tests.qualification.image_cases $TOOLCHAINS --evidence .runs/ci/image-cases
-      # Keep each case's summary, run and setup records; the clones and Maven repositories stay on the runner.
-      - name: Keep real-case evidence
-        if: always() && steps.select.outputs.toolchains != ''
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: image-cases
-          path: |
-            .runs/ci/image-cases
-            !.runs/ci/image-cases/*/*/work
-            !.runs/ci/image-cases/*/*/m2
-          if-no-files-found: ignore
-          retention-days: 30
