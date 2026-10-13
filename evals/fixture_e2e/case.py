@@ -92,14 +92,15 @@ def scripted_identification() -> FunctionModel:
         "target": {"symbol": "read_document", "source": {"path": "documents.py", "start_line": 3, "end_line": 4}}})
 
 
-def reference_plan() -> dict:
+def reference_plan(discovery: tuple[str, ...] = DISCOVER) -> dict:
     cases = yaml.safe_load((REPOSITORY / "evals/test_planning/cases.yaml").read_text())["cases"]
     plan = next(c for c in cases if c["name"] == "path_traversal_unguarded")["metadata"]["reference_plan"]
-    return plan | {"discovery_command": list(DISCOVER)}
+    return plan | {"discovery_command": list(discovery)}
 
 
-def scripted_planning() -> FunctionModel:
-    return _reads_then(["documents.py", "test_existing.py"], lambda info: {"plan": reference_plan()})
+def scripted_planning(discovery: tuple[str, ...] = DISCOVER) -> FunctionModel:
+    """The reference plan for the environment whose discovery command is ``discovery``."""
+    return _reads_then(["documents.py", "test_existing.py"], lambda info: {"plan": reference_plan(discovery)})
 
 
 # Assertion lines of test_security_rejects_outside_read in the reviewed bytes, as the authoring dataset records.
@@ -127,7 +128,8 @@ INVENTORY = re.compile(r"(?P<item>[a-z0-9][a-z0-9_.-]*) \(kind (?P<kind>\w+), (?
 
 
 def scripted_assessment(execution="completed", finding="inconclusive", fix="not_verified") -> FunctionModel:
-    """Reads every inventory item once and proposes the given triple, citing each revision's first item line."""
+    """Reads every inventory item once and proposes the given triple, citing each revision's witness item when
+    one is listed (the assessor's grounding rule), else its first item, at line 1."""
     async def respond(messages, info):
         prompt = next(part.content for message in messages for part in message.parts if part.part_kind == "user-prompt")
         items = [match.groupdict() for match in INVENTORY.finditer(prompt)]
@@ -137,7 +139,8 @@ def scripted_assessment(execution="completed", finding="inconclusive", fix="not_
                                                      tool_call_id=f"evidence-{done}")])
 
         def cite(revision):
-            item = next(i for i in items if i["revision"] == revision)
+            ordered = sorted((i for i in items if i["revision"] == revision), key=lambda i: i["kind"] != "witness")
+            item = ordered[0]
             return {"item_id": item["item"], "start_line": 1, "end_line": 1}
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {
             "execution": execution, "finding": finding, "fix": fix,

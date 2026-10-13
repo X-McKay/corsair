@@ -12,6 +12,7 @@ from uuid import NAMESPACE_URL, uuid5
 from pydantic import Field
 from pydantic_ai import ModelRetry, RunContext
 from pydantic_ai.messages import ModelRequest, ModelResponse, ToolCallPart, ToolReturnPart
+from pydantic_ai.tools import ToolDefinition
 from pydantic_ai.toolsets import FunctionToolset
 
 from corsair.ports.test_runner import (
@@ -77,6 +78,27 @@ def development_runs(ctx: RunContext) -> list[DevelopmentRun]:
     return [DevelopmentRun.model_validate(ret.content) for _, ret in _successful(ctx, RUN_TOOL)]
 
 
+def dispatched_runs(ctx: RunContext) -> list[str | None]:
+    """Ids of every run_tests call dispatched in this run, including ones whose returns are not yet in history."""
+    return [part.tool_call_id for message in ctx.messages
+            if isinstance(message, ModelResponse) and message.run_id == ctx.run_id
+            for part in message.parts if isinstance(part, ToolCallPart) and part.tool_name == RUN_TOOL]
+
+
+async def while_edits_can_help(ctx: RunContext[AuthoringDependencies], tool: ToolDefinition) -> ToolDefinition | None:
+    """Hide writes and runs once no test edit can change the outcome, leaving only the output contract.
+
+    After a workspace failure the tests never ran, so a rewrite cannot address it and another run would
+    blindly retry the refusal; once the run budget is spent, further writes could not be verified.
+    """
+    executed = [run for run in development_runs(ctx) if run.status != "not_run"]
+    if executed and executed[-1].status == "workspace_failure":
+        return None
+    if len(dispatched_runs(ctx)) >= ctx.deps.budget.dev_runs:
+        return None
+    return tool
+
+
 def approved_patch(files: dict[str, str], approved: tuple[str, ...]) -> ApprovedPatch:
     return ApprovedPatch(files=tuple(PatchFile(path, content.encode()) for path, content in sorted(files.items())),
                          approved_paths=approved)
@@ -119,7 +141,7 @@ def summarize(number: int, observed: NativeTestRun, *, control_id: str, security
 def authoring_tools() -> FunctionToolset[AuthoringDependencies]:
     tools = FunctionToolset[AuthoringDependencies](id=TOOLSET_ID)
 
-    @tools.tool(name=WRITE_TOOL, retries=TOOL_RETRIES)
+    @tools.tool(name=WRITE_TOOL, retries=TOOL_RETRIES, prepare=while_edits_can_help)
     async def write_test_file(ctx: RunContext[AuthoringDependencies],
                               path: Annotated[str, Field(description="One of the approved test paths, exactly as given")],
                               content: Annotated[str, Field(description="Complete new file content; replaces any earlier write of this path")]) -> WrittenFile:
@@ -131,25 +153,33 @@ def authoring_tools() -> FunctionToolset[AuthoringDependencies]:
             raise ModelRetry(f"test file exceeds {MAX_PATCH_FILE_BYTES} bytes")
         return WrittenFile(path=path, sha256=sha256(data).hexdigest(), size=len(data))
 
-    @tools.tool(name=RUN_TOOL, retries=TOOL_RETRIES, sequential=True)
+    @tools.tool(name=RUN_TOOL, retries=TOOL_RETRIES, sequential=True, prepare=while_edits_can_help)
     def run_tests(ctx: RunContext[AuthoringDependencies]) -> DevelopmentRun:
         """Apply the current patch to a fresh copy of the baseline source in the development sandbox, run native discovery and, when exactly the two planned tests are found, execute them once.
 
-        Returns discovered test ids, collection or compile errors and the control outcome. The security test's pass/fail outcome is withheld; a setup error or skip is shown. Every call counts against an operator run budget.
+        Returns discovered test ids, collection or compile errors and the control outcome. The security test's pass/fail outcome is withheld; a setup error or skip is shown. Every call counts against an operator run budget; only the first call in one response runs.
         """
         deps = ctx.deps
         plan = deps.inputs.plan
         # Reserve against every run_tests call dispatched in this run, including others in the same
         # model response whose returns are not yet in history; each call gets its own operation.
-        dispatched = [part.tool_call_id for message in ctx.messages
-                      if isinstance(message, ModelResponse) and message.run_id == ctx.run_id
-                      for part in message.parts if isinstance(part, ToolCallPart) and part.tool_name == RUN_TOOL]
+        dispatched = dispatched_runs(ctx)
         if dispatched.count(ctx.tool_call_id) != 1:
             raise RuntimeError("run_tests call id must identify exactly one dispatched call in this run")
         number = dispatched.index(ctx.tool_call_id) + 1
+        # Calls in one response see the same files, so a later one would repeat the first run's patch blindly,
+        # including after a workspace failure with uncertain side effects; only the first runs.
+        response = next(message for message in ctx.messages if isinstance(message, ModelResponse)
+                        and message.run_id == ctx.run_id and any(isinstance(part, ToolCallPart)
+                                                                 and part.tool_call_id == ctx.tool_call_id
+                                                                 for part in message.parts))
+        batched = [part.tool_call_id for part in response.parts
+                   if isinstance(part, ToolCallPart) and part.tool_name == RUN_TOOL]
         files = current_files(ctx)
-        if not files or number > deps.budget.dev_runs:
-            reason = "no test file has been written" if not files else f"development run budget of {deps.budget.dev_runs} is spent"
+        if not files or number > deps.budget.dev_runs or batched[0] != ctx.tool_call_id:
+            reason = ("no test file has been written" if not files
+                      else f"development run budget of {deps.budget.dev_runs} is spent" if number > deps.budget.dev_runs
+                      else "only the first run_tests call in one response runs; the files cannot change between them")
             return DevelopmentRun(run=number, operation="", patch_sha256=sha256(b"").hexdigest(), status="not_run",
                                   discovered_test_ids=(), errors=reason, control=None, security=None,
                                   run_command=(), cleanup="not_required")

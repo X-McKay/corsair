@@ -21,7 +21,7 @@ Implement [SPEC-0035](../specs/SPEC-0035-assessment-evals-and-durable-chain.md) 
 - [x] Durable chain: child stage workflows, revision activity, worker-side runner resolution, native Temporal tests and replay.
 - [x] Chain dataset in durable mode; direct/durable parity.
 - [ ] Live baselines on the local provider (assessment development split; chain with live stages).
-- [ ] Review, records, handoff.
+- [x] Review, records, handoff ([HANDOFF-0055](../handoffs/HANDOFF-0055-assessment-evals-and-durable-chain.md)).
 
 ## Validation and progress
 
@@ -42,6 +42,8 @@ Evaluation sets (scripted models only; no provider):
 
 Merged main with PR #35 (witness capture): `run_chain` passes the admitted witness request through both executors (the durable `RevisionRequest` carries it; `ChainResult` carries the mapped witnesses); chain oracles now hold the witness-dependent triples (true pair `completed`/`reproduced`/`verified`, reversed `not_reproduced`/`not_verified`); assessment witness items use the merged probe-record format under the E2E-0 operator envelope and are mapped by the real `nodes.witness.witness_evidence` (held-out manifest refrozen for that format change only). Review fixes: `chain_worker` is an async context manager holding the process configuration, so `configure_chain` and a second worker are refused while any chain worker runs. After the merge: `make test-config` 836 passed; native `pytest tests/temporal` 47 passed.
 
+Merged main after #34, #33 and #36 (`ef48774`): the assessment factory keeps both the #34 witness-citation rule and the `durability=` seam; a verified claim citing only JUnit is now refused by the stage itself, so the eval test records it as a task failure. `make test-config` 853 passed; native `pytest tests/temporal` 47 passed.
+
 Evaluation set decisions: `cases.yaml` is written by `Dataset.to_file` but read with `Dataset.from_text(..., fmt="json")` after YAML load, because the strict gate contracts refuse YAML lists as tuples. Regeneration never rewrites `held_out.json` (only `build.py --freeze-held-out`), so a builder change that alters a held-out case fails the guard until deliberately refrozen. A timeout is modelled as an in-sandbox timeout (acknowledged, terminal, exit 124); unknown delivery uses a lost worker. The base environment identity is the capture host's declaration.
 
 
@@ -52,7 +54,7 @@ Durable chain decisions (`src/corsair/workflows/chain.py`, `chain_runtime.py`):
 - Authoring deps cross natively as `AuthoringPayload` (inputs, budget, the runner's purpose via the workflow-side `WorkerRunner` stand-in); `AuthoringRunContext` (native `run_context_type`) adds the run's messages, which `run_tests` and the patch rebuild read, and resolves the development runner from the worker's `Runners`. This deviates from the spec's wording (inputs and budget in the run context) only to avoid carrying the inputs twice per activity.
 - Output retries are fixed when agents are built, so admission requires the request's `output_retries` to equal the ceiling's. Native bytes cross as base64 (`RevisionRequest`, `RevisionRun`, `ExecutionRecord`). Messages round-trip with tool-return contents as JSON values.
 
-Next: live baselines on the local provider (assessment development split; chain with live identification, planning and assessment), then rebase after PRs #35, #34 and #33.
+Next: record the RIG0 live baselines (started on branch commit `7014af9`, before the witness-format and #34 merges) and rerun them from main.
 
 Work proceeds in parallel: the evaluation sets and the durable chain touch separate files except `composition/direct.py`, which only the durable work changes, keeping `run_direct`'s signature.
 

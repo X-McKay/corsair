@@ -59,7 +59,8 @@ def test_over_claim_fails_admission_and_calibration_and_weakening_fails_calibrat
     assert not weak["calibrated"] and all(value for name, value in weak.items() if name != "calibrated")
 
 
-def test_verified_claim_citing_only_junit_is_not_witness_grounded(tmp_path):
+def test_verified_claim_citing_only_junit_is_refused_by_the_stage_and_recorded(tmp_path):
+    # The stage's output function (SPEC-0030, witness rule) refuses it before the evaluator sees an output.
     report = run(tmp_path, ("true_pair",), true_pair={"cite_witness": False})
-    result = assertions(report, "true_pair")
-    assert not result["witness_grounded"] and all(value for name, value in result.items() if name != "witness_grounded")
+    assert not report.cases and [failure.name for failure in report.failures] == ["true_pair"]
+    assert not passed(report)
