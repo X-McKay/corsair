@@ -1,4 +1,6 @@
 """SPEC-0042: build metadata to runtime requirement, and selection against the runtime matrix (offline)."""
+from pathlib import Path
+
 import pytest
 
 from corsair.nodes.runtime.detect import MAX_FILE_BYTES, detect, is_build_file
@@ -222,6 +224,30 @@ def test_selection_supported_unsupported_conflict():
     with pytest.raises(ValueError, match='not one the selection admitted'):
         check_ready(ready('junit5'), selection, prepared)
 
+
+# SPEC-0056 image row, staged here until its live gate passes; runtime and make are what the image measured.
+STAGED_PERL526 = {'id': 'perl-5.26-make', 'language': 'perl',
+                  'base_image': 'docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7',
+                  'image_source': 'deploy/qualification/toolchains/perl526', 'runtime': {'name': 'perl', 'version': '5.26.3'},
+                  'tools': {'make': '4.2.1'}, 'selector': {}, 'qualification': {'records': ['SPEC-0056'], 'report': 'x'}}
+
+
+def test_perl526_row_meets_runtime_and_make_and_waits_for_a_tap_runner():
+    fixture = Path(__file__).resolve().parents[2] / 'deploy/qualification/toolchains/perl526/Makefile.PL'
+    requirement = detect({'Makefile.PL': fixture.read_bytes()}, 'perl')
+    matrix = load().model_dump()
+    staged = Matrix.model_validate({**matrix, 'images': [*matrix['images'], STAGED_PERL526]})
+    # No Corsair runner and report parser for TAP yet, so no framework row: the image alone does not run a case.
+    selection = select(requirement, staged)
+    assert selection.status == 'unsupported' and [n.name for n in selection.needs] == ['tap-harness']
+    assert [check.name for check in selection.rejected[0].unmet] == ['tap-harness']
+    runner = {'name': 'tap-harness', 'language': 'perl', 'versions': '==3.38', 'runner': 'x', 'images': ['perl-5.26-make'],
+              'qualification': {'records': ['SPEC-0056'], 'report': 'x'}}
+    selection = select(requirement, Matrix.model_validate({**staged.model_dump(), 'frameworks': [*matrix['frameworks'], runner]}))
+    assert selection.status == 'supported' and selection.image_id == 'perl-5.26-make'
+    # A project that needs a newer Perl is not routed to 5.26.
+    newer = detect({'Makefile.PL': fixture.read_bytes().replace(b"'5.026'", b"'5.028'")}, 'perl')
+    assert select(newer, staged).status == 'unsupported' and 'perl' in [n.name for n in select(newer, staged).needs]
 
 def test_matrix_refuses_selector_rows_and_duplicates():
     data = load().model_dump()

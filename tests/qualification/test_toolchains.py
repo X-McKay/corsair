@@ -15,7 +15,7 @@ from tests.qualification.support import ROOT, NetworkFixture
 from tests.qualification.gateway import native_gateway
 from tests.qualification.test_lifecycle import SdkReceipts
 from tests.qualification.test_policy import require_network, owned_sandbox, observe_policy, global_policy_observation, wait_logging_activation
-from tests.qualification.prepare_toolchains import JAVA_TESTS, JEST, LAUNCHER, NODE_TESTS, NODES, NPM, PYTHONS, SOURCE, image_receipt, jest_report, source_hashes
+from tests.qualification.prepare_toolchains import JAVA_TESTS, JEST, LAUNCHER, NODE_TESTS, NODES, NPM, PERLS, PYTHONS, SOURCE, TAP_TESTS, image_receipt, jest_report, source_hashes, tap_report
 from corsair.adapters.maven_runner import WRAPPER, MavenRunner, MavenRunnerConfig, selection
 from corsair.reports.junit_listing import listed
 
@@ -45,7 +45,7 @@ def toolchain_gateway(kube, request):
 
 def toolchain_policy(language):
     policy = yaml.safe_load((ROOT / 'policies/openshell/identity.yaml').read_text())
-    policy['filesystem_policy']['read_only'] += ['/opt/corsair-fixture'] + ([] if language in PYTHONS else
+    policy['filesystem_policy']['read_only'] += ['/opt/corsair-fixture'] + ([] if language in PYTHONS or language in PERLS else
         # Node 8's Debian buster base is not merged-/usr: its loader is under /lib64; Yarn is unpacked under /opt.
         ['/lib64', '/opt/corsair-npm', '/opt/yarn-v1.21.1'] if language in NODES else
         ['/opt/java/openjdk', '/opt/corsair-m2', '/opt/corsair-m2.sha256', '/opt/corsair-junit', '/opt/corsair-junit.sha256'])
@@ -78,6 +78,10 @@ def stage_project(kube, cli, sdk, name, language, record):
     elif language in NODES:
         for file in ('package.json', 'package-lock.json', 'native.test.js'):
             shutil.copyfile(SOURCE / language / file, project / file)
+    elif language in PERLS:
+        shutil.copyfile(SOURCE / language / 'Makefile.PL', project / 'Makefile.PL')
+        shutil.copytree(SOURCE / language / 'lib', project / 'lib')
+        shutil.copytree(SOURCE / language / 't', project / 't')
     else:
         shutil.copyfile(SOURCE / language / 'pom.xml', project / 'pom.xml')
         shutil.copytree(SOURCE / language / 'src', project / 'src')
@@ -234,6 +238,50 @@ def node_dependencies(kube, cli, sdk, name, remote, record, language):
                                         'missing_package': 'permitted registry 404 through npm (E404), not a policy denial'}
 
 
+# Exact versions each Perl image carries, measured in the upstream image (core modules plus the image's GNU Make).
+PERL = {'perl526': {'perl': '5.26.3', 'make': 'GNU Make 4.2.1', 'harness': 'TAP::Harness v3.38 and Perl v5.26.3',
+                    'modules': 'ExtUtils::MakeMaker 7.24 Test::More 1.302073'}}
+
+
+def perl_offline(sdk, name, remote, record, language):
+    """The fixture through MakeMaker, make and prove offline, then the sibling images' diagnostics in TAP terms.
+    No Corsair TAP runner exists yet, so no runner argv is exercised here."""
+    expect = PERL[language]
+    perl, prove, make = '/usr/local/bin/perl', '/usr/local/bin/prove', '/usr/bin/make'
+    versions = "/usr/local/bin/perl -e 'printf qq{%vd\\n}, $^V'; /usr/bin/make --version; /usr/local/bin/prove --version; /usr/local/bin/perl -MExtUtils::MakeMaker -MTest::More -e 'print qq{ExtUtils::MakeMaker $ExtUtils::MakeMaker::VERSION Test::More $Test::More::VERSION\\n}'"
+    result = execute(sdk, name, ['/bin/sh', '-ec', versions], remote)
+    expect_completed(result, 0, expect['harness'])
+    assert result.stdout.splitlines()[0] == expect['perl'] and expect['make'] in result.stdout and expect['modules'] in result.stdout
+    record['versions'] = result.stdout
+    expect_completed(execute(sdk, name, [perl, 'Makefile.PL'], remote), 0, 'Writing Makefile for Corsair::Native')
+    expect_completed(execute(sdk, name, [make], remote), 0, 'blib/lib/Corsair/Native.pm')
+    expect_completed(execute(sdk, name, [make, 'test'], remote), 0, 'Result: PASS')
+    result = execute(sdk, name, [prove, '-b', '-v', 't/'], remote)
+    assert result.exit_code == 0, result.stdout[-2000:] + result.stderr[-2000:]
+    record.setdefault('native_reports', []).append(tap_report(result.stdout, TAP_TESTS))
+    setup = execute(sdk, name, ['/bin/sh', '-ec', 'for case in missing none syntax assertion; do cp -R . /tmp/perl-$case; rm /tmp/perl-$case/t/native.t; done; '
+                                'printf "use Corsair::Absent;\\nuse Test::More tests => 1;\\nok(1, q{unreached});\\n" > /tmp/perl-missing/t/missing.t; '
+                                'printf "use Test::More tests => 1;\\nmy \\$value = ;\\n" > /tmp/perl-syntax/t/syntax.t; '
+                                'printf "use Test::More tests => 1;\\nis(2, 1, q{deliberate_failure});\\n" > /tmp/perl-assertion/t/assertion.t'], remote)
+    expect_completed(setup, 0, '')
+    result = execute(sdk, name, [prove, '-b', 't/'], '/tmp/perl-missing')
+    expect_completed(result, 1, "Can't locate Corsair/Absent.pm in @INC")
+    assert 'Result: FAIL' in result.stdout
+    # No discovery exits 0: only prove's NOTESTS summary tells it apart from a pass.
+    result = execute(sdk, name, [prove, '-b', 't/'], '/tmp/perl-none')
+    expect_completed(result, 0, 'Result: NOTESTS')
+    assert 'Files=0, Tests=0' in result.stdout
+    result = execute(sdk, name, [prove, '-b', 't/'], '/tmp/perl-syntax')
+    expect_completed(result, 1, 'syntax error at t/syntax.t line 2')
+    assert 'Result: FAIL' in result.stdout
+    result = execute(sdk, name, [prove, '-b', 't/'], '/tmp/perl-assertion')
+    expect_completed(result, 1, "Failed test 'deliberate_failure'")
+    assert "got: '2'" in result.stdout + result.stderr and "expected: '1'" in result.stdout + result.stderr and 'Result: FAIL' in result.stdout
+    result = execute(sdk, name, [make, 'test'], '/tmp/perl-assertion')
+    expect_completed(result, 2, 'Result: FAIL')
+    record['offline_diagnostics'] = ['missing-module', 'no-discovery (exit 0, NOTESTS)', 'compilation', 'assertion', 'assertion through make test']
+
+
 def java_runner_commands(sdk, name, remote, record, engine):
     """The Maven runner's own discovery and execution argv (SPEC-0041) on the fixture, offline in the sandbox."""
     config = MavenRunnerConfig(command=('/usr/share/maven/bin/mvn', '-B', '-ntp', '-o', '-Dmaven.repo.local=/tmp/m2', f'--file={remote}/pom.xml'),
@@ -364,6 +412,8 @@ def toolchain_gate(kube, gateway, language):
                 elif language in NODES:
                     node_offline(sdk, name, remote, record, language)
                     node_dependencies(kube, gateway['cli'], sdk, name, remote, record, language)
+                elif language in PERLS:
+                    perl_offline(sdk, name, remote, record, language)
                 else:
                     java_offline(sdk, name, remote, record, language)
             assert all(r['outcome'] == 'passed' and r['cleanup_confirmed'] for r in summary['sandboxes'])
@@ -401,3 +451,8 @@ def test_native_python_toolchain(image_kube, toolchain_gateway):
 def test_native_python37_toolchain(image_kube, toolchain_gateway):
     """The CPython 3.7 image through the same offline, diagnostic and dependency checks as the 3.12 image."""
     toolchain_gate(image_kube, toolchain_gateway, 'python37')
+
+
+@pytest.mark.toolchain('perl526')
+def test_native_perl526_toolchain(image_kube, toolchain_gateway):
+    toolchain_gate(image_kube, toolchain_gateway, 'perl526')
