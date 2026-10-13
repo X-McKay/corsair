@@ -55,7 +55,7 @@ Each agent is improved through its own loop, independent of the cluster and of o
 3. **Results:** `.runs/evals/<agent>/<UTC stamp>-<set>-<mode>/` holds `command.json`, the suite's `evidence/`, `summary.json` (prompt/config/skill versions, model, dataset digest, pass rates, efficiency) and `comparison.md` against the promoted baseline or else the previous run; `index.jsonl` lists every run. Promote a reference with `make eval-baseline AGENT=<name> RUN=<run id>`.
 4. **No cluster:** sandboxes, runners and command executors are ports answered by fixtures, recorded observations or deterministic host doubles. Model-written code is never executed on the host; the authoring eval uses a static host runner and leaves execution dimensions unknown until a sandbox replay.
 
-A change to an agent states the baseline it was compared with and the comparison's result in its plan. A new agent ships with its eval set and a `SUITES` entry in `evals/run.py`.
+A change to an agent states the baseline it was compared with and the comparison's result in its plan. A new agent ships with its eval set and a `SUITES` entry in `evals/run.py`. Agent packages follow the [agent package convention](../agent-packages.md); a suite that reports `toolset_sha256` makes any change to the offered tools visible in `comparison.md`.
 
 ## Using the skills
 
@@ -67,6 +67,7 @@ Launch the client from the repository. Codex supports repository `.agents/skills
 | Review design/code/evidence | `$corsair-review` | `/corsair-review` |
 | Prepare continuation | `$corsair-handoff` | `/corsair-handoff` |
 | Add or register a toolchain base image | `$corsair-base-image` | `/corsair-base-image` |
+| Create an agent, add a tool, or move a package to the [convention](../agent-packages.md) | `$corsair-agent-scaffold` | `/corsair-agent-scaffold` |
 
 Clients can also select skills from their descriptions. If an already-running session does not discover newly added skills, start a fresh session or explicitly read the `SKILL.md` file. Missing symlink support should be fixed in the checkout, not by maintaining duplicated instructions. Claude imports `AGENTS.md` through `@AGENTS.md`; Codex reads it natively.
 

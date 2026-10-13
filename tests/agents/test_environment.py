@@ -13,7 +13,7 @@ from pydantic_ai.usage import UsageLimits
 
 from corsair.agents.environment.agent import SKILL_TEXT, create_environment_agent, environment_prompt
 from corsair.agents.environment.contracts import EnvironmentInput, ReadyEnvironment
-from corsair.agents.environment.tools import EnvironmentDependencies, SetupBudget
+from corsair.agents.environment.dependencies import EnvironmentDependencies, SetupBudget
 from corsair.ports.execution import ExecutionError, ExecutionReceipt
 from corsair.ports.sandbox import SandboxHandle
 

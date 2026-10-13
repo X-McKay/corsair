@@ -22,6 +22,8 @@ Every node has explicit success, blocked, unsupported, failure, and unknown outc
 
 ## Agent contracts
 
+Each agent package follows the [agent package convention](agent-packages.md): one file per responsibility, one module per model-facing tool, explicit registration.
+
 | Agent | Objective and output | Authority |
 | --- | --- | --- |
 | Issue identification | Reported security concern and relevant source target, or a concrete blocker | Confined source/issue reads only |
