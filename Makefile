@@ -200,8 +200,10 @@ qualify-fixture-e2e:
 .PHONY: qualify-python37-case
 # SPEC-0046: host-fetch CVE-2021-32839 into RUN-sources (pins written there, not to benchmarks/), then the pytest
 # runner on its baseline and fix commits in fresh CPython 3.7 sandboxes. Needs TOOLCHAINS=python37 images loaded.
+# Cases each per-image case target runs; make qualify-image reads these before it installs a gateway.
+CASES_python37 := CVE-2021-32839
 qualify-python37-case:
-	test -z "$(CASE)" -o "$(CASE)" = CVE-2021-32839
+	test -z "$(CASE)" -o "$(CASE)" = "$(CASES_python37)"
 	test ! -e "$(CORSAIR_QUAL_RUN)"
 	mkdir -p "$(CORSAIR_QUAL_RUN)"
 	PYTHONPATH="$(CURDIR)/src:$(CURDIR)" uv run --locked python -m evals.benchmark.sources fetch --run-dir "$(CORSAIR_QUAL_RUN)-sources" --cases CVE-2021-32839 --keep --pins "$(CORSAIR_QUAL_RUN)-sources/source-pins.json"

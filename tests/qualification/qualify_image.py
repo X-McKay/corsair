@@ -40,6 +40,12 @@ def make_targets():
     return set(re.findall(r'^([a-z0-9][a-z0-9-]*):', (ROOT / 'Makefile').read_text(), re.M))
 
 
+def case_ids(toolchain):
+    """The cases `qualify-<toolchain>-case` runs, from its `CASES_<toolchain>` line in the Makefile."""
+    found = re.search(rf'^CASES_{re.escape(toolchain)} := (.*)$', (ROOT / 'Makefile').read_text(), re.M)
+    return found.group(1).split() if found else []
+
+
 def make(target, log, variables):
     """One make target in this checkout; its whole output goes to `log`. Returns the exit code (None on a missing make)."""
     argv = ['make', '-C', str(ROOT), target, *(f'{k}={v}' for k, v in variables.items())]
@@ -259,8 +265,10 @@ def command_run(args):
     from tests.qualification.prepare_toolchains import BASES
     if args.toolchain not in BASES:
         raise SystemExit(f'Unknown TOOLCHAIN {args.toolchain!r}; prepared image directories: {sorted(BASES)}')
-    if args.case and f'qualify-{args.toolchain}-case' not in make_targets():
-        raise SystemExit(f'No case target qualify-{args.toolchain}-case in the Makefile; run without CASE for the gate alone')
+    if args.case and (f'qualify-{args.toolchain}-case' not in make_targets() or args.case not in case_ids(args.toolchain)):
+        # Checked before anything is installed: a refused case after the case gateway would leave that gateway behind.
+        raise SystemExit(f'qualify-{args.toolchain}-case does not run {args.case}; it runs {case_ids(args.toolchain) or "nothing"}. '
+                         'Run without CASE for the gate alone')
     # Untracked files count too (a stray test module would be collected); ignored .runs, .state and .cache do not.
     dirty = git('status', '--porcelain', '--untracked-files=all')
     if dirty:

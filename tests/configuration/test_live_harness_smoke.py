@@ -241,3 +241,11 @@ def test_qualify_image_stops_when_explicitly_named_evidence_is_refused(tmp_path,
     run, stop, calls = orchestrate(tmp_path, monkeypatch, Answers(), prepared=True, admission=str(tmp_path / 'named'))
     assert stop.step == 'admission' and 'qualify-admission' not in [t for t, _ in calls]
     assert 'named explicitly' in run.steps['admission']['detail']
+
+
+def test_qualify_image_refuses_a_case_its_case_target_does_not_run_before_installing_anything(monkeypatch):
+    assert qualify_image.case_ids('python37') == ['CVE-2021-32839'] and qualify_image.case_ids('java8') == []
+    monkeypatch.setattr(qualify_image, 'git', lambda *args: '' if args[0] == 'status' else 'x')
+    for toolchain, case in (('python37', 'CVE-0000-0000'), ('java8', 'VUL4J-6')):
+        with pytest.raises(SystemExit, match='does not run'):
+            qualify_image.main(['run', '--toolchain', toolchain, '--case', case])
