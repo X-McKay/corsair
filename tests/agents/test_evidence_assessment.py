@@ -219,8 +219,8 @@ def test_prompt_carries_plan_and_inventory_but_not_run_evidence_or_content():
     data = inputs()
     prompt = assessment_prompt(data)
     assert 'baseline-0-junit (kind junit, baseline run 0, lines 1..3)' in prompt and PLAN.security_test_id in prompt
-    assert prompt.endswith('\nWitness items: baseline 1, candidate 1')
-    assert assessment_prompt(inputs(witnesses=False)).endswith('\nWitness items: baseline 0, candidate 0')
+    # Live, a count line ("Witness items: baseline 0") was read as an item id to fetch; kinds stay per item.
+    assert 'Witness items' not in prompt and 'baseline-0-witness (kind witness' in prompt
     for hidden in ('"effect"', 'sandbox_events', 'path_reached', 'outside.txt', 'AssertionError</failure>',
                    'vulnerable', 'fixed'):
         assert hidden not in prompt

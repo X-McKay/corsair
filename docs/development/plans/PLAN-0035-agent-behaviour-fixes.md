@@ -31,6 +31,17 @@ Independent of witness capture (SPEC-0033/PLAN-0033) and the fully live chain (P
 
 2026-10-13, branch `claude/agent-behaviour-fixes-f1h06f` from main `0d9bb5a`. `make test-config`: 788 passed (one existing pydantic_graph deprecation warning). New checks were confirmed to fail on the old agent code: authoring tool hiding after a workspace failure and after a spent budget (3), assessment witness grounding and prompt line (5, including the composition over-claim test). Scripted authoring evals 12/12. Scripted checks only so far; no live claim.
 
+Before (RIG0, worktree at main `0d9bb5a`, `make test-config` 781 there; vLLM Qwen3.6-35B-A3B-NVFP4 at llm.almckay.io, the PLAN-0031 provider configuration: cap 16384, server-default thinking, timeout 180 s, temperature 0, no retries; fixture E2E with one live stage, others scripted). A first pass with relative `--evidence` paths raised in `LocalArtifacts` before any model call and is kept aside, not counted.
+
+| Stage (live) | Attempts | Outcome | Notes |
+| --- | --- | --- | --- |
+| Planning | 4 | 0/4 plans | Each: two reads, then one response spending the whole 16384 cap on reasoning (≈16.7k reasoning tokens, ≈120 s), no answer |
+| Authoring | 3 | 0 patches, 1 blocked | auth-1/2: two reads then the cap, before any write. auth-3: four write/run pairs, runs 1-3 `workspace_failure` (reviewed workspace refusal), run 4 `not_run` (budget spent) after an identical rewrite, then `blocked`/`sandbox` with an accurate reason (11 requests, 7025 output tokens) |
+| Assessment | 3 | 3/3 proposed `completed`/`reproduced`/`verified`, 0/3 admitted | Gate permitted `completed`/`inconclusive`/`not_verified` (`witness_missing` both revisions). Every application observation cited only JUnit items; one run called the JUnit content "the witness". 8 requests, ≈3.4k output tokens, ≈31 s each |
+| Planning evals (6 cases × 2, eval budget 5 requests/4 tools/48k tokens) | 12 | 6/12 completed, all passing every assertion | The other 6 hit the 16384 cap after two reads; injection and unsupported-observation 0/2 each, unguarded and guarded 1/2, no-baseline and implementation-absent 2/2 |
+
+14 of 20 live planning and authoring attempts ended in a single all-reasoning response at the provider cap right after reading source: the provider cap, not the agent budget, stopped them. Private evidence: `.runs/behaviour-20261013/before/` in `/home/al/git/corsair-behaviour` on RIG0.
+
 Behaviour change in composition: a live assessor that over-claims twice without a witness now fails the assessment stage on its output retries instead of reaching `admit()`; the rejected proposals stay in the attempt messages and the gate verdict is still computed.
 
 ## Decisions and next action

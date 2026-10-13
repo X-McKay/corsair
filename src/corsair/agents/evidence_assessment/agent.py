@@ -16,7 +16,7 @@ from .tools import READ_EVIDENCE_TOOL, TOOL_RETRIES, AssessmentDependencies, evi
 
 # PROMPT_VERSION covers everything the model sees (instructions, skill, rendered prompt,
 # tool and output schema text); CONFIG_VERSION covers retry budgets and instrumentation.
-PROMPT_VERSION = "evidence-assessment-v3"
+PROMPT_VERSION = "evidence-assessment-v4"
 CONFIG_VERSION = "evidence-assessment-config-v1"
 SKILL_ID = "assess-evidence"
 SKILL_BYTES = (Path(__file__).parent / "skills" / SKILL_ID / "SKILL.md").read_bytes()
@@ -34,9 +34,7 @@ def assessment_prompt(inputs: AssessmentInput) -> str:
             "\nFrozen evidence inventory: " + ", ".join(
                 f"{item.item_id} (kind {item.kind}, "
                 + (f"{item.revision} run {item.run}, " if item.revision else "")
-                + f"lines 1..{len(item.content.splitlines())})" for item in inputs.items)
-            + "\nWitness items: " + ", ".join(f"{revision} {_witnesses(inputs, revision)}"
-                                              for revision in ("baseline", "candidate")))
+                + f"lines 1..{len(item.content.splitlines())})" for item in inputs.items))
 
 
 def _witnesses(inputs: AssessmentInput, revision: str) -> int:
