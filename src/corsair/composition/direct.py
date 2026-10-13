@@ -254,7 +254,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
                     patch=patch)
     executions = []
     try:
-        request, unrequested = witness_request(identification, case.witness_envelope), ()
+        request, unrequested = witness_request(identification, case.witness_envelope, plan.security.witness), ()
     except ValueError as exc:
         # No approved envelope covers the identified target: run without a witness and say so.
         request, unrequested = None, (f"no witness requested: {exc}"[:512],)

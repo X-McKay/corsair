@@ -170,6 +170,8 @@ def edit(path, value):
     edit(("security", "witness", "subject"), "/tmp/outside.txt"),                                # absolute subject
     edit(("security", "witness", "subject"), "../outside.txt"),                                  # escapes scratch
     edit(("security", "witness", "subject"), "allowed/document.txt"),                            # same subject as control
+    edit(("security", "witness", "subject"), "allowed//document.txt"),                           # alias of the control subject
+    edit(("security", "witness", "subject"), "./outside.txt"),                                   # noncanonical spelling
     edit(("security", "witness", "subject"), "sentinel.txt"),                                    # input never aims at it
     edit(("security_expectation", "safe_behavior"), "no_outside_open"),                          # neither no_<effect> nor named
     {k: v for k, v in reference().items() if k != "control"} | {"control": {

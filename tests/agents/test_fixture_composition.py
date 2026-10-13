@@ -271,3 +271,33 @@ def test_a_target_outside_the_operator_envelope_runs_without_a_witness(store, tm
     assert run.gate.permitted == Disposition(execution="completed", finding="inconclusive", fix="not_verified")
     assert f"no witness requested: {reason}" in run.limitations
     assert not any("witness (kind witness" in prompt for prompt in prompts(run))
+
+
+def _process_start_planning():
+    """The reference plan with both witnesses moved to a listed process_start facility the probe does not record."""
+    from evals.fixture_e2e.case import DISCOVER, _reads_then, reference_plan
+    plan = reference_plan(DISCOVER)
+    for name in ("control", "security"):
+        plan[name] = plan[name] | {"witness": plan[name]["witness"] | {"facility": "audit_exec", "effect": "process_start"}}
+    return _reads_then(["documents.py", "test_existing.py"], lambda info: {"plan": plan})
+
+
+def test_a_planned_witness_the_envelope_does_not_record_runs_without_a_witness(store, tmp_path):
+    """SPEC-0040 kinds without a recorder, or another subject, never borrow the envelope's file-open evidence."""
+    from corsair.agents.test_planning.contracts import WitnessFacility
+    base = fixture_case()
+    process = WitnessFacility(id="audit_exec", kind="process_start", description="Process start audit events")
+    environment = base.environment.model_copy(update={
+        "witness_facilities": base.environment.witness_facilities + (process,)})
+    cases = {
+        "the planned process_start witness is not recorded by the operator probe":
+            (replace(base, environment=environment), stages(planning=_process_start_planning())),
+        "the planned witness subject is not the operator witness envelope effect":
+            (replace(base, witness_envelope=WitnessRequest("documents.py", "read_document", "other.txt")), stages()),
+    }
+    for index, (reason, (case, models_)) in enumerate(cases.items()):
+        (tmp_path / f"work{index}").mkdir()
+        run = asyncio.run(run_direct(case, models_, reviewed_runners(store, tmp_path / f"work{index}")))
+        assert run.stopped_at is None and all(e.observed.witness is None for e in run.executions)
+        assert run.gate.permitted == Disposition(execution="completed", finding="inconclusive", fix="not_verified")
+        assert f"no witness requested: {reason}" in run.limitations

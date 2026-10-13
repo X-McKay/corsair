@@ -44,6 +44,9 @@ def scratch_relative(subject: str) -> str:
     path = PurePosixPath(subject)
     if path.is_absolute() or ".." in path.parts or subject.startswith("~") or path == PurePosixPath("."):
         raise ValueError(f"file_open subject {subject!r} must be a path inside the scratch location, relative to it")
+    # One spelling per file, so distinct subjects are distinct files ("./a", "a//b", "a/./b" and "a/" are refused).
+    if str(path) != subject:
+        raise ValueError(f"file_open subject {subject!r} must be written canonically as {str(path)!r}")
     return subject
 
 
