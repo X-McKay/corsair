@@ -895,6 +895,7 @@
       "language": "Perl",
       "build_system": "CPAN / project-specific / prove",
       "project": "HTTP-Tiny",
+      "project_root": "cpan/HTTP-Tiny",
       "issue_id": "CVE-2023-31486",
       "issue_category": "TLS certificate verification disabled by default",
       "cwe": null,

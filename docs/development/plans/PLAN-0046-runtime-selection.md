@@ -133,6 +133,13 @@ The report rerun after these fixes changed no outcome; the JSON gains each unrea
 
 Limits: this is metadata, not admission (PLAN-0021). A suggested row satisfies a case's runtime declarations, not its dependency closure or tests.
 
+## Follow-up after merge (#48 merged as `a9ba2b0`)
+
+- CVE-2023-31486 project root: Al chose `cpan/HTTP-Tiny`. `InventoryCase.project_root` (optional, relative, no `.`/`..` segments) is set on that row; `runtimes.py` fetches and reads only build files under the root, keyed relative to it, and passes the root to `detect`. RIG0's earlier fetch found no build file in that directory, so the case is undetermined with "no perl build file at the project root"; this container still cannot fetch it (`not_fetched`). `tests/unit/test_runtime_report.py` checks the scoping on a perl-core-shaped tree.
+- Codex's review of `028d724` (completed after the merge) found three P2s, each fixed with a check that fails on the old code: a PEP 508 direct reference (`pytest @ git+...`) is an unread pytest constraint instead of vanishing; every unresolved reason is cut to the 240-character contract limit; and an explicit `python` language accepts requirement-only trees (`requirements-dev.txt`, `requirements/*.txt`, `pytest.ini`, `.python-version`, lockfiles are Python markers).
+- The report rerun over the stored trees changed no result except the new `project_root` field; the detector and inventory digests changed.
+- `make test-config`: 1234 passed on main `a9ba2b0` plus this follow-up.
+
 ## Decisions and next action
 
 - Java strictness, framework sufficiency, missing-runtime handling and the per-version (not kitchen-sink) image choice are recorded in SPEC-0042, along with why no new agent is needed.

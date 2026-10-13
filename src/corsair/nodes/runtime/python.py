@@ -10,6 +10,7 @@ from corsair.nodes.runtime.versions import VersionSyntaxError, exactly, parse_ve
 
 CLASSIFIER = re.compile(r'Programming Language :: Python :: (\d+\.\d+)$')
 REQUIREMENT = re.compile(r'^\s*(pytest)\s*(?:\[[^\]]*\])?\s*([<>=!~][^;#]*)?(?:;[^#]*)?(?:#.*)?$', re.I)
+DIRECT_PYTEST = re.compile(r'^\s*pytest\s*(?:\[[^\]]*\])?\s*@', re.I)  # PEP 508 direct reference: no version range
 TOX_ENV = re.compile(r'^py(\d)(\d+)$')
 CI_KEYS = ('python-version', 'python', 'python_version', 'py', 'python-versions')
 FRAMEWORK = ('test_framework', 'pytest', 'registry')
@@ -71,6 +72,8 @@ def _classifiers(c: Collector, path: str, values):
 def _requirement_lines(c: Collector, path: str, lines, source: str):
     for line in lines:
         if (match := REQUIREMENT.match(line)): _pytest(c, path, line.strip(), match[2], source)
+        elif DIRECT_PYTEST.match(line):  # `pytest @ git+...` may resolve to any revision
+            c.unparsed(*FRAMEWORK, path, line.strip()[:120], f'pytest direct reference {line.strip()[:60]!r} names no version range')
 
 
 def detect(c: Collector) -> None:

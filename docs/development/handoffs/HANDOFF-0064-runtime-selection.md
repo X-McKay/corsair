@@ -39,7 +39,7 @@ Settled in SPEC-0042:
 
 Next bounded actions:
 1. Prepare and qualify a JDK 8 + Maven row with a JUnit 4 fixture, and a CPython row with an older pytest range, through one toolchain gate each on a fresh node, then add them to the matrix.
-2. Decide CVE-2023-31486's project root (`cpan/HTTP-Tiny/` or perl core as its own runtime).
+2. CVE-2023-31486's project root is `cpan/HTTP-Tiny` (Al, 2026-10-13; PLAN-0046 follow-up). It stays undetermined because that directory has no build file; resolving it needs the upstream HTTP-Tiny repository as the case source, or perl core as its own runtime.
 3. As part of G12, call `environment_input` from the chain and durable workflow, and `check_ready` on the agent's result.
 
 Al reviews the draft PR and says "merge".
