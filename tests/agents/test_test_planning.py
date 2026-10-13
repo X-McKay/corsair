@@ -309,7 +309,7 @@ def test_ready_plan_requires_identified_target_anchor_for_each_test(name, refere
         run(create_test_planning_agent(responding(plan), output_retries=0), case().inputs)
 
 
-@pytest.mark.parametrize("call", ["fake_read_document(root, name)", "read_document_stub(root, name)", "read_document$stub(root, name)", "read_document\u0301(root, name)", "read_document\u093e(root, name)"])
+@pytest.mark.parametrize("call", ["fake_read_document(root, name)", "read_document_stub(root, name)", "read_document$stub(root, name)", "read_document\u0301(root, name)", "read_document\u093e(root, name)", "read_document£(root, name)", "read_document\u200c(root, name)", "read_document\u200d(root, name)"])
 def test_target_name_substrings_do_not_authorize_an_implementation_call(call):
     with pytest.raises(UnexpectedModelBehavior):
         run(create_test_planning_agent(responding(edit(("security", "implementation_call"), call)),
@@ -324,3 +324,20 @@ def test_adjacent_cited_ranges_can_jointly_cover_identified_anchor():
             {"path": "documents.py", "start_line": 3, "end_line": 4},
         ]
     assert isinstance(run(create_test_planning_agent(responding(plan)), case().inputs).output, ReadyTestPlan)
+
+
+@pytest.mark.parametrize("symbol", ["read_document£", "read_document\u200c", "read_document\u200d"])
+def test_exact_extended_identifier_spelling_is_preserved(symbol):
+    from corsair.agents.test_planning.agent import _symbol_occurs
+    assert _symbol_occurs(symbol, f"documents.{symbol}(root, name)")
+
+
+@pytest.mark.parametrize("call", ["fake_read_document(root, name)", "read_document\u0301(root, name)",
+                                  "read_document£(root, name)", "read_document\u200c(root, name)",
+                                  "read_document\u200d(root, name)"])
+def test_curated_implementation_call_check_refuses_partial_identifiers(call):
+    c = case()
+    plan = run(create_test_planning_agent(responding(reference())), c.inputs).output
+    assert plan_checks(c.inputs, plan, c.metadata)["implementation_call"]
+    altered = plan.model_copy(update={"security": plan.security.model_copy(update={"implementation_call": call})})
+    assert not plan_checks(c.inputs, altered, c.metadata)["implementation_call"]

@@ -52,3 +52,10 @@ Independent review confirmed that Python regex \w excludes valid Unicode identif
 Focused target/anchor checks:10 passed; development scripted12/12 versus12/12, `.runs/evals/planning/20261013T100740Z-development-scripted`, unchanged estimated requests/tools/tokens.
 
 Final affected planning and documentation/dataset guards:52 passed, one existing event-loop deprecation warning. git diff --check passed. Live candidate rerun and full-suite repeat unrun; prior full-suite source remains separately recorded.
+
+## Conservative cross-language lexical follow-up
+
+Cross-review found Java/JavaScript currency symbols and format characters still accepted as partial-name suffixes. The adjacent-character guard now conservatively includes Unicode Sc and Cf categories together with Python identifier continuations; this covers currency and zero-width joiner/non-joiner suffixes while preserving complete literal spellings. It is intentionally not a parser or declaration/semantic proof. Native negative and complete-spelling checks retain existing dollar and punctuation expectations. Identities advance to grounding-3 (planning config v5). No corpus/held-out, provider or authority changes.
+
+Focused native admission/evaluator checks:21 passed, one existing deprecation warning. Final scripted development12/12 against12/12 at `.runs/evals/planning/20261013T101200Z-development-scripted`, unchanged estimated requests/tools/tokens. The independent implementation_call scorer now applies the defined lexical boundary rather than a substring; mutated-output negatives prove prefix and Unicode suffix sensitivity.
+Full-suite repeat, live provider and runtime checks unrun for this bounded correction; earlier checks remain historical. git diff --check passed.
