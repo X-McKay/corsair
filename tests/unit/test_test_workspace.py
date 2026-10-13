@@ -13,8 +13,8 @@ from uuid import uuid4, uuid5
 import pytest
 
 from corsair.adapters.local_artifacts import LocalArtifacts
-from corsair.adapters.openshell_workspace import (VERIFY, CliUpload, OpenShellTestWorkspace, UploadError,
-                                                  WorkspaceConfig, WorkspaceError, _patch_manifest)
+from corsair.adapters.openshell_workspace import (VERIFY, CliUpload, OpenShellTestWorkspace, UploadedVerifier,
+                                                  UploadError, WorkspaceConfig, WorkspaceError, _patch_manifest)
 from corsair.adapters.pytest_runner import PytestRunner, PytestRunnerConfig
 from corsair.ports.artifacts import SourceFile, SourceSnapshot
 from corsair.ports.execution import ExecutionReceipt
@@ -71,13 +71,25 @@ class Upload:
 
 class Verifier:
     """Runs only the fixed operator verifier, locally; anything else would be workload code."""
-    def __init__(self):
-        self.calls = []
+    def __init__(self, uploaded=None):
+        self.calls, self.uploaded = [], uploaded
 
     def execute(self, handle, command, operation):
-        assert command[:6] == (PYTHON, '-I', '-S', '-B', '-c', VERIFY)
         self.calls.append(operation)
-        done = subprocess.run([sys.executable, *command[1:]], capture_output=True, timeout=30, env={})
+        if self.uploaded is not None:
+            # The static binary's stand-in: the Python reference reports the same document, plus the SHA-256
+            # of the executable the upload placed, as the binary reads it through /proc/self/exe.
+            parent, directory, name = command[0].rsplit('/', 2)
+            assert (parent, name) == (self.uploaded.remote_parent, 'verify') and len(command) == 4
+            assert directory.startswith(self.uploaded.name + '-')
+            done = subprocess.run([sys.executable, '-I', '-S', '-B', '-c', VERIFY, *command[1:]], capture_output=True,
+                                  timeout=30, env={})
+            placed = Path(command[0]).read_bytes()
+            report = dict(json.loads(done.stdout), verifier_sha256=hashlib.sha256(placed).hexdigest())
+            done.stdout = json.dumps(report).encode()
+        else:
+            assert command[:6] == (PYTHON, '-I', '-S', '-B', '-c', VERIFY)
+            done = subprocess.run([sys.executable, *command[1:]], capture_output=True, timeout=30, env={})
         return ExecutionReceipt(str(operation), handle, 'local', 0.1, 'acknowledged', 'terminal_observed', 'terminal',
                                 stdout=done.stdout, stderr=done.stderr, native_exit=done.returncode,
                                 worker_cleanup='confirmed')
@@ -111,6 +123,26 @@ def test_prepare_delivers_source_and_patch_and_admits_exact_tree(store, tmp_path
         path='tests/test_app.py', sha256=hashlib.sha256(PATCH.files[0].content).hexdigest(), size=len(PATCH.files[0].content))])
     assert not any(config.staging.iterdir()), 'host staging copy is removed once the CLI exits'
     assert adapter.release(prepared, operation) == 'confirmed' and lifecycle.calls[-1] == ('delete', uuid5(operation, 'release'))
+
+
+def test_prepare_source_places_overlay_files_read_only_beside_the_source(store, tmp_path):
+    """SPEC-0071: an operator smoke test goes in with the captured source and is verified the same way."""
+    adapter, (lifecycle, verifier, upload), config = workspace(store, tmp_path)
+    adapter.prepare_source(uuid4(), (PatchFile('tests/test_corsair_smoke.py', b'def test_s(): pass\n'),))
+    assert modes(Path(config.remote_root)) == {'pkg': 0o700, 'pkg/app.py': 0o400, 'tests': 0o700,
+                                               'tests/test_corsair_smoke.py': 0o400, 'tool.sh': 0o500}
+
+
+def test_prepare_source_places_exactly_the_captured_source(store, tmp_path):
+    """SPEC-0070: the environment stage's sandbox holds the captured source and no tests, verified the same way."""
+    adapter, (lifecycle, verifier, upload), config = workspace(store, tmp_path)
+    operation = uuid4()
+    handle = adapter.prepare_source(operation)
+    assert [c[0] for c in lifecycle.calls] == ['create', 'wait_ready']
+    assert verifier.calls == [uuid5(operation, 'absent'), uuid5(operation, 'verify')]
+    assert modes(Path(config.remote_root)) == {'pkg': 0o700, 'pkg/app.py': 0o400, 'tool.sh': 0o500}
+    assert adapter.release_source(handle, operation) == 'confirmed'
+    assert lifecycle.calls[-1] == ('delete', uuid5(operation, 'release'))
 
 
 @pytest.mark.parametrize('patch', [
@@ -308,3 +340,60 @@ def test_receipt_storage_failure_is_attributed_to_upload(store, tmp_path):
         adapter.prepare(PATCH, uuid4())
     assert refused.value.layer == 'upload' and 'delivery acknowledged; receipt storage full' in refused.value.detail
     assert (refused.value.staging, refused.value.cleanup) == ('removed', 'confirmed')
+
+
+BINARY = b'\x7fELF stand-in for the static verifier\n'
+
+
+def uploaded_workspace(store, tmp_path, *, upload=None, pin=None):
+    staging, remote = tmp_path / 'staging', tmp_path / 'remote'
+    staging.mkdir(mode=0o700, exist_ok=True); remote.mkdir(mode=0o700, exist_ok=True)
+    binary = tmp_path / 'verify'
+    binary.write_bytes(BINARY)
+    verifier = UploadedVerifier(binary, pin or hashlib.sha256(BINARY).hexdigest(), str(tmp_path / 'tools'))
+    (tmp_path / 'tools').mkdir(mode=0o700, exist_ok=True)
+    config = WorkspaceConfig(staging, str(remote), 'workspace', None, verifier=verifier)
+    parts = Lifecycle(), Verifier(verifier), upload or Upload()
+    return OpenShellTestWorkspace(*parts, store, snapshot(store), config), parts, config
+
+
+def test_an_uploaded_verifier_needs_no_interpreter_in_the_image(store, tmp_path):
+    """SPEC-0070: the pinned static verifier goes in first, then the same exact admission as the Python route."""
+    adapter, (lifecycle, verifier, upload), config = uploaded_workspace(store, tmp_path)
+    operation = uuid4()
+    handle = adapter.prepare_source(operation)
+    delivered = uuid5(operation, 'verifier')
+    assert [(c[0].name, c[1], c[2]) for c in upload.calls] == [
+        (f'corsair-verifier-{delivered.hex}', config.verifier.remote_parent, delivered),
+        ('workspace', config.remote_parent, uuid5(operation, 'upload'))]
+    assert verifier.calls == [uuid5(operation, 'absent'), uuid5(operation, 'verify')]
+    assert modes(Path(config.remote_root)) == {'pkg': 0o700, 'pkg/app.py': 0o400, 'tool.sh': 0o500}
+    assert Path(config.verifier.remote_path(delivered)).stat().st_mode & 0o777 == 0o500
+    assert not any(config.staging.iterdir())
+    assert adapter.release_source(handle, operation) == 'confirmed'
+
+
+def test_a_verifier_that_is_not_the_pinned_executable_is_refused(store, tmp_path):
+    """Only an honest substitute is caught: one that prints the pinned value is not (SPEC-0070, not attestation)."""
+    def swap(placed):
+        (placed / 'verify').chmod(0o700)
+        (placed / 'verify').write_bytes(b'another program\n')
+    upload = Upload()
+    upload.tamper = lambda placed: swap(placed) if placed.name.startswith('corsair-verifier-') else None
+    adapter, (lifecycle, verifier, _), config = uploaded_workspace(store, tmp_path, upload=upload)
+    with pytest.raises(WorkspaceError, match='verifier is not the pinned executable') as refused:
+        adapter.prepare_source(uuid4())
+    assert refused.value.layer == 'admission' and refused.value.cleanup == 'confirmed'
+    assert lifecycle.calls[-1][0] == 'delete' and len(upload.calls) == 1
+
+
+def test_a_verifier_binary_off_its_pin_is_refused_before_any_sandbox(store, tmp_path):
+    with pytest.raises(ValueError, match='does not match its pin'):
+        uploaded_workspace(store, tmp_path, pin='0' * 64)
+
+
+@pytest.mark.parametrize('python, uploaded', [(None, False), (PYTHON, True)])
+def test_exactly_one_verifier_route_is_configured(tmp_path, python, uploaded):
+    verifier = UploadedVerifier(tmp_path / 'verify', '0' * 64, '/tmp') if uploaded else None
+    with pytest.raises(ValueError, match='Exactly one workspace verifier route'):
+        WorkspaceConfig(tmp_path, '/tmp', 'workspace', python, verifier=verifier)

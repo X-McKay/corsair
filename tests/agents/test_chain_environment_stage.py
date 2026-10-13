@@ -10,8 +10,8 @@ from pydantic_ai.models.function import FunctionModel
 
 from corsair.adapters.local_artifacts import LocalArtifacts
 from corsair.agents.issue_analysis.contracts import SourceFile
-from corsair.composition.direct import (OBSERVED_IDENTITY, SMOKE_BASELINE, UNOBSERVED, PreparedSandbox, SetupSource,
-                                        StageModels, run_direct)
+from corsair.composition.direct import (OBSERVED_IDENTITY, SMOKE_BASELINE, UNOBSERVED, PreparationRefused,
+                                        PreparedSandbox, SetupSource, StageModels, run_direct)
 from corsair.nodes.runtime.contracts import RuntimeInputs
 from corsair.nodes.runtime.environment import RuntimeCatalog, recipe_sha256
 from corsair.nodes.runtime.matrix import load
@@ -323,3 +323,14 @@ def test_a_baseline_test_file_the_capture_cannot_supply_ends_the_run(run, captur
                  catalog=catalog(), preparation=Sandboxes(OK, capture=capture))
     _stopped_before_identification(result)
     assert result.reason == f'ready environment refused: baseline test file test_existing.py {why}'
+
+
+def test_a_preparation_refused_before_any_sandbox_records_no_cleanup(run):
+    """SPEC-0070: an adapter that refuses before creating a sandbox says so; nothing is left unconfirmed."""
+    class Refusing(Sandboxes):
+        def prepare(self, toolchain, operation, *, overlay=()):
+            raise PreparationRefused('host', 'storage_budget: node short of space', 'not_required')
+    result = run(case(), FunctionModel(lambda m, i: None), catalog=catalog(), preparation=Refusing(OK))
+    _stopped_before_identification(result)
+    assert result.reason.startswith('environment produced no output: PreparationRefused: host: storage_budget')
+    assert result.attempts[0].cleanup is None and 'environment sandbox cleanup unconfirmed' not in result.limitations
