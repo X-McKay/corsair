@@ -1,0 +1,15 @@
+{
+  "case": "ih-python-queryhelper",
+  "language": "python",
+  "split": "development",
+  "oracle": {
+    "stopped_at": null,
+    "gate": {
+      "execution": "completed",
+      "finding": "not_reproduced",
+      "fix": "not_applicable"
+    },
+    "assessment_admitted": true
+  },
+  "case_sha256": "ad3ba6d9f0c510eea90cd0bdf24186e89a4d1751c99a6c1257e7b0b80d6e911b"
+}

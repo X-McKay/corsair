@@ -1,0 +1,15 @@
+{
+  "case": "ih-python-tempfile",
+  "language": "python",
+  "split": "development",
+  "oracle": {
+    "stopped_at": null,
+    "gate": {
+      "execution": "completed",
+      "finding": "reproduced",
+      "fix": "verified"
+    },
+    "assessment_admitted": true
+  },
+  "case_sha256": "a61e6cc120be941163f035fce90ba5df0fec34edefdd99c2873e02c113d0a407"
+}
