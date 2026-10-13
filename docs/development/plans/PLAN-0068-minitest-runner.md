@@ -23,7 +23,8 @@ Implement [SPEC-0063](../specs/SPEC-0063-minitest-runner.md) on main after the `
 - [x] Image-only real case under Docker: CVE-2025-27610 (rack) at both commits through `tests/qualification/ruby_image_case.py`.
 - [ ] Sandbox run of a real case in the milestone gate batch; flips both rows to `live`.
 - [ ] Rack CVE-2025-27610 through the chain end to end once the model server is free (CI case replay deferred by Al, 2026-10-13 15:43Z, until end-to-end runs are on the board).
-- [ ] `minitest` admission in the environment agent (assessed against its eval baseline), skill text, handoff.
+- [x] `minitest` admission in the environment agent and skill text (#101, see note below); live environment eval pending.
+- [ ] Handoff.
 
 ## Validation and progress
 
@@ -44,6 +45,10 @@ Implement [SPEC-0063](../specs/SPEC-0063-minitest-runner.md) on main after the `
 
 Not run: sanitize CVE-2023-36823 (the benchmark records only its fix revision), sinatra CVE-2024-21510, Rails CVE-2023-22794 (component directory and database setup still to check).
 
+2026-10-13, environment-agent admission of `jest` and `minitest` (branch from main 165afac), generalised with `tap-harness` as file-unit frameworks in `agents/environment/frameworks.py`: the baseline id is one plain repository-relative test file, one rule (`OneFile`) checks that the baseline command runs exactly that file under the runner with no filtering, listing or code-loading option, and each framework reads its own result. Jest needs `--json --runTestsByPath` and admits the JSON report only with one suite, every test passed and no pending, todo or failed test; Minitest needs `ruby` (or `bundle exec ruby`) on the one file without `-n/--name/-e/--exclude` and exactly one summary line with at least one run and no failure, error or skip. Checked against output captured offline in the `node8` (Jest 24.8.0) and `ruby31` (Minitest 5.15.0) images (`tests/agents/framework_outputs/`); prompt `environment-v6-file-unit-frameworks`; `make eval AGENT=environment` scripted 16/16; live eval waits for the model server.
+
+2026-10-13, review fix on #101: a Minitest baseline command now allows only `-I` and `-r` before the file (an allow-list, as for prove), since `ruby -Csub <file>` runs `sub/<file>` and `ruby -s other.rb <file>` runs `other.rb`; Jest's `-c/--config` is refused, since an inline or file config can change test matching, roots and reporters. Tests for each evasion in `tests/agents/test_environment.py`.
+
 ## Decisions and next action
 
-The environment-agent admission waits for the real case, so the agent's prompt and eval are changed once, with evidence. Under the lighter path (Al, 2026-10-13 13:55Z) the rows landed as `image-only` from the Docker evidence above; the milestone gate batch for `ruby31` (with the runner argv) flips them to `live`. Next: the rack case end to end through the chain, then the environment-agent admission.
+The environment-agent admission waits for the real case, so the agent's prompt and eval are changed once, with evidence. Under the lighter path (Al, 2026-10-13 13:55Z) the rows landed as `image-only` from the Docker evidence above; the milestone gate batch for `ruby31` (with the runner argv) flips them to `live`. Next: the rack case end to end through the chain (the environment agent admits `minitest` since #101).

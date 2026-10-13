@@ -616,6 +616,23 @@ def test_setup_cfg_install_requires_is_read():
     assert select(detect(files, 'python'), load()).status == 'unsupported'
 
 
+def test_ruby_selection_admits_a_minitest_ready_result():
+    # The environment agent's `minitest` ready result is admitted by a Ruby selection that admitted the Minitest row.
+    from corsair.agents.environment.contracts import ReadyEnvironment
+    from corsair.nodes.runtime.environment import check_ready
+    requirements = json.loads((Path(__file__).resolve().parents[2] / 'benchmarks/runtime-requirements.json').read_text())
+    rack = next(RuntimeRequirement.model_validate(revision['requirement']) for r in requirements['results']
+                if r['case_id'] == 'CVE-2025-27610' for revision in r['revisions'].values() if 'requirement' in revision)
+    selection = select(rack, load())
+    assert selection.status == 'supported' and selection.image_id == 'ruby-3.1-bundler'
+    prepared = {'ruby-3.1-bundler': 'docker.io/library/corsair-ruby31@sha256:' + '0' * 64}
+    ready = lambda framework: ReadyEnvironment.model_construct(toolchain_id='ruby-3.1-bundler',
+                                                               toolchain_image=prepared['ruby-3.1-bundler'], framework=framework)
+    check_ready(ready('minitest'), selection, prepared)
+    with pytest.raises(ValueError, match='not one the selection admitted'):
+        check_ready(ready('tap-harness'), selection, prepared)
+
+
 def test_ruby31_rows_select_the_four_minitest_cases_and_not_the_rspec_ones():
     requirements = json.loads((Path(__file__).resolve().parents[2] / 'benchmarks/runtime-requirements.json').read_text())
     revisions = {(r['case_id'], name): RuntimeRequirement.model_validate(revision['requirement'])
