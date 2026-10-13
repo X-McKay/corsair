@@ -273,3 +273,13 @@ def test_heldout_cases_are_disjoint_from_development_and_pass_scripted_plumbing(
     report = asyncio.run(evaluate(tmp_path / "heldout", EvaluationBudget(), cases="heldout"))
     assert passed(report) and len(report.cases) == 12
     assert report.experiment_metadata["dataset"] == "heldout"
+
+
+def test_heldout_evaluation_refuses_a_changed_case(tmp_path, monkeypatch):
+    import evals.test_planning.evaluate as module
+    changed = tmp_path / "cases-heldout.yaml"
+    changed.write_text((module.ROOT / module.DATASETS["heldout"]).read_text().replace("touch pwned", "touch owned", 1))
+    monkeypatch.setitem(module.DATASETS, "heldout", str(changed))
+    with pytest.raises(ValueError, match="frozen manifest"):
+        asyncio.run(evaluate(tmp_path / "refused", EvaluationBudget(), cases="heldout"))
+    assert not (tmp_path / "refused").exists()

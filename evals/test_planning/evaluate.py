@@ -20,6 +20,7 @@ from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RunUsage, UsageLimits
 from pydantic_evals import Dataset, set_eval_attribute
 from pydantic_evals.evaluators import Evaluator, HasMatchingSpan, MaxModelRequests, MaxToolCalls
+import yaml
 
 from corsair.agents.provider import LocalModelConfig, local_model
 from corsair.agents.source.contracts import SourceRead
@@ -35,6 +36,8 @@ from evals.issue_analysis.live import NoUnknownToolAttempts, ProviderUsageCovera
 ROOT = Path(__file__).parent
 # Development cases were used to shape prompts v1-v3; held-out cases were frozen before any provider saw them.
 DATASETS = {"development": "cases.yaml", "heldout": "cases-heldout.yaml"}
+# SPEC-0023: a manifest of case name and content hash beside each held-out dataset.
+MANIFESTS = {"heldout": "cases-heldout.manifest.json"}
 # Fixture setup reaching the parent of the scratch location or a fixed host directory (PLAN-0025 review finding).
 OUTSIDE_SCRATCH = re.compile(r"\.parent\b|(?<![\w.])/(?:tmp|var|etc|home|root)\b|(?<![\w.])~/", re.IGNORECASE)
 PlanOutput = ReadyTestPlan | UnsupportedTestPlan
@@ -103,6 +106,18 @@ class ReadBeforePlanning(Evaluator[TestPlanningInput, PlanOutput, PlanOracle]):
         return {"required_reads": ctx.metadata is not None and set(ctx.metadata.required_reads) <= read}
 
 
+def case_hashes(name: str) -> dict[str, str]:
+    """Content hash per case, over the canonical JSON of its YAML entry."""
+    cases = yaml.safe_load((ROOT / DATASETS[name]).read_text())["cases"]
+    return {case["name"]: sha256(json.dumps(case, sort_keys=True).encode()).hexdigest() for case in cases}
+
+
+def check_manifest(name: str) -> None:
+    """Refuse a held-out dataset whose cases differ from its frozen manifest."""
+    if name in MANIFESTS and case_hashes(name) != json.loads((ROOT / MANIFESTS[name]).read_text()):
+        raise ValueError(f"{DATASETS[name]} differs from its frozen manifest {MANIFESTS[name]}")
+
+
 def dataset(name: str = "development") -> Dataset[TestPlanningInput, PlanOutput, PlanOracle]:
     return Dataset[TestPlanningInput, PlanOutput, PlanOracle].from_file(
         ROOT / DATASETS[name], custom_evaluator_types=(MatchesPlan, ReadBeforePlanning),
@@ -137,6 +152,7 @@ class EvaluationBudget(BaseModel):
 
 
 async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, cases: str = "development", provider=None):
+    check_manifest(cases)
     # Reserve before the first request; rerunning the same attempt is always refused.
     evidence.mkdir(parents=True, exist_ok=False)
     logfire.configure(send_to_logfire=False, console=False)
