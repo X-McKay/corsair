@@ -34,8 +34,10 @@ class Probe:
         self.config = config
         self.target_file = os.path.realpath(os.path.join(config['root'], config['target_path']))
         self.symbol = config['target_symbol']
+        self.effect_name = config['effect_name']
         self.record = {'schema': SCHEMA, 'nonce': config['nonce'], 'plugin_sha256': plugin_sha256,
-                       'target': {'path': config['target_path'], 'symbol': self.symbol},
+                       'target': {'path': config['target_path'], 'symbol': self.symbol,
+                                  'effect_name': self.effect_name},
                        'tool_registered': False, 'intact': False, 'tests': {}}
         self.active = None
         # Keyed by identity with the code object kept alive: equal code objects from other files or
@@ -76,13 +78,19 @@ class Probe:
         return False
 
     @staticmethod
-    def _importing(frame):
-        # Module loading reads source and bytecode through importlib; that is never the planned effect.
-        while frame is not None:
-            if frame.f_code.co_filename.startswith(('<frozen importlib', '<frozen zipimport')):
-                return True
-            frame = frame.f_back
-        return False
+    def _loader_frame(frame):
+        # Only the import system's own source and bytecode reads (io.open_code called directly from an
+        # importlib loader frame) are excluded; code a module body runs during import still counts.
+        return frame.f_code.co_filename.startswith(('<frozen importlib', '<frozen zipimport'))
+
+    def _planned(self, path):
+        if not isinstance(path, str):
+            return False
+        try:
+            resolved = os.path.realpath(path)
+        except (OSError, ValueError):
+            resolved = path
+        return self.effect_name in (os.path.basename(path), os.path.basename(resolved))
 
     def _test(self):
         return self.record['tests'].get(self.active) if self.active is not None else None
@@ -114,11 +122,15 @@ class Probe:
 
     def _raise(self, code, offset, exception):
         test = self._test()
-        if test is not None and isinstance(exception, OSError) and self._on_stack(sys._getframe(1)):
-            # RAISE fires again in every frame the exception propagates through; record it once.
+        frame = sys._getframe(1)
+        if test is not None and isinstance(exception, OSError) and self._on_stack(frame):
+            # RAISE fires again in every frame the exception propagates through; record it once, and never
+            # for the import system's own path probing (its first frame is a loader frame).
             if any(seen is exception for seen in self.raised):
                 return
             self.raised.append(exception)
+            if self._loader_frame(frame):
+                return
             if len(test['os_errors']) < MAX_OPENS:
                 test['os_errors'].append({'type': _name(exception), 'errno': exception.errno})
             else:
@@ -129,13 +141,14 @@ class Probe:
             return
         test = self._test()
         frame = sys._getframe(1)
-        if test is None or not self._on_stack(frame) or self._importing(frame):
+        if test is None or self._loader_frame(frame) or not self._on_stack(frame):
             return
         path = args[0] if args else None
         if isinstance(path, bytes):
             path = path.decode('utf-8', 'replace')
         if len(test['opens']) < MAX_OPENS:
-            test['opens'].append(str(path)[:512] if isinstance(path, (str, int)) else None)
+            test['opens'].append({'path': str(path)[:512] if isinstance(path, (str, int)) else None,
+                                  'planned': self._planned(path)})
         else:
             test['truncated'] = True
 

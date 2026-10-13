@@ -33,6 +33,8 @@ Implement [SPEC-0033](../specs/SPEC-0033-witness-capture.md): the execution node
 
 `make test-config` after the fixes: 816 passed.
 
+2026-10-13, Al's review of `391682e` (two P1, both reproduced with the real probe and gates): a target reading only a benign config file supported `reproduced` because any open counted as the effect, and an application read executed by a module body during an import was hidden because any importlib ancestor frame excluded the open, letting a candidate reach `verified`. Fixed: witnesses are requested only inside an operator-approved envelope (target plus planned effect file name) matching the identification target, and only opens of that file are the effect; only opens and `OSError`s issued directly by importlib loader frames are excluded. Both counterexamples are now real subprocess regressions, plus envelope refusal in the composition. `make test-config`: 820 passed.
+
 Live: not yet run. The RIG0 helper found the shared kind cluster in use by the fully live E2E thread and changed nothing; the run waits for that thread to finish.
 
 ## Decisions and next action

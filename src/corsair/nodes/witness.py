@@ -40,7 +40,7 @@ def probe_argv(command: tuple[str, ...], request: WitnessRequest, *, root: str, 
     if len(pairs) != 1:
         raise ValueError('witness capture needs exactly one `-m pytest` in the operator command')
     config = json.dumps({'root': root, 'target_path': request.target_path, 'target_symbol': request.target_symbol,
-                         'record_path': record_path, 'nonce': nonce, 'tool_id': TOOL_ID}, sort_keys=True)
+                         'effect_name': request.effect_name, 'record_path': record_path, 'nonce': nonce, 'tool_id': TOOL_ID}, sort_keys=True)
     at = pairs[0]
     return command[:at] + ('-c', BOOTSTRAP, PROBE_SOURCE, config) + command[at + 2:]
 
@@ -54,10 +54,15 @@ class _OSError(_Record):
     errno: int | None
 
 
+class _Open(_Record):
+    path: str | None = Field(max_length=512)
+    planned: bool
+
+
 class _TestRecord(_Record):
     entered: int = Field(ge=0)
     exits: tuple[str | None, ...] = Field(max_length=32)
-    opens: tuple[str | int | None, ...] = Field(max_length=32)
+    opens: tuple[_Open, ...] = Field(max_length=32)
     os_errors: tuple[_OSError, ...] = Field(max_length=32)
     truncated: bool
     complete: bool
@@ -66,6 +71,7 @@ class _TestRecord(_Record):
 class _Target(_Record):
     path: str
     symbol: str
+    effect_name: str
 
 
 class ProbeRecord(_Record):
@@ -107,7 +113,8 @@ def witness_evidence(capture: WitnessCapture | None, request: WitnessRequest,
         return _refused(f'witness record invalid: {error.error_count()} errors')
     if (record.schema_ != 'corsair-witness-v1' or record.nonce != capture.nonce
             or record.plugin_sha256 != PROBE_SHA256
-            or (record.target.path, record.target.symbol) != (request.target_path, request.target_symbol)):
+            or (record.target.path, record.target.symbol, record.target.effect_name)
+            != (request.target_path, request.target_symbol, request.effect_name)):
         return _refused('witness record does not belong to this run, probe or target')
     if not (record.tool_registered and record.intact):
         return _refused('witness probe was not registered or its monitoring changed during the run')
@@ -119,10 +126,14 @@ def witness_evidence(capture: WitnessCapture | None, request: WitnessRequest,
 
     denials = [e for e in test.os_errors if e.errno in DENIALS]
     events = tuple(SandboxEvent(kind='policy_denial', phase='test', touches_witness_path=None) for _ in denials)
-    if test.opens and len(denials) < len(test.os_errors):
+    # Only opens of the planned file are the effect; other files the target reads are recorded, not counted.
+    planned = [o for o in test.opens if o.planned]
+    if planned and len(denials) < len(test.os_errors):
         effect = 'unknown'  # an attempted open failed for another reason; the effect is not established
-    elif test.opens:
+    elif planned:
         effect = 'observed'
+    elif test.truncated:
+        effect = 'unknown'  # a planned open may lie beyond the recorded cap
     else:
         effect = 'absent'
     exits = set(test.exits)
@@ -130,6 +141,6 @@ def witness_evidence(capture: WitnessCapture | None, request: WitnessRequest,
     if test.entered and not test.truncated and len(exits) == 1:
         (only,) = exits
         safe = only if only is not None and TOKEN.fullmatch(only) else None
-    witness = Witness(artifact_sha256=capture.artifact.sha256, path_reached=test.entered > 0 or bool(test.opens),
+    witness = Witness(artifact_sha256=capture.artifact.sha256, path_reached=test.entered > 0 or bool(planned),
                       effect=effect, safe_behavior=safe)
     return WitnessEvidence(witness, events, 'admitted')

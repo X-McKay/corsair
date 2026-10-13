@@ -125,9 +125,13 @@ class Execution:
 
 @dataclass(frozen=True)
 class WitnessRequest:
-    """Operator-derived from the admitted identification target; never model text or test output."""
+    """An operator-approved envelope: the probed target and the file name its planned effect opens.
+
+    Admitted only when it equals the identification target; never model text or test output.
+    """
     target_path: str
     target_symbol: str
+    effect_name: str
 
     def __post_init__(self):
         approved_path(self.target_path)
@@ -135,6 +139,9 @@ class WitnessRequest:
                 or not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*', self.target_symbol)
                 or len(self.target_symbol) > 256):
             raise ValueError('Witness target needs a plain qualified symbol')
+        if (type(self.effect_name) is not str or not re.fullmatch(r'[A-Za-z0-9_.-]{1,128}', self.effect_name)
+                or self.effect_name in ('.', '..')):
+            raise ValueError('Witness effect needs a plain file name')
 
 
 @dataclass(frozen=True)

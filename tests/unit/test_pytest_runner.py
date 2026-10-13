@@ -215,7 +215,7 @@ def test_reviewed_spec0018_fixture_through_real_pytest(store, tmp_path, variant)
     assert store.get(result.execution.junit) == result.execution.receipt.stdout
 
 
-REQUEST = WitnessRequest('src/target.py', 'read')
+REQUEST = WitnessRequest('src/target.py', 'read', 'outside.txt')
 
 
 def run_witnessed(store, *steps, record='/tmp/corsair-witness.json'):

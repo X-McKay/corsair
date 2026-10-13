@@ -43,7 +43,7 @@ PREFIX = ('/usr/bin/env', 'PYTEST_DISABLE_PLUGIN_AUTOLOAD=1', 'PYTHONDONTWRITEBY
 DISCOVER = PREFIX + ('--collect-only', '-q')
 REPETITIONS = 2
 # The admitted identification target for this fixture and the reviewed security assertion lines.
-REQUEST = WitnessRequest('documents.py', 'read_document')
+REQUEST = WitnessRequest('documents.py', 'read_document', 'outside.txt')
 SECURITY_ASSERTION_LINES = (64, 65, 66)
 WHEELS = ROOT / 'deploy/qualification/toolchains/python/wheels.json'
 WITNESS_SOURCES = ['src/corsair/nodes/witness.py', 'src/corsair/nodes/witness_probe.py',

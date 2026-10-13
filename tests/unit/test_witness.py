@@ -12,7 +12,7 @@ from corsair.nodes.witness import BOOTSTRAP, PROBE_SHA256, PROBE_SOURCE, probe_a
 from corsair.ports.artifacts import ArtifactRef
 from corsair.ports.test_runner import WitnessCapture, WitnessRequest
 
-REQUEST = WitnessRequest('target.py', 'read')
+REQUEST = WitnessRequest('target.py', 'read', 'outside.txt')
 COMMAND = ('python3.12', '-m', 'pytest', '-p', 'no:cacheprovider', '-q')
 NONCE = 'nonce-1'
 SECURITY = 'test_case.py::test_security'
@@ -61,8 +61,8 @@ def mapped(tmp_path, body):
 def test_argv_replaces_exactly_one_module_invocation():
     argv = probe_argv(COMMAND, REQUEST, root='/w', record_path='/tmp/r.json', nonce=NONCE)
     assert argv[:4] == ('python3.12', '-c', BOOTSTRAP, PROBE_SOURCE) and argv[5:] == COMMAND[3:]
-    assert json.loads(argv[4]) == {'nonce': NONCE, 'record_path': '/tmp/r.json', 'root': '/w', 'target_path': 'target.py',
-                                   'target_symbol': 'read', 'tool_id': 4}
+    assert json.loads(argv[4]) == {'effect_name': 'outside.txt', 'nonce': NONCE, 'record_path': '/tmp/r.json',
+                                   'root': '/w', 'target_path': 'target.py', 'target_symbol': 'read', 'tool_id': 4}
     for command in (('python3.12', 'pytest'), COMMAND + ('-m', 'pytest')):
         with pytest.raises(ValueError, match='exactly one'):
             probe_argv(command, REQUEST, root='/w', record_path='r', nonce=NONCE)
@@ -71,9 +71,12 @@ def test_argv_replaces_exactly_one_module_invocation():
 @pytest.mark.parametrize('symbol', ['', 'a b', '1x', 'x.', 'a;b'])
 def test_request_needs_a_plain_symbol_and_confined_path(symbol):
     with pytest.raises(ValueError):
-        WitnessRequest('target.py', symbol)
+        WitnessRequest('target.py', symbol, 'outside.txt')
     with pytest.raises(ValueError):
-        WitnessRequest('../target.py', 'read')
+        WitnessRequest('../target.py', 'read', 'outside.txt')
+    for name in ('', '..', 'a/b', 'x y'):
+        with pytest.raises(ValueError):
+            WitnessRequest('target.py', 'read', name)
 
 
 def test_opens_inside_the_target_count_and_the_tests_own_reads_do_not(tmp_path):
@@ -91,7 +94,8 @@ def test_security(tmp_path):
 ''')
     security = record['tests'][SECURITY]
     assert (security['entered'], security['exits'], len(security['opens'])) == (1, [None], 1)
-    assert security['opens'][0].endswith('sub/../outside.txt') and record['intact']
+    assert security['opens'][0]['path'].endswith('sub/../outside.txt') and security['opens'][0]['planned']
+    assert record['intact']
     assert (found.witness.path_reached, found.witness.effect, found.witness.safe_behavior) == (True, 'observed', None)
     assert found.sandbox_events == () and found.reason == 'admitted'
 
@@ -123,12 +127,14 @@ def test_security(tmp_path):
     assert found.witness.safe_behavior == 'PermissionError'
 
 
-def test_a_failed_open_leaves_the_effect_unknown(tmp_path):
-    found, _ = mapped(tmp_path, '''
+def test_a_failed_planned_open_leaves_the_effect_unknown(tmp_path):
+    request = WitnessRequest('target.py', 'read', 'missing.txt')
+    done, record = run_probe(tmp_path, '''
 def test_security(tmp_path):
     (tmp_path / "x").write_text("x")
     target.read(tmp_path, "x", error="swallow")
-''')
+''', request=request)
+    found = witness_evidence(capture(record, request), request, SECURITY)
     assert found.witness.effect == 'unknown' and found.sandbox_events == ()
 
 
@@ -177,7 +183,8 @@ def test_security(tmp_path):
     (dict(status='unavailable', detail='read: exit 1'), 'witness unavailable: read: exit 1'),
     (dict(nonce='other'), 'does not belong'),
     (dict(probe_sha256='0' * 64), 'another target or probe'),
-    (dict(request=WitnessRequest('target.py', 'other')), 'does not belong'),
+    (dict(request=WitnessRequest('target.py', 'other', 'outside.txt')), 'does not belong'),
+    (dict(request=WitnessRequest('target.py', 'read', 'other.txt')), 'does not belong'),
     (dict(artifact=ArtifactRef('0' * 64, 1)), 'differ from the stored artifact'),
     (dict(record=b'{"schema": 1}'), 'differ from the stored artifact'),
 ])
@@ -212,7 +219,7 @@ def test_the_probe_argv_stays_well_inside_the_execution_adapter_bound():
     from evals.fixture_e2e.reviewed import PREFIX
     ids = ('test_documents.py::test_benign_control', 'test_documents.py::test_security_rejects_outside_read')
     argv = (('/bin/sh', '-c', WRAPPER, 'corsair-pytest', '/tmp/corsair-junit.xml')
-            + probe_argv(PREFIX, WitnessRequest('documents.py', 'read_document'), root='/tmp/workspace',
+            + probe_argv(PREFIX, WitnessRequest('documents.py', 'read_document', 'outside.txt'), root='/tmp/workspace',
                          record_path='/tmp/corsair-witness.json', nonce=NONCE) + ('--tb=native',) + ids)
     assert sum(len(arg.encode()) + 1 for arg in argv) < 12288
 
@@ -241,7 +248,7 @@ def lazy(name):
     raise ValueError(name)
 '''
     (tmp_path / 'lazy_dependency.py').write_text('VALUE = 1\n')
-    request = WitnessRequest('target.py', 'lazy')
+    request = WitnessRequest('target.py', 'lazy', 'outside.txt')
     done, record = run_probe(tmp_path, '''
 import pytest
 def test_security():
@@ -261,7 +268,7 @@ def inner(path):
 def outer(path):
     return inner(path)
 '''
-    request = WitnessRequest('target.py', 'outer')
+    request = WitnessRequest('target.py', 'outer', 'outside.txt')
     done, record = run_probe(tmp_path, '''
 import pytest
 def test_security(tmp_path):
@@ -280,7 +287,7 @@ class ValueError(Exception):
 def shadow(name):
     raise ValueError(name)
 '''
-    request = WitnessRequest('target.py', 'shadow')
+    request = WitnessRequest('target.py', 'shadow', 'outside.txt')
     done, record = run_probe(tmp_path, '''
 import pytest
 def test_security():
@@ -289,3 +296,36 @@ def test_security():
 ''', target=target, request=request)
     found = witness_evidence(capture(record, request), request, SECURITY)
     assert found.witness.safe_behavior == 'target.ValueError'
+
+
+def test_reading_another_file_is_not_the_planned_effect(tmp_path):
+    """Review counterexample: a target that only reads its config must not support a reproduction."""
+    found, record = mapped(tmp_path, '''
+def test_security(tmp_path):
+    (tmp_path / "config.txt").write_text("c")
+    target.read(tmp_path, "config.txt")
+    assert False, "faulty security assertion"
+''')
+    assert [o['planned'] for o in record['tests'][SECURITY]['opens']] == [False]
+    assert (found.witness.path_reached, found.witness.effect) == (True, 'absent')
+
+
+def test_a_planned_read_in_a_module_body_imported_by_the_target_counts(tmp_path):
+    """Review counterexample: only the loader's own reads are excluded, not code a module runs on import."""
+    target = TARGET + '''
+def imports(root):
+    import helper
+    raise ValueError(helper.VALUE)
+'''
+    (tmp_path / 'helper.py').write_text('from pathlib import Path\nVALUE = Path("outside.txt").read_text()\n')
+    (tmp_path / 'outside.txt').write_text('secret')
+    request = WitnessRequest('target.py', 'imports', 'outside.txt')
+    done, record = run_probe(tmp_path, '''
+import pytest
+def test_security(tmp_path):
+    with pytest.raises(ValueError, match="secret"):
+        target.imports(tmp_path)
+''', target=target, request=request)
+    found = witness_evidence(capture(record, request), request, SECURITY)
+    assert [o['planned'] for o in json.loads(record)['tests'][SECURITY]['opens']] == [True]
+    assert (found.witness.effect, found.witness.safe_behavior) == ('observed', 'ValueError')

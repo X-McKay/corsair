@@ -20,6 +20,7 @@ from corsair.agents.source.contracts import SourceFile
 from corsair.agents.test_planning.contracts import BaselineTest, EnvironmentEvidence
 from corsair.composition.direct import FixtureCase
 from corsair.core.disposition import EnvironmentIdentity
+from corsair.ports.test_runner import WitnessRequest
 
 from .reviewed import DISCOVER, FIXTURE, PREFIX, REVIEWED_TEST, ReviewedLocalExecution, ReviewedWorkspace
 
@@ -59,6 +60,7 @@ def fixture_case() -> FixtureCase:
     return FixtureCase(issue=IssueAnalysisInput(fixture_id="path-traversal-e2e-v1", issue=ISSUE, scope="component",
                                                 source_files=sources),
                        environment=environment, environment_identity=identity,
+                       witness_envelope=WitnessRequest("documents.py", "read_document", "outside.txt"),
                        revision_sources={revision: _digest((FIXTURE / VARIANTS[revision] / "documents.py").read_bytes())
                                          for revision in ("baseline", "candidate")})
 

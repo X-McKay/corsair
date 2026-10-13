@@ -39,12 +39,16 @@ def observation_plan(plan: ReadyTestPlan, patch: TestPatch) -> ObservationPlan:
         frozen_patch_sha256=patch.patch_sha256)
 
 
-def witness_request(identification: IssueIdentification) -> WitnessRequest:
-    """The probe target is the admitted identification target, never the plan's prose or the test's code."""
+def witness_request(identification: IssueIdentification, envelope: WitnessRequest | None) -> WitnessRequest:
+    """The operator's approved envelope, used only when the admitted identification names exactly its target."""
     if identification.status != 'ready' or identification.target is None:
         raise ValueError('a witness needs a ready identification target')
+    if envelope is None:
+        raise ValueError('the operator approved no witness envelope for this case')
     target = identification.target
-    return WitnessRequest(target_path=target.source.path, target_symbol=target.symbol)
+    if (target.source.path, target.symbol) != (envelope.target_path, envelope.target_symbol):
+        raise ValueError('the identified target is outside the operator witness envelope')
+    return envelope
 
 
 def freeze(patch: TestPatch, approved_paths: tuple[str, ...]) -> ApprovedPatch:

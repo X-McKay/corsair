@@ -33,7 +33,7 @@ from corsair.agents.test_planning.agent import PlanningDependencies, create_test
 from corsair.agents.test_planning.contracts import EnvironmentEvidence, ReadyTestPlan, TestPlanningInput
 from corsair.core.disposition import AssessmentEvidence, EnvironmentIdentity, GateResult, ObservationPlan, assess
 from corsair.nodes.witness import WitnessEvidence, witness_evidence
-from corsair.ports.test_runner import NativeTestRun, TestRunner
+from corsair.ports.test_runner import NativeTestRun, TestRunner, WitnessRequest
 
 from .evidence import evidence_items, freeze, observation_plan, run_evidence, witness_request
 
@@ -88,6 +88,8 @@ class FixtureCase:
     environment_identity: EnvironmentIdentity
     # Operator-known digest of each revision's captured source; a run from any other source is refused.
     revision_sources: dict[Literal["baseline", "candidate"], str]
+    # Operator-approved probe target and planned effect file; without it no witness is requested.
+    witness_envelope: WitnessRequest | None = None
 
 
 @dataclass(frozen=True)
@@ -208,9 +210,9 @@ async def run_direct(case: FixtureCase, models: StageModels, runners: Runners,
                     patch=patch)
     executions = []
     try:
-        request, unrequested = witness_request(identification), ()
+        request, unrequested = witness_request(identification, case.witness_envelope), ()
     except ValueError as exc:
-        # The identified symbol or path cannot address a probe target: run without one and say so.
+        # No approved envelope covers the identified target: run without a witness and say so.
         request, unrequested = None, (f"no witness requested: {exc}"[:512],)
     for revision in ("baseline", "candidate"):
         operation, observed, failure = uuid4(), None, None
