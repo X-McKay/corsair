@@ -39,6 +39,7 @@ Live Docker attempts at `8679af4` on RIG0 (2026-10-13, run by the campaign's liv
 | B1 fixture `not-exploitable-absent --without-fix` | admitted `completed / not_reproduced / not_applicable`, LIKELY_NOT_EXPLOITABLE (`fixture-e2e-docker/absent-without-fix-001`) |
 | B2 fixture `exploitable --without-fix` | admitted `completed / reproduced / not_applicable`, LIKELY_EXPLOITABLE (`fixture-e2e-docker/exploitable-without-fix-001`) |
 | B3 corpus `ih-python-healthcheck`, attempt 1 | ERROR at environment with 0 model requests: the provider returned 502 `upstream_unreachable` (infrastructure; the endpoint answered again minutes later). Preserved; one diagnosed rerun (attempt 2) recorded as its own attempt |
+| B3 corpus `ih-python-healthcheck`, attempt 2 (the one diagnosed rerun) | INCONCLUSIVE, stopped at environment after 8 model requests; the candidate-free path never got past setup. The first draft was refused (`draft.ready.build_command: Tuple should have at least 1 item`: an interpreted project with nothing to build, empty build step); the correction produced 59,887 characters of reasoning and no final JSON, spending the single output retry. No admitted disposition, so the oracle was not opened. Both attempts used; no further run without a change. The empty-build-step contract gap is a general environment mechanism handed to lane 2, not fixed here |
 
 ## Decisions and next steps
 
