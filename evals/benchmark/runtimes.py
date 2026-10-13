@@ -12,6 +12,8 @@ import argparse
 from collections import Counter
 import json
 from pathlib import Path, PurePosixPath
+import re
+import shutil
 import subprocess
 import sys
 import urllib.request
@@ -29,6 +31,7 @@ PINS = REPOSITORY / 'benchmarks/source-pins.json'
 REPOSITORIES = ('https://repo.maven.apache.org/maven2', 'https://repo.jenkins-ci.org/public')
 MAX_POM_BYTES = 1 << 20
 MAX_PARENTS = 128
+COORDINATE = re.compile(r'(?!\.+$)[A-Za-z0-9_.-]{1,128}')  # untrusted POM coordinates become URL and file names
 
 
 def case_dir(case_id: str) -> str:
@@ -75,13 +78,16 @@ def checkout(pins: dict, root: Path, cases: set[str] | None) -> None:
                 if kind == b'blob' and mode in (b'100644', b'100755') and is_build_file(path): wanted.append((path, oid.decode()))
             for start in range(0, len(wanted), 256):
                 _git('fetch', '-q', '--filter=blob:none', 'origin', *[oid for _, oid in wanted[start:start + 256]], cwd=repo)
+            partial = target.with_name(target.name + '.partial')  # renamed only once every blob is written
+            shutil.rmtree(partial, ignore_errors=True)
+            partial.mkdir(parents=True)
             for path, oid in wanted:
                 relative = PurePosixPath(path)
                 if relative.is_absolute() or '..' in relative.parts: continue
-                destination = target / relative
+                destination = partial / relative
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 destination.write_bytes(_git('cat-file', 'blob', oid, cwd=repo).stdout)
-            target.mkdir(parents=True, exist_ok=True)
+            partial.rename(target)
             print(f'{case_id} {role} {commit[:12]} {len(wanted)} build files', file=sys.stderr)
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
             detail = getattr(error, 'stderr', b'') or b''
@@ -107,7 +113,7 @@ def fetch_parents(root: Path, cache: Path) -> None:
     cached, seen = load_parents(cache), set()
     while pending and len(seen) < MAX_PARENTS:
         gav = pending.pop()
-        if not gav or not all(gav) or ':'.join(gav) in seen: continue
+        if not gav or not all(COORDINATE.fullmatch(part) for part in gav) or ':'.join(gav) in seen: continue
         key = ':'.join(gav)
         seen.add(key)
         if key in cached:

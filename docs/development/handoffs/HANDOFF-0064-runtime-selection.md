@@ -23,7 +23,7 @@ Nothing is connected to the environment agent or the chain. No new image is buil
 
 ## Validation and blockers
 
-- `make test-config`: 881 passed.
+- `make test-config`: 888 passed.
 - Report: 39 of the 40 acquired cases fetched; 35 unsupported with the requirement named, 4 undetermined, 0 supported on the existing images. Details, commands and the suggested rows are in PLAN-0046.
 - The container's egress refused salsa.debian.org and repo.jenkins-ci.org, so CVE-2023-31486 is `not_fetched` and two Jenkins parent POMs are missing. RIG0 can rerun `parents` and `report` to close both.
 - No live check was run, and none applies to this offline component.

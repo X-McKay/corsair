@@ -11,6 +11,7 @@ CI_KEYS = ('node', 'node-version', 'node_version', 'nodejs', 'node-versions')
 
 def _node(c: Collector, strength: str, source: str, path: str, needle: str, raw: str):
     raw = raw.strip().strip('\'"')
+    raw = re.sub(r'(?<=\d)\.x$', '', raw)  # CI x-ranges: 18.x is the 18 series
     try:
         version = parse_version(raw)
     except VersionSyntaxError:
@@ -39,7 +40,7 @@ def detect(c: Collector) -> None:
             except VersionSyntaxError as error:
                 c.unparsed(kind, name, 'image', 'package.json', f'"{name}"', str(error))
     manager = package.get('packageManager')
-    if isinstance(manager, str) and (match := re.fullmatch(r'(npm|yarn|pnpm)@(\d+(?:\.\d+)*)(?:\+.*)?', manager)):
+    if isinstance(manager, str) and (match := re.fullmatch(r'(npm|yarn|pnpm)@(\d+(?:\.\d+){0,7})(?:\+.*)?', manager)):
         version = parse_version(match[2])
         c.add('build_tool', match[1], 'image', 'pinned', 'packageManager', 'package.json', '"packageManager"', series(version), listed=version)
     if (lock := c.text('package-lock.json')) is not None:

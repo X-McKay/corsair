@@ -24,7 +24,7 @@ Implement [SPEC-0042](../specs/SPEC-0042-runtime-selection.md) offline: detect e
 
 ## Validation and progress
 
-Offline: `make test-config` passed 881 checks, which is main's 853 plus 26 runtime unit checks and 2 matrix guards.
+Offline: `make test-config` passed 888 checks, which is main's 853 plus 33 runtime unit checks and 2 matrix guards.
 
 Report run in the cloud container on 2026-10-13, against the pins file from PR #42's branch `claude/benchmark-repo-fetch-g6cnts` (head `4167369`):
 
@@ -76,6 +76,21 @@ Spot checks against the files:
 - VUL4J-42 resolves JDK 8 from plexus parent 3.3.1's compiler 1.5 plus its own enforcer (>=7).
 - Werkzeug's CI matrix stops at 3.11; its `3.12-dev` entry is kept as unparsed.
 - VUL4J-6 pins Maven 3.5.0 through its wrapper and tests JDK 7, 8 and 9 on Travis.
+
+Independent review (an Opus sub-agent, read-only) found 11 issues, all fixed with regression checks before the PR:
+- `unresolved` inputs not making the selection undetermined;
+- the toolchains plugin's own version read as a JDK;
+- non-Java lines of `.tool-versions` read as a JDK;
+- unbounded Maven property expansion;
+- crashes on malformed YAML, TOML, META or overlong versions;
+- Poetry `~=` parsed with npm semantics;
+- compiler-level precedence (plugin configuration over the property default);
+- non-atomic checkout;
+- unvalidated parent coordinates used in URLs and file names;
+- exclusive lower bounds in `preferred`;
+- CI `18.x` and commented requirement lines.
+
+The rerun changed one row: CVE-2020-15123's CI x-range now admits Node 12.
 
 Limits: this is metadata, not admission (PLAN-0021). A suggested row satisfies a case's runtime declarations, not its dependency closure or tests.
 

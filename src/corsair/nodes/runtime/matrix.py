@@ -99,6 +99,7 @@ def _missing(requirement: RuntimeRequirement) -> list[str]:
         missing.append('runtime version not declared in the build files' + (f' ({reasons})' if reasons else ''))
     missing += [f'{c.name} declarations conflict: {", ".join(f"{e.path}:{e.line} {e.declares}" for e in c.evidence)}'[:240]
                 for c in requirement.components if c.declared and c.conflict and _matched(c)]
+    missing += [f'unresolved input: {u}' for u in requirement.unresolved]
     if not any(c.declared for c in requirement.component('test_framework')):
         reasons = '; '.join(f'{u.path}:{u.line} {u.reason}' for c in requirement.component('test_framework') for u in c.unparsed)[:200]
         missing.append('test framework not identified' + (f' ({reasons})' if reasons else ''))
@@ -107,7 +108,7 @@ def _missing(requirement: RuntimeRequirement) -> list[str]:
 
 def select(requirement: RuntimeRequirement, matrix: Matrix) -> Selection:
     if (missing := _missing(requirement)):
-        return Undetermined(status='undetermined', missing=tuple(missing + list(requirement.unresolved))[:64])
+        return Undetermined(status='undetermined', missing=tuple(missing)[:64])
     wanted = [c for c in requirement.components if c.declared and _matched(c)]
     supported = {f.name: f.versions for f in matrix.frameworks if f.language == requirement.language}
     rejected = []

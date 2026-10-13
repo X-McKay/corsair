@@ -60,7 +60,7 @@ def detect(c: Collector) -> None:
             except VersionSyntaxError:
                 c.unparsed('build_tool', 'bundler', 'image', 'Gemfile.lock', 'BUNDLED WITH', f'bundler {match[1]!r}')
         for framework in FRAMEWORKS:
-            if (match := re.search(rf'^    {re.escape(framework)} \((\d+(?:\.\d+)*)\)$', text, re.M)):
+            if (match := re.search(rf'^    {re.escape(framework)} \((\d+(?:\.\d+){{0,7}})\)$', text, re.M)):
                 version = parse_version(match[1])
                 c.add('test_framework', framework, 'registry', 'pinned', 'lockfile', 'Gemfile.lock', match[0].strip(), exactly(version), listed=version)
     if 'Gemfile' in c.files and not any(d.name == 'bundler' for d in c.declarations):

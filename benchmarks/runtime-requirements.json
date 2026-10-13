@@ -801,6 +801,14 @@
         "evidence": [
          {
           "path": "pom.xml",
+          "line": 388,
+          "text": "<target>${jdk.version}</target>",
+          "strength": "constraint",
+          "source": "compiler-target",
+          "declares": ">=8"
+         },
+         {
+          "path": "pom.xml",
           "line": 426,
           "text": "<requireJavaVersion>",
           "strength": "constraint",
@@ -816,14 +824,7 @@
           "declares": "8.*"
          }
         ],
-        "unparsed": [
-         {
-          "path": "pom.xml",
-          "line": 106,
-          "text": "<maven.compiler.target>${jdk}</maven.compiler.target>",
-          "reason": "compiler level '${jdk}' does not resolve (property undefined in the available POMs)"
-         }
-        ]
+        "unparsed": []
        },
        {
         "kind": "test_framework",
@@ -985,6 +986,14 @@
         "evidence": [
          {
           "path": "pom.xml",
+          "line": 388,
+          "text": "<target>${jdk.version}</target>",
+          "strength": "constraint",
+          "source": "compiler-target",
+          "declares": ">=8"
+         },
+         {
+          "path": "pom.xml",
           "line": 426,
           "text": "<requireJavaVersion>",
           "strength": "constraint",
@@ -1000,14 +1009,7 @@
           "declares": "8.*"
          }
         ],
-        "unparsed": [
-         {
-          "path": "pom.xml",
-          "line": 106,
-          "text": "<maven.compiler.target>${jdk}</maven.compiler.target>",
-          "reason": "compiler level '${jdk}' does not resolve (property undefined in the available POMs)"
-         }
-        ]
+        "unparsed": []
        },
        {
         "kind": "test_framework",
@@ -3658,8 +3660,8 @@
      },
      "status": "undetermined",
      "missing": [
-      "test framework not identified",
-      "parent POM org.jvnet.hudson.plugins:analysis-pom:1.63 not available"
+      "unresolved input: parent POM org.jvnet.hudson.plugins:analysis-pom:1.63 not available",
+      "test framework not identified"
      ]
     },
     "fix": {
@@ -3726,8 +3728,8 @@
      },
      "status": "undetermined",
      "missing": [
-      "test framework not identified",
-      "parent POM org.jvnet.hudson.plugins:analysis-pom:1.63 not available"
+      "unresolved input: parent POM org.jvnet.hudson.plugins:analysis-pom:1.63 not available",
+      "test framework not identified"
      ]
     }
    },
@@ -3794,8 +3796,8 @@
      "status": "undetermined",
      "missing": [
       "runtime version not declared in the build files (Jenkinsfile:1 buildPlugin() without jdkVersions uses the shared library default)",
-      "test framework not identified",
-      "parent POM org.jenkins-ci.plugins:plugin:2.15 not available"
+      "unresolved input: parent POM org.jenkins-ci.plugins:plugin:2.15 not available",
+      "test framework not identified"
      ]
     },
     "fix": {
@@ -3854,8 +3856,8 @@
      "status": "undetermined",
      "missing": [
       "runtime version not declared in the build files (Jenkinsfile:1 buildPlugin() without jdkVersions uses the shared library default)",
-      "test framework not identified",
-      "parent POM org.jenkins-ci.plugins:plugin:2.15 not available"
+      "unresolved input: parent POM org.jenkins-ci.plugins:plugin:2.15 not available",
+      "test framework not identified"
      ]
     }
    },
@@ -6987,8 +6989,8 @@
         "kind": "runtime",
         "name": "node",
         "provider": "image",
-        "allowed": "6.* || 7.* || 8.* || 9.* || 10.* || 11.*",
-        "preferred": "11",
+        "allowed": "6.* || 7.* || 8.* || 9.* || 10.* || 11.* || 12.*",
+        "preferred": "12",
         "declared": true,
         "conflict": false,
         "evidence": [
@@ -6999,6 +7001,30 @@
           "strength": "constraint",
           "source": "engines",
           "declares": ">=4.0"
+         },
+         {
+          "path": ".github/workflows/nodejs.yml",
+          "line": 12,
+          "text": "node-version: [8.x, 10.x, 12.x]",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "8.*"
+         },
+         {
+          "path": ".github/workflows/nodejs.yml",
+          "line": 12,
+          "text": "node-version: [8.x, 10.x, 12.x]",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "10.*"
+         },
+         {
+          "path": ".github/workflows/nodejs.yml",
+          "line": 12,
+          "text": "node-version: [8.x, 10.x, 12.x]",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "12.*"
          },
          {
           "path": ".travis.yml",
@@ -7099,24 +7125,6 @@
         ],
         "unparsed": [
          {
-          "path": ".github/workflows/nodejs.yml",
-          "line": 12,
-          "text": "node-version: [8.x, 10.x, 12.x]",
-          "reason": "not a Node.js release: '8.x'"
-         },
-         {
-          "path": ".github/workflows/nodejs.yml",
-          "line": 12,
-          "text": "node-version: [8.x, 10.x, 12.x]",
-          "reason": "not a Node.js release: '10.x'"
-         },
-         {
-          "path": ".github/workflows/nodejs.yml",
-          "line": 12,
-          "text": "node-version: [8.x, 10.x, 12.x]",
-          "reason": "not a Node.js release: '12.x'"
-         },
-         {
           "path": ".travis.yml",
           "line": 1,
           "text": "language: node_js",
@@ -7179,8 +7187,8 @@
       {
        "kind": "runtime",
        "name": "node",
-       "allowed": "6.* || 7.* || 8.* || 9.* || 10.* || 11.*",
-       "preferred": "11"
+       "allowed": "6.* || 7.* || 8.* || 9.* || 10.* || 11.* || 12.*",
+       "preferred": "12"
       },
       {
        "kind": "build_tool",
@@ -7207,8 +7215,8 @@
         "kind": "runtime",
         "name": "node",
         "provider": "image",
-        "allowed": "6.* || 7.* || 8.* || 9.* || 10.* || 11.*",
-        "preferred": "11",
+        "allowed": "6.* || 7.* || 8.* || 9.* || 10.* || 11.* || 12.*",
+        "preferred": "12",
         "declared": true,
         "conflict": false,
         "evidence": [
@@ -7219,6 +7227,30 @@
           "strength": "constraint",
           "source": "engines",
           "declares": ">=4.0"
+         },
+         {
+          "path": ".github/workflows/nodejs.yml",
+          "line": 12,
+          "text": "node-version: [8.x, 10.x, 12.x]",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "8.*"
+         },
+         {
+          "path": ".github/workflows/nodejs.yml",
+          "line": 12,
+          "text": "node-version: [8.x, 10.x, 12.x]",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "10.*"
+         },
+         {
+          "path": ".github/workflows/nodejs.yml",
+          "line": 12,
+          "text": "node-version: [8.x, 10.x, 12.x]",
+          "strength": "tested",
+          "source": "ci",
+          "declares": "12.*"
          },
          {
           "path": ".travis.yml",
@@ -7319,24 +7351,6 @@
         ],
         "unparsed": [
          {
-          "path": ".github/workflows/nodejs.yml",
-          "line": 12,
-          "text": "node-version: [8.x, 10.x, 12.x]",
-          "reason": "not a Node.js release: '8.x'"
-         },
-         {
-          "path": ".github/workflows/nodejs.yml",
-          "line": 12,
-          "text": "node-version: [8.x, 10.x, 12.x]",
-          "reason": "not a Node.js release: '10.x'"
-         },
-         {
-          "path": ".github/workflows/nodejs.yml",
-          "line": 12,
-          "text": "node-version: [8.x, 10.x, 12.x]",
-          "reason": "not a Node.js release: '12.x'"
-         },
-         {
           "path": ".travis.yml",
           "line": 1,
           "text": "language: node_js",
@@ -7399,8 +7413,8 @@
       {
        "kind": "runtime",
        "name": "node",
-       "allowed": "6.* || 7.* || 8.* || 9.* || 10.* || 11.*",
-       "preferred": "11"
+       "allowed": "6.* || 7.* || 8.* || 9.* || 10.* || 11.* || 12.*",
+       "preferred": "12"
       },
       {
        "kind": "build_tool",

@@ -12,7 +12,7 @@ from typing import Iterable, Mapping
 import yaml
 
 from corsair.nodes.runtime.contracts import Component, Evidence, Kind, Provider, Strength, Unparsed
-from corsair.nodes.runtime.versions import ANY, Version, VersionSet, render
+from corsair.nodes.runtime.versions import ANY, Version, VersionSet, render, version_key
 
 TESTED_RANK = ('ci', 'tox', 'classifier', 'derived')
 MAX_TEXT = 240
@@ -87,7 +87,7 @@ def combine(declarations: Iterable[Declaration]) -> tuple[Component, ...]:
             for d in chosen: selected = selected.intersect(d.versions) if pins else selected.union(d.versions)
             allowed = constraint.intersect(selected)
         listed = sorted({d.listed for d in chosen if d.listed is not None and allowed.contains(d.listed)},
-                        key=lambda v: v + (0,) * (4 - len(v)))
+                        key=version_key)
         preferred = render(listed[-1]) if listed else (render(allowed.lowest) if allowed.lowest else None)
         used = {id(d) for d in parsed if d.strength == 'constraint'} | {id(d) for d in chosen}
         components.append(Component(
@@ -115,10 +115,11 @@ def load_yaml(text: str):
         return None
 
 
-def scalars(value) -> list[str]:
-    if isinstance(value, list): return [s for item in value for s in scalars(item)]
+def scalars(value, depth: int = 0) -> list[str]:
+    """String leaves of nested lists, at most 4 deep and 256 items (YAML aliases cannot recurse or blow up)."""
     if isinstance(value, (str, int, float)): return [str(value)]
-    return []
+    if not isinstance(value, list) or depth >= 4: return []
+    return [s for item in value[:256] for s in scalars(item, depth + 1)][:256]
 
 
 TEST_HINT = re.compile(r'\b(test|tests|pytest|tox|nox|unittest|mvn|maven|gradle|npm|yarn|jest|mocha|rake|rspec|prove|make)\b', re.I)
@@ -136,17 +137,17 @@ def ci_versions(collector: Collector, keys: tuple[str, ...], travis_keys: tuple[
         if path.startswith('.github/workflows/') and path.endswith(('.yml', '.yaml')):
             document = load_yaml(collector.text(path) or '')
             jobs = document.get('jobs') if isinstance(document, dict) else None
-            for job in (jobs or {}).values():
+            for job in (jobs.values() if isinstance(jobs, dict) else ()):
                 if not isinstance(job, dict): continue
                 steps = [s for s in job.get('steps') or [] if isinstance(s, dict)]
                 testing = TEST_HINT.search(' '.join([str(job.get('name', ''))] +
                                                     [str(s.get('run', '')) + ' ' + str(s.get('name', '')) for s in steps]))
                 if not testing: continue
-                matrix = (job.get('strategy') or {}).get('matrix') if isinstance(job.get('strategy'), dict) else None
+                matrix = job['strategy'].get('matrix') if isinstance(job.get('strategy'), dict) else None
                 if isinstance(matrix, dict):
                     for key, value in matrix.items():
                         if key in keys: found += [(path, v, 'ci') for v in scalars(value)]
-                    for entry in matrix.get('include') or []:
+                    for entry in matrix.get('include') if isinstance(matrix.get('include'), list) else []:
                         if isinstance(entry, dict):
                             found += [(path, v, 'ci') for key, value in entry.items() if key in keys for v in scalars(value)]
                 for step in steps:
@@ -157,7 +158,8 @@ def ci_versions(collector: Collector, keys: tuple[str, ...], travis_keys: tuple[
             document = load_yaml(collector.text(path) or '')
             if not isinstance(document, dict): continue
             entries = [document] + [e for section in ('matrix', 'jobs') if isinstance(document.get(section), dict)
-                                    for e in document[section].get('include') or [] if isinstance(e, dict)]
+                                    and isinstance(document[section].get('include'), list)
+                                    for e in document[section]['include'] if isinstance(e, dict)]
             for entry in entries:
                 found += [(path, v, 'ci') for key in travis_keys if key in entry for v in scalars(entry[key])]
     return [(p, v.strip(), s) for p, v, s in found if '${{' not in v]

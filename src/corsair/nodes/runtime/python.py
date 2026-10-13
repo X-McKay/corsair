@@ -6,10 +6,10 @@ import re
 import tomllib
 
 from corsair.nodes.runtime.declarations import Collector, ci_versions
-from corsair.nodes.runtime.versions import VersionSyntaxError, exactly, npm, parse_version, pep440, series
+from corsair.nodes.runtime.versions import VersionSyntaxError, exactly, parse_version, pep440, poetry, series
 
 CLASSIFIER = re.compile(r'Programming Language :: Python :: (\d+\.\d+)$')
-REQUIREMENT = re.compile(r'^\s*(pytest)\s*(?:\[[^\]]*\])?\s*([<>=!~][^;#]*)?(?:;.*)?$', re.I)
+REQUIREMENT = re.compile(r'^\s*(pytest)\s*(?:\[[^\]]*\])?\s*([<>=!~][^;#]*)?(?:;[^#]*)?(?:#.*)?$', re.I)
 TOX_ENV = re.compile(r'^py(\d)(\d+)$')
 CI_KEYS = ('python-version', 'python', 'python_version', 'py', 'python-versions')
 FRAMEWORK = ('test_framework', 'pytest', 'registry')
@@ -61,28 +61,29 @@ def detect(c: Collector) -> None:
         except tomllib.TOMLDecodeError as error:
             c.unparsed('runtime', 'cpython', 'image', 'pyproject.toml', '', f'invalid TOML: {error}')
             data = {}
-        project = data.get('project') or {}
+        project = data.get('project') if isinstance(data.get('project'), dict) else {}
         if isinstance(project.get('requires-python'), str):
             _requires_python(c, 'pyproject.toml', 'requires-python', project['requires-python'])
-        _classifiers(c, 'pyproject.toml', project.get('classifiers') or [])
-        optional = project.get('optional-dependencies') or {}
-        _requirement_lines(c, 'pyproject.toml', [r for group in optional.values() for r in group if isinstance(r, str)], 'extras')
-        poetry = (data.get('tool') or {}).get('poetry') or {}
-        python = (poetry.get('dependencies') or {}).get('python')
+        _classifiers(c, 'pyproject.toml', [x for x in project.get('classifiers') or [] if isinstance(x, str)] if isinstance(project.get('classifiers'), list) else [])
+        optional = project.get('optional-dependencies') if isinstance(project.get('optional-dependencies'), dict) else {}
+        _requirement_lines(c, 'pyproject.toml', [r for group in optional.values() if isinstance(group, list) for r in group if isinstance(r, str)], 'extras')
+        tool = data.get('tool') if isinstance(data.get('tool'), dict) else {}
+        poetry_table = tool.get('poetry') if isinstance(tool.get('poetry'), dict) else {}
+        python = (poetry_table.get('dependencies') or {}).get('python') if isinstance(poetry_table.get('dependencies'), dict) else None
         if isinstance(python, str):
             try:  # Poetry's caret/tilde/comma syntax maps onto npm-style ranges
                 c.add('runtime', 'cpython', 'image', 'constraint', 'requires-python', 'pyproject.toml', 'python',
-                      npm(python.replace(',', ' ')))
+                      poetry(python))
             except VersionSyntaxError as error:
                 c.unparsed('runtime', 'cpython', 'image', 'pyproject.toml', 'python', str(error))
         for group in ('dev-dependencies',):
-            pytest = (poetry.get(group) or {}).get('pytest')
+            pytest = poetry_table.get(group).get('pytest') if isinstance(poetry_table.get(group), dict) else None
             if isinstance(pytest, str):
-                try: c.add(*FRAMEWORK, 'constraint', 'poetry', 'pyproject.toml', 'pytest', npm(pytest.replace(',', ' ')))
+                try: c.add(*FRAMEWORK, 'constraint', 'poetry', 'pyproject.toml', 'pytest', poetry(pytest))
                 except VersionSyntaxError as error: c.unparsed(*FRAMEWORK, 'pyproject.toml', 'pytest', str(error))
-        if 'pytest' in (data.get('tool') or {}) or 'pytest' in str((data.get('tool') or {}).get('hatch', '')):
+        if 'pytest' in tool:
             c.add(*FRAMEWORK, 'constraint', 'config', 'pyproject.toml', '[tool.pytest', pep440(''))
-        backend = (data.get('build-system') or {}).get('build-backend')
+        backend = data['build-system'].get('build-backend') if isinstance(data.get('build-system'), dict) else None
         if isinstance(backend, str):
             c.add('build_tool', backend.split('.')[0].split(':')[0], 'registry', 'constraint', 'build-backend', 'pyproject.toml', 'build-backend', pep440(''))
     if (text := c.text('setup.cfg')) is not None:
@@ -165,7 +166,7 @@ def detect(c: Collector) -> None:
     for path, needle in (('uv.lock', 'requires-python'), ('poetry.lock', 'python-versions')):
         if (text := c.text(path)) is not None and (match := re.search(rf'^{needle}\s*=\s*"([^"]+)"', text, re.M)):
             try:
-                versions = pep440(match[1]) if path == 'uv.lock' else npm(match[1].replace(',', ' '))
+                versions = pep440(match[1]) if path == 'uv.lock' else poetry(match[1])
                 c.add('runtime', 'cpython', 'image', 'constraint', 'lockfile', path, match[0], versions)
             except VersionSyntaxError as error:
                 c.unparsed('runtime', 'cpython', 'image', path, match[0], str(error))

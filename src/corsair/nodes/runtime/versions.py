@@ -9,7 +9,8 @@ import re
 from typing import Iterable
 
 Version = tuple[int, ...]
-NUMERIC = re.compile(r'v?(\d+(?:\.\d+){0,3})')
+MAX_PARTS = 8
+NUMERIC = re.compile(r'v?(\d+(?:\.\d+){0,7})')
 
 
 class VersionSyntaxError(ValueError):
@@ -26,8 +27,12 @@ def render(version: Version) -> str:
     return '.'.join(map(str, version))
 
 
+def version_key(version: Version) -> Version:
+    return _key(version)
+
+
 def _key(version: Version) -> Version:
-    return version + (0,) * (4 - len(version))
+    return version + (0,) * (MAX_PARTS - len(version))
 
 
 def bump(version: Version) -> Version:
@@ -100,8 +105,9 @@ class VersionSet:
 
     @property
     def lowest(self) -> Version | None:
-        bounds = [i.lower for i in self.intervals]
-        return None if not bounds or None in bounds else min(bounds, key=_key)
+        """The smallest member when the set starts at an inclusive bound; None otherwise."""
+        if not self.intervals or self.intervals[0].lower is None or not self.intervals[0].lower_inclusive: return None
+        return self.intervals[0].lower
 
     def __str__(self) -> str:
         if self.is_any: return '*'
@@ -151,7 +157,7 @@ def _comparator(op: str, version: Version, wildcard: bool = False) -> VersionSet
     }[op]
 
 
-PEP440 = re.compile(r'\s*(~=|===|==|!=|<=|>=|<|>)\s*v?(\d+(?:\.\d+)*)(\.\*)?\s*')
+PEP440 = re.compile(r'\s*(~=|===|==|!=|<=|>=|<|>)\s*v?(\d+(?:\.\d+){0,7})(\.\*)?\s*')
 
 
 def pep440(text: str) -> VersionSet:
@@ -176,7 +182,7 @@ def _npm_partial(text: str) -> tuple[Version, int]:
     given = []
     for part in parts:
         if part in ('x', 'X', '*', ''): break
-        if not part.isdigit(): raise VersionSyntaxError(f'unsupported npm version {text!r}')
+        if not part.isdigit() or len(given) == MAX_PARTS: raise VersionSyntaxError(f'unsupported npm version {text!r}')
         given.append(int(part))
     return tuple(given), len(given)
 
@@ -216,7 +222,7 @@ def npm(text: str) -> VersionSet:
     return result
 
 
-GEM = re.compile(r'\s*(~>|>=|<=|!=|=|>|<)?\s*(\d+(?:\.\d+)*)\s*')
+GEM = re.compile(r'\s*(~>|>=|<=|!=|=|>|<)?\s*(\d+(?:\.\d+){0,7})\s*')
 
 
 def gem(clauses: Iterable[str]) -> VersionSet:
@@ -295,4 +301,19 @@ def parse_set(text: str) -> VersionSet:
                 if not match: raise VersionSyntaxError(f'not a canonical version set: {text!r}')
                 clause = clause.intersect(_comparator(match[1], parse_version(match[2])))
             result = result.union(clause)
+    return result
+
+
+def poetry(text: str) -> VersionSet:
+    """Poetry constraints: `^`/`~` clauses (npm semantics) and PEP 440 clauses (`~=`, `==`, `>=`...), comma-joined,
+    with `||` alternatives."""
+    result = NONE
+    for alternative in text.split('||'):
+        clause_set = ANY
+        for clause in filter(None, (c.strip() for c in alternative.replace(',', ' , ').split(' , '))):
+            if clause.startswith('^') or (clause.startswith('~') and not clause.startswith('~=')) or not re.match(r'[<>=!~]', clause):
+                clause_set = clause_set.intersect(npm(clause))
+            else:
+                clause_set = clause_set.intersect(pep440(clause))
+        result = result.union(clause_set)
     return result

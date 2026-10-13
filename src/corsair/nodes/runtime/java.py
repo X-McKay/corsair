@@ -9,7 +9,8 @@ import xml.etree.ElementTree as ET
 from typing import Mapping
 
 from corsair.nodes.runtime.declarations import Collector, Declaration, ci_versions, line_of
-from corsair.nodes.runtime.versions import ANY, Interval, VersionSet, VersionSyntaxError, java_feature, maven, parse_version, series
+from corsair.nodes.runtime.versions import (ANY, Interval, VersionSet, VersionSyntaxError, java_feature, maven, parse_version,
+                                            series, version_key)
 
 PROPERTY = re.compile(r'\$\{([^}]+)\}')
 MAX_PARENT_DEPTH = 8
@@ -83,10 +84,15 @@ def _chain(c: Collector, pom: Pom, in_tree: Mapping[tuple, Pom], parents: Mappin
     return chain
 
 
+MAX_EXPANDED = 256
+
+
 def _resolve(value: str, properties: Mapping[str, str]) -> str | None:
+    """`${name}` expansion, bounded: at most 8 rounds and 256 characters; a cycle or overflow resolves to None."""
     for _ in range(8):
         if '${' not in value: return value
         value = PROPERTY.sub(lambda m: properties.get(m[1], m[0]), value)
+        if len(value) > MAX_EXPANDED: return None
         if all(name not in properties for name in PROPERTY.findall(value)): break
     return None if '${' in value else value
 
@@ -121,21 +127,17 @@ def _maven(c: Collector, parents: Mapping[str, bytes]) -> None:
     for pom in reversed(chain): properties.update(pom.properties)
     properties.update({'project.version': root.gav[2], 'pom.version': root.gav[2], 'project.groupId': root.gav[0]})
 
-    # Bytecode level: release wins over target, target over source; the nearest POM in the chain that says it.
-    level = None
-    for pom in chain:
-        for name in ('maven.compiler.release', 'maven.compiler.target', 'maven.compiler.source'):
-            if name in pom.properties:
-                level = (pom, f'<{name}>', pom.properties[name]); break
-        if level: break
-        for artifact, plugin in pom.plugins():
-            if artifact == 'maven-compiler-plugin':
-                for key in ('release', 'target', 'source'):
-                    value = plugin.findtext(f'configuration/{key}')
-                    if value:
-                        level = (pom, f'<{key}>{value}', value.strip()); break
-            if level: break
-        if level: break
+    # Bytecode level as Maven computes it: each compiler parameter takes the nearest POM that sets it, the plugin's
+    # <configuration> over the `maven.compiler.*` property default within one POM; then release over target over source.
+    def parameter(key):
+        for pom in chain:
+            for artifact, plugin in pom.plugins():
+                if artifact == 'maven-compiler-plugin' and (value := plugin.findtext(f'configuration/{key}')):
+                    return pom, f'<{key}>{value}', value.strip()
+            if f'maven.compiler.{key}' in pom.properties:
+                return pom, f'<maven.compiler.{key}>', pom.properties[f'maven.compiler.{key}']
+        return None
+    level = parameter('release') or parameter('target') or parameter('source')
     if level:
         pom, needle, raw = level
         value = _resolve(raw, properties)
@@ -163,7 +165,7 @@ def _maven(c: Collector, parents: Mapping[str, bytes]) -> None:
                         except VersionSyntaxError:
                             _add(c, kind, name, 'image', 'constraint', 'unparsed', pom, f'<{rule}>', None, reason=f'enforcer version {raw!r} does not resolve')
             if artifact == 'maven-toolchains-plugin':
-                for element in plugin.iter('version'):
+                for element in plugin.findall('configuration/toolchains/jdk/version'):
                     if element.text and (value := _resolve(element.text.strip(), properties)):
                         try:
                             _add(c, 'runtime', 'jdk', 'image', 'pinned', 'toolchains', pom, '<toolchains>',
@@ -205,7 +207,7 @@ def _maven(c: Collector, parents: Mapping[str, bytes]) -> None:
             union = VersionSet(())
             for v in versions: union = union.union(series(v))
             _add(c, 'test_framework', family, 'registry', 'constraint', 'dependency', pom, f'<artifactId>{artifact}', union,
-                 listed=max(versions, key=lambda v: v + (0,) * (4 - len(v))))
+                 listed=max(versions, key=version_key))
         elif all(not r for _, _, r, _ in items):
             _add(c, 'test_framework', family, 'registry', 'constraint', 'dependency', pom, f'<artifactId>{artifact}', ANY)
         else:
@@ -231,6 +233,10 @@ def _wrappers(c: Collector) -> None:
                                 ('gradle/wrapper/gradle-wrapper.properties', 'gradle', r'gradle-(\d+(?:\.\d+)*)-(?:bin|all)')):
         if (text := c.text(path)) is not None:
             match = re.search(r'distributionUrl\s*=\s*\S*?' + pattern, text)
+            try:
+                parse_version(match[1]) if match else None
+            except VersionSyntaxError:
+                match = None
             if match:
                 version = parse_version(match[1])
                 c.add('build_tool', name, 'image', 'pinned', 'wrapper', path, 'distributionUrl', series(version), listed=version)
@@ -286,7 +292,8 @@ def _ci(c: Collector) -> None:
             c.unparsed('runtime', 'jdk', 'image', 'Jenkinsfile', 'buildPlugin', 'buildPlugin() without jdkVersions uses the shared library default')
     for path in ('.java-version', '.sdkmanrc', '.tool-versions'):
         if (text := c.text(path)) is not None:
-            match = re.search(r'(?:^|java[=\s]+)(?:\D*?)(1\.\d+|\d+)(?:[.\d]*)', text, re.M)
+            line = text if path == '.java-version' else '\n'.join(l for l in text.splitlines() if re.match(r'\s*java\s*[=\s]', l))
+            match = re.search(r'(?:^|java\s*[=\s]\s*)(?:[A-Za-z-]*?)(1\.\d+|\d+)(?:[.\d]*)', line.strip(), re.M)
             if match:
                 feature = java_feature(parse_version(match[1]))[0]
                 c.add('runtime', 'jdk', 'image', 'pinned', 'version-file', path, match[0].strip(), series((feature,)), listed=(feature,))

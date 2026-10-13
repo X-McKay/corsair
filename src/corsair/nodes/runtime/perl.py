@@ -41,7 +41,11 @@ def detect(c: Collector) -> None:
         for match in CPAN_PERL.finditer(text): _constraint(c, 'cpanfile', match[0], match[1], 'cpanfile')
     for path in ('META.json', 'META.yml'):
         if (text := c.text(path)) is None: continue
-        data = json.loads(text) if path.endswith('json') and text.strip().startswith('{') else load_yaml(text)
+        try:
+            data = json.loads(text) if path.endswith('json') else load_yaml(text)
+        except ValueError:
+            c.unparsed('runtime', 'perl', 'image', path, '', 'invalid META')
+            continue
         prereqs = (data or {}).get('prereqs') if isinstance(data, dict) else None
         requires = (((prereqs or {}).get('runtime') or {}).get('requires') or {}) if isinstance(prereqs, dict) else \
             ((data or {}).get('requires') or {}) if isinstance(data, dict) else {}

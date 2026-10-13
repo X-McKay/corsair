@@ -216,3 +216,56 @@ def test_matrix_refuses_selector_rows_and_duplicates():
     data = load().model_dump()
     data['images'] = [*data['images'], data['images'][0]]
     with pytest.raises(ValueError, match='duplicate'): Matrix.model_validate(data)
+
+
+def pom(body: str) -> bytes:
+    return f'<project><modelVersion>4.0.0</modelVersion><groupId>g</groupId><artifactId>a</artifactId><version>1</version>{body}</project>'.encode()
+
+
+COMPILER = '<plugin><artifactId>maven-compiler-plugin</artifactId><configuration><release>17</release></configuration></plugin>'
+
+
+def test_review_findings_java():
+    # Plugin configuration beats the property default; the toolchains plugin's own version is not a JDK.
+    both = pom('<properties><maven.compiler.source>1.8</maven.compiler.source></properties>'
+               f'<build><plugins>{COMPILER}<plugin><artifactId>maven-toolchains-plugin</artifactId><version>3.1.0</version>'
+               '<configuration><toolchains><jdk><version>17</version></jdk></toolchains></configuration></plugin></plugins></build>')
+    assert component(detect({'pom.xml': both}, 'java'), 'runtime', 'jdk').allowed == '17.*'
+    # Only the java line of a multi-tool version file counts.
+    tools = detect({'pom.xml': pom(''), '.tool-versions': b'nodejs 18.12.0\njava temurin-11.0.2\n'}, 'java')
+    assert component(tools, 'runtime', 'jdk').allowed == '11.*'
+    # Self-referential properties stay bounded and unresolved.
+    blowup = pom('<properties><a>' + '${a}' * 64 + '</a><maven.compiler.release>${a}</maven.compiler.release></properties>')
+    assert not component(detect({'pom.xml': blowup}, 'java'), 'runtime', 'jdk').declared
+    # An unresolved input makes selection undetermined even when the rest would match.
+    child = pom(f'<parent><groupId>x</groupId><artifactId>p</artifactId><version>1</version></parent>'
+                f'<build><plugins>{COMPILER}</plugins></build><dependencies><dependency><groupId>org.junit.jupiter</groupId>'
+                '<artifactId>junit-jupiter</artifactId><version>5.14.4</version></dependency></dependencies>')
+    assert select(detect({'pom.xml': child}, 'java'), load()).status == 'undetermined'
+
+
+@pytest.mark.parametrize('files', [
+    {'pyproject.toml': b'project = "x"\ntool = 3\n'},
+    {'setup.py': b'', '.github/workflows/t.yml': b'jobs: [1, 2]\n'},
+    {'setup.py': b'', '.github/workflows/t.yml': b'jobs:\n  t:\n    name: test\n    strategy:\n      matrix:\n        python: &a [*a]\n'},
+    {'setup.py': b'', '.travis.yml': b'python: ["3.8.1.2.3.4.5.6.7"]\nmatrix: {include: 3}\n'},
+])
+def test_malformed_python_inputs_do_not_crash(files):
+    assert detect(files, 'python').language == 'python'
+
+
+def test_malformed_other_inputs_do_not_crash():
+    assert detect({'Makefile.PL': b'', 'META.json': b'{nope'}, 'perl').language == 'perl'
+    assert detect({'package.json': b'{"packageManager": "npm@1.2.3.4.5.6.7.8.9"}'}, 'javascript').language == 'javascript'
+    assert detect({'Gemfile': b'', 'Gemfile.lock': b'    minitest (5.1.2.3.4.5.6.7.8.9)\n'}, 'ruby').language == 'ruby'
+    assert detect({'pom.xml': pom(''), '.mvn/wrapper/maven-wrapper.properties': b'distributionUrl=x/apache-maven-3.8.1.1.1.1.1.1.1-bin.zip'}, 'java')
+
+
+def test_review_findings_versions():
+    from corsair.nodes.runtime.versions import poetry
+    assert str(poetry('~=3.8')) == '>=3.8,<4' and str(poetry('^3.7')) == '>=3.7,<4' and str(poetry('>=3.6,<3.10')) == '>=3.6,<3.10'
+    assert npm('>8.0.0').lowest is None
+    assert component(detect({'requirements-dev.txt': b'pytest==7.4.0  # pinned\n', 'setup.py': b''}, 'python'),
+                     'test_framework', 'pytest').allowed == '==7.4.0'
+    ci = b'jobs:\n  t:\n    strategy:\n      matrix:\n        node-version: [16.x, 18.x]\n    steps:\n      - run: npm test\n'
+    assert component(detect({'package.json': b'{}', '.github/workflows/t.yml': ci}, 'javascript'), 'runtime', 'node').allowed == '16.* || 18.*'
