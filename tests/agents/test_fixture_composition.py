@@ -13,7 +13,9 @@ from pydantic_ai.models.function import FunctionModel
 
 from corsair.adapters.local_artifacts import LocalArtifacts
 from corsair.agents.test_authoring.contracts import BlockedAuthoring, TestPatch
-from corsair.composition.direct import UNOBSERVED, UNSELECTED, StageModels, run_direct
+from corsair.composition.direct import (
+    UNOBSERVED, UNSELECTED, BudgetExhausted, CompositionBudget, RecordedFailure, StageModels, exhaustion, run_direct,
+)
 from corsair.composition.evidence import freeze, observation_plan, run_evidence
 from corsair.core.disposition import AssessmentEvidence, Disposition, Witness, assess
 from corsair.ports.test_runner import WitnessRequest
@@ -271,3 +273,93 @@ def test_a_target_outside_the_operator_envelope_runs_without_a_witness(store, tm
     assert run.gate.permitted == Disposition(execution="completed", finding="inconclusive", fix="not_verified")
     assert f"no witness requested: {reason}" in run.limitations
     assert not any("witness (kind witness" in prompt for prompt in prompts(run))
+
+
+def test_stage_limits_are_derived_from_each_stage_input_and_recorded(store, tmp_path):
+    run = compose(store, tmp_path)
+    limits = {a.stage: a.limits for a in run.attempts}
+    # Two saved files of one window each; authoring adds three runs of (two writes and one run) on one test path
+    # and one admission refusal; assessment reads every frozen evidence item once.
+    assert (limits["identification"].read_windows, limits["identification"].tool_calls_limit) == (2, 4)
+    assert (limits["planning"].read_windows, limits["planning"].tool_calls_limit) == (2, 4)
+    assert (limits["authoring"].work_tool_calls, limits["authoring"].tool_calls_limit) == (10, 14)
+    assert limits["assessment"].read_windows == 9 and limits["assessment"].tool_calls_limit == \
+        limits["assessment"].read_windows + 3
+    for attempt in run.attempts:
+        assert attempt.exhausted is None and attempt.usage.tool_calls <= attempt.limits.tool_calls_limit
+        assert attempt.limits.request_limit == attempt.limits.tool_calls_limit + 3
+
+
+def test_a_stage_that_cannot_finish_without_its_withdrawn_tools_is_tool_budget_exhausted(store, tmp_path):
+    """The scripted assessor insists on reading every item; at the cap its tools are withdrawn and it cannot answer."""
+    budget = CompositionBudget(assessment=CompositionBudget().assessment.model_copy(update={"tool_calls_limit": 3}))
+    (tmp_path / "work").mkdir()
+    run = asyncio.run(run_direct(fixture_case(), stages(), reviewed_runners(store, tmp_path / "work"), budget))
+    assessment = run.attempts[-1]
+    assert assessment.stage == "assessment" and assessment.usage.tool_calls == 3 and assessment.output is None
+    assert (assessment.exhausted.limit, assessment.exhausted.cap) == ("tool_calls_limit", 3)
+    assert run.stopped_at == "assessment" and run.reason.startswith("assessment budget exhausted: tool_calls_limit 3")
+    # The gate verdict over the frozen evidence does not depend on the assessor.
+    assert run.gate is not None
+
+
+def test_a_stage_ending_on_its_cap_is_a_typed_budget_exhaustion(store, tmp_path):
+    budget = CompositionBudget(authoring=CompositionBudget().authoring.model_copy(update={"request_limit": 2}))
+    (tmp_path / "work").mkdir()
+    run = asyncio.run(run_direct(fixture_case(), stages(), reviewed_runners(store, tmp_path / "work"), budget))
+    authoring = run.attempts[-1]
+    assert run.stopped_at == "authoring" and authoring.output is None
+    assert isinstance(authoring.exhausted, BudgetExhausted)
+    assert (authoring.exhausted.limit, authoring.exhausted.cap) == ("request_limit", 2)
+    assert run.reason.startswith("authoring budget exhausted: request_limit 2 (derived from 2 read windows")
+    assert exhaustion("planning", authoring.limits, ValueError("x")) is None
+    # Codex review on 78f1690: only the stage's own deadline is its timeout budget; a provider, tool or activity
+    # timeout inside the stage keeps its own classification.
+    assert exhaustion("planning", authoring.limits, RecordedFailure("TimeoutError", "late")) is None
+    assert exhaustion("planning", authoring.limits, RecordedFailure("TimeoutError", "late"), deadline=True).limit == \
+        "timeout_seconds"
+
+
+def test_an_unrelated_failure_after_the_tool_cap_keeps_its_own_classification(store, tmp_path):
+    """Review on #49: reaching the cap is recorded, but only a native limit error is exhaustion.
+
+    A call to a tool withdrawn at the cap is refused natively as UsageLimitExceeded; UnexpectedModelBehavior is
+    also what providers raise for malformed responses, so it never establishes the cap, at or past it.
+    """
+    from pydantic_ai.exceptions import UnexpectedModelBehavior, UsageLimitExceeded
+    limits = CompositionBudget().planning.limits(2, 0, 1)
+    for failure in (ValueError("provider response was invalid"), RecordedFailure("ModelAPIError", "500"),
+                    UnexpectedModelBehavior("Exceeded maximum output retries (1)"),
+                    UnexpectedModelBehavior("Received empty model response"),
+                    RecordedFailure("UnexpectedModelBehavior", "Invalid response from provider")):
+        assert exhaustion("planning", limits, failure) is None
+    for failure in (UsageLimitExceeded("The next tool call(s) would exceed the tool_calls_limit of 4 (tool_calls=5)"),
+                    RecordedFailure("UsageLimitExceeded", "would exceed the tool_calls_limit of 4")):
+        assert exhaustion("planning", limits, failure).limit == "tool_calls_limit"
+
+
+def test_a_call_to_a_withdrawn_tool_is_refused_natively_as_the_tool_call_limit():
+    from pydantic_ai import Agent
+    from pydantic_ai.exceptions import UsageLimitExceeded
+    from pydantic_ai.usage import UsageLimits
+    from corsair.agents.budget import tool_budget
+
+    async def respond(messages, info):
+        return ModelResponse(parts=[ToolCallPart("probe", {})])
+    agent = Agent(FunctionModel(respond), output_type=int, capabilities=[tool_budget()],
+                  retries={"tools": 0, "output": 1})
+
+    @agent.tool_plain
+    def probe() -> int:
+        return 1
+    limits = CompositionBudget().planning.limits(0, 0, 1)
+    with pytest.raises(UsageLimitExceeded) as failed:
+        agent.run_sync("x", usage_limits=UsageLimits(tool_calls_limit=1, request_limit=10))
+    assert exhaustion("planning", limits, failed.value).limit == "tool_calls_limit"
+
+
+def test_an_attempt_records_reaching_its_tool_cap_whatever_ended_it(store, tmp_path):
+    budget = CompositionBudget(assessment=CompositionBudget().assessment.model_copy(update={"tool_calls_limit": 3}))
+    (tmp_path / "work").mkdir()
+    run = asyncio.run(run_direct(fixture_case(), stages(), reviewed_runners(store, tmp_path / "work"), budget))
+    assert run.attempts[-1].tool_cap_reached and not run.attempts[0].tool_cap_reached

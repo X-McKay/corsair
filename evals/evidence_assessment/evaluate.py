@@ -24,7 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from pydantic_ai import capture_run_messages, models
 from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart, ToolReturnPart
 from pydantic_ai.models.function import FunctionModel
-from pydantic_ai.usage import RunUsage, UsageLimits
+from pydantic_ai.usage import RunUsage
 from pydantic_evals import Case, Dataset, set_eval_attribute
 from pydantic_evals.evaluators import (ConfusionMatrixEvaluator, Evaluator, HasMatchingSpan, MaxModelRequests,
                                        MaxToolCalls, ReportEvaluator)
@@ -36,6 +36,7 @@ from corsair.agents.evidence_assessment.contracts import AssessmentInput, Eviden
 from corsair.agents.evidence_assessment.dependencies import AssessmentDependencies
 from corsair.agents.evidence_assessment.tools import READ_EVIDENCE_TOOL
 from corsair.agents.provider import LocalModelConfig, local_model
+from corsair.composition.direct import CompositionBudget, StageLimits, stage_limits
 from corsair.core.disposition import Disposition, admit, assess
 from evals.issue_analysis.evaluate import describe_model, record_count
 from evals.issue_analysis.live import NoUnknownToolAttempts, ProviderUsageCoverage, message_counts, output_tool_names
@@ -205,15 +206,26 @@ def read_items(messages: list[ModelMessage]) -> list[str]:
                    and part.outcome == "success"})
 
 
+ASSESSMENT = CompositionBudget().assessment
+
+
 class EvaluationBudget(BaseModel):
-    """Mirrors the composition's assessment stage budget."""
+    """Mirrors the composition's assessment stage budget: these are ceilings, and each case's caps are derived
+    from its own evidence items the way ``stage_limits`` derives them (SPEC-0043)."""
     model_config = ConfigDict(extra="forbid", frozen=True)
     repeat: int = Field(default=3, ge=1, le=5, strict=True)
-    request_limit: int = Field(default=12, ge=1, le=24, strict=True)
-    tool_calls_limit: int = Field(default=10, ge=0, le=24, strict=True)
-    total_tokens_limit: int = Field(default=128000, ge=1, le=262144, strict=True)
+    request_limit: int = Field(default=ASSESSMENT.request_limit, ge=1, le=64, strict=True)
+    tool_calls_limit: int = Field(default=ASSESSMENT.tool_calls_limit, ge=0, le=48, strict=True)
+    total_tokens_limit: int = Field(default=ASSESSMENT.total_tokens_limit, ge=1, le=262144, strict=True)
     task_seconds: int = Field(default=600, ge=1, le=1800, strict=True)
     output_retries: int = Field(default=1, ge=0, le=1, strict=True)
+
+    def limits(self, inputs: AssessmentInput) -> StageLimits:
+        stage = ASSESSMENT.model_copy(update={"request_limit": self.request_limit,
+                                              "tool_calls_limit": self.tool_calls_limit,
+                                              "total_tokens_limit": self.total_tokens_limit,
+                                              "timeout_seconds": float(self.task_seconds)})
+        return stage_limits("assessment", inputs, CompositionBudget(assessment=stage, output_retries=self.output_retries))
 
 
 async def evaluate(evidence: Path, budget: EvaluationBudget, *, split: Split | Literal["all"] = "development",
@@ -263,12 +275,12 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, split: Split | L
         selected = fixture_models[input_key(inputs)] if offline else model
         known_tools = frozenset({READ_EVIDENCE_TOOL}) | output_tool_names(selected)
         agent = create_evidence_assessment_agent(selected, output_retries=budget.output_retries)
+        limits = budget.limits(inputs)
         try:
             with capture_run_messages() as messages, models.override_allow_model_requests(not offline):
                 result = await asyncio.wait_for(agent.run(
                     assessment_prompt(inputs), deps=AssessmentDependencies(inputs), usage=usage,
-                    usage_limits=UsageLimits(request_limit=budget.request_limit, tool_calls_limit=budget.tool_calls_limit,
-                                             total_tokens_limit=budget.total_tokens_limit)), timeout=budget.task_seconds)
+                    usage_limits=limits.usage_limits()), timeout=budget.task_seconds)
             return result.output
         except BaseException as exc:
             failure = {"type": type(exc).__name__, "detail": str(exc),
@@ -280,6 +292,7 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, split: Split | L
             elapsed = perf_counter() - started
             responses = [m for m in messages if isinstance(m, ModelResponse)]
             receipt = {"input_key": input_key(inputs), "completed": result is not None, "failure": failure,
+                       "limits": limits.model_dump(mode="json"),
                        "elapsed_seconds": elapsed, "usage": TypeAdapter(RunUsage).dump_python(usage, mode="json"),
                        "usage_source": "scripted_estimate" if offline else "native_responses_partial_on_failure",
                        "provider_usage_present": None if offline else bool(responses) and all(
