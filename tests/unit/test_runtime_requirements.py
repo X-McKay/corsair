@@ -213,15 +213,24 @@ def test_selection_supported_unsupported_conflict():
     # JUnit 4 before 4.12 has no Vintage discovery (SPEC-0041); the JDK alone is not enough.
     old_junit = select(detect({'pom.xml': PARENT.replace(b'4.12', b'4.8.2')}, 'java'), staged)
     assert old_junit.status == 'unsupported' and [n.name for n in old_junit.needs] == ['junit4']
+    # The environment agent's `junit4` ready result is admitted by the JDK 8 selection, and only there.
+    from corsair.agents.environment.contracts import ReadyEnvironment
+    from corsair.nodes.runtime.environment import check_ready
+    prepared = {'temurin-8-maven': 'docker.io/library/corsair-java8@sha256:' + '0' * 64}
+    ready = lambda framework: ReadyEnvironment.model_construct(toolchain_id='temurin-8-maven',
+                                                               toolchain_image=prepared['temurin-8-maven'], framework=framework)
+    check_ready(ready('junit4'), selection, prepared)
+    with pytest.raises(ValueError, match='not one the selection admitted'):
+        check_ready(ready('junit5'), selection, prepared)
 
 
 STAGED_JDK8 = {'id': 'temurin-8-maven', 'language': 'java',
                'base_image': 'docker.io/library/maven@sha256:f2cb52730ea0bde9dc8ba20e5e539d000dcdd7ab9e498d70c301fe04fbddb656',
                'image_source': 'deploy/qualification/toolchains/java8', 'runtime': {'name': 'jdk', 'version': '8.0.504'},
                'tools': {'maven': '3.10.0'}, 'selector': {}, 'qualification': {'records': ['SPEC-0045'], 'report': 'x'}}
-STAGED_JUNIT = [{'name': 'junit4', 'language': 'java', 'versions': '>=4.12,<4.14', 'runner': 'x', 'images': ['temurin-8-maven'],
+STAGED_JUNIT = [{'name': 'junit4', 'language': 'java', 'versions': '==4.13.2 || ==4.12', 'runner': 'x', 'images': ['temurin-8-maven'],
                  'qualification': {'records': ['SPEC-0045'], 'report': 'x'}},
-                {'name': 'junit5', 'language': 'java', 'versions': '5.14.*', 'runner': 'x', 'images': ['temurin-17-maven'],
+                {'name': 'junit5', 'language': 'java', 'versions': '==5.14.4', 'runner': 'x', 'images': ['temurin-17-maven'],
                  'qualification': {'records': ['SPEC-0045'], 'report': 'x'}}]
 
 

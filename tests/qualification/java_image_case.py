@@ -41,19 +41,19 @@ def setup(image, checkout, m2, evidence):
     # Surefire resolves its JUnit provider only when it runs a test, so the absent-test run leaves it out; fetch the
     # providers of the project's own Surefire version (read from Maven's execution banner) without running a body.
     script = (f'cp -R /opt/corsair-m2/. /m2/; cp -R /src {WORK}; cd {WORK}; '
-              f'{MVN} -B -ntp -Dmaven.repo.local=/m2 test-compile {DEPENDENCY}:build-classpath '
+              f'{MVN} -B -ntp -C -Dmaven.repo.local=/m2 test-compile {DEPENDENCY}:build-classpath '
               f'-Dmdep.outputFile=target/corsair-setup.classpath -Dmdep.includeScope=test; '
-              f'{MVN} -B -ntp -Dmaven.repo.local=/m2 test -Dtest=CorsairSetupAbsentTest -DfailIfNoTests=false '
+              f'{MVN} -B -ntp -C -Dmaven.repo.local=/m2 test -Dtest=CorsairSetupAbsentTest -DfailIfNoTests=false '
               f'-Dsurefire.failIfNoSpecifiedTests=false > /tmp/absent.log 2>&1 || {{ cat /tmp/absent.log; exit 4; }}; '
               'cat /tmp/absent.log; '
               "version=$(sed -n 's/.*surefire\\(-plugin\\)\\{0,1\\}:\\([0-9][^:]*\\):test .*/\\2/p' /tmp/absent.log | head -1); "
               'test -n "$version" || { echo "no surefire:test execution found" >&2; exit 3; }; echo "surefire version $version"; '
               'resolved=0; for provider in surefire-junit4 surefire-junit47 surefire-junit-platform; do '
-              f'if {MVN} -B -ntp -Dmaven.repo.local=/m2 {DEPENDENCY}:get -Dartifact=org.apache.maven.surefire:$provider:$version; '
+              f'if {MVN} -B -ntp -C -Dmaven.repo.local=/m2 {DEPENDENCY}:get -Dartifact=org.apache.maven.surefire:$provider:$version; '
               'then resolved=$((resolved + 1)); else echo "provider $provider:$version not resolved"; fi; done; '
               # Not every provider exists for every version (junit-platform starts at 2.22.0); none at all is a failure.
               'test "$resolved" -gt 0 || { echo "no Surefire provider resolved for $version" >&2; exit 5; }')
-    result = docker('run', '--rm', '--user', user(), '-e', 'HOME=/tmp', '-v', f'{checkout}:/src:ro', '-v', f'{m2}:/m2',
+    result = docker('run', '--rm', '--cap-drop=ALL', '--security-opt=no-new-privileges', '--user', user(), '-e', 'HOME=/tmp', '-v', f'{checkout}:/src:ro', '-v', f'{m2}:/m2',
                     image, '/bin/sh', '-ec', script, timeout=1800)
     (evidence / 'setup.stdout').write_bytes(result.stdout)
     (evidence / 'setup.stderr').write_bytes(result.stderr)
@@ -100,7 +100,13 @@ class DockerCase:
         started, clock = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), time.monotonic()
         # A hang (for example a vulnerable infinite loop) is a terminal-unknown failure, never retried; the
         # container is removed with everything in it on exit.
-        result = docker('exec', '-w', WORK, self.container, *argv, timeout=self.timeout)
+        try:
+            result = docker('exec', '-w', WORK, self.container, *argv, timeout=self.timeout)
+        except subprocess.TimeoutExpired as error:
+            return ExecutionReceipt(operation=str(operation), handle=handle, started_at=started,
+                                    elapsed_seconds=round(time.monotonic() - clock, 3), delivery='acknowledged',
+                                    completion='unknown', reason='timeout', stdout=error.stdout or b'',
+                                    stderr=error.stderr or b'', native_exit=None, worker_cleanup='unconfirmed')
         return ExecutionReceipt(operation=str(operation), handle=handle, started_at=started,
                                 elapsed_seconds=round(time.monotonic() - clock, 3), delivery='acknowledged',
                                 completion='terminal_observed', reason='terminal', stdout=result.stdout,

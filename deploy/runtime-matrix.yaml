@@ -33,7 +33,7 @@ images:
     qualification:
       records: [SPEC-0007, PLAN-0008]
       report: docs/qualification/openshell-toolchains.md
-      note: Temurin 17.0.20.1, Maven 3.10.0 and JUnit Jupiter 5.14.4 under Surefire 3.6.0, offline closure in the image.
+      note: Temurin 17.0.20.1, Maven 3.10.0 and JUnit Jupiter 5.14.4 under Surefire 3.6.0, offline closure in the image. The image source changed in SPEC-0045 (pinned JUnit console launcher, dependency plugin closure, second fixture method); the gate has not rerun on that source.
 frameworks:
   - name: pytest
     language: python
