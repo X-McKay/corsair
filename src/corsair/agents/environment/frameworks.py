@@ -20,6 +20,19 @@ class Framework:
     file_of: Callable[[str], str | None]
     targets: Callable[[tuple[str, ...], str], bool]
     passed: Callable[[bytes], bool]
+    # SPEC-0071: whether a checkout path is a test file under the runner's own default discovery convention.
+    test_file: Callable[[str], bool]
+
+
+def _convention(pattern: str, ignored: tuple[str, ...] = ()) -> Callable[[str], bool]:
+    """A runner's default test-file convention: `pattern` over the repository-relative path, never inside hidden
+    directories or the directories the runner itself skips by default."""
+    compiled = re.compile(pattern)
+    def test_file(path: str) -> bool:
+        directories = path.split("/")[:-1]
+        return (compiled.search(path) is not None
+                and not any(d.startswith(".") or d in ignored or d.endswith(".egg") for d in directories))
+    return test_file
 
 
 def _pytest_file(test_id: str) -> str | None:
@@ -170,20 +183,30 @@ def _jest_passed(output: bytes) -> bool:
 _MINITEST_SUMMARY = re.compile(rb"^[1-9][0-9]* runs?, [0-9]+ assertions?, 0 failures?, 0 errors?, 0 skips?$", re.MULTILINE)
 
 
+_SUREFIRE_INCLUDES = _convention(r"(?:^|/)src/test/java/(?:.*/)?(?:Test[^/]*|[^/]*Tests?|[^/]*TestCase)\.java$")
+
+
 FRAMEWORKS = {
     "pytest": Framework(_pytest_file, _pytest_targets,
-                        lambda output: _PYTEST_SUMMARY.search(output) is not None),
+                        lambda output: _PYTEST_SUMMARY.search(output) is not None,
+                        # `python_files` and `norecursedirs` defaults.
+                        _convention(r"(?:^|/)(?:test_[^/]*|[^/]*_test)\.py$", ("build", "dist", "node_modules", "venv", "CVS", "_darcs", "{arch}"))),
     # Maven Surefire with JUnit 5 or JUnit 4 (same ids and Surefire summary); ids are `fully.qualified.Class#method`,
     # files end with the class path.
-    "junit5": Framework(_junit_file, _junit_targets, _surefire_passed),
-    "junit4": Framework(_junit_file, _junit_targets, _surefire_passed),
+    # Surefire's default includes under a module's `src/test/java`.
+    "junit5": Framework(_junit_file, _junit_targets, _surefire_passed, _SUREFIRE_INCLUDES),
+    "junit4": Framework(_junit_file, _junit_targets, _surefire_passed, _SUREFIRE_INCLUDES),
     # Perl Test::More files through prove (Test::Harness); the baseline id is one repository-relative `.t` file.
-    "tap-harness": Framework(_file_id(".t"), _tap_targets, _tap_passed),
+    "tap-harness": Framework(_file_id(".t"), _tap_targets, _tap_passed, _convention(r"\.t$", ("blib",))),
     # Jest test files run by path with a JSON report; the baseline id is one repository-relative test file.
-    "jest": Framework(_file_id(".js", ".jsx", ".mjs", ".cjs"), _jest_targets, _jest_passed),
+    # Jest's default `testMatch` and `testPathIgnorePatterns`.
+    "jest": Framework(_file_id(".js", ".jsx", ".mjs", ".cjs"), _jest_targets, _jest_passed,
+                      _convention(r"(?:^|/)__tests__/.*\.[jt]sx?$|(?:^|[./])(?:spec|test)\.[jt]sx?$", ("node_modules",))),
     # One Minitest file loaded by Ruby (directly or under `bundle exec`); the baseline id is that `.rb` file.
     "minitest": Framework(_file_id(".rb"), _minitest_targets,
-                          lambda output: len(_MINITEST_SUMMARY.findall(output)) == 1),
+                          lambda output: len(_MINITEST_SUMMARY.findall(output)) == 1,
+                          # Rake's TestTask and the `test_*.rb` convention; bundled gems are not the project's.
+                          _convention(r"(?:^|/)(?:test_[^/]*|[^/]*_test)\.rb$", ("vendor",))),
 }
 
 
@@ -208,3 +231,11 @@ def project_tests(framework: str, smoke: "SmokeTest", discovery: bytes) -> list[
             continue
         others.append(token)
     return others
+
+
+def checkout_tests(framework: str, smoke: "SmokeTest", paths: tuple[str, ...]) -> list[str]:
+    """SPEC-0071: the checkout's test files under the framework's own default convention, other than the smoke file.
+    `paths` is the operator's listing of the whole captured revision, never the agent's, so a smoke baseline is
+    admitted only when the project has no test the runner would find by default."""
+    test_file = FRAMEWORKS[framework].test_file
+    return [path for path in paths if path != smoke.path and test_file(path)]

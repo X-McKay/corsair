@@ -8,7 +8,7 @@ from corsair.agents.issue_analysis.contracts import SourceRead, SourceReference
 
 from .contracts import EnvironmentDraft, EnvironmentResult, ReadyEnvironmentDraft
 from .dependencies import EnvironmentDependencies
-from .frameworks import FRAMEWORKS, file_matches, project_tests
+from .frameworks import FRAMEWORKS, checkout_tests, file_matches, project_tests
 from .tools.read_source import READ_SOURCE_TOOL
 from .tools.run_setup_command import RUN_SETUP_COMMAND_TOOL, SetupRun
 
@@ -73,8 +73,17 @@ async def finalize_environment(ctx: RunContext[EnvironmentDependencies], draft: 
         discovery, baseline = succeeded[positions[-2]], succeeded[positions[-1]]
         if draft.baseline_test_id.encode() not in deps.ledger.outputs[discovery][0]:
             raise ModelRetry("baseline_test_id must appear in the discovery command's output")
+        if smoke is not None and any(smoke.path in token or smoke.test_id in token for token in draft.discovery_command):
+            raise ModelRetry("with the smoke test as baseline, the discovery command must be the project's general one, "
+                             "not one naming the smoke file, so that any project test would be listed")
         if smoke is not None and (others := project_tests(draft.framework, smoke, deps.ledger.outputs[discovery][0])):
             raise ModelRetry(f"discovery listed project tests ({', '.join(others[:3])}); use one of them as the baseline, "
+                             "not the smoke test")
+        if smoke is not None and deps.checkout_paths is None:
+            raise ModelRetry("this run has no operator listing of the checkout, so the smoke test cannot be the baseline; "
+                             "use a project test or report unsupported")
+        if smoke is not None and (others := checkout_tests(draft.framework, smoke, deps.checkout_paths)):
+            raise ModelRetry(f"the checkout has project tests ({', '.join(others[:3])}); use one of them as the baseline, "
                              "not the smoke test")
         if not framework.passed(deps.ledger.outputs[baseline][0]):
             raise ModelRetry("the baseline run must report exactly one passed test, with nothing skipped, xfailed or errored")

@@ -79,3 +79,22 @@ def test_a_smoke_baseline_is_refused_when_discovery_lists_a_project_test(framewo
     row = SMOKE_TESTS[framework]
     smoke = SmokeTest(framework=framework, path=row.path, test_id=row.test_id, content=row.content)
     assert project_tests(framework, smoke, discovery) == others
+
+
+@pytest.mark.parametrize('framework, paths, others', [
+    ('pytest', ('app.py', 'tests/test_corsair_smoke.py', '.venv/lib/test_site.py', 'build/test_old.py', 'tests/app_test.py'),
+     ['tests/app_test.py']),
+    ('junit5', ('src/test/java/CorsairSmokeTest.java', 'core/src/test/java/a/ParserTests.java', 'src/main/java/a/Test.java',
+                'src/test/java/a/Helper.java'), ['core/src/test/java/a/ParserTests.java']),
+    ('tap-harness', ('t/corsair_smoke.t', 'lib/A.pm', 'xt/author.t', 'blib/lib/x.t'), ['xt/author.t']),
+    ('jest', ('__tests__/corsair_smoke.test.js', 'src/app.js', 'node_modules/x/a.test.js', 'src/app.spec.jsx'),
+     ['src/app.spec.jsx']),
+    ('minitest', ('test/corsair_smoke_test.rb', 'lib/app.rb', 'vendor/bundle/x/test/a_test.rb', 'test/test_app.rb'),
+     ['test/test_app.rb']),
+])
+def test_the_operator_listing_finds_project_tests_by_the_runner_convention(framework, paths, others):
+    from corsair.agents.environment.contracts import SmokeTest
+    from corsair.agents.environment.frameworks import checkout_tests
+    row = SMOKE_TESTS[framework]
+    smoke = SmokeTest(framework=framework, path=row.path, test_id=row.test_id, content=row.content)
+    assert checkout_tests(framework, smoke, paths) == others

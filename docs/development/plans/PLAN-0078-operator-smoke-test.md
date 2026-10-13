@@ -19,6 +19,8 @@ Implement [SPEC-0071](../specs/SPEC-0071-operator-smoke-test.md) offline on top 
 - [x] Chain: offer from the selection, overlay through `Preparation.prepare`, smoke file into planning/authoring inventory, limitation.
 - [x] `evals/corpus/cohorts.json`: `corpus-python`, the 17 Python development cases.
 - [x] `evals/corpus/issues.py`: each corpus case as an issue JSON (`corsair-issue-request/v1`, per the kick-off note) over a local bare repository (each variant one root commit, fixed neutral metadata, reproducible ids) plus an evaluator-only `expected.json`; `--set corpus-python` writes the cohort; the 17 cases are committed under `evals/corpus/issues/` (repository named by its checkout-relative path, so a clone carries the case data), and a test checks they match the generator.
+- [x] Trusted absence of project tests (review, 18:11Z): finalization refuses a smoke baseline when the operator's listing of the captured revision (`PreparedSandbox.source_paths`) holds a file the runner's default convention would discover, or when no listing is supplied; per-framework conventions in `frameworks.py` `test_file`.
+- [ ] OpenShell (#116) and Docker (#113) preparation adapters supply `source_paths` (their capture's file list).
 - [ ] Run the Jest and JUnit templates in their images (image-only harness).
 - [ ] Live environment eval against its baseline when the model is free.
 - [ ] Wire `SET=corpus-python` into the chain suite once the issue entry point (`corsair investigate --issue-json`, Node thread) lands; align field names with its schema.
