@@ -230,7 +230,7 @@ def test_perl526_rows_select_the_fixture_and_need_the_tap_runner():
     requirement = detect({'Makefile.PL': fixture.read_bytes()}, 'perl')
     matrix = load()
     selection = select(requirement, matrix)
-    assert selection.status == 'supported' and selection.image_id == 'perl-5.26-make'
+    assert selection.status == 'supported' and selection.image_id == 'perl-5.26-make' and selection.evidence == 'image-only'
     # Without the tap-harness framework row the image alone does not run a case.
     bare = Matrix.model_validate({**matrix.model_dump(), 'frameworks': [f for f in matrix.model_dump()['frameworks'] if f['name'] != 'tap-harness']})
     selection = select(requirement, bare)
@@ -238,6 +238,30 @@ def test_perl526_rows_select_the_fixture_and_need_the_tap_runner():
     # A project that needs a newer Perl is not routed to 5.26.
     newer = detect({'Makefile.PL': fixture.read_bytes().replace(b"'5.026'", b"'5.028'")}, 'perl')
     assert select(newer, matrix).status == 'unsupported' and 'perl' in [n.name for n in select(newer, matrix).needs]
+
+
+def test_selection_carries_the_weakest_row_evidence():
+    fixture = Path(__file__).resolve().parents[2] / 'deploy/qualification/toolchains/perl526/Makefile.PL'
+    requirement = detect({'Makefile.PL': fixture.read_bytes()}, 'perl')
+    data = load().model_dump()
+    for row in (*data['images'], *data['frameworks']): row['qualification']['evidence'] = 'live'
+    assert select(requirement, Matrix.model_validate(data)).evidence == 'live'
+    # A live image with an image-only framework row, and the reverse, are both image-only.
+    next(f for f in data['frameworks'] if f['name'] == 'tap-harness')['qualification']['evidence'] = 'image-only'
+    assert select(requirement, Matrix.model_validate(data)).evidence == 'image-only'
+    next(f for f in data['frameworks'] if f['name'] == 'tap-harness')['qualification']['evidence'] = 'live'
+    next(i for i in data['images'] if i['id'] == 'perl-5.26-make')['qualification']['evidence'] = 'image-only'
+    assert select(requirement, Matrix.model_validate(data)).evidence == 'image-only'
+
+
+def test_benchmark_report_counts_image_only_apart():
+    from evals.benchmark.runtimes import markdown
+    def record(case, evidence=None):
+        revision = {'status': 'supported', 'image_id': 'perl-5.26-make', **({'evidence': evidence} if evidence else {})}
+        return {'case_id': case, 'language': 'perl', 'status': 'supported', 'revisions': {'baseline': revision}}
+    report = markdown([record('a', 'live'), record('b', 'image-only'), record('c')])
+    assert '| b | perl | supported (image-only) |' in report
+    assert 'Outcomes: supported 1, supported (evidence unrecorded) 1, supported (image-only) 1' in report
 
 
 def test_rows_state_their_evidence():
