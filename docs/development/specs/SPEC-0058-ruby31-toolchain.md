@@ -27,7 +27,7 @@ Findings for the runner PR and setup: project gems cannot go into `GEM_HOME`, so
 
 ## Acceptance and validation
 
-Offline: `make test-config`; the trusted control and the gate's offline sequence run against the image built locally with Docker (an image-only check, not sandbox qualification). Live on RIG0: `make toolchain-images` and `make toolchain-images-load` for `ruby31`, then the `ruby31` toolchain gate on a fresh admitted kind node. The `ruby-3.1-bundler` matrix row (`runtime: {name: ruby, version: 3.1.7}`, `tools: {bundler: 2.3.27}`) is added only after that gate passes, together with the qualification report entry. A real case through a Corsair runner belongs to the runner PR.
+Offline: `make test-config`; the trusted control and the gate's offline sequence run against the image built locally with Docker (an image-only check, not sandbox qualification). Live on RIG0: `make toolchain-images` and `make toolchain-images-load` for `ruby31`, then the `ruby31` toolchain gate on a fresh admitted kind node. The `ruby-3.1-bundler` matrix row (`runtime: {name: ruby, version: 3.1.7}`, `tools: {bundler: 2.3.27}`) lands as `evidence: image-only` with the runner PR's Docker case run (lighter path, SPEC-0062) and becomes `live` with the qualification report entry after that gate passes in a milestone batch. A real case through a Corsair runner belongs to the runner PR.
 
 ## Decisions and open questions
 
