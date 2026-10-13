@@ -230,7 +230,8 @@ def python_dependencies(kube, cli, sdk, name, remote, record, endpoint, pair, la
     execute(sdk, name, [python, '-c', 'from pathlib import Path; Path("cold.txt").write_text(' + repr(requirement) + ')'], remote)
     result = execute(sdk, name, [python, '-m', 'pip', '--isolated', 'install', '--disable-pip-version-check', '--no-cache-dir', '--no-deps', '--require-hashes', '--retries', '0', '--timeout', '10', '--target', remote + '/cold', '-r', 'cold.txt'], remote)
     expect_completed(result, 0, 'Successfully installed six-1.17.0')
-    result = execute(sdk, name, [python, '-c', 'import sys; sys.path.insert(0,"cold"); import six; assert six.__version__=="1.17.0"; assert six.__file__.startswith(' + repr(remote + '/cold/') + '); print(six.__version__); print(six.__file__)'], remote)
+    # An absolute path entry: CPython 3.7 keeps a relative entry's module __file__ relative (3.12 makes it absolute).
+    result = execute(sdk, name, [python, '-c', 'import sys; sys.path.insert(0,' + repr(remote + '/cold') + '); import six; assert six.__version__=="1.17.0"; assert six.__file__.startswith(' + repr(remote + '/cold/') + '); print(six.__version__); print(six.__file__)'], remote)
     expect_completed(result, 0, '1.17.0')
     # Keep native HTTP detail separate from pip's resolver diagnostic.
     request = 'import urllib.request,urllib.error;\ntry:\n r=urllib.request.urlopen(' + repr('https://pypi.org' + missing) + ',timeout=10); print(r.status); print(r.read().decode())\nexcept urllib.error.HTTPError as e:\n print(e.code); print(e.read().decode())'
