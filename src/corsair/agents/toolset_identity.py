@@ -11,3 +11,9 @@ def toolset_sha256(toolset: FunctionToolset) -> str:
     """Digest of the toolset id and, in offered order, every tool definition field and retry limit."""
     offered = [asdict(tool.tool_def) | {"max_retries": tool.max_retries} for tool in toolset.tools.values()]
     return sha256(json.dumps({"id": toolset.id, "tools": offered}, sort_keys=True).encode()).hexdigest()
+
+
+def toolsets_sha256(*toolsets: FunctionToolset) -> str:
+    """Digest of several toolsets in offered order; a single toolset keeps its own digest."""
+    digests = [toolset_sha256(toolset) for toolset in toolsets]
+    return digests[0] if len(digests) == 1 else sha256(json.dumps(digests).encode()).hexdigest()

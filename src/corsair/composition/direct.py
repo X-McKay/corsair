@@ -31,7 +31,7 @@ from corsair.agents.source.contracts import Contract
 from corsair.agents.source.tools import READ_LINE_LIMIT
 from corsair.agents.test_authoring.agent import authoring_prompt, create_test_authoring_agent
 from corsair.agents.test_authoring.contracts import TestAuthoringInput, TestPatch
-from corsair.agents.test_authoring.tools import AuthoringBudget, AuthoringDependencies
+from corsair.agents.test_authoring.dependencies import AuthoringBudget, AuthoringDependencies
 from corsair.agents.test_planning.agent import PlanningDependencies, create_test_planning_agent, planning_prompt
 from corsair.agents.test_planning.contracts import EnvironmentEvidence, ReadyTestPlan, TestPlanningInput
 from corsair.core.disposition import AssessmentEvidence, EnvironmentIdentity, GateResult, ObservationPlan, assess

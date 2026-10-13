@@ -32,7 +32,7 @@ from temporalio.workflow import ActivityConfig
 from corsair.agents.evidence_assessment.contracts import EvidenceAssessment
 from corsair.agents.issue_analysis.identification_contracts import IssueIdentification
 from corsair.agents.test_authoring.contracts import AuthoringResult, TestAuthoringInput, TestPatch
-from corsair.agents.test_authoring.tools import AuthoringBudget, AuthoringDependencies
+from corsair.agents.test_authoring.dependencies import AuthoringBudget, AuthoringDependencies
 from corsair.agents.test_planning.contracts import ReadyTestPlan, TestPlan
 from corsair.composition.direct import (
     AGENTS, AgentStage, BudgetExhausted, CompositionBudget, DirectRun, FixtureCase, Purpose, RecordedFailure, Runners,
