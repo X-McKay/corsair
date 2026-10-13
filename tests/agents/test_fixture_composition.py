@@ -1,5 +1,9 @@
 """E2E-0 direct composition over the SPEC-0018 pair with scripted stage models and real reviewed pytest runs."""
 import asyncio
+import base64
+import hashlib
+import json
+from uuid import uuid4, uuid5
 from dataclasses import replace
 
 import pytest
@@ -177,3 +181,37 @@ def test_a_run_from_the_wrong_revision_is_never_labelled_as_the_requested_one(st
     run = asyncio.run(run_direct(fixture_case(), stages(), runner))
     assert run.stopped_at == "execution" and run.gate is None
     assert run.reason == "candidate workspace source is not the candidate revision"
+
+
+def test_cli_keeps_every_native_run_with_its_bindings_and_failures(tmp_path):
+    """Saved evidence keeps receipts, artifact references and failures without any assessment read."""
+    from evals.fixture_e2e import run as cli
+    evidence = tmp_path / "evidence"
+    result = asyncio.run(cli.main_async(evidence, (), None))
+    entries = json.loads((evidence / "native-runs.json").read_text())
+    assert [e["purpose"] for e in entries] == ["development", "baseline", "candidate"]
+    sources = fixture_case().revision_sources
+    for entry, execution in zip(entries[1:], result.executions):
+        observed = entry["observed"]
+        assert entry["operation"] == observed["operation"] == str(execution.operation)
+        assert observed["workspace"]["source"]["sha256"] == sources[execution.revision]
+        receipt = observed["execution"]["receipt"]
+        assert (receipt["delivery"], receipt["completion"], receipt["operation"]) == (
+            "acknowledged", "terminal_observed", str(uuid5(execution.operation, "execution")))
+        junit = base64.b64decode(receipt["stdout"]["base64"])
+        assert observed["execution"]["junit"]["sha256"] == receipt["stdout"]["sha256"] == hashlib.sha256(junit).hexdigest()
+        assert observed["discovery"]["command"] and observed["execution"]["command"]
+
+
+def test_journal_keeps_a_refused_development_run(store, tmp_path):
+    from evals.fixture_e2e.run import Journal
+    from corsair.ports.test_runner import ApprovedPatch, PatchFile
+    (tmp_path / "work").mkdir()
+    journal = Journal(reviewed_runners(store, tmp_path / "work"))
+    patch = ApprovedPatch((PatchFile("test_documents.py", b"def test_x():\n    assert True\n"),), ("test_documents.py",))
+    journal("development").run(patch, control_test_id=CONTROL, security_test_id=SECURITY,
+                                discovery_command=("python",), operation=uuid4())
+    (entry,) = journal.entries
+    observed = entry["observed"]
+    assert observed["failure_layer"] == "workspace" and observed["cleanup"] == "unconfirmed"
+    assert "reviewed SPEC-0018" in observed["detail"]

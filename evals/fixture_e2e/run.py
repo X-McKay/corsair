@@ -8,14 +8,15 @@ test workspace exists. Existing evidence directories are refused.
 import argparse
 import asyncio
 from contextlib import AsyncExitStack
-from dataclasses import asdict
+import base64
+from dataclasses import asdict, fields, is_dataclass
 from hashlib import sha256
 import json
 from pathlib import Path
 import sys
 
 import logfire
-from pydantic import TypeAdapter
+from pydantic import BaseModel, TypeAdapter
 from pydantic_ai.messages import ModelMessage
 from pydantic_ai.usage import RunUsage
 
@@ -42,6 +43,51 @@ VERSIONS = {
     "authoring": (authoring.PROMPT_VERSION, authoring.CONFIG_VERSION, AUTHORING_SKILL),
     "assessment": (assessment.PROMPT_VERSION, assessment.CONFIG_VERSION, assessment.SKILL_SHA256),
 }
+
+
+def encode(value):
+    """Lossless JSON for native runner observations: dataclasses by field, bytes with digest and base64."""
+    if is_dataclass(value) and not isinstance(value, type):
+        return {field.name: encode(getattr(value, field.name)) for field in fields(value)}
+    if isinstance(value, BaseModel):
+        return value.model_dump(mode="json")
+    if isinstance(value, bytes):
+        return {"sha256": sha256(value).hexdigest(), "size": len(value), "base64": base64.b64encode(value).decode()}
+    if isinstance(value, (tuple, list)):
+        return [encode(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): encode(item) for key, item in value.items()}
+    if isinstance(value, BaseException):
+        return {"type": type(value).__name__, "detail": str(value)[:4096], "receipt": encode(getattr(value, "receipt", None))}
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    return str(value)
+
+
+class Journal:
+    """Wraps the operator's runners and keeps every complete native observation, failed ones included,
+    with its purpose and operation, independently of what any agent later reads."""
+    def __init__(self, runners):
+        self.runners, self.entries = runners, []
+
+    def __call__(self, purpose):
+        inner = self.runners(purpose)
+        journal = self
+
+        class Recorded:
+            def run(self, patch, *, control_test_id, security_test_id, discovery_command, operation):
+                entry = {"purpose": purpose, "operation": str(operation), "patch_sha256": patch.sha256,
+                         "observed": None, "failure": None}
+                journal.entries.append(entry)
+                try:
+                    observed = inner.run(patch, control_test_id=control_test_id, security_test_id=security_test_id,
+                                         discovery_command=discovery_command, operation=operation)
+                except BaseException as exc:
+                    entry["failure"] = encode(exc)
+                    raise
+                entry["observed"] = encode(observed)
+                return observed
+        return Recorded()
 
 
 def _dump(value):
@@ -93,8 +139,12 @@ async def main_async(evidence: Path, live: tuple[str, ...], config: LocalModelCo
             "runner": "reviewed_host_workspace", "witness_capture": "none",
             "source": {"python": sys.version}}, indent=2))
         store = stack.enter_context(LocalArtifacts(evidence / "artifacts", max_bytes=4 * 1024 * 1024))
-        run = await run_direct(fixture_case(), StageModels(**selected), reviewed_runners(store, evidence / "work"),
-                               budget)
+        journal = Journal(reviewed_runners(store, evidence / "work"))
+        try:
+            run = await run_direct(fixture_case(), StageModels(**selected), journal, budget)
+        finally:
+            with (evidence / "native-runs.json").open("x") as destination:
+                json.dump(journal.entries, destination, indent=2)
     for index, attempt in enumerate(run.attempts):
         with (evidence / f"attempt-{index}-{attempt.stage}.json").open("x") as destination:
             json.dump(attempt_record(attempt), destination, indent=2)
