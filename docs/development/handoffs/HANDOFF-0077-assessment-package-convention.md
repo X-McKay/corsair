@@ -17,7 +17,7 @@ Branch `claude/project-thread-gzpz1j` from main `0ad9900` (#62 merged). `evidenc
 
 Recorded in PLAN-0056: identical offered-surface capture, pinned digest equal to the pre-split digest, 95 focused tests, scripted assessment evals 51/51 and 21/21 before and after with no changed row, environment eval unchanged. Unrun: live provider evals, durable worker run beyond the offline Temporal suites in `make test-config`.
 
-#49 (open) changes four factory lines in `evidence_assessment/agent.py`; they remain in `agent.py`, so its merge needs only that hunk re-applied. #49 and #55 each add lines to `evals/evidence_assessment/evaluate.py`, near but not on the line this change adds.
+#49 (open) changes four factory lines in `evidence_assessment/agent.py`; they remain in `agent.py`. Al's review of `b9255c9` found the actual merge tree with #49 also conflicts in `CURRENT.md` and `composition/direct.py`: whichever lands second keeps the `AssessmentDependencies` import from `dependencies`, #49's budget/exhaustion logic and config identity, then reruns the affected composition and agent checks. #49 and #55 each add lines to `evals/evidence_assessment/evaluate.py`, near this change's line.
 
 ## Decisions and next steps
 
