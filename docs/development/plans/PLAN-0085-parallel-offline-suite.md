@@ -2,7 +2,7 @@
 id: PLAN-0085
 kind: plan
 title: Parallel offline suite in CI
-status: in_progress
+status: complete
 updated: 2026-10-13
 related: [PLAN-0002]
 ---
