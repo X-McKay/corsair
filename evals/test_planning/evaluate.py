@@ -34,10 +34,11 @@ from evals.issue_analysis.evaluate import describe_model, record_count
 from evals.issue_analysis.live import NoUnknownToolAttempts, ProviderUsageCoverage, message_counts, output_tool_names
 
 ROOT = Path(__file__).parent
-# Development cases were used to shape prompts v1-v3; held-out cases were frozen before any provider saw them.
-DATASETS = {"development": "cases.yaml", "heldout": "cases-heldout.yaml"}
+# Development cases shaped prompts v1-v5; each held-out set was frozen before any provider saw it
+# (heldout was exposed to v2/v3 in PLAN-0036; heldout2 was written and reviewed apart from the v4/v5 prompt author).
+DATASETS = {"development": "cases.yaml", "heldout": "cases-heldout.yaml", "heldout2": "cases-heldout-2.yaml"}
 # SPEC-0023: a manifest of case name and content hash beside each held-out dataset.
-MANIFESTS = {"heldout": "cases-heldout.manifest.json"}
+MANIFESTS = {"heldout": "cases-heldout.manifest.json", "heldout2": "cases-heldout-2.manifest.json"}
 # Fixture setup reaching the parent of the scratch location or a fixed host directory (PLAN-0025 review finding).
 OUTSIDE_SCRATCH = re.compile(r"\.parent\b|(?<![\w.])/(?:tmp|var|etc|home|root)\b|(?<![\w.])~/", re.IGNORECASE)
 PlanOutput = ReadyTestPlan | UnsupportedTestPlan

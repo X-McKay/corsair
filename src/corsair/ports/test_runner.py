@@ -21,6 +21,11 @@ MAX_PATCH_FILES = 4
 MAX_PATCH_FILE_BYTES = 32768
 MAX_TEST_ID = 128
 TEST_ID = re.compile(r'^[A-Za-z0-9_./-]+\.py(::[A-Za-z_][A-Za-z0-9_]*){1,2}$')
+# JUnit on Maven: `[module/]fully.qualified.Class#method`. The optional module is the reactor directory
+# relative to the repository root; top-level classes and plain ASCII identifiers only (no nested `$` classes).
+JAVA_TEST_ID = re.compile(r'^(?:(?P<module>[A-Za-z0-9_][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_][A-Za-z0-9_.-]*)*)/)?'
+                          r'(?P<class_name>(?:[A-Za-z_][A-Za-z0-9_]*\.)*[A-Za-z_][A-Za-z0-9_]*)'
+                          r'#(?P<method>[A-Za-z_][A-Za-z0-9_]*)$')
 
 
 def approved_path(value: str) -> str:
@@ -29,6 +34,29 @@ def approved_path(value: str) -> str:
             or any(ord(char) < 32 for char in value) or not re.fullmatch(r'[A-Za-z0-9_./-]+', value)):
         raise ValueError('Expected a canonical confined relative test path')
     return value
+
+
+@dataclass(frozen=True)
+class JavaTestId:
+    """A JUnit method in a Maven module; Surefire reports it as (class_name, method)."""
+    module: str | None
+    class_name: str
+    method: str
+
+    @classmethod
+    def parse(cls, value: str) -> 'JavaTestId':
+        match = JAVA_TEST_ID.fullmatch(value) if type(value) is str and len(value) <= MAX_TEST_ID else None
+        if match is None:
+            raise ValueError('Expected `[module/]package.Class#method`')
+        return cls(match['module'], match['class_name'], match['method'])
+
+    def source_path(self, test_root: str = 'src/test/java') -> str:
+        """Maven's conventional location of the declaring class, relative to the repository root."""
+        relative = f'{test_root}/{self.class_name.replace(".", "/")}.java'
+        return f'{self.module}/{relative}' if self.module else relative
+
+    def __str__(self) -> str:
+        return f'{self.module + "/" if self.module else ""}{self.class_name}#{self.method}'
 
 
 @dataclass(frozen=True)
