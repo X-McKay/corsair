@@ -19,6 +19,7 @@ from .reviewed import REVIEWED_TEST
 
 PYTHON = "/usr/local/bin/python3.12"
 JUNIT = "/tmp/corsair-junit.xml"
+WITNESS_RECORD = "/tmp/corsair-witness.json"
 # Operator-owned in-sandbox pytest argv: no plugins, config or conftest from the workspace; scratch under /tmp.
 PREFIX = ("/usr/bin/env", "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1", "PYTHONDONTWRITEBYTECODE=1", "PYTHONPATH=.", PYTHON,
           "-m", "pytest", "-c", "/dev/null", "--rootdir", ".", "--noconftest", "--import-mode=importlib",
@@ -57,6 +58,7 @@ def sandbox_case(snapshots: dict[str, SourceSnapshot], image_manifest_digest: st
         policy_revision=f"identity.yaml:{_digest(POLICY.read_bytes())[:16]}",
         limits_sha256=_digest(json.dumps(limits, sort_keys=True).encode()))
     return FixtureCase(issue=base.issue, environment=environment, environment_identity=identity,
+                       witness_envelope=base.witness_envelope,
                        revision_sources={revision: snapshots[VARIANTS[revision]].manifest.sha256
                                          for revision in ("baseline", "candidate")})
 
@@ -69,7 +71,7 @@ def sandbox_runners(lifecycle, verifier, execution, upload, store, snapshots: di
     """
     workspaces = {variant: OpenShellTestWorkspace(lifecycle, verifier, upload, store, snapshot, config)
                   for variant, snapshot in snapshots.items()}
-    runner_config = PytestRunnerConfig(PREFIX, JUNIT, config.remote_root)
+    runner_config = PytestRunnerConfig(PREFIX, JUNIT, config.remote_root, witness_record_path=WITNESS_RECORD)
 
     def runner(purpose):
         return PytestRunner(workspaces[VARIANTS[purpose]], execution, store, runner_config)

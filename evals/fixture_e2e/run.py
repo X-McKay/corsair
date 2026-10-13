@@ -84,15 +84,15 @@ class Journal:
         journal = self
 
         class Recorded:
-            def run(self, patch, *, control_test_id, security_test_id, discovery_command, operation):
+            def run(self, patch, *, control_test_id, security_test_id, discovery_command, operation, witness=None):
                 entry = {"purpose": purpose, "operation": str(operation), "patch_sha256": patch.sha256,
-                         "observed": None, "failure": None}
+                         "witness_request": encode(witness), "observed": None, "failure": None}
                 with journal._idle:
                     journal.entries.append(entry)
                     journal._running += 1
                 try:
                     observed = inner.run(patch, control_test_id=control_test_id, security_test_id=security_test_id,
-                                         discovery_command=discovery_command, operation=operation)
+                                         discovery_command=discovery_command, operation=operation, witness=witness)
                 except BaseException as exc:
                     entry["failure"] = encode(exc)
                     raise
@@ -125,6 +125,8 @@ def result_record(run: DirectRun) -> dict:
     return {"stopped_at": run.stopped_at, "reason": run.reason, "identification": _dump(run.identification),
             "plan": _dump(run.plan), "patch": _dump(run.patch), "observation_plan": _dump(run.observation_plan),
             "executions": executions, "gate": _dump(run.gate), "assessment": _dump(run.assessment),
+            "witnesses": [{"witness": _dump(w.witness), "sandbox_events": None if w.sandbox_events is None else
+                           [_dump(e) for e in w.sandbox_events], "reason": w.reason} for w in run.witnesses],
             "limitations": list(run.limitations)}
 
 
@@ -155,7 +157,8 @@ async def record_run(evidence: Path, live: tuple[str, ...], config: LocalModelCo
             "models": {stage: describe_model(selected[stage]) for stage in STAGES},
             "versions": {stage: dict(zip(("prompt_version", "config_version", "skill_sha256"), VERSIONS[stage]))
                          for stage in STAGES},
-            "runner": runner, "witness_capture": "none",
+            "runner": runner, "witness_capture": "operator_probe" if case.witness_envelope else "none",
+            "witness_envelope": encode(case.witness_envelope),
             "environment": _dump(case.environment), "environment_identity": _dump(case.environment_identity),
             "revision_sources": case.revision_sources, "source": {"python": sys.version}}, indent=2))
         journal = Journal(runners)

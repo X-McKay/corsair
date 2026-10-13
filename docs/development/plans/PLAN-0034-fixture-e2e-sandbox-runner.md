@@ -52,4 +52,7 @@ Credential placeholder gate, RIG0 after `make openshell-install` (the E2E gate's
 
 ## Decisions and next action
 
+2026-10-13, merging main `d479e3b` (PR #35, SPEC-0033 witness capture): the sandbox route now requests the operator probe witness like the reviewed route (`witness_envelope` from the fixture case, `witness_record_path=/tmp/corsair-witness.json`); the journal keeps each witness request and still drains in-flight calls. Offline, the scripted chain over fake sandbox ports now permits `completed`/`reproduced`/`verified` with both witnesses admitted; the live gate records the control's verdict and witness reasons and asserts only its native outcomes and `completed`, leaving witness qualification to `make qualify-witness`. `make test-config` 826 passed. The RIG0 run above predates this merge and ran without a witness.
+
+
 The sandbox route reuses PLAN-0032's adapters and wiring unchanged; the only new code is the purpose-to-variant factory, the sandbox environment declaration and the gate. The scripted control runs first in every gate invocation so a live failure can be attributed to the agent rather than the route. Live agent outcomes are not gate assertions. Next: switch the RIG0 worktree to this branch and run the gate.

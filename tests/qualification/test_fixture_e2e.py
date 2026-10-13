@@ -2,8 +2,9 @@
 
 One all-scripted control run first proves the sandbox route end to end; then each live run puts the
 named stages on the operator's local model. The gate asserts the control and the runtime (confirmed
-cleanup, no remaining Sandbox resources); live agent outcomes are recorded, never asserted. No witness
-is captured outside the test process, so no run can reach a reproduced finding or a verified fix.
+cleanup, no remaining Sandbox resources); live agent outcomes are recorded, never asserted. Every run
+requests the SPEC-0033 operator probe witness; the gate verdict and witness admission are recorded, and the
+witness itself is qualified by `make qualify-witness`, not here.
 """
 from dataclasses import asdict
 import asyncio
@@ -39,7 +40,7 @@ SOURCES = ['evals/fixture_e2e/case.py', 'evals/fixture_e2e/reviewed.py', 'evals/
            'evals/fixture_e2e/sandbox.py', 'src/corsair/composition/direct.py', 'src/corsair/composition/evidence.py',
            'src/corsair/adapters/openshell_workspace.py', 'src/corsair/adapters/pytest_runner.py',
            'src/corsair/adapters/openshell.py', 'src/corsair/adapters/openshell_execution.py',
-           'src/corsair/core/disposition.py', 'tests/qualification/test_fixture_e2e.py',
+           'src/corsair/core/disposition.py', 'src/corsair/nodes/witness.py', 'src/corsair/nodes/witness_probe.py', 'tests/qualification/test_fixture_e2e.py',
            'benchmarks/fixtures/path-traversal/test_documents.py',
            'benchmarks/fixtures/path-traversal/vulnerable/documents.py',
            'benchmarks/fixtures/path-traversal/fixed/documents.py', 'policies/openshell/identity.yaml',
@@ -90,7 +91,7 @@ def test_fixture_chain_in_fresh_sandbox_workspaces(kube, adapter_gateway, reques
     config = LocalModelConfig.model_validate_json(Path(provider).read_bytes()) if live and repetitions else None
     summary = dict(outcome='failed', scope='SPEC-0018 E2E-0 chain through OpenShellTestWorkspace; fixture only',
                    live_stages=list(live), application_retries=0, stage_retries=0, runs=[],
-                   witness='absent: no execution node captures it outside the test process')
+                   witness='SPEC-0033 operator probe in the test interpreter; tamper-evident, not tamper-proof')
     kube.evidence.chmod(0o700)
     (kube.evidence/'fixture-e2e-hashes.json').write_text(json.dumps(
         {p: hashlib.sha256((ROOT/p).read_bytes()).hexdigest() for p in SOURCES}, indent=2))
@@ -140,17 +141,18 @@ def test_fixture_chain_in_fresh_sandbox_workspaces(kube, adapter_gateway, reques
                     record['elapsed_seconds'] = round(time.monotonic()-started, 1)
                     if (evidence/'native-runs.json').exists():
                         record['native_runs'] = native_record(evidence)
-                record.update(run_summary(run), limitations=list(run.limitations))
+                record.update(run_summary(run), limitations=list(run.limitations),
+                              witnesses=[w.reason for w in run.witnesses])
                 cluster_clean(kube, 400)
                 record['cluster_sandboxes_absent'] = True
                 assert all(n['cleanup'] == 'confirmed' for n in record['native_runs']), record['native_runs']
                 if not stages:
-                    # The control: the reviewed bytes through every real sandbox step, witness-limited verdict.
+                    # The control: the reviewed bytes through every real sandbox step; the verdict is recorded.
                     assert (run.stopped_at, run.reason) == (None, 'complete'), run.reason
                     baseline, candidate = run.executions
                     assert [c.outcome for c in baseline.observed.execution.cases] == ['passed', 'failed']
                     assert [c.outcome for c in candidate.observed.execution.cases] == ['passed', 'passed']
-                    assert record['gate'] == {'execution': 'completed', 'finding': 'inconclusive', 'fix': 'not_verified'}
+                    assert record['gate'] is not None and record['gate']['execution'] == 'completed', record['gate']
                 record['outcome'] = 'recorded'
         summary['outcome'] = 'passed'
     except BaseException as error:

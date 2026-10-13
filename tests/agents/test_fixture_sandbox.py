@@ -54,15 +54,16 @@ class Sandboxes(Lifecycle):
 
 
 class SandboxRun:
-    """Test-only stand-in for in-sandbox execution: the operator argv with interpreter and scratch localized."""
+    """Test-only stand-in for in-sandbox execution: the operator argv with interpreter and /tmp paths localized
+    per sandbox, since each real sandbox has its own /tmp."""
     def __init__(self, root, scratch):
         self.root, self.scratch, self.commands = root, scratch, []
 
     def execute(self, handle, command, operation):
         self.commands.append(command)
-        argv = [sys.executable if t == PYTHON else str(self.scratch) if t == "/tmp/corsair-scratch" else t
-                for t in command]
-        argv = [t.replace("/tmp/corsair-junit.xml", str(self.scratch.parent / "junit.xml")) for t in argv]
+        tmp = self.scratch / handle.id
+        tmp.mkdir(parents=True, exist_ok=True)
+        argv = [sys.executable if t == PYTHON else t.replace("/tmp/corsair-", f"{tmp}/corsair-") for t in command]
         started = time.monotonic()
         done = subprocess.run(argv, cwd=self.root, env={"PATH": os.environ["PATH"]}, capture_output=True, timeout=60)
         return ExecutionReceipt(str(operation), handle, "local", time.monotonic() - started, "acknowledged",
@@ -105,8 +106,10 @@ def test_scripted_chain_runs_every_purpose_in_a_fresh_sandbox(store, tmp_path):
     assert [c.outcome for c in baseline.observed.execution.cases] == ["passed", "failed"]
     assert [c.outcome for c in candidate.observed.execution.cases] == ["passed", "passed"]
     assert all(e.observed.cleanup == "confirmed" for e in run.executions)
+    # The SPEC-0033 operator probe's records travel through the sandbox route like the reviewed one.
+    assert [w.reason for w in run.witnesses] == ["admitted", "admitted"]
     assert (run.gate.permitted.execution, run.gate.permitted.finding, run.gate.permitted.fix) == (
-        "completed", "inconclusive", "not_verified")
+        "completed", "reproduced", "verified")
     assert all(command[:len(DISCOVER)] == DISCOVER for command in execution.commands if "--collect-only" in command)
 
 
@@ -139,7 +142,8 @@ def test_record_run_keeps_the_sandbox_route_and_environment(store, tmp_path):
     assert configuration["revision_sources"] == case.revision_sources
     assert [e["purpose"] for e in json.loads((evidence / "native-runs.json").read_text())] == [
         "development", "baseline", "candidate"]
-    assert cli.summary(run)["gate"] == {"execution": "completed", "finding": "inconclusive", "fix": "not_verified"}
+    assert cli.summary(run)["gate"] == {"execution": "completed", "finding": "reproduced", "fix": "verified"}
+    assert configuration["witness_capture"] == "operator_probe"
 
 
 def test_journal_drains_a_runner_call_still_running_after_its_stage():

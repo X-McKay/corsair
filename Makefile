@@ -177,3 +177,9 @@ qualify-fixture-e2e:
 	test -z "$(CORSAIR_E2E_LIVE)" -o "$(CORSAIR_E2E_RUNS)" = 0 -o -f "$(CORSAIR_PROVIDER_CONFIG)"
 	mkdir -p "$(CORSAIR_QUAL_RUN)"
 	uv run --locked python -m pytest tests/qualification -m fixture_e2e --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --provider-config "$(CORSAIR_PROVIDER_CONFIG)" --e2e-live "$(CORSAIR_E2E_LIVE)" --e2e-runs "$(CORSAIR_E2E_RUNS)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
+
+.PHONY: qualify-witness
+qualify-witness:
+	test ! -e "$(CORSAIR_QUAL_RUN)"
+	mkdir -p "$(CORSAIR_QUAL_RUN)"
+	uv run --locked python -m pytest tests/qualification -m witness --tb=short --kubeconfig .state/kind/kubeconfig --context kind-corsair --network-evidence "$(CORSAIR_NETWORK_RUN)" --evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
