@@ -12,7 +12,7 @@ import json
 import re
 from typing import Mapping
 
-from corsair.agents.environment.contracts import EnvironmentInput, ReadyEnvironment, Toolchain
+from corsair.agents.environment.contracts import EnvironmentInput, ReadyEnvironment, SmokeTest, Toolchain
 from corsair.agents.test_planning.contracts import BaselineTest, EnvironmentEvidence
 from corsair.core.blockers import Blocker
 from corsair.core.disposition import EnvironmentIdentity
@@ -126,8 +126,9 @@ def runtime_outcome(requirement: RuntimeRequirement | str, selection: Selection 
     if selection.image_id not in prepared:
         return stop('not_prepared', f'matrix row {selection.image_id} has no prepared image on this node')
     return RuntimeOutcome(status='supported', requirement=requirement, detection=None, selection=selection,
-                          image=prepared[selection.image_id], reason=f'runtime supported by matrix row {selection.image_id}',
-                          toolchain=toolchain(selection, matrix, prepared))
+                          image=prepared[selection.image_id], reason=f'runtime supported by matrix row {selection.image_id}' + (
+                              f' (runtime inferred, not declared: {"; ".join(selection.inferred_from)})'[:1900] if selection.runtime_basis == 'inferred' else ''),
+                          toolchain=toolchain(selection, matrix, prepared), smoke_tests=smoke_tests(selection, matrix))
 
 
 def select_runtime(inputs: RuntimeInputs, catalog: RuntimeCatalog) -> RuntimeOutcome:
@@ -169,6 +170,19 @@ def check_ready(result: ReadyEnvironment, selection: Supported, prepared: Mappin
     admitted = {AGENT_FRAMEWORK.get(c.name) for c in selection.checks if c.kind == 'test_framework' and c.satisfied}
     if result.framework not in admitted:
         raise ValueError(f'framework {result.framework!r} is not one the selection admitted ({sorted(a for a in admitted if a)})')
+
+
+def smoke_tests(selection: Supported, matrix: Matrix) -> tuple[SmokeTest, ...]:
+    """SPEC-0071: the smoke template carried on each framework row the selection admitted on its image, offered to
+    the environment agent as a baseline for a project with no test that runs. Two admitted frameworks sharing one
+    smoke path is ambiguous, so neither is offered."""
+    image = next(r for r in matrix.images if r.id == selection.image_id)
+    admitted = {c.name for c in selection.checks if c.kind == 'test_framework' and c.satisfied}
+    offered = [SmokeTest(framework=AGENT_FRAMEWORK[f.name], path=f.smoke.path, test_id=f.smoke.test_id, content=f.smoke.content)
+               for f in sorted(matrix.frameworks, key=lambda f: f.name)
+               if f.applies(image) and f.name in admitted and f.smoke is not None and f.name in AGENT_FRAMEWORK]
+    paths = [t.path for t in offered]
+    return tuple(t for t in offered if paths.count(t.path) == 1)
 
 
 def recipe_sha256(result: ReadyEnvironment) -> str:

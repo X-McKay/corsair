@@ -1,0 +1,15 @@
+{
+  "case": "ih-python-openredirect",
+  "language": "python",
+  "split": "development",
+  "oracle": {
+    "stopped_at": null,
+    "gate": {
+      "execution": "completed",
+      "finding": "reproduced",
+      "fix": "verified"
+    },
+    "assessment_admitted": true
+  },
+  "case_sha256": "4712fa8894776b8afde6a35856f5b6079e39de128ee7cd7bab55e94ff5ddcabd"
+}
