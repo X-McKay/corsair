@@ -49,7 +49,7 @@ def test_a_supported_prepared_row_continues_and_is_recorded(run):
 
 
 @pytest.mark.parametrize('inputs, prepared, status, reason', [
-    (pyproject('>=3.7,<3.12'), True, 'unsupported', 'runtime unsupported: cpython'),
+    (pyproject('>=3.8,<3.12'), True, 'unsupported', 'runtime unsupported: cpython'),
     (RuntimeInputs(files={'README.md': b'x'}), True, 'undetermined', 'no runtime requirement: no build files'),
     (RuntimeInputs(files={'pytest.ini': b'[pytest]\n'}), True, 'undetermined', 'runtime undetermined: '),
     (pyproject('>=3.10'), False, 'not_prepared', f'matrix row {ROW} has no prepared image on this node'),

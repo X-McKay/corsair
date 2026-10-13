@@ -197,7 +197,9 @@ def test_selection_supported_unsupported_conflict():
     supported = select(python_project('>=3.9'), matrix)
     assert supported.status == 'supported' and supported.image_id == 'cpython-3.12-pytest'
     old = select(python_project('>=3.7,<3.12'), matrix)
-    assert old.status == 'unsupported' and [(n.name, n.allowed) for n in old.needs] == [('cpython', '>=3.7,<3.12')]
+    assert (old.status, old.image_id, old.evidence) == ('supported', 'cpython-3.7-pytest', 'live')  # SPEC-0046 row, never a nearby version
+    between = select(python_project('>=3.8,<3.12'), matrix)
+    assert between.status == 'unsupported' and [(n.name, n.allowed) for n in between.needs] == [('cpython', '>=3.8,<3.12')]
     old_pytest = select(python_project('>=3.9', '==6.2.5'), matrix)
     assert old_pytest.status == 'unsupported' and [n.name for n in old_pytest.needs] == ['pytest']
     conflict = detect({'pyproject.toml': b'[project]\nrequires-python = ">=3.10"\n', '.python-version': b'3.8.12\n',
@@ -394,12 +396,11 @@ def test_malformed_pipfile_structure_is_recorded_not_raised(pipfile):
 
 def test_framework_rows_scoped_to_images():
     # A framework range qualified on one image must not be claimed by another image of the same language.
-    data = load().model_dump()
-    py312 = data['images'][0]
-    py37 = {**py312, 'id': 'cpython-3.7-pytest', 'runtime': {'name': 'cpython', 'version': '3.7.17'}}
-    old = {**data['frameworks'][0], 'versions': '>=6.0,<8', 'images': ['cpython-3.7-pytest']}
-    new = {**data['frameworks'][0], 'images': ['cpython-3.12-pytest']}
-    matrix = Matrix.model_validate({**data, 'images': [py312, py37, *data['images'][1:]], 'frameworks': [new, old]})
+    matrix = load()
+    data = matrix.model_dump()
+    py312, py37 = data['images'][:2]
+    new, old = data['frameworks'][:2]
+    assert (py37['id'], new['images'], old['images']) == ('cpython-3.7-pytest', ('cpython-3.12-pytest',), ('cpython-3.7-pytest',))
     wide = lambda pytest: python_project('>=3.7', pytest)
     assert select(wide('>=9,<10'), matrix).image_id == 'cpython-3.12-pytest'
     assert select(python_project('>=3.7,<3.8', '>=9,<10'), matrix).status == 'unsupported'  # pytest 9 not qualified on 3.7
@@ -410,7 +411,7 @@ def test_framework_rows_scoped_to_images():
     with pytest.raises(ValueError, match='at least 1'):
         Matrix.model_validate({**data, 'frameworks': [{**new, 'images': []}]})
     # Al's re-review of dbbb980: a new image row without its own framework row gets no framework support.
-    unscoped = Matrix.model_validate({**data, 'images': [py312, py37, *data['images'][1:]]})
+    unscoped = Matrix.model_validate({**data, 'frameworks': [f for f in data['frameworks'] if f is not old]})
     probe = detect({'pyproject.toml': b'[project]\nrequires-python = ">=3.7,<3.8"\n[tool.pytest.ini_options]\n'}, 'python')
     assert select(probe, unscoped).status == 'unsupported'
     with pytest.raises(ValueError, match='not a python row'):
