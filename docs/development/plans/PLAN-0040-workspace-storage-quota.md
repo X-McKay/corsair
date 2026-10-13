@@ -23,8 +23,8 @@ Implement [SPEC-0036](../specs/SPEC-0036-workspace-storage-quota.md) (bytes and 
 - [ ] Receipt `statfs` parsing, `storage_exhausted` attribution and host size pre-check; unit tests.
 - [ ] Live gate `make qualify-workspace-quota` on two fresh nodes (SPEC-0036 acceptance).
 - [ ] Rerun the SPEC-0032 workspace gate and E2E-0 on the quota class with the workspace policy.
-- [ ] Benchmark case manifests, loader and report (IDEA-0005 step 1).
-- [ ] Review, CURRENT.md, handoff.
+- [x] Benchmark case manifests, loader and report (IDEA-0005 step 1).
+- [x] Review, CURRENT.md, handoff ([HANDOFF-0058](../handoffs/HANDOFF-0058-workspace-quota-and-benchmark-cases.md)).
 
 ## Validation and progress
 
@@ -37,6 +37,8 @@ Implement [SPEC-0036](../specs/SPEC-0036-workspace-storage-quota.md) (bytes and 
 **Offline build** (`deploy/storage/`, `deploy/openshell/values-workspace-quota.yaml`, `policies/openshell/workspace.yaml`, `make workspace-storage`): `setup.sh`/`teardown.sh` run under shimmed `stat`/`xfs_quota`/`xfs_io` in `tests/configuration/test_workspace_quota_guards.py`: limits set and read back; refusal and no volume left for non-XFS, accounting or enforcement off, a failed limit, a mismatched read-back, block mode and sizes outside 1 MiB–16 GiB; teardown clears the project. Manifests agree on class, provisioner and ConfigMap names; per-class quota (2 × 8Gi) stays below the 18G image; the workspace policy equals the identity policy minus `/tmp`. `make test-config`: 867 passed (853 on main plus 14). Nothing applied to a cluster. Open: helper package versions are recorded at build and pinned afterwards (the cloud proxy refused the Alpine index); the node mount does not survive a node restart; `openshell-sandboxes` must exist before the gateway installs with the overlay; whether the gateway's chart RBAC covers a separate sandbox namespace in 0.1.3 is untested.
 
 **Benchmark inventory**: see IDEA-0005; every claim cites source on `334aa03`.
+
+**Benchmark cases** (IDEA-0005 step 1, offline, not wired into the chain): `benchmarks/cases/jspwiki-forwarding/case.yaml` splits an agent part (neutral issue, scope, repository, baseline/candidate commits, language, build system) from an evaluator part (case id, CWE, fix reference, reference test digest, hypothesised per-revision outcomes, chain oracle left null because the file-open witness cannot observe a dispatcher choice, split null, admission, blocking gaps). `evals/benchmark/cases.py` joins all 50 inventory rows with manifests and refuses manifests that disagree with the inventory, reference tests whose digest differs, and issue text naming the case, CVE/GHSA ids or a dataset; `agent_input()` builds `IssueAnalysisInput` from the agent part only. `python -m evals.benchmark.report`: 50 cases, 1 manifest, 0 admitted; every case blocked by G1, G2b, G2c, G3, G4, G7, G10, G11, G12. Defaults for rows without a manifest are a per-language table; G7 applies to all because 40 rows have no CWE, G13 to none until a build is measured. The JSPWiki issue text is unreviewed (`issue_reviewed: false`). Reference test digest recomputed: `6ebf6244…b95d`, matching the README and PLAN-0021. `make test-config`: 888 passed.
 
 ## Decisions and next action
 
