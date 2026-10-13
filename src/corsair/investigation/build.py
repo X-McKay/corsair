@@ -177,9 +177,8 @@ def build(request: IssueRequest, work: Path, images: dict[str, str], *, roots: t
     repository, repository_basis = repository_of(request)
     if request.revision is None:
         raise Refused("the request names no revision (resolving a branch to a commit is not built yet)")
-    if request.fixed_revision is None:
-        raise Refused("the request names no fixed revision (a vulnerable-only run is not built yet)")
-    commits = {"baseline": request.revision, "candidate": request.fixed_revision}
+    # Without a fix commit only the reported revision runs and no fix is verified (fix not_applicable; Al, 2026-10-13).
+    commits = {"baseline": request.revision} | ({"candidate": request.fixed_revision} if request.fixed_revision else {})
     trees = _acquire(repository, commits, work, roots, acquisition, checkout)
     baseline = trees["baseline"]
     paths = sorted(p.relative_to(baseline).as_posix() for p in baseline.rglob("*") if p.is_file() and not p.is_symlink())
