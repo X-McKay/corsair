@@ -10,12 +10,11 @@ from dataclasses import dataclass
 import re
 from uuid import uuid5
 
-from corsair.adapters.native_runner import NativeRunner, error_text
-from corsair.ports.test_runner import (MAX_TEST_ID, ApprovedPatch, Discovery, Execution, PerlTestId,
-                                       WitnessCapture, WitnessRequest, approved_path)
+from corsair.adapters.native_runner import NativeRunner, check_bounds, check_command, check_ids, check_root
+from corsair.ports.test_runner import ApprovedPatch, PerlTestId, WitnessRequest, approved_path
 from corsair.reports.junit import MAX_JUNIT_BYTES
+from corsair.reports.admission import failed_count
 from corsair.reports.tap import RESULT, TapError, parse_tap
-from corsair.reports.test_observations import AdmittedTestClaims, TestClaim, WorkloadTestReport
 
 # Fixed operator scripts run by absolute /bin/sh; the root, the Perl argv and the file arrive only as positional
 # arguments. Execution: stdout is the merged TAP stream, exit status is the test file's.
@@ -30,7 +29,6 @@ LISTER = ('use strict; use warnings; use Test::More (); use POSIX ();'
           ' if (!defined $loaded && $!) { print STDERR "cannot read $file: $!\\n"; POSIX::_exit(2) }'
           ' POSIX::_exit(0);')
 LISTED = re.compile(r'corsair-subtest\t(?P<name>[A-Za-z_][A-Za-z0-9_]*)')
-CLAIM = {'passed': 'passed', 'failed': 'failed', 'error': 'failed', 'skipped': 'skipped'}
 
 
 @dataclass(frozen=True)
@@ -46,20 +44,15 @@ class TapRunnerConfig:
     max_excerpt_chars: int = 4096
 
     def __post_init__(self):
-        if (type(self.command) is not tuple or not self.command
-                or any(type(t) is not str or not t or '\0' in t for t in self.command)):
-            raise ValueError('Runner command must be nonempty string tokens')
+        check_command(self.command)
         if not self.command[0].startswith('/'):
             raise ValueError('Perl must be an absolute operator path')
         for token in self.command[1:]:
             if not token.startswith('-I'):
                 raise ValueError('Perl prefix must hold `-I<dir>` options only')
             approved_path(token[2:])
-        if type(self.workspace_root) is not str or not self.workspace_root.startswith('/') or '\0' in self.workspace_root:
-            raise ValueError('Workspace root must be an absolute operator path')
-        if not (type(self.max_report_bytes) is int and 1 <= self.max_report_bytes <= MAX_JUNIT_BYTES
-                and type(self.max_excerpt_chars) is int and 1 <= self.max_excerpt_chars <= 65536):
-            raise ValueError('Runner bounds outside the admitted range')
+        check_root(self.workspace_root)
+        check_bounds(self.max_report_bytes, self.max_excerpt_chars, MAX_JUNIT_BYTES)
 
 
 def listed(stdout: bytes) -> tuple[str, ...] | None:
@@ -74,27 +67,21 @@ def listed(stdout: bytes) -> tuple[str, ...] | None:
 
 
 class TapRunner(NativeRunner):
-    def run(self, patch, *, control_test_id, security_test_id, discovery_command, operation, witness=None):
-        if discovery_command != self._config.command:
-            raise ValueError('TAP discovery command must equal the operator\'s Perl prefix')
-        return super().run(patch, control_test_id=control_test_id, security_test_id=security_test_id,
-                           discovery_command=discovery_command, operation=operation, witness=witness)
+    exact_discovery = 'TAP discovery command must equal the operator\'s Perl prefix'
+    tool, report_format = 'perl', 'TAP'
+
+    @staticmethod
+    def _exit_agrees(native_exit, cases):
+        # Test::More exits with the number of failed subtests, or 255 when the file died; parse_tap also
+        # checks the plan, which only the stream shows.
+        if any(case.outcome == 'error' for case in cases):
+            return native_exit == 255
+        return native_exit == failed_count(cases)
 
     def _validate(self, patch: ApprovedPatch, ids: tuple[str, str], witness: WitnessRequest | None) -> None:
-        if witness is not None and not isinstance(witness, WitnessRequest):
-            raise ValueError('Witness capture needs a typed request')
-        try:
-            parsed = [PerlTestId.parse(i) for i in ids]
-        except ValueError as error:
-            raise ValueError('Two distinct `path/to/file.t#subtest` ids are required') from error
-        paths = {item.path for item in patch.files}
-        if len(set(ids)) != 2 or any(len(i) > MAX_TEST_ID or item.path not in paths for i, item in zip(ids, parsed)):
-            raise ValueError('Two distinct test ids declared in patch files are required')
         # One TAP stream per file; both subtests in one file keep exactly one stream to admit.
-        if len({item.path for item in parsed}) != 1:
-            raise ValueError('Control and security tests must be subtests of one file')
-        if any(path[0] == '-' for path in paths):
-            raise ValueError('Patch paths conflict with runner arguments')
+        check_ids(patch, ids, witness, PerlTestId.parse, '`path/to/file.t#subtest`', unit=lambda item: item.path,
+                  together='Control and security tests must be subtests of one file')
 
     def _discovery_argv(self, file: str) -> tuple[str, ...]:
         return ('/bin/sh', '-c', WRAPPER, 'corsair-tap-discover', self._config.workspace_root,
@@ -102,48 +89,27 @@ class TapRunner(NativeRunner):
 
     def _stages(self, prepared, ids, discovery_command, paths, operation, witness):
         file = PerlTestId.parse(ids[0]).path
-        command = self._discovery_argv(file)
-        receipt, problem = self._execute(prepared.handle, command, uuid5(operation, 'discovery'))
-        if problem:
-            discovery = Discovery('execution_failure', (), self._excerpt(receipt), command, receipt)
-            return discovery, None, 'discovery', f'discovery: {problem}', None
-        names = listed(receipt.stdout)
-        found = None if names is None else tuple(f'{file}#{name}' for name in names)
-        if receipt.native_exit != 0 or found is None or len(found) != len(set(found)) or set(found) != set(ids):
-            discovery = Discovery('collection_error', found or (), self._excerpt(receipt), command, receipt)
-            return (discovery, None, 'discovery', f'discovery: exit {receipt.native_exit}, found {list(found or ())}',
-                    None)
-        discovery = Discovery('discovered', found, '', command, receipt)
+        read = lambda stdout: None if (names := listed(stdout)) is None else tuple(f'{file}#{name}' for name in names)
+        discovery, stopped = self._discover(prepared.handle, self._discovery_argv(file), ids, operation, read)
+        if stopped:
+            return stopped
         execution, layer = self._run_once(prepared, ids, file, frozenset(paths), uuid5(operation, 'execution'))
-        captured = None
-        if witness is not None:
-            # No Perl probe exists; nothing is run, so the gates see an absent witness.
-            captured = WitnessCapture('unavailable', witness, str(uuid5(operation, 'witness-nonce')), '', b'', None,
-                                      'no Perl witness probe', None)
-        return discovery, execution, layer, execution.detail, captured
+        return discovery, execution, layer, execution.detail, self._no_witness(witness, operation, 'no Perl witness probe')
 
     def _run_once(self, prepared, ids, file, test_paths, operation):
         argv = ('/bin/sh', '-c', WRAPPER, 'corsair-tap', self._config.workspace_root, *self._config.command, file)
         receipt, problem = self._execute(prepared.handle, argv, operation)
-        failure = lambda layer, detail, report=None, status='execution_failure': (
-            Execution(status, (), report, None, detail, argv, receipt), layer)
         if problem:
-            return failure('execution', f'execution: {problem}')
+            return self._failure(argv, receipt, 'execution', f'execution: {problem}')
         if receipt.native_exit == 125:
-            return failure('execution', 'execution: workspace root unavailable')
+            return self._failure(argv, receipt, 'execution', 'execution: workspace root unavailable')
+        report, stored = self._store_report(receipt.stdout)
+        if stored:
+            return self._failure(argv, receipt, 'report', f'report storage: {stored}')
         try:
-            report = self._store.put(receipt.stdout)
-        except Exception as error:
-            return failure('report', f'report storage: {error_text(error)}')
-        try:
+            # The exit status is checked against the outcomes inside: Test::More's rule depends on how the file ended.
             cases = parse_tap(receipt.stdout, ids, exit_status=receipt.native_exit, test_paths=test_paths,
                               max_bytes=self._config.max_report_bytes)
         except TapError as error:
-            return failure('report', f'report: {error}', report, 'invalid_report')
-        control, security = (TestClaim(test_id=case.test_id, outcome=CLAIM[case.outcome]) for case in cases)
-        claims_report = WorkloadTestReport(schema_version='test-observations-v1', operation=str(operation),
-                                           source_sha256=prepared.source.sha256, tests_sha256=prepared.tests.sha256,
-                                           control=control, security=security)
-        claims = AdmittedTestClaims(str(operation), prepared.handle, prepared.source, prepared.tests, report,
-                                    receipt.native_exit, claims_report)
-        return Execution('completed', cases, report, claims, '', argv, receipt), None
+            return self._failure(argv, receipt, 'report', f'report: {error}', report, 'invalid_report')
+        return self._completed(prepared, argv, receipt, cases, report, operation)
