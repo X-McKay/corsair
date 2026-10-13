@@ -2116,7 +2116,8 @@
   },
   "CVE-2023-31486": {
    "case_id": "CVE-2023-31486",
-   "url": "https://salsa.debian.org/perl-team/interpreter/perl",
+   "url": "https://salsa.debian.org/perl-team/interpreter/perl.git",
+   "fetched_url": "https://salsa.debian.org/perl-team/interpreter/perl",
    "commit": "1490431e40e22052f75a0b3449f1f53cbd27ba92",
    "via": "patch",
    "repository_matches_inventory": false,
@@ -2180,7 +2181,7 @@
     }
    },
    "acquired_on": "operator workstation RIG0 (direct egress); this cloud container is refused by its egress proxy",
-   "note": "Fix lives in Debian perl packaging history, not the inventory repository (HTTP-Tiny); needs case review."
+   "note": "Fix lives in Debian perl packaging history, not the inventory repository (HTTP-Tiny); needs case review. Fetched before acquisition stopped following redirects: GitLab redirects a repository URL without .git to the .git URL now pinned (seen on gitlab.com; salsa runs GitLab and is unreachable from the cloud container). Not yet refetched under the no-redirect rule; the commit identity is verified either way."
   },
   "CVE-2026-15043": {
    "case_id": "CVE-2026-15043",

@@ -20,6 +20,8 @@ def test_every_inventory_case_resolves_or_names_its_gap():
         ('patch', 'https://github.com/libwww-perl/HTTP-Daemon')
     # A fix hosted outside the inventory's repository is resolved where the commit is, and flagged.
     assert not resolved['CVE-2023-31486'].repository_matches_inventory
+    # Acquisition follows no redirects, so a GitLab commit reference resolves to the canonical `.git` URL.
+    assert resolved['CVE-2023-31486'].target.url == 'https://salsa.debian.org/perl-team/interpreter/perl.git'
     assert resolved['VUL4J-18'].repository_matches_inventory
 
 

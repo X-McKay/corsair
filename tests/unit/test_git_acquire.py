@@ -209,3 +209,51 @@ def test_result_receipt_loss_keeps_the_known_outcome(tmp_path, origin, monkeypat
     receipt = raised.value.receipt
     assert raised.value.layer == 'receipt_storage' and receipt['outcome'] == 'completed'
     assert receipt['result']['commit'] == origin[2] and 'disk full' in receipt['storage_error']
+
+
+@pytest.fixture
+def redirecting_server(tmp_path):
+    """An admitted HTTPS host (localhost) that redirects every request to another host (127.0.0.1)."""
+    import http.server, shutil, ssl, threading
+    if not shutil.which('openssl'): pytest.skip('openssl not installed')
+    cert, key = tmp_path/'cert.pem', tmp_path/'key.pem'
+    subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', '/CN=localhost',
+                    '-addext', 'subjectAltName=DNS:localhost,IP:127.0.0.1', '-keyout', key, '-out', cert],
+                   check=True, capture_output=True)
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER); context.load_cert_chain(cert, key)
+    other_requests = []
+
+    def serve(handler):
+        server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), handler)
+        server.socket = context.wrap_socket(server.socket, server_side=True)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        return server
+
+    class Other(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            other_requests.append(self.path); self.send_response(404); self.send_header('Content-Length', '0')
+            self.end_headers()
+        def log_message(self, *args): pass
+    other = serve(Other)
+
+    class Redirect(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(302); self.send_header('Location', f'https://127.0.0.1:{other.server_port}{self.path}')
+            self.send_header('Content-Length', '0'); self.end_headers()
+        def log_message(self, *args): pass
+    admitted = serve(Redirect)
+    yield f'https://localhost:{admitted.server_port}/fixture/repo', cert, other_requests
+    admitted.shutdown(); other.shutdown()
+
+
+def test_redirects_to_unadmitted_hosts_are_not_followed(tmp_path, origin, redirecting_server):
+    served_url, cert, other_requests = redirecting_server
+    # The admitted URL is served by a local HTTPS host; Git's own redirect handling is what is under test.
+    fetch = f'set -- $(printf "%s\\n" "$@" | sed "s#^{URL}\\$#{served_url}#"); exec {GIT} "$@"'
+    with GitAcquisition(fake_git(tmp_path, origin[0], fetch=fetch), pin(PRLIMIT),
+                        transport=HostTransport(frozenset({'github.com'}), ca_bundle=cert),
+                        limits=AcquireLimits(wall_seconds=30), receipts=private(tmp_path/'receipts')) as acquire:
+        with pytest.raises(AcquisitionError) as raised:
+            acquire.acquire(FetchTarget(URL, origin[2]), tmp_path/'repo', uuid4())
+    assert other_requests == [] and raised.value.layer == 'transport'
+    assert 'returned error: 302' in raised.value.receipt['native_calls'][-1]['stderr']

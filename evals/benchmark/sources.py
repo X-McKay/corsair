@@ -66,6 +66,8 @@ def resolve(row: dict) -> SourceRequest | Unresolved:
         url, via = f'https://github.com/{match["path"]}', 'pull_request'
     elif match := COMMIT_URL.fullmatch(reference):
         url, via = f'https://{match["host"]}/{match["path"]}', 'patch' if match['patch'] else 'commit'
+        # Acquisition follows no redirects, and GitLab redirects a repository URL without `.git` to the one with it.
+        if '/-/commit/' in reference: url += '.git'
     else:
         return Unresolved(row['case_id'], 'fix reference is not a commit URL')
     return SourceRequest(row['case_id'], FetchTarget(url, match['commit']), via, _same(url, repository))

@@ -186,7 +186,9 @@ class GitAcquisition:
         for message in sorted(limits.fsck_warn):
             config += ['-c', f'fetch.fsck.{message}=warn', '-c', f'fsck.{message}=warn']
         if network:
-            config += ['-c', 'protocol.https.allow=always']
+            # protocol.https.allow limits the scheme, not the destination: a redirect would let an admitted server
+            # send this fetch to a host the operator never allowed, so the admitted URL must be the canonical one.
+            config += ['-c', 'protocol.https.allow=always', '-c', 'http.followRedirects=false']
             if self._transport.proxy: config += ['-c', 'http.proxy='+self._transport.proxy]
             if self._transport.ca_bundle: config += ['-c', f'http.sslCAInfo={self._transport.ca_bundle}']
         argv = [str(self._prlimit.path), f'--as={limits.memory_bytes}:{limits.memory_bytes}',
