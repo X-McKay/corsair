@@ -30,6 +30,14 @@ jobs:
       - run: npx playwright install --with-deps chromium
         working-directory: ui
       - run: make ui-test
+      - name: Build production image
+        run: docker build -f deploy/ui/Dockerfile -t corsair-ui:ci .
+      - name: Check production image against an actual scripted evaluation
+        run: |
+          results_root=$(mktemp -d /tmp/corsair-ui-ci-XXXXXX)
+          chmod 755 "$results_root"
+          CORSAIR_EVAL_RESULTS="$results_root/evals" uv run --locked python -m evals.run identification
+          python deploy/ui/smoke.py --image corsair-ui:ci --results "$results_root/evals" --runtime-matrix deploy/runtime-matrix.yaml
       - name: Retain browser failure evidence
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

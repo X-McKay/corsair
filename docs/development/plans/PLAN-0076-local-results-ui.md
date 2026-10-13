@@ -83,3 +83,30 @@ After user approval, checked PR #107 at1c0e937. Automated review finding42614120
 Remote UI job38444867282 failed waiting5s for the runtime-page h1; no browser artifact had been retained, so the root cause is not established. Browser assertions now have a bounded15s wait within the existing30s test timeout, default workers are capped at2 (also addresses prior local screenshot pressure), and CI retains synthetic-fixture screenshots/traces for7days on failure using a commit-pinned official action. No automatic retry or weakened assertions added. This improves timing tolerance and diagnostics; only the next remote run can establish current CI status.
 
 Final local checks for this revision: make test-config1831passed in110.37s; development record guards5passed; git diff --check passed. No live model or sandbox calls.
+
+
+## Kubernetes integration (2026-10-13)
+
+User requested real data/service connections without placeholders and selected deployment alongside Corsair in Kubernetes. Audit found production pages already use saved native records, but loopback-only serving, combined checkout roots and silent missing-directory handling prevented reliable deployment. No existing general application API/worker chart exists; use existing native Temporal visibility and filesystem report contracts, not invented endpoints. The earlier illustrative design file is not application data.
+
+- [x] Separate configured data/assets/matrix roots, surface missing storage and implement common local/production route boundary.
+- [x] Native read-only service checks and parent investigation visibility; no raw workflow payloads.
+- [x] Production container and internal Kubernetes resources with explicit existing PVC and origin.
+- [x] Verify actual eval producer output through deployed-style mounts/server, source failures, UI routes and full offline guards.
+- [x] Review, document operator configuration and remaining live gates; update PR and handoff.
+
+Pinned production WSGI server chosen because stdlib HTTP is only a development server; reuse its narrow application routes without another web framework. Gunicorn official docs/release notes and PyPI inspected:26.2.1 appears in upstream release material but is not installable from current PyPI; pin available 26.2.0. An initial uv lock at26.2.1 failed before installation; corrected to the published release. Separate `ui` dependency group includes only server, matrix validation and native service SDKs, without model/evaluation frameworks.
+
+
+Implementation and review evidence:
+
+- Common read-only Application serves local HTTP and production WSGI. Explicit results/assets/matrix roots, actionable 503 for missing storage, process liveness and data-source readiness are separate. ConfigMap symlinks are resolved only for the operator-selected matrix; evidence/assets keep descriptor-based link refusal.
+- Native Temporal namespace and parent-investigation visibility plus OpenShell health checks use explicit endpoint/TLS config. Fixed workflow types, 100-row limit, 2s native deadlines, no retries/payload/history retrieval. Missing endpoints remain not_configured. A real loopback Temporal refusal was observed at the transport layer in 0.08s; this is not a successful service qualification.
+- UI Runs/System pages, 30s visible-tab refresh, 15s request timeout and safe backend error detail. Same approved styling. 18 frontend unit tests/build and 64 browser tests passed,8 duplicate mobile contrast checks skipped; production Agents/System visually inspected against the actual newly generated identification report.
+- New producer env configuration verified with an actual scripted identification run, 16/16 clean attempts, in /tmp/corsair-ui-connected-results. A regression runs the real producer from another cwd with relative configured output and verifies report counts/latencies through Evidence.
+- Independent review found relative producer output could split native reports from summaries and renderer OpenShell HTTPS URLs did not match native SDK host:port targets. Both corrected and regression-checked. Explicit empty producer env is refused. 85 combined web/service/deployment/producer tests passed.
+- Container testing caught missing eager-import PydanticAI dependencies and Gunicorn's default control socket on a read-only filesystem. Added the existing pinned native SDK dependency and disabled the unnecessary control socket; no agent behavior changed. Final image sha256:8d8805a11b516277d93093adae0a464af5f6eb4579d9b0033652e9582cbeef52 built successfully. Final smoke compared real counts and exact native latency/input/output/paired-token distributions, served production assets, checked nonroot/no baked records, and verified absent storage 503. Owned containers 0108deb2aca0 and ab8aae41b1cd were removed by immutable IDs with absence confirmed. Raw logs/results stay outside Git.
+- CI now builds the same production image and runs the smoke against a freshly generated scripted eval. Kubernetes renderer uses existing explicit PVC/namespace/image/origin and optional existing TLS Secrets; 18 focused renderer checks passed. A client dry-run attempted API discovery and was blocked; no cluster mutation performed. No target deployment, successful native service connection, remote auth or live model/workload qualified.
+- First full offline integration check: 1862passed/1failed due to using unsupported plan status 'active'. Changed it to 'in_progress'; final suite recorded below. Initial dependency resolution failed on unavailable Gunicorn 26.2.1; official PyPI available 26.2.0 pinned. Initial renderer subprocess test lacked its documented PYTHONPATH; corrected module invocation. No failed check is counted as a pass.
+
+Final integration validation: `UV_CACHE_DIR=/tmp/corsair-provider-uv-cache make test-config` passed **1873 tests in 109.54s**. Final development-record checks and publication are performed with this revision; remote CI must be checked at its published head. Target-cluster live gates remain unqualified as scoped above.

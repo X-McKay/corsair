@@ -149,9 +149,11 @@ export function State({
       ) : (
         <AlertCircle size={28} />
       )}
-      <h2>{loading ? "Reading local evidence…" : "Unable to load evidence"}</h2>
+      <h2>{loading ? "Reading evidence…" : "Unable to load evidence"}</h2>
       <p>
-        {loading ? "Loading recorded evaluations from this workspace." : error}
+        {loading
+          ? "Loading records from the configured Corsair service."
+          : error}
       </p>
       {error && (
         <>
@@ -175,17 +177,19 @@ export function Empty({ filtered = false }: { filtered?: boolean }) {
         <FlaskConical size={30} />
       </div>
       <h2>
-        {filtered
-          ? "No matching evaluations"
-          : "No recorded evaluations"}
+        {filtered ? "No matching evaluations" : "No recorded evaluations"}
       </h2>
       <p>
         {filtered
           ? "Try another agent, evidence mode, or search term."
-          : "Run an isolated agent evaluation to see its assertions, timing and recorded token usage here."}
+          : "Run an isolated agent evaluation and write its results to the configured shared results directory to see its assertions, timing and token usage here."}
       </p>
       {!filtered && (
         <>
+          <p>
+            Set <code>CORSAIR_EVAL_RESULTS</code> on the evaluation host to the
+            shared results directory mounted by this UI.
+          </p>
           <CopyCommand command="make eval AGENT=identification" />
           <small>Host-only · Scripted by default · No model calls</small>
         </>

@@ -1249,3 +1249,35 @@ progress.bar::-moz-progress-bar {
     visibility: visible;
   }
 }
+
+.system-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.system-section-title {
+  font-size: 18px;
+  margin: 28px 0 16px;
+}
+.system-detail {
+  color: var(--muted);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.workflow-table {
+  min-width: 820px;
+}
+.workflow-table td:first-child {
+  max-width: 320px;
+}
+.workflow-id {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.workflow-table .row-subtitle {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

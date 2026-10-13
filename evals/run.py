@@ -242,8 +242,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repeat", type=int)
     parser.add_argument("--note", default="", help="Free text recorded with the run, e.g. what changed")
     parser.add_argument("--promote", metavar="RUN", help="Make RUN the baseline for its set and mode instead of running")
-    parser.add_argument("--results", type=Path, default=RESULTS, help=argparse.SUPPRESS)
+    parser.add_argument("--results", type=Path, default=os.environ.get("CORSAIR_EVAL_RESULTS", str(RESULTS)),
+                        help="Results directory shared with the UI (default: CORSAIR_EVAL_RESULTS or .runs/evals)")
+    # Resolve against the invoking directory before the suite switches to REPOSITORY.
+    # An explicitly empty environment setting must not silently select that directory.
+    if os.environ.get("CORSAIR_EVAL_RESULTS") == "":
+        parser.error("CORSAIR_EVAL_RESULTS must name a nonempty results directory")
     args = parser.parse_args(argv)
+    args.results = args.results.resolve()
     if args.agent in MISSING:
         parser.error(f"{args.agent}: {MISSING[args.agent]}")
     if args.promote:

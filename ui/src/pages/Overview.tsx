@@ -36,7 +36,7 @@ export function Overview({
   return (
     <>
       <Heading
-        eyebrow="Local evaluations"
+        eyebrow="Recorded evaluations"
         title="Overview"
         description="Recorded runs, outcomes, latency and token usage."
       />
@@ -45,7 +45,7 @@ export function Overview({
           {
             label: "Recorded evaluations",
             value: integer(data.runs.length),
-            note: "In this local workspace",
+            note: "In the configured results directory",
             icon: <FlaskConical size={18} />,
           },
           {
@@ -99,7 +99,10 @@ export function Overview({
           <ol>
             <li>
               <b>Record a baseline</b>
-              <span>Run a frozen case set for one agent.</span>
+              <span>
+                Run a frozen case set for one agent and save results to the
+                configured shared directory.
+              </span>
             </li>
             <li>
               <b>Update the agent</b>
@@ -110,6 +113,10 @@ export function Overview({
               <span>Review assertions, usage and timing.</span>
             </li>
           </ol>
+          <p>
+            Set <code>CORSAIR_EVAL_RESULTS</code> on the evaluation host to the
+            shared results directory mounted by this UI.
+          </p>
           <CopyCommand command="make eval AGENT=planning" />
           <Link to="/runtime" className="text-link">
             Inspect runtime evidence <ArrowRight size={14} />
@@ -117,9 +124,9 @@ export function Overview({
         </aside>
       </div>
       <Notice>
-        Clean attempts passed the
-        recorded evaluators. Scripted checks and live model runs do not, on
-        their own, prove application behavior or sandbox readiness.
+        Clean attempts passed the recorded evaluators. Scripted checks and live
+        model runs do not, on their own, prove application behavior or sandbox
+        readiness.
       </Notice>
     </>
   );

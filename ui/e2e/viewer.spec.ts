@@ -88,7 +88,7 @@ test('empty and connection failure states are actionable', async ({page}) => {
 });
 
 test('visual review captures all primary screens without horizontal overflow', async ({page},testInfo) => {
-  for(const [name,url] of [['overview','/'],['evaluations','/evaluations'],['detail',planning],['runtime','/runtime'],['agents','/agents'],['experiments','/experiments']]){
+  for(const [name,url] of [['overview','/'],['evaluations','/evaluations'],['detail',planning],['runtime','/runtime'],['agents','/agents'],['experiments','/experiments'],['system','/system'],['runs','/runs']]){
     await page.goto(url);
     await expect(page.locator('h1')).toBeVisible();
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
@@ -147,4 +147,96 @@ test('experiments show descriptive deltas and block incompatible runs',async({pa
   await page.getByLabel('Candidate run',{exact:true}).selectOption('assessment/20261013T130000Z-development-live');
   await expect(page.getByText(/different agents/)).toBeVisible();
   await expect(page.locator('.experiment-outcome').first()).toContainText('Comparison unavailable');
+});
+
+test('system shows actual configured sources separately from unconfigured services', async ({ page, request }) => {
+  const response = await request.get('/api/status');
+  expect(response.ok()).toBeTruthy();
+  const data = await response.json();
+  expect(data.sources.every((source: any) => source.status === 'available')).toBeTruthy();
+  expect(data.services.every((service: any) => service.status === 'not_configured')).toBeTruthy();
+  await page.goto('/system');
+  await expect(page.getByRole('heading', { name: 'System', exact: true })).toBeVisible();
+  await expect(page.getByText('Data sources available', { exact: true })).toBeVisible();
+  await expect(page.getByText('Not configured', { exact: true })).toHaveCount(2);
+  await expect(page.getByText(/do not query running workflows/)).toBeVisible();
+});
+
+test('automatic refresh replaces records and preserves actionable server failures', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/evaluations');
+  await expect(page.locator('tbody tr')).toHaveCount(4);
+  await page.route('**/api/evaluations', route => route.fulfill({ json: { runs: [], warnings: [] } }));
+  await page.clock.fastForward(30_000);
+  await expect(page.getByRole('heading', { name: 'No recorded evaluations' })).toBeVisible();
+  await page.unroute('**/api/evaluations');
+  await page.route('**/api/evaluations', route => route.fulfill({ status: 503, json: { error: 'Evaluation storage is unavailable. Check the shared volume mount.' } }));
+  await page.clock.fastForward(30_000);
+  await expect(page.getByText('Evaluation storage is unavailable. Check the shared volume mount.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'No recorded evaluations' })).toHaveCount(0);
+});
+
+test('refresh pauses while hidden and resumes when visible', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/evaluations');
+  await expect(page.locator('tbody tr')).toHaveCount(4);
+  let requests = 0;
+  await page.route('**/api/evaluations', route => {
+    requests++;
+    return route.fulfill({ json: { runs: [], warnings: [] } });
+  });
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await page.clock.fastForward(90_000);
+  expect(requests).toBe(0);
+  await expect(page.locator('tbody tr')).toHaveCount(4);
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(page.getByRole('heading', { name: 'No recorded evaluations' })).toBeVisible();
+  expect(requests).toBe(1);
+});
+
+test('workflow page distinguishes unconfigured service from an empty namespace', async ({ page, request }) => {
+  const response = await request.get('/api/runs');
+  expect(response.ok()).toBeTruthy();
+  expect((await response.json()).status).toBe('not_configured');
+  await page.goto('/runs');
+  await expect(page.getByRole('heading', { name: 'Temporal is not configured' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'No Corsair workflows returned' })).toHaveCount(0);
+});
+
+test('workflow rendering preserves native identity, fixture distinction and partial coverage', async ({ page }) => {
+  // Presentation-only fixture; the test does not qualify a live Temporal connection.
+  await page.route('**/api/runs', route => route.fulfill({ json: {
+    status: 'available', detail: 'Visible workflows in the configured namespace.', limited: true,
+    runs: [
+      { id: 'fixture-check', run_id: 'fixture-execution', workflow_type: 'corsair.fixture.Investigation', status: 'COMPLETED', started: '2026-10-13T12:00:00Z', ended: '2026-10-13T12:01:00Z' },
+      { id: '<script>investigation</script>', run_id: 'real-execution', workflow_type: 'corsair.chain.Investigation', status: 'RUNNING', started: '2026-10-13T12:00:00Z' },
+    ],
+  }}));
+  await page.goto('/runs');
+  await expect(page.locator('tbody tr')).toHaveCount(2);
+  await expect(page.getByText('Fixture investigation', { exact: true })).toBeVisible();
+  await expect(page.getByText('<script>investigation</script>', { exact: true })).toBeVisible();
+  await expect(page.getByText('Unavailable', { exact: true })).toBeVisible();
+  await expect(page.getByText(/Additional executions may exist/)).toBeVisible();
+  await expect(page.getByText(/not security correctness/)).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+});
+
+test('hung requests time out without concurrent polling', async ({ page }) => {
+  await page.clock.install();
+  let requests = 0;
+  await page.route('**/api/evaluations', () => { requests++; });
+  await page.goto('/evaluations');
+  await expect(page.getByRole('heading', { name: 'Reading evidence…' })).toBeVisible();
+  await page.clock.fastForward(14_000);
+  expect(requests).toBe(1);
+  await page.clock.fastForward(1_000);
+  await expect(page.getByText(/did not respond within 15 seconds/)).toBeVisible();
+  expect(requests).toBe(1);
 });

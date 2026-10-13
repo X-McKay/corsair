@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import {
   Boxes,
+  Cable,
+  Workflow,
   ChartColumn,
   GitCompareArrows,
   ChevronRight,
@@ -23,6 +25,8 @@ import { Evaluations } from "./pages/Evaluations";
 import { Detail } from "./pages/EvaluationDetail";
 import { Runtime } from "./pages/Runtime";
 import { Metrics } from "./pages/Metrics";
+import { Runs } from "./pages/Runs";
+import { System } from "./pages/System";
 import { Experiments } from "./pages/Experiments";
 export function App() {
   const path = usePath();
@@ -62,15 +66,20 @@ export function App() {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [menu]);
-  const page = path.startsWith("/evaluations")
-    ? "Evaluations"
-    : path === "/metrics" || path === "/agents"
-      ? "Agents"
-      : path === "/experiments"
-        ? "Experiments"
-        : path === "/runtime"
-          ? "Runtime readiness"
-          : "Overview";
+  const page =
+    path === "/runs"
+      ? "Runs"
+      : path.startsWith("/evaluations")
+        ? "Evaluations"
+        : path === "/metrics" || path === "/agents"
+          ? "Agents"
+          : path === "/experiments"
+            ? "Experiments"
+            : path === "/runtime"
+              ? "Runtime readiness"
+              : path === "/system"
+                ? "System"
+                : "Overview";
   const parts = path.split("/").filter(Boolean);
   let detail: { agent: string; run: string } | undefined;
   if (parts[0] === "evaluations" && parts.length === 3) {
@@ -114,6 +123,11 @@ export function App() {
           {[
             { to: "/", label: "Overview", icon: <LayoutDashboard size={18} /> },
             {
+              to: "/runs",
+              label: "Runs",
+              icon: <Workflow size={18} />,
+            },
+            {
               to: "/evaluations",
               label: "Evaluations",
               icon: <FlaskConical size={18} />,
@@ -133,6 +147,11 @@ export function App() {
               label: "Runtime readiness",
               icon: <Boxes size={18} />,
             },
+            {
+              to: "/system",
+              label: "System",
+              icon: <Cable size={18} />,
+            },
           ].map((item) => (
             <Link
               key={item.to}
@@ -151,7 +170,7 @@ export function App() {
         <div className="sidebar-bottom">
           <div className="local-note">
             <span className="status-dot" />
-            <b>Local workspace</b>
+            <b>Corsair records</b>
             <span>Read-only inspection</span>
           </div>
           <label className="theme-label">
@@ -160,7 +179,7 @@ export function App() {
           </label>
           <div className="sidebar-foot">
             <ShieldCheck size={13} />
-            Local evaluation records
+            Configured evaluation records
           </div>
         </div>
       </aside>
@@ -195,7 +214,11 @@ export function App() {
           </div>
         </header>
         <main id="main-content" tabIndex={-1}>
-          {path === "/runtime" ? (
+          {path === "/runs" ? (
+            <Runs revision={revision} retry={retry} />
+          ) : path === "/system" ? (
+            <System revision={revision} retry={retry} />
+          ) : path === "/runtime" ? (
             <Runtime revision={revision} retry={retry} />
           ) : path === "/agents" || path === "/metrics" ? (
             <Metrics revision={revision} retry={retry} />
@@ -232,7 +255,7 @@ export function App() {
               Corsair <span className="footer-dot">/</span> Agent evaluation &
               evidence
             </span>
-            <span>Local records · No automatic refresh</span>
+            <span>Refreshes every 30 seconds while visible</span>
           </footer>
         </main>
       </div>

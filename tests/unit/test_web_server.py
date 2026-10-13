@@ -7,7 +7,7 @@ from threading import Thread
 
 import pytest
 
-from corsair.web.server import Evidence, EvidenceError, MAX_JSON, Server
+from corsair.web.server import Application, Evidence, EvidenceError, MAX_JSON, Server, SourceUnavailable
 
 
 @pytest.fixture
@@ -134,6 +134,14 @@ def test_invalid_and_oversized_evidence_does_not_hide_other_runs(root):
 def test_missing_records_not_fabricated(root):
     empty = root / 'empty'
     empty.mkdir()
+    with pytest.raises(SourceUnavailable):
+        Evidence(empty).evaluations()
+    with serving(empty) as server:
+        assert request(server, '/api/evaluations')[0] == 503
+        assert request(server, '/api/evaluations/planning/missing')[0] == 503
+        assert request(server, '/api/ready')[0] == 503
+        assert request(server, '/api/live')[0] == 200
+    (empty / '.runs/evals').mkdir(parents=True)
     assert Evidence(empty).evaluations() == {'runs': [], 'warnings': []}
     with serving(empty) as server:
         assert request(server, '/api/evaluations/planning/missing')[0] == 404
@@ -388,10 +396,73 @@ def test_disconnected_client_does_not_receive_an_error_retry(failure, fail_on_wr
     handler.requestline = 'GET /api/health HTTP/1.1'
     handler.headers = Message()
     handler.headers['Host'] = '127.0.0.1:8765'
-    handler.server = SimpleNamespace(server_port=8765)
+    handler.server = SimpleNamespace(application=Application(None, ('http://127.0.0.1:8765',)))
     handler.wfile = DisconnectedWriter()
     handler.close_connection = False
     handler.error = lambda *_: pytest.fail('A cancelled response must not trigger an error response')
     handler.do_GET()
     assert handler.wfile.writes == fail_on_write
     assert handler.close_connection is True
+
+
+
+def test_independent_mounts_and_configmap_symlink(root, tmp_path):
+    matrix = Path(__file__).resolve().parents[2] / 'deploy/runtime-matrix.yaml'
+    config = tmp_path / 'config'
+    config.mkdir()
+    selected = config / 'runtime-matrix.yaml'
+    selected.symlink_to(matrix)
+    evidence = Evidence(tmp_path, results=root / '.runs/evals', assets=root / 'ui/dist', runtime_matrix=selected)
+    assert len(evidence.evaluations()['runs']) == 1
+    assert evidence.metrics()['groups'][0]['runs'] == 1
+    assert evidence.runtime()['rows']
+    assert all(item['status'] == 'available' for item in evidence.sources())
+    evidence.results_root = tmp_path / 'unmounted'
+    with pytest.raises(SourceUnavailable):
+        evidence.evaluations()
+    assert evidence.sources()[0]['status'] == 'unavailable'
+
+
+def wsgi_request(app, path, method='GET', **headers):
+    captured = []
+    environ = {'REQUEST_METHOD': method, 'RAW_URI': path, 'HTTP_HOST': 'corsair.example', **headers}
+    data = b''.join(app(environ, lambda status, values: captured.extend([status, dict(values)])))
+    return captured[0], captured[1], data
+
+
+def test_production_origin_security_and_common_routes(root):
+    app = Application(Evidence(root), ('https://corsair.example',))
+    status, headers, data = wsgi_request(app, '/api/evaluations', HTTP_ORIGIN='https://corsair.example')
+    assert status == '200 OK' and len(json.loads(data)['runs']) == 1
+    assert 'frame-ancestors' in headers['Content-Security-Policy']
+    assert wsgi_request(app, '/api/evaluations', HTTP_ORIGIN='http://corsair.example')[0].startswith('403')
+    assert wsgi_request(app, '/api/evaluations', HTTP_HOST='other.example')[0].startswith('403')
+    assert wsgi_request(app, '/api/evaluations', HTTP_HOST='corsair.example, other.example')[0].startswith('403')
+    assert wsgi_request(app, '/api/evaluations', 'POST')[0].startswith('405')
+    for path in ('/system', '/runs', '/agents'):
+        assert wsgi_request(app, path)[0] == '200 OK'
+    assert wsgi_request(app, '/api/evaluations?path=secret')[0].startswith('400')
+    assert wsgi_request(app, '/%2e%2e/secret.html')[0].startswith('400')
+    assert wsgi_request(app, '/api/live', 'HEAD')[2] == b''
+
+
+@pytest.mark.parametrize('origin', ['https://user:secret@example.com', 'https://example.com/path',
+                                   'https://example.com?x=y', 'https://example.com:wrong',
+                                   'https://example.com,evil', 'file://example.com'])
+def test_invalid_production_origin_refused(root, origin):
+    with pytest.raises(ValueError):
+        Application(Evidence(root), (origin,))
+
+
+def test_status_reads_actual_sources_and_distinguishes_service_configuration(root, monkeypatch):
+    for name in ('CORSAIR_UI_TEMPORAL_ADDRESS', 'CORSAIR_UI_OPENSHELL_ENDPOINT'):
+        monkeypatch.delenv(name, raising=False)
+    with serving(root) as server:
+        code, _, raw = request(server, '/api/status')
+        result = json.loads(raw)
+        assert code == 200 and result['ready'] is False  # No matrix in this test root.
+        assert result['sources'][0]['status'] == 'available'
+        assert result['sources'][1]['status'] == 'unavailable'
+        assert all(service['status'] == 'not_configured' for service in result['services'])
+        assert json.loads(request(server, '/api/runs')[2])['status'] == 'not_configured'
+        assert b'SECRET' not in raw

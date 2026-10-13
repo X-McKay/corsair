@@ -1,8 +1,11 @@
-"""A loopback-only evidence viewer; no workload execution or configuration writes."""
+"""Read-only evidence API, with a local HTTP adapter and production WSGI adapter."""
 from __future__ import annotations
 
 import argparse
 from contextlib import contextmanager
+from datetime import datetime, timezone
+from email.message import Message
+from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import hashlib
@@ -27,6 +30,10 @@ METRIC = re.compile(r'[A-Za-z][A-Za-z0-9_]{0,100}\Z')
 MIME = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
         '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png',
         '.ico': 'image/x-icon', '.woff2': 'font/woff2'}
+
+
+class SourceUnavailable(OSError):
+    """A configured source cannot be read; never interpret this as zero runs."""
 
 
 class EvidenceError(ValueError):
@@ -149,18 +156,56 @@ def project(record: dict, agent: str, run: str) -> dict:
 
 
 class Evidence:
-    def __init__(self, root: Path):
-        # The operator chooses this root, but symlinks beneath it are never followed.
+    def __init__(self, root: Path, *, results: Path | None = None,
+                 runtime_matrix: Path | None = None, assets: Path | None = None):
+        # Explicit roots are operator configuration, never request parameters.
         self.root = root.resolve(strict=True)
+        self.results_root = results.absolute() if results is not None else self.root
+        self.results_parts = () if results is not None else ('.runs', 'evals')
+        self.assets_root = assets.absolute() if assets is not None else self.root
+        self.assets_parts = () if assets is not None else ('ui', 'dist')
+        self.matrix = runtime_matrix.absolute() if runtime_matrix is not None else None
+
+    def require_results(self):
+        try:
+            with directory(self.results_root, self.results_parts) as fd:
+                # Test directory enumeration, not merely traversal permission.
+                with os.scandir(fd) as entries:
+                    next(entries, None)
+        except OSError as error:
+            raise SourceUnavailable('Evaluation storage is unavailable. Check the results mount, '
+                                    'read permissions and CORSAIR_UI_RESULTS; configure the producer '
+                                    'with the same CORSAIR_EVAL_RESULTS directory.') from error
+
+    def static(self, parts: tuple[str, ...]) -> bytes:
+        return read_file(self.assets_root, self.assets_parts + parts, MAX_STATIC)
+
+    def sources(self) -> list[dict]:
+        checks = (
+            ('evaluations', self.require_results, 'Evaluation storage is readable. Only saved records are shown.',
+             'Check the results PVC, directory and read permissions; the producer and UI must use the same results storage.'),
+            ('runtime', self.runtime, 'Runtime matrix is readable and valid. Registration is not current service health.',
+             'Mount a valid runtime matrix and check CORSAIR_UI_RUNTIME_MATRIX.'),
+            ('assets', lambda: self.static(('index.html',)), 'Built UI assets are readable.',
+             'Build the UI and check CORSAIR_UI_ASSETS or the container image.'),
+        )
+        result = []
+        for name, check, success, failure in checks:
+            try:
+                check()
+                result.append({'id': name, 'status': 'available', 'detail': success})
+            except (OSError, ValueError, RecursionError):
+                result.append({'id': name, 'status': 'unavailable', 'detail': failure})
+        return result
 
     def detail(self, agent: str, run: str) -> dict:
         if agent not in AGENTS or not NAME.fullmatch(run) or run in ('.', '..'):
             raise EvidenceError('Invalid run identifier')
-        parts = ('.runs', 'evals', agent, run)
-        result = project(read_json(self.root, parts + ('summary.json',)), agent, run)
+        parts = self.results_parts + (agent, run)
+        result = project(read_json(self.results_root, parts + ('summary.json',)), agent, run)
         # Native reports contain inputs, outputs and arbitrary exception text. Only expose counts.
         try:
-            report = read_json(self.root, parts + ('evidence', 'report.json'))
+            report = read_json(self.results_root, parts + ('evidence', 'report.json'))
             result['report'] = {
                 'completed_attempts': len(report['cases']) if isinstance(report.get('cases'), list) else None,
                 'failed_attempts': len(report['failures']) if isinstance(report.get('failures'), list) else None}
@@ -169,10 +214,11 @@ class Evidence:
         return result
 
     def evaluations(self) -> dict:
+        self.require_results()
         candidates, warnings = [], []
         for agent in AGENTS:
             try:
-                with directory(self.root, ('.runs', 'evals', agent)) as fd:
+                with directory(self.results_root, self.results_parts + (agent,)) as fd:
                     with os.scandir(fd) as entries:
                         for index, entry in enumerate(entries):
                             if index >= MAX_ENTRIES:
@@ -189,7 +235,7 @@ class Evidence:
         runs = []
         for run, agent in sorted(candidates, reverse=True)[:MAX_RUNS]:
             try:
-                runs.append(project(read_json(self.root, ('.runs', 'evals', agent, run, 'summary.json')), agent, run))
+                runs.append(project(read_json(self.results_root, self.results_parts + (agent, run, 'summary.json')), agent, run))
             except (OSError, EvidenceError):
                 warnings.append(f'{agent}/{run}: summary unavailable, malformed or unsafe; omitted.')
         return {'runs': runs, 'warnings': warnings}
@@ -202,9 +248,9 @@ class Evidence:
         warnings = list(listing['warnings'])
         for record in listing['runs']:
             agent, run = record['agent'], record['run']
-            parts = ('.runs', 'evals', agent, run)
+            parts = self.results_parts + (agent, run)
             try:
-                raw = read_json(self.root, parts + ('summary.json',))
+                raw = read_json(self.results_root, parts + ('summary.json',))
                 # Revalidate after rereading: the producer may still be replacing records.
                 record = project(raw, agent, run)
                 identity = obj(obj(raw.get('summary')).get('identity'))
@@ -255,7 +301,7 @@ class Evidence:
                 continue
             reports_read += 1
             try:
-                report = read_json(self.root, parts + ('evidence', 'report.json'))
+                report = read_json(self.results_root, parts + ('evidence', 'report.json'))
             except (OSError, EvidenceError):
                 group['warnings'].append('Native report unavailable; no distribution samples for this run.')
                 continue
@@ -310,8 +356,14 @@ class Evidence:
         import yaml
         from corsair.nodes.runtime.matrix import Matrix
         try:
-            matrix = Matrix.model_validate(yaml.safe_load(read_file(
-                self.root, ('deploy', 'runtime-matrix.yaml'), MAX_JSON)))
+            # Kubernetes ConfigMap files are atomic symlinks. Only this explicitly
+            # operator-selected file may resolve them; run/static paths still refuse links.
+            if self.matrix is not None:
+                selected = self.matrix.resolve(strict=True)
+                raw = read_file(selected.parent, (selected.name,), MAX_JSON)
+            else:
+                raw = read_file(self.root, ('deploy', 'runtime-matrix.yaml'), MAX_JSON)
+            matrix = Matrix.model_validate(yaml.safe_load(raw))
         except (ValueError, yaml.YAMLError) as error:
             raise EvidenceError('Runtime matrix is invalid') from error
         return {'rows': [row.model_dump(mode='json') | {'frameworks': [f.model_dump(mode='json')
@@ -320,12 +372,130 @@ class Evidence:
                                 'Matrix records describe bounded qualification; they do not establish end-to-end readiness.']}
 
 
+SECURITY_HEADERS = (
+    ('Cache-Control', 'no-store'),
+    ('X-Content-Type-Options', 'nosniff'),
+    ('Referrer-Policy', 'no-referrer'),
+    ('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"),
+    ('Cross-Origin-Resource-Policy', 'same-origin'),
+)
+
+
+def validate_origin(value: str) -> str:
+    parsed = urlsplit(value)
+    if (parsed.scheme not in ('http', 'https') or not parsed.hostname or parsed.username
+            or parsed.password or parsed.path or parsed.query or parsed.fragment
+            or any(c.isspace() for c in value) or ',' in value):
+        raise ValueError('Public origin must be an http(s) origin without credentials, path or query')
+    try:
+        parsed.port
+    except ValueError as error:
+        raise ValueError('Public origin has an invalid port') from error
+    return value
+
+
+class Application:
+    def __init__(self, evidence: Evidence, origins: tuple[str, ...]):
+        self.evidence = evidence
+        self.origins = tuple(validate_origin(origin) for origin in origins)
+
+    def allowed(self, headers):
+        hosts = headers.get_all('Host', [])
+        origins = headers.get_all('Origin', [])
+        return (len(hosts) == 1 and
+                any(hosts[0] == urlsplit(origin).netloc and
+                    (not origins or origins == [origin]) for origin in self.origins) and
+                headers.get('Sec-Fetch-Site') != 'cross-site')
+
+    def response(self, method, target, headers):
+        def json_response(value, status=200):
+            return status, json.dumps(value, allow_nan=False).encode(), 'application/json'
+
+        def error(status, message):
+            return json_response({'error': message}, status)
+
+        if not self.allowed(headers):
+            return error(403, 'Use the configured UI origin; unexpected Host or Origin was refused')
+        if method not in ('GET', 'HEAD'):
+            return error(405, 'This viewer is read-only')
+        try:
+            url = urlsplit(target)
+            path = unquote(url.path, errors='strict')
+            if (url.scheme or url.netloc or url.fragment or '\\' in path or '\x00' in path
+                    or (url.query and path.startswith('/api/'))):
+                return error(400, 'Invalid request path')
+            parts = tuple(path.strip('/').split('/'))
+            if any(p in ('.', '..') for p in parts):
+                return error(400, 'Invalid request path')
+            if path in ('/api/health', '/api/live'):
+                return json_response({'service': 'corsair-ui', 'read_only': True})
+            if path in ('/api/ready', '/api/status'):
+                sources = self.evidence.sources()
+                ready = all(source['status'] == 'available' for source in sources)
+                result = {'sources': sources, 'ready': ready,
+                          'checked_at': datetime.now(timezone.utc).isoformat()}
+                if path == '/api/status':
+                    from corsair.web.services import service_status
+                    result['services'] = service_status()
+                    return json_response(result)
+                return json_response(result, 200 if ready else 503)
+            if path == '/api/runs':
+                from corsair.web.services import workflow_runs
+                return json_response(workflow_runs())
+            if path == '/api/evaluations':
+                return json_response(self.evidence.evaluations())
+            if len(parts) == 4 and parts[:2] == ('api', 'evaluations'):
+                self.evidence.require_results()
+                return json_response(self.evidence.detail(parts[2], parts[3]))
+            if path == '/api/metrics':
+                return json_response(self.evidence.metrics())
+            if path == '/api/runtime':
+                try:
+                    return json_response(self.evidence.runtime())
+                except (OSError, ValueError):
+                    return error(503, 'Runtime matrix unavailable or invalid. Check the runtime ConfigMap and CORSAIR_UI_RUNTIME_MATRIX.')
+            if path.startswith('/api/'):
+                return error(404, 'Unknown endpoint')
+            spa = path in ('/', '/evaluations', '/runtime', '/metrics', '/agents', '/experiments', '/system', '/runs') or (
+                len(parts) == 3 and parts[0] == 'evaluations' and parts[1] in AGENTS
+                and NAME.fullmatch(parts[2]))
+            static_parts = ('index.html',) if spa else parts
+            suffix = Path(static_parts[-1]).suffix
+            if suffix not in MIME:
+                return error(404, 'Static asset not found')
+            return 200, self.evidence.static(static_parts), MIME[suffix]
+        except SourceUnavailable as issue:
+            return error(503, str(issue))
+        except FileNotFoundError:
+            return error(404, 'Record or UI asset not found. Check the selected run or rebuild the UI image.')
+        except (OSError, EvidenceError, UnicodeError, ValueError, RecursionError):
+            return error(422, 'Evidence could not be read safely; check the record, permissions and size limits')
+
+    def __call__(self, environ, start_response):
+        headers = Message()
+        for key, value in environ.items():
+            if key.startswith('HTTP_'):
+                headers[key[5:].replace('_', '-')] = value
+        # Gunicorn preserves the raw target; decoding PATH_INFO again would permit
+        # inconsistent double-decoding between the local and production adapters.
+        target = environ.get('RAW_URI') or environ.get('PATH_INFO', '/')
+        if 'RAW_URI' not in environ and environ.get('QUERY_STRING'):
+            target += '?' + environ['QUERY_STRING']
+        status, data, content_type = self.response(environ['REQUEST_METHOD'], target, headers)
+        start_response(f'{status} {HTTPStatus(status).phrase}',
+                       [('Content-Type', content_type), ('Content-Length', str(len(data))), *SECURITY_HEADERS])
+        return [b'' if environ['REQUEST_METHOD'] == 'HEAD' else data]
+
+
 class Server(ThreadingHTTPServer):
+    """Development-only HTTP adapter; containers use Gunicorn and the same Application."""
     daemon_threads = True
 
-    def __init__(self, root: Path, port: int = 8765):
-        self.evidence = Evidence(root)
+    def __init__(self, root: Path, port: int = 8765, *, results=None, assets=None, runtime_matrix=None):
+        self.evidence = Evidence(root, results=results, assets=assets, runtime_matrix=runtime_matrix)
         super().__init__(('127.0.0.1', port), Handler)
+        self.application = Application(self.evidence, (f'http://127.0.0.1:{self.server_port}',
+                                                      f'http://localhost:{self.server_port}'))
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -336,93 +506,46 @@ class Handler(BaseHTTPRequestHandler):
         self.connection.settimeout(5)
 
     def log_message(self, *_):
-        pass  # Do not echo untrusted URLs or evidence into terminal logs.
+        pass
 
-    def respond(self, status: int, data: bytes, content_type: str = 'application/json'):
+    def do_GET(self):
+        status, data, content_type = self.server.application.response(self.command, self.path, self.headers)
         try:
             self.send_response(status)
             self.send_header('Content-Type', content_type)
             self.send_header('Content-Length', str(len(data)))
-            self.send_header('Cache-Control', 'no-store')
-            self.send_header('X-Content-Type-Options', 'nosniff')
-            self.send_header('Referrer-Policy', 'no-referrer')
-            self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'")
-            self.send_header('Cross-Origin-Resource-Policy', 'same-origin')
+            for key, value in SECURITY_HEADERS:
+                self.send_header(key, value)
             self.end_headers()
             if self.command != 'HEAD':
                 self.wfile.write(data)
         except (BrokenPipeError, ConnectionResetError):
-            # Navigation can cancel an in-flight fetch; do not retry a response on a closed socket.
             self.close_connection = True
 
-    def error(self, status, message):
-        self.respond(status, json.dumps({'error': message}).encode())
-
-    def allowed(self):
-        hosts = {f'127.0.0.1:{self.server.server_port}', f'localhost:{self.server.server_port}'}
-        host = self.headers.get_all('Host', [])
-        origins = self.headers.get_all('Origin', [])
-        return (len(host) == 1 and host[0] in hosts and
-                (not origins or origins == [f'http://{host[0]}']) and
-                self.headers.get('Sec-Fetch-Site') not in ('cross-site',))
-
-    def do_GET(self):
-        if not self.allowed():
-            return self.error(403, 'Only same-origin loopback requests are accepted')
-        try:
-            url = urlsplit(self.path)
-            path = unquote(url.path, errors='strict')
-            if (url.scheme or url.netloc or url.fragment or '\\' in path or '\x00' in path
-                    or (url.query and path.startswith('/api/'))):
-                return self.error(400, 'Invalid request path')
-            parts = tuple(path.strip('/').split('/'))
-            if any(p in ('.', '..') for p in parts):
-                return self.error(400, 'Invalid request path')
-            if path == '/api/health':
-                result = {'service': 'corsair', 'version': '0.0.0', 'read_only': True}
-            elif path == '/api/evaluations':
-                result = self.server.evidence.evaluations()
-            elif len(parts) == 4 and parts[:2] == ('api', 'evaluations'):
-                result = self.server.evidence.detail(parts[2], parts[3])
-            elif path == '/api/metrics':
-                result = self.server.evidence.metrics()
-            elif path == '/api/runtime':
-                result = self.server.evidence.runtime()
-            elif path.startswith('/api/'):
-                return self.error(404, 'Unknown endpoint')
-            else:
-                spa = path in ('/', '/evaluations', '/runtime', '/metrics', '/agents', '/experiments') or (
-                    len(parts) == 3 and parts[0] == 'evaluations' and parts[1] in AGENTS
-                    and NAME.fullmatch(parts[2]))
-                static_parts = ('index.html',) if spa else parts
-                suffix = Path(static_parts[-1]).suffix
-                if suffix not in MIME:
-                    return self.error(404, 'Static asset not found')
-                data = read_file(self.server.evidence.root, ('ui', 'dist') + static_parts, MAX_STATIC)
-                return self.respond(200, data, MIME[suffix])
-            self.respond(200, json.dumps(result, allow_nan=False).encode())
-        except FileNotFoundError:
-            self.error(404, 'Evidence or UI assets not found; build the UI and run an evaluation first')
-        except (OSError, EvidenceError, UnicodeError, ValueError, RecursionError):
-            self.error(422, 'Evidence could not be read safely; check the local record and size limits')
-
     do_HEAD = do_GET
+    do_POST = do_GET
+    do_PUT = do_GET
+    do_PATCH = do_GET
+    do_DELETE = do_GET
+    do_OPTIONS = do_GET
 
-    def do_POST(self):
-        self.error(405, 'This viewer is read-only')
 
-    do_PUT = do_POST
-    do_PATCH = do_POST
-    do_DELETE = do_POST
-    do_OPTIONS = do_POST
+def configured_evidence() -> Evidence:
+    return Evidence(Path.cwd(), **{key: Path(os.environ[env]) for key, env in (
+        ('results', 'CORSAIR_UI_RESULTS'), ('assets', 'CORSAIR_UI_ASSETS'),
+        ('runtime_matrix', 'CORSAIR_UI_RUNTIME_MATRIX')) if os.environ.get(env)})
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--root', type=Path, default=Path.cwd(), help='Corsair checkout containing .runs and ui/dist')
+    parser = argparse.ArgumentParser(description='Local read-only viewer; use the deployment image for Kubernetes')
+    parser.add_argument('--root', type=Path, default=Path.cwd(), help='Default checkout root')
+    parser.add_argument('--results', type=Path, default=os.environ.get('CORSAIR_UI_RESULTS'))
+    parser.add_argument('--assets', type=Path, default=os.environ.get('CORSAIR_UI_ASSETS'))
+    parser.add_argument('--runtime-matrix', type=Path, default=os.environ.get('CORSAIR_UI_RUNTIME_MATRIX'))
     parser.add_argument('--port', type=int, default=8765)
     args = parser.parse_args()
-    with Server(args.root, args.port) as server:
+    with Server(args.root, args.port, results=args.results, assets=args.assets,
+                runtime_matrix=args.runtime_matrix) as server:
         print(f'Corsair read-only viewer: http://127.0.0.1:{server.server_port}', flush=True)
         try:
             server.serve_forever()

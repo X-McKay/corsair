@@ -26,9 +26,9 @@ Setup and qualification are separate commands. Failed prerequisites produce erro
 
 The remaining 1A admission commands and limitations are documented in the [admission runbook](docs/runbooks/openshell-admission.md). They install prerequisites and stage the trusted runtime probe without deploying a gateway. The [gateway runbook](docs/runbooks/openshell-gateway.md) adds an explicit node-admission-gated native installation and separate 1B probes. The [policy runbook](docs/runbooks/openshell-policy.md) stages a fixed canary artifact and runs the separately qualified native 1D matrix.
 
-## Local results UI
+## Results UI
 
-Inspect saved evaluations and runtime readiness with `make ui-install`, `make ui-build`, then `make ui`. Open http://127.0.0.1:8765. The [local UI runbook](docs/runbooks/local-ui.md) explains evidence limits, empty states and browser checks. This read-only interface launches no work.
+Inspect saved evaluations, agent metrics, runtime registrations and native Temporal investigations with `make ui-install`, `make ui-build`, then `make ui`. Open http://127.0.0.1:8765. The [UI runbook](docs/runbooks/local-ui.md) covers local sources, shared results storage and Kubernetes deployment with explicit service connections. The production image contains no sample data. This read-only interface launches no work.
 
 ## Provider configuration
 

@@ -21,7 +21,7 @@ export function Runtime({
       />
       <Notice>
         <strong>Registration is not current availability.</strong> This is the
-        checked-in runtime matrix, not a live cluster or image registry probe.
+        configured runtime matrix, not a live cluster or image registry probe.
         Image-only evidence does not qualify OpenShell execution.
       </Notice>
       <div className="runtime-grid">

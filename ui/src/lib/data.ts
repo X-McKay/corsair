@@ -134,3 +134,32 @@ export function assertionResult(value: { passed?: number; total?: number }): {
     tone: value.passed === value.total ? "success" : "warning",
   };
 }
+
+export interface SystemData {
+  checked_at: string;
+  ready: boolean;
+  sources: {
+    id: string;
+    status: "available" | "unavailable";
+    detail: string;
+  }[];
+  services: {
+    id: string;
+    status: "available" | "unavailable" | "not_configured";
+    detail: string;
+  }[];
+}
+
+export interface WorkflowRuns {
+  status: "available" | "unavailable" | "not_configured";
+  detail: string;
+  limited: boolean;
+  runs: {
+    id: string;
+    run_id: string;
+    workflow_type: string;
+    status: string;
+    started: string | null;
+    ended?: string;
+  }[];
+}
