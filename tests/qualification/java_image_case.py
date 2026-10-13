@@ -44,12 +44,15 @@ def setup(image, checkout, m2, evidence):
               f'{MVN} -B -ntp -Dmaven.repo.local=/m2 test-compile {DEPENDENCY}:build-classpath '
               f'-Dmdep.outputFile=target/corsair-setup.classpath -Dmdep.includeScope=test; '
               f'{MVN} -B -ntp -Dmaven.repo.local=/m2 test -Dtest=CorsairSetupAbsentTest -DfailIfNoTests=false '
-              f'-Dsurefire.failIfNoSpecifiedTests=false | tee /tmp/absent.log; '
+              f'-Dsurefire.failIfNoSpecifiedTests=false > /tmp/absent.log 2>&1 || {{ cat /tmp/absent.log; exit 4; }}; '
+              'cat /tmp/absent.log; '
               "version=$(sed -n 's/.*surefire\\(-plugin\\)\\{0,1\\}:\\([0-9][^:]*\\):test .*/\\2/p' /tmp/absent.log | head -1); "
               'test -n "$version" || { echo "no surefire:test execution found" >&2; exit 3; }; echo "surefire version $version"; '
-              'for provider in surefire-junit4 surefire-junit47 surefire-junit-platform; do '
-              f'{MVN} -B -ntp -Dmaven.repo.local=/m2 {DEPENDENCY}:get -Dartifact=org.apache.maven.surefire:$provider:$version '
-              '|| echo "provider $provider:$version not resolved"; done')
+              'resolved=0; for provider in surefire-junit4 surefire-junit47 surefire-junit-platform; do '
+              f'if {MVN} -B -ntp -Dmaven.repo.local=/m2 {DEPENDENCY}:get -Dartifact=org.apache.maven.surefire:$provider:$version; '
+              'then resolved=$((resolved + 1)); else echo "provider $provider:$version not resolved"; fi; done; '
+              # Not every provider exists for every version (junit-platform starts at 2.22.0); none at all is a failure.
+              'test "$resolved" -gt 0 || { echo "no Surefire provider resolved for $version" >&2; exit 5; }')
     result = docker('run', '--rm', '--user', user(), '-e', 'HOME=/tmp', '-v', f'{checkout}:/src:ro', '-v', f'{m2}:/m2',
                     image, '/bin/sh', '-ec', script, timeout=1800)
     (evidence / 'setup.stdout').write_bytes(result.stdout)
