@@ -18,7 +18,7 @@ Implement [SPEC-0044](../specs/SPEC-0044-isolated-agent-evaluation.md): every ag
 | Agent | Eval set | One command | Recorded live baseline | Cluster-free |
 | --- | --- | --- | --- | --- |
 | Identification | 8 development cases | `make eval AGENT=identification` | v3: 16/16 attempts passed every check ([report](../../qualification/issue-identification.md)) | Yes |
-| Planning | 6 development, two held-out sets of 6 (both exposed); a third is being written for the typed witness | `make eval AGENT=planning SET=development\|heldout\|heldout2` | v6: development 12/12, second held-out 13/18 ([PLAN-0038](PLAN-0038-planner-prompt-v4.md)); not qualified | Yes |
+| Planning | 6 development, three held-out sets of 6 (all exposed; the first two retired by SPEC-0040) | `make eval AGENT=planning SET=development\|heldout3` | v7: development 11/12, third held-out 17/18 ([PLAN-0044](PLAN-0044-typed-planned-witness.md)); not qualified | Yes |
 | Authoring | 6 development cases, no held-out | `make eval AGENT=authoring` | None before this plan: scripted only, live authoring ran only in the sandboxed chain ([PLAN-0039](PLAN-0039-live-witness-and-full-chain.md)) | Yes from this plan (static host runner) |
 | Environment | None (unit tests only) | None | None | Not yet: its tool runs setup commands in a preparation sandbox |
 | Assessment | 17 development, 7 held-out | `make eval AGENT=assessment SET=development\|held_out` | Pending: live baselines from main not yet recorded ([SPEC-0035](../specs/SPEC-0035-assessment-evals-and-durable-chain.md)) | Yes |

@@ -405,7 +405,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
                     patch=patch)
     executions = []
     try:
-        request, unrequested = witness_request(identification, case.witness_envelope), ()
+        request, unrequested = witness_request(identification, case.witness_envelope, plan.security.witness), ()
     except ValueError as exc:
         # No approved envelope covers the identified target: run without a witness and say so.
         request, unrequested = None, (f"no witness requested: {exc}"[:512],)
@@ -436,9 +436,14 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
 
     identity = case.environment_identity
     runs = {e.revision: (e.observed,) for e in executions}
-    witnesses = {e.revision: (witness_evidence(e.observed.witness, request, plan.security.test_id) if request else
-                              WitnessEvidence(None, None, "no witness was requested or captured for this run"))
-                 for e in executions}
+    def witness_of(e):
+        if not request:
+            return WitnessEvidence(None, None, "no witness was requested or captured for this run")
+        # An absence counts as the planned safe behavior only on the candidate until SPEC-0040's control
+        # calibration lands: an uncalibrated baseline absence (a vacuous payload) must not be not_reproduced.
+        planned = plan.security_expectation.safe_behavior if e.revision == "candidate" else None
+        return witness_evidence(e.observed.witness, request, plan.security.test_id, planned_safe_behavior=planned)
+    witnesses = {e.revision: witness_of(e) for e in executions}
     done["witnesses"] = tuple(witnesses.values())
 
     def gate_run(revision):
