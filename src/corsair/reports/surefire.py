@@ -12,8 +12,6 @@ from corsair.reports.junit import MAX_JUNIT_BYTES, MAX_MESSAGE_CHARS, MAX_OUTPUT
 OUTCOMES = {'failure': 'failed', 'error': 'error', 'skipped': 'skipped'}
 # Rerun and flaky elements mean Surefire retried a test; one execution is the contract, so they are refused.
 CHILDREN = {*OUTCOMES, 'system-out', 'system-err'}
-# The JUnit Platform (1.13+) reports every test this way when `junit.platform.execution.dryRun.enabled` is honoured.
-DRY_RUN_MESSAGE = 'JUnit Platform dry-run mode is enabled'
 # `\tat [module/]package.Class.method(File.java:N)`; Surefire may trim the trace to the test class's frames.
 FRAME = re.compile(r'\tat (?:[\w.$-]+(?:@[\w.-]+)?/)?(?P<class_name>[\w$]+(?:\.[\w$]+)*)\.(?P<method>[\w$<>]+)'
                    r'\((?P<file>[\w$]+\.java):(?P<line>\d+)\)')
@@ -48,13 +46,11 @@ def _failure(kind: str, element: ET.Element, frame_paths: dict[str, str]) -> Fai
 
 
 def parse_surefire(data: bytes, test_ids: tuple[str, ...], *, test_paths: frozenset[str],
-                   test_root: str = 'src/test/java', max_bytes: int = MAX_JUNIT_BYTES,
-                   dry_run: bool = False) -> tuple[TestCaseResult, ...]:
+                   test_root: str = 'src/test/java', max_bytes: int = MAX_JUNIT_BYTES) -> tuple[TestCaseResult, ...]:
     """Exactly one testcase per expected id, in the given order, from one class's report.
 
     `test_paths` are the patch's repository-relative files; frames map to them through Maven's test
-    source root in the ids' module. With `dry_run`, every testcase must carry the platform's dry-run skip,
-    otherwise test bodies may have executed and the report is refused.
+    source root in the ids' module.
     """
     try:
         parsed = [JavaTestId.parse(test_id) for test_id in test_ids]
@@ -86,8 +82,6 @@ def parse_surefire(data: bytes, test_ids: tuple[str, ...], *, test_paths: frozen
         if len(marks) > 1:
             raise SurefireError(f'Ambiguous outcome for {test_id}')
         outcome = OUTCOMES[marks[0].tag] if marks else 'passed'
-        if dry_run and (outcome != 'skipped' or marks[0].get('message') != DRY_RUN_MESSAGE):
-            raise SurefireError(f'Dry run not honoured for {test_id}: reported {outcome}; test bodies may have run')
         failure = _failure(marks[0].tag, marks[0], frame_paths) if outcome in ('failed', 'error') else None
         output = ''.join(child.text or '' for child in case if child.tag == 'system-out')
         results[test_id] = TestCaseResult(test_id, outcome, failure, output[:MAX_OUTPUT_CHARS])
