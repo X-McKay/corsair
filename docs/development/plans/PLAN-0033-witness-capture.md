@@ -43,7 +43,7 @@ Live, first attempt from this thread: not run.
 
 ## Decisions and next action
 
-The design fork (in-interpreter operator probe versus an out-of-process kernel observer) was put to the user as a decision card; work continued on the recommended probe. The probe travels as an execution argument instead of a file, so the SPEC-0032 tree admission and the toolchain image are unchanged. Next: run the live gate interactively on RIG0, then record the result here. Command sequence:
+The design fork (in-interpreter operator probe versus an out-of-process kernel observer) was put to the user as a decision card; work continued on the recommended probe. The probe travels as an execution argument instead of a file, so the SPEC-0032 tree admission and the toolchain image are unchanged. The live gate has run once and passed under PLAN-0039 (above); do not rerun it from this plan. Remaining follow-ups: a typed planned effect from the planner instead of the operator envelope, a layered out-of-process cross-check, and keeping model-authored tests from installing their own audit hooks (see SPEC-0033 open questions and PLAN-0039). Historical only, the staging sequence this plan proposed before PLAN-0039 ran the gate:
 
 ```
 cd /home/al/git/corsair-witness
