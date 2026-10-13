@@ -461,6 +461,10 @@ def test_tools_are_withdrawn_at_the_tool_call_cap_and_the_author_returns_its_out
     ("import importlib\nimportlib.import_module('ctypes')\n", "importlib.import_module()"),
     ("import importlib\nimportlib.__import__('ctypes')\n", "importlib.__import__"),
     ("import os\nvars(os)['system'] = print\n", "vars()"),
+    # Re-review on 538fb4b: member-import aliases of the dynamic functions.
+    ("from operator import attrgetter as get\nimport sys\nget('audit')(sys)('open', '/x', 'r')\n", "get()"),
+    ("from operator import methodcaller as call\nimport sys\ncall('audit', 'open')(sys)\n", "call()"),
+    ("import operator as op\nimport sys\nop.attrgetter('audit')(sys)\n", "op.attrgetter()"),
 ])
 def test_aliased_and_direct_patches_of_observed_facilities_are_found(content, facility):
     """Review on #49: aliases of protected modules and plain assignments must not bypass admission."""

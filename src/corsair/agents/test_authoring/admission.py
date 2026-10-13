@@ -187,7 +187,11 @@ def self_observation(content: str) -> tuple[AdmissionFinding, ...]:
         if isinstance(node, ast.Call):
             func = _dotted(node.func)
             name = func.rsplit(".", 1)[-1] if func else None
-            if (isinstance(node.func, ast.Name) and name in DYNAMIC_CALLS) or name in DYNAMIC_FUNCTIONS:
+            # The bound name decides: from operator import attrgetter as get makes get(...) an attrgetter call.
+            bound = _resolved(node.func, aliases)
+            bound_name = bound.rsplit(".", 1)[-1] if bound else None
+            if (isinstance(node.func, ast.Name) and name in DYNAMIC_CALLS) or bound_name in DYNAMIC_FUNCTIONS | (
+                    DYNAMIC_CALLS if bound != func else set()):
                 refuse(node, f"{func}()")
             if name in PATCH_CALLS:
                 # monkeypatch.setattr(os, "open", f), setattr(builtins, ...), monkeypatch.setattr("builtins.open", f),
