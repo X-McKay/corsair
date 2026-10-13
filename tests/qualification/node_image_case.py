@@ -123,7 +123,7 @@ def main():
     parser.add_argument('phase', choices=['setup', 'run'])
     parser.add_argument('--image', required=True, help='Prepared node8 image config id (sha256:<64 hex>)')
     parser.add_argument('--checkout', required=True, type=Path, help='Clean checkout of the case at one commit')
-    parser.add_argument('--modules', required=True, type=Path, help='Case dependency directory filled by setup')
+    parser.add_argument('--modules', required=True, type=Path, help='Case dependency directory; setup creates it and refuses an existing one')
     parser.add_argument('--evidence', required=True, type=Path)
     parser.add_argument('--test-file', type=Path, help='Test file placed at the ids\' path as the patch')
     parser.add_argument('--timeout', type=int, default=600, help='Seconds per runner command')
@@ -136,7 +136,8 @@ def main():
     commit = subprocess.run(['git', '-C', str(args.checkout), 'rev-parse', 'HEAD'], capture_output=True, text=True,
                             check=True).stdout.strip()
     if args.phase == 'setup':
-        args.modules.mkdir(parents=True, exist_ok=True)
+        # A fresh directory per setup: copying into an existing tree would mix two commits' dependency closures.
+        args.modules.mkdir(parents=True, exist_ok=False)
         code = setup(args.image, args.checkout.resolve(), args.modules.resolve(), args.evidence)
         print(json.dumps({'phase': 'setup', 'commit': commit, 'exit': code}))
         raise SystemExit(code)

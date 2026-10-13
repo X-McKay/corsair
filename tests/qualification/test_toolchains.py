@@ -407,7 +407,7 @@ def python_dependencies(kube, cli, sdk, name, remote, record, endpoint, pair, la
 def toolchain_gate(kube, gateway, language):
     """One image's gate, into its own evidence subdirectory; select one image by its test node id."""
     assert not (kube.evidence / 'toolchain.json').exists(), 'Another toolchain gate already wrote this evidence directory'
-    sources = ['tests/qualification/test_toolchains.py', 'tests/qualification/prepare_toolchains.py', 'tests/qualification/test_policy.py', 'tests/qualification/test_lifecycle.py', 'tests/qualification/gateway.py', 'tests/qualification/support.py', 'src/corsair/adapters/maven_runner.py', 'src/corsair/reports/junit_listing.py', 'src/corsair/adapters/jest_runner.py', 'src/corsair/reports/jest.py', 'policies/openshell/identity.yaml', 'deploy/runtime-lock.yaml', 'pyproject.toml', 'uv.lock']
+    sources = ['tests/qualification/test_toolchains.py', 'tests/qualification/prepare_toolchains.py', 'tests/qualification/test_policy.py', 'tests/qualification/test_lifecycle.py', 'tests/qualification/gateway.py', 'tests/qualification/support.py', 'src/corsair/adapters/maven_runner.py', 'src/corsair/reports/junit_listing.py', 'src/corsair/adapters/jest_runner.py', 'src/corsair/reports/jest.py', 'src/corsair/ports/test_runner.py', 'policies/openshell/identity.yaml', 'deploy/runtime-lock.yaml', 'pyproject.toml', 'uv.lock']
     (kube.evidence / 'toolchain-source-hashes.json').write_text(json.dumps(dict(source_hashes(language), **{p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest() for p in sources}), indent=2))
     summary = {'outcome': 'failed', 'sandboxes': [], 'internal_retry_counts': 'unknown'}
     endpoint = NetworkFixture(kube, 'toolchain-endpoint')
