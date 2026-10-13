@@ -42,10 +42,10 @@ def repository(path, entries):
     return commit
 
 
-def capture(root,repo,commit,*,limits=None,op=None):
+def capture(root,repo,commit,*,limits=None,op=None,**options):
     with LocalArtifacts(private(root/'objects'),max_bytes=4*1024*1024) as store:
         with GitSource(pin('/usr/bin/git'),pin('/usr/bin/prlimit'),store=store,
-                       limits=limits or SourceLimits(),receipts=private(root/'receipts')) as source:
+                       limits=limits or SourceLimits(),receipts=private(root/'receipts'),**options) as source:
             return source.capture(repo,commit,op or uuid4())
 
 
@@ -198,3 +198,35 @@ def test_native_pipe_limits_reap_original_child(tmp_path,body,cap,wall):
         with pytest.raises((ValueError,TimeoutError)):
             source._native(tmp_path,['--version'],cap,time.monotonic()+wall,calls)
         assert len(calls)==1 and calls[0]['reaped'] and calls[0]['exit'] is not None and calls[0]['stdout_bytes']<=cap
+
+
+def test_nonregular_entries_are_refused_unless_skipped_and_listed(tmp_path):
+    repo=tmp_path/'repo';commit=repository(repo,[('a','100644',b'a'),('link','120000',b'a')])
+    with pytest.raises(SourceCaptureError) as error:capture(private(tmp_path/'strict'),repo,commit)
+    assert error.value.receipt['layer']=='source_admission' and not error.value.receipt['skipped']
+    op=uuid4();snapshot=capture(private(tmp_path/'skip'),repo,commit,op=op,skip_nonregular=True)
+    assert [f.path for f in snapshot.files]==['a']
+    with LocalArtifacts(tmp_path/'skip/objects',max_bytes=4096) as store:
+        manifest=json.loads(store.get(snapshot.manifest))
+    skipped=[dict(path='link',mode='120000',kind='symlink',object=git(repo,'rev-parse',f'{commit}:link').strip().decode())]
+    assert manifest['skipped']==skipped
+    assert json.loads((tmp_path/f'skip/receipts/{op}.result.json').read_text())['skipped']==skipped
+    # A regular-only tree keeps the unchanged manifest shape.
+    plain=repository(tmp_path/'plain',[('a','100644',b'a')])
+    snapshot=capture(private(tmp_path/'plain-capture'),tmp_path/'plain',plain,skip_nonregular=True)
+    with LocalArtifacts(tmp_path/'plain-capture/objects',max_bytes=4096) as store:
+        assert 'skipped' not in json.loads(store.get(snapshot.manifest))
+
+
+def test_format_only_fsck_messages_are_refused_unless_the_operator_ignores_them(tmp_path):
+    repo=tmp_path/'repo';good=repository(repo,[('a','100644',b'a')])
+    tree=git(repo,'cat-file','commit',good).splitlines()[0][5:]
+    raw=b'tree '+tree+b'\nauthor Fixture <fixture@invalid> 1 +99999\ncommitter Fixture <fixture@invalid> 1 +0000\n\nold\n'
+    odd=git(repo,'hash-object','-t','commit','--literally','-w','--stdin',input=raw).strip().decode()
+    with pytest.raises(SourceCaptureError) as error:capture(private(tmp_path/'strict'),repo,odd)
+    assert error.value.receipt['native_calls'][-1]['args'][0]=='fsck'
+    op=uuid4();snapshot=capture(private(tmp_path/'ignore'),repo,odd,op=op,fsck_ignore=frozenset({'badTimezone'}))
+    assert snapshot.commit==odd
+    assert json.loads((tmp_path/f'ignore/receipts/{op}.result.json').read_text())['fsck_ignore']==['badTimezone']
+    for bad in (dict(fsck_ignore=frozenset({'missingTree'})),dict(skip_nonregular=1)):
+        with pytest.raises(ValueError):capture(private(tmp_path/f'bad{len(bad)}{list(bad)[0]}'),repo,odd,**bad)
