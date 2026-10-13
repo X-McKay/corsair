@@ -2,6 +2,7 @@
 is unsupported with the missing components named, or is undetermined. No row is ever chosen as a substitute."""
 from pathlib import Path
 import re
+from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 import yaml
@@ -17,6 +18,9 @@ VersionText = str
 
 
 class Qualification(_Frozen):
+    # `image-only`: the image built and the gate body and a real case passed under plain Docker; selectable while the
+    # project is in development, never reported as qualified. `live`: the kind/OpenShell toolchain gate passed.
+    evidence: Literal['live', 'image-only']
     records: tuple[str, ...] = Field(min_length=1)
     report: str = Field(min_length=1)
     note: str = ''
@@ -149,7 +153,10 @@ def select(requirement: RuntimeRequirement, matrix: Matrix) -> Selection:
         if all(check.satisfied for check in checks if check.kind != 'test_framework'):
             runtime_fits = True
             if any(f.satisfied for f in frameworks):
-                return Supported(status='supported', image_id=row.id, image=row.base_image, checks=checks)
+                rows = [row.qualification.evidence, *(f.qualification.evidence for f in matrix.frameworks if f.applies(row)
+                                                      and any(c.satisfied and c.name == f.name for c in frameworks))]
+                evidence = 'live' if all(e == 'live' for e in rows) else 'image-only'
+                return Supported(status='supported', image_id=row.id, image=row.base_image, checks=checks, evidence=evidence)
         unmet = [c for c in checks if not c.satisfied and c.kind != 'test_framework']
         rejected.append(Rejection(image_id=row.id, unmet=tuple(unmet + ([] if any(f.satisfied for f in frameworks) else frameworks))))
     if runtime_fits and unread:
