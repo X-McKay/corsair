@@ -5,6 +5,7 @@ from pathlib import Path
 
 from pydantic_ai import Agent, ModelRetry, RunContext
 from pydantic_ai.capabilities import Capability, Instrumentation
+from pydantic_ai.durable_exec.temporal import TemporalDurability
 from pydantic_ai.messages import ModelRequest, ToolReturnPart
 from pydantic_ai.models import Model
 from pydantic_ai.models.instrumented import InstrumentationSettings
@@ -37,7 +38,11 @@ def assessment_prompt(inputs: AssessmentInput) -> str:
                 + f"lines 1..{len(item.content.splitlines())})" for item in inputs.items))
 
 
-def create_evidence_assessment_agent(model: Model, *, output_retries: int = 1) -> Agent[AssessmentDependencies, EvidenceAssessment]:
+def create_evidence_assessment_agent(
+    model: Model, *, output_retries: int = 1,
+    durability: TemporalDurability[AssessmentDependencies] | None = None,
+) -> Agent[AssessmentDependencies, EvidenceAssessment]:
+    """Explicit model seam reusable by native durability; no configured provider fallback."""
     if not isinstance(model, Model):
         raise TypeError("an explicit PydanticAI Model instance is required")
 
@@ -79,5 +84,6 @@ def create_evidence_assessment_agent(model: Model, *, output_retries: int = 1) -
         model, name="evidence_assessment", deps_type=AssessmentDependencies, output_type=finalize_assessment,
         instructions=INSTRUCTIONS, retries={"tools": TOOL_RETRIES, "output": output_retries},
         capabilities=[Capability(id=SKILL_ID, instructions=SKILL_TEXT, toolsets=[evidence_tools()]),
-                      Instrumentation(settings=InstrumentationSettings(include_content=False, version=5))],
+                      Instrumentation(settings=InstrumentationSettings(include_content=False, version=5)),
+                      *([durability] if durability is not None else [])],
     )
