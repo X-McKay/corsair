@@ -226,6 +226,10 @@ def test_read_output_returns_retained_bytes_beyond_the_tail():
     assert run(ready(), calls, execution).output.status == "ready"
 
 
+TAP_OK = (b"t/ok.t .. \n1..2\nok 1 - a\nok 2 - b\nok\nAll tests successful.\n"
+          b"Files=1, Tests=2,  0 wallclock secs ( 0.03 usr  0.00 sys +  0.03 cusr  0.00 csys =  0.06 CPU)\nResult: PASS\n")
+
+
 @pytest.mark.parametrize("framework,test_id,path,command,output,ok", [
     ("pytest", "tests/a_test.py::test_x[1]", "tests/a_test.py", ("pytest", "tests/a_test.py::test_x[1]"), b"== 1 passed in 0.2s ==\n", True),
     ("pytest", "tests/a_test.py::test_x", "tests/a_test.py", ("pytest", "tests/a_test.py::test_x"), b"1 passed, 1 warning in 0.03s\n", True),
@@ -255,6 +259,27 @@ def test_read_output_returns_retained_bytes_beyond_the_tail():
      b"[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0\n[INFO] BUILD SUCCESS\n", True),
     ("junit4", "org.example.LegacyTest#forwards", "src/test/java/org/example/LegacyTest.java", ("mvn", "-Dtest=LegacyTest#forwards"),
      b"[INFO] Tests run: 1, Failures: 0, Errors: 1, Skipped: 0\n[INFO] BUILD SUCCESS\n", False),
+    # prove output captured from the perl526 image (prove 3.38): verbose shows the TAP lines; the summary alone passes
+    # skipped, todo and skip-all files.
+    ("tap-harness", "t/ok.t", "t/ok.t", ("prove", "--norc", "-lv", "t/ok.t"), TAP_OK, True),
+    ("tap-harness", "t/ok.t", "t/ok.t", ("prove", "-lv", "t/ok.t"), TAP_OK, False),  # a project .proverc would apply
+    ("tap-harness", "t/ok.t", "t/ok.t", ("prove", "--norc", "-v", "-I", "inc", "t/ok.t"), TAP_OK, True),
+    ("tap-harness", "t/ok.t", "t/ok.t", ("prove", "--norc", "-v", "-MFoo", "t/ok.t"), TAP_OK, False),
+    ("tap-harness", "t/ok.t", "t/ok.t", ("prove", "--norc", "-v", "-P", "Foo", "t/ok.t"), TAP_OK, False),
+    ("tap-harness", "t/../ok.t", "t/../ok.t", ("prove", "--norc", "-v", "t/../ok.t"), TAP_OK, False),
+    ("tap-harness", "t/ok.t", "t/ok.t", ("prove", "t/ok.t"), b"t/ok.t .. ok\nAll tests successful.\nFiles=1, Tests=2,  0 wallclock secs\nResult: PASS\n", False),
+    ("tap-harness", "t/ok.t", "t/ok.t", ("prove", "--norc", "-v", "t/ok.t"), TAP_OK.replace(b"ok 2 - b", b"ok 2 # skip why"), False),
+    ("tap-harness", "t/ok.t", "t/ok.t", ("prove", "--norc", "-v", "t/ok.t"), TAP_OK.replace(b"ok 2 - b", b"not ok 2 - b # TODO later"), False),
+    ("tap-harness", "t/ok.t", "t/ok.t", ("prove", "--norc", "-v", "t/ok.t"), b"t/ok.t .. skipped: nope\nFiles=1, Tests=0,  0 wallclock secs\nResult: NOTESTS\n", False),
+    ("tap-harness", "t/ok.t", "t/ok.t", ("prove", "--norc", "-v", "t/ok.t"), TAP_OK.replace(b"ok 2 - b", b"    1..0 # SKIP no\nok 2 # skip no"), False),
+    ("tap-harness", "t/ok.t", "t/ok.t", ("prove", "--norc", "-v", "t"), TAP_OK, False),
+    ("tap-harness", "t/ok.t", "t/ok.t", ("prove", "--norc", "-v", "t/ok.t", "t/other.t"), TAP_OK, False),
+    ("tap-harness", "t/ok.t", "t/ok.t", ("prove", "--norc", "--dry", "t/ok.t"), TAP_OK, False),
+    ("tap-harness", "t/ok.t", "t/ok.t", ("prove", "--norc", "-vD", "t/ok.t"), TAP_OK, False),
+    ("tap-harness", "t/ok.t", "t/ok.t", ("prove", "--norc", "-v", "--state=failed", "t/ok.t"), TAP_OK, False),
+    ("tap-harness", "t/ok.t", "t/ok.t", ("prove", "--norc", "-v", "--exec", "/bin/true", "t/ok.t"), TAP_OK, False),
+    ("tap-harness", "t/ok.t", "lib/t/ok.t", ("prove", "--norc", "-v", "t/ok.t"), TAP_OK, False),
+    ("tap-harness", "t/ok.t#sub", "t/ok.t", ("prove", "--norc", "-v", "t/ok.t#sub"), TAP_OK, False),
 ])
 def test_framework_admission_is_exact(framework, test_id, path, command, output, ok):
     from corsair.agents.environment.frameworks import FRAMEWORKS, file_matches
