@@ -86,6 +86,8 @@ def summarize(evidence: Path) -> dict:
                 entry["failed_assertions"][key] = entry["failed_assertions"].get(key, 0) + 1
         for key, value in case["metrics"].items():
             metrics.setdefault(key, []).append(value)
+        for key, item in case["scores"].items():
+            metrics.setdefault("score_" + key, []).append(item["value"])
         metrics.setdefault("task_seconds", []).append(case["task_duration"])
     for failure in report["failures"]:
         name = failure.get("source_case_name") or failure["name"]

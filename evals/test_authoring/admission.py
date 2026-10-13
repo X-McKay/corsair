@@ -38,6 +38,21 @@ def no_process_or_network(content: str) -> bool:
     return True
 
 
+WITNESS_HOOKS = frozenset({"addaudithook", "settrace", "setprofile", "monitoring"})
+
+
+def witness_hooks(content: str) -> int:
+    """Author-written audit, trace or monitoring hooks: the live failure mode where the author builds its own
+    witness. Counted, not asserted, because the reviewed realization in today's cases installs one; the
+    authoring stage's own admission rule decides what is refused."""
+    try:
+        tree = ast.parse(content)
+    except SyntaxError:
+        return 0
+    return sum(1 for n in ast.walk(tree) if isinstance(n, ast.Attribute) and n.attr in WITNESS_HOOKS
+               and isinstance(n.value, ast.Name) and n.value.id == "sys")
+
+
 def admission_facts(plan: ReadyTestPlan, files: dict[str, str], security_lines: tuple[int, ...]) -> dict[str, bool]:
     """Facts for a patch output; a fact whose plan premise is absent is omitted, not passed."""
     control_file, security_file = files.get(plan.control.test_path, ""), files.get(plan.security.test_path, "")

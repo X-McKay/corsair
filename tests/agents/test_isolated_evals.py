@@ -114,3 +114,9 @@ def test_eval_command_files_runs_and_compares_with_the_previous_and_promoted_run
     assert f"Compared with {first} (baseline)" in text and "clean attempts 12/12" in text
     with pytest.raises(SystemExit):
         eval_run.main(["environment"])
+
+
+def test_author_witness_hooks_are_counted_as_a_score():
+    from evals.test_authoring.admission import witness_hooks
+    assert witness_hooks(REFERENCE) == 1 and witness_hooks("import sys\nsys.monitoring.use_tool_id(1, 'x')\n") == 1
+    assert witness_hooks("def test_x():\n    assert 1 == 1\n") == 0

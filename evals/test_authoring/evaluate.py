@@ -38,7 +38,7 @@ from corsair.ports.test_runner import (
 )
 from evals.issue_analysis.evaluate import describe_model, record_count
 from evals.issue_analysis.live import NoUnknownToolAttempts, ProviderUsageCoverage, message_counts, output_tool_names
-from evals.test_authoring.admission import admission_facts
+from evals.test_authoring.admission import admission_facts, witness_hooks
 from evals.test_authoring.static_runner import StaticRunner
 
 ROOT = Path(__file__).parent
@@ -141,7 +141,11 @@ class MatchesAuthoring(Evaluator[AuthoringCase, AuthoringOutput, AuthoringOracle
     def evaluate(self, ctx):
         if ctx.metadata is None:
             return {"oracle_present": False}
-        return authoring_checks(ctx.inputs.inputs, ctx.output, ctx.metadata, self.live)
+        checks = authoring_checks(ctx.inputs.inputs, ctx.output, ctx.metadata, self.live)
+        if isinstance(ctx.output, TestPatch):
+            # A score, not an assertion: reported per attempt so a prompt change can be compared on it.
+            checks["author_witness_hooks"] = sum(witness_hooks(item.content) for item in ctx.output.files)
+        return checks
 
 
 @dataclass
