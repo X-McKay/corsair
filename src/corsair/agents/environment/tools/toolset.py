@@ -3,12 +3,9 @@
 A module under tools/ is offered only once it is registered here; nothing is discovered by scanning.
 """
 
-from dataclasses import asdict
-from hashlib import sha256
-import json
-
 from pydantic_ai.toolsets import FunctionToolset
 
+from ...toolset_identity import toolset_sha256
 from ..dependencies import EnvironmentDependencies
 from .list_toolchains import LIST_TOOLCHAINS_TOOL, list_toolchains
 from .read_output import READ_OUTPUT_TOOL, read_output
@@ -26,12 +23,6 @@ def environment_tools() -> FunctionToolset[EnvironmentDependencies]:
     tools.add_function(run_setup_command, name=RUN_SETUP_COMMAND_TOOL, retries=TOOL_RETRIES)
     tools.add_function(read_output, name=READ_OUTPUT_TOOL, retries=TOOL_RETRIES)
     return tools
-
-
-def toolset_sha256(toolset: FunctionToolset) -> str:
-    """Digest of what the toolset offers: id, order, every tool definition field and retry limit."""
-    offered = [asdict(tool.tool_def) | {"max_retries": tool.max_retries} for tool in toolset.tools.values()]
-    return sha256(json.dumps({"id": toolset.id, "tools": offered}, sort_keys=True).encode()).hexdigest()
 
 
 TOOLSET_SHA256 = toolset_sha256(environment_tools())
