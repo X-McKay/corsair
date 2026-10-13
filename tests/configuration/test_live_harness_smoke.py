@@ -139,7 +139,7 @@ class Answers:
         assert str(path) in self.good['network'], 'refused'
 
 
-def orchestrate(tmp_path, monkeypatch, answers, fail=None, case=None, prepared=False, retained_gateway=False):
+def orchestrate(tmp_path, monkeypatch, answers, fail=None, case=None, prepared=False, retained_gateway=False, admission=None):
     monkeypatch.setattr(qualify_image, 'QUALIFY', tmp_path / 'qualify')
     monkeypatch.setattr(qualify_image, 'GATEWAY_STATE', tmp_path / 'openshell')
     monkeypatch.setattr(qualify_image, 'image_cache_state', lambda toolchain: 'prepared' if prepared else 'absent')
@@ -152,7 +152,7 @@ def orchestrate(tmp_path, monkeypatch, answers, fail=None, case=None, prepared=F
         log.write_text('stub\n')
         return 2 if target == fail else 0
 
-    run = qualify_image.Run('java8', case, tmp_path / 'qualify' / 'run', answers, runner=runner)
+    run = qualify_image.Run('java8', case, tmp_path / 'qualify' / 'run', answers, runner=runner, admission=admission)
     stop = run.execute()
     qualify_image.write_summary(run, stop, 'start', 'end', {'commit': 'c' * 40, 'branch': 'b', 'checkout': '/x'})
     return run, stop, calls
@@ -209,4 +209,35 @@ def test_rig0_allow_rules_cover_the_runbook_and_never_the_blocked_commands():
     targets = qualify_image.make_targets()
     for target in re.findall(r'make -C \S+ ([a-z0-9-]+)', allowed):
         assert target in targets
-    assert {'Bash(*mkfs*)', 'Bash(*dd if=*)', 'Bash(*delete namespace*)'} <= set(rules['deny'])
+    # The five substrings Al's pre-bash hook refuses (PLAN-0040), and make options that would replace the Makefile.
+    assert {'Bash(*mkfs*)', 'Bash(*dd if=*)', 'Bash(*delete namespace*)', 'Bash(*delete --all*)', 'Bash(*rm -rf /*)',
+            'Bash(make *--eval*)', 'Bash(make * -f*)', 'Bash(make *--file*)'} <= set(rules['deny'])
+
+
+@pytest.mark.parametrize('argv', [
+    ['qualify-image', 'TOOLCHAIN=java8', 'kind-down'],
+    ['kind-up', 'qualify-image', 'TOOLCHAIN=java8'],
+    ['qualify-image', 'TOOLCHAIN=java8";id;"'],
+    ['qualify-image', 'TOOLCHAIN=java8 python'],
+    ['qualify-image'],
+    ['qualify-image', 'TOOLCHAIN=java8', 'SHELL=/tmp/other'],
+    ['archive-runs', 'PYTHONPATH=/tmp/other'],
+    ['cluster-status', 'qualify-gateway'],
+])
+def test_pre_allowed_targets_refuse_extra_goals_variables_and_unknown_toolchains(argv):
+    completed = subprocess.run(['make', '-n', '--no-print-directory', '-C', str(ROOT), *argv], capture_output=True, text=True, timeout=60)
+    assert completed.returncode != 0 and '***' in completed.stderr and not completed.stdout.strip()
+
+
+def test_pre_allowed_targets_keep_values_out_of_recipe_text():
+    completed = subprocess.run(['make', '-n', '--no-print-directory', '-C', str(ROOT), 'qualify-image', 'TOOLCHAIN=java8', 'CASE=x"; id; "'],
+                               capture_output=True, text=True, timeout=60)
+    assert completed.returncode == 0 and 'id;' not in completed.stdout and '"$QUALIFY_CASE"' in completed.stdout
+    with pytest.raises(SystemExit):
+        qualify_image.main(['run', '--toolchain', 'java8', '--case', 'x"; id; "'])
+
+
+def test_qualify_image_stops_when_explicitly_named_evidence_is_refused(tmp_path, monkeypatch):
+    run, stop, calls = orchestrate(tmp_path, monkeypatch, Answers(), prepared=True, admission=str(tmp_path / 'named'))
+    assert stop.step == 'admission' and 'qualify-admission' not in [t for t, _ in calls]
+    assert 'named explicitly' in run.steps['admission']['detail']

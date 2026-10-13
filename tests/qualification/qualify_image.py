@@ -171,10 +171,17 @@ class Run:
         except Stop as stop:
             return stop
 
+    def reused(self, name, check, pattern):
+        path, tried = reuse(check, self.explicit[name], pattern)
+        self.steps[name]['refused_candidates'] = tried
+        if self.explicit[name] and not path:
+            # The operator asked for this evidence; running a fresh check instead would answer a different question.
+            self.refuse(name, f'the {name} evidence named explicitly was refused: {tried[0]["refused"]}')
+        return path
+
     def admission(self):
-        path, tried = reuse(self.cluster.admission_ok, self.explicit['admission'], '*/admission')
+        path = self.reused('admission', self.cluster.admission_ok, '*/admission')
         record = self.steps['admission']
-        record['refused_candidates'] = tried
         if path:
             record.update(outcome='reused', evidence=str(path))
             return path
@@ -186,9 +193,8 @@ class Run:
         return self.root / 'admission'
 
     def network(self):
-        path, tried = reuse(self.cluster.network_ok, self.explicit['network'], '*/network')
+        path = self.reused('network', self.cluster.network_ok, '*/network')
         record = self.steps['network']
-        record['refused_candidates'] = tried
         if path:
             record.update(outcome='reused', evidence=str(path))
             return path
@@ -255,9 +261,10 @@ def command_run(args):
         raise SystemExit(f'Unknown TOOLCHAIN {args.toolchain!r}; prepared image directories: {sorted(BASES)}')
     if args.case and f'qualify-{args.toolchain}-case' not in make_targets():
         raise SystemExit(f'No case target qualify-{args.toolchain}-case in the Makefile; run without CASE for the gate alone')
-    dirty = git('status', '--porcelain', '--untracked-files=no')
+    # Untracked files count too (a stray test module would be collected); ignored .runs, .state and .cache do not.
+    dirty = git('status', '--porcelain', '--untracked-files=all')
     if dirty:
-        raise SystemExit('Tracked files differ from the commit; evidence must name one commit. Commit or stash first:\n' + dirty)
+        raise SystemExit('The checkout differs from its commit; evidence must name one commit. Commit, stash or remove:\n' + dirty)
     root = QUALIFY / (args.run or f'{args.toolchain}-{stamp()}')
     if root.exists():
         raise SystemExit(f'{root} exists; evidence is never overwritten, pick another RUN')
@@ -328,19 +335,34 @@ def command_archive(args):
     print(f'Archived {len(source)} files from {RUNS} to {destination}; the worktree may now be removed')
 
 
+def optional(pattern):
+    """argparse type: '' (make passes every option) means not given; anything else must match `pattern`."""
+    def parse(value):
+        if not value:
+            return None
+        if not re.fullmatch(pattern, value):
+            raise argparse.ArgumentTypeError(f'{value!r} is not allowed here')
+        return value
+    return parse
+
+
+NAME = r'[A-Za-z0-9][A-Za-z0-9._-]{0,127}'
+PATH = r'[A-Za-z0-9._/-]{1,1024}'
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest='command', required=True)
     run = commands.add_parser('run', help='Live chain for one image (make qualify-image)')
     run.add_argument('--toolchain', required=True, help='Image directory under deploy/qualification/toolchains')
-    run.add_argument('--case', help='Benchmark case id for the image\'s qualify-<dir>-case target')
-    run.add_argument('--run', help='Run directory name under .runs/qualify (default <toolchain>-<UTC stamp>)')
-    run.add_argument('--admission', help='Admission evidence to try first instead of this checkout\'s newest runs')
-    run.add_argument('--network', help='Network evidence to try first instead of this checkout\'s newest runs')
+    run.add_argument('--case', type=optional(NAME), help='Benchmark case id for the image\'s qualify-<dir>-case target')
+    run.add_argument('--run', type=optional(NAME), help='Run directory name under .runs/qualify (default <toolchain>-<UTC stamp>)')
+    run.add_argument('--admission', type=optional(PATH), help='Admission evidence to try first instead of this checkout\'s newest runs')
+    run.add_argument('--network', type=optional(PATH), help='Network evidence to try first instead of this checkout\'s newest runs')
     run.set_defaults(handler=command_run)
     commands.add_parser('status', help='Read-only cluster and evidence status (make cluster-status)').set_defaults(handler=command_status)
     archive = commands.add_parser('archive', help='Copy this worktree\'s .runs into the main checkout (make archive-runs)')
-    archive.add_argument('--dest', help='Destination directory (default <main checkout>/.runs/worktrees/<worktree>-<stamp>)')
+    archive.add_argument('--dest', type=optional(PATH), help='Destination directory (default <main checkout>/.runs/worktrees/<worktree>-<stamp>)')
     archive.set_defaults(handler=command_archive)
     args = parser.parse_args(argv)
     args.handler(args)

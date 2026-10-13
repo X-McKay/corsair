@@ -25,6 +25,8 @@ Implement [SPEC-0062](../specs/SPEC-0062-live-qualification-tooling.md). Branch 
 
 2026-10-13, cloud container (no Docker daemon, no cluster): the new smoke file passed 16/16. Mutation checks: making `toolchain_gateway` function-scoped fails the one-gateway-per-target check (three installs under `toolchain`); removing the image-case `objects` directory creation fails the image-case check. Every other live test reached its first native call or gateway use under the stubs. `make cluster-status` ran here and reported no receipt and no cluster. Full `make test-config`: see below.
 
+Al's review at `d10dd13` (comment-type): orchestrator and evidence logic sound; before the allow file reaches RIG0, the `qualify-image *` rule admitted extra make goals and shell injection through `TOOLCHAIN`/`CASE` (confirmed with `make -n`), and the deny list lacked `kubectl delete --all` and `rm -rf /`. Fixed in the Makefile guard (one goal, allowed command-line variables only, `TOOLCHAIN` from the image directories, values through the environment), with `--eval`/`-f`/`-I`/`-e` make options denied, all five hook substrings denied, refusal of a named-but-refused evidence run, untracked files counted, and the guide's hook wording corrected; `make -n` cases added to the smoke file.
+
 ## Decisions and next action
 
 - Network is checked before the gateway install, not after, so a failed network check leaves no unconsumed gateway.
