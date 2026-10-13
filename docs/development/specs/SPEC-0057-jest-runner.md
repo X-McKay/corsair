@@ -4,7 +4,7 @@ kind: spec
 title: Jest test runner and report parser
 status: draft
 updated: 2026-10-13
-related: [SPEC-0055, SPEC-0039, SPEC-0041, SPEC-0042, PLAN-0069]
+related: [SPEC-0055, SPEC-0039, SPEC-0041, SPEC-0042, PLAN-0070]
 ---
 
 # Jest test runner and report parser
@@ -27,4 +27,4 @@ Offline: parser and runner tests over real Jest 24.8.0 output captured on Node 8
 
 ## Decisions and open questions
 
-Listing by a never-matching name pattern rather than `--listTests` (which names files, not tests) or a static parse of the file; it is the only Jest 24 mode that names tests without running them. The framework matrix row (`jest`, exact versions that ran, images `node-8.17.0-npm`) is added with the image row after the live gate, naming only Jest 24.8.0 until a case's own Jest version runs. Plan: [PLAN-0069](../plans/PLAN-0069-jest-runner.md).
+Listing by a never-matching name pattern rather than `--listTests` (which names files, not tests) or a static parse of the file; it is the only Jest 24 mode that names tests without running them. The framework matrix row (`jest`, exact versions that ran, images `node-8.17.0-npm`) is added with the image row after the live gate, naming only Jest 24.8.0 until a case's own Jest version runs. Plan: [PLAN-0070](../plans/PLAN-0070-jest-runner.md).
