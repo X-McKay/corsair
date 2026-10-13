@@ -22,7 +22,7 @@ Implement [SPEC-0063](../specs/SPEC-0063-minitest-runner.md) on main after the `
 - [x] Docker harness refuses image tags and dirty checkouts or overlay directories, as #74 does for Java.
 - [x] Image-only real case under Docker: CVE-2025-27610 (rack) at both commits through `tests/qualification/ruby_image_case.py`.
 - [ ] Sandbox run of a real case in the milestone gate batch; flips both rows to `live`.
-- [ ] Rack CVE-2025-27610 in the CI image-only case table once that table is on main (PR #76 adds it, Java-only so far).
+- [ ] Rack CVE-2025-27610 through the chain end to end once the model server is free (CI case replay deferred by Al, 2026-10-13 15:43Z, until end-to-end runs are on the board).
 - [ ] `minitest` admission in the environment agent (assessed against its eval baseline), skill text, handoff.
 
 ## Validation and progress
@@ -46,4 +46,4 @@ Not run: sanitize CVE-2023-36823 (the benchmark records only its fix revision), 
 
 ## Decisions and next action
 
-The environment-agent admission waits for the real case, so the agent's prompt and eval are changed once, with evidence. Under the lighter path (Al, 2026-10-13 13:55Z) the rows landed as `image-only` from the Docker evidence above; the milestone gate batch for `ruby31` (with the runner argv) flips them to `live`. Next: the rack case in the CI table after #76, then the environment-agent admission.
+The environment-agent admission waits for the real case, so the agent's prompt and eval are changed once, with evidence. Under the lighter path (Al, 2026-10-13 13:55Z) the rows landed as `image-only` from the Docker evidence above; the milestone gate batch for `ruby31` (with the runner argv) flips them to `live`. Next: the rack case end to end through the chain, then the environment-agent admission.
