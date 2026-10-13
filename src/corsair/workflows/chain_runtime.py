@@ -36,7 +36,7 @@ from corsair.agents.test_authoring.tools import AuthoringBudget, AuthoringDepend
 from corsair.agents.test_planning.contracts import ReadyTestPlan, TestPlan
 from corsair.composition.direct import (
     AGENTS, AgentStage, BudgetExhausted, CompositionBudget, DirectRun, FixtureCase, Purpose, RecordedFailure, Runners,
-    Stage, StageLimits,
+    Stage, StageLimits, cap_reached,
 )
 from corsair.core.disposition import GateResult, ObservationPlan
 from corsair.nodes.witness import WitnessEvidence
@@ -115,6 +115,10 @@ class AttemptRecord:
     failure: FailureRecord | None
     limits: StageLimits | None = None
     exhausted: BudgetExhausted | None = None
+
+    @property
+    def tool_cap_reached(self) -> bool:
+        return cap_reached(self.limits, self.usage)
 
 
 class ExecutionRecord(BaseModel):

@@ -55,6 +55,44 @@ def _dotted(node: ast.AST) -> str | None:
     return None
 
 
+def _aliases(tree: ast.Module) -> dict[str, str]:
+    """Each imported local name and the module path it is bound to: ``import socket as net`` binds net to socket."""
+    bound: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                bound[alias.asname or alias.name.split(".")[0]] = alias.name if alias.asname else alias.name.split(".")[0]
+        elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
+            for alias in node.names:
+                bound[alias.asname or alias.name] = f"{node.module}.{alias.name}"
+    return bound
+
+
+def _resolved(node: ast.AST, aliases: dict[str, str]) -> str | None:
+    dotted = _dotted(node)
+    if dotted is None:
+        return None
+    head, _, rest = dotted.partition(".")
+    return ".".join(filter(None, (aliases.get(head, head), rest)))
+
+
+def _protected(target: str | None) -> bool:
+    """A file, process, network or import facility, or sys.modules; environment inputs stay writable."""
+    if not target or any(target == allowed or target.startswith(allowed + ".") for allowed in UNOBSERVED_TARGETS):
+        return False
+    return target.split(".")[0] in PATCHED or any(target == exact or target.startswith(exact + ".")
+                                                  for exact in PATCHED_EXACT)
+
+
+def _written(target: ast.AST) -> ast.AST | None:
+    """The object an assignment or deletion writes into: ``io.open = f`` writes io.open, ``m['k'] = v`` writes m."""
+    if isinstance(target, ast.Attribute):
+        return target
+    if isinstance(target, ast.Subscript):
+        return target.value
+    return None
+
+
 def _imported(node: ast.Import | ast.ImportFrom) -> list[str]:
     if isinstance(node, ast.Import):
         return [alias.name for alias in node.names]
@@ -73,6 +111,7 @@ def self_observation(content: str) -> tuple[AdmissionFinding, ...]:
         return ()
     sys_modules, sys_members = _bindings(tree, "sys")
     threading_modules, threading_members = _bindings(tree, "threading")
+    aliases = _aliases(tree)
     found: dict[tuple[int, str], None] = {}
 
     def refuse(node: ast.AST, construct: str) -> None:
@@ -100,7 +139,17 @@ def self_observation(content: str) -> tuple[AdmissionFinding, ...]:
             refuse(node, "mocker fixture")
         elif isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value in NAMES:
             refuse(node, f"string {node.value!r}")
-        elif isinstance(node, ast.Call):
+        if isinstance(node, (ast.Assign, ast.AugAssign, ast.AnnAssign, ast.Delete)):
+            # Direct writes and deletes: io.open = f, del os.system, sys.modules["x"] = m, sp.run += f.
+            targets = node.targets if isinstance(node, (ast.Assign, ast.Delete)) else [node.target]
+            verb = "delete" if isinstance(node, ast.Delete) else "assign"
+            for target in targets:
+                for element in (target.elts if isinstance(target, (ast.Tuple, ast.List)) else [target]):
+                    written = _written(element)
+                    resolved = _resolved(written, aliases) if written is not None else None
+                    if _protected(resolved):
+                        refuse(node, f"{verb} {resolved}")
+        if isinstance(node, ast.Call):
             func = _dotted(node.func)
             name = func.rsplit(".", 1)[-1] if func else None
             if name in PATCH_CALLS:
@@ -108,9 +157,8 @@ def self_observation(content: str) -> tuple[AdmissionFinding, ...]:
                 # and a patch of any module's own "open" name.
                 for argument in node.args[:2]:
                     patched = argument.value if isinstance(argument, ast.Constant) and isinstance(
-                        argument.value, str) else _dotted(argument)
-                    if patched and patched not in UNOBSERVED_TARGETS and (
-                            patched.split(".")[0] in PATCHED or patched in PATCHED_EXACT):
+                        argument.value, str) else _resolved(argument, aliases)
+                    if _protected(patched):
                         refuse(node, f"{func}({patched})")
                         break
     return tuple(AdmissionFinding(line=line, facility=construct[:128]) for line, construct in sorted(found))

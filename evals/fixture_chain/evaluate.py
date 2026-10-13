@@ -75,6 +75,7 @@ class StageEfficiency(BaseModel):
     request_limit: int | None = None
     tool_calls_limit: int | None = None
     exhausted: str | None = None
+    tool_cap_reached: bool = False
 
 
 class ChainOutcome(BaseModel):
@@ -165,7 +166,8 @@ def outcome(run: DirectRun | ChainResult) -> ChainOutcome:
             elapsed_seconds=a.elapsed_seconds,
             output_corrections=sum(isinstance(part, RetryPromptPart) for m in a.messages for part in m.parts),
             failure=_failure(a.failure), request_limit=a.limits and a.limits.request_limit,
-            tool_calls_limit=a.limits and a.limits.tool_calls_limit, exhausted=a.exhausted and a.exhausted.limit)
+            tool_calls_limit=a.limits and a.limits.tool_calls_limit, exhausted=a.exhausted and a.exhausted.limit,
+            tool_cap_reached=a.tool_cap_reached)
             for a in run.attempts))
 
 

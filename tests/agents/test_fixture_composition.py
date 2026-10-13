@@ -315,3 +315,24 @@ def test_a_stage_ending_on_its_cap_is_a_typed_budget_exhaustion(store, tmp_path)
     assert exhaustion("planning", authoring.limits, None, ValueError("x")) is None
     assert exhaustion("planning", authoring.limits, None, RecordedFailure("TimeoutError", "late")).limit == \
         "timeout_seconds"
+
+
+def test_an_unrelated_failure_after_the_tool_cap_keeps_its_own_classification(store, tmp_path):
+    """Review on #49: reaching the cap is recorded, but only a limit or withdrawn-tool failure is exhaustion."""
+    from pydantic_ai.exceptions import UnexpectedModelBehavior
+    from pydantic_ai.usage import RunUsage
+    limits = CompositionBudget().planning.limits(2, 0, 1)
+    spent = RunUsage(requests=4, tool_calls=limits.tool_calls_limit)
+    assert exhaustion("planning", limits, spent, ValueError("provider response was invalid")) is None
+    assert exhaustion("planning", limits, spent, RecordedFailure("ModelAPIError", "500")) is None
+    assert exhaustion("planning", limits, RunUsage(tool_calls=1), UnexpectedModelBehavior("bad output")) is None
+    for failure in (UnexpectedModelBehavior("Exceeded maximum output retries"),
+                    RecordedFailure("UnexpectedModelBehavior", "Tool 'read_source' not found")):
+        assert exhaustion("planning", limits, spent, failure).limit == "tool_calls_limit"
+
+
+def test_an_attempt_records_reaching_its_tool_cap_whatever_ended_it(store, tmp_path):
+    budget = CompositionBudget(assessment=CompositionBudget().assessment.model_copy(update={"tool_calls_limit": 3}))
+    (tmp_path / "work").mkdir()
+    run = asyncio.run(run_direct(fixture_case(), stages(), reviewed_runners(store, tmp_path / "work"), budget))
+    assert run.attempts[-1].tool_cap_reached and not run.attempts[0].tool_cap_reached

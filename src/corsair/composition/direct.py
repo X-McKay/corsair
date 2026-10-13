@@ -129,6 +129,11 @@ def stage_limits(stage: "AgentStage", inputs: Any, budget: "CompositionBudget") 
     return getattr(budget, stage).limits(reads, work, budget.output_retries)
 
 
+def cap_reached(limits: StageLimits | None, usage: RunUsage | None) -> bool:
+    """Whether the run spent its tool-call cap; recorded on every attempt, whatever ended it."""
+    return limits is not None and usage is not None and usage.tool_calls >= limits.tool_calls_limit
+
+
 def exhaustion(stage: "AgentStage", limits: StageLimits, usage: RunUsage | None,
                failure: BaseException | None) -> BudgetExhausted | None:
     """Which cap ended a stage that returned no output; None when it failed for another reason."""
@@ -141,8 +146,9 @@ def exhaustion(stage: "AgentStage", limits: StageLimits, usage: RunUsage | None,
     elif kind == "UsageLimitExceeded":
         limit = next((name for name in ("tool_calls_limit", "total_tokens_limit", "request_limit")
                       if name in str(failure)), "request_limit")
-    elif usage is not None and usage.tool_calls >= limits.tool_calls_limit:
-        # Its tools were withdrawn at the cap and it could not complete its output without them.
+    elif kind == "UnexpectedModelBehavior" and cap_reached(limits, usage):
+        # Its tools were withdrawn at the cap and the model could not complete its output without them (a call
+        # to a withdrawn tool or exhausted output retries). Any other failure after the cap keeps its own kind.
         limit = "tool_calls_limit"
     if limit is None:
         return None
@@ -185,6 +191,10 @@ class StageAttempt:
     failure: BaseException | None
     limits: StageLimits | None = None  # None: refused before its limits were derived
     exhausted: BudgetExhausted | None = None
+
+    @property
+    def tool_cap_reached(self) -> bool:
+        return cap_reached(self.limits, self.usage)
 
 
 @dataclass(frozen=True)

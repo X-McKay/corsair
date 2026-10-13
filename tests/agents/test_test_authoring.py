@@ -407,3 +407,22 @@ def test_tools_are_withdrawn_at_the_tool_call_cap_and_the_author_returns_its_out
         usage_limits=UsageLimits(request_limit=8, tool_calls_limit=3))
     assert isinstance(result.output, TestPatch) and result.usage.tool_calls == 3
     assert offered == [ALL_TOOLS, ALL_TOOLS, ALL_TOOLS, []]
+
+
+@pytest.mark.parametrize("content, facility", [
+    ("import socket as net\n\ndef test_x(monkeypatch):\n    monkeypatch.setattr(net, 'create_connection', print)\n",
+     "monkeypatch.setattr(socket)"),
+    ("import io\nio.open = lambda *a, **k: None\n", "assign io.open"),
+    ("import os as o\ndel o.system\n", "delete os.system"),
+    ("from os import path as p\np.exists = bool\n", "assign os.path.exists"),
+    ("import builtins as b\nb.__dict__['open'] = print\n", "import builtins"),
+    ("import sys\nsys.modules['documents'] = None\n", "assign sys.modules"),
+    ("import subprocess as sp\nsp.run += print\n", "assign subprocess.run"),
+])
+def test_aliased_and_direct_patches_of_observed_facilities_are_found(content, facility):
+    """Review on #49: aliases of protected modules and plain assignments must not bypass admission."""
+    assert facility in {f.facility for f in self_observation(content)}
+
+
+def test_rebinding_a_local_name_or_setting_the_environment_is_not_a_patch():
+    assert self_observation("import os\nos.environ['LANG'] = 'C'\nopen_count = 0\n") == ()
