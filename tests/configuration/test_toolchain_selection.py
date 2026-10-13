@@ -18,6 +18,7 @@ def collect(*names):
 
 @pytest.mark.parametrize('names, gates', [
     (('python37',), ['test_native_python37_toolchain']),
+    (('ruby31',), ['test_native_ruby31_toolchain']),
     (('python',), ['test_native_python_toolchain']),
     (('java', 'python'), ['test_native_java_toolchain', 'test_native_python_toolchain']),
     (('python', 'java8', 'python37'), ['test_native_java8_toolchain', 'test_native_python37_toolchain', 'test_native_python_toolchain']),

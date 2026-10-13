@@ -17,12 +17,17 @@ BASES = {
     'java': 'docker.io/library/maven@sha256:5394efaabc436795b507ca400aaf86311db03543072e0e87ae66c595965d4aed',
     'java8': 'docker.io/library/maven@sha256:f2cb52730ea0bde9dc8ba20e5e539d000dcdd7ab9e498d70c301fe04fbddb656',
     'python37': 'docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b',
+    'ruby31': 'docker.io/library/ruby@sha256:91627f55e8969006aab67d15c92fb930500ff73948803da1330b8a853fecebb5',
 }
 # Both Java images hold the pinned JUnit Platform console launcher for SPEC-0041 discovery.
 LAUNCHER = '/opt/corsair-junit/junit-platform-console-standalone-1.14.4.jar'
 JAVA_TESTS = ('nativeRoundtrip', 'nativeRuntime')
 # Interpreter each Python toolchain directory is built for; its wheels are fetched hash-checked before an offline build.
 PYTHONS = {'python': 'python3.12', 'python37': 'python3.7'}
+# Minitest has no native XML report; its verbose run lists each test and ends with this summary line.
+RUBY_TESTS = ('test_native_roundtrip', 'test_native_runtime')
+RUBY_SUMMARY = '2 runs, 4 assertions, 0 failures, 0 errors, 0 skips'
+RUBY_RUN = ['/usr/bin/env', 'BUNDLE_FROZEN=true', '/usr/local/bin/bundle', 'exec', '/usr/local/bin/ruby', '-Itest', 'test/native_test.rb', '-v']
 
 
 def source_hashes(language=None):
@@ -43,11 +48,16 @@ def control(kube, image, language):
     cidfile = kube.evidence / (language + '-control.id')
     command = ('cp /opt/corsair-fixture/test_native.py /tmp/test_native.py; cd /tmp; ' + PYTHONS[language] + ' -m pytest -q test_native.py --junitxml=/tmp/result.xml; cat /tmp/result.xml' if language in PYTHONS else
                'sha256sum -c /opt/corsair-junit.sha256 >/dev/null; cd /opt/corsair-m2; sha256sum -c /opt/corsair-m2.sha256 >/dev/null; printf "CACHE-BEGIN\\n"; cat /opt/corsair-m2.sha256; printf "CACHE-END\\n"; cp -R /opt/corsair-fixture /tmp/project; cp -R /opt/corsair-m2 /tmp/m2; /usr/share/maven/bin/mvn -B -ntp -o -f /tmp/project/pom.xml -Dmaven.repo.local=/tmp/m2 test; cat /tmp/project/target/surefire-reports/TEST-corsair.NativeTest.xml')
+    if language == 'ruby31':
+        command = 'cp -R /opt/corsair-fixture /tmp/project; cd /tmp/project; ' + ' '.join(RUBY_RUN)
     try:
         result = kube.native(DOCKER + ['run', '--rm', '--cidfile', str(cidfile), '--network=none', '--cap-drop=ALL', '--security-opt=no-new-privileges', '--user=10001:10001', image, '/bin/sh', '-ec', command], timeout=180)
-        assert 'tests="%d"' % (1 if language in PYTHONS else len(JAVA_TESTS)) in result.stdout and 'failures="0"' in result.stdout and 'skipped="0"' in result.stdout
-        assert all(name in result.stdout for name in (('test_native_roundtrip',) if language in PYTHONS else JAVA_TESTS))
-        if language not in PYTHONS:
+        if language == 'ruby31':
+            assert result.stdout.rstrip().endswith(RUBY_SUMMARY) and all(f'NativeTest#{name} = ' in result.stdout for name in RUBY_TESTS)
+        else:
+            assert 'tests="%d"' % (1 if language in PYTHONS else len(JAVA_TESTS)) in result.stdout and 'failures="0"' in result.stdout and 'skipped="0"' in result.stdout
+            assert all(name in result.stdout for name in (('test_native_roundtrip',) if language in PYTHONS else JAVA_TESTS))
+        if language.startswith('java'):
             (kube.evidence / (language + '-maven-cache.sha256')).write_text(result.stdout.split('CACHE-BEGIN\n', 1)[1].split('CACHE-END\n', 1)[0])
     finally:
         cleanup = {'confirmed': False}
@@ -98,7 +108,7 @@ def main():
                 kube.native(DOCKER + ['pull', base], timeout=180)
                 # Maven's trusted preparation explicitly downloads exact pinned artifacts;
                 # its strict native checksums and complete cache hashes are retained.
-                kube.native(DOCKER + ['build', '--network=' + ('none' if language in PYTHONS else 'default'), '--pull=false', '--tag', tag, str(context)], timeout=300)
+                kube.native(DOCKER + ['build', '--network=' + ('default' if language.startswith('java') else 'none'), '--pull=false', '--tag', tag, str(context)], timeout=300)
                 config = kube.native(DOCKER + ['image', 'inspect', '--format', '{{.Id}}', tag]).stdout.strip()
                 control(kube, config, language)
                 receipt = {'tag': tag, 'config_id': config, 'base': base, 'sources': hashes, 'evidence': str(evidence), 'trusted_control_passed': True}
