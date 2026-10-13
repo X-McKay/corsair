@@ -22,7 +22,7 @@ from pydantic_ai.usage import RunUsage, UsageLimits
 
 from corsair.agents.evidence_assessment.agent import assessment_prompt, create_evidence_assessment_agent
 from corsair.agents.evidence_assessment.contracts import WINDOW_LINES, AssessmentInput, EvidenceAssessment
-from corsair.agents.evidence_assessment.tools import AssessmentDependencies
+from corsair.agents.evidence_assessment.dependencies import AssessmentDependencies
 from corsair.agents.issue_analysis.contracts import IssueAnalysisInput
 from corsair.agents.issue_analysis.identification import create_issue_identification_agent, identification_prompt
 from corsair.agents.issue_analysis.identification_contracts import IssueIdentification

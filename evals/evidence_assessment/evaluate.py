@@ -30,10 +30,11 @@ from pydantic_evals.evaluators import (ConfusionMatrixEvaluator, Evaluator, HasM
                                        MaxToolCalls, ReportEvaluator)
 from pydantic_evals.reporting.analyses import ScalarResult, TableResult
 
-from corsair.agents.evidence_assessment import (CONFIG_VERSION, PROMPT_VERSION, SKILL_SHA256, assessment_prompt,
-                                                create_evidence_assessment_agent)
+from corsair.agents.evidence_assessment import (CONFIG_VERSION, PROMPT_VERSION, SKILL_SHA256, TOOLSET_SHA256,
+                                                assessment_prompt, create_evidence_assessment_agent)
 from corsair.agents.evidence_assessment.contracts import AssessmentInput, EvidenceAssessment, EvidenceRead
-from corsair.agents.evidence_assessment.tools import READ_EVIDENCE_TOOL, AssessmentDependencies
+from corsair.agents.evidence_assessment.dependencies import AssessmentDependencies
+from corsair.agents.evidence_assessment.tools import READ_EVIDENCE_TOOL
 from corsair.agents.provider import LocalModelConfig, local_model
 from corsair.composition.direct import CompositionBudget, StageLimits, stage_limits
 from corsair.core.disposition import Disposition, admit, assess
@@ -249,6 +250,7 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, split: Split | L
     metadata = {"mode": "scripted_fixture" if offline else "direct_local_provider",
                 "model": describe_model(actual_model), "weights_identity": "not_applicable" if offline else "unknown",
                 "prompt_version": PROMPT_VERSION, "config_version": CONFIG_VERSION, "skill_sha256": SKILL_SHA256,
+                "toolset_sha256": TOOLSET_SHA256,
                 "budget": budget.model_dump(), "split": split, "cases": [case.name for case in corpus.cases],
                 "task_retries": 0, "max_concurrency": 1,
                 "dataset_sha256": sha256(CASES.read_bytes()).hexdigest(),
