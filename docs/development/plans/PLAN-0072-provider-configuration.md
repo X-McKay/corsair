@@ -47,3 +47,9 @@ Merged current main bb4f3b7 (including the planning package split) into the work
 ## Qualification limits and next gate
 
 HTTP mock transports, Bedrock Stubber, scripted agent evaluations and offline durable composition checks are not live service qualification. No authenticated ticket reads, hosted model spend, native Temporal service, or OpenShell gate ran. Supply an authorized model/identity and read-only ticket target for bounded live checks, then evaluate each selected agent/profile before promoting a baseline. Existing full real-case environment-chain integration remains separate work. Raw evidence remains ignored/local.
+
+## PR 91 integration follow-up — 2026-10-13
+
+Merged main `164a556` into the provider branch from `1e184bc`. Resolved the two fixture-chain conflicts by retaining per-agent model dispatch/profile metadata and main's canonical identification import and four-field version identity including `toolset_sha256`. PR #95 remains open and its local-vLLM limits are not part of this merge; if it lands first, carry those changes into `inference/vllm.py` while retaining the compatibility shim.
+
+`UV_CACHE_DIR=/tmp/corsair-provider-uv-cache make test-config`: **1646 passed in 90.27 seconds**. `make eval AGENT=chain`: **5/5 clean scripted attempts**, zero task failures, matching the previous 5/5 run. Local evidence: `.runs/evals/chain/20261013T143851Z-fixture-scripted/`. Inspected configuration output: all four stages retain toolset digests and stage provider metadata remains present. Initial inspection used an incorrect shallow glob and found no configuration; corrected with recursive lookup. Merge whitespace check reports one pre-existing trailing blank line from main in PLAN-0070, outside this correction. No live provider, authenticated ticket, native Temporal or OpenShell qualification was run.

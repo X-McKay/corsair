@@ -7,9 +7,8 @@ import re
 import xml.etree.ElementTree as ET
 
 from corsair.ports.test_runner import FailureDetail, JavaTestId, TestCaseResult
-from corsair.reports.junit import MAX_JUNIT_BYTES, MAX_MESSAGE_CHARS, MAX_OUTPUT_CHARS, JUnitError, admit_xml
+from corsair.reports.junit import MAX_JUNIT_BYTES, MAX_MESSAGE_CHARS, OUTCOMES, JUnitError, admit_xml, testcases
 
-OUTCOMES = {'failure': 'failed', 'error': 'error', 'skipped': 'skipped'}
 # Rerun and flaky elements mean Surefire retried a test; one execution is the contract, so they are refused.
 CHILDREN = {*OUTCOMES, 'system-out', 'system-err'}
 # `\tat [module/]package.Class.method(File.java:N)`; Surefire may trim the trace to the test class's frames.
@@ -69,22 +68,5 @@ def parse_surefire(data: bytes, test_ids: tuple[str, ...], *, test_paths: frozen
         raise SurefireError('Expected the Surefire report of exactly the tests\' class')
     if any(child.tag not in ('properties', 'testcase', 'system-out', 'system-err') for child in tree):
         raise SurefireError('Unexpected element in Surefire testsuite')
-    results = {}
-    for case in tree.iter('testcase'):
-        test_id = keys.get((case.get('classname'), case.get('name')))
-        if test_id is None:
-            raise SurefireError(f'Unexpected testcase {case.get("classname")!r}#{case.get("name")!r}')
-        if test_id in results:
-            raise SurefireError(f'Duplicate testcase {test_id}')
-        if any(child.tag not in CHILDREN for child in case):
-            raise SurefireError(f'Unexpected element in testcase {test_id}')
-        marks = [child for child in case if child.tag in OUTCOMES]
-        if len(marks) > 1:
-            raise SurefireError(f'Ambiguous outcome for {test_id}')
-        outcome = OUTCOMES[marks[0].tag] if marks else 'passed'
-        failure = _failure(marks[0].tag, marks[0], frame_paths) if outcome in ('failed', 'error') else None
-        output = ''.join(child.text or '' for child in case if child.tag == 'system-out')
-        results[test_id] = TestCaseResult(test_id, outcome, failure, output[:MAX_OUTPUT_CHARS])
-    if set(results) != set(test_ids):
-        raise SurefireError(f'Missing testcases: {sorted(set(test_ids)-set(results))}')
-    return tuple(results[test_id] for test_id in test_ids)
+    failure = lambda kind, element: _failure(kind, element, frame_paths)
+    return testcases(tree, keys, test_ids, children=CHILDREN, failure=failure, separator='#', error=SurefireError)

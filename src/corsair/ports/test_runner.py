@@ -27,6 +27,15 @@ JAVA_TEST_ID = re.compile(r'^(?:(?P<module>[A-Za-z0-9_][A-Za-z0-9_.-]*(?:/[A-Za-
                           r'(?P<class_name>(?:[A-Za-z_][A-Za-z0-9_]*\.)*[A-Za-z_][A-Za-z0-9_]*)'
                           r'#(?P<method>[A-Za-z_][A-Za-z0-9_]*)$')
 
+# Minitest: `path/to/file_test.rb::Module::Class#test_method`, the repository-relative file that defines the class
+# and a classic `Minitest::Test` method (spec-style `it` names hold spaces and are not admitted).
+RUBY_TEST_ID = re.compile(r'^(?P<path>[A-Za-z0-9_./-]+\.rb)::(?P<class_name>(?:[A-Z][A-Za-z0-9_]*::)*[A-Z][A-Za-z0-9_]*)'
+                          r'#(?P<method>test_[A-Za-z0-9_]*)$')
+
+# Jest: `path/to/file.test.js::[suite::]name` for a top-level test or one in a top-level `describe`. Segments are
+# plain identifiers, so Jest's full name (ancestor titles and title joined by a space) maps back to one id.
+JS_TEST_ID = re.compile(r'^(?P<path>[A-Za-z0-9_./-]+\.(?:js|jsx|mjs|cjs))'
+                        r'::(?:(?P<suite>[A-Za-z_][A-Za-z0-9_]*)::)?(?P<name>[A-Za-z_][A-Za-z0-9_]*)$')
 # TAP on Perl: `path/to/file.t#subtest`, a repository-relative test file and one of its top-level Test::More subtests.
 PERL_TEST_ID = re.compile(r'^(?P<path>[A-Za-z0-9_][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_][A-Za-z0-9_.-]*)*\.t)'
                           r'#(?P<name>[A-Za-z_][A-Za-z0-9_]*)$')
@@ -61,6 +70,52 @@ class JavaTestId:
 
     def __str__(self) -> str:
         return f'{self.module + "/" if self.module else ""}{self.class_name}#{self.method}'
+
+
+@dataclass(frozen=True)
+class RubyTestId:
+    """A Minitest method; the file is loaded and the class named by its constant path."""
+    path: str
+    class_name: str
+    method: str
+
+    @classmethod
+    def parse(cls, value: str) -> 'RubyTestId':
+        match = RUBY_TEST_ID.fullmatch(value) if type(value) is str and len(value) <= MAX_TEST_ID else None
+        if match is None or match['path'][0] == '-':
+            raise ValueError('Expected `path/file.rb::Class#test_method`')
+        approved_path(match['path'])
+        return cls(match['path'], match['class_name'], match['method'])
+
+    def __str__(self) -> str:
+        return f'{self.path}::{self.class_name}#{self.method}'
+
+
+@dataclass(frozen=True)
+class JsTestId:
+    """A Jest test in one repository file; Jest's JSON report names it by (ancestorTitles, title)."""
+    path: str
+    suite: str | None
+    name: str
+
+    @classmethod
+    def parse(cls, value: str) -> 'JsTestId':
+        match = JS_TEST_ID.fullmatch(value) if type(value) is str and len(value) <= MAX_TEST_ID else None
+        if match is None:
+            raise ValueError('Expected `path/file.test.js::[suite::]name` with identifier segments')
+        return cls(approved_path(match['path']), match['suite'], match['name'])
+
+    @property
+    def titles(self) -> tuple[tuple[str, ...], str]:
+        return ((self.suite,) if self.suite else (), self.name)
+
+    @property
+    def full_name(self) -> str:
+        """What Jest's `--testNamePattern` matches: ancestor titles and the title joined by one space."""
+        return f'{self.suite} {self.name}' if self.suite else self.name
+
+    def __str__(self) -> str:
+        return f'{self.path}::{self.suite + "::" if self.suite else ""}{self.name}'
 
 
 @dataclass(frozen=True)
