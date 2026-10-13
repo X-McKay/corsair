@@ -42,3 +42,28 @@ def test_ready_must_stay_on_the_selection():
     for wrong in (dict(toolchain_image='other@sha256:' + 'b' * 64, framework='pytest'), dict(toolchain_image=image, framework='junit5')):
         with pytest.raises(ValueError):
             check_ready(ReadyEnvironment.model_construct(toolchain_id='cpython-3.12-pytest', **wrong), selection, PREPARED)
+
+
+def test_runtime_stop_distinguishes_new_image_from_preparation_and_keeps_ranges():
+    requirement, selection = project(">=3.7,<3.12")
+    result = environment_input(requirement, selection, load(), PREPARED, **FIELDS)
+    assert result.diagnostic.code == "image_unavailable"
+    assert requirement.components[0].allowed in result.diagnostic.render()
+    assert result.diagnostic.evidence == ("pyproject.toml:2", "pyproject.toml:3")
+    requirement, selection = project(">=3.10")
+    result = environment_input(requirement, selection, load(), {}, **FIELDS)
+    assert result.diagnostic.code == "image_not_prepared"
+    assert "Do not create a replacement row" in result.diagnostic.render()
+
+
+def test_framework_only_mismatch_does_not_prescribe_a_new_runtime():
+    requirement = detect({"pyproject.toml": b'[project]\nrequires-python=">=3.12"\n[project.optional-dependencies]\ntest=["pytest<8"]\n'}, 'python')
+    result = environment_input(requirement, select(requirement, load()), load(), PREPARED, **FIELDS)
+    assert result.diagnostic.code == "framework_unqualified"
+    assert "Qualify the framework/runner" in result.diagnostic.render()
+
+
+def test_undetermined_stops_before_environment_input_validation():
+    result = environment_input("no build files", None, load(), {}, commit="invalid")
+    assert result.diagnostic.code == "runtime_undetermined"
+    assert result.diagnostic.owner == "developer"
