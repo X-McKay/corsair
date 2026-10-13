@@ -23,7 +23,7 @@ from pydantic_ai.usage import RunUsage
 
 from corsair.adapters.local_artifacts import LocalArtifacts
 from corsair.agents.evidence_assessment import agent as assessment
-from corsair.agents.issue_analysis import identification
+from corsair.agents.issue_identification import agent as identification
 from corsair.agents.provider import LocalModelConfig, local_model
 from corsair.agents.test_authoring import agent as authoring
 from corsair.agents.test_authoring.skills import SKILL_SHA256 as AUTHORING_SKILL
@@ -38,11 +38,15 @@ from .case import (fixture_case, reviewed_runners, scripted_assessment, scripted
 STAGES = ("identification", "planning", "authoring", "assessment")
 SCRIPTED = {"identification": scripted_identification, "planning": scripted_planning,
             "authoring": scripted_authoring, "assessment": scripted_assessment}
+# Per-stage identity as each stage's own eval reports it (SPEC-0044, SPEC-0052).
+VERSION_FIELDS = ("prompt_version", "config_version", "skill_sha256", "toolset_sha256")
 VERSIONS = {
-    "identification": (identification.PROMPT_VERSION, identification.CONFIG_VERSION, identification.SKILL_SHA256),
-    "planning": (planning.PROMPT_VERSION, planning.CONFIG_VERSION, PLANNING_SKILL),
-    "authoring": (authoring.PROMPT_VERSION, authoring.CONFIG_VERSION, AUTHORING_SKILL),
-    "assessment": (assessment.PROMPT_VERSION, assessment.CONFIG_VERSION, assessment.SKILL_SHA256),
+    "identification": (identification.PROMPT_VERSION, identification.CONFIG_VERSION, identification.SKILL_SHA256,
+                       identification.TOOLSET_SHA256),
+    "planning": (planning.PROMPT_VERSION, planning.CONFIG_VERSION, PLANNING_SKILL, planning.TOOLSET_SHA256),
+    "authoring": (authoring.PROMPT_VERSION, authoring.CONFIG_VERSION, AUTHORING_SKILL, authoring.TOOLSET_SHA256),
+    "assessment": (assessment.PROMPT_VERSION, assessment.CONFIG_VERSION, assessment.SKILL_SHA256,
+                   assessment.TOOLSET_SHA256),
 }
 # Per-stage request controls an operator profile may set on top of the base provider configuration.
 PROFILE_FIELDS = {"response_token_limit", "thinking_mode", "thinking_token_budget", "timeout_seconds"}
@@ -175,7 +179,7 @@ async def record_run(evidence: Path, live: tuple[str, ...], config: LocalModelCo
             "provider": config.model_dump() if config else None, "stage_profiles": profiles,
             "stage_providers": {stage: configs[stage].model_dump() for stage in live},
             "models": {stage: describe_model(selected[stage]) for stage in STAGES},
-            "versions": {stage: dict(zip(("prompt_version", "config_version", "skill_sha256"), VERSIONS[stage]))
+            "versions": {stage: dict(zip(VERSION_FIELDS, VERSIONS[stage]))
                          for stage in STAGES},
             "runner": runner, "witness_capture": "operator_probe" if case.witness_envelope else "none",
             "witness_envelope": encode(case.witness_envelope),
