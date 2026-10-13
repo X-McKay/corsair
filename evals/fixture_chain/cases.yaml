@@ -1,0 +1,81 @@
+name: fixture-chain-v2
+cases:
+- name: vulnerable_to_fixed
+  inputs:
+    revisions:
+      development: vulnerable
+      baseline: vulnerable
+      candidate: fixed
+    source: saved
+  metadata:
+    stopped_at: null
+    gate:
+      execution: completed
+      finding: reproduced
+      fix: verified
+    assessment_admitted: true
+  expected_output: null
+  evaluators: []
+- name: fixed_to_vulnerable
+  inputs:
+    revisions:
+      development: fixed
+      baseline: fixed
+      candidate: vulnerable
+    source: saved
+  metadata:
+    stopped_at: null
+    gate:
+      execution: completed
+      finding: not_reproduced
+      fix: not_verified
+    assessment_admitted: true
+  expected_output: null
+  evaluators: []
+- name: both_vulnerable
+  inputs:
+    revisions:
+      development: vulnerable
+      baseline: vulnerable
+      candidate: vulnerable
+    source: saved
+  metadata:
+    stopped_at: null
+    gate:
+      execution: completed
+      finding: reproduced
+      fix: not_verified
+    assessment_admitted: true
+  expected_output: null
+  evaluators: []
+- name: both_fixed
+  inputs:
+    revisions:
+      development: fixed
+      baseline: fixed
+      candidate: fixed
+    source: saved
+  metadata:
+    stopped_at: null
+    gate:
+      execution: completed
+      finding: not_reproduced
+      fix: not_verified
+    assessment_admitted: true
+  expected_output: null
+  evaluators: []
+- name: source_absent
+  inputs:
+    revisions:
+      development: vulnerable
+      baseline: vulnerable
+      candidate: fixed
+    source: absent
+  metadata:
+    stopped_at: identification
+    gate: null
+    assessment_admitted: null
+  expected_output: null
+  evaluators: []
+evaluators: []
+report_evaluators: []

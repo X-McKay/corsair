@@ -14,7 +14,7 @@ kind-down:
 	uv run --locked python deploy/kind/bootstrap.py down
 
 test-config:
-	uv run --locked python -m pytest tests/configuration tests/unit tests/agents tests/temporal/test_fixture_contracts.py tests/temporal/test_issue_analysis_composition.py
+	uv run --locked python -m pytest tests/configuration tests/unit tests/agents tests/temporal/test_fixture_contracts.py tests/temporal/test_issue_analysis_composition.py tests/temporal/test_chain_composition.py
 
 qualify-network:
 	test ! -e "$(CORSAIR_QUAL_RUN)"
