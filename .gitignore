@@ -11,3 +11,4 @@ __pycache__/
 .tools/
 .cache/
 .state/
+.worktrees/
