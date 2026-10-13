@@ -727,7 +727,7 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
     if problems:
         return stop("execution", "; ".join(problems)[:2048], **done)
 
-    ready("execution", lambda: "both revisions ran")
+    ready("execution", lambda: " and ".join(e.revision for e in executions) + " ran")
     runs = {e.revision: (e.observed,) for e in executions}
     # SPEC-0040: an absence counts as the planned safe behavior on either revision only when the plan's control
     # witness is observed in the same run, so an uncalibrated baseline absence is never not_reproduced.

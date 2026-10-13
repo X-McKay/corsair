@@ -52,7 +52,8 @@ def _digest(value: str | bytes) -> str:
     return sha256(value if isinstance(value, bytes) else value.encode()).hexdigest()
 
 
-def fixture_case(case: str = "exploitable") -> FixtureCase:
+def fixture_case(case: str = "exploitable", fix: bool = True) -> FixtureCase:
+    """`fix=False` drops the candidate: a request without a fix commit runs the reported revision only (ISSUE-0008)."""
     variants = CASES[case]
     sources = (SourceFile(path="documents.py", content=(FIXTURE / variants["baseline"] / "documents.py").read_text()),
                SourceFile(path="test_existing.py", content=BASELINE_TEST))
@@ -78,7 +79,11 @@ def fixture_case(case: str = "exploitable") -> FixtureCase:
                        environment=environment, environment_identity=identity,
                        witness_envelope=WitnessRequest("documents.py", "read_document", "outside.txt"),
                        revision_sources={revision: _digest((FIXTURE / variants[revision] / "documents.py").read_bytes())
-                                         for revision in ("baseline", "candidate")})
+                                         for revision in revisions(fix)})
+
+
+def revisions(fix: bool = True) -> tuple[str, ...]:
+    return ("baseline", "candidate") if fix else ("baseline",)
 
 
 def reviewed_runners(store, root: Path, case: str = "exploitable"):

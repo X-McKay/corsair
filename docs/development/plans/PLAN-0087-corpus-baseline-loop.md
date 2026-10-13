@@ -33,6 +33,8 @@ The earlier unpublished campaign used PLAN-0085, which now identifies the merged
 
 Documentation publication based on `e84a2bb`. Main's source was checked for the absent corpus campaign module and existing candidate-free build refusal. Corpus scope remains 42 topics / 82 configurations; repeated attempts do not increase breadth. No new model, Docker or corpus run and no accuracy gain are claimed. Documentation guards passed 5 tests; the full current-main offline suite passed 1,965 tests with one skip and 11 deprecation warnings in 58.98 s. `git diff --check` passed. Details are recorded in HANDOFF-0113.
 
+Candidate-free lane (2026-10-13, [HANDOFF-0117](../handoffs/HANDOFF-0117-candidate-free-investigations.md)): ISSUE-0008 is implemented by open PR #123; a stacked follow-up adds the resolution-criteria checks and `evals.fixture_e2e.run --without-fix`. Offline: 1,977 passed; scripted `chain` 5/5 and `assessment` 54/54 match main. Live Docker positive/negative attempts are unrun.
+
 ## Decisions and next action
 
 Start with the runbook and source verification, then up to three isolated worker lanes: shared approved-path contract, candidate-free product support, and one JavaScript or Perl execution/evidence slice. One coordinator initially owns live Docker/model dispatch. Use actual available agent capabilities; no specific desktop app is required.

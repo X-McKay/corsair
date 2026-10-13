@@ -20,7 +20,7 @@ from corsair.composition.direct import FixtureCase
 from corsair.core.disposition import EnvironmentIdentity
 from corsair.investigation.frameworks import harness
 
-from .case import CASES, FIXTURE, fixture_case
+from .case import CASES, FIXTURE, fixture_case, revisions
 from .reviewed import REVIEWED_TEST
 from .sandbox import DISCOVER, JUNIT, PREFIX, TOOLCHAIN, WITNESS_RECORD, _pytest_version
 
@@ -45,7 +45,7 @@ def limits(timeout: int) -> dict:
     return {"network": "none", "capabilities": "drop-all", "timeout_seconds": timeout}
 
 
-def docker_case(image: str, timeout: int, case: str = "exploitable") -> FixtureCase:
+def docker_case(image: str, timeout: int, case: str = "exploitable", fix: bool = True) -> FixtureCase:
     """The reviewed fixture issue with the Docker route's environment facts; `image` is the local config id.
 
     Identity fields are declarations of what both revisions share (the image Docker runs, the argv, the image's
@@ -67,7 +67,7 @@ def docker_case(image: str, timeout: int, case: str = "exploitable") -> FixtureC
     return FixtureCase(issue=base.issue, environment=environment, environment_identity=identity,
                        witness_envelope=base.witness_envelope,
                        revision_sources={revision: _digest(source_label(CASES[case][revision]))
-                                         for revision in ("baseline", "candidate")})
+                                         for revision in revisions(fix)})
 
 
 def docker_runners(image: str, root: Path, store, stack: ExitStack, timeout: int, case: str = "exploitable"):

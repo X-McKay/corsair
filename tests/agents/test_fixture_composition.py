@@ -497,6 +497,74 @@ def test_a_case_without_a_fix_runs_only_the_reported_revision_and_leaves_the_fix
     assert not any("candidate-0" in prompt for prompt in prompts(run))
 
 
+def _without_fix(store, root, case, runners=None, **overrides):
+    """ISSUE-0008: the CLI's scripted models for a case run with its fix commit dropped."""
+    from evals.fixture_e2e.run import scripted_for
+    fixture = fixture_case(case, fix=False)
+    models = {stage: build() for stage, build in scripted_for(case, fixture.environment.discovery_command, False).items()}
+    (root / "work").mkdir()
+    factory = (runners or (lambda runner: runner))(reviewed_runners(store, root / "work", case))
+    return asyncio.run(run_direct(fixture, StageModels(**(models | overrides)), factory))
+
+
+def _label(run):
+    from corsair.investigation.results import headline
+    return headline(run.stopped_at, run.assessment.disposition.model_dump())
+
+
+@pytest.mark.parametrize("case", ["not-exploitable", "not-exploitable-absent"])
+def test_a_scoped_negative_without_a_fix_is_not_reproduced_from_the_baseline_alone(store, tmp_path, case):
+    """Raised-exception and calibrated-absence routes: one baseline run settles not_reproduced; no fix is claimed."""
+    run = _without_fix(store, tmp_path, case)
+    assert [e.revision for e in run.executions] == ["baseline"]
+    assert run.gate.permitted == Disposition(execution="completed", finding="not_reproduced", fix="not_applicable")
+    assert run.gate.limitations == ()  # Nothing about a candidate: none was run or claimed
+    assert run.assessment.admission.admitted and _label(run) == "LIKELY_NOT_EXPLOITABLE"
+    assert not any("candidate" in prompt for prompt in prompts(run)[-1:])
+
+
+@pytest.mark.parametrize("unsettled", ["no witness", "uncalibrated absence"])
+def test_without_a_fix_an_unsettled_baseline_stays_inconclusive(store, tmp_path, unsettled):
+    """not_applicable says only that no candidate ran; it never turns missing evidence into a negative finding."""
+    if unsettled == "no witness":
+        run = _without_fix(store, tmp_path, "exploitable",
+                           runners=lambda runners: (lambda purpose: WithoutWitness(runners(purpose))))
+    else:
+        run = _without_fix(store, tmp_path, "not-exploitable", planning=_absence_planning("allowed/unopened.txt"),
+                           assessment=scripted_assessment(fix="not_applicable"))
+    assert run.gate.permitted == Disposition(execution="completed", finding="inconclusive", fix="not_applicable")
+    assert {limitation.code for limitation in run.gate.limitations} >= {"no_valid_run"}
+    assert run.assessment.admission.admitted and _label(run) == "INCONCLUSIVE"
+
+
+def test_without_a_fix_a_fix_claim_is_rejected_and_the_gate_stands(store, tmp_path):
+    """An assessor that still says not_verified claims a candidate that never ran: rejected, the gate's triple stands."""
+    run = _without_fix(store, tmp_path, "not-exploitable",
+                       assessment=scripted_assessment(finding="not_reproduced", fix="not_verified"))
+    assert not run.assessment.admission.admitted
+    assert run.assessment.admission.rejections == ("fix not_verified conflicts with permitted not_applicable",)
+    assert run.assessment.disposition == run.gate.permitted == Disposition(
+        execution="completed", finding="not_reproduced", fix="not_applicable")
+
+
+def test_without_a_fix_a_baseline_run_from_other_source_stops_before_any_gate(store, tmp_path):
+    """The one revision is still checked against its source; a mismatch stops execution, nothing is assessed."""
+    run = _without_fix(store, tmp_path, "exploitable",
+                       runners=lambda runners: (lambda purpose: runners("candidate" if purpose == "baseline" else purpose)))
+    assert run.stopped_at == "execution" and run.gate is None and run.assessment is None
+    assert run.reason == "baseline workspace source is not the baseline revision"
+
+
+def test_cli_without_a_fix_requests_only_development_and_baseline_runs(tmp_path):
+    from evals.fixture_e2e import run as cli
+    evidence = tmp_path / "evidence"
+    result = asyncio.run(cli.main_async(evidence, (), None, case="not-exploitable-absent", fix=False))
+    assert [e["purpose"] for e in json.loads((evidence / "native-runs.json").read_text())] == ["development", "baseline"]
+    assert json.loads((evidence / "configuration.json").read_text())["runner"]["fix_commit"] is False
+    assert result.assessment.disposition == Disposition(execution="completed", finding="not_reproduced",
+                                                        fix="not_applicable")
+
+
 def test_a_stop_on_an_operator_ceiling_says_so_not_derived():
     """First corpus case (2026-10-13): the token cap came from the ceiling, while the reason said it was derived."""
     from corsair.composition.direct import StageBudget

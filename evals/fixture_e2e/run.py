@@ -94,32 +94,35 @@ async def record_run(evidence: Path, live: tuple[str, ...], config: LocalModelCo
     return run
 
 
-def scripted_for(case: str, discovery: tuple[str, ...]) -> dict:
+def scripted_for(case: str, discovery: tuple[str, ...], fix: bool = True) -> dict:
     """The scripted stage models for a fixture case; the not-exploitable case's assessor proposes the triple its
-    gates permit (the security test passes on both confined revisions), so a scripted control shows it admitted."""
+    gates permit (the security test passes on both confined revisions), so a scripted control shows it admitted.
+    Without a fix commit no candidate runs, so the assessor proposes fix not_applicable."""
     models = SCRIPTED | {"identification": lambda: scripted_identification(case),
                          "planning": lambda: scripted_planning(discovery, case),
                          "authoring": lambda: scripted_authoring(case)}
-    if case != "exploitable":
-        models["assessment"] = lambda: scripted_assessment(finding="not_reproduced", fix="not_verified")
+    claim = "not_verified" if fix else "not_applicable"
+    finding = "inconclusive" if case == "exploitable" else "not_reproduced"
+    models["assessment"] = lambda: scripted_assessment(finding=finding, fix=claim)
     return models
 
 
 async def main_async(evidence: Path, live: tuple[str, ...], config: LocalModelConfig | InferenceConfig | None,
-                     profiles: dict | None = None, case: str = "exploitable") -> DirectRun:
+                     profiles: dict | None = None, case: str = "exploitable", fix: bool = True) -> DirectRun:
     """Reviewed host workspace: only the reviewed SPEC-0018 test bytes execute."""
     evidence.mkdir(parents=True, exist_ok=False)
     (evidence / "work").mkdir(mode=0o700)
     (evidence / "artifacts").mkdir(mode=0o700)
     with LocalArtifacts(evidence / "artifacts", max_bytes=4 * 1024 * 1024) as store:
-        fixture = fixture_case(case)
+        fixture = fixture_case(case, fix)
         return await record_run(evidence, live, config, fixture, reviewed_runners(store, evidence / "work", case),
-                                {"route": "reviewed_host_workspace", "case": case}, profiles,
-                                scripted=scripted_for(case, fixture.environment.discovery_command))
+                                {"route": "reviewed_host_workspace", "case": case, "fix_commit": fix}, profiles,
+                                scripted=scripted_for(case, fixture.environment.discovery_command, fix))
 
 
 async def docker_async(evidence: Path, live: tuple[str, ...], config: LocalModelConfig | InferenceConfig | None,
-                       image: str, profiles: dict | None = None, timeout: int = 120, case: str = "exploitable") -> DirectRun:
+                       image: str, profiles: dict | None = None, timeout: int = 120, case: str = "exploitable",
+                       fix: bool = True) -> DirectRun:
     """Plain Docker: every purpose in a fresh offline container of `image`; unqualified, risk accepted."""
     from .docker import ROUTE, ROW, docker_case, docker_runners, limits
     evidence.mkdir(parents=True, exist_ok=False)
@@ -128,10 +131,11 @@ async def docker_async(evidence: Path, live: tuple[str, ...], config: LocalModel
     (evidence / "docker").mkdir(mode=0o700)
     with ExitStack() as containers, LocalArtifacts(evidence / "artifacts", max_bytes=4 * 1024 * 1024) as store:
         runners = docker_runners(image, evidence / "docker", store, containers, timeout, case)
-        fixture = docker_case(image, timeout, case)
+        fixture = docker_case(image, timeout, case, fix)
         return await record_run(evidence, live, config, fixture, runners,
-                                ROUTE | {"image_row": ROW, "image": image, "limits": limits(timeout), "case": case},
-                                profiles, scripted=scripted_for(case, fixture.environment.discovery_command))
+                                ROUTE | {"image_row": ROW, "image": image, "limits": limits(timeout), "case": case,
+                                         "fix_commit": fix},
+                                profiles, scripted=scripted_for(case, fixture.environment.discovery_command, fix))
 
 
 def summary(run: DirectRun) -> dict:
@@ -166,6 +170,9 @@ def main():
                         help="exploitable: the reported traversal exists at the baseline and the candidate fixes it; "
                              "not-exploitable: the same report, but every revision rejects the path with ValueError; "
                              "not-exploitable-absent: every revision returns an empty result without opening the file")
+    parser.add_argument("--without-fix", action="store_true",
+                        help="Drop the case's fix commit: only the reported revision runs and no fix is claimed "
+                             "(fix not_applicable; ISSUE-0008)")
     args = parser.parse_args()
     live = tuple(stage for stage in args.live.split(",") if stage)
     if set(live) - set(STAGES) or (live and args.provider_config is None):
@@ -194,10 +201,11 @@ def main():
         if image is None:
             parser.error("--sandbox docker needs --images or CORSAIR_IMAGES")
         with TerminalDisplay(f"fixture run (docker, unqualified) → {args.evidence}") as display, observing(display):
-            run = asyncio.run(docker_async(args.evidence, live, config, image, profiles, args.timeout, args.case))
+            run = asyncio.run(docker_async(args.evidence, live, config, image, profiles, args.timeout, args.case,
+                                           not args.without_fix))
     else:
         with TerminalDisplay(f"fixture run → {args.evidence}") as display, observing(display):
-            run = asyncio.run(main_async(args.evidence, live, config, profiles, args.case))
+            run = asyncio.run(main_async(args.evidence, live, config, profiles, args.case, not args.without_fix))
     route = json.loads((args.evidence / "configuration.json").read_text())["runner"]
     containers = args.evidence / "docker" / "containers.json"
     removed = ([c["cleanup"] for c in json.loads(containers.read_text())] if containers.exists() else None)

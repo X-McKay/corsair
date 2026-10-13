@@ -63,6 +63,13 @@ CASES = {
     # name: (baseline runs, candidate runs, (execution, finding, fix), required limitation codes)
     'spec0018_reproduced_and_verified': ((REPRO,) * 3, (SAFE,) * 3, ('completed', 'reproduced', 'verified'), set()),
     'reproduced_without_candidate': ((REPRO,), (), ('completed', 'reproduced', 'not_applicable'), set()),
+    # ISSUE-0008: without a candidate the baseline alone decides; not_applicable never settles a finding.
+    'safe_without_candidate': ((SAFE,), (), ('completed', 'not_reproduced', 'not_applicable'), set()),
+    'failed_control_without_candidate': ((run('passed', control='failed'),), (),
+                                         ('completed', 'inconclusive', 'not_applicable'), {'control_failed'}),
+    'missing_witness_without_candidate': ((run('passed', witness=None),), (),
+                                          ('completed', 'inconclusive', 'not_applicable'),
+                                          {'witness_missing', 'no_valid_run'}),
     'unrelated_baseline_exception': (
         (run(failure=PLANNED_FAILURE.model_copy(update={'exception_type': 'KeyError', 'path': 'documents.py',
                                                         'function': 'read_document', 'line': 3})),),
