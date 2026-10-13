@@ -75,10 +75,10 @@ qualify-policy:
 .PHONY: toolchain-images toolchain-images-load qualify-toolchain
 # TOOLCHAINS limits preparation and the gate to named toolchain directories, e.g. TOOLCHAINS=python37.
 toolchain-images:
-	uv run --locked python -m tests.qualification.prepare_toolchains build $(if $(TOOLCHAINS),--only $(TOOLCHAINS))
+	uv run --locked python -m tests.qualification.prepare_toolchains build $(foreach language,$(TOOLCHAINS),--language $(language))
 
 toolchain-images-load:
-	uv run --locked python -m tests.qualification.prepare_toolchains load $(if $(TOOLCHAINS),--only $(TOOLCHAINS))
+	uv run --locked python -m tests.qualification.prepare_toolchains load $(foreach language,$(TOOLCHAINS),--language $(language))
 
 qualify-toolchain:
 	test ! -e "$(CORSAIR_QUAL_RUN)"

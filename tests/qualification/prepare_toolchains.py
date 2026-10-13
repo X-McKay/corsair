@@ -22,7 +22,7 @@ PYTHONS = {'python': 'python3.12', 'python37': 'python3.7'}
 
 
 def source_hashes(language=None):
-    """Source file hashes of one toolchain directory, or of all; an image receipt covers only its own directory."""
+    """Source digests of one image (each image is prepared and invalidated alone) or, with no language, of all."""
     root = SOURCE / language if language else SOURCE
     return {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(root.rglob('*')) if p.is_file()}
 
@@ -63,7 +63,7 @@ def control(kube, image, language):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=['build', 'load'])
-    parser.add_argument('--only', nargs='+', choices=sorted(BASES), help='Prepare only these toolchain directories')
+    parser.add_argument('--language', choices=sorted(BASES), action='append', help='Prepare only these images (default: all)')
     args = parser.parse_args()
     os.umask(0o077)
     evidence = ROOT / '.runs/toolchains-image' / uuid.uuid4().hex
@@ -72,7 +72,7 @@ def main():
     try:
         node = require_owned_cluster(kube) if args.action == 'load' else None
         for language, base in BASES.items():
-            if args.only and language not in args.only:
+            if args.language and language not in args.language:
                 continue
             cache = CACHE / language
             if args.action == 'build':
