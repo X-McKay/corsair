@@ -36,5 +36,5 @@ This is an implementation check; it qualifies no live provider, sandbox or durab
 ## Decisions and open questions
 
 - Owner direction (Al, 2026-10-13): adopt the recommended variant, and cascade across all agents if successful. The cascade is planned in [PLAN-0056](../plans/PLAN-0056-agent-package-convention.md) and waits for #49 and #44, which change planning, authoring, assessment and identification.
-- `toolset_sha256` lives in the environment package until a second agent adopts it; the first follow-on move promotes the helper to a shared module (second consumer).
+- `toolset_sha256` lived in the environment package until a second agent adopted it; the assessment move promoted it to `corsair.agents.toolset_identity` (second consumer).
 - Receipts (section D) and the generator (section F) remain proposed in IDEA-0006 until a concrete consumer or a new agent needs them.
