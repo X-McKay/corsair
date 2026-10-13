@@ -11,16 +11,17 @@ related: [SPEC-0056, SPEC-0042, PLAN-0049, PLAN-0050]
 
 ## Objective and dependencies
 
-Implement [SPEC-0056](../specs/SPEC-0056-perl526-toolchain.md) on branch `claude/toolchain-perl526-i5y3mp`. It stacks on PR #51 (JDK 8: per-image source hashes, `--language`, one gate per image with its own evidence directory) and PR #55 (CPython 3.7: `TOOLCHAINS`/`--toolchain`, `PYTHONS`), which both change `prepare_toolchains.py` and `test_toolchains.py`. The merge commit keeps #51's one-gate-per-image structure and #55's selection, with `python37` as its own gate; whichever of #51 and #55 merges second resolves the same conflict on main, and this branch then takes main's version and re-applies only the Perl lines. The live gate needs the kind cluster on RIG0, after the JDK 8, CPython 3.7 and #49 holders. The TAP runner is the next PR and does not wait for the live gate.
+Implement [SPEC-0056](../specs/SPEC-0056-perl526-toolchain.md) on branch `claude/toolchain-perl526-i5y3mp`. It stacks on PR #51 (JDK 8: per-image source hashes, `--language`, one gate per image with its own evidence directory) and PR #55 (CPython 3.7: `TOOLCHAINS`/`--toolchain`, `PYTHONS`), which both change `prepare_toolchains.py` and `test_toolchains.py`. The merge commit keeps #51's one-gate-per-image structure and #55's selection, with `python37` as its own gate; whichever of #51 and #55 merges second resolves the same conflict on main, and this branch then takes main's version and re-applies only the Perl lines. The live gate needs the kind cluster on RIG0, after the JDK 8, CPython 3.7 and #49 holders. Both have merged (main 93a0fab). The TAP runner is the next PR and does not wait for the live gate.
 
 ## Steps
 
 - [x] Image source, fixture, preparation (`BASES`, `PERLS`, control, offline build), `tap_report`.
 - [x] Gate `test_native_perl526_toolchain` with the TAP diagnostics; selection and one-gate-per-image check.
 - [x] Captured real prove output and `tap_report` tests; staged `perl-5.26-make` row in the selection test.
-- [ ] RIG0: build, load and gate on a fresh kind node (paste message in the thread).
-- [ ] Add the `perl-5.26-make` matrix row and the qualification report entry from the gate evidence; review; handoff.
-- [ ] Next PR: TAP runner and report parser, `tap-harness` framework row on this image, a real case at both commits.
+- [x] Merge on offline review and CI (process change approved by Al 2026-10-13 11:59Z; Al's word to merge after #51, 12:20Z).
+- [ ] RIG0: build, load and gate on a fresh kind node, in the batch run before rows land.
+- [ ] Evidence-only follow-up PR: the `perl-5.26-make` matrix row and the qualification report entry from the gate evidence.
+- [ ] Next PR: TAP runner and report parser (SPEC-0061, next PR), `tap-harness` framework row on this image, a real case at both commits under Docker.
 
 ## Validation and progress
 
@@ -34,4 +35,4 @@ Selection over PR #61's `benchmarks/runtime-requirements.json` (both revisions o
 
 ## Decisions and next action
 
-No framework row in this PR: a framework with no Corsair runner is a gap, not a row (base-image skill step 6). Next: post the RIG0 paste message and ask the #49 thread for the cluster after it; meanwhile plan the TAP runner PR.
+No framework row in this PR: a framework with no Corsair runner is a gap, not a row (base-image skill step 6). Under the 2026-10-13 process change an image PR merges once offline review and CI are clean, with no matrix row; the kind gate runs once in the batch before rows land and the row follows in a small evidence-only PR. Main merged at 93a0fab (#51 and #55 on main), so the diff is only the Perl image work. Next: the TAP runner PR.

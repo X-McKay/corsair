@@ -33,7 +33,18 @@ images:
     qualification:
       records: [SPEC-0007, PLAN-0008]
       report: docs/qualification/openshell-toolchains.md
-      note: Temurin 17.0.20.1, Maven 3.10.0 and JUnit Jupiter 5.14.4 under Surefire 3.6.0, offline closure in the image. The image source changed in SPEC-0045 (pinned JUnit console launcher, dependency plugin closure, second fixture method); the gate has not rerun on that source.
+      note: Temurin 17.0.20.1, Maven 3.10.0 and JUnit Jupiter 5.14.4 under Surefire 3.6.0, offline closure in the image. The SPEC-0045 source (pinned JUnit console launcher, dependency plugin closure, second fixture method) passed the gate again on 2026-10-13 (PLAN-0049).
+  - id: temurin-8-maven
+    language: java
+    base_image: docker.io/library/maven@sha256:f2cb52730ea0bde9dc8ba20e5e539d000dcdd7ab9e498d70c301fe04fbddb656
+    image_source: deploy/qualification/toolchains/java8
+    runtime: {name: jdk, version: 8.0.504}
+    tools: {maven: 3.10.0}
+    selector: {}
+    qualification:
+      records: [SPEC-0045, PLAN-0049]
+      report: docs/qualification/openshell-toolchains.md
+      note: Temurin 1.8.0_504-b01 and Maven 3.10.0 measured in the sandbox; JUnit 4.13.2 under Surefire 3.6.0 with the pinned JUnit Platform console launcher (Vintage engine), offline closure in the image.
 frameworks:
   - name: pytest
     language: python
@@ -44,3 +55,21 @@ frameworks:
       records: [SPEC-0028, PLAN-0027, SPEC-0032, PLAN-0032]
       report: docs/qualification/openshell-test-workspace.md
       note: pytest runner and JUnit report parser exercised with pytest 9.0.x only (reviewed SPEC-0018 pair).
+  - name: junit4
+    language: java
+    versions: ==4.13.2 || ==4.12
+    runner: src/corsair/adapters/maven_runner.py
+    images: [temurin-8-maven]
+    qualification:
+      records: [SPEC-0045, PLAN-0049]
+      report: docs/qualification/openshell-toolchains.md
+      note: 4.13.2 by the toolchain gate fixture in the sandbox; 4.12 by VUL4J-6 (commons-compress, Surefire 2.19.1) on the same image outside OpenShell (image-only). Vintage needs 4.12 or later.
+  - name: junit5
+    language: java
+    versions: ==5.14.4
+    runner: src/corsair/adapters/maven_runner.py
+    images: [temurin-17-maven]
+    qualification:
+      records: [SPEC-0041, SPEC-0045, PLAN-0049]
+      report: docs/qualification/openshell-toolchains.md
+      note: JUnit Jupiter 5.14.4 under Surefire 3.6.0 by the toolchain gate fixture, listed and run through the Maven runner's own argv in the sandbox.

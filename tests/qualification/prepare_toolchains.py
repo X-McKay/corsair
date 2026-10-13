@@ -20,11 +20,11 @@ BASES = {
     'python37': 'docker.io/library/python@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b',
     'perl526': 'docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7',
 }
+# Interpreter each Python toolchain directory is built for; its wheels are fetched hash-checked before an offline build.
+PYTHONS = {'python': 'python3.12', 'python37': 'python3.7'}
 # Both Java images hold the pinned JUnit Platform console launcher for SPEC-0041 discovery.
 LAUNCHER = '/opt/corsair-junit/junit-platform-console-standalone-1.14.4.jar'
 JAVA_TESTS = ('nativeRoundtrip', 'nativeRuntime')
-# Interpreter each Python toolchain directory is built for; its wheels are fetched hash-checked before an offline build.
-PYTHONS = {'python': 'python3.12', 'python37': 'python3.7'}
 # Perl image directories: the upstream image already carries make and the core TAP harness, so nothing is fetched.
 PERLS = ('perl526',)
 TAP_TESTS = ('native_roundtrip', 'native_runtime')

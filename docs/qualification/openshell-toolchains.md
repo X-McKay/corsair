@@ -86,3 +86,27 @@ Unavailable registry acceptance requires native client exit1 with close/read-tim
 Source/artifact/evidence review corrected all listed oracle findings before final-source acceptance. Native evidence and failure history remain local under ignored .runs/; credentials/private gateway state are never published. Resolve the tracked source with git log -1 --format=%H -- docs/qualification/openshell-toolchains.md and compare raw source hashes when resuming.
 
 This is bounded native 1E on one Linux amd64 host and two independently created single-node clusters. It cannot establish production tenancy, fleet/multi-node behavior, other architectures, arbitrary Python/Maven registries, application framework/security cases or general escape resistance. 1F interruptions/limits/recovery, adapters, PydanticAI and Temporal remain unqualified. Earlier native admission delays near140–142s remain observed with unknown cause; this slice does not establish a reliability repair. Host call counts, command elapsed times and bytes are retained; internal retries/queue timing are unknown. No agent/model/provider telemetry exists, and missing telemetry is not zero.
+
+## SPEC-0045: JDK 8 image and per-image gates (2026-10-13)
+
+[SPEC-0045](../development/specs/SPEC-0045-jdk8-toolchain-and-junit4.md) adds the `java8` image, puts the pinned JUnit Platform console launcher 1.14.4 (SHA-256 7c6968cbcaf4301c729f202b23b7d736c5d88be625fc7d27ad5d746146a8bc28, Java 8 class files) and maven-dependency-plugin 3.8.1 in both Java images, and splits the gate into one test per image under one module-scoped gateway. Run on RIG0 in the worktree `.worktrees/claude-toolchain-jdk8-junit4-x5k2l4`, on a fresh cluster that worktree created (kind node container dd6cd613…, Kubernetes 1.35.8, Calico ready). Commands, every attempt and the corrections are in [PLAN-0049](../development/plans/PLAN-0049-jdk8-toolchain-and-junit4.md).
+
+| Artifact | Immutable selection |
+| --- | --- |
+| Official Maven/Temurin 8 | `maven:3.10.0-eclipse-temurin-8` index sha256:f2cb52730ea0bde9dc8ba20e5e539d000dcdd7ab9e498d70c301fe04fbddb656; docker-library source [docker-maven 4bcc1de](https://github.com/carlossg/docker-maven/tree/4bcc1dea6507fba8ec40c602bf1bfdb963e21288) (official-images library file on 2026-10-13; the tag's directory is not recorded per digest) |
+| Prepared images (ed57d13 build) | java8 config sha256:b48b90862a6860d60f9b3fa6de1e9a3db9a8d9e460c4f7b281cb4529dbe8f02c; java config sha256:e23aaf05…; python config sha256:68f08d0e… (full digests in each image's `.cache/toolchains/<dir>/image.json` on RIG0) |
+| Measured in the java8 sandbox | javac 1.8.0_504, Temurin 1.8.0_504-b01, Maven 3.10.0, JUnit 4.13.2 under Surefire 3.6.0 through the Vintage engine |
+
+Admission `qual-admission` 1 passed (89 s) and network `qual-network` 3 passed (169 s) at 3cb0bc6, both under the worktree's `.runs/jdk8-toolchain-20261013/`, reused for the final gate on the same node. Final gate `qual-toolchain-2` at 3ad3755, one attempt, 3 passed, 454 s; pytest root pinned to the worktree by the Makefile:
+
+| Gate | Seconds | Sandbox id | In-sandbox checks |
+| --- | --- | --- | --- |
+| java8 | 154 | 7f85f8b8-94c8-400b-98d5-187516514f95 | runner discovery and execution argv (junit-vintage, both `corsair.NativeTest` methods), missing artifact (native Maven prefix resolver), no discovery, compilation, assertion |
+| java | 172 | 869db6a6-322e-4f01-bf6d-e021915d272c | the same through junit-jupiter |
+| python | 127 | 40acfe48-1ba5-4642-bde3-ec25618f3528 | syntax/collection, no discovery, assertion, dependency diagnostics |
+
+The shared gateway passed TLS, caller auth, identity and access isolation (probe sandbox 450b97d7-42b6-4589-b9fe-d3fad1295c00); every sandbox's cleanup and the gateway uninstall, PV reclamation, private-state removal and port-forward stop were confirmed. After this run, #55's CPython 3.7 gate was merged in as a fourth gate on the same module-scoped gateway; that harness change did not touch the Java or Python 3.12 paths, and the 3.7 gate has its own live run.
+
+Real case, image-only (Docker on RIG0, not OpenShell): VUL4J-6 (commons-compress, JUnit 4.12, Surefire 2.19.1) through `MavenRunner` in a `--network=none`, capability-dropped container of the java8 image. The control is a Corsair-authored copy of `ZipShortTest#testToBytes` added to Vul4J's `Test_CVE_2018_1324`, whose PoV method stays byte-identical. Fix revision: both ids listed, control and PoV passed (8.8 s). Vulnerable revision with the fix's test file: control passed, PoV `TestTimedOutException` after 6000 ms, the CVE-2018-1324 loop hitting the test's own timeout (11.8 s). This qualifies JUnit 4.12 with the runner on this image; it is not sandbox evidence.
+
+Not established: JUnit 4 before 4.12 (no Vintage discovery), any JUnit 4 or 5 version other than those listed, JDK 8 under other Maven versions, a checked-in expected Maven cache manifest for either Java image (follow-up), and the SPEC-0042 benchmark report, whose matrix input predates these rows.
