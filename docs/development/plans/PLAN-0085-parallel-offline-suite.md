@@ -23,7 +23,7 @@ image-only, and the record-id and development-workflow checks keep running on ev
 - [x] Pin `pytest-xdist==3.8.0` in the dev dependency group (uv.lock adds it and `execnet==2.1.2`).
 - [x] `make test-config` runs with `-n $(TEST_WORKERS)`, default `auto`; `TEST_WORKERS=0` in the environment runs serially.
 - [x] Raise the `offline-guards` job timeout from 5 to 10 minutes so suite growth or a slow runner is not a false red.
-- [ ] Compare the first CI runs on this branch against the 2026-10-13 serial baseline.
+- [x] Compare the first CI run on this branch against the 2026-10-13 serial baseline.
 
 ## Validation and progress
 
@@ -38,8 +38,12 @@ Local container, 4 cores, branch on main 9ad65fb:
   fork() may lead to deadlocks in the child` (from `multiprocessing` in the worker). It passed in every parallel run; if it
   ever hangs, `--dist loadfile` or a serial mark for that file is the first step.
 
+CI on e8aae0c (PR #124, job 115519469174): `offline-guards` 2:21 wall (20:20:40 to 20:23:01Z), 1966 passed in 129 s
+on 4 workers, against a median of 3:32 wall and ~200-250 s of pytest on 23 serial PR runs the same day. The same 10
+fork warnings from `test_sandbox_execution.py`; no hang.
+
 ## Decisions and next action
 
 xdist is the standard pytest plugin for this; no bespoke sharding or workflow matrix. Not changed: the slow-file costs
 themselves (`test_toolchain_selection.py` spawns a `pytest --collect-only` per case, ~30 s serial), left for a separate small
-change. Next: read the CI timings on this PR's runs and record them here.
+change. Next: none in this plan; merge on Al's word.
