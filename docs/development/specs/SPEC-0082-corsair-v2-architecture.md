@@ -83,10 +83,12 @@ Authors cannot run tests (D3). After both drafts are frozen, trusted code makes 
 | Classifier outcome | Mechanical class | Next action |
 | --- | --- | --- |
 | passed, assertion_failed, anomalous | ok | Nothing is returned to the author; continue to review |
-| not_run, errored | not_run or errored | Only output lines that name the author's own test file are returned, capped at 20 lines, with the mechanical class. Everything else is withheld. One revision (A2), frozen again |
+| not_run, errored | not_run or errored | No runtime output is returned. The author gets the mechanical class, a fixed hint chosen from the exit class and the markers (not discovered, harness error, body did not start, raised before the check marker), and the full output of the row's syntax check if that check failed. One revision (A2), frozen again |
 | infra | infra | The attempt stops with `infra_error` (R1, ERROR) |
 
-`anomalous` maps to `ok` because returning it would hint at the outcome. Application code can run before the test body, from a fixture, a setup hook, a module import or a class initializer, so a missing start marker does not prove an output is mechanical. Only lines that name the author's own test file are returned, for example a compiler error or a traceback frame in that file. They can still carry text from the application, and that residual is recorded as a limitation. Nobody sees the discarded outcome: not the authors, not the Reviewer, not the rule table. The Reviewer then reviews the final frozen bytes. Execute runs only bytes that carry a bound review, and any change after review needs a fresh review before Execute.
+`anomalous` maps to `ok` because returning it would hint at the outcome. Application code can run before the test body, from a fixture, a setup hook, a module import or a class initializer. Any line of runtime output, even one that names the author's own file, can therefore carry an observation of the target. So runtime output is never returned.
+
+The only text returned is mechanical by construction. Each matrix row may declare a syntax-check template that parses or compiles the probe file without running application code, for example `python -m py_compile {file}`, `node --check {file}`, `ruby -c {file}` or the row's test-compile step. Trusted code runs it before the check run, and its output is returned in full, capped at 4 KiB. A row whose check can execute code, such as `perl -c` running BEGIN blocks, must not declare one, and the authors on that row get only the fixed hints. Nobody sees the discarded outcome: not the authors, not the Reviewer, not the rule table. The Reviewer then reviews the final frozen bytes. Execute runs only bytes that carry a bound review, and any change after review needs a fresh review before Execute.
 
 A missing CWE skill never causes a refusal. The run is tagged `uncovered_cwe` for eval slicing.
 
@@ -148,7 +150,7 @@ The label is a pure function of recorded facts. Rules are evaluated top to botto
 | Rule | Condition | Label |
 | --- | --- | --- |
 | R0 | Stopped before a model stage (no matrix row, build failed) | UNABLE_TO_RUN |
-| R1 | Provider or infrastructure failure before the vulnerable revision's probe outcomes are recorded | ERROR |
+| R1 | Provider or infrastructure failure on the vulnerable revision: before any ProbeRun exists, or any vulnerable-revision probe whose outcome is `infra` | ERROR |
 | R2 | Review missing or negative for either probe on the vulnerable revision | INCONCLUSIVE (test_invalid) |
 | R3 | Vulnerable control not passed | INCONCLUSIVE (`control_failed` when the control's outcome is assertion_failed, otherwise the reason its outcome maps to) |
 | R4 | Vulnerable security assertion_failed | LIKELY_EXPLOITABLE |
@@ -187,7 +189,7 @@ The fix result carries a terminal reason from the same mapping over the fixed-re
 
 | Place | Holds |
 | --- | --- |
-| Matrix row (`deploy/v2/runtime-matrix.yaml`) | Image digest, versions, evidence level, detection hints, approved build registries, run-one-test template, exit-code map |
+| Matrix row (`deploy/v2/runtime-matrix.yaml`) | Image digest, versions, evidence level, detection hints, approved build registries, run-one-test template, exit-code map, optional syntax-check template |
 | Framework skill | How to name and place one test, read an environment variable, write a file, put a message on an assertion; the canary pair |
 | CWE family skill (optional) | Benign and adversarial input shapes, the property to assert, which doubles keep production logic |
 | Eval cases | Language-specific inputs and oracles, read by evaluators only |

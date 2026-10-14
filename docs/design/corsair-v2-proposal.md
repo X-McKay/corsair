@@ -562,6 +562,10 @@ The Codex review of PR #134 found three gaps. All three are fixed in SPEC-0082, 
 - **Fourth review round (supersedes the two bullets above where they differ).**
   - Both tests carry the token in the assertion after their check marker, so a failed control assertion reads as `assertion_failed` and R3 records `control_failed` only then. Any other control outcome maps to `probe_not_run`, `probe_errored` or `probe_anomalous`.
   - For `not_run` and `errored` alike, authors get back only output lines that name their own test file, at most 20. Application code can run before the test body starts, for example in a fixture or a module import.
+- **Fifth review round (supersedes the feedback rules above).**
+  - Authors never get runtime output, because even a line that names their own file can carry the application's message. A not\_run or errored draft gets back its mechanical class and a fixed hint chosen from the exit class and the markers.
+  - Authors also get the full output of the matrix row's optional syntax check, such as `python -m py_compile`, `node --check`, `ruby -c` or a test-compile step. That check runs no application code, and a row whose check could run code, such as `perl -c`, declares none.
+  - R1 now covers every vulnerable-revision probe whose outcome is `infra`, so infrastructure failures always read as ERROR.
 
 ### Later changes on 14 October
 
