@@ -33,10 +33,12 @@ import math
 import os
 import posixpath
 import re
+import shlex
 import stat
 import subprocess
 import tarfile
 import tempfile
+import threading
 import time
 import uuid
 from collections.abc import Callable, Mapping, Sequence
@@ -71,7 +73,6 @@ CONTROL_TIMEOUT_S = 120.0
 POLICY_WAIT_S = 120
 EXEC_DEFAULT_TIMEOUT_S = 3600
 """``exec_once`` without a timeout is still bounded: the gateway gets this execution timeout."""
-SETUP_TIMEOUT_S = 1800.0
 CONTROL_EXEC_S = 300
 MAX_OUTPUT_BYTES = 32 * 1024 * 1024
 STDIN_CHUNK_BYTES = 1024 * 1024
@@ -90,6 +91,7 @@ _ENDPOINT = re.compile(r"^[A-Za-z0-9.-]+:[0-9]{1,5}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _NAME = re.compile(r"^[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?$")
 _LABEL_VALUE = re.compile(r"^(?:[A-Za-z0-9](?:[A-Za-z0-9._-]{0,61}[A-Za-z0-9])?)?$")
+_HOST = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$")
 _LABEL_KEY = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,61}[A-Za-z0-9])?$")
 
 # Records the command's pid so a timeout or cancellation can kill its process group inside the sandbox.
@@ -145,21 +147,40 @@ def check_policy(document: Any, kind: str) -> dict:
     if not isinstance(filesystem, dict) or not isinstance(filesystem.get("read_write"), list):
         raise ValueError(f"{kind} policy needs a filesystem_policy with read_write paths")
     network = document.get("network_policies") or {}
+    if not isinstance(network, dict):
+        raise ValueError(f"{kind} policy network_policies must be a mapping")
     if kind == "none" and network:
         raise ValueError("the none policy must grant no network")
-    for rule in network.values():
-        for endpoint in rule.get("endpoints", ()):
-            host = str(endpoint.get("host", ""))
-            if "*" in host or not host or endpoint.get("enforcement") != "enforce" or endpoint.get("port") != 443:
-                raise ValueError(f"{kind} policy endpoint {host!r} must be an exact host on 443, enforced")
+    for rule_name, rule in network.items():
+        if not isinstance(rule, dict) or not isinstance(rule.get("endpoints"), list) or not rule["endpoints"]:
+            raise ValueError(f"{kind} policy rule {rule_name!r} must be a mapping with endpoints")
+        for endpoint in rule["endpoints"]:
+            if not isinstance(endpoint, dict):
+                raise ValueError(f"{kind} policy rule {rule_name!r} has an endpoint that is not a mapping")
+            host = endpoint.get("host")
+            if (not isinstance(host, str) or not _HOST.fullmatch(host) or endpoint.get("port") != 443
+                    or endpoint.get("protocol") != "rest" or endpoint.get("enforcement") != "enforce"):
+                raise ValueError(f"{kind} policy endpoint {host!r} must be an exact host on 443, rest, enforced")
+            rules = endpoint.get("rules")
+            if not isinstance(rules, list) or not rules or not all(
+                    isinstance(item, dict) and set(item) == {"allow"} and isinstance(item["allow"], dict)
+                    and item["allow"].get("method") == "GET" for item in rules):
+                raise ValueError(f"{kind} policy endpoint {host!r} must allow GET only")
     return document
+
+
+def _empty(value: Any) -> bool:
+    return value is None or value == {} or value == [] or value == ""
 
 
 def loads_requested(native: Mapping, requested: Mapping) -> bool:
     """Whether the gateway's effective policy is the requested document: every field the document sets is equal, an
-    absent ``network_policies`` is empty, and the gateway adds nothing but its own ``process`` defaults (v1 gate)."""
-    if not set(native) <= POLICY_FIELDS:
-        return False
+    absent ``network_policies`` is empty, and the gateway adds nothing but its own ``process`` defaults (v1 gate).
+    A field the document does not set may appear only empty (the readback may print ``network_middlewares: {}``);
+    a non-empty one, known to the pinned ``SandboxPolicy`` or not, is authority nobody requested."""
+    for key, value in native.items():
+        if key not in requested and key not in ("process", "network_policies") and not _empty(value):
+            return False
     expected = {"network_policies": {}} | dict(requested)
     return all(native.get(key, {} if key == "network_policies" else None) == value
                for key, value in expected.items())
@@ -276,6 +297,10 @@ class _Ran:
     elapsed: float = 0.0
 
 
+_INSTANCES: dict[Path, OpenShellSandboxes] = {}
+_INSTANCES_LOCK = threading.Lock()
+
+
 class OpenShellSandboxes:
     """The ``Sandboxes`` port over the OpenShell SDK and the pinned CLI. ``client`` is a ``SandboxClient`` (or the
     offline double); ``cli`` runs one CLI argv; ``clock`` is monotonic seconds. Building it does no gateway I/O."""
@@ -289,15 +314,21 @@ class OpenShellSandboxes:
         self._cli_runner = cli
         self._clock = clock
         self._workspace = config.workspace
+        self._cli_verified: tuple[str, int, int] | None = None
 
     @classmethod
     def from_config(cls, path: Path) -> OpenShellSandboxes:
+        """One instance (one gRPC channel) per resolved config path per process; the config is read once."""
         from openshell import SandboxClient, TlsConfig
 
-        config = OpenShellConfig.from_json(path)
-        client = SandboxClient(config.endpoint, tls=TlsConfig(ca_path=config.ca, cert_path=config.cert,
-                                                              key_path=config.key), timeout=CONTROL_TIMEOUT_S)
-        return cls(config, client)
+        key = Path(path).resolve()
+        with _INSTANCES_LOCK:
+            if key not in _INSTANCES:
+                config = OpenShellConfig.from_json(key)
+                client = SandboxClient(config.endpoint, tls=TlsConfig(ca_path=config.ca, cert_path=config.cert,
+                                                                      key_path=config.key), timeout=CONTROL_TIMEOUT_S)
+                _INSTANCES[key] = cls(config, client)
+            return _INSTANCES[key]
 
     # --- state records ---
 
@@ -359,8 +390,13 @@ class OpenShellSandboxes:
 
     def _cli(self, *args: str) -> bytes:
         binary = self.config.cli_path
-        if hashlib.sha256(binary.read_bytes()).hexdigest() != self.config.cli_sha256:
-            raise WorkspaceError(f"the OpenShell CLI at {binary} differs from its pinned sha256")
+        info = binary.stat()
+        identity = (str(binary), info.st_mtime_ns, info.st_size)
+        if self._cli_verified != identity:  # Re-hashed whenever the file's path, mtime or size changes.
+            self._cli_verified = None
+            if hashlib.sha256(binary.read_bytes()).hexdigest() != self.config.cli_sha256:
+                raise WorkspaceError(f"the OpenShell CLI at {binary} differs from its pinned sha256")
+            self._cli_verified = identity
         argv = [str(binary), "--gateway", self.config.gateway, "--workspace", self._workspace, *args]
         try:
             done = self._cli_runner(argv, self.config.cli_env, CONTROL_TIMEOUT_S + POLICY_WAIT_S)
@@ -499,7 +535,7 @@ class OpenShellSandboxes:
         if not source.is_dir():
             raise FileNotFoundError(source)
         self._ready_ref(name)
-        archive = io.BytesIO()
+        archive, total = io.BytesIO(), 0
         with tarfile.open(fileobj=archive, mode="w", format=tarfile.PAX_FORMAT) as tar:
             for directory, dirnames, filenames in os.walk(source, followlinks=False):
                 dirnames.sort()
@@ -508,6 +544,9 @@ class OpenShellSandboxes:
                     info = path.lstat()
                     if not (stat.S_ISREG(info.st_mode) or stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode)):
                         raise WorkspaceError(f"refusing to copy {path}: not a file, directory or symlink")
+                    total += info.st_size if stat.S_ISREG(info.st_mode) else 0
+                    if total > MAX_TRANSFER_BYTES:  # Checked before reading: a file over the bound is never read.
+                        raise WorkspaceError(f"{source} exceeds the {MAX_TRANSFER_BYTES}-byte transfer bound")
                     member = tar.gettarinfo(str(path), arcname=path.relative_to(source).as_posix())
                     member.uid = member.gid = 0
                     member.uname = member.gname = ""
@@ -657,15 +696,17 @@ class OpenShellSandboxes:
 
     def seal_environment(self, name: str, tag: str, key: str, log_sha256: str, *, recipe: Recipe,
                          tree_source: Path, base_image: str) -> None:
+        from ..build import BASELINE_TIMEOUT_S, SETUP_TIMEOUT_S
         from ..intake import tree_sha256
 
-        self._image_ref(base_image)
+        base_ref = self._image_ref(base_image)
         recipe_json = recipe.model_dump(mode="json")
         self._write_json(self._manifest_path(tag), {
             "tag": tag, "key": key, "log_sha256": log_sha256, "recipe": recipe_json,
             "recipe_sha256": hashlib.sha256(json.dumps(recipe_json, sort_keys=True).encode()).hexdigest(),
             "tree_source": str(Path(tree_source).resolve()), "tree_sha256": tree_sha256(Path(tree_source)),
-            "base_image": base_image})
+            "base_image": base_image, "base_image_ref": base_ref,
+            "setup_timeout": SETUP_TIMEOUT_S, "baseline_timeout": BASELINE_TIMEOUT_S})
 
     def open_environment(self, environment: Environment, sandbox_labels: Mapping[str, str]) -> str:
         from ..contracts import Recipe
@@ -680,10 +721,24 @@ class OpenShellSandboxes:
         tree = Path(manifest["tree_source"])
         if manifest["tree_sha256"] != tree_sha256(tree) or manifest["tree_sha256"] != environment.tree_sha256:
             raise WorkspaceError(f"the tree of sealed environment {environment.image} changed since it was sealed")
+        if self.resolve_image(manifest["base_image"]) != manifest["base_image_ref"]:
+            raise WorkspaceError(f"base image {manifest['base_image']} no longer resolves to the sealed "
+                                 f"{manifest['base_image_ref']}")
         spec = SandboxSpec(image=manifest["base_image"], labels=sandbox_labels, workdir=environment.workdir,
                            network="build" if recipe.network_during_setup else "none")
         step = "create"
         name, sandbox_id = self._create_native(spec)  # SandboxExists propagates: never remove another attempt's.
+        log: list[bytes] = []
+
+        def run(argv: Sequence[str], timeout: float) -> None:
+            result = self.exec_once(name, argv, workdir=environment.workdir, timeout=timeout)
+            status = ("timed out" if result.timed_out else "sandbox failed" if result.container_failed
+                      else f"exit {result.exit_code}")
+            log.append(f"$ {shlex.join(argv)}\n".encode() + result.stdout + result.stderr
+                       + f"\n[{status}]\n".encode())
+            if result.exit_code != 0:
+                raise WorkspaceError(f"{status}: {result.stderr.decode(errors='replace')[-1000:]}")
+
         try:
             self._prepare(name, sandbox_id, spec)
             step = "copy tree"
@@ -693,19 +748,28 @@ class OpenShellSandboxes:
                 self.write_file(name, posixpath.join(environment.workdir, added.path), added.content.encode())
             for index, argv in enumerate(recipe.setup, 1):
                 step = f"setup step {index}"
-                result = self.exec_once(name, argv, workdir=environment.workdir, timeout=SETUP_TIMEOUT_S)
-                if result.exit_code != 0:
-                    status = ("timed out" if result.timed_out else "sandbox failed" if result.container_failed
-                              else f"exited {result.exit_code}")
-                    raise WorkspaceError(f"{status}: {result.stderr.decode(errors='replace')[-1000:]}")
+                run(argv, float(manifest["setup_timeout"]))
             step = "drop network"
             if spec.network == "build":
                 self.drop_network(name)
+            step = "baseline test"
+            run(recipe.baseline_test, float(manifest["baseline_timeout"]))
         except Exception as error:
+            digest = self._write_open_log(name, log)
             removed = self.remove(name)
-            raise WorkspaceError(f"open_environment {environment.image} failed at {step}: {error}"
-                                 f"{'' if removed else ' (cleanup unconfirmed)'}") from error
+            raise WorkspaceError(f"open_environment {environment.image} failed at {step}: {error} "
+                                 f"(open log sha256 {digest}){'' if removed else ' (cleanup unconfirmed)'}"
+                                 ) from error
+        self._write_open_log(name, log)
         return spec.name
+
+    def _write_open_log(self, name: str, log: list[bytes]) -> str:
+        """Keep this open's replay log under ``state_dir/environments/opens``; returns its sha256."""
+        data = b"".join(log)
+        path = self.config.state_dir / "environments" / "opens" / f"{name}.log"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        return hashlib.sha256(data).hexdigest()
 
     def agent_workspace(self, image: str, sandbox_labels: Mapping[str, str]) -> OpenShellWorkspace:
         return OpenShellWorkspace(self, SandboxSpec(image=image, labels=sandbox_labels, network="build"))

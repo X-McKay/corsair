@@ -36,6 +36,7 @@ from corsair.v2.workspace.openshell import (
     native_labels,
     native_name,
 )
+from tests.v2.live_cleanup import record_cleanup, remove_confirmed
 from tests.v2.openshell_fake import ERROR, FakeGateway, FakeRpcError, Outcome
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -43,6 +44,7 @@ POLICIES = ROOT / "policies/openshell/v2"
 IMAGE = "corsair-python:61a3e8db1afb1726"
 DIGEST_REF = "docker.io/library/corsair-python@sha256:" + "a" * 64
 LIVE_CONFIG = os.environ.get("CORSAIR_OPENSHELL_CONFIG")
+PROVIDER_NAME = "openshell"
 
 
 def write_config(tmp_path: Path, **changes) -> Path:
@@ -114,7 +116,8 @@ def test_an_image_must_map_to_a_digest_pinned_ref(tmp_path, ref):
         OpenShellConfig.from_json(path)
 
 
-@pytest.mark.parametrize("weaken", ["audit", "wildcard", "port", "landlock", "field", "fs"])
+@pytest.mark.parametrize("weaken", ["audit", "wildcard", "port", "landlock", "field", "fs", "post", "protocol",
+                                    "rule", "endpoint", "no_rules"])
 def test_weakened_policies_are_refused(tmp_path, weaken):
     document = documents()["build"]
     endpoint = document["network_policies"]["corsair-build-python"]["endpoints"][0]
@@ -128,12 +131,31 @@ def test_weakened_policies_are_refused(tmp_path, weaken):
         document["landlock"]["compatibility"] = "best_effort"
     elif weaken == "field":
         document["providers"] = ["github"]
+    elif weaken == "post":
+        endpoint["rules"].append({"allow": {"method": "POST", "path": "/**"}})
+    elif weaken == "protocol":
+        endpoint["protocol"] = "tcp"
+    elif weaken == "rule":
+        document["network_policies"]["corsair-build-python"] = ["not", "a", "mapping"]
+    elif weaken == "endpoint":
+        document["network_policies"]["corsair-build-python"]["endpoints"].append("pypi.org")
+    elif weaken == "no_rules":
+        endpoint["rules"] = []
     else:
         document["filesystem_policy"]["read_write"].append("/etc")
     (tmp_path / "build.yaml").write_text(yaml.safe_dump(document))
     with pytest.raises(ValueError):
         OpenShellConfig.from_json(write_config(tmp_path, policies={"none": str(POLICIES / "none.yaml"),
                                                                    "build": str(tmp_path / "build.yaml")}))
+
+
+def test_loaded_readback_ignores_empty_fields_but_not_unrequested_authority():
+    none = documents()["none"]
+    assert backend.loads_requested(none | {"network_middlewares": {}, "process": {"run_as_user": "sandbox"}}, none)
+    assert backend.loads_requested({k: v for k, v in none.items() if k != "network_policies"}, none)
+    assert not backend.loads_requested(none | {"network_middlewares": {"m": {"name": "m"}}}, none)
+    assert not backend.loads_requested(none | {"something_new": ["x"]}, none)
+    assert not backend.loads_requested(none | {"network_policies": {"x": {}}}, none)
 
 
 def test_policy_documents_match_the_runtime_matrix():
@@ -229,6 +251,28 @@ def test_a_policy_or_readiness_not_observed_fails_create(sandboxes, gateway, fau
         gateway.ready_phase = ERROR
     with pytest.raises(WorkspaceError):
         sandboxes.create(spec())
+
+
+def test_the_cli_hash_is_cached_by_path_mtime_and_size(sandboxes, gateway, tmp_path):
+    cli = tmp_path / "openshell"
+    sandboxes.create(spec())
+    info = cli.stat()
+    cli.write_bytes(b"pinned cli BYTES")  # Same size; with the old mtime the verified identity is unchanged.
+    os.utime(cli, ns=(info.st_atime_ns, info.st_mtime_ns))
+    sandboxes.drop_network(spec().name)
+    os.utime(cli, ns=(info.st_atime_ns, info.st_mtime_ns + 1_000_000))
+    with pytest.raises(WorkspaceError, match="pinned sha256"):
+        sandboxes.drop_network(spec().name)
+
+
+def test_from_config_shares_one_instance_per_config_path(tmp_path):
+    path = write_config(tmp_path)
+    first = OpenShellSandboxes.from_config(path)
+    try:
+        assert OpenShellSandboxes.from_config(tmp_path / "." / path.name) is first
+    finally:
+        backend._INSTANCES.pop(path.resolve(), None)
+        first.client.close()
 
 
 def test_the_cli_is_checked_against_its_pin_before_every_call(sandboxes, gateway, tmp_path):
@@ -327,6 +371,20 @@ def test_copy_tree_in_sends_symlinks_as_links_in_bounded_chunks(sandboxes, gatew
     assert members["linkdir"].issym() and b"host only" not in b"".join(chunks)
     extract = gateway.execs[-1].command
     assert "tar -x" in extract[2] and "--no-same-owner" in extract[2] and extract[-1] == "/work"
+
+
+def test_copy_tree_in_refuses_an_oversized_tree_before_reading_it(sandboxes, made, tmp_path, monkeypatch):
+    monkeypatch.setattr(backend, "MAX_TRANSFER_BYTES", 1000)
+    tree = tmp_path / "tree"
+    tree.mkdir()
+    (tree / "a.bin").write_bytes(b"a" * 600)
+    (tree / "b.bin").write_bytes(b"b" * 600)
+    opened: list[Path] = []
+    real_open = Path.open
+    monkeypatch.setattr(Path, "open", lambda self, *a, **k: opened.append(self) or real_open(self, *a, **k))
+    with pytest.raises(WorkspaceError, match="transfer bound"):
+        sandboxes.copy_tree_in(made, tree, "/work")
+    assert tree / "b.bin" not in opened
 
 
 def test_copy_tree_in_refuses_special_files(sandboxes, made, tmp_path):
@@ -438,8 +496,10 @@ def test_seal_find_and_open_replay_the_recipe_in_order(sandboxes, gateway, tmp_p
     box = gateway.sandboxes[native_name(name)]
     assert box.revisions == [documents()["build"], documents()["none"]]
     commands = [call.command for call in gateway.execs]
-    setup = [command for command in commands if command[0] in ("pip", "python")]
-    assert setup == [list(step) for step in RECIPE.setup]
+    replayed = [command for command in commands if command[0] in ("pip", "python")]
+    assert replayed == [list(step) for step in RECIPE.setup] + [list(RECIPE.baseline_test)]
+    baseline = gateway.execs[commands.index(list(RECIPE.baseline_test))]
+    assert baseline.timeout_seconds == 600
     written = [call.command[-1] for call in gateway.execs if 'cat > "$1"' in call.command[2:3]
                or "mkdir -p \"$(dirname" in call.command[2]]
     assert "/work/tests/test_smoke.py" in written
@@ -448,8 +508,10 @@ def test_seal_find_and_open_replay_the_recipe_in_order(sandboxes, gateway, tmp_p
         "setup": lambda c: c[0] == "pip"}.items()}
     assert index["extract"] < index["file"] < index["setup"]
     sets = gateway.policy_sets()
-    assert len(sets) == 2 and gateway.calls.index(sets[1]) > max(
-        i for i, call in enumerate(gateway.calls) if call[0] == "exec_stream" and call[2][0] == "python")
+    setup_calls = [i for i, call in enumerate(gateway.calls) if call[0] == "exec_stream" and call[2][0] == "python"]
+    assert len(sets) == 2 and setup_calls[0] < gateway.calls.index(sets[1]) < setup_calls[1]
+    log = (sandboxes.config.state_dir / "environments" / "opens" / f"{native_name(name)}.log").read_bytes()
+    assert b"$ pip install -e ." in log and b"$ python -m pytest tests/test_smoke.py" in log
 
 
 def test_an_offline_recipe_never_gets_the_build_policy(sandboxes, gateway, tmp_path):
@@ -467,6 +529,30 @@ def test_a_failed_replay_removes_its_sandbox_and_names_the_step(sandboxes, gatew
     with pytest.raises(WorkspaceError, match="setup step 2"):
         sandboxes.open_environment(environment, labels("run-1", "execute", "control"))
     assert gateway.sandboxes == {} and [c for c in gateway.execs if c.command[0] == "python"].__len__() == 1
+
+
+def test_a_failed_baseline_on_open_names_it_and_keeps_the_log(sandboxes, gateway, tmp_path):
+    environment, tree = _environment(tmp_path, RECIPE)
+    sandboxes.seal_environment("b", environment.image, "k", "", recipe=RECIPE, tree_source=tree, base_image=IMAGE)
+    gateway.handler = lambda call: Outcome(1, b"1 failed") if call.command[:3] == ["python", "-m", "pytest"] \
+        else Outcome()
+    wanted = labels("run-1", "execute", "control")
+    with pytest.raises(WorkspaceError, match="baseline test") as failed:
+        sandboxes.open_environment(environment, wanted)
+    opened = native_name(SandboxSpec(image=IMAGE, labels=wanted).name)
+    log = sandboxes.config.state_dir / "environments" / "opens" / f"{opened}.log"
+    assert hashlib.sha256(log.read_bytes()).hexdigest() in str(failed.value) and b"1 failed" in log.read_bytes()
+    assert gateway.sandboxes == {}
+
+
+def test_open_refuses_a_base_image_that_resolves_differently(sandboxes, gateway, tmp_path):
+    environment, tree = _environment(tmp_path, RECIPE)
+    sandboxes.seal_environment("b", environment.image, "k", "", recipe=RECIPE, tree_source=tree, base_image=IMAGE)
+    sandboxes.config.images[IMAGE] = "docker.io/library/corsair-python@sha256:" + "b" * 64
+    gateway.calls.clear()
+    with pytest.raises(WorkspaceError, match="no longer resolves"):
+        sandboxes.open_environment(environment, labels("run-1", "execute", "control"))
+    assert gateway.calls == []
 
 
 def test_open_refuses_a_changed_tree_or_a_held_identity(sandboxes, gateway, tmp_path):
@@ -567,7 +653,7 @@ class TestOpenShellWorkspaceConformance(WorkspaceBackendSuite):
         live = _live()
         workspace = OpenShellWorkspace(live, _live_spec())
         yield workspace
-        live.remove(workspace.name)
+        assert remove_confirmed(live, [workspace.name]) == []
 
     @pytest.fixture
     def fresh_backend(self):
@@ -578,8 +664,7 @@ class TestOpenShellWorkspaceConformance(WorkspaceBackendSuite):
             return made[-1]
 
         yield build
-        for workspace in made:
-            live.remove(workspace.name)
+        assert remove_confirmed(live, [workspace.name for workspace in made]) == []
 
     @pytest.fixture
     def attach_backend(self):
@@ -589,6 +674,21 @@ class TestOpenShellWorkspaceConformance(WorkspaceBackendSuite):
     @pytest.fixture
     def destroy_environment(self):
         async def destroy(workspace: OpenShellWorkspace) -> None:
-            assert await workspace.destroy()
+            confirmed = await workspace.destroy()
+            record_cleanup(PROVIDER_NAME, workspace.name, confirmed)
+            assert confirmed
 
         return destroy
+
+
+
+def test_live_cleanup_is_recorded_and_unconfirmed_names_are_returned(sandboxes, gateway, tmp_path, monkeypatch):
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    monkeypatch.setenv("CORSAIR_EVIDENCE_DIR", str(evidence))
+    kept, gone = sandboxes.create(spec()), sandboxes.create(spec(extra_label="x"))
+    gateway.replace(native_name(kept))
+    assert remove_confirmed(sandboxes, [kept, gone]) == [kept]
+    lines = [json.loads(line) for line in (evidence / "cleanup.jsonl").read_text().splitlines()]
+    assert lines == [{"backend": "openshell", "name": kept, "confirmed": False},
+                     {"backend": "openshell", "name": gone, "confirmed": True}]

@@ -1,6 +1,6 @@
 """One conformance suite for the ``Sandboxes`` port, run against every backend that can honestly run it.
 
-- ``docker``: needs Docker and the image below; skips otherwise.
+- ``docker``: needs Docker and the runtime matrix's first ``corsair-python`` image; skips otherwise.
 - ``openshell``: needs ``CORSAIR_OPENSHELL_CONFIG`` (a live gateway); skips otherwise. ``CORSAIR_OPENSHELL_IMAGE``
   picks the mapped image tag to use (default: the first one in the operator's images map).
 
@@ -19,12 +19,16 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+import yaml
 
 from corsair.v2.contracts import Environment, Recipe, RecipeFile
 from corsair.v2.intake import tree_sha256
 from corsair.v2.workspace import Sandboxes, SandboxExists, SandboxSpec, labels
+from tests.v2.live_cleanup import record_cleanup, remove_confirmed
 
-DOCKER_IMAGE = "corsair-python:ebf057997574de59"
+MATRIX = Path(__file__).resolve().parents[2] / "deploy/v2/runtime-matrix.yaml"
+DOCKER_IMAGE = next(row["image"] for row in yaml.safe_load(MATRIX.read_text())["rows"]
+                    if row["image"].startswith("corsair-python:"))
 OPENSHELL_CONFIG = os.environ.get("CORSAIR_OPENSHELL_CONFIG")
 
 
@@ -40,6 +44,7 @@ def _docker() -> Backend:
 
     if not docker_available() or docker("image", "inspect", DOCKER_IMAGE).returncode != 0:
         pytest.skip(f"docker or {DOCKER_IMAGE} unavailable")
+
     def forget(tag: str) -> None:
         docker("image", "rm", "--force", tag)
 
@@ -71,8 +76,7 @@ def run_id(port) -> Iterator[str]:
     """A fresh run; every sandbox it labelled is removed afterwards and must be confirmed gone."""
     run = f"port-{uuid.uuid4().hex[:10]}"
     yield run
-    leftovers = port.sandboxes.labelled(run)
-    assert all(port.sandboxes.remove(name) for name in leftovers)
+    assert remove_confirmed(port.sandboxes, port.sandboxes.labelled(run)) == []
     assert port.sandboxes.labelled(run) == []
 
 
@@ -148,7 +152,9 @@ def test_remove_is_confirmed_and_the_sandbox_is_then_gone(port, run_id):
     name = port.sandboxes.create(_spec(port, run_id))
     image = port.sandboxes.image_id(name)
     assert image is None or "sha256:" in image
-    assert port.sandboxes.remove(name) is True
+    confirmed = port.sandboxes.remove(name)
+    record_cleanup(port.sandboxes.provider, name, confirmed)
+    assert confirmed is True
     assert port.sandboxes.exec_once(name, ["true"], workdir="/work", timeout=30).container_failed
     assert port.sandboxes.remove(name) is True
 
@@ -163,7 +169,7 @@ def test_labelled_filters_by_run(port, run_id):
         assert set(listed + others) <= set(port.sandboxes.labelled())
         assert mine != theirs
     finally:
-        assert port.sandboxes.remove(theirs)
+        assert remove_confirmed(port.sandboxes, [theirs]) == []
 
 
 def test_resolve_image_is_provenance_or_none(port):
@@ -193,7 +199,7 @@ def test_seal_find_and_open_environment_round_trip(port, run_id, tmp_path):
         assert port.sandboxes.exec_once(built, recipe.setup[0], workdir="/work", timeout=60).exit_code == 0
         port.sandboxes.seal_environment(built, tag, "key", "c" * 64, recipe=recipe, tree_source=tree,
                                         base_image=port.image)
-        assert port.sandboxes.remove(built)
+        assert remove_confirmed(port.sandboxes, [built]) == []
         assert port.sandboxes.find_environment(tag, "key") == "c" * 64
         assert port.sandboxes.find_environment(tag, "other-key") is None
         wanted = labels(run_id, "execute", "control")
