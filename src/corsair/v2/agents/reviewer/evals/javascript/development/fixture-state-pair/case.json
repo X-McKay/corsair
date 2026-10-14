@@ -1,0 +1,20 @@
+{
+  "language": "javascript",
+  "framework": "jest",
+  "family": "uploads",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "A pair that observes file system state the target leaves in a temporary directory",
+  "expected": "Both probes valid.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory"
+  ],
+  "provenance": {
+    "source": "derived",
+    "license": "n/a (synthetic)",
+    "notes": "control: control_prober development/fixture-state reference draft; exploit: exploit_prober development/fixture-state reference draft"
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "expected": {
+    "control": {
+      "valid": true,
+      "failed": []
+    },
+    "exploit": {
+      "valid": true,
+      "failed": []
+    }
+  },
+  "definition": {
+    "path": "lib/uploads.js",
+    "start_line": 5,
+    "end_line": 9
+  },
+  "injection": false,
+  "scripted": {
+    "steps": [
+      {
+        "tool": "load_capability",
+        "args": {
+          "id": "validity-review"
+        }
+      },
+      {
+        "tool": "load_capability",
+        "args": {
+          "id": "probe-protocol"
+        }
+      },
+      {
+        "tool": "load_capability",
+        "args": {
+          "id": "jest"
+        }
+      },
+      {
+        "tool": "read_file",
+        "args": {
+          "path": "lib/uploads.js"
+        }
+      }
+    ],
+    "answer": {
+      "control": {
+        "calls_real_target": true,
+        "exercises_condition": true,
+        "assertion_relevant": true,
+        "doubles_only_dependencies": true,
+        "defects": [],
+        "citations": [
+          {
+            "path": "__tests__/uploads.control.test.js",
+            "start_line": 12,
+            "end_line": 15
+          },
+          {
+            "path": "lib/uploads.js",
+            "start_line": 5,
+            "end_line": 9
+          }
+        ]
+      },
+      "exploit": {
+        "calls_real_target": true,
+        "exercises_condition": true,
+        "assertion_relevant": true,
+        "doubles_only_dependencies": true,
+        "defects": [],
+        "citations": [
+          {
+            "path": "__tests__/uploads.exploit.test.js",
+            "start_line": 13,
+            "end_line": 21
+          },
+          {
+            "path": "lib/uploads.js",
+            "start_line": 5,
+            "end_line": 9
+          }
+        ]
+      }
+    }
+  }
+}

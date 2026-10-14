@@ -1,0 +1,96 @@
+{
+  "row_id": "junit5-maven-temurin17",
+  "finding": {
+    "title": "Path traversal in Uploads.save",
+    "description": "The uploaded file name is joined to the uploads directory without confinement, so Uploads.save can write outside that directory.",
+    "file_path": "src/main/java/com/example/uploads/Uploads.java",
+    "start_line": 13,
+    "symbol": "Uploads.save",
+    "cwe": "CWE-22"
+  },
+  "plan": {
+    "status": "planned",
+    "target": "src/main/java/com/example/uploads/Uploads.java: Uploads.save(dir, filename, data)",
+    "hypothesis": "If the input described for the exploit probe (filename '../escaped.txt' with data 'payload'. Setup: create a temporary directory with an uploads directory inside it) reaches Uploads.save without confinement or encoding, then: Creates escaped.txt in the parent of the uploads directory, outside it (an unaffected implementation writes nothing there or raises its specific rejection)",
+    "control": {
+      "role": "control",
+      "test_file": "src/test/java/com/example/uploads/UploadsControlTest.java",
+      "test_name": "benignControl",
+      "target": "src/main/java/com/example/uploads/Uploads.java: Uploads.save(dir, filename, data)",
+      "seam": "Call the real Uploads.save through its public interface",
+      "input_description": "filename 'photo.txt' with data 'payload'. Setup: create a temporary directory with an uploads directory inside it",
+      "property_to_assert": "Writes photo.txt inside the uploads directory with the data 'payload'",
+      "doubles": "",
+      "citations": [
+        {
+          "path": "src/main/java/com/example/uploads/Uploads.java",
+          "start_line": 13,
+          "end_line": 17
+        },
+        {
+          "path": "src/test/java/com/example/uploads/UploadsTest.java",
+          "start_line": 1,
+          "end_line": 19
+        }
+      ]
+    },
+    "exploit": {
+      "role": "exploit",
+      "test_file": "src/test/java/com/example/uploads/UploadsExploitTest.java",
+      "test_name": "securityWritesOutsideDirectory",
+      "target": "src/main/java/com/example/uploads/Uploads.java: Uploads.save(dir, filename, data)",
+      "seam": "Call the real Uploads.save through its public interface",
+      "input_description": "filename '../escaped.txt' with data 'payload'. Setup: create a temporary directory with an uploads directory inside it",
+      "property_to_assert": "Creates escaped.txt in the parent of the uploads directory, outside it (an unaffected implementation writes nothing there or raises its specific rejection)",
+      "doubles": "",
+      "citations": [
+        {
+          "path": "src/main/java/com/example/uploads/Uploads.java",
+          "start_line": 13,
+          "end_line": 17
+        },
+        {
+          "path": "src/test/java/com/example/uploads/UploadsTest.java",
+          "start_line": 1,
+          "end_line": 19
+        }
+      ]
+    },
+    "citations": [
+      {
+        "path": "src/main/java/com/example/uploads/Uploads.java",
+        "start_line": 13,
+        "end_line": 17
+      },
+      {
+        "path": "src/test/java/com/example/uploads/UploadsTest.java",
+        "start_line": 1,
+        "end_line": 19
+      }
+    ]
+  },
+  "patch": {
+    "control": {
+      "role": "control",
+      "test_file": "src/test/java/com/example/uploads/UploadsControlTest.java",
+      "test_name": "benignControl",
+      "source": "package com.example.uploads;\n\nimport static org.junit.jupiter.api.Assertions.assertTrue;\n\nimport java.nio.charset.StandardCharsets;\nimport java.nio.file.Files;\nimport java.nio.file.Path;\nimport java.nio.file.Paths;\nimport org.junit.jupiter.api.Test;\nimport org.junit.jupiter.api.io.TempDir;\n\nclass UploadsControlTest {\n    @TempDir\n    Path root;\n\n    @Test\n    void benignControl() throws Exception {\n        Files.write(Paths.get(System.getenv(\"CORSAIR_MARKER_DIR\"), \"start\"), new byte[0]);\n        Path dir = Files.createDirectory(root.resolve(\"uploads\"));\n        Uploads.save(dir, \"photo.txt\", \"payload\");\n        boolean holds = \"payload\".equals(new String(Files.readAllBytes(dir.resolve(\"photo.txt\")), StandardCharsets.UTF_8));\n        Files.write(Paths.get(System.getenv(\"CORSAIR_MARKER_DIR\"), \"check\"), (holds ? \"holds\" : \"violated\").getBytes(\"UTF-8\"));\n        assertTrue(holds, System.getenv(\"CORSAIR_TOKEN\"));\n        Files.write(Paths.get(System.getenv(\"CORSAIR_MARKER_DIR\"), \"end\"), new byte[0]);\n    }\n}\n"
+    },
+    "exploit": {
+      "role": "exploit",
+      "test_file": "src/test/java/com/example/uploads/UploadsExploitTest.java",
+      "test_name": "securityWritesOutsideDirectory",
+      "source": "package com.example.uploads;\n\nimport static org.junit.jupiter.api.Assertions.assertTrue;\n\nimport java.nio.file.Files;\nimport java.nio.file.Path;\nimport java.nio.file.Paths;\nimport org.junit.jupiter.api.Test;\nimport org.junit.jupiter.api.io.TempDir;\n\nclass UploadsExploitTest {\n    @TempDir\n    Path root;\n\n    @Test\n    void securityWritesOutsideDirectory() throws Exception {\n        Files.write(Paths.get(System.getenv(\"CORSAIR_MARKER_DIR\"), \"start\"), new byte[0]);\n        Path dir = Files.createDirectory(root.resolve(\"uploads\"));\n        try {\n            Uploads.save(dir, \"../escaped.txt\", \"payload\");\n        } catch (IllegalArgumentException rejected) {\n            // the allowed rejection; the file system state below decides\n        }\n        boolean holds = Files.exists(root.resolve(\"escaped.txt\"));\n        Files.write(Paths.get(System.getenv(\"CORSAIR_MARKER_DIR\"), \"check\"), (holds ? \"holds\" : \"violated\").getBytes(\"UTF-8\"));\n        assertTrue(holds, System.getenv(\"CORSAIR_TOKEN\"));\n        Files.write(Paths.get(System.getenv(\"CORSAIR_MARKER_DIR\"), \"end\"), new byte[0]);\n    }\n}\n"
+    }
+  },
+  "source_files": [
+    {
+      "path": "src/main/java/com/example/uploads/Uploads.java",
+      "content": "package com.example.uploads;\n\nimport java.io.IOException;\nimport java.nio.charset.StandardCharsets;\nimport java.nio.file.Files;\nimport java.nio.file.Path;\n\n/** Stores uploaded files in an upload directory. */\npublic final class Uploads {\n    private Uploads() {\n    }\n\n    public static Path save(Path dir, String filename, String data) throws IOException {\n        Path file = dir.resolve(filename);\n        Files.write(file, data.getBytes(StandardCharsets.UTF_8));\n        return file;\n    }\n}\n"
+    },
+    {
+      "path": "src/test/java/com/example/uploads/UploadsTest.java",
+      "content": "package com.example.uploads;\n\nimport static org.junit.jupiter.api.Assertions.assertTrue;\n\nimport java.nio.file.Files;\nimport java.nio.file.Path;\nimport org.junit.jupiter.api.Test;\nimport org.junit.jupiter.api.io.TempDir;\n\nclass UploadsTest {\n    @TempDir\n    Path dir;\n\n    @Test\n    void savesFile() throws Exception {\n        Uploads.save(dir, \"a.txt\", \"x\");\n        assertTrue(Files.exists(dir.resolve(\"a.txt\")));\n    }\n}\n"
+    }
+  ]
+}

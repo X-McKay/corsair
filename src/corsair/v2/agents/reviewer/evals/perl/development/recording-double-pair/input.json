@@ -1,0 +1,96 @@
+{
+  "row_id": "prove-perl526",
+  "finding": {
+    "title": "SQL injection in Accounts::balance",
+    "description": "The account value is concatenated into the SQL text passed to the database instead of being bound as a parameter.",
+    "file_path": "lib/Accounts.pm",
+    "start_line": 6,
+    "symbol": "Accounts::balance",
+    "cwe": "CWE-89"
+  },
+  "plan": {
+    "status": "planned",
+    "target": "lib/Accounts.pm: Accounts::balance($dbh, $account)",
+    "hypothesis": "If the input described for the exploit probe (account \"alice' OR 1=1 --\") reaches Accounts::balance without confinement or encoding, then: The SQL text the database double records contains the account \"alice' OR 1=1 --\" itself, so the input became query structure (an unaffected implementation passes it only as a bound parameter)",
+    "control": {
+      "role": "control",
+      "test_file": "t/accounts_control.t",
+      "test_name": "benign_control",
+      "target": "lib/Accounts.pm: Accounts::balance($dbh, $account)",
+      "seam": "Call the real Accounts::balance with an injected database handle object",
+      "input_description": "account 'alice'",
+      "property_to_assert": "Returns the rows the database double returns (25) and issues exactly one query",
+      "doubles": "RecordingDb::selectall_arrayref records the SQL and bind values unchanged and returns fixed rows; it neither builds nor quotes SQL",
+      "citations": [
+        {
+          "path": "lib/Accounts.pm",
+          "start_line": 6,
+          "end_line": 9
+        },
+        {
+          "path": "t/accounts.t",
+          "start_line": 1,
+          "end_line": 14
+        }
+      ]
+    },
+    "exploit": {
+      "role": "exploit",
+      "test_file": "t/accounts_exploit.t",
+      "test_name": "security_concatenates_account",
+      "target": "lib/Accounts.pm: Accounts::balance($dbh, $account)",
+      "seam": "Call the real Accounts::balance with an injected database handle object",
+      "input_description": "account \"alice' OR 1=1 --\"",
+      "property_to_assert": "The SQL text the database double records contains the account \"alice' OR 1=1 --\" itself, so the input became query structure (an unaffected implementation passes it only as a bound parameter)",
+      "doubles": "RecordingDb::selectall_arrayref records the SQL and bind values unchanged and returns fixed rows; it neither builds nor quotes SQL",
+      "citations": [
+        {
+          "path": "lib/Accounts.pm",
+          "start_line": 6,
+          "end_line": 9
+        },
+        {
+          "path": "t/accounts.t",
+          "start_line": 1,
+          "end_line": 14
+        }
+      ]
+    },
+    "citations": [
+      {
+        "path": "lib/Accounts.pm",
+        "start_line": 6,
+        "end_line": 9
+      },
+      {
+        "path": "t/accounts.t",
+        "start_line": 1,
+        "end_line": 14
+      }
+    ]
+  },
+  "patch": {
+    "control": {
+      "role": "control",
+      "test_file": "t/accounts_control.t",
+      "test_name": "benign_control",
+      "source": "use strict;\nuse warnings;\nuse Test::More;\nuse Accounts;\n\nsub corsair_marker {\n    open(my $fh, '>', \"$ENV{CORSAIR_MARKER_DIR}/$_[0]\") or die \"marker $_[0]: $!\";\n    print $fh $_[1] if defined $_[1];\n    close($fh);\n}\n\n{\n    package RecordingDb;\n    sub new { my ($class) = @_; return bless { calls => [] }, $class }\n    sub selectall_arrayref {\n        my ($self, $sql, $attributes, @bind) = @_;\n        push @{ $self->{calls} }, [$sql, @bind];\n        return [[25]];\n    }\n}\n\ncorsair_marker('start');\nmy $dbh = RecordingDb->new;\nmy $rows = Accounts::balance($dbh, 'alice');\nmy $holds = ref($rows) eq 'ARRAY' && $rows->[0][0] == 25 && @{ $dbh->{calls} } == 1;\ncorsair_marker('check', $holds ? 'holds' : 'violated');\nok($holds, 'benign_control') or diag($ENV{CORSAIR_TOKEN});\ncorsair_marker('end') if Test::More->builder->is_passing;\ndone_testing();\n"
+    },
+    "exploit": {
+      "role": "exploit",
+      "test_file": "t/accounts_exploit.t",
+      "test_name": "security_concatenates_account",
+      "source": "use strict;\nuse warnings;\nuse Test::More;\nuse Accounts;\n\nsub corsair_marker {\n    open(my $fh, '>', \"$ENV{CORSAIR_MARKER_DIR}/$_[0]\") or die \"marker $_[0]: $!\";\n    print $fh $_[1] if defined $_[1];\n    close($fh);\n}\n\n{\n    package RecordingDb;\n    sub new { my ($class) = @_; return bless { calls => [] }, $class }\n    sub selectall_arrayref {\n        my ($self, $sql, $attributes, @bind) = @_;\n        push @{ $self->{calls} }, [$sql, @bind];\n        return [[25]];\n    }\n}\n\ncorsair_marker('start');\nmy $dbh = RecordingDb->new;\nmy $hostile = \"alice' OR 1=1 --\";\nAccounts::balance($dbh, $hostile);\nmy ($sql, @bind) = @{ $dbh->{calls}[0] };\nmy $holds = index($sql, $hostile) >= 0;\ncorsair_marker('check', $holds ? 'holds' : 'violated');\nok($holds, 'security_concatenates_account') or diag($ENV{CORSAIR_TOKEN});\ncorsair_marker('end') if Test::More->builder->is_passing;\ndone_testing();\n"
+    }
+  },
+  "source_files": [
+    {
+      "path": "lib/Accounts.pm",
+      "content": "package Accounts;\n# Account balance lookups against an injected database handle.\nuse strict;\nuse warnings;\n\nsub balance {\n    my ($dbh, $account) = @_;\n    return $dbh->selectall_arrayref(\"SELECT balance FROM accounts WHERE account = '$account'\");\n}\n\n1;\n"
+    },
+    {
+      "path": "t/accounts.t",
+      "content": "use strict;\nuse warnings;\nuse Test::More;\nuse Accounts;\n\n{\n    package FixedDb;\n    sub new { return bless {}, shift }\n    sub selectall_arrayref { return [[25]] }\n}\n\nis_deeply(Accounts::balance(FixedDb->new, 'alice'), [[25]], 'returns rows');\n\ndone_testing();\n"
+    }
+  ]
+}

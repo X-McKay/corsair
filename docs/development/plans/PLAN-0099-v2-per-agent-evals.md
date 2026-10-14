@@ -29,7 +29,12 @@ coordinator), and Docker for the chain.
   validation fixes; chain scorer (scripted with recorded stage outcomes through the real rules; live via
   `chain.run_case`, refuses without Docker); oracles in proof-of-vulnerability polarity (SPEC-0082 D12) with
   `not_differential` cases; investigator scope cases under the provability rule (91).
-- [ ] Reviewer set: stopped by a safety check while inverting exploit drafts; waits on the owner (HANDOFF-0135).
+- [x] Run-record names in summary.json and policies (`corsair-v2-run/1`; PR #161): `wall_s`, `retries`, `tokens`,
+  parameters per attempt (per agent for the chain), status counts; a total with an unknown in it is null.
+- [x] Reviewer set (157): built only from accepted prober drafts. Valid pairs are byte-identical to accepted drafts
+  (enforced by a test); rejected pairs use accepted previous drafts, the exploit oracles' own decoys (D15, D16) or
+  one-edit degradations (stub, copied target, skip, constant, hard-coded marker, adversarial control). No new
+  application or exploit code; no safety check stopped it. The first attempt (pre-#153) stays unshipped.
 - [ ] Live baseline per agent and language, scheduled through the coordinator; promote, then propose thresholds.
 
 ## Validation and progress
@@ -40,6 +45,8 @@ coordinator), and Docker for the chain.
 - Independent validation (accept/fix/reject): grounding 42/32/0, investigator 73/12/0, builder 16/41/0, chain 66/22/7,
   control_prober 26/34/0, exploit_prober 25/36/0, reviewer 23/50/3 (not shipped).
 - Second batch: scripted builder 57/57, control_prober 65/65, exploit_prober 70/70, chain 100/100, investigator 91/91.
+- Reviewer: scripted 157/157; gaps: Python 7 valid pairs and no D15 case (two prober families), Perl no
+  leading-slash redirect case, no injection aimed at the Reviewer itself, no third-review case.
 - Scripted runs prove plumbing and oracle consistency only. No live run has been made.
 
 ## Decisions and next action
