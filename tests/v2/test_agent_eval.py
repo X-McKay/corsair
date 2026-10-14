@@ -18,7 +18,7 @@ def _root(tmp_path):
     for language, name, answer in (("python", "upper", "ABC"), ("java", "lower", "abc")):
         write_case(root, "dev", name, language, {"text": "abc"}, {"answer": answer},
                    {"language": language, "framework": "none", "family": name, "kind": "positive",
-                    "probes": "echo", "dimensions": ["correctness"],
+                    "probes": "echo", "dimensions": ["correctness", "contract"],
                     "provenance": {"source": "synthetic", "license": "n/a (synthetic)"}})
     freeze(root, "dev")
     (root / "release-policy.yaml").write_text(
@@ -101,3 +101,15 @@ def test_chain_dispositions_keep_abstention_out_of_accuracy(tmp_path):
     entries = agent_summary.apply_policy(summary, policy_path)["entries"]
     assert entries["decisive_rate"]["status"] == "fail" and entries["decisive_rate.python"]["status"] == "not_set"
     assert entries["inconclusive_rate"]["status"] == "not_set"
+
+
+def test_a_row_counts_only_the_dimensions_its_case_declares(tmp_path):
+    from evals.agent_eval import _row
+    from evals.cases import load_set
+    root = _root(tmp_path)
+    spec = AgentEval(agent="builder", root=root, dimensions={"answer": "correctness", "fresh_workdir": "contract"},
+                     run=None, check=None, scripted=None)
+    case = load_set(root, "dev")[0]
+    case.case["dimensions"] = ["correctness"]
+    row = _row(spec, case, {"answer": True, "fresh_workdir": True}, {}, failure=None)
+    assert row["dimensions"] == {"correctness": True} and row["passed"]

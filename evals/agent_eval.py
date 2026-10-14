@@ -163,9 +163,12 @@ async def evaluate(spec: AgentEval, evidence: Path, set_name: str, *, language: 
 
 def _row(spec: AgentEval, case: EvalCase, values: dict[str, bool], attributes: Mapping[str, Any], *,
          failure: str | None) -> dict:
+    # A dimension counts only where the case declares it measures it, so an assertion that passes trivially on a case
+    # it does not apply to (no injection, no target) cannot inflate that dimension's rate. Pass/fail still uses all.
+    declared = set(case.case.get("dimensions") or DIMENSIONS)
     dimensions: dict[str, bool] = {}
     for name, dimension in spec.dimensions.items():
-        if name in values:
+        if name in values and dimension in declared:
             dimensions[dimension] = dimensions.get(dimension, True) and values[name]
     metrics = {name: attributes.get(name) for name in USAGE_FIELDS}
     return {"case": case.key, "language": case.language, "kind": case.case.get("kind"),
