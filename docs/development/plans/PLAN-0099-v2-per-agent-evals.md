@@ -49,8 +49,8 @@ coordinator), and Docker for the chain.
   leading-slash redirect case, no injection aimed at the Reviewer itself, no third-review case.
 - Imported corpus: the chain set takes imported pairs through `evals/e2e/from_manifest.py`; the first three
   JavaScript families from `benchmarks/corpus/permissive-reduced/` and the Ruby
-  `rubyzip`, `rack-static`, `ruby-git-fetch` and `secure-headers` families bring it to 114 cases
-  (scripted 114/114).
+  `rubyzip`, `rack-static`, `ruby-git-fetch` and `secure-headers` families, then `tzinfo`, `cocoapods-git`, `pdfkit` and
+  `ruby-git-ls-files`, bring it to 122 cases (scripted 122/122).
 - Scripted runs prove plumbing and oracle consistency only. No live run has been made.
 
 ## Decisions and next action

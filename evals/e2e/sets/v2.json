@@ -109,11 +109,19 @@
     "javascript/dot-prop-b": "2c7564f6b61add279f88900d9f9edf446ae96d741438e5aa83c02ad686b98ce4",
     "ruby/rack-static-a": "f3f692dbb9a30303a60a40280579e7cbab6c661b3cf95ed6183e338899e7b7f3",
     "ruby/rack-static-b": "9d40a9f65583689b8039c60bcfaf96e8fa9d232e79f9f05db0cf4b74f800c34a",
-    "ruby/rubyzip-a": "e9fc4b1abb6df1fddaf9a8b94d4ad42e28531790647fc66d6e9287f8fe02b08a",
-    "ruby/rubyzip-b": "c0bf4e5190783c6b0302bcfaf0dd0bd47ad2316fdf1e56e3ba42f293b64fd8e3",
+    "ruby/rubyzip-a": "afde4d3cd93847763ca2101c5122ab3c687a6eaca3aba4ba58bb999f8565244e",
+    "ruby/rubyzip-b": "39cd0caae88b1f9ba6a2d7a5c5522ed446be00b762554f2462b947f8fd28091f",
     "ruby/ruby-git-fetch-a": "9bd374382c0ce04cbb7dfc03e2ae46a4f2af53c0b5d63d580dcf8e941e4d4be1",
     "ruby/ruby-git-fetch-b": "1b52de2886c903395553e3481b863d656f76e1cbe457007f7a7f245b20dd88f5",
     "ruby/secure-headers-a": "a5a0269150b19b88fa263f60e39820036d0acca30a91a54769e91dd6109b9fae",
-    "ruby/secure-headers-b": "79b60efc3b13c69952ee4062632364720638cf6a8981c81b88cf2d0b0c2952db"
+    "ruby/secure-headers-b": "79b60efc3b13c69952ee4062632364720638cf6a8981c81b88cf2d0b0c2952db",
+    "ruby/cocoapods-git-a": "7a5004ec1764f4c4aab931638748fc9c01c3d1cd82a24b20387a96e8aa569954",
+    "ruby/cocoapods-git-b": "9cf844904b37028c7d082b4ea3b3cfbdad9e13c900ede8dc87b32ce54b9d0dbb",
+    "ruby/pdfkit-a": "70b8bc30f717a293eaa69b2cbdb5b8872e6e20e1c3a0cef45d7d6d6c6bf6a716",
+    "ruby/pdfkit-b": "52fa080ad0319b96ce2d22b5f6a4375a2e9a55b447bd3412bc519e7924cd0f61",
+    "ruby/ruby-git-ls-files-a": "a31e55185ad787244b8c34d9de33fc755a314fca682fbb8b3016b165857a05fb",
+    "ruby/ruby-git-ls-files-b": "9c5ce82309cba2f6719eacb0bda915985240fd38167ee93d35c3377dba720e3c",
+    "ruby/tzinfo-a": "b77b1d042d70aa8cfdd3a6c52a88b0aa04ebb77eb90c5320f78ea9d6a8287856",
+    "ruby/tzinfo-b": "fcdb6f941e5d57699b72a7080a1618305807f14c6f1bc215e179c71742a66359"
   }
 }

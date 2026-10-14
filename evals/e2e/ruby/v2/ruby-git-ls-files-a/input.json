@@ -1,0 +1,13 @@
+{
+  "case_id": "corpus:bbb8625fea756a54",
+  "finding": {
+    "title": "Path unquoting in Git::Lib#ls_files",
+    "description": "Git::Lib#ls_files parses the output of the git ls-files subcommand into a hash keyed by path, unquoting quoted path strings.",
+    "file_path": "lib/git/lib.rb",
+    "start_line": 14,
+    "symbol": "ls_files",
+    "cwe": "CWE-94"
+  },
+  "source": "../../../../../benchmarks/corpus/permissive-reduced/ruby/ruby-git-ls-files/a",
+  "fixed_source": "../../../../../benchmarks/corpus/permissive-reduced/ruby/ruby-git-ls-files/b"
+}
