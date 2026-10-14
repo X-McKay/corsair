@@ -78,7 +78,15 @@ Each agent is a native `AgentSpec` file plus a small Python module for its tools
 
 The two probers are separate packages with separate evals and baselines. They share the probe-protocol skill, the framework skills, the test-file write tool and the draft contract. Each has its own AgentSpec, instructions, output check, budget and provider key. Neither ever sees the other's brief, draft or result.
 
-Authors cannot run tests (D3). After both drafts are frozen, trusted code makes one mechanical check run of each on the vulnerable revision. This run is not investigation execution: it keeps only a mechanical class (`ok`, `not_run` or `errored`) and discards the outcome, so `passed` and `assertion_failed` both become `ok`. Nobody sees the discarded outcome: not the authors, not the Reviewer, not the rule table. A `not_run` or `errored` result returns that author's own diagnostics, and the author gets one revision (A2), which is frozen again. The Reviewer then reviews the final frozen bytes. Execute runs only bytes that carry a bound review, and any change after review needs a fresh review before Execute.
+Authors cannot run tests (D3). After both drafts are frozen, trusted code makes one mechanical check run of each on the vulnerable revision. This run is not investigation execution. It keeps only a mechanical class and discards the outcome:
+
+| Classifier outcome | Mechanical class | Next action |
+| --- | --- | --- |
+| passed, assertion_failed, anomalous | ok | Nothing is returned to the author; continue to review |
+| not_run, errored | not_run or errored | That author's own diagnostics are returned; one revision (A2), which is frozen again |
+| infra | infra | The attempt stops with `infra_error` (R1, ERROR) |
+
+`anomalous` maps to `ok` because returning it would hint at the outcome. Nobody sees the discarded outcome: not the authors, not the Reviewer, not the rule table. The Reviewer then reviews the final frozen bytes. Execute runs only bytes that carry a bound review, and any change after review needs a fresh review before Execute.
 
 A missing CWE skill never causes a refusal. The run is tagged `uncovered_cwe` for eval slicing.
 
@@ -114,13 +122,15 @@ For each run, trusted code sets four environment variables: `CORSAIR_MARKER_STAR
 - Each probe runs alone, using the matrix row's run-one-test template filled with only the planned file and test name.
 - The container runtime gives the exit code, signal or timeout. The row's exit-code map sorts the code into `pass`, `test_failed`, `no_tests`, `harness_error` or `unknown`.
 
+Rows are evaluated top to bottom, and the first match wins. Infrastructure exits come first, so a harness error before the start marker stays attributable as `infra`.
+
 | Exit class | start | check | end | token | Outcome |
 | --- | --- | --- | --- | --- | --- |
+| harness_error, timeout, signal | any | any | any | any | infra |
+| no_tests, or no start marker | any | any | any | any | not_run |
 | pass | yes | safe | yes | no | passed |
 | test_failed | yes | unsafe | no | yes | assertion_failed |
 | test_failed | yes | absent | no | any | errored |
-| no_tests, or no start marker | any | any | any | any | not_run |
-| harness_error, timeout, signal | any | any | any | any | infra |
 | any other combination | | | | | anomalous |
 
 Only `passed` and `assertion_failed` are decisive.
@@ -156,7 +166,7 @@ Otherwise the result is `not_verified`, or `not_applicable` when there is no fix
 
 Calibration (a detector self-test or an ablation run) is recorded as calibration and never as proof of absence. `refuted_in_scope` stays disabled.
 
-The terminal reason comes from a closed enum: `ok`, `no_runtime`, `build_failed`, `plan_unresolved`, `probe_not_run`, `probe_errored`, `test_invalid`, `control_failed`, `budget_exhausted`, `provider_error`, `infra_error`, `cleanup_unconfirmed`. A model may write a rationale once the label is fixed. It cannot change the label.
+The terminal reason comes from a closed enum: `ok`, `no_runtime`, `build_failed`, `plan_unresolved`, `probe_not_run`, `probe_errored`, `probe_anomalous`, `test_invalid`, `control_failed`, `no_valid_observation`, `budget_exhausted`, `provider_error`, `infra_error`, `cleanup_unconfirmed`. R6 records `probe_anomalous` when either vulnerable-revision probe was `anomalous`, and `no_valid_observation` otherwise. A model may write a rationale once the label is fixed. It cannot change the label.
 
 ### Corrections, caches, modes and fact origins
 
