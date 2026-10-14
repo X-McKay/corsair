@@ -42,7 +42,7 @@ ENVIRONMENT = Environment(image="env:1", runtime_row="row", recipe_sha256=SHA, t
 def draft(role: str, body: str = "") -> ProbeDraft:
     b = brief(role)
     return ProbeDraft(role=role, test_file=b.test_file, test_name=b.test_name,
-                      source=f"CORSAIR_START {body} CORSAIR_END")
+                      source=f"CORSAIR_MARKER_DIR {body}")
 
 
 def usage(agent: str, **values: Any) -> AgentUsage:
