@@ -12,6 +12,7 @@ from pydantic_ai.models.instrumented import InstrumentationSettings
 from pydantic_ai_harness import Skills
 
 from ..common.budget import tool_budget
+from ..common.repetition import read_loop_guard
 from ..common.prompted_output import prompted_output
 from ..probing.agent import PROTOCOL_SKILLS, framework_skills, skills_home
 from ..probing.source import source_tools
@@ -32,6 +33,7 @@ def create_agent(model: Model, *, durability: TemporalDurability[ReviewDeps] | N
                                Skills([SKILLS, PROTOCOL_SKILLS], workspace=skills_home()),
                                *framework_skills(None),
                                tool_budget(),
+            read_loop_guard(),
                                prompted_output(),
                                Instrumentation(settings=InstrumentationSettings(include_content=False, version=5)),
                                *([durability] if durability is not None else []),

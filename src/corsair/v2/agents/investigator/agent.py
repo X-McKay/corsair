@@ -22,6 +22,7 @@ from pydantic_ai_harness import Skills
 from corsair.v2.contracts import AgentUsage, Case, ProbePlan, Runtime
 
 from ..common.budget import tool_budget
+from ..common.repetition import read_loop_guard
 from ..common.framework import guidance_block
 from ..common.prompted_output import prompted_output
 from ..common.usage import run_recorded
@@ -31,7 +32,8 @@ from .validation import check_plan
 PACKAGE = Path(__file__).parent
 SPEC = AgentSpec.from_file(PACKAGE / "agent.yaml")
 SKILL_ID = "probe-planning"
-LIMITS = UsageLimits(request_limit=40, tool_calls_limit=40)
+LIMITS = UsageLimits(request_limit=40, tool_calls_limit=30)
+"""Tools are withdrawn after 30 calls, leaving requests to answer (see common/budget.py)."""
 """Operator budget: domain tools are withdrawn at the tool cap so the agent still answers."""
 
 
@@ -52,6 +54,7 @@ def create_agent(model: Model, *, durability: TemporalDurability | None = None,
             source_tools(),
             Skills("skills", include=[SKILL_ID], workspace=LocalWorkspaceBackend(PACKAGE)),
             tool_budget(),
+            read_loop_guard(),
             prompted_output(),
             *([durability] if durability is not None else []),
         ])
