@@ -1,4 +1,0 @@
-tests/test_case.py::TestSecurity::test_security
-tests/test_case.py::test_control
-
-no tests ran in 0.00s
