@@ -139,6 +139,16 @@ def test_citations_keep_supported_precedents_and_drop_the_rest_with_caveats():
         GroundingBrief(summary="s", prior_disposition="fixed")
 
 
+def test_a_quote_from_a_related_issue_description_is_supported():
+    related = CONTEXT.related[0]
+    text = "the export parameters are bound before the query runs"
+    context = CONTEXT.model_copy(update={"related": (
+        related.model_copy(update={"issue": related.issue.model_copy(update={"description": text}),
+                                   "comments": ()}), *CONTEXT.related[1:])})
+    quoted = precedent(related.issue.id, "parameters are bound before the query")
+    assert validate_citations(GroundingBrief(summary="s", precedents=(quoted,)), context).precedents == (quoted,)
+
+
 FINDING = Finding(title="SQL built from input in report query", cwe="CWE-89")
 
 
