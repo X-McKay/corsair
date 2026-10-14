@@ -26,7 +26,7 @@ Implement [SPEC-0083](../specs/SPEC-0083-openshell-sandbox-backend.md) on develo
 
 ## Validation and progress
 
-2026-10-14 (cloud container, no Docker, kind or gateway): `uv run --locked python -m pytest -c pyproject.toml --rootdir=. -n auto tests` -> 1575 passed, 117 skipped (every Docker and live OpenShell test skipped). Recording fake docker CLI: old and new code gave identical outputs and identical docker argv for replay x2, run_probe, diagnose and sweep. Nothing ran live.
+2026-10-14 (cloud container, no Docker, kind or gateway): `uv run --locked python -m pytest -c pyproject.toml --rootdir=. -n auto tests` -> 1575 passed, 117 skipped before review; after the review fixes 1588 passed, 117 skipped (every Docker and live OpenShell test skipped). Recording fake docker CLI: old and new code gave identical outputs and identical docker argv for replay x2, run_probe, diagnose and sweep; `tests/v2/test_docker_argv.py` now pins that recording. An independent review found no Docker behaviour change and nine OpenShell findings (baseline not rerun on open, base digest not pinned, unbounded copy memory, a gRPC channel per call, policy readback and GET-only checks, live cleanup evidence, a stale Docker test tag, runbook overstatement), all fixed. Nothing ran live.
 
 ## Decisions and next action
 
