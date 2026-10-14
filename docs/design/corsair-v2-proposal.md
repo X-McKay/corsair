@@ -573,6 +573,12 @@ The Codex review of PR #134 found three gaps. All three are fixed in SPEC-0082, 
   - Still invalid after three rounds or when the budget runs out: nothing executes and R2 gives INCONCLUSIVE (`test_invalid`).
   - Each round and revision is its own recorded step. A prober's `clean_attempt_rate` counts only drafts accepted at the first review; `accepted_within_limit` and the mean revision count measure the loop.
   - Example: the first live run's exploit probe patched `subprocess` globally instead of at the target's import site. The Exploit Prober now gets that defect and its citation, revises, and the pair is reviewed again.
+- **PoV polarity (Al, 14 October; supersedes the security-regression form).**
+  - The exploit probe is a proof-of-vulnerability (PoV) test, the DARPA Cyber Grand Challenge and Vul4J term: it passes on the vulnerable revision by demonstrating the reported condition, and fails on the fixed one.
+  - The outcome classifier is unchanged. The check marker values are renamed `holds` and `violated`: whether the property about to be asserted is true.
+  - R4: vulnerable control passed and PoV passed, and the PoV did not also pass on the fixed revision, gives LIKELY\_EXPLOITABLE. R5: PoV assertion\_failed (not demonstrated) gives LIKELY\_NOT\_EXPLOITABLE with its calibration listed. A PoV that passes on both revisions gives INCONCLUSIVE (`not_differential`).
+  - Fix verified: R4, and on the fixed revision the control passed and the PoV is assertion\_failed.
+  - A passing test is easier to make vacuous, so the Reviewer also checks that the PoV assertion could fail on code without the condition.
 
 ### Later changes on 14 October
 
