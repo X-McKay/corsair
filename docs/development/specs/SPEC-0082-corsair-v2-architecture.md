@@ -312,6 +312,8 @@ The proposal's decisions and their status:
 | D7 | Reuse the verdict rule table, terminal reasons, per-stage replay and blinded runs from Al's InfoSec Harness v2 spec | Accepted with the build kickoff; Al also asked for the Grounding agent from that harness |
 | D8 | Deterministic outcome table with an exit-code map per framework and a canary pair per row | Al, 07:49Z |
 | D9 | Exactly two tests; native parametrisation inside a test is allowed | Accepted with the build kickoff |
+| D12 | The exploit probe is a proof-of-vulnerability test that passes when it demonstrates the reported condition (PoV polarity) | Decided by Al, 2026-10-14 09:17Z |
+| D13 | Reviewer feedback loop: three reviews in total, at most two review revisions per author | Decided by Al, 2026-10-14 09:09Z |
 
 "Accepted with the build kickoff" means Al started the build on this proposal without objecting to that decision. Any of them can be reopened.
 
