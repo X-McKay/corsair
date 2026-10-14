@@ -21,7 +21,7 @@ def test_every_agent_suite_has_per_case_sets():
 def test_v2_cases_name_their_dimensions(agent):
     for name in set_names(SUITES[agent]):
         for case in load_set(SUITES[agent], name):
-            assert case.case.get("dimensions"), (agent, case.key)
+            assert case.case.get("dimensions") and case.case.get("category"), (agent, case.key)
 
 
 @pytest.mark.parametrize(("suite", "name"), SETS)

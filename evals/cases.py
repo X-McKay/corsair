@@ -36,6 +36,8 @@ EVALS = Path(__file__).resolve().parent
 # one place that names the package; it changes once if the v2 tree moves.
 AGENTS_PACKAGE = "corsair.v2.agents"
 AGENTS = ("grounding", "builder", "investigator", "control_prober", "exploit_prober", "reviewer")
+# A v2 case's case.json `category`: what kind of evidence the case gives (infosec-harness style).
+CATEGORIES = ("smoke", "capability", "regression", "adversarial", "failure-mode")
 # Eval types a v2 case may name in case.json `dimensions` (efficiency is measured on every attempt, never pass/fail).
 DIMENSIONS = ("correctness", "contract", "grounding", "trajectory", "robustness", "safety")
 CASE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$")
@@ -93,6 +95,8 @@ def check_case(case: EvalCase) -> None:
         raise ValueError(f"{case.key}: case.json language {meta['language']!r} does not match its directory")
     if not PROVENANCE_FIELDS <= set(meta["provenance"]):
         raise ValueError(f"{case.key}: provenance needs {sorted(PROVENANCE_FIELDS)}")
+    if "category" in meta and meta["category"] not in CATEGORIES:
+        raise ValueError(f"{case.key}: category must be one of {CATEGORIES}")
     if "dimensions" in meta and (not meta["dimensions"] or not set(meta["dimensions"]) <= set(DIMENSIONS)):
         raise ValueError(f"{case.key}: dimensions must be a non-empty subset of {DIMENSIONS}")
 
