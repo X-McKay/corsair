@@ -61,6 +61,7 @@ from typing import Any, Generic, TypeVar
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_ai.models import Model
 
+from .agents.common.usage import call_parameters, count_retries
 from .contracts import (AgentUsage, BuildResult, Case, CheckResult, Environment, FrozenPatch, ProbeBrief, ProbeDraft,
                         ProbePlan, ProbeRun, ProbeValidity, Recipe, Runtime, TerminalReason, Validity, Verdict)
 from .record import RunRecorder
@@ -164,6 +165,7 @@ class Stages:
     workspace: WorkspaceFactory
     ground: Ground | None = None
     grounding_context: Callable[[Case], Any] | None = None  # the configured context source; None skips Ground
+    inspect_image: Callable[[str], str | None] | None = None  # image reference -> local image id; None: unknown
 
 
 def default_stages(*, grounding_context: Callable[[Case], Any] | None = None) -> Stages:
@@ -178,10 +180,12 @@ def default_stages(*, grounding_context: Callable[[Case], Any] | None = None) ->
     from .execute import diagnose, run_probe
     from .matrix import select
     from .rules import decide
+    from .workspace.docker import image_id
 
     return Stages(select=select, investigate=investigate, build=build, replay=replay, control_probe=control_probe,
                   exploit_probe=exploit_probe, review=review, diagnose=diagnose, execute=run_probe, decide=decide,
-                  workspace=docker_workspace, ground=ground, grounding_context=grounding_context)
+                  workspace=docker_workspace, ground=ground, grounding_context=grounding_context,
+                  inspect_image=image_id)
 
 
 @asynccontextmanager
@@ -270,11 +274,14 @@ class LocalOps:
             except Exception as exc:  # a workspace or tool failure inside the episode; attributable, not a crash
                 failure, error = TerminalReason.INFRA_ERROR, _describe(exc)
         wall = round(perf_counter() - started, 3)
+        known = call_parameters(agent, model)  # model settings and spec identity; limits only the stage knows
         if usage is None:
-            usage = AgentUsage(agent=agent, model=getattr(model, "model_name", None), wall_s=wall,
-                               status="ok" if failure is None else failure.value)
-        else:
-            usage = usage.model_copy(update={"wall_s": wall})
+            usage = AgentUsage(agent=agent, wall_s=wall, status="ok" if failure is None else failure.value, **known)
+        else:  # fill what the stage left unknown, never overwrite what it reported
+            usage = usage.model_copy(update={"wall_s": wall, **{key: value for key, value in known.items()
+                                                                 if getattr(usage, key) is None}})
+        if messages:  # the captured history is complete even when the run raised
+            usage = usage.model_copy(update={"retries": count_retries(messages)})
         if failure is None and output is None and usage.status in ("provider_error", "budget_exhausted",
                                                                     "infra_error"):
             failure = TerminalReason(usage.status)
@@ -316,9 +323,20 @@ class LocalOps:
         # Advisory only: the brief never leaves this step.
         return StepResult(usage=result.usage, failure=result.failure, detail=result.detail)
 
+    def _image_id(self, reference: str) -> str | None:
+        inspect = self.stages.inspect_image
+        try:
+            return inspect(reference) if inspect is not None else None
+        except Exception:  # provenance is best effort: an uninspectable image is unknown, never a failed run
+            return None
+
     async def select(self, step: str, case: Case) -> StepResult[Runtime]:
-        return await self._code(step, {"case_id": case.case_id, "matrix": self.matrix_path},
-                                lambda: self.stages.select(case, self.matrix_path))
+        result = await self._code(step, {"case_id": case.case_id, "matrix": self.matrix_path},
+                                  lambda: self.stages.select(case, self.matrix_path))
+        if result.output is not None:
+            image = result.output.image
+            self.record.runtime(result.output, await asyncio.to_thread(self._image_id, image))
+        return result
 
     async def investigate(self, step: str, case: Case, runtime: Runtime) -> StepResult[ProbePlan]:
         return await self._agent(step, "investigator", {"case": case, "runtime": runtime},
@@ -343,8 +361,12 @@ class LocalOps:
             ok = build.replayed and environment is not None
             return Replayed(build=build, environment=environment, failure_tail="" if ok else _tail(build))
 
-        return await self._code(step, {"case_id": case.case_id, "runtime": runtime, "recipe": recipe,
-                                       "revision": revision}, call)
+        result = await self._code(step, {"case_id": case.case_id, "runtime": runtime, "recipe": recipe,
+                                         "revision": revision}, call)
+        environment = result.output.environment if result.output is not None else None
+        if environment is not None:
+            self.record.environment(revision, environment, await asyncio.to_thread(self._image_id, environment.image))
+        return result
 
     async def probe(self, step: str, brief: ProbeBrief, runtime: Runtime, case: Case, diagnostics: str | None,
                     previous: ProbeDraft | None, review_feedback: str | None = None) -> StepResult[ProbeDraft]:
@@ -648,14 +670,17 @@ async def compose(case: Case, ops: Any, budget: Budget = Budget()) -> Verdict:
 
 
 async def run_case(case: Case, *, stages: Stages, models: Mapping[str, Model], matrix_path: Path,
-                   record: RunRecorder, budget: Budget = Budget(), progress: Progress | None = None) -> Verdict:
-    """Direct mode: one case through every stage in this process, recorded under ``record.run_dir``."""
+                   record: RunRecorder, budget: Budget = Budget(), progress: Progress | None = None,
+                   provider_config: Path | None = None) -> Verdict:
+    """Direct mode: one case through every stage in this process, recorded under ``record.run_dir``.
+
+    ``provider_config`` is the file the models were built from; only its digest is recorded."""
     ops = LocalOps(stages, models, matrix_path, record, progress)
     needed = ["investigator", "builder", "control_prober", "exploit_prober", "reviewer"]
     missing = [agent for agent in needed + (["grounding"] if ops.grounding else []) if agent not in models]
     if missing:
         raise ValueError(f"no model configured for agents: {', '.join(missing)}")
-    record.begin(case, mode="direct")
+    record.begin(case, mode="direct", provider_config=provider_config, matrix=matrix_path)
     verdict = await compose(case, ops, budget)
     record.finish(verdict)
     return verdict

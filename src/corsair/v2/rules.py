@@ -33,6 +33,8 @@ Choices the design left open, recorded here:
 - R3 names ``control_failed`` only when the control's own assertion failed (``assertion_failed``); any other
   non-passing control maps to ``probe_not_run``, ``probe_errored`` or ``probe_anomalous``.
 - A review or run bound to a different frozen patch than the vulnerable runs counts as missing.
+- A run whose environment tree (``ProbeRun.tree_sha256``) is not the tree of the case revision it claims counts
+  as missing, like a patch mismatch: it ran on other code. An unrecorded tree (None) is not a mismatch.
 """
 from __future__ import annotations
 
@@ -251,8 +253,12 @@ def _gather(case: Case, runtime: Runtime | None, build: BuildResult | None, plan
         reviews[item.revision] = item
     vulnerable = [run.patch_sha256 for run in runs if run.revision == "vulnerable"]
     patch = vulnerable[0] if vulnerable else (reviews["vulnerable"].patch_sha256 if "vulnerable" in reviews else None)
-    # A run bound to another patch than the vulnerable one is not this experiment's evidence.
-    by_key = {key: run for key, run in by_key.items() if run.patch_sha256 == patch}
+    # A run bound to another patch than the vulnerable one, or run on another tree than the revision it claims, is
+    # not this experiment's evidence.
+    trees = {"vulnerable": case.revision.tree_sha256,
+             "fixed": case.fixed_revision.tree_sha256 if case.fixed_revision is not None else None}
+    by_key = {key: run for key, run in by_key.items() if run.patch_sha256 == patch
+              and (run.tree_sha256 is None or run.tree_sha256 == trees[run.revision])}
     return Facts(case, runtime, build, plan, TerminalReason(stopped) if stopped is not None else None,
                  TerminalReason(fix_stopped) if fix_stopped is not None else None, by_key, reviews, patch)
 

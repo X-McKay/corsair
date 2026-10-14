@@ -21,7 +21,8 @@ from .artifacts import ArtifactStore
 from .contracts import (CheckResult, Environment, ExitClass, FrozenPatch, Outcome, ProbeDraft, ProbeFacts, ProbeRun,
                         Runtime)
 from .outcome import classify, read_check
-from .workspace.docker import ContainerExists, DockerConfig, create, exec_once, labels, remove, write_file
+from .workspace.docker import (ContainerExists, DockerConfig, create, exec_once, image_id, labels, remove,
+                               write_file)
 
 PROBE_TIMEOUT_S = 300.0
 SYNTAX_LIMIT = 4 * 1024
@@ -61,6 +62,7 @@ class Observation:
     token: str
     cleanup_confirmed: bool | None
     syntax: tuple[int | None, bytes] | None = None  # (exit code, output) of the row's syntax check, when run
+    image_id: str | None = None  # the image the probe's container was created from, as Docker reports it
 
 
 def _infra() -> ProbeFacts:
@@ -79,9 +81,10 @@ def observe(environment: Environment, runtime: Runtime, draft: ProbeDraft, *, re
     config = DockerConfig(image=environment.image, workdir=environment.workdir, network="none",
                           labels=labels(run_id or uuid.uuid4().hex[:12], "execute", draft.role, **extra))
     env = {MARKER_ENV: marker_dir, TOKEN_ENV: token}
-    facts, output, duration, ours, syntax = _infra(), b"", None, True, None
+    facts, output, duration, ours, syntax, image = _infra(), b"", None, True, None, None
     try:
         name = create(config, adopt=False)
+        image = image_id(name, container=True)
         write_file(name, posixpath.join(environment.workdir, draft.test_file), draft.source.encode())
         made = exec_once(name, ["mkdir", "-p", marker_dir], workdir="/", timeout=60)
         if made.exit_code != 0:
@@ -110,7 +113,7 @@ def observe(environment: Environment, runtime: Runtime, draft: ProbeDraft, *, re
         output += f"\n[infra: {type(error).__name__}: {error}]\n".encode()
     finally:
         confirmed = remove(config.name) if ours else None
-    return Observation(facts, output, duration, token, confirmed, syntax)
+    return Observation(facts, output, duration, token, confirmed, syntax, image)
 
 
 def run_probe(environment: Environment, runtime: Runtime, patch: FrozenPatch, role: str, *,
@@ -123,7 +126,8 @@ def run_probe(environment: Environment, runtime: Runtime, patch: FrozenPatch, ro
                    patch_sha256=patch.sha256)
     return ProbeRun(role=draft.role, revision=revision, patch_sha256=patch.sha256, facts=seen.facts,
                     outcome=classify(seen.facts), output=ArtifactStore(artifacts).put(seen.output),
-                    duration_s=seen.duration_s, cleanup_confirmed=seen.cleanup_confirmed)
+                    duration_s=seen.duration_s, cleanup_confirmed=seen.cleanup_confirmed,
+                    image_digest=seen.image_id, tree_sha256=environment.tree_sha256)
 
 
 def _truncate(text: str, limit: int = SYNTAX_LIMIT) -> str:

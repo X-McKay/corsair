@@ -78,16 +78,18 @@ class WorkerConfig:
     models: Mapping[str, Model]
     matrix_path: Path
     progress: Progress | None = None
+    provider_config: Path | None = None  # the file the models were built from; only its digest is recorded
 
 
 _CONFIG: WorkerConfig | None = None
 
 
-def configure(stages: Stages, models: Mapping[str, Model], matrix_path: Path, progress: Progress | None = None
-              ) -> None:
+def configure(stages: Stages, models: Mapping[str, Model], matrix_path: Path, progress: Progress | None = None,
+              provider_config: Path | None = None) -> None:
     """Bind this worker process's stages, models and matrix; activities read it. One configuration per process."""
     global _CONFIG
-    _CONFIG = WorkerConfig(stages, models, Path(matrix_path), progress)
+    _CONFIG = WorkerConfig(stages, models, Path(matrix_path), progress,
+                           Path(provider_config) if provider_config is not None else None)
 
 
 def _ops(run_dir: str) -> LocalOps:
@@ -102,7 +104,10 @@ def _ops(run_dir: str) -> LocalOps:
 
 @activity.defn(name="corsair.v2.begin_run")
 async def begin_run(run_dir: str, case: Case) -> None:
-    RunRecorder(Path(run_dir)).begin(case, mode="temporal")
+    config = _CONFIG  # a control worker without a configuration records the digests as unknown
+    RunRecorder(Path(run_dir)).begin(case, mode="temporal",
+                                     provider_config=config.provider_config if config else None,
+                                     matrix=config.matrix_path if config else None)
 
 
 @activity.defn(name="corsair.v2.finish_run")

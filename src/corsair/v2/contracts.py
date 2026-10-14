@@ -277,6 +277,11 @@ class ProbeRun(Frozen):
     output: ArtifactRef | None = None
     duration_s: float | None = Field(default=None, ge=0)
     cleanup_confirmed: bool | None = Field(default=None, description="False is cleanup_unconfirmed; None unknown")
+    image_digest: str | None = Field(default=None, max_length=256,
+                                     description="Image id the probe's container ran from; None unknown")
+    tree_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$",
+                                    description="Tree of the environment it ran on; Decide drops a run whose tree "
+                                                "is not the case revision it claims. None unknown")
 
 
 # --- 8. Decide (code) -------------------------------------------------------------------------------------------
@@ -344,10 +349,29 @@ class Verdict(Frozen):
 
 
 class AgentUsage(Frozen):
-    """Native usage for one agent run. Missing values stay None: unknown, never zero."""
+    """Native usage for one agent run, and the parameters it ran with. Missing values stay None: unknown, never zero.
+
+    Parameters are read from the native objects (the model's settings, the ``UsageLimits`` passed, the agent's
+    retry settings) and the agent's ``agent.yaml`` metadata; ``retries`` is what the run actually spent (retry
+    prompts in its message history). See ``RUN_RECORD.md``.
+    """
 
     agent: Literal["grounding", "builder", "investigator", "control_prober", "exploit_prober", "reviewer"]
     model: str | None = None
+    provider_host: str | None = Field(default=None, max_length=256, description="Endpoint host, no credentials")
+    temperature: float | None = None
+    max_tokens: int | None = None
+    thinking: str | None = Field(default=None, max_length=64,
+                                 description="disabled, budget, server_default or the native thinking setting")
+    thinking_budget: int | None = None
+    request_limit: int | None = None
+    tool_calls_limit: int | None = None
+    max_output_retries: int | None = None
+    max_tool_retries: int | None = None
+    prompt_version: str | None = Field(default=None, max_length=128)
+    config_version: str | None = Field(default=None, max_length=128)
+    spec_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$", description="sha256 of agent.yaml")
+    retries: int | None = Field(default=None, ge=0, description="Retry prompts (output or tool) the run spent")
     requests: int | None = None
     input_tokens: int | None = None
     output_tokens: int | None = None

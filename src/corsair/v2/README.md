@@ -33,7 +33,10 @@ test-running tool.
 
 `contracts.py` holds every type that crosses a stage boundary. `chain.py` composes the stages as plain async
 functions (direct mode, used by evals and `corsair-v2 run`); `workflow.py` runs the same functions in one Temporal
-workflow per case on three task queues: `model` (one slot), `workspace` and `control`.
+workflow per case on three task queues: `model` (one slot), `workspace` and `control`. Every run writes the
+versioned run record `corsair-v2-run/1` (`record.py`, documented in [RUN_RECORD.md](RUN_RECORD.md)): what produced
+the run, per-agent parameters and usage, outcome and totals; `corsair-v2 runs compare <run_dir>...` lists runs side
+by side.
 
 ## Rules every module keeps
 

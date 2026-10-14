@@ -47,8 +47,12 @@ def test_workflow_runs_the_same_chain_as_direct_mode(tmp_path):
     verdict, run_dir = asyncio.run(_run(tmp_path, fakes, "durable", fixed=True))
     assert (verdict.label.value, verdict.rule_id, verdict.terminal_reason.value) == ("LIKELY_EXPLOITABLE", "R4", "ok")
     assert len(verdict.runs) == 4
-    assert json.loads((run_dir / "run.json").read_text())["mode"] == "temporal"
-    assert json.loads((run_dir / "summary.json").read_text())["rule_id"] == "R4"
+    run = json.loads((run_dir / "run.json").read_text())
+    assert (run["schema"], run["mode"], run["runtime_row"]) == ("corsair-v2-run/1", "temporal", "row")
+    assert set(run["environments"]) == {"vulnerable", "fixed"} and run["finished_at"] is not None
+    summary = json.loads((run_dir / "summary.json").read_text())
+    assert summary["rule_id"] == "R4" and summary["schema"] == "corsair-v2-run/1"
+    assert set(summary["outcome"]["probes"]) == {"vulnerable", "fixed"}
 
     direct = Fakes(diagnose_outcomes={"exploit": "errored"})
     record = RunRecorder.create(tmp_path, "direct")
