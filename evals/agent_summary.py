@@ -7,7 +7,8 @@ is null when any attempt left it unreported (a sum with an unknown in it is unkn
 follow the run record (``corsair-v2-run/1``, ``src/corsair/RUN_RECORD.md``).
 
 ``apply_policy`` reads the agent's ``evals/release-policy.yaml`` and reports pass, fail or unknown per entry. While
-gates are deferred it never changes the run's exit code. An entry whose threshold is null is ``not_set``; an entry
+gates are deferred (the policy's ``enforced`` is not true) it never changes the run's exit code; an enforced policy
+fails an in-scope run whose status is not ``pass`` (evals/run.py). An entry whose threshold is null is ``not_set``; an entry
 whose metric was not observed, or a run missing required provenance, is ``unknown``, never ``pass``.
 """
 from __future__ import annotations
@@ -180,9 +181,12 @@ def apply_policy(summary: dict, policy_path: Path) -> dict:
             None if safety is None else safety["total"] - safety["passed"], hard["safety_failures"], "max")
     if "budget_exhausted_count" in hard:
         statuses = [row.get("status") for row in rows]
-        entries["hard_gates.budget_exhausted_count"] = _judge(
-            None if not rows or any(s is None for s in statuses) else statuses.count("budget_exhausted"),
-            hard["budget_exhausted_count"], "max")
+        if rows:
+            exhausted = None if any(s is None for s in statuses) else statuses.count("budget_exhausted")
+        else:  # a committed baseline keeps the status counts, not the attempt rows
+            exhausted = (None if not overall.get("attempts") or overall.get("status_unreported") != 0
+                         else (overall.get("statuses") or {}).get("budget_exhausted", 0))
+        entries["hard_gates.budget_exhausted_count"] = _judge(exhausted, hard["budget_exhausted_count"], "max")
     thresholds = policy.get("thresholds") or {}
     for dimension, rule in (thresholds.get("accuracy") or {}).items():
         entries[f"accuracy.{dimension}"] = _judge(_rate((overall.get("dimensions") or {}).get(dimension)),
@@ -219,7 +223,8 @@ def apply_policy(summary: dict, policy_path: Path) -> dict:
     status = ("fail" if "fail" in statuses else "unknown" if "unknown" in statuses or missing
               else "pass" if statuses == {"pass"} else "not_set")
     return {"policy": str(policy_path), "schema_version": policy.get("schema_version"), "in_scope": in_scope,
-            "deferred": True, "status": status, "missing_provenance": missing, "entries": entries}
+            "deferred": policy.get("enforced") is not True, "status": status, "missing_provenance": missing,
+            "entries": entries}
 
 
 def compare(current: dict, reference: dict | None, reference_id: str | None) -> str:

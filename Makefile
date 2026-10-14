@@ -1,4 +1,4 @@
-.PHONY: test test-v2 eval eval-baseline baseline-commit eval-live-baselines canary toolchain-images maven-hashes
+.PHONY: test test-v2 eval eval-baseline baseline-commit eval-live-baselines release-check gate-status canary toolchain-images maven-hashes
 .PHONY: test-config
 export UV_CACHE_DIR ?= $(CURDIR)/.cache/uv
 # pytest otherwise infers its root from argument paths, so an evidence dir inside another checkout (for example
@@ -46,6 +46,15 @@ eval-live-baselines:
 	  if [ "$$after" -gt "$$before" ]; then tail -n +$$((before + 1)) "$$index"; \
 	  else echo "$$agent: no run recorded"; failed="$$failed $$agent"; fi; \
 	done; test -z "$$failed" || { echo "no run recorded for:$$failed"; exit 1; }
+
+# Release check (tools/release_check.py, docs/design/gates-and-release.md), offline and deterministic: check every agent
+# and the chain against its committed live baseline and release policy, and report whether the gate for turning gates
+# back on holds.
+release-check:
+	uv run --locked python tools/release_check.py check $(foreach agent,$(AGENT),--agent $(agent))
+
+gate-status:
+	uv run --locked python tools/release_check.py gate
 
 # Classify each runtime-matrix row's known-passing and known-failing canary on its image (evidence under .runs/canary/).
 canary:

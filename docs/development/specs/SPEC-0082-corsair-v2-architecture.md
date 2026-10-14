@@ -293,7 +293,7 @@ Gates are deferred (Al, 2026-10-14 08:09Z). No kind or OpenShell gate, witness, 
 1. At least three end-to-end runs reach the correct decisive label on both revisions, in at least three languages.
 2. Every agent has a promoted baseline tracking accuracy, latency and tokens, split by language and eval type.
 
-Canary pairs and failure-injection fixtures still run as ordinary development tests where they are cheap. Until something runs end to end, develop's PR path runs one offline job, `make test-v2`, with no model (Al, 08:28Z). The v1 suites, the image gate and the qualification and record guards stay runnable by hand and return with the gates and release policies.
+Canary pairs and failure-injection fixtures still run as ordinary development tests where they are cheap. Until something runs end to end, develop's PR path runs one offline job, `make test-v2`, with no model (Al, 08:28Z). The v1 suites, the image gate and the qualification and record guards stay runnable by hand and return with the gates and release policies. The restored gates, CI and release check are prepared in [gates-and-release.md](../../design/gates-and-release.md); `make gate-status` reports whether the two conditions above hold.
 
 Acceptance for the build:
 

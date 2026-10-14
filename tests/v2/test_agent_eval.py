@@ -68,6 +68,10 @@ def test_runner_rows_summary_and_policy(tmp_path):
     assert entries["accuracy.correctness"]["status"] == "pass" and entries["accuracy.correctness.java"]["status"] == "fail"
     assert entries["clean_attempt_rate"]["status"] == "not_set"
     assert policy["status"] == "fail" and policy["deferred"] is True
+    # an enforced policy is no longer deferred, so evals/run.py fails an in-scope run on this verdict
+    enforced = root / "enforced-policy.yaml"
+    enforced.write_text((root / "release-policy.yaml").read_text() + "\nenforced: true\n")
+    assert agent_summary.apply_policy(summary, enforced)["deferred"] is False
 
 
 def test_unreported_usage_is_unknown_not_zero(tmp_path):
