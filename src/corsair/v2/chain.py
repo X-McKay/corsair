@@ -22,6 +22,10 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+import uuid
+import re
 import json
 import traceback
 from collections.abc import Awaitable, Callable, Mapping
@@ -113,11 +117,11 @@ class Stages:
 
 def default_stages(*, grounding_context: Callable[[Case], Any] | None = None) -> Stages:
     """The real stage modules, imported only when a run needs them."""
-    from .agents.builder import build
+    from .agents.builder.agent import build_agent as build
     from .agents.control_prober import probe as control_probe
     from .agents.exploit_prober import probe as exploit_probe
-    from .agents.grounding import ground
-    from .agents.investigator import investigate
+    from .agents.grounding.agent import ground
+    from .agents.investigator.agent import investigate
     from .agents.reviewer import review
     from .build import replay
     from .execute import diagnose, run_probe
@@ -129,15 +133,26 @@ def default_stages(*, grounding_context: Callable[[Case], Any] | None = None) ->
                   workspace=docker_workspace, ground=ground, grounding_context=grounding_context)
 
 
-def docker_workspace(case: Case, runtime: Runtime) -> AbstractAsyncContextManager[object]:
-    """The Builder's disposable workspace: the runtime image with the revision's tree copied in.
+@asynccontextmanager
+async def docker_workspace(case: Case, runtime: Runtime) -> AsyncIterator[object]:
+    """The Builder's disposable workspace: the runtime image with the revision's tree copied in, removed after.
 
-    Network is allowed only to the row's build hosts, when the row declares them.
+    The Builder explores with network so it can install the project's declared dependencies; Docker cannot narrow
+    egress to the row's registry hosts, so that limit is a recorded gap until the OpenShell backend. Trusted replay
+    runs the recipe again in a fresh container, and probes never run where an agent typed.
     """
-    from .workspace.docker import DockerWorkspace
+    from pydantic_ai.workspaces import Workspace
 
-    return DockerWorkspace(image=runtime.image, source=Path(case.revision.source),
-                           network=tuple(getattr(runtime, "build_hosts", ())))
+    from .workspace.docker import DockerConfig, DockerWorkspace, labels
+
+    run_id = f"{re.sub(r'[^A-Za-z0-9_.-]', '-', case.case_id)}-{uuid.uuid4().hex[:8]}"
+    backend = DockerWorkspace(DockerConfig(image=runtime.image, labels=labels(run_id, "build-agent"),
+                                           network="bridge"))
+    try:
+        await backend.copy_in(Path(case.revision.source))
+        yield Workspace(backend)
+    finally:
+        await backend.destroy()
 
 
 # --- One step, performed in-process -------------------------------------------------------------------------------
@@ -295,7 +310,8 @@ class LocalOps:
     async def diagnose(self, step: str, environment: Environment, runtime: Runtime, patch: FrozenPatch,
                        role: str) -> StepResult[Diagnosis]:
         def call() -> Diagnosis:
-            outcome, diagnostics = self.stages.diagnose(environment, runtime, patch, role)
+            draft = patch.control if role == "control" else patch.exploit
+            outcome, diagnostics = self.stages.diagnose(environment, runtime, draft)
             keep = outcome in (Outcome.NOT_RUN, Outcome.ERRORED)
             return Diagnosis(outcome=outcome, diagnostics=diagnostics if keep else None)
 

@@ -38,7 +38,7 @@ class ArtifactRef(Frozen):
     size: int = Field(ge=0)
 
 
-# --- 1. Intake (code) and Grounding (agent placeholder) ---------------------------------------------------------
+# --- 1. Intake (code) ---------------------------------------------------------------------------------------------
 
 
 class Finding(Frozen):
@@ -60,15 +60,6 @@ class Revision(Frozen):
     tree_sha256: str = Field(pattern=r"^[0-9a-f]{64}$", description="Digest over the tree's paths, modes and bytes")
 
 
-class GroundingContext(Frozen):
-    """What the Grounding agent adds to a ticket before investigation. Empty until that agent is implemented."""
-
-    related_issues: tuple[str, ...] = ()
-    prior_comments: tuple[str, ...] = ()
-    graph_facts: tuple[str, ...] = ()
-    summary: str = Field(default="", max_length=8_000)
-
-
 class Case(Frozen):
     """One reported issue against an exact revision, and optionally its fix revision."""
 
@@ -77,7 +68,6 @@ class Case(Frozen):
     finding: Finding
     revision: Revision
     fixed_revision: Revision | None = None
-    grounding: GroundingContext = GroundingContext()
 
 
 # --- 2. Select (code) -------------------------------------------------------------------------------------------
@@ -107,9 +97,17 @@ class Runtime(Frozen):
 # --- 3. Build (Builder agent, then trusted replay) --------------------------------------------------------------
 
 
+class RecipeFile(Frozen):
+    """A small file the Builder added (a smoke test when the project has none); replay writes it before setup."""
+
+    path: SafePath
+    content: str = Field(max_length=16_000)
+
+
 class Recipe(Frozen):
     """A setup the Builder found, which trusted code replays in a fresh container before anything relies on it."""
 
+    files: tuple[RecipeFile, ...] = Field(default=(), max_length=4, description="New files, written before setup")
     setup: tuple[tuple[str, ...], ...] = Field(default=(), max_length=32, description="argv lists, run in order")
     network_during_setup: bool = False
     baseline_test: tuple[str, ...] = Field(min_length=1, description="argv of one existing native test, or smoke")
@@ -320,4 +318,5 @@ class AgentUsage(Frozen):
     tool_calls: int | None = None
     wall_s: float | None = None
     status: Literal["ok", "output_invalid", "budget_exhausted", "provider_error", "infra_error"] = "ok"
+    error: str | None = Field(default=None, max_length=2_000, description="Upstream failure detail, if any")
 

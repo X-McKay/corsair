@@ -112,7 +112,7 @@ def build_model(profile: ModelProfile, *, openai_client=None) -> Model:
     from pydantic_ai import InlineDefsJsonSchemaTransformer
     from pydantic_ai.models.openai import OpenAIChatModel
     from pydantic_ai.profiles.openai import OpenAIModelProfile
-    from pydantic_ai.providers.openai import OpenAIProvider
+    from pydantic_ai.providers.vllm import VLLMProvider
 
     if openai_client is None:
         openai_client = AsyncOpenAI(base_url=profile.base_url, api_key=_api_key(profile), organization="",
@@ -120,8 +120,10 @@ def build_model(profile: ModelProfile, *, openai_client=None) -> Model:
     model_profile = OpenAIModelProfile(json_schema_transformer=InlineDefsJsonSchemaTransformer,
                                        default_structured_output_mode="prompted", supports_json_schema_output=False,
                                        supports_json_object_output=False,
-                                       openai_supports_strict_tool_definition=False)
-    return OpenAIChatModel(profile.model_name, provider=OpenAIProvider(openai_client=openai_client),
+                                       openai_supports_strict_tool_definition=False,
+                                       # The served chat template accepts exactly one system message, first.
+                                       openai_chat_supports_multiple_system_messages=False)
+    return OpenAIChatModel(profile.model_name, provider=VLLMProvider(openai_client=openai_client),
                            profile=model_profile, settings=model_settings(profile))
 
 
