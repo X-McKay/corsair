@@ -1,0 +1,74 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "evaluate_rule",
+    "path": "lib/Pricing/Rules.pm",
+    "lines": [
+      7,
+      11
+    ],
+    "max_span": 8
+  },
+  "exploit_markers": [
+    "system("
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "lib/Pricing/Rules.pm"
+  ],
+  "replay": {
+    "reads": [
+      "lib/Pricing/Rules.pm"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "evaluate_rule",
+      "hypothesis": "If price 10 and expression \"system('id')\" reaches evaluate_rule without the relevant check, the safe property fails: no command runs: a CORE::GLOBAL::system override records no call",
+      "control": {
+        "role": "control",
+        "test_file": "t/rules-control.t",
+        "test_name": "test_benign_control",
+        "target": "evaluate_rule",
+        "seam": "Pricing::Rules->new->evaluate_rule(price => ..., expression => ...)",
+        "input_description": "price 10 and expression '10 * 0.9'",
+        "property_to_assert": "returns 9",
+        "doubles": "CORE::GLOBAL::system is overridden to record calls",
+        "citations": [
+          {
+            "path": "lib/Pricing/Rules.pm",
+            "start_line": 7,
+            "end_line": 11,
+            "quote": "sub evaluate_rule {\n    my $self = shift;\n    my %args = @_;\n    my $price = $args{price};\n    my $result = eval $args{expression};"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "t/rules-exploit.t",
+        "test_name": "test_security_regression",
+        "target": "evaluate_rule",
+        "seam": "Pricing::Rules->new->evaluate_rule(price => ..., expression => ...)",
+        "input_description": "price 10 and expression \"system('id')\"",
+        "property_to_assert": "no command runs: a CORE::GLOBAL::system override records no call",
+        "doubles": "CORE::GLOBAL::system is overridden to record calls",
+        "citations": [
+          {
+            "path": "lib/Pricing/Rules.pm",
+            "start_line": 7,
+            "end_line": 11,
+            "quote": "sub evaluate_rule {\n    my $self = shift;\n    my %args = @_;\n    my $price = $args{price};\n    my $result = eval $args{expression};"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "lib/Pricing/Rules.pm",
+          "start_line": 7,
+          "end_line": 11,
+          "quote": "sub evaluate_rule {\n    my $self = shift;\n    my %args = @_;\n    my $price = $args{price};\n    my $result = eval $args{expression};"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

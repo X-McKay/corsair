@@ -1,0 +1,21 @@
+{
+  "language": "perl",
+  "framework": "test-more",
+  "family": "toctou-race",
+  "kind": "refusal",
+  "category": "failure-mode",
+  "probes": "A symlink check-then-open race needs controlled concurrency; a sequential test only re-tests the check.",
+  "expected": "status unsupported_scope with a reason citing lib/Spool.pm 6-13, no probe briefs.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic spool writer.; converted from evals/test_planning/perl/breadth/perl-toctou-race-unsupported"
+  }
+}

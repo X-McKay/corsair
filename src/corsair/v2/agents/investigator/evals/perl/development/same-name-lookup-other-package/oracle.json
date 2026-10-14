@@ -1,0 +1,74 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "get_user",
+    "path": "lib/UserDao.pm",
+    "lines": [
+      6,
+      8
+    ],
+    "max_span": 8
+  },
+  "exploit_markers": [
+    "OR '1'='1"
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "lib/UserDao.pm"
+  ],
+  "replay": {
+    "reads": [
+      "lib/UserDao.pm"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "get_user",
+      "hypothesis": "If name \"' OR '1'='1\" reaches get_user without the relevant check, the safe property fails: the recorded SQL text does not contain the name; it is a bind value",
+      "control": {
+        "role": "control",
+        "test_file": "t/userdao-control.t",
+        "test_name": "test_benign_control",
+        "target": "get_user",
+        "seam": "call UserDao::get_user with a blessed handle double that records SQL and bind values",
+        "input_description": "name 'alice'",
+        "property_to_assert": "the recorded query looks up alice",
+        "doubles": "a blessed DBI-handle double records selectall_arrayref arguments",
+        "citations": [
+          {
+            "path": "lib/UserDao.pm",
+            "start_line": 6,
+            "end_line": 8,
+            "quote": "sub get_user {\n    my ($dbh, $name) = @_;\n    return $dbh->selectall_arrayref(\"SELECT id, name FROM users WHERE name = '$name'\");"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "t/userdao-exploit.t",
+        "test_name": "test_security_regression",
+        "target": "get_user",
+        "seam": "call UserDao::get_user with a blessed handle double that records SQL and bind values",
+        "input_description": "name \"' OR '1'='1\"",
+        "property_to_assert": "the recorded SQL text does not contain the name; it is a bind value",
+        "doubles": "a blessed DBI-handle double records selectall_arrayref arguments",
+        "citations": [
+          {
+            "path": "lib/UserDao.pm",
+            "start_line": 6,
+            "end_line": 8,
+            "quote": "sub get_user {\n    my ($dbh, $name) = @_;\n    return $dbh->selectall_arrayref(\"SELECT id, name FROM users WHERE name = '$name'\");"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "lib/UserDao.pm",
+          "start_line": 6,
+          "end_line": 8,
+          "quote": "sub get_user {\n    my ($dbh, $name) = @_;\n    return $dbh->selectall_arrayref(\"SELECT id, name FROM users WHERE name = '$name'\");"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

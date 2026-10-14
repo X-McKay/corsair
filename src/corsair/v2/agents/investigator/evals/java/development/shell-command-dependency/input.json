@@ -1,0 +1,19 @@
+{
+  "finding": {
+    "title": "ThumbnailService.createThumbnail receives the uploaded file name.",
+    "description": "ThumbnailService.createThumbnail receives the uploaded file name. A name such as cat.png; touch pwned may be interpreted by a shell when the thumbnail command is built. Assess command construction only.",
+    "file_path": "src/main/java/com/example/media/ThumbnailService.java",
+    "symbol": "createThumbnail"
+  },
+  "row_id": "junit5-maven-temurin17",
+  "source_files": [
+    {
+      "path": "src/main/java/com/example/media/ThumbnailService.java",
+      "content": "package com.example.media;\n\nimport java.io.IOException;\nimport java.util.Arrays;\nimport java.util.List;\n\npublic class ThumbnailService {\n    public interface CommandRunner {\n        int run(List<String> command) throws IOException;\n    }\n\n    private final CommandRunner runner;\n\n    public ThumbnailService(CommandRunner runner) {\n        this.runner = runner;\n    }\n\n    /** Render a 128px thumbnail next to the uploaded image. */\n    public int createThumbnail(String uploadName) throws IOException {\n        String command = \"convert \" + uploadName + \" -resize 128x128 thumb_\" + uploadName;\n        return runner.run(Arrays.asList(\"sh\", \"-c\", command));\n    }\n}\n"
+    },
+    {
+      "path": "src/test/java/com/example/media/ThumbnailServiceTest.java",
+      "content": "package com.example.media;\n\nimport static org.junit.jupiter.api.Assertions.assertEquals;\n\nimport org.junit.jupiter.api.Test;\n\nclass ThumbnailServiceTest {\n    @Test\n    void returnsRunnerStatus() throws Exception {\n        assertEquals(0, new ThumbnailService(command -> 0).createThumbnail(\"cat.png\"));\n    }\n}\n"
+    }
+  ]
+}

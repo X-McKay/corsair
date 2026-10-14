@@ -1,0 +1,8 @@
+{
+  "finding": {
+    "title": "A user supplied filename may escape the configured documents directory.",
+    "description": "A user supplied filename may escape the configured documents directory. No source was captured. Identify the facts needed for component analysis."
+  },
+  "row_id": "pytest-cpython312",
+  "source_files": []
+}

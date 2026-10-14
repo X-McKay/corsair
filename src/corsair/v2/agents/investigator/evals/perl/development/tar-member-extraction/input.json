@@ -1,0 +1,19 @@
+{
+  "finding": {
+    "title": "Theme::install unpacks theme tarballs uploaded by site owners.",
+    "description": "Theme::install unpacks theme tarballs uploaded by site owners. A member named ../escaped.txt may be written outside the theme directory. Analyze this component only.",
+    "file_path": "lib/Theme.pm",
+    "symbol": "install"
+  },
+  "row_id": "prove-perl526",
+  "source_files": [
+    {
+      "path": "lib/Theme.pm",
+      "content": "package Theme;\nuse strict;\nuse warnings;\nuse Archive::Tar;\nuse File::Basename qw(dirname);\nuse File::Path qw(make_path);\n\n# Install an uploaded theme tarball below $dest; returns the number of files written.\nsub install {\n    my ($tarball, $dest) = @_;\n    my $tar = Archive::Tar->new($tarball) or die Archive::Tar->error;\n    my $count = 0;\n    for my $file ($tar->get_files) {\n        next unless $file->is_file;\n        my $target = \"$dest/\" . $file->full_path;\n        make_path(dirname($target));\n        open(my $out, '>', $target) or die \"cannot write $target: $!\";\n        binmode $out;\n        print {$out} $file->get_content;\n        close $out;\n        $count++;\n    }\n    return $count;\n}\n\n1;\n"
+    },
+    {
+      "path": "t/theme.t",
+      "content": "use strict;\nuse warnings;\nuse Archive::Tar;\nuse File::Temp qw(tempdir);\nuse Test::More;\nuse Theme;\n\nsubtest installs_one_file => sub {\n    my $dir = tempdir(CLEANUP => 1);\n    my $tar = Archive::Tar->new;\n    $tar->add_data('a.css', 'x');\n    $tar->write(\"$dir/theme.tar\");\n    is(Theme::install(\"$dir/theme.tar\", \"$dir/out\"), 1, 'one file');\n};\n\ndone_testing;\n"
+    }
+  ]
+}

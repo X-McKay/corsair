@@ -1,0 +1,19 @@
+{
+  "finding": {
+    "title": "LinkHelper.profile_link renders the display name a user picked into every comment header.",
+    "description": "LinkHelper.profile_link renders the display name a user picked into every comment header. A display name such as <img src=x onerror=alert(1)> may run script in readers' browsers. Analyze this component only.",
+    "file_path": "lib/link_helper.rb",
+    "symbol": "profile_link"
+  },
+  "row_id": "minitest-ruby31",
+  "source_files": [
+    {
+      "path": "lib/link_helper.rb",
+      "content": "# frozen_string_literal: true\n\nmodule LinkHelper\n  # Build the profile link shown in comment headers.\n  def self.profile_link(label, url)\n    %(<a class=\"profile\" href=\"#{url}\">#{label}</a>)\n  end\nend\n"
+    },
+    {
+      "path": "test/link_helper_test.rb",
+      "content": "# frozen_string_literal: true\n\nrequire 'minitest/autorun'\nrequire 'link_helper'\n\nclass LinkHelperTest < Minitest::Test\n  def test_builds_link\n    assert_includes LinkHelper.profile_link('Ann', '/u/ann'), '>Ann</a>'\n  end\nend\n"
+    }
+  ]
+}

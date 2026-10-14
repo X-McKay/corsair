@@ -1,0 +1,74 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "make_thumbnail",
+    "path": "lib/Thumbnail.pm",
+    "lines": [
+      11,
+      13
+    ],
+    "max_span": 8
+  },
+  "exploit_markers": [
+    "; touch"
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "lib/Thumbnail.pm"
+  ],
+  "replay": {
+    "reads": [
+      "lib/Thumbnail.pm"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "make_thumbnail",
+      "hypothesis": "If source 'a.png; touch /tmp/pwned' and destination 'a-thumb.png' reaches make_thumbnail without the relevant check, the safe property fails: system receives an argument list, never one shell string containing the name",
+      "control": {
+        "role": "control",
+        "test_file": "t/thumbnail-control.t",
+        "test_name": "test_benign_control",
+        "target": "make_thumbnail",
+        "seam": "call Thumbnail::make_thumbnail with CORE::GLOBAL::system overridden to record its arguments",
+        "input_description": "source 'a.png' and destination 'a-thumb.png'",
+        "property_to_assert": "system is called once and the recorded command names a.png",
+        "doubles": "CORE::GLOBAL::system records its arguments and returns 0",
+        "citations": [
+          {
+            "path": "lib/Thumbnail.pm",
+            "start_line": 11,
+            "end_line": 13,
+            "quote": "sub make_thumbnail {\n    my ($src, $dst) = @_;\n    system(\"convert \" . _trim($src) . \" -resize 128x128 $dst\") == 0 or die \"convert failed\";"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "t/thumbnail-exploit.t",
+        "test_name": "test_security_regression",
+        "target": "make_thumbnail",
+        "seam": "call Thumbnail::make_thumbnail with CORE::GLOBAL::system overridden to record its arguments",
+        "input_description": "source 'a.png; touch /tmp/pwned' and destination 'a-thumb.png'",
+        "property_to_assert": "system receives an argument list, never one shell string containing the name",
+        "doubles": "CORE::GLOBAL::system records its arguments and returns 0",
+        "citations": [
+          {
+            "path": "lib/Thumbnail.pm",
+            "start_line": 11,
+            "end_line": 13,
+            "quote": "sub make_thumbnail {\n    my ($src, $dst) = @_;\n    system(\"convert \" . _trim($src) . \" -resize 128x128 $dst\") == 0 or die \"convert failed\";"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "lib/Thumbnail.pm",
+          "start_line": 11,
+          "end_line": 13,
+          "quote": "sub make_thumbnail {\n    my ($src, $dst) = @_;\n    system(\"convert \" . _trim($src) . \" -resize 128x128 $dst\") == 0 or die \"convert failed\";"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

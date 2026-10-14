@@ -1,0 +1,21 @@
+{
+  "language": "python",
+  "framework": "pytest",
+  "family": "sql-injection",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "The SQL sink is a method of a class in a package path, beside an unrelated module function.",
+  "expected": "Planned against UserRepository.find_by_name (app/repositories/users.py 12-14).",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/issue_identification/python/breadth/python-sqli-repository-class-method; v1 checked file/symbol selection only, the probe inputs and exploit markers are Corsair-authored for v2"
+  }
+}

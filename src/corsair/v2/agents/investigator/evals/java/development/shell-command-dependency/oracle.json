@@ -1,0 +1,74 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "createThumbnail",
+    "path": "src/main/java/com/example/media/ThumbnailService.java",
+    "lines": [
+      19,
+      21
+    ],
+    "max_span": 11
+  },
+  "exploit_markers": [
+    "; touch"
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "src/main/java/com/example/media/ThumbnailService.java"
+  ],
+  "replay": {
+    "reads": [
+      "src/main/java/com/example/media/ThumbnailService.java"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "createThumbnail",
+      "hypothesis": "If upload name 'cat.png; touch pwned' reaches createThumbnail without the relevant check, the safe property fails: The recorded command does not start with a shell interpreter (sh -c) and the hostile name appears only as one whole list element",
+      "control": {
+        "role": "control",
+        "test_file": "src/test/java/com/example/media/ThumbnailServiceControlTest.java",
+        "test_name": "passesPlainNameToRunner",
+        "target": "createThumbnail",
+        "seam": "Call the real createThumbnail with an injected CommandRunner",
+        "input_description": "upload name 'cat.png'",
+        "property_to_assert": "Returns 0 and the runner records exactly one command that names cat.png Observed by: Recorded command list from the real createThumbnail call, asserted with assertEquals",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "src/main/java/com/example/media/ThumbnailService.java",
+            "start_line": 19,
+            "end_line": 21,
+            "quote": "    public int createThumbnail(String uploadName) throws IOException {\n        String command = \"convert \" + uploadName + \" -resize 128x128 thumb_\" + uploadName;\n        return runner.run(Arrays.asList(\"sh\", \"-c\", command));"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "src/test/java/com/example/media/ThumbnailServiceExploitTest.java",
+        "test_name": "keepsHostileNameOutOfShell",
+        "target": "createThumbnail",
+        "seam": "Call the real createThumbnail with an injected CommandRunner",
+        "input_description": "upload name 'cat.png; touch pwned'",
+        "property_to_assert": "The recorded command does not start with a shell interpreter (sh -c) and the hostile name appears only as one whole list element Observed by: Recorded command list from the real createThumbnail call: assert its first element is not sh and that 'cat.png; touch pwned' is an exact element",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "src/main/java/com/example/media/ThumbnailService.java",
+            "start_line": 19,
+            "end_line": 21,
+            "quote": "    public int createThumbnail(String uploadName) throws IOException {\n        String command = \"convert \" + uploadName + \" -resize 128x128 thumb_\" + uploadName;\n        return runner.run(Arrays.asList(\"sh\", \"-c\", command));"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "src/main/java/com/example/media/ThumbnailService.java",
+          "start_line": 19,
+          "end_line": 21,
+          "quote": "    public int createThumbnail(String uploadName) throws IOException {\n        String command = \"convert \" + uploadName + \" -resize 128x128 thumb_\" + uploadName;\n        return runner.run(Arrays.asList(\"sh\", \"-c\", command));"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "path-traversal",
+  "kind": "positive",
+  "category": "smoke",
+  "probes": "File.join traversal planned as assert_raises in a Dir.mktmpdir fixture.",
+  "expected": "Planned against Attachments.fetch_attachment (lib/attachments.rb 5-6); exploit ../outside.txt.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic File.read download helper.; converted from evals/test_planning/ruby/breadth/ruby-traversal-rejected-exception"
+  }
+}

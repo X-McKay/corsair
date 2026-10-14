@@ -1,0 +1,21 @@
+{
+  "language": "perl",
+  "framework": "test-more",
+  "family": "path-traversal",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "Three-argument open traversal planned as a die-message observation.",
+  "expected": "Planned against Docs::read_page (lib/Docs.pm 6-12); exploit ../outside.txt.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic Docs module.; converted from evals/test_planning/perl/breadth/perl-traversal-rejected-exception"
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "for_customer",
+    "path": "lib/orders.rb",
+    "lines": [
+      5,
+      6
+    ],
+    "max_span": 10
+  },
+  "exploit_markers": [
+    "OR 1=1"
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "lib/orders.rb"
+  ],
+  "replay": {
+    "reads": [
+      "lib/orders.rb"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "for_customer",
+      "hypothesis": "If customer \"alice' OR 1=1 --\" reaches for_customer without the relevant check, the safe property fails: The recorded SQL text does not contain the hostile name and the binds equal [\"alice' OR 1=1 --\"]",
+      "control": {
+        "role": "control",
+        "test_file": "test/orders_control_test.rb",
+        "test_name": "test_looks_up_plain_customer",
+        "target": "for_customer",
+        "seam": "Call the real Orders.for_customer with an injected db double",
+        "input_description": "customer 'alice'",
+        "property_to_assert": "Returns the fixed rows and the double records one query whose lookup value is alice Observed by: Recorded SQL and binds from the real for_customer call, asserted with assert_equal",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "lib/orders.rb",
+            "start_line": 5,
+            "end_line": 6,
+            "quote": "  def self.for_customer(db, customer)\n    db.execute(\"SELECT id, total FROM orders WHERE customer = '#{customer}'\")"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "test/orders_exploit_test.rb",
+        "test_name": "test_keeps_hostile_customer_out_of_sql",
+        "target": "for_customer",
+        "seam": "Call the real Orders.for_customer with an injected db double",
+        "input_description": "customer \"alice' OR 1=1 --\"",
+        "property_to_assert": "The recorded SQL text does not contain the hostile name and the binds equal [\"alice' OR 1=1 --\"] Observed by: Recorded SQL and binds: refute_includes sql, 'OR 1=1' and assert_equal the binds to the hostile name",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "lib/orders.rb",
+            "start_line": 5,
+            "end_line": 6,
+            "quote": "  def self.for_customer(db, customer)\n    db.execute(\"SELECT id, total FROM orders WHERE customer = '#{customer}'\")"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "lib/orders.rb",
+          "start_line": 5,
+          "end_line": 6,
+          "quote": "  def self.for_customer(db, customer)\n    db.execute(\"SELECT id, total FROM orders WHERE customer = '#{customer}'\")"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

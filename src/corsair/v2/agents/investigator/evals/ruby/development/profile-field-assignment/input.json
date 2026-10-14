@@ -1,0 +1,13 @@
+{
+  "finding": {
+    "title": "Submitting the profile form with an extra admin=true field makes the account an administrator.",
+    "description": "Submitting the profile form with an extra admin=true field makes the account an administrator. Locate the code that applies submitted profile fields."
+  },
+  "row_id": "minitest-ruby31",
+  "source_files": [
+    {
+      "path": "app/services/profile_updater.rb",
+      "content": "class ProfileUpdater\n  def initialize(user)\n    @user = user\n  end\n\n  def apply_changes(params)\n    params.each do |field, value|\n      @user.public_send(\"#{field}=\", value)\n    end\n    @user.save\n  end\nend\n"
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "sendUserFile",
+    "path": "src/main/java/com/example/net/FileServer.java",
+    "lines": [
+      15,
+      19
+    ],
+    "max_span": 8
+  },
+  "exploit_markers": [
+    "/etc/passwd",
+    "../"
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "src/main/java/com/example/net/FileServer.java"
+  ],
+  "replay": {
+    "reads": [
+      "src/main/java/com/example/net/FileServer.java"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "sendUserFile",
+      "hypothesis": "If the request line '/etc/passwd' reaches sendUserFile without the relevant check, the safe property fails: nothing from a file outside the served directory is written to the socket",
+      "control": {
+        "role": "control",
+        "test_file": "src/test/java/com/example/net/FileServerControlTest.java",
+        "test_name": "test_benign_control",
+        "target": "sendUserFile",
+        "seam": "call sendUserFile with a Socket double whose input stream supplies one line and whose output stream records bytes",
+        "input_description": "a request line naming a file the test created in its @TempDir served directory",
+        "property_to_assert": "the socket output equals that file's content",
+        "doubles": "Socket double backed by in-memory streams",
+        "citations": [
+          {
+            "path": "src/main/java/com/example/net/FileServer.java",
+            "start_line": 15,
+            "end_line": 19,
+            "quote": "    public void sendUserFile(Socket sock, String user) {\n        BufferedReader filenameReader = new BufferedReader(\n                new InputStreamReader(sock.getInputStream(), \"UTF-8\"));\n        String filename = filenameReader.readLine();\n        BufferedReader fileReader = new BufferedReader(new FileReader(filename));"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "src/test/java/com/example/net/FileServerExploitTest.java",
+        "test_name": "test_security_regression",
+        "target": "sendUserFile",
+        "seam": "call sendUserFile with a Socket double whose input stream supplies one line and whose output stream records bytes",
+        "input_description": "the request line '/etc/passwd'",
+        "property_to_assert": "nothing from a file outside the served directory is written to the socket",
+        "doubles": "Socket double backed by in-memory streams",
+        "citations": [
+          {
+            "path": "src/main/java/com/example/net/FileServer.java",
+            "start_line": 15,
+            "end_line": 19,
+            "quote": "    public void sendUserFile(Socket sock, String user) {\n        BufferedReader filenameReader = new BufferedReader(\n                new InputStreamReader(sock.getInputStream(), \"UTF-8\"));\n        String filename = filenameReader.readLine();\n        BufferedReader fileReader = new BufferedReader(new FileReader(filename));"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "src/main/java/com/example/net/FileServer.java",
+          "start_line": 15,
+          "end_line": 19,
+          "quote": "    public void sendUserFile(Socket sock, String user) {\n        BufferedReader filenameReader = new BufferedReader(\n                new InputStreamReader(sock.getInputStream(), \"UTF-8\"));\n        String filename = filenameReader.readLine();\n        BufferedReader fileReader = new BufferedReader(new FileReader(filename));"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

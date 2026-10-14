@@ -1,0 +1,74 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "download",
+    "path": "src/main/java/com/example/web/FileController.java",
+    "lines": [
+      26,
+      27
+    ],
+    "max_span": 8
+  },
+  "exploit_markers": [
+    "../"
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "src/main/java/com/example/web/FileController.java"
+  ],
+  "replay": {
+    "reads": [
+      "src/main/java/com/example/web/FileController.java"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "download",
+      "hypothesis": "If name '../../application.properties' reaches download without the relevant check, the safe property fails: the call is refused and no bytes from outside /srv/uploads are returned",
+      "control": {
+        "role": "control",
+        "test_file": "src/test/java/com/example/web/FileControllerControlTest.java",
+        "test_name": "test_benign_control",
+        "target": "download",
+        "seam": "call FileController.download directly with the name argument",
+        "input_description": "name 'report.pdf'",
+        "property_to_assert": "the response body is the bytes of /srv/uploads/report.pdf",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "src/main/java/com/example/web/FileController.java",
+            "start_line": 26,
+            "end_line": 27,
+            "quote": "    public ResponseEntity<byte[]> download(@RequestParam(\"name\") String name) throws IOException {\n        byte[] body = Files.readAllBytes(uploads.resolve(name));"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "src/test/java/com/example/web/FileControllerExploitTest.java",
+        "test_name": "test_security_regression",
+        "target": "download",
+        "seam": "call FileController.download directly with the name argument",
+        "input_description": "name '../../application.properties'",
+        "property_to_assert": "the call is refused and no bytes from outside /srv/uploads are returned",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "src/main/java/com/example/web/FileController.java",
+            "start_line": 26,
+            "end_line": 27,
+            "quote": "    public ResponseEntity<byte[]> download(@RequestParam(\"name\") String name) throws IOException {\n        byte[] body = Files.readAllBytes(uploads.resolve(name));"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "src/main/java/com/example/web/FileController.java",
+          "start_line": 26,
+          "end_line": 27,
+          "quote": "    public ResponseEntity<byte[]> download(@RequestParam(\"name\") String name) throws IOException {\n        byte[] body = Files.readAllBytes(uploads.resolve(name));"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

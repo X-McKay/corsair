@@ -1,0 +1,7 @@
+{
+  "held_out": false,
+  "cases": {
+    "python/tls-verification-disabled": "44ff55ffc0043edf11657d4e50282dc6fb20f9a5c4c39161ddb65142cd54b6ea",
+    "ruby/tls-verification-disabled": "b11c15ff072c0519f984013c7915cb83b623395477042faa31e01723ea289c31"
+  }
+}

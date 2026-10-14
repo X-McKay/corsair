@@ -1,0 +1,74 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "extract",
+    "path": "src/main/java/com/example/imports/ArchiveImporter.java",
+    "lines": [
+      16,
+      31
+    ],
+    "max_span": 24
+  },
+  "exploit_markers": [
+    "../"
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "src/main/java/com/example/imports/ArchiveImporter.java"
+  ],
+  "replay": {
+    "reads": [
+      "src/main/java/com/example/imports/ArchiveImporter.java"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "extract",
+      "hypothesis": "If archive with entry '../escaped.txt' reaches extract without the relevant check, the safe property fails: The extract call throws IOException for the entry, and after the call @TempDir/escaped.txt does not exist",
+      "control": {
+        "role": "control",
+        "test_file": "src/test/java/com/example/imports/ArchiveImporterControlTest.java",
+        "test_name": "extractsEntryInsideDestination",
+        "target": "extract",
+        "seam": "Call the real ArchiveImporter.extract on an in-memory archive stream",
+        "input_description": "archive with entry 'css/site.css'",
+        "property_to_assert": "Returns 1 and @TempDir/theme/css/site.css exists with the sentinel content Observed by: Files.readAllBytes of the extracted file in the @TempDir fixture after the real extract call",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "src/main/java/com/example/imports/ArchiveImporter.java",
+            "start_line": 16,
+            "end_line": 31,
+            "quote": "    public static int extract(InputStream archive, Path destination) throws IOException {\n        int written = 0;\n        try (ZipInputStream zip = new ZipInputStream(archive)) {\n            ZipEntry entry;\n            while ((entry = zip.getNextEntry()) != null) {\n                Path target = destination.resolve(entry.getName());\n                if (entry.isDirectory()) {\n                    Files.createDirectories(target);\n                } else {\n                    Files.createDirectories(target.getParent());\n                    Files.copy(zip, target, StandardCopyOption.REPLACE_EXISTING);\n                    written++;\n                }\n            }\n        }\n        return written;"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "src/test/java/com/example/imports/ArchiveImporterExploitTest.java",
+        "test_name": "keepsEntriesInsideDestination",
+        "target": "extract",
+        "seam": "Call the real ArchiveImporter.extract on an in-memory archive stream",
+        "input_description": "archive with entry '../escaped.txt'",
+        "property_to_assert": "The extract call throws IOException for the entry, and after the call @TempDir/escaped.txt does not exist Observed by: assertThrows(IOException.class, ...) then Files.exists on @TempDir/escaped.txt in the fixture is false",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "src/main/java/com/example/imports/ArchiveImporter.java",
+            "start_line": 16,
+            "end_line": 31,
+            "quote": "    public static int extract(InputStream archive, Path destination) throws IOException {\n        int written = 0;\n        try (ZipInputStream zip = new ZipInputStream(archive)) {\n            ZipEntry entry;\n            while ((entry = zip.getNextEntry()) != null) {\n                Path target = destination.resolve(entry.getName());\n                if (entry.isDirectory()) {\n                    Files.createDirectories(target);\n                } else {\n                    Files.createDirectories(target.getParent());\n                    Files.copy(zip, target, StandardCopyOption.REPLACE_EXISTING);\n                    written++;\n                }\n            }\n        }\n        return written;"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "src/main/java/com/example/imports/ArchiveImporter.java",
+          "start_line": 16,
+          "end_line": 31,
+          "quote": "    public static int extract(InputStream archive, Path destination) throws IOException {\n        int written = 0;\n        try (ZipInputStream zip = new ZipInputStream(archive)) {\n            ZipEntry entry;\n            while ((entry = zip.getNextEntry()) != null) {\n                Path target = destination.resolve(entry.getName());\n                if (entry.isDirectory()) {\n                    Files.createDirectories(target);\n                } else {\n                    Files.createDirectories(target.getParent());\n                    Files.copy(zip, target, StandardCopyOption.REPLACE_EXISTING);\n                    written++;\n                }\n            }\n        }\n        return written;"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

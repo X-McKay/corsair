@@ -1,0 +1,19 @@
+{
+  "finding": {
+    "title": "Orders.for_customer searches orders by the customer name from the support search box.",
+    "description": "Orders.for_customer searches orders by the customer name from the support search box. Check whether the name is interpolated into SQL structure; hostile input must remain a bound parameter. Assess query construction only.",
+    "file_path": "lib/orders.rb",
+    "symbol": "for_customer"
+  },
+  "row_id": "minitest-ruby31",
+  "source_files": [
+    {
+      "path": "lib/orders.rb",
+      "content": "# frozen_string_literal: true\n\nmodule Orders\n  # Orders for the customer named in the support search box.\n  def self.for_customer(db, customer)\n    db.execute(\"SELECT id, total FROM orders WHERE customer = '#{customer}'\")\n  end\nend\n"
+    },
+    {
+      "path": "test/orders_test.rb",
+      "content": "# frozen_string_literal: true\n\nrequire 'minitest/autorun'\nrequire 'orders'\n\nclass OrdersTest < Minitest::Test\n  FakeDb = Struct.new(:rows) do\n    def execute(*_args)\n      rows\n    end\n  end\n\n  def test_returns_rows\n    assert_equal [[1, 25]], Orders.for_customer(FakeDb.new([[1, 25]]), 'alice')\n  end\nend\n"
+    }
+  ]
+}

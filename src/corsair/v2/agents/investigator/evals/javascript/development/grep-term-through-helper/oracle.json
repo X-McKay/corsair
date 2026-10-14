@@ -1,0 +1,74 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "search",
+    "path": "src/search.js",
+    "lines": [
+      6,
+      7
+    ],
+    "max_span": 8
+  },
+  "exploit_markers": [
+    "--file="
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "src/search.js"
+  ],
+  "replay": {
+    "reads": [
+      "src/search.js"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "search",
+      "hypothesis": "If term '--file=/etc/passwd' and file 'notes.txt' reaches search without the relevant check, the safe property fails: an end-of-options '--' precedes the term in the recorded grep arguments",
+      "control": {
+        "role": "control",
+        "test_file": "__tests__/search.control.test.js",
+        "test_name": "test_benign_control",
+        "target": "search",
+        "seam": "call search with child_process.execFile mocked by jest.mock to record its arguments",
+        "input_description": "term 'beta' and file 'notes.txt'",
+        "property_to_assert": "execFile receives grep with beta then notes.txt",
+        "doubles": "child_process.execFile is a jest mock",
+        "citations": [
+          {
+            "path": "src/search.js",
+            "start_line": 6,
+            "end_line": 7,
+            "quote": "function search(term, file, cb) {\n  execFile(\"grep\", [normalizeTerm(term), file], (err, stdout) => cb(stdout));"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "__tests__/search.exploit.test.js",
+        "test_name": "test_security_regression",
+        "target": "search",
+        "seam": "call search with child_process.execFile mocked by jest.mock to record its arguments",
+        "input_description": "term '--file=/etc/passwd' and file 'notes.txt'",
+        "property_to_assert": "an end-of-options '--' precedes the term in the recorded grep arguments",
+        "doubles": "child_process.execFile is a jest mock",
+        "citations": [
+          {
+            "path": "src/search.js",
+            "start_line": 6,
+            "end_line": 7,
+            "quote": "function search(term, file, cb) {\n  execFile(\"grep\", [normalizeTerm(term), file], (err, stdout) => cb(stdout));"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "src/search.js",
+          "start_line": 6,
+          "end_line": 7,
+          "quote": "function search(term, file, cb) {\n  execFile(\"grep\", [normalizeTerm(term), file], (err, stdout) => cb(stdout));"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

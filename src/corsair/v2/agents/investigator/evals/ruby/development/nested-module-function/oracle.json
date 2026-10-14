@@ -1,0 +1,74 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "fetch",
+    "path": "lib/acme/storage/local.rb",
+    "lines": [
+      10,
+      11
+    ],
+    "max_span": 8
+  },
+  "exploit_markers": [
+    "../"
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "lib/acme/storage/local.rb"
+  ],
+  "replay": {
+    "reads": [
+      "lib/acme/storage/local.rb"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "fetch",
+      "hypothesis": "If key '../../../etc/hostname' reaches fetch without the relevant check, the safe property fails: binread is never called with a path outside /var/lib/acme/blobs",
+      "control": {
+        "role": "control",
+        "test_file": "test/local_control_test.rb",
+        "test_name": "test_benign_control",
+        "target": "fetch",
+        "seam": "Acme::Storage::Local.fetch(key) with File.binread stubbed to record its path",
+        "input_description": "key 'avatar.png'",
+        "property_to_assert": "binread receives /var/lib/acme/blobs/avatar.png",
+        "doubles": "File.binread records its path and returns fixed bytes",
+        "citations": [
+          {
+            "path": "lib/acme/storage/local.rb",
+            "start_line": 10,
+            "end_line": 11,
+            "quote": "      def self.fetch(key)\n        File.binread(File.join(ROOT, key))"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "test/local_exploit_test.rb",
+        "test_name": "test_security_regression",
+        "target": "fetch",
+        "seam": "Acme::Storage::Local.fetch(key) with File.binread stubbed to record its path",
+        "input_description": "key '../../../etc/hostname'",
+        "property_to_assert": "binread is never called with a path outside /var/lib/acme/blobs",
+        "doubles": "File.binread records its path and returns fixed bytes",
+        "citations": [
+          {
+            "path": "lib/acme/storage/local.rb",
+            "start_line": 10,
+            "end_line": 11,
+            "quote": "      def self.fetch(key)\n        File.binread(File.join(ROOT, key))"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "lib/acme/storage/local.rb",
+          "start_line": 10,
+          "end_line": 11,
+          "quote": "      def self.fetch(key)\n        File.binread(File.join(ROOT, key))"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

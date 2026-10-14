@@ -1,0 +1,42 @@
+{
+  "status": "unsupported_scope",
+  "target": {
+    "symbol": "write_job",
+    "path": "lib/Spool.pm",
+    "lines": [
+      6,
+      13
+    ],
+    "max_span": 16
+  },
+  "required_reads": [
+    "lib/Spool.pm"
+  ],
+  "replay": {
+    "reads": [
+      "lib/Spool.pm"
+    ],
+    "plan": {
+      "status": "unsupported_scope",
+      "target": "",
+      "hypothesis": "",
+      "control": null,
+      "exploit": null,
+      "citations": [
+        {
+          "path": "lib/Spool.pm",
+          "start_line": 6,
+          "end_line": 13,
+          "quote": "sub write_job {\n    my ($dir, $name, $data) = @_;\n    my $path = \"$dir/$name\";\n    die \"refusing symlink $path\\n\" if -l $path;\n    open(my $fh, '>', $path) or die \"cannot write $path: $!\";\n    print {$fh} $data;\n    close $fh;\n    return 1;"
+        },
+        {
+          "path": "t/spool.t",
+          "start_line": 1,
+          "end_line": 13,
+          "quote": "use strict;\nuse warnings;\nuse File::Temp qw(tempdir);\nuse Test::More;\nuse Spool;\n\nsubtest refuses_existing_symlink => sub {\n    my $dir = tempdir(CLEANUP => 1);\n    symlink(\"$dir/target\", \"$dir/job\") or die $!;\n    ok(!eval { Spool::write_job($dir, 'job', 'x') }, 'symlink refused');\n};\n\ndone_testing;"
+        }
+      ],
+      "reason": "The concern is a check-then-open race: showing it needs a concurrent actor that replaces the path between the -l check and open, with controlled scheduling, and a unit test at a seam offers no concurrency or scheduling control, only native TAP outcomes"
+    }
+  }
+}

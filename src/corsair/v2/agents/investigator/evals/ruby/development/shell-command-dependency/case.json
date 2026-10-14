@@ -1,0 +1,21 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "command-injection",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "A shell command string observed through an injected recording runner.",
+  "expected": "Planned against Backup#archive (lib/backup.rb 9-10); exploit project carries '; touch'.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic Backup class with an injectable runner.; converted from evals/test_planning/ruby/breadth/ruby-command-construction-dependency"
+  }
+}

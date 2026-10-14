@@ -1,0 +1,21 @@
+{
+  "language": "java",
+  "framework": "junit5",
+  "family": "xss",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "HTML rendering checked as a return value with no fixture.",
+  "expected": "Planned against CommentRenderer.render (lines 8-12); control body 'great talk', exploit body with <script>.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic StringBuilder renderer.; converted from evals/test_planning/java/breadth/java-html-escape-return-value"
+  }
+}
