@@ -78,7 +78,7 @@ Each agent is a native `AgentSpec` file plus a small Python module for its tools
 
 The two probers are separate packages with separate evals and baselines. They share the probe-protocol skill, the framework skills, the test-file write tool and the draft contract. Each has its own AgentSpec, instructions, output check, budget and provider key. Neither ever sees the other's brief, draft or result.
 
-Authors cannot run tests (D3). After both drafts are frozen, trusted code runs each once on the vulnerable revision. A `not_run` or `errored` result returns that author's own diagnostics, and the author gets one revision (A2). Any other result returns nothing to the author.
+Authors cannot run tests (D3). After both drafts are frozen, trusted code makes one mechanical check run of each on the vulnerable revision. This run is not investigation execution: it keeps only a mechanical class (`ok`, `not_run` or `errored`) and discards the outcome, so `passed` and `assertion_failed` both become `ok`. Nobody sees the discarded outcome: not the authors, not the Reviewer, not the rule table. A `not_run` or `errored` result returns that author's own diagnostics, and the author gets one revision (A2), which is frozen again. The Reviewer then reviews the final frozen bytes. Execute runs only bytes that carry a bound review, and any change after review needs a fresh review before Execute.
 
 A missing CWE skill never causes a refusal. The run is tagged `uncovered_cwe` for eval slicing.
 
@@ -106,23 +106,26 @@ Grounding:
 
 ### Probe protocol and outcome table (D2, D8)
 
-For each run, trusted code sets three environment variables: `CORSAIR_MARKER_START` and `CORSAIR_MARKER_END` (paths inside the container) and `CORSAIR_TOKEN` (a fresh random string).
+For each run, trusted code sets four environment variables: `CORSAIR_MARKER_START`, `CORSAIR_MARKER_CHECK` and `CORSAIR_MARKER_END` (paths inside the container) and `CORSAIR_TOKEN` (a fresh random string).
 
 - Each test writes the start marker as the first statement of its body and the end marker as the last, after its assertions.
+- Immediately before its security assertion, each test writes the check marker. It holds `safe` or `unsafe`, the value the assertion is about to test.
 - The exploit test puts the token in its security assertion's failure message. The control test carries no token.
 - Each probe runs alone, using the matrix row's run-one-test template filled with only the planned file and test name.
 - The container runtime gives the exit code, signal or timeout. The row's exit-code map sorts the code into `pass`, `test_failed`, `no_tests`, `harness_error` or `unknown`.
 
-| Exit class | start | end | token | Outcome |
-| --- | --- | --- | --- | --- |
-| pass | yes | yes | no | passed |
-| test_failed | yes | no | yes | assertion_failed |
-| test_failed | yes | no | no | errored |
-| no_tests, or no start marker | any | any | any | not_run |
-| harness_error, timeout, signal | any | any | any | infra |
-| any other combination | | | | anomalous |
+| Exit class | start | check | end | token | Outcome |
+| --- | --- | --- | --- | --- | --- |
+| pass | yes | safe | yes | no | passed |
+| test_failed | yes | unsafe | no | yes | assertion_failed |
+| test_failed | yes | absent | no | any | errored |
+| no_tests, or no start marker | any | any | any | any | not_run |
+| harness_error, timeout, signal | any | any | any | any | infra |
+| any other combination | | | | | anomalous |
 
 Only `passed` and `assertion_failed` are decisive.
+
+A token in the output alone cannot attribute a failure, because the whole test process can read the token. The check marker is what does: an unrelated exception raised before the assertion leaves no check marker and reads as `errored`, even if repository code printed the token. Forging all three signals takes deliberate code in the test or the repository. The outcome-blind review reads the test, and the comparison across revisions covers the repository. That residual is recorded as a limitation, not hidden.
 
 Each framework skill ships a canary pair: one test that passes and one whose token assertion fails. A matrix row is admitted only when its canaries classify as `passed` and `assertion_failed` through its run template and exit-code map.
 
@@ -135,7 +138,7 @@ The label is a pure function of recorded facts. Rules are evaluated top to botto
 | Rule | Condition | Label |
 | --- | --- | --- |
 | R0 | Stopped before a model stage (no matrix row, build failed) | UNABLE_TO_RUN |
-| R1 | Provider or infrastructure failure | ERROR |
+| R1 | Provider or infrastructure failure before the vulnerable revision's probe outcomes are recorded | ERROR |
 | R2 | Review missing or negative for either probe on the vulnerable revision | INCONCLUSIVE (test_invalid) |
 | R3 | Vulnerable control not passed | INCONCLUSIVE (control_failed) |
 | R4 | Vulnerable security assertion_failed | LIKELY_EXPLOITABLE |
@@ -149,7 +152,7 @@ Fix verification is a separate rule over the same facts. `verified` requires all
 - A positive review for the fixed revision.
 - The same frozen patch on both revisions.
 
-Otherwise the result is `not_verified`, or `not_applicable` when there is no fixed revision.
+Otherwise the result is `not_verified`, or `not_applicable` when there is no fixed revision. A provider or infrastructure failure on the fixed revision gives `not_verified`, with its terminal reason recorded in the fix result. It never changes the label decided from the vulnerable revision.
 
 Calibration (a detector self-test or an ablation run) is recorded as calibration and never as proof of absence. `refuted_in_scope` stays disabled.
 
