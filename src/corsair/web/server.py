@@ -19,6 +19,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from email.message import Message
 import hashlib
+import heapq
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -107,18 +108,25 @@ def optional_json(root: Path, parts: tuple[str, ...], kind: type = dict):
         return None
 
 
+def newest(names, limit: int = MAX_ENTRIES) -> tuple[list[str], bool]:
+    """The ``limit`` lexically greatest of ``names``, newest first, and whether any were left out. Every name is
+    seen before the cut, so scan order (unspecified for a directory) never decides which records are shown."""
+    kept, limited = [], False
+    for name in names:
+        if len(kept) < limit:
+            heapq.heappush(kept, name)
+        else:
+            limited = True
+            heapq.heappushpop(kept, name)
+    return sorted(kept, reverse=True), limited
+
+
 def entries(root: Path, parts: tuple[str, ...]) -> tuple[list[str], bool]:
-    """Directory names (no symlinks) in ``parts``, newest name first, and whether the scan limit cut it short."""
-    names, limited = [], False
+    """Directory names (no symlinks) in ``parts``, newest name first, and whether the limit cut it short."""
     with directory(root, parts) as fd:
         with os.scandir(fd) as found:
-            for index, entry in enumerate(found):
-                if index >= MAX_ENTRIES:
-                    limited = True
-                    break
-                if NAME.fullmatch(entry.name) and entry.is_dir(follow_symlinks=False):
-                    names.append(entry.name)
-    return sorted(names, reverse=True), limited
+            return newest(entry.name for entry in found
+                          if NAME.fullmatch(entry.name) and entry.is_dir(follow_symlinks=False))
 
 
 def is_dir(root: Path, parts: tuple[str, ...]) -> bool:
@@ -719,9 +727,10 @@ class Evidence:
 def entries_files(root: Path, parts: tuple[str, ...], suffix: str) -> list[str]:
     with directory(root, parts) as fd:
         with os.scandir(fd) as found:
-            return sorted(entry.name for index, entry in enumerate(found)
-                          if index < MAX_ENTRIES and entry.name.endswith(suffix) and NAME.fullmatch(entry.name)
-                          and entry.is_file(follow_symlinks=False))
+            names, _ = newest(entry.name for entry in found
+                              if entry.name.endswith(suffix) and NAME.fullmatch(entry.name)
+                              and entry.is_file(follow_symlinks=False))
+    return sorted(names)
 
 
 SECURITY_HEADERS = (

@@ -9,7 +9,7 @@ from threading import Thread
 import pytest
 
 from corsair import runs as corsair_runs
-from corsair.web.server import AGENTS, Application, Evidence, MAX_JSON, Server, SourceUnavailable
+from corsair.web.server import AGENTS, Application, Evidence, MAX_JSON, Server, SourceUnavailable, entries, newest
 from evals.cases import AGENTS as EVAL_AGENTS, CHAIN
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -291,3 +291,15 @@ def test_production_origin_validation(root):
     started = []
     body = Application(Evidence(root), ('https://corsair.example',))(environ, lambda s, h: started.append(s))
     assert started == ['200 OK'] and json.loads(b''.join(body))['runs']
+
+
+def test_scan_limit_keeps_the_newest_names_whatever_the_scan_order(tmp_path):
+    names = [f'20261014T{n:06d}Z-run' for n in range(12)]
+    for order in (names, names[::-1], names[5:] + names[:5]):
+        assert newest(order, limit=3) == (names[:-4:-1], True)
+    assert newest(names[:2], limit=3) == (names[1::-1], False)
+    for name in names:
+        (tmp_path / name).mkdir()
+    (tmp_path / 'not a record').mkdir()
+    shown, limited = entries(tmp_path, ())
+    assert shown == sorted(names, reverse=True) and limited is False
