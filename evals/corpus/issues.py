@@ -71,7 +71,7 @@ def capture(case: CorpusCase, root: Path, corpus: Path = CORPUS) -> tuple[dict, 
     if fixed:
         issue["fixed_revision"] = fixed
     expected = {"case": case.case_id, "language": case.language, "split": case.split,
-                "oracle": case.oracle.model_dump(mode="json"), "case_sha256": case_digest(case, corpus)}
+                "oracle": case.oracle, "case_sha256": case_digest(case, corpus)}
     (directory / "issue.json").write_text(json.dumps(issue, indent=2) + "\n")
     (directory / "expected.json").write_text(json.dumps(expected, indent=2) + "\n")
     return issue, expected

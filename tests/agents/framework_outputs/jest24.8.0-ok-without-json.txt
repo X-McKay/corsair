@@ -1,3 +1,0 @@
-  console.log test/ok.test.js:1
-    noise
-
