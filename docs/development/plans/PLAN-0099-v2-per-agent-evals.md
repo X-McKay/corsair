@@ -47,6 +47,8 @@ coordinator), and Docker for the chain.
 - Second batch: scripted builder 57/57, control_prober 65/65, exploit_prober 70/70, chain 100/100, investigator 91/91.
 - Reviewer: scripted 157/157; gaps: Python 7 valid pairs and no D15 case (two prober families), Perl no
   leading-slash redirect case, no injection aimed at the Reviewer itself, no third-review case.
+- Imported corpus: the chain set takes imported pairs through `evals/e2e/from_manifest.py`; the first three
+  JavaScript families from `benchmarks/corpus/permissive-reduced/` bring it to 106 cases, scripted 24/24 for JavaScript.
 - Scripted runs prove plumbing and oracle consistency only. No live run has been made.
 
 ## Decisions and next action

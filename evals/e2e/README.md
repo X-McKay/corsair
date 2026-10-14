@@ -13,14 +13,14 @@ Whole-chain cases in the [eval layout](../README.md): `evals/e2e/<language>/<set
 
 ## v2 whole-chain set (`v2`)
 
-`evals/e2e/<language>/v2/<case>/`, manifest `sets/v2.json`: 100 cases for the v2 chain (`src/corsair/v2/`), each
+`evals/e2e/<language>/v2/<case>/`, manifest `sets/v2.json`: 106 cases for the v2 chain (`src/corsair/v2/`), each
 ending in a `Verdict` from the D4 rule table (`src/corsair/v2/rules.py`).
 
 | Language | Cases | Positive | Negative | Injection | Ineffective fix | No runtime | Missing target | Unbuildable |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | python | 37 | 15 | 17 | 1 | 1 | 1 | 1 | 1 |
 | java | 11 | 3 | 3 | 1 | 1 | 1 | 1 | 1 |
-| javascript | 18 | 4 | 4 | 1 | 1 | 6 | 1 | 1 |
+| javascript | 24 | 7 | 7 | 1 | 1 | 6 | 1 | 1 |
 | perl | 15 | 5 | 5 | 1 | 1 | 1 | 1 | 1 |
 | ruby | 15 | 5 | 5 | 1 | 1 | 1 | 1 | 1 |
 | common (C) | 4 | | | | | 4 | | |
@@ -47,7 +47,11 @@ Sources and choices:
 - Positives and negatives are the non-held-out infosec-harness families (held-out families are excluded by
   `evals/corpus/held_out.json`). The 17 v1 corpus requests and 2 v1 negatives map onto the Python families; v1's
   `INCONCLUSIVE` for the XXE negative was a v1 calibration constraint, so the v2 oracle keeps the manifest truth.
-- The corpus has no Ruby, so the 14 Ruby cases are Corsair-authored (five paired families, a source-comment
+- Imported pairs (`benchmarks/corpus/permissive-reduced/`, permissively licensed upstream code reduced to small
+  offline trees; provenance per family) are written by `python -m evals.e2e.from_manifest <manifest> <family>...`,
+  which takes the finding, the opaque id and the truth from that manifest exactly as for infosec-harness: the
+  JavaScript families `dot-prop`, `angular-http-server` and `codecov-node`.
+- The infosec-harness corpus has no Ruby, so the 14 Ruby cases are Corsair-authored (five paired families, a source-comment
   injection and three failure modes). Java has only three non-held-out families, so it has exactly ten cases. The
   real-repository benchmark cases under `benchmarks/cases/` (including the two v1 `jest` cases, `rack-static` and
   `http-tiny-verify-ssl`) need an upstream fetch; v2 intake takes a local tree, so they are not in this set.
@@ -76,7 +80,7 @@ Sources and choices:
 `tests/v2/test_chain_cases.py` checks the set without running the chain: counts per language, every input loading
 through v2 intake with the pinned tree digests, Select choosing `expected_runtime_row`, oracles consistent with the
 rule table, corpus cases equal to the manifest route, no held-out family, and no oracle field or label in any input.
-The generator lives outside the repository; regenerate by editing cases and running
+The generator for the original 100 cases lives outside the repository; regenerate them by editing cases and running
 `PYTHONPATH=src:. .venv/bin/python -m evals.cases e2e v2 --freeze`.
 
 ## Scorer
