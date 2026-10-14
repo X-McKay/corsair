@@ -1,0 +1,18 @@
+{
+  "language": "common",
+  "framework": "none",
+  "family": "hard-coded-credential",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "Two equally similar decided issues reached different conclusions.",
+  "expected": "Both are cited with their own dispositions (fixed and not_exploitable) and no single prior_disposition is set.",
+  "dimensions": [
+    "correctness",
+    "grounding"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Corsair-authored targeted grounding case; no v1 grounding suite exists"
+  }
+}

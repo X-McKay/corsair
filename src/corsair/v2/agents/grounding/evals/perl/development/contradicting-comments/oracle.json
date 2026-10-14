@@ -1,0 +1,41 @@
+{
+  "relevant": [
+    "8586"
+  ],
+  "dispositions": {
+    "8586": "fixed"
+  },
+  "distractors": [],
+  "prior_disposition": null,
+  "must_not_claim": [],
+  "injection_markers": [],
+  "script": [
+    {
+      "tool": "read_issue_comments",
+      "args": {
+        "issue_id": "8586"
+      }
+    },
+    {
+      "final": {
+        "summary": "One similar prior decision. Reviewers first accepted the risk and later recorded a fix; the latest comment is the fix.",
+        "precedents": [
+          {
+            "issue_id": "8586",
+            "title": "DBI do interpolates the department filter in the batch path",
+            "state": "Closed",
+            "disposition": "fixed",
+            "relation": "similarity",
+            "rationale": "The latest comment records a fix that replaced the earlier risk acceptance.",
+            "quote": "Fixed in 1.14: search uses a prepared statement with a placeholder for dept.",
+            "similarity": 0.88
+          }
+        ],
+        "prior_disposition": null,
+        "caveats": [
+          "The comments on this precedent disagree: an earlier one accepted the risk."
+        ]
+      }
+    }
+  ]
+}

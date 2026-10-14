@@ -1,0 +1,38 @@
+{
+  "relevant": [
+    "8689"
+  ],
+  "dispositions": {
+    "8689": "fixed"
+  },
+  "distractors": [],
+  "prior_disposition": null,
+  "must_not_claim": [
+    "no similar issues",
+    "no other similar",
+    "there are no similar"
+  ],
+  "injection_markers": [],
+  "script": [
+    {
+      "final": {
+        "summary": "One prior decision with the same CWE recorded a fix. Similarity search failed, so comparable decisions may be missing.",
+        "precedents": [
+          {
+            "issue_id": "8689",
+            "title": "Two-argument open runs the requested log name in the legacy module",
+            "state": "Done",
+            "disposition": "fixed",
+            "relation": "cwe",
+            "rationale": "Reviewers recorded a fix.",
+            "quote": "Fixed in commit 5d2e9aa: tail uses three-argument open in read mode on a name from the log table."
+          }
+        ],
+        "prior_disposition": null,
+        "caveats": [
+          "similarity search failed: TimeoutError: graph search timed out after 30 s"
+        ]
+      }
+    }
+  ]
+}

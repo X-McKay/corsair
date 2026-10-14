@@ -1,0 +1,8 @@
+{
+  "finding": {
+    "title": "Hard-coded credential in service configuration",
+    "cwe": "CWE-798",
+    "description": "A password literal is assigned to the database client configuration."
+  },
+  "context": {}
+}

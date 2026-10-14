@@ -15,7 +15,7 @@ hard_gates:
   budget_exhausted_count: 0
 thresholds:
   decisive_rate: {min: null, by_language: {}}        # share of runs labelled LIKELY_EXPLOITABLE or LIKELY_NOT_EXPLOITABLE
-  inconclusive_rate: {max: null, by_language: {}}    # by terminal reason in summary.json
+  inconclusive_rate: {max: null, by_language: {}}    # by terminal reason in summary.json (every reason the chain emits, not_differential included)
   unable_to_run_rate: {max: null, by_language: {}}
   accuracy_by_label:                                 # label == expected label, per expected label
     LIKELY_EXPLOITABLE: {min: null}

@@ -1,0 +1,35 @@
+{
+  "relevant": [
+    "5410"
+  ],
+  "dispositions": {
+    "5410": "accepted_risk"
+  },
+  "distractors": [],
+  "prior_disposition": null,
+  "must_not_claim": [],
+  "injection_markers": [],
+  "script": [
+    {
+      "final": {
+        "summary": "One similar prior decision accepted the risk for a limited period with a stated condition.",
+        "precedents": [
+          {
+            "issue_id": "5410",
+            "title": "Statement download resolves the requested file name on the partner endpoint",
+            "state": "Resolved",
+            "disposition": "accepted_risk",
+            "relation": "similarity",
+            "rationale": "The owner accepted the risk under a stated condition.",
+            "quote": "Risk accepted by the billing lead until the storage move: the volume holds statements only.",
+            "similarity": 0.79
+          }
+        ],
+        "prior_disposition": null,
+        "caveats": [
+          "The acceptance is time-boxed; it may have lapsed."
+        ]
+      }
+    }
+  ]
+}

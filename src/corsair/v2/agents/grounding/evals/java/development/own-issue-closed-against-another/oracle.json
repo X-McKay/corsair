@@ -1,0 +1,50 @@
+{
+  "relevant": [
+    "5220",
+    "5222"
+  ],
+  "dispositions": {
+    "5220": "duplicate",
+    "5222": "fixed"
+  },
+  "distractors": [],
+  "prior_disposition": "duplicate",
+  "must_not_claim": [],
+  "injection_markers": [],
+  "script": [
+    {
+      "tool": "read_issue_comments",
+      "args": {
+        "issue_id": "5222"
+      }
+    },
+    {
+      "final": {
+        "summary": "Two prior decisions: this issue was closed as a duplicate of an earlier report, which was fixed.",
+        "precedents": [
+          {
+            "issue_id": "5220",
+            "title": "JPQL query concatenates the customer filter",
+            "state": "Closed",
+            "disposition": "duplicate",
+            "relation": "self",
+            "rationale": "Closed as a duplicate of the first report.",
+            "quote": "Duplicate of 5222: same code path, tracked and resolved there."
+          },
+          {
+            "issue_id": "5222",
+            "title": "JPQL query concatenates the customer filter (first report)",
+            "state": "Closed",
+            "disposition": "fixed",
+            "relation": "similarity",
+            "rationale": "The first report was fixed.",
+            "quote": "Fixed in commit 41ac0d2: search uses a named parameter for the filter instead of concatenation.",
+            "similarity": 0.91
+          }
+        ],
+        "prior_disposition": "duplicate",
+        "caveats": []
+      }
+    }
+  ]
+}

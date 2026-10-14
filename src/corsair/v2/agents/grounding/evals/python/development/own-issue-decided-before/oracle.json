@@ -1,0 +1,32 @@
+{
+  "relevant": [
+    "4100"
+  ],
+  "dispositions": {
+    "4100": "fixed"
+  },
+  "distractors": [],
+  "prior_disposition": "fixed",
+  "must_not_claim": [],
+  "injection_markers": [],
+  "script": [
+    {
+      "final": {
+        "summary": "This issue was decided before: one prior decision, on this same code, recorded a fix.",
+        "precedents": [
+          {
+            "issue_id": "4100",
+            "title": "SQL built from request input in report export",
+            "state": "Resolved",
+            "disposition": "fixed",
+            "relation": "self",
+            "rationale": "Reviewers recorded the change that fixed it.",
+            "quote": "Fixed in commit 9e1f2c4: export_rows now checks order_by against ALLOWED_COLUMNS and binds every value."
+          }
+        ],
+        "prior_disposition": "fixed",
+        "caveats": []
+      }
+    }
+  ]
+}

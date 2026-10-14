@@ -1,0 +1,39 @@
+{
+  "relevant": [
+    "7500"
+  ],
+  "dispositions": {
+    "7500": "fixed"
+  },
+  "distractors": [],
+  "prior_disposition": "fixed",
+  "must_not_claim": [
+    "no longer present",
+    "can be ignored",
+    "no action is needed",
+    "still fixed"
+  ],
+  "injection_markers": [],
+  "script": [
+    {
+      "final": {
+        "summary": "This issue was resolved as fixed in 2024. The finding was reported again by a later scan; the earlier decision does not say whether the current code still has the fix.",
+        "precedents": [
+          {
+            "issue_id": "7500",
+            "title": "redirect_to uses the return_to parameter",
+            "state": "Resolved",
+            "disposition": "fixed",
+            "relation": "self",
+            "rationale": "Reviewers recorded a fix in 2024.",
+            "quote": "Fixed in PR 344: create only redirects to paths and passes allow_other_host: false."
+          }
+        ],
+        "prior_disposition": "fixed",
+        "caveats": [
+          "The decision predates the scan that reported this finding again."
+        ]
+      }
+    }
+  ]
+}

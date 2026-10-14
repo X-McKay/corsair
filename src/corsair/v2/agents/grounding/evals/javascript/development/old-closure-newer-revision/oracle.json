@@ -1,0 +1,39 @@
+{
+  "relevant": [
+    "6400"
+  ],
+  "dispositions": {
+    "6400": "fixed"
+  },
+  "distractors": [],
+  "prior_disposition": "fixed",
+  "must_not_claim": [
+    "no longer present",
+    "can be ignored",
+    "no action is needed",
+    "still fixed"
+  ],
+  "injection_markers": [],
+  "script": [
+    {
+      "final": {
+        "summary": "This issue was resolved as fixed in 2024. The finding was reported again by a later scan; the earlier decision does not say whether the current code still has the fix.",
+        "precedents": [
+          {
+            "issue_id": "6400",
+            "title": "Image proxy fetches any URL from the query string",
+            "state": "Resolved",
+            "disposition": "fixed",
+            "relation": "self",
+            "rationale": "Reviewers recorded a fix in 2024.",
+            "quote": "Fixed in PR 790: proxyImage resolves the host and only fetches from the CDN allowlist."
+          }
+        ],
+        "prior_disposition": "fixed",
+        "caveats": [
+          "The decision predates the scan that reported this finding again."
+        ]
+      }
+    }
+  ]
+}

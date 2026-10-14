@@ -1,0 +1,28 @@
+{
+  "finding": {
+    "title": "redirect_to uses the return_to parameter",
+    "description": "create calls redirect_to params[:return_to] after sign-in. Reported again by the 2026-09 scan of the main branch.",
+    "file_path": "app/controllers/sessions_controller.rb",
+    "start_line": 37,
+    "symbol": "SessionsController#create",
+    "cwe": "CWE-601"
+  },
+  "context": {
+    "issue": {
+      "id": "7500",
+      "title": "redirect_to uses the return_to parameter",
+      "state": "Resolved",
+      "cwe": "CWE-601",
+      "description": "create calls redirect_to params[:return_to] after sign-in.",
+      "repo_url": "https://dev.azure.com/acme/_git/member-portal",
+      "source_file": "app/controllers/sessions_controller.rb:37"
+    },
+    "comments": [
+      {
+        "author": "reviewer",
+        "created_at": "2024-02-09",
+        "text": "Fixed in PR 344: create only redirects to paths and passes allow_other_host: false."
+      }
+    ]
+  }
+}

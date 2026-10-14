@@ -1,0 +1,50 @@
+{
+  "relevant": [
+    "7420",
+    "7422"
+  ],
+  "dispositions": {
+    "7420": "duplicate",
+    "7422": "fixed"
+  },
+  "distractors": [],
+  "prior_disposition": "duplicate",
+  "must_not_claim": [],
+  "injection_markers": [],
+  "script": [
+    {
+      "tool": "read_issue_comments",
+      "args": {
+        "issue_id": "7422"
+      }
+    },
+    {
+      "final": {
+        "summary": "Two prior decisions: this issue was closed as a duplicate of an earlier report, which was fixed.",
+        "precedents": [
+          {
+            "issue_id": "7420",
+            "title": "where clause interpolates the sort parameter",
+            "state": "Closed",
+            "disposition": "duplicate",
+            "relation": "self",
+            "rationale": "Closed as a duplicate of the first report.",
+            "quote": "Duplicate of 7422: same code path, tracked and resolved there."
+          },
+          {
+            "issue_id": "7422",
+            "title": "where clause interpolates the sort parameter (first report)",
+            "state": "Closed",
+            "disposition": "fixed",
+            "relation": "similarity",
+            "rationale": "The first report was fixed.",
+            "quote": "Fixed in 5.1.3: index maps params[:sort] through SORTABLE and uses a hash condition.",
+            "similarity": 0.91
+          }
+        ],
+        "prior_disposition": "duplicate",
+        "caveats": []
+      }
+    }
+  ]
+}

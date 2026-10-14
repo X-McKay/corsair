@@ -1,0 +1,38 @@
+{
+  "relevant": [
+    "7589"
+  ],
+  "dispositions": {
+    "7589": "fixed"
+  },
+  "distractors": [],
+  "prior_disposition": null,
+  "must_not_claim": [
+    "no similar issues",
+    "no other similar",
+    "there are no similar"
+  ],
+  "injection_markers": [],
+  "script": [
+    {
+      "final": {
+        "summary": "One prior decision with the same CWE recorded a fix. Similarity search failed, so comparable decisions may be missing.",
+        "precedents": [
+          {
+            "issue_id": "7589",
+            "title": "YAML.load on imported profile data in the legacy module",
+            "state": "Done",
+            "disposition": "fixed",
+            "relation": "cwe",
+            "rationale": "Reviewers recorded a fix.",
+            "quote": "Fixed in commit c07be11: ProfileImport uses YAML.safe_load with permitted_classes set to an empty list."
+          }
+        ],
+        "prior_disposition": null,
+        "caveats": [
+          "similarity search failed: TimeoutError: graph search timed out after 30 s"
+        ]
+      }
+    }
+  ]
+}

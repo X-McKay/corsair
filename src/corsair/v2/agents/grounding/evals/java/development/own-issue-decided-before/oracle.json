@@ -1,0 +1,32 @@
+{
+  "relevant": [
+    "5200"
+  ],
+  "dispositions": {
+    "5200": "fixed"
+  },
+  "distractors": [],
+  "prior_disposition": "fixed",
+  "must_not_claim": [],
+  "injection_markers": [],
+  "script": [
+    {
+      "final": {
+        "summary": "This issue was decided before: one prior decision, on this same code, recorded a fix.",
+        "precedents": [
+          {
+            "issue_id": "5200",
+            "title": "XML external entities enabled when parsing invoice uploads",
+            "state": "Resolved",
+            "disposition": "fixed",
+            "relation": "self",
+            "rationale": "Reviewers recorded the change that fixed it.",
+            "quote": "Fixed in 2.8.1: InvoiceParser sets disallow-doctype-decl to true on the DocumentBuilderFactory."
+          }
+        ],
+        "prior_disposition": "fixed",
+        "caveats": []
+      }
+    }
+  ]
+}

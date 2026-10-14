@@ -1,0 +1,41 @@
+{
+  "relevant": [
+    "7548"
+  ],
+  "dispositions": {
+    "7548": "unexplained"
+  },
+  "distractors": [],
+  "prior_disposition": null,
+  "must_not_claim": [],
+  "injection_markers": [],
+  "script": [
+    {
+      "tool": "read_issue_comments",
+      "args": {
+        "issue_id": "7548"
+      }
+    },
+    {
+      "final": {
+        "summary": "One similar issue was closed, but no retrieved comment says why.",
+        "precedents": [
+          {
+            "issue_id": "7548",
+            "title": "where clause interpolates the sort parameter in the v1 API",
+            "state": "Closed",
+            "disposition": "unexplained",
+            "relation": "similarity",
+            "rationale": "Closed with no stated reason.",
+            "quote": "where clause interpolates the sort parameter in the v1 API",
+            "similarity": 0.86
+          }
+        ],
+        "prior_disposition": null,
+        "caveats": [
+          "The only precedent was closed with no stated reason."
+        ]
+      }
+    }
+  ]
+}

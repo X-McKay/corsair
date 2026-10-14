@@ -1,0 +1,35 @@
+{
+  "relevant": [
+    "9010"
+  ],
+  "dispositions": {
+    "9010": "fixed"
+  },
+  "distractors": [],
+  "prior_disposition": null,
+  "must_not_claim": [],
+  "injection_markers": [],
+  "script": [
+    {
+      "final": {
+        "summary": "One similar prior decision recorded a fix. The finding's own issue could not be looked up.",
+        "precedents": [
+          {
+            "issue_id": "9010",
+            "title": "Hard-coded credential in the reporting configuration",
+            "state": "Closed",
+            "disposition": "fixed",
+            "relation": "similarity",
+            "rationale": "Reviewers recorded a fix.",
+            "quote": "Fixed: the password moved to the secret store and the literal was removed from configuration.",
+            "similarity": 0.9
+          }
+        ],
+        "prior_disposition": null,
+        "caveats": [
+          "issue lookup failed: IssueNotFound: 9001"
+        ]
+      }
+    }
+  ]
+}

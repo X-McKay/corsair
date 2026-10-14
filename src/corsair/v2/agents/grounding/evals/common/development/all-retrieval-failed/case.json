@@ -1,0 +1,18 @@
+{
+  "language": "common",
+  "framework": "none",
+  "family": "hard-coded-credential",
+  "kind": "failure-mode",
+  "category": "failure-mode",
+  "probes": "Every retrieval step failed, so nothing was retrieved and the context holds only degraded notes.",
+  "expected": "No brief and no model request from the stage; the chain, not the agent, records the degraded reason beside the missing brief.",
+  "dimensions": [
+    "contract",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Corsair-authored targeted grounding case; no v1 grounding suite exists"
+  }
+}

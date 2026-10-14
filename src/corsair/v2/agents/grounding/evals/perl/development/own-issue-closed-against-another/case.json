@@ -1,0 +1,18 @@
+{
+  "language": "perl",
+  "framework": "mojolicious",
+  "family": "sql-injection",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "The own issue was closed pointing at an earlier report that is itself in the context.",
+  "expected": "Both issues are cited: the own issue as duplicate (prior_disposition duplicate) and the earlier report with the fix its comment states.",
+  "dimensions": [
+    "correctness",
+    "grounding"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Corsair-authored targeted grounding case; no v1 grounding suite exists"
+  }
+}

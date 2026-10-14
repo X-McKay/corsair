@@ -1,0 +1,41 @@
+{
+  "finding": {
+    "title": "XML external entities enabled when parsing invoice uploads",
+    "description": "DocumentBuilderFactory is created with default settings and parses the uploaded invoice XML.",
+    "file_path": "src/main/java/com/acme/billing/InvoiceParser.java",
+    "start_line": 47,
+    "symbol": "InvoiceParser.parse",
+    "cwe": "CWE-611"
+  },
+  "context": {
+    "issue": {
+      "id": "5440",
+      "title": "XML external entities enabled when parsing invoice uploads",
+      "state": "Active",
+      "cwe": "CWE-611",
+      "description": "DocumentBuilderFactory is created with default settings and parses the uploaded invoice XML.",
+      "repo_url": "https://dev.azure.com/acme/_git/billing-api",
+      "source_file": "src/main/java/com/acme/billing/InvoiceParser.java:47"
+    },
+    "related": [
+      {
+        "issue": {
+          "id": "5452",
+          "title": "XML external entities enabled when parsing invoice uploads in a sibling handler",
+          "state": "Completed",
+          "cwe": "CWE-611",
+          "description": "DocumentBuilderFactory is created with default settings and parses the uploaded invoice XML.",
+          "repo_url": "https://dev.azure.com/acme/_git/billing-api"
+        },
+        "relation": "nearby",
+        "comments": [
+          {
+            "author": "reviewer",
+            "created_at": "2026-02-27",
+            "text": "Fixed in 2.8.1: InvoiceParser sets disallow-doctype-decl to true on the DocumentBuilderFactory."
+          }
+        ]
+      }
+    ]
+  }
+}

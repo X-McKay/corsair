@@ -1,0 +1,49 @@
+{
+  "finding": {
+    "title": "Untrusted pickle loaded from the session cache",
+    "description": "load_session calls pickle.loads on bytes read back from the shared Redis cache.",
+    "file_path": "app/cache/session.py",
+    "start_line": 33,
+    "symbol": "load_session",
+    "cwe": "CWE-502"
+  },
+  "context": {
+    "issue": {
+      "id": "4120",
+      "title": "Untrusted pickle loaded from the session cache",
+      "state": "Closed",
+      "cwe": "CWE-502",
+      "description": "load_session calls pickle.loads on bytes read back from the shared Redis cache.",
+      "repo_url": "https://dev.azure.com/acme/_git/reporting-service",
+      "source_file": "app/cache/session.py:33"
+    },
+    "comments": [
+      {
+        "author": "reviewer",
+        "created_at": "2026-04-11",
+        "text": "Duplicate of 4122: same code path, tracked and resolved there."
+      }
+    ],
+    "related": [
+      {
+        "issue": {
+          "id": "4122",
+          "title": "Untrusted pickle loaded from the session cache (first report)",
+          "state": "Closed",
+          "cwe": "CWE-502",
+          "description": "load_session calls pickle.loads on bytes read back from the shared Redis cache.",
+          "repo_url": "https://dev.azure.com/acme/_git/reporting-service"
+        },
+        "relation": "similarity",
+        "comments": [
+          {
+            "author": "reviewer",
+            "created_at": "2026-04-02",
+            "text": "Fixed in release 3.4: sessions are stored as signed JSON and pickle.loads was removed from load_session."
+          }
+        ],
+        "similarity": 0.91
+      }
+    ]
+  }
+}

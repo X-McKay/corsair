@@ -1,0 +1,43 @@
+{
+  "relevant": [
+    "7631"
+  ],
+  "dispositions": {
+    "7631": "fixed"
+  },
+  "distractors": [
+    "INC-7719"
+  ],
+  "prior_disposition": null,
+  "must_not_claim": [],
+  "injection_markers": [],
+  "script": [
+    {
+      "tool": "read_issue",
+      "args": {
+        "issue_id": "INC-7719"
+      }
+    },
+    {
+      "final": {
+        "summary": "One similar prior decision recorded a fix. Its comment points at another ticket that was not retrieved.",
+        "precedents": [
+          {
+            "issue_id": "7631",
+            "title": "where clause interpolates the sort parameter in the mobile API",
+            "state": "Closed",
+            "disposition": "fixed",
+            "relation": "similarity",
+            "rationale": "Reviewers recorded a fix.",
+            "quote": "Fixed together with INC-7719; the patch and its review are on that ticket.",
+            "similarity": 0.84
+          }
+        ],
+        "prior_disposition": null,
+        "caveats": [
+          "INC-7719 is referenced but was not retrieved, so it cannot be cited."
+        ]
+      }
+    }
+  ]
+}

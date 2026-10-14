@@ -1,0 +1,37 @@
+{
+  "relevant": [
+    "7443"
+  ],
+  "dispositions": {
+    "7443": "not_exploitable"
+  },
+  "distractors": [],
+  "prior_disposition": null,
+  "must_not_claim": [],
+  "injection_markers": [],
+  "script": [
+    {
+      "tool": "find_prior_issues",
+      "args": {}
+    },
+    {
+      "final": {
+        "summary": "One similar prior decision: reviewers judged comparable code not exploitable, for a reason specific to that code. This issue itself has not been decided.",
+        "precedents": [
+          {
+            "issue_id": "7443",
+            "title": "redirect_to uses the return_to parameter in the admin variant",
+            "state": "Closed",
+            "disposition": "not_exploitable",
+            "relation": "similarity",
+            "rationale": "Reviewers found the input constrained before it is used.",
+            "quote": "Not exploitable: return_to is replaced by a stored session value before the redirect.",
+            "similarity": 0.82
+          }
+        ],
+        "prior_disposition": null,
+        "caveats": []
+      }
+    }
+  ]
+}

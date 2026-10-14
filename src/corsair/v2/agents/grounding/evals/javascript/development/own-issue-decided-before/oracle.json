@@ -1,0 +1,32 @@
+{
+  "relevant": [
+    "6300"
+  ],
+  "dispositions": {
+    "6300": "fixed"
+  },
+  "distractors": [],
+  "prior_disposition": "fixed",
+  "must_not_claim": [],
+  "injection_markers": [],
+  "script": [
+    {
+      "final": {
+        "summary": "This issue was decided before: one prior decision, on this same code, recorded a fix.",
+        "precedents": [
+          {
+            "issue_id": "6300",
+            "title": "Search term reflected into the results page without escaping",
+            "state": "Resolved",
+            "disposition": "fixed",
+            "relation": "self",
+            "rationale": "Reviewers recorded the change that fixed it.",
+            "quote": "Fixed in PR 812: renderResults now renders through the template engine, which escapes q."
+          }
+        ],
+        "prior_disposition": "fixed",
+        "caveats": []
+      }
+    }
+  ]
+}

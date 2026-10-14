@@ -1,0 +1,38 @@
+{
+  "relevant": [
+    "5389"
+  ],
+  "dispositions": {
+    "5389": "fixed"
+  },
+  "distractors": [],
+  "prior_disposition": null,
+  "must_not_claim": [
+    "no similar issues",
+    "no other similar",
+    "there are no similar"
+  ],
+  "injection_markers": [],
+  "script": [
+    {
+      "final": {
+        "summary": "One prior decision with the same CWE recorded a fix. Similarity search failed, so comparable decisions may be missing.",
+        "precedents": [
+          {
+            "issue_id": "5389",
+            "title": "XML external entities enabled when parsing invoice uploads in the legacy module",
+            "state": "Done",
+            "disposition": "fixed",
+            "relation": "cwe",
+            "rationale": "Reviewers recorded a fix.",
+            "quote": "Fixed in 2.8.1: InvoiceParser sets disallow-doctype-decl to true on the DocumentBuilderFactory."
+          }
+        ],
+        "prior_disposition": null,
+        "caveats": [
+          "similarity search failed: TimeoutError: graph search timed out after 30 s"
+        ]
+      }
+    }
+  ]
+}
