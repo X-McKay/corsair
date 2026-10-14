@@ -1,6 +1,6 @@
-"""Operator-owned identification skills, one per source mode, loaded before any model request.
+"""Operator-owned identification skill bytes and provenance, one per source mode.
 
-No skill discovery, user paths, script execution or workspace access is exposed.
+Native Skills publishes each fixed role catalog and discloses its body on activation.
 """
 
 from hashlib import sha256

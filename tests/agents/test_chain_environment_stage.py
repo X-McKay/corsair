@@ -19,7 +19,7 @@ from corsair.nodes.runtime.matrix import load
 SMOKE_TESTS = {f.name: f.smoke for f in load().frameworks}
 from corsair.ports.execution import ExecutionReceipt
 from corsair.ports.sandbox import SandboxHandle
-from evals.fixture_e2e.case import (fixture_case, reviewed_runners, scripted_assessment, scripted_authoring,
+from evals.fixture_e2e.case import (fixture_case, reviewed_runners, scripted_assessment, scripted_control_authoring, scripted_exploit_authoring,
                                     scripted_identification, scripted_planning)
 from evals.fixture_e2e.reviewed import DISCOVER, PREFIX, REVIEWED_TEST
 
@@ -46,7 +46,7 @@ def ready_draft(**changes):
     return {'status': 'ready', 'toolchain_id': ROW, 'recipe': [], 'build_command': list(BUILD),
             'discovery_command': list(DISCOVER), 'framework': 'pytest', 'baseline_test_id': BASELINE_ID,
             'baseline_test_path': 'test_existing.py', 'baseline_test_command': list(BASELINE),
-            'approved_test_paths': [REVIEWED_TEST]} | changes
+            'approved_test_paths': ['test_control.py', 'test_exploit.py']} | changes
 
 
 def environment_model(commands, draft):
@@ -98,7 +98,7 @@ def run(tmp_path):
 
     def go(case, environment=None, identification=None, **options):
         stage_models = StageModels(identification=identification or scripted_identification(), planning=scripted_planning(),
-                                   authoring=scripted_authoring(), assessment=scripted_assessment(),
+                                   control_authoring=scripted_control_authoring(), exploit_authoring=scripted_exploit_authoring(), assessment=scripted_assessment(),
                                    environment=environment)
         with LocalArtifacts(tmp_path / 'artifacts', max_bytes=1024 * 1024) as store, models.override_allow_model_requests(False):
             return asyncio.run(run_direct(case, stage_models, reviewed_runners(store, tmp_path / 'work'), **options))
@@ -120,10 +120,11 @@ def test_an_admitted_ready_environment_replaces_the_declaration(run):
     ready = result.environment
     assert (ready.status, ready.toolchain_image) == ('ready', result.runtime.image)
     # The assessment reads the gate's evidence, which now carries the observed recipe instead of the declared one.
-    assessed = str(next(a for a in result.attempts if a.stage == 'assessment').messages)
+    assessed = str([a for a in result.attempts if a.stage == 'assessment'][-1].messages)
     declared = fixture_case().environment_identity
     assert recipe_sha256(ready) in assessed and declared.recipe_sha256 not in assessed
-    assert result.limitations[:4] == UNOBSERVED[:2] + OBSERVED_IDENTITY
+    assert all(note in result.limitations for note in OBSERVED_IDENTITY)
+    assert any("Unit tests validate" in note for note in result.limitations)
     # The revisions run on the operator's runners, so planning keeps the declared scratch, not the released sandbox's.
     planned = str(next(a for a in result.attempts if a.stage == 'planning').messages)
     assert fixture_case().environment.scratch_location in planned and '/sandbox/scratch' not in planned

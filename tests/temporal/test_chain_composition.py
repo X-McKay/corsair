@@ -22,6 +22,8 @@ from corsair.agents.test_authoring.contracts import AuthoringResult, TestAuthori
 from corsair.agents.test_authoring.dependencies import AuthoringBudget, AuthoringDependencies
 from corsair.agents.test_planning.contracts import TestPlan
 from corsair.composition.direct import CompositionBudget, RecordedFailure, StageModels, run_direct
+from corsair.composition.assembly import FrozenTestPatch
+from corsair.agents.probe_authoring.contracts import Drafted, Blocked
 from corsair.composition.evidence import freeze
 from corsair.nodes.runtime.contracts import MAX_INPUT_BYTES, RuntimeInputs, RuntimeOutcome
 from corsair.nodes.runtime.environment import RuntimeCatalog, runtime_inputs
@@ -33,7 +35,7 @@ from corsair.workflows.chain_runtime import (
     WorkerRunner, chain_result, configure_chain, failure_record, select_runtime, serving, within,
 )
 from evals.fixture_e2e.case import (
-    fixture_case, reviewed_runners, scripted_assessment, scripted_authoring, scripted_identification,
+    fixture_case, reviewed_runners, scripted_assessment, scripted_authoring, scripted_control_authoring, scripted_exploit_authoring, scripted_identification,
     scripted_planning,
 )
 
@@ -43,7 +45,7 @@ CONVERTER = DataConverter(payload_converter_class=PydanticAIPayloadConverter)
 
 def stage_models():
     return StageModels(identification=scripted_identification(), planning=scripted_planning(),
-                       authoring=scripted_authoring(), assessment=scripted_assessment())
+                       control_authoring=scripted_control_authoring(), exploit_authoring=scripted_exploit_authoring(), assessment=scripted_assessment())
 
 
 def canonical(value):
@@ -71,19 +73,19 @@ def test_direct_run_records_and_stage_payloads_roundtrip(direct):
     async def check():
         result = chain_result(direct)
         assert canonical(await roundtrip(result, ChainResult)) == canonical(result)
-        assert [type(a.output) for a in result.attempts] == [IssueIdentification, type(direct.plan), TestPatch,
-                                                              EvidenceAssessment]
-        for attempt, hint in zip(direct.attempts, (IssueIdentification, TestPlan, AuthoringResult, EvidenceAssessment)):
+        assert [type(a.output) for a in result.attempts] == [IssueIdentification, type(direct.plan), Drafted, Drafted,
+                                                              EvidenceAssessment, EvidenceAssessment]
+        for attempt, hint in zip(direct.attempts, (IssueIdentification, TestPlan, Drafted | Blocked, Drafted | Blocked, EvidenceAssessment, EvidenceAssessment)):
             record = StageRecord(attempt.output, attempt.usage, attempt.messages, None)
             assert canonical(await roundtrip(record, StageRecord[hint])) == canonical(record)
-        request = ChainRequest(fixture_case(), StageKeys("a", "b", "c", "d"), CompositionBudget())
+        request = ChainRequest(fixture_case(), StageKeys("a", "b", "c", "d", "e"), CompositionBudget())
         assert await roundtrip(request, ChainRequest) == request
     asyncio.run(check())
 
 
 def test_revision_payloads_keep_non_utf8_bytes(direct):
     async def check():
-        patch = freeze(direct.patch, ("test_documents.py",))
+        patch = freeze(direct.patch, fixture_case().environment.approved_test_paths)
         request = RevisionRequest(revision="candidate", patch=patch, control_test_id="a.py::t", security_test_id="a.py::u",
                                   discovery_command=("python",), operation=uuid4())
         assert await roundtrip(request, RevisionRequest) == request
@@ -99,7 +101,7 @@ def test_runtime_stage_payloads_and_worker_activity(tmp_path):
     catalog = RuntimeCatalog(load(), {"cpython-3.12-pytest": "corsair-python@sha256:" + "a" * 64})
 
     async def check():
-        request = ChainRequest(replace(fixture_case(), runtime=inputs), StageKeys("a", "b", "c", "d"), CompositionBudget())
+        request = ChainRequest(replace(fixture_case(), runtime=inputs), StageKeys("a", "b", "c", "d", "e"), CompositionBudget())
         assert await roundtrip(request, ChainRequest) == request
         configure_chain({"scripted": scripted_identification()}, reviewed_runners(None, tmp_path),
                         activity_config=ACTIVITY_CONFIG)
@@ -149,8 +151,8 @@ def test_admission_refuses_unconfigured_keys_and_budgets_before_any_request(tmp_
              (("scripted",), ceiling.model_copy(update={"output_retries": 0}), "BudgetNotAdmitted"),
              (("scripted",), ceiling.model_copy(update={"admission_refusals": 2}), "BudgetNotAdmitted"),
              # Codex review on 78f1690: the derivation terms are operator-owned like the caps.
-             *((("scripted",), ceiling.model_copy(update={"authoring": ceiling.authoring.model_copy(
-                 update={term: getattr(ceiling.authoring, term) + 1})}), "BudgetNotAdmitted")
+             *((("scripted",), ceiling.model_copy(update={"control_authoring": ceiling.control_authoring.model_copy(
+                 update={term: getattr(ceiling.control_authoring, term) + 1})}), "BudgetNotAdmitted")
                for term in ("slack_tool_calls", "tokens_per_request"))]
     for keys, budget, kind in cases:
         with pytest.raises(ApplicationError) as refusal:
@@ -176,7 +178,7 @@ def test_a_serving_configuration_refuses_replacement_and_overlapping_durable_run
     configure_chain({"scripted": scripted_identification()}, runners, activity_config=ACTIVITY_CONFIG)
 
 
-def test_authoring_context_resolves_the_runner_on_the_worker_and_carries_messages(direct):
+def test_historical_authoring_context_resolves_development_runner_without_production_registration():
     resolved = []
 
     def runners(purpose):
@@ -184,8 +186,17 @@ def test_authoring_context_resolves_the_runner_on_the_worker_and_carries_message
         return object()
     configure_chain({"scripted": scripted_authoring()}, runners, activity_config=ACTIVITY_CONFIG)
     case = fixture_case()
-    payload = AuthoringPayload(TestAuthoringInput(plan=direct.plan, source_files=case.issue.source_files,
-                                                  environment=case.environment),
+    from evals.fixture_e2e.case import historical_reference_plan
+    from corsair.agents.test_planning.contracts import ReadyTestPlan
+    raw = historical_reference_plan()
+    sources = {s.path:s.content.splitlines() for s in case.issue.source_files}
+    def quoted(ref): return ref | {'quote':'\n'.join(sources[ref['path']][ref['start_line']-1:ref['end_line']])}
+    raw['citations'] = [quoted(c) for c in raw['citations']]
+    for role in ('control','security'): raw[role]['source_references'] = [quoted(c) for c in raw[role]['source_references']]
+    plan = ReadyTestPlan.model_validate(raw)
+    old_environment = case.environment.model_copy(update={'approved_test_paths': ('test_documents.py',)})
+    payload = AuthoringPayload(TestAuthoringInput(plan=plan, source_files=case.issue.source_files,
+                                                  environment=old_environment),
                                WorkerRunner("development"), AuthoringBudget(dev_runs=2))
     messages = [ModelRequest(parts=[UserPromptPart("written")])]
     # As an activity receives it: plain JSON values, rehydrated into native messages.

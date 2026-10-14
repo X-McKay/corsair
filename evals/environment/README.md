@@ -28,3 +28,23 @@ written held-out cases are required before prompt tuning or runtime admission.
 Unsupported-runtime truth has bounded evaluator-only wording anchors for required and prepared
 versions. An inverted claim fails even with correct source quotations. This is a curated semantic
 regression, not validation of arbitrary natural-language requirements.
+
+
+Versioned correction: `development-v2` uses `cases-v2.json` and `manifest-v2.json`.
+Select it explicitly with `python -m evals.environment.evaluate --cases development-v2`
+(or the environment suite's `SET=development-v2`). The original `development` set,
+`cases.json`, manifest and historical receipts remain unchanged. V2 declares the
+recorded locked pip, build, collection, baseline-test and offline Maven command
+arguments in the agent-visible repository source. It preserves the eight case
+statuses, failure layers and command budgets; unknown delivery still requires the
+first dispatched receipt, and the budget case still requires the admitted prefix.
+The exact-command double and oracle remain unchanged: no alternative spelling is
+silently accepted, and an early unrelated refusal does not satisfy the trajectory.
+
+Prompt v9 adds a generic runtime precheck before setup and concise halt feedback:
+no follow-up setup commands after a halt, no invented run ID for a refused call,
+and blocked output after an observed failure. Native correction admission remains
+unchanged. Comparing original v1/live with v2/current changes both fixture source
+and procedure; it cannot isolate a prompt effect. The corrected scripted 8/8 result
+checks fixture/contracts, not provider capability or runtime readiness. A fresh
+explicit v2 provider run at unchanged caps is needed for that narrower comparison.

@@ -16,12 +16,12 @@ from pathlib import Path
 from corsair.adapters.docker_image import WORK, DockerCase, docker
 from corsair.adapters.pytest_runner import PytestRunnerConfig
 from corsair.agents.test_planning.contracts import EnvironmentEvidence
-from corsair.composition.direct import FixtureCase
+from corsair.composition.direct import FixtureCase, CapturedReviewSource
 from corsair.core.disposition import EnvironmentIdentity
 from corsair.investigation.frameworks import harness
 
-from .case import CASES, FIXTURE, fixture_case
-from .reviewed import REVIEWED_TEST
+from .case import CASES, FIXTURE, BASELINE_TEST, fixture_case
+from corsair.agents.source.contracts import SourceFile
 from .sandbox import DISCOVER, JUNIT, PREFIX, TOOLCHAIN, WITNESS_RECORD, _pytest_version
 
 ROW = "cpython-3.12-pytest"
@@ -55,7 +55,7 @@ def docker_case(image: str, timeout: int, case: str = "exploitable") -> FixtureC
     base = fixture_case(case)
     environment = EnvironmentEvidence(
         language="Python", runtime="CPython 3.12", framework=f"pytest {_pytest_version()}",
-        discovery_command=DISCOVER, approved_test_paths=(REVIEWED_TEST,), baseline_test=base.environment.baseline_test,
+        discovery_command=DISCOVER, approved_test_paths=("test_control.py", "test_exploit.py"), baseline_test=base.environment.baseline_test,
         scratch_location="The per-test pytest tmp_path directory under the operator's --basetemp; "
                          "fixtures must not be created elsewhere",
         observation_facilities=base.environment.observation_facilities,
@@ -65,6 +65,11 @@ def docker_case(image: str, timeout: int, case: str = "exploitable") -> FixtureC
         dependency_inventory_sha256=_digest((TOOLCHAIN / "wheels.json").read_bytes()), policy_revision=POLICY,
         limits_sha256=_digest(json.dumps(limits(timeout), sort_keys=True)))
     return FixtureCase(issue=base.issue, environment=environment, environment_identity=identity,
+                       review_sources={revision: CapturedReviewSource(
+                           source_sha256=_digest(source_label(CASES[case][revision])),
+                           files=(SourceFile(path="documents.py", content=(FIXTURE / CASES[case][revision] / "documents.py").read_text()),
+                                  SourceFile(path="test_existing.py", content=BASELINE_TEST)))
+                           for revision in ("baseline", "candidate")},
                        witness_envelope=base.witness_envelope,
                        revision_sources={revision: _digest(source_label(CASES[case][revision]))
                                          for revision in ("baseline", "candidate")})

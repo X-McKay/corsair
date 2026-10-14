@@ -158,6 +158,53 @@ def names_test_in(test_id: str, path: str) -> bool:
     return False
 
 
+def format_test_id(baseline_test_id: str, path: str, name: str, container: str | None = None,
+                   *, baseline_path: str) -> str:
+    """Format explicit test components using the executed baseline's admitted runner grammar.
+
+    No framework prose or guessed delimiter selects a runner. Unsupported names, paths,
+    containers and ambiguous baseline grammars are refused before authoring.
+    """
+    approved_path(path)
+    if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', name):
+        raise ValueError('test_name must be one plain native identifier, not a parameterized test')
+    admitted = []
+    for index, file_of in enumerate(_ID_FILES):
+        try:
+            if file_of(baseline_test_id) != baseline_path:
+                continue
+        except ValueError:
+            continue
+        admitted.append(index)
+    if len(admitted) != 1:
+        raise ValueError('executed baseline must identify exactly one admitted native runner grammar')
+    grammar = admitted[0]
+    if grammar in (0, 2):
+        if container is not None and not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', container):
+            raise ValueError('test_container must be one native class or suite identifier')
+        value = f'{path}::{container + "::" if container else ""}{name}'
+    elif grammar == 1:
+        if container is None:
+            raise ValueError('this runner requires an explicit test_container class')
+        value = f'{path}::{container}#{name}'
+    elif grammar == 3:
+        if container is not None:
+            raise ValueError('this runner admits only top-level tests without test_container')
+        value = f'{path}#{name}'
+    else:
+        root = 'src/test/java/'
+        before, separator, relative = path.partition(root)
+        if not separator or not relative.endswith('.java') or (before and not before.endswith('/')):
+            raise ValueError('test_path must use the admitted native source root')
+        class_name = relative[:-5].replace('/', '.')
+        if container is not None and container != class_name:
+            raise ValueError('test_container differs from the class named by test_path')
+        value = f'{before}{class_name}#{name}'
+    if _ID_FILES[grammar](value) != path:
+        raise ValueError('formatted test identity does not match test_path in the baseline runner grammar')
+    return value
+
+
 def native_test_function(test_id: str) -> str:
     """The function/subtest name reported by an admitted native runner grammar.
 

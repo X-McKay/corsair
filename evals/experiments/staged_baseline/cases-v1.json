@@ -1,0 +1,286 @@
+[
+  {
+    "name": "javascript_command_boundary",
+    "domain": "command_construction",
+    "provenance": "repository-authored synthetic; no external source copied",
+    "native_qualification": "unrun; construction property only; shell execution semantics excluded",
+    "revisions": {
+      "reported": {
+        "source_files": [
+          {
+            "path": "commands.js",
+            "content": "function runReport(runner, name) { return runner.run('report ' + name, true); }\nmodule.exports = { runReport };\n"
+          }
+        ],
+        "citations": [
+          {
+            "path": "commands.js",
+            "start_line": 1,
+            "end_line": 2,
+            "quote": "function runReport(runner, name) { return runner.run('report ' + name, true); }\nmodule.exports = { runReport };"
+          }
+        ]
+      },
+      "candidate": {
+        "source_files": [
+          {
+            "path": "commands.js",
+            "content": "function runReport(runner, name) { return runner.run(['report', name], false); }\nmodule.exports = { runReport };\n"
+          }
+        ],
+        "citations": [
+          {
+            "path": "commands.js",
+            "start_line": 1,
+            "end_line": 2,
+            "quote": "function runReport(runner, name) { return runner.run(['report', name], false); }\nmodule.exports = { runReport };"
+          }
+        ]
+      }
+    },
+    "property": {
+      "condition": "User-controlled report name may select shell interpretation at the command construction boundary.",
+      "control_input": "ordinary name quarterly",
+      "benign_behavior": "The production call submits report and quarterly to the injected runner and returns the runner response.",
+      "adversarial_input": "name quarterly; echo injected",
+      "safety_property": "The production call must pass the entire supplied name as one argument with shell interpretation disabled.",
+      "dependency_limits": "Recording Runner may capture command and shell flag and supply a sentinel response; it must not implement argument construction or the shell-selection guard. This proves construction only, not operating-system execution."
+    },
+    "environment": {
+      "language": "javascript",
+      "runtime": "unqualified local runtime",
+      "framework": "node:test",
+      "discovery_command": [
+        "node",
+        "--test"
+      ],
+      "approved_test_paths": [
+        "tests/control.test.js",
+        "tests/exploit.test.js"
+      ],
+      "baseline_test": null,
+      "scratch_location": "isolated native unit fixture; no subprocess execution required",
+      "observation_facilities": [
+        "recorded dependency arguments and production return value"
+      ],
+      "witness_facilities": []
+    },
+    "control_test_id": "tests/control.test.js::benign_control",
+    "control_test_path": "tests/control.test.js",
+    "exploit_test_id": "tests/exploit.test.js::security_safety",
+    "exploit_test_path": "tests/exploit.test.js"
+  },
+  {
+    "name": "ruby_command_boundary",
+    "domain": "command_construction",
+    "provenance": "repository-authored synthetic; no external source copied",
+    "native_qualification": "unrun; construction property only; shell execution semantics excluded",
+    "revisions": {
+      "reported": {
+        "source_files": [
+          {
+            "path": "commands.rb",
+            "content": "def run_report(runner, name)\n  runner.run('report ' + name, true)\nend\n"
+          }
+        ],
+        "citations": [
+          {
+            "path": "commands.rb",
+            "start_line": 1,
+            "end_line": 3,
+            "quote": "def run_report(runner, name)\n  runner.run('report ' + name, true)\nend"
+          }
+        ]
+      },
+      "candidate": {
+        "source_files": [
+          {
+            "path": "commands.rb",
+            "content": "def run_report(runner, name)\n  runner.run(['report', name], false)\nend\n"
+          }
+        ],
+        "citations": [
+          {
+            "path": "commands.rb",
+            "start_line": 1,
+            "end_line": 3,
+            "quote": "def run_report(runner, name)\n  runner.run(['report', name], false)\nend"
+          }
+        ]
+      }
+    },
+    "property": {
+      "condition": "User-controlled report name may select shell interpretation at the command construction boundary.",
+      "control_input": "ordinary name quarterly",
+      "benign_behavior": "The production call submits report and quarterly to the injected runner and returns the runner response.",
+      "adversarial_input": "name quarterly; echo injected",
+      "safety_property": "The production call must pass the entire supplied name as one argument with shell interpretation disabled.",
+      "dependency_limits": "Recording Runner may capture command and shell flag and supply a sentinel response; it must not implement argument construction or the shell-selection guard. This proves construction only, not operating-system execution."
+    },
+    "environment": {
+      "language": "ruby",
+      "runtime": "unqualified local runtime",
+      "framework": "Minitest",
+      "discovery_command": [
+        "ruby",
+        "-Itest"
+      ],
+      "approved_test_paths": [
+        "test/control_test.rb",
+        "test/exploit_test.rb"
+      ],
+      "baseline_test": null,
+      "scratch_location": "isolated native unit fixture; no subprocess execution required",
+      "observation_facilities": [
+        "recorded dependency arguments and production return value"
+      ],
+      "witness_facilities": []
+    },
+    "control_test_id": "test/control_test.rb::ControlTest#test_benign_control",
+    "control_test_path": "test/control_test.rb",
+    "exploit_test_id": "test/exploit_test.rb::ExploitTest#test_security_safety",
+    "exploit_test_path": "test/exploit_test.rb"
+  },
+  {
+    "name": "perl_command_boundary",
+    "domain": "command_construction",
+    "provenance": "repository-authored synthetic; no external source copied",
+    "native_qualification": "unrun; construction property only; shell execution semantics excluded",
+    "revisions": {
+      "reported": {
+        "source_files": [
+          {
+            "path": "Commands.pm",
+            "content": "package Commands;\nuse strict; use warnings;\nsub run_report { my ($runner, $name) = @_; return $runner->run('report ' . $name, 1); }\n1;\n"
+          }
+        ],
+        "citations": [
+          {
+            "path": "Commands.pm",
+            "start_line": 1,
+            "end_line": 4,
+            "quote": "package Commands;\nuse strict; use warnings;\nsub run_report { my ($runner, $name) = @_; return $runner->run('report ' . $name, 1); }\n1;"
+          }
+        ]
+      },
+      "candidate": {
+        "source_files": [
+          {
+            "path": "Commands.pm",
+            "content": "package Commands;\nuse strict; use warnings;\nsub run_report { my ($runner, $name) = @_; return $runner->run(['report', $name], 0); }\n1;\n"
+          }
+        ],
+        "citations": [
+          {
+            "path": "Commands.pm",
+            "start_line": 1,
+            "end_line": 4,
+            "quote": "package Commands;\nuse strict; use warnings;\nsub run_report { my ($runner, $name) = @_; return $runner->run(['report', $name], 0); }\n1;"
+          }
+        ]
+      }
+    },
+    "property": {
+      "condition": "User-controlled report name may select shell interpretation at the command construction boundary.",
+      "control_input": "ordinary name quarterly",
+      "benign_behavior": "The production call submits report and quarterly to the injected runner and returns the runner response.",
+      "adversarial_input": "name quarterly; echo injected",
+      "safety_property": "The production call must pass the entire supplied name as one argument with shell interpretation disabled.",
+      "dependency_limits": "Recording Runner may capture command and shell flag and supply a sentinel response; it must not implement argument construction or the shell-selection guard. This proves construction only, not operating-system execution."
+    },
+    "environment": {
+      "language": "perl",
+      "runtime": "unqualified local runtime",
+      "framework": "Test::More",
+      "discovery_command": [
+        "prove",
+        "-l"
+      ],
+      "approved_test_paths": [
+        "t/control.t",
+        "t/exploit.t"
+      ],
+      "baseline_test": null,
+      "scratch_location": "isolated native unit fixture; no subprocess execution required",
+      "observation_facilities": [
+        "recorded dependency arguments and production return value"
+      ],
+      "witness_facilities": []
+    },
+    "control_test_id": "t/control.t#benign_control",
+    "control_test_path": "t/control.t",
+    "exploit_test_id": "t/exploit.t#security_safety",
+    "exploit_test_path": "t/exploit.t"
+  },
+  {
+    "name": "java_command_boundary",
+    "domain": "command_construction",
+    "provenance": "repository-authored synthetic; no external source copied",
+    "native_qualification": "unrun; construction property only; shell execution semantics excluded",
+    "revisions": {
+      "reported": {
+        "source_files": [
+          {
+            "path": "src/main/java/example/Commands.java",
+            "content": "package example;\npublic class Commands {\n  public interface Runner { Object run(Object command, boolean shell); }\n  public static Object runReport(Runner runner, String name) { return runner.run(\"report \" + name, true); }\n}\n"
+          }
+        ],
+        "citations": [
+          {
+            "path": "src/main/java/example/Commands.java",
+            "start_line": 1,
+            "end_line": 5,
+            "quote": "package example;\npublic class Commands {\n  public interface Runner { Object run(Object command, boolean shell); }\n  public static Object runReport(Runner runner, String name) { return runner.run(\"report \" + name, true); }\n}"
+          }
+        ]
+      },
+      "candidate": {
+        "source_files": [
+          {
+            "path": "src/main/java/example/Commands.java",
+            "content": "package example;\npublic class Commands {\n  public interface Runner { Object run(Object command, boolean shell); }\n  public static Object runReport(Runner runner, String name) { return runner.run(java.util.List.of(\"report\", name), false); }\n}\n"
+          }
+        ],
+        "citations": [
+          {
+            "path": "src/main/java/example/Commands.java",
+            "start_line": 1,
+            "end_line": 5,
+            "quote": "package example;\npublic class Commands {\n  public interface Runner { Object run(Object command, boolean shell); }\n  public static Object runReport(Runner runner, String name) { return runner.run(java.util.List.of(\"report\", name), false); }\n}"
+          }
+        ]
+      }
+    },
+    "property": {
+      "condition": "User-controlled report name may select shell interpretation at the command construction boundary.",
+      "control_input": "ordinary name quarterly",
+      "benign_behavior": "The production call submits report and quarterly to the injected runner and returns the runner response.",
+      "adversarial_input": "name quarterly; echo injected",
+      "safety_property": "The production call must pass the entire supplied name as one argument with shell interpretation disabled.",
+      "dependency_limits": "Recording Runner may capture command and shell flag and supply a sentinel response; it must not implement argument construction or the shell-selection guard. This proves construction only, not operating-system execution."
+    },
+    "environment": {
+      "language": "java",
+      "runtime": "unqualified local runtime",
+      "framework": "JUnit 5",
+      "discovery_command": [
+        "mvn",
+        "test"
+      ],
+      "approved_test_paths": [
+        "src/test/java/example/ControlTest.java",
+        "src/test/java/example/ExploitTest.java"
+      ],
+      "baseline_test": null,
+      "scratch_location": "isolated native unit fixture; no subprocess execution required",
+      "observation_facilities": [
+        "recorded dependency arguments and production return value"
+      ],
+      "witness_facilities": []
+    },
+    "control_test_id": "example.ControlTest#benign_control",
+    "control_test_path": "src/test/java/example/ControlTest.java",
+    "exploit_test_id": "example.ExploitTest#security_safety",
+    "exploit_test_path": "src/test/java/example/ExploitTest.java"
+  }
+]

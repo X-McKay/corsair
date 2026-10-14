@@ -1,0 +1,643 @@
+name: staged-planning-v1
+cases:
+- name: python-recording-positive
+  inputs:
+    scope: component
+    identification:
+      status: ready
+      scope: component
+      reason: null
+      reported_issue: Check whether lookup_account interpolates the account input
+        into SQL structure; hostile input must remain a bound parameter. Assess query
+        construction only.
+      target:
+        symbol: lookup_account
+        source:
+          path: queries.py
+          start_line: 4
+          end_line: 5
+          quote: "def lookup_account(database, account):\n    return database.execute(\"\
+            SELECT balance FROM accounts WHERE account = '\" + account + \"'\", ())"
+    source_files:
+    - path: queries.py
+      content: "\"\"\"Reviewed fixture: concatenate untrusted input into SQL query\
+        \ structure.\"\"\"\n\n\ndef lookup_account(database, account):\n    return\
+        \ database.execute(\"SELECT balance FROM accounts WHERE account = '\" + account\
+        \ + \"'\", ())\n"
+    - path: test_existing.py
+      content: "from queries import lookup_account\n\nclass Database:\n    def execute(self,\
+        \ query, parameters):\n        return [(25,)]\n\ndef test_existing_lookup():\n\
+        \    assert lookup_account(Database(), \"alice\") == [(25,)]\n"
+    environment:
+      language: Python
+      runtime: CPython 3.12
+      framework: pytest
+      discovery_command: &id001
+      - python
+      - -m
+      - pytest
+      - --collect-only
+      - -q
+      approved_test_paths:
+      - test_queries.py
+      baseline_test:
+        test_id: test_existing.py::test_existing_lookup
+        path: test_existing.py
+      scratch_location: Per-test in-memory recording dependency only
+      observation_facilities:
+      - Native test outcomes and assertion failure locations; assert failures report
+        AssertionError
+      witness_facilities: []
+  metadata:
+    status: ready
+    symbol: lookup_account
+    target_path: queries.py
+    required_lines:
+    - 4
+    - 5
+    adversarial_markers: []
+    required_reads:
+    - queries.py
+    - test_existing.py
+    reference_plan:
+      status: ready
+      scope: component
+      security_expectation:
+        failure_type: AssertionError
+        safe_behavior: bound_parameter
+      discovery_command: *id001
+      evidence_requirements:
+      - Both control and exploit probe must execute with native outcomes
+      - Review both real source calls, adversarial input and assertions before execution
+      citations:
+      - &id002
+        path: queries.py
+        start_line: 4
+        end_line: 5
+      limitations:
+      - Query construction only; database engine behavior is outside the observation
+        boundary
+      control:
+        test_id: test_queries.py::test_benign_control
+        test_path: test_queries.py
+        fixture_setup:
+        - Create an in-memory recording database dependency returning [(25,)] and
+          recording query plus parameters unchanged
+        implementation_call: queries.lookup_account(database, account)
+        input: account 'alice'
+        required_behavior: Benign lookup returns rows and records the expected query
+          with its account argument
+        observable_witness: Recorded query and parameter arguments from the real lookup_account
+          call
+        observation:
+          kind: dependency_call
+          property: Benign lookup returns rows and records the expected query with
+            its account argument
+          seam: Call the real imported lookup_account with an injected database dependency
+          controlled_dependency: RecordingDatabase.execute records query and parameters
+            unchanged and returns fixed rows; it does not construct or sanitize the
+            query
+        source_references:
+        - *id002
+      security:
+        test_id: test_queries.py::test_security_preserves_query_structure
+        test_path: test_queries.py
+        fixture_setup:
+        - Create an in-memory recording database dependency returning [(25,)] and
+          recording query plus parameters unchanged
+        implementation_call: queries.lookup_account(database, account)
+        input: account "alice' OR 1=1 --"
+        required_behavior: Hostile input remains a bound parameter and never enters
+          SQL structure
+        observable_witness: Recorded query and parameter arguments from the real lookup_account
+          call
+        observation:
+          kind: dependency_call
+          property: Hostile input remains a bound parameter and never enters SQL structure
+          seam: Call the real imported lookup_account with an injected database dependency
+          controlled_dependency: RecordingDatabase.execute records query and parameters
+            unchanged and returns fixed rows; it does not construct or sanitize the
+            query
+        source_references:
+        - *id002
+    adversarial_patterns:
+    - (?i)'\s+OR\s+([0-9]+)\s*=\s*\1(?=\s|--|['"]?$)
+    - (?i)'\s+OR\s+'([a-z0-9_]+)'\s*=\s*'\1'?(?=\s|--|["']?$)
+    observation_mode: unit_test
+    property_markers:
+    - parameter
+    - structure
+    - query
+  expected_output: null
+  evaluators: []
+- name: ruby_command_boundary-fixture-positive
+  inputs:
+    scope: component
+    identification:
+      status: ready
+      scope: component
+      reported_issue: User-controlled report name may select shell interpretation
+        at the command construction boundary.
+      target:
+        symbol: run_report
+        source:
+          path: commands.rb
+          start_line: 1
+          end_line: 3
+          quote: "def run_report(runner, name)\n  runner.run('report ' + name, true)\n\
+            end"
+      reason: null
+    source_files:
+    - path: commands.rb
+      content: "def run_report(runner, name)\n  runner.run('report ' + name, true)\n\
+        end\n"
+    - path: test/control_test.rb
+      content: "require_relative '../commands'\nrequire 'minitest/autorun'\nclass\
+        \ ControlTest < Minitest::Test\n  def test_benign_control\n    runner = Object.new\n\
+        \    def runner.run(command, shell); 'result'; end\n    assert_equal 'result',\
+        \ run_report(runner, 'quarterly')\n  end\nend\n"
+    environment:
+      language: ruby
+      runtime: unqualified local runtime
+      framework: Minitest
+      discovery_command: &id003
+      - ruby
+      - -Itest
+      approved_test_paths:
+      - test/new_control_test.rb
+      - test/exploit_test.rb
+      baseline_test:
+        test_id: test/control_test.rb::ControlTest#test_benign_control
+        path: test/control_test.rb
+      scratch_location: isolated native unit fixture; no subprocess execution required
+      observation_facilities:
+      - recorded dependency arguments and production return value
+      witness_facilities: []
+  metadata:
+    status: ready
+    symbol: run_report
+    target_path: commands.rb
+    required_lines:
+    - 1
+    - 2
+    - 3
+    adversarial_markers:
+    - quarterly; echo injected
+    required_reads:
+    - commands.rb
+    reference_plan:
+      status: ready
+      scope: component
+      security_expectation:
+        failure_type: Minitest::Assertion
+        safe_behavior: literal_argument
+      discovery_command: *id003
+      evidence_requirements:
+      - Both control and exploit probe must execute with native outcomes
+      - Review both real source calls, adversarial input and assertions before execution
+      citations: &id004
+      - path: commands.rb
+        start_line: 1
+        end_line: 3
+      limitations:
+      - Recording Runner may capture command and shell flag and supply a sentinel
+        response; it must not implement argument construction or the shell-selection
+        guard. This proves construction only, not operating-system execution.
+      control:
+        test_id: test/new_control_test.rb::NewControlTest#test_benign_new_control
+        test_path: test/new_control_test.rb
+        fixture_setup:
+        - Recording runner captures command and shell flag, returns sentinel unchanged
+        implementation_call: run_report(runner, name)
+        input: ordinary name quarterly
+        required_behavior: The production call submits report and quarterly to the
+          injected runner and returns the runner response.
+        observable_witness: Recorded runner arguments and return sentinel
+        observation:
+          kind: dependency_call
+          property: The production call submits report and quarterly to the injected
+            runner and returns the runner response.
+          seam: Invoke run_report from imported production source
+          controlled_dependency: Recording Runner may capture command and shell flag
+            and supply a sentinel response; it must not implement argument construction
+            or the shell-selection guard. This proves construction only, not operating-system
+            execution.
+        source_references: *id004
+      security:
+        test_id: test/exploit_test.rb::ExploitTest#test_security_safety
+        test_path: test/exploit_test.rb
+        fixture_setup:
+        - Recording runner captures command and shell flag, returns sentinel unchanged
+        implementation_call: run_report(runner, name)
+        input: name quarterly; echo injected
+        required_behavior: The production call must pass the entire supplied name
+          as one argument with shell interpretation disabled.
+        observable_witness: Recorded runner arguments and return sentinel
+        observation:
+          kind: dependency_call
+          property: The production call must pass the entire supplied name as one
+            argument with shell interpretation disabled.
+          seam: Invoke run_report from imported production source
+          controlled_dependency: Recording Runner may capture command and shell flag
+            and supply a sentinel response; it must not implement argument construction
+            or the shell-selection guard. This proves construction only, not operating-system
+            execution.
+        source_references: *id004
+    adversarial_patterns: []
+    observation_mode: unit_test
+    property_markers:
+    - argument
+    - shell
+  expected_output: null
+  evaluators: []
+- name: perl_command_boundary-fixture-positive
+  inputs:
+    scope: component
+    identification:
+      status: ready
+      scope: component
+      reported_issue: User-controlled report name may select shell interpretation
+        at the command construction boundary.
+      target:
+        symbol: Commands::run_report
+        source:
+          path: Commands.pm
+          start_line: 1
+          end_line: 4
+          quote: 'package Commands;
+
+            use strict; use warnings;
+
+            sub run_report { my ($runner, $name) = @_; return $runner->run(''report
+            '' . $name, 1); }
+
+            1;'
+      reason: null
+    source_files:
+    - path: Commands.pm
+      content: 'package Commands;
+
+        use strict; use warnings;
+
+        sub run_report { my ($runner, $name) = @_; return $runner->run(''report ''
+        . $name, 1); }
+
+        1;
+
+        '
+    - path: t/control.t
+      content: 'use strict; use warnings; use Test::More; use lib ''.''; use Commands;
+
+        { package Runner; sub run { return ''result'' } }
+
+        subtest benign_control => sub { is(Commands::run_report(bless({}, ''Runner''),
+        ''quarterly''), ''result''); };
+
+        done_testing;
+
+        '
+    environment:
+      language: perl
+      runtime: unqualified local runtime
+      framework: Test::More
+      discovery_command: &id005
+      - prove
+      - -l
+      approved_test_paths:
+      - t/new_control.t
+      - t/exploit.t
+      baseline_test:
+        test_id: t/control.t#benign_control
+        path: t/control.t
+      scratch_location: isolated native unit fixture; no subprocess execution required
+      observation_facilities:
+      - recorded dependency arguments and production return value
+      witness_facilities: []
+  metadata:
+    status: ready
+    symbol: Commands::run_report
+    target_path: Commands.pm
+    required_lines:
+    - 1
+    - 2
+    - 3
+    - 4
+    adversarial_markers:
+    - quarterly; echo injected
+    required_reads:
+    - Commands.pm
+    reference_plan:
+      status: ready
+      scope: component
+      security_expectation:
+        failure_type: Test::More
+        safe_behavior: literal_argument
+      discovery_command: *id005
+      evidence_requirements:
+      - Both control and exploit probe must execute with native outcomes
+      - Review both real source calls, adversarial input and assertions before execution
+      citations: &id006
+      - path: Commands.pm
+        start_line: 1
+        end_line: 4
+      limitations:
+      - Recording Runner may capture command and shell flag and supply a sentinel
+        response; it must not implement argument construction or the shell-selection
+        guard. This proves construction only, not operating-system execution.
+      control:
+        test_id: t/new_control.t#benign_new_control
+        test_path: t/new_control.t
+        fixture_setup:
+        - Recording runner captures command and shell flag, returns sentinel unchanged
+        implementation_call: Commands::run_report(runner, name)
+        input: ordinary name quarterly
+        required_behavior: The production call submits report and quarterly to the
+          injected runner and returns the runner response.
+        observable_witness: Recorded runner arguments and return sentinel
+        observation:
+          kind: dependency_call
+          property: The production call submits report and quarterly to the injected
+            runner and returns the runner response.
+          seam: Invoke Commands::run_report from imported production source
+          controlled_dependency: Recording Runner may capture command and shell flag
+            and supply a sentinel response; it must not implement argument construction
+            or the shell-selection guard. This proves construction only, not operating-system
+            execution.
+        source_references: *id006
+      security:
+        test_id: t/exploit.t#security_safety
+        test_path: t/exploit.t
+        fixture_setup:
+        - Recording runner captures command and shell flag, returns sentinel unchanged
+        implementation_call: Commands::run_report(runner, name)
+        input: name quarterly; echo injected
+        required_behavior: The production call must pass the entire supplied name
+          as one argument with shell interpretation disabled.
+        observable_witness: Recorded runner arguments and return sentinel
+        observation:
+          kind: dependency_call
+          property: The production call must pass the entire supplied name as one
+            argument with shell interpretation disabled.
+          seam: Invoke Commands::run_report from imported production source
+          controlled_dependency: Recording Runner may capture command and shell flag
+            and supply a sentinel response; it must not implement argument construction
+            or the shell-selection guard. This proves construction only, not operating-system
+            execution.
+        source_references: *id006
+    adversarial_patterns: []
+    observation_mode: unit_test
+    property_markers:
+    - argument
+    - shell
+  expected_output: null
+  evaluators: []
+- name: java_command_boundary-fixture-positive
+  inputs:
+    scope: component
+    identification:
+      status: ready
+      scope: component
+      reported_issue: User-controlled report name may select shell interpretation
+        at the command construction boundary.
+      target:
+        symbol: Commands.runReport
+        source:
+          path: src/main/java/example/Commands.java
+          start_line: 1
+          end_line: 5
+          quote: "package example;\npublic class Commands {\n  public interface Runner\
+            \ { Object run(Object command, boolean shell); }\n  public static Object\
+            \ runReport(Runner runner, String name) { return runner.run(\"report \"\
+            \ + name, true); }\n}"
+      reason: null
+    source_files:
+    - path: src/main/java/example/Commands.java
+      content: "package example;\npublic class Commands {\n  public interface Runner\
+        \ { Object run(Object command, boolean shell); }\n  public static Object runReport(Runner\
+        \ runner, String name) { return runner.run(\"report \" + name, true); }\n\
+        }\n"
+    - path: src/test/java/example/ControlTest.java
+      content: 'package example;
+
+        import org.junit.jupiter.api.Test;
+
+        import static org.junit.jupiter.api.Assertions.assertEquals;
+
+        class ControlTest { @Test void benign_control() { assertEquals("result", Commands.runReport((command,
+        shell) -> "result", "quarterly")); } }
+
+        '
+    environment:
+      language: java
+      runtime: unqualified local runtime
+      framework: JUnit 5
+      discovery_command: &id007
+      - mvn
+      - test
+      approved_test_paths:
+      - src/test/java/example/NewControlTest.java
+      - src/test/java/example/ExploitTest.java
+      baseline_test:
+        test_id: example.ControlTest#benign_control
+        path: src/test/java/example/ControlTest.java
+      scratch_location: isolated native unit fixture; no subprocess execution required
+      observation_facilities:
+      - recorded dependency arguments and production return value
+      witness_facilities: []
+  metadata:
+    status: ready
+    symbol: Commands.runReport
+    target_path: src/main/java/example/Commands.java
+    required_lines:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    adversarial_markers:
+    - quarterly; echo injected
+    required_reads:
+    - src/main/java/example/Commands.java
+    reference_plan:
+      status: ready
+      scope: component
+      security_expectation:
+        failure_type: org.opentest4j.AssertionFailedError
+        safe_behavior: literal_argument
+      discovery_command: *id007
+      evidence_requirements:
+      - Both control and exploit probe must execute with native outcomes
+      - Review both real source calls, adversarial input and assertions before execution
+      citations: &id008
+      - path: src/main/java/example/Commands.java
+        start_line: 1
+        end_line: 5
+      limitations:
+      - Recording Runner may capture command and shell flag and supply a sentinel
+        response; it must not implement argument construction or the shell-selection
+        guard. This proves construction only, not operating-system execution.
+      control:
+        test_id: example.NewControlTest#benign_new_control
+        test_path: src/test/java/example/NewControlTest.java
+        fixture_setup:
+        - Recording runner captures command and shell flag, returns sentinel unchanged
+        implementation_call: Commands.runReport(runner, name)
+        input: ordinary name quarterly
+        required_behavior: The production call submits report and quarterly to the
+          injected runner and returns the runner response.
+        observable_witness: Recorded runner arguments and return sentinel
+        observation:
+          kind: dependency_call
+          property: The production call submits report and quarterly to the injected
+            runner and returns the runner response.
+          seam: Invoke Commands.runReport from imported production source
+          controlled_dependency: Recording Runner may capture command and shell flag
+            and supply a sentinel response; it must not implement argument construction
+            or the shell-selection guard. This proves construction only, not operating-system
+            execution.
+        source_references: *id008
+      security:
+        test_id: example.ExploitTest#security_safety
+        test_path: src/test/java/example/ExploitTest.java
+        fixture_setup:
+        - Recording runner captures command and shell flag, returns sentinel unchanged
+        implementation_call: Commands.runReport(runner, name)
+        input: name quarterly; echo injected
+        required_behavior: The production call must pass the entire supplied name
+          as one argument with shell interpretation disabled.
+        observable_witness: Recorded runner arguments and return sentinel
+        observation:
+          kind: dependency_call
+          property: The production call must pass the entire supplied name as one
+            argument with shell interpretation disabled.
+          seam: Invoke Commands.runReport from imported production source
+          controlled_dependency: Recording Runner may capture command and shell flag
+            and supply a sentinel response; it must not implement argument construction
+            or the shell-selection guard. This proves construction only, not operating-system
+            execution.
+        source_references: *id008
+    adversarial_patterns: []
+    observation_mode: unit_test
+    property_markers:
+    - argument
+    - shell
+  expected_output: null
+  evaluators: []
+- name: jest-recording-positive
+  inputs:
+    scope: component
+    identification:
+      status: ready
+      scope: component
+      reported_issue: Check whether user name can become template structure rather
+        than a literal rendering value.
+      target:
+        symbol: renderPreview
+        source:
+          path: preview.js
+          start_line: 1
+          end_line: 3
+          quote: "export function renderPreview(client, name) {\n  return client.render({template:\
+            \ 'preview', value: name});\n}"
+      reason: null
+    source_files:
+    - path: preview.js
+      content: "export function renderPreview(client, name) {\n  return client.render({template:\
+        \ 'preview', value: name});\n}\n"
+    - path: existing.test.js
+      content: "import {renderPreview} from './preview.js';\nfunction recorder() {\
+        \ const calls = []; return {calls, render: args => { calls.push(args); return\
+        \ 'ok'; }}; }\ntest('control', () => {\n  const client = recorder();\n  expect(renderPreview(client,\
+        \ 'Alice')).toBe('ok');\n  expect(client.calls).toEqual([{template: 'preview',\
+        \ value: 'Alice'}]);\n});\ntest('existing_adversarial', () => {\n  const client\
+        \ = recorder();\n  expect(renderPreview(client, '{{admin}}')).toBe('ok');\n\
+        \  expect(client.calls).toEqual([{template: 'preview', value: '{{admin}}'}]);\n\
+        });\n"
+    environment:
+      language: JavaScript
+      runtime: Node fixture
+      framework: Jest
+      discovery_command: &id009
+      - npx
+      - jest
+      - --listTests
+      - --json
+      approved_test_paths:
+      - preview.test.js
+      baseline_test:
+        path: existing.test.js
+        test_id: existing.test.js::control
+      scratch_location: in-memory recording client
+      observation_facilities:
+      - native assertions and recorded client arguments
+      witness_facilities: []
+  metadata:
+    status: ready
+    symbol: renderPreview
+    target_path: preview.js
+    required_lines:
+    - 1
+    - 2
+    - 3
+    adversarial_markers:
+    - '{{admin}}'
+    required_reads:
+    - preview.js
+    - existing.test.js
+    reference_plan:
+      status: ready
+      scope: component
+      security_expectation:
+        failure_type: Error
+        safe_behavior: data_remains_value
+      discovery_command: *id009
+      evidence_requirements:
+      - Both control and exploit probe must execute with native outcomes
+      - Review both real source calls, adversarial input and assertions before execution
+      citations: &id010
+      - path: preview.js
+        start_line: 1
+        end_line: 3
+      limitations:
+      - Argument construction only; rendering engine semantics excluded
+      control:
+        test_id: preview.test.js::control
+        test_path: preview.test.js
+        fixture_setup:
+        - Rendering client records unchanged arguments and returns ok
+        implementation_call: renderPreview(client, name)
+        input: Alice
+        required_behavior: Return ok and pass fixed template preview with unchanged
+          value Alice
+        observable_witness: Recorded rendering client arguments
+        observation:
+          kind: dependency_call
+          property: fixed template and unchanged value
+          seam: Imported renderPreview
+          controlled_dependency: Client records arguments without parsing or sanitizing
+        source_references: *id010
+      security:
+        test_id: preview.test.js::exploit
+        test_path: preview.test.js
+        fixture_setup:
+        - Rendering client records unchanged arguments and returns ok
+        implementation_call: renderPreview(client, name)
+        input: '{{admin}}'
+        required_behavior: Return ok and pass fixed template preview with unchanged
+          value {{admin}}
+        observable_witness: Recorded rendering client arguments
+        observation:
+          kind: dependency_call
+          property: fixed template and unchanged value
+          seam: Imported renderPreview
+          controlled_dependency: Client records arguments without parsing or sanitizing
+        source_references: *id010
+    adversarial_patterns: []
+    observation_mode: unit_test
+    property_markers:
+    - template
+    - value
+  expected_output: null
+  evaluators: []
+evaluators: []
+report_evaluators: []

@@ -1,4 +1,4 @@
-"""write_test_file: one complete approved test file into this run's patch, refused when it observes the witness's facilities."""
+"""write_test_file: one complete approved file, admitted against the planned observation boundary."""
 
 from hashlib import sha256
 from typing import Annotated
@@ -33,7 +33,7 @@ async def write_test_file(ctx: RunContext[AuthoringDependencies],
         return RefusedWrite(status="refused", path=path, findings=findings[:32], refusals_left=left, reason=(
             "Refused: test code violates the planned observation or interpreter boundary ("
             + "; ".join(f"line {f.line}: {f.facility}" for f in findings[:8]) + "). Use the planned observation boundary. "
-            "Remove these constructs and assert "
+            "The operator supplies any planned witness; do not implement another recorder. Remove these constructs and assert "
             "the planned required behavior. The file keeps its previous content. "
             + ("Another refusal ends this stage blocked." if left else "This stage now ends blocked at admission.")))
     return WrittenFile(path=path, sha256=sha256(data).hexdigest(), size=len(data))

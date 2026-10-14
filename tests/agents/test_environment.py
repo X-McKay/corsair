@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from pydantic_ai import models
 from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.messages import ModelResponse, ToolCallPart
+from tests.agents.native_skills import activate_skill
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import UsageLimits
 
@@ -84,8 +85,10 @@ def scripted(final, calls):
     seen = []
 
     async def respond(messages, info):
-        assert "sole task" in info.instructions and SKILL_TEXT.strip() in info.instructions
-        assert {t.name for t in info.function_tools} == {"read_source", "list_toolchains", "run_setup_command", "read_output"}
+        activation = activate_skill(messages, info, 'prepare-environment', SKILL_TEXT)
+        if activation is not None:
+            return activation
+        assert {t.name for t in info.function_tools} == {"load_capability", "read_source", "list_toolchains", "run_setup_command", "read_output"}
         if len(seen) < len(calls):
             seen.append(calls[len(seen)])
             name, args = seen[-1]

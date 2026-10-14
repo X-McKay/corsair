@@ -16,6 +16,7 @@ from openai import APIConnectionError
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from pydantic_ai import capture_run_messages, models
 from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart, ToolReturnPart
+from evals.native_skills import load_skills
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RunUsage, UsageLimits
 from pydantic_evals import Dataset, set_eval_attribute
@@ -26,12 +27,13 @@ from corsair.inference.config import load_agent_config
 from corsair.inference.models import configured_model
 from corsair.agents.source.contracts import SourceRead
 from corsair.agents.source.tools import READ_SOURCE_TOOL
-from corsair.agents.test_planning.agent import CONFIG_VERSION, create_test_planning_agent
+from corsair.agents.test_planning.agent import MANIFEST_IDENTITY, CONFIG_VERSION, create_test_planning_agent
 from corsair.agents.test_planning.contracts import ReadyTestPlan, TestPlanningInput, UnsupportedTestPlan
 from corsair.agents.test_planning.dependencies import PlanningDependencies
 from corsair.agents.test_planning.prompts import PROMPT_VERSION, SKILL_SHA256, planning_prompt
 from corsair.agents.test_planning.tools import TOOLSET_ID, TOOLSET_SHA256
 from corsair.agents.test_planning.validation import _symbol_occurs
+from evals.test_planning.drafts import component_draft
 from evals.issue_analysis.evaluate import describe_model, record_count
 from evals.issue_analysis.live import NoUnknownToolAttempts, ProviderUsageCoverage, message_counts, output_tool_names
 
@@ -40,12 +42,12 @@ ROOT = Path(__file__).parent
 # (heldout was exposed to v2/v3 in PLAN-0036; heldout2 was written and reviewed apart from the v4/v5 prompt author;
 # heldout3 carries SPEC-0040 typed facilities and witnesses and was written apart from the prompt author).
 DATASETS = {"development": "cases.yaml", "heldout": "cases-heldout.yaml", "heldout2": "cases-heldout-2.yaml",
-            "heldout3": "cases-heldout-3.yaml", "unit": "cases-unit.yaml"}
+            "heldout3": "cases-heldout-3.yaml", "unit": "cases-unit.yaml", "unit-v2": "cases-unit-v2.yaml", "unit-first": "cases-unit-first-v2.yaml"}
 # Held-out sets written before SPEC-0040 typed witnesses: frozen, exposed and no longer runnable.
 RETIRED = frozenset({"heldout", "heldout2"})
 # SPEC-0023: a manifest of case name and content hash beside each held-out dataset.
 MANIFESTS = {"heldout": "cases-heldout.manifest.json", "heldout2": "cases-heldout-2.manifest.json",
-             "heldout3": "cases-heldout-3.manifest.json", "unit": "cases-unit.manifest.json"}
+             "heldout3": "cases-heldout-3.manifest.json", "unit": "cases-unit.manifest.json", "unit-v2": "cases-unit-v2.manifest.json", "unit-first": "cases-unit-first-v2.manifest.json"}
 # Fixture setup reaching the parent of the scratch location or a fixed host directory (PLAN-0025 review finding).
 OUTSIDE_SCRATCH = re.compile(r"\.parent\b|(?<![\w.])/(?:tmp|var|etc|home|root)\b|(?<![\w.])~/", re.IGNORECASE)
 PlanOutput = ReadyTestPlan | UnsupportedTestPlan
@@ -62,6 +64,9 @@ class PlanOracle(BaseModel):
     witness_markers: tuple[str, ...] = ()
     # SPEC-0040: the effect kind a correct typed security witness records; None for sets written before it.
     witness_effect: str | None = None
+    adversarial_patterns: tuple[str, ...] = ()
+    observation_mode: Literal["unit_test"] | None = None
+    property_markers: tuple[str, ...] = ()
     observation_kind: str | None = None
     required_reads: tuple[str, ...] = ()
     forbidden_markers: tuple[str, ...] = ()
@@ -85,15 +90,21 @@ def plan_checks(inputs: TestPlanningInput, output: PlanOutput, oracle: PlanOracl
     # Plan text without trusted quotations, so quoted hostile source cannot count against the plan.
     authored = output.model_dump_json(exclude={"citations": {"__all__": {"quote"}},
         "control": {"source_references": {"__all__": {"quote"}}}, "security": {"source_references": {"__all__": {"quote"}}}})
+    adversarial = lambda text: any(m in text for m in oracle.adversarial_markers) or any(
+        re.search(pattern, text) is not None for pattern in oracle.adversarial_patterns)
+    observation_checks = ({"native_property": all(spec.witness is None and spec.observation is not None for spec in specs)
+        and any(marker.lower() in (output.security.required_behavior + " " + output.security.observable_witness
+            + " " + (output.security.observation.property if output.security.observation else "")).lower()
+                for marker in oracle.property_markers)} if oracle.observation_mode == "unit_test" else {
+        "witness": any(m in lowered(output.security.observable_witness) for m in oracle.witness_markers),
+        **({"typed_witness": output.security.witness is not None and output.security.witness.effect == oracle.witness_effect} if oracle.witness_effect else {})})
     return checks | {
         "contract": all(spec.test_path in environment.approved_test_paths for spec in specs)
                     and output.discovery_command == environment.discovery_command
                     and output.control.test_id != output.security.test_id,
         "implementation_call": oracle.symbol is not None and all(_symbol_occurs(oracle.symbol, spec.implementation_call) for spec in specs),
-        "adversarial_input": any(m in output.security.input for m in oracle.adversarial_markers)
-                             and not any(m in output.control.input for m in oracle.adversarial_markers),
-        "witness": any(m in lowered(output.security.observable_witness) for m in oracle.witness_markers),
-        **({"typed_witness": output.security.witness is not None and output.security.witness.effect == oracle.witness_effect} if oracle.witness_effect else {}),
+        "adversarial_input": adversarial(output.security.input) and not adversarial(output.control.input),
+        **observation_checks,
         **({"native_observation": all(spec.witness is None and spec.observation is not None
             and spec.observation.kind == oracle.observation_kind for spec in specs)} if oracle.observation_kind else {}),
         "grounding": oracle.target_path is not None and all(
@@ -141,12 +152,15 @@ def dataset(name: str = "development") -> Dataset[TestPlanningInput, PlanOutput,
 def scripted_model(oracle: PlanOracle) -> FunctionModel:
     """Oracle injection is confined to the scripted plumbing model, never live task inputs."""
     async def respond(messages, info):
+        activation = load_skills(messages, info, ['plan-two-tests'])
+        if activation is not None:
+            return activation
         returned = {SourceRead.model_validate(part.content).path for message in messages for part in message.parts
                     if isinstance(part, ToolReturnPart) and part.tool_name == READ_SOURCE_TOOL}
         pending = [path for path in oracle.required_reads if path not in returned]
         if pending:
             return ModelResponse(parts=[ToolCallPart(READ_SOURCE_TOOL, {"path": pending[0], "start_line": 1})])
-        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {"plan": oracle.reference_plan})])
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {"plan": component_draft(oracle.reference_plan)})])
     return FunctionModel(respond)
 
 
@@ -158,22 +172,35 @@ def read_paths(messages: list[ModelMessage]) -> list[str]:
 class EvaluationBudget(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     repeat: int = Field(default=2, ge=1, le=3, strict=True)
-    request_limit: int = Field(default=5, ge=1, le=8, strict=True)
-    tool_calls_limit: int = Field(default=4, ge=0, le=6, strict=True)
+    request_limit: int = Field(default=6, ge=1, le=8, strict=True)
+    tool_calls_limit: int = Field(default=5, ge=0, le=6, strict=True)
     # Room for one full 32768-token response (~235 s on the local server) beside the rest of the attempt.
     total_tokens_limit: int = Field(default=96000, ge=1, le=192000, strict=True)
     task_seconds: int = Field(default=600, ge=1, le=1200, strict=True)
     output_retries: int = Field(default=1, ge=0, le=1, strict=True)
 
 
-async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, cases: str = "development", provider=None):
+async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, cases: str = "development", provider=None,
+                   corpus=None, dataset_identity: dict | None = None):
     if cases in RETIRED:
         raise ValueError(f"{cases} is retired: its environments list no typed witness facilities (SPEC-0040)")
-    check_manifest(cases)
+    supplied_corpus = corpus is not None
+    if supplied_corpus != (dataset_identity is not None):
+        raise ValueError('a supplied planning corpus and its frozen dataset identity must be given together')
+    if supplied_corpus:
+        if not isinstance(dataset_identity, dict):
+            raise ValueError('supplied planning dataset identity must be a dictionary')
+        allowed = {'dataset', 'dataset_sha256', 'evaluator_version', 'source_manifest', 'evaluator_source_sha256'}
+        if set(dataset_identity) - allowed:
+            raise ValueError('unsupported planning dataset identity fields')
+        if not {'dataset', 'dataset_sha256'} <= dataset_identity.keys():
+            raise ValueError('supplied planning dataset identity requires dataset and dataset_sha256')
+    else:
+        check_manifest(cases)
     # Reserve before the first request; rerunning the same attempt is always refused.
     evidence.mkdir(parents=True, exist_ok=False)
     logfire.configure(send_to_logfire=False, console=False)
-    corpus = dataset(cases)
+    corpus = corpus if supplied_corpus else dataset(cases)
     scripted = model is None
     fixture_models = {case.inputs.input_digest: scripted_model(case.metadata) for case in corpus.cases} if scripted else {}
     actual_model = model if model is not None else next(iter(fixture_models.values()))
@@ -181,10 +208,16 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, case
                 "model": describe_model(actual_model), "weights_identity": "not_applicable" if scripted else "unknown",
                 "prompt_version": PROMPT_VERSION, "config_version": CONFIG_VERSION, "skill_sha256": SKILL_SHA256,
                 "toolset_id": TOOLSET_ID, "toolset_sha256": TOOLSET_SHA256, "budget": budget.model_dump(), "task_retries": 0, "max_concurrency": 1,
-                "dataset": cases, "dataset_sha256": sha256((ROOT / DATASETS[cases]).read_bytes()).hexdigest(),
+                "evaluator_version": "planning-v2" if cases in ("unit-first", "unit-v2") else "planning-v1",
+                "dataset": cases, "dataset_sha256": dataset_identity["dataset_sha256"] if supplied_corpus else sha256((ROOT / DATASETS[cases]).read_bytes()).hexdigest(),
                 "provider": provider,
                 "output_contract": "ReadyTestPlan | UnsupportedTestPlan",
                 "draft_contract": "ReadyTestPlanDraft | UnsupportedTestPlanDraft"}
+    metadata |= MANIFEST_IDENTITY
+    if supplied_corpus:
+        metadata |= dataset_identity
+        metadata['execution'] = 'synthetic_fixture_baseline_not_executed'
+        metadata['qualification'] = 'Operator planning fixture only; native baselines and runtime/composition are unqualified.'
     (evidence / "configuration.json").write_text(json.dumps(metadata, indent=2))
     corpus.evaluators.append(NoUnknownToolAttempts())
     if not scripted:
@@ -198,7 +231,7 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, case
         usage, messages, result, failure = RunUsage(), [], None, None
         started = perf_counter()
         selected = fixture_models[inputs.input_digest] if scripted else model
-        known_tools = frozenset({READ_SOURCE_TOOL}) | output_tool_names(selected)
+        known_tools = frozenset({READ_SOURCE_TOOL, "load_capability"}) | output_tool_names(selected)
         agent = create_test_planning_agent(selected, output_retries=budget.output_retries)
         try:
             with capture_run_messages() as messages, models.override_allow_model_requests(not scripted):

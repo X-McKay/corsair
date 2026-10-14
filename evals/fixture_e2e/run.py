@@ -1,7 +1,7 @@
 """Run one E2E-0 direct composition over the SPEC-0018 pair and keep every stage receipt.
 
 Stages not named in --live use scripted plumbing models. By default this CLI executes on the reviewed
-host workspace, which admits only the reviewed SPEC-0018 test bytes: a live author's own test code is
+host workspace, which admits only the exact reviewed split-v2 test bytes: a live author's own test code is
 refused before it reaches an interpreter. `--sandbox docker` runs every purpose in a fresh offline
 container of the local CPython 3.12 toolchain image instead (unqualified, risk accepted; `docker.py`),
 so a live author's tests execute there. The live gate `make qualify-fixture-e2e` runs the same
@@ -13,6 +13,7 @@ from contextlib import AsyncExitStack, ExitStack
 import os
 from hashlib import sha256
 import json
+from corsair.policy.budget import BUDGET_POLICY_SHA256, budget_sha256
 from pathlib import Path
 import sys
 
@@ -31,11 +32,11 @@ from corsair.nodes.runtime.environment import RuntimeCatalog
 from corsair.investigate import images
 from evals.issue_analysis.evaluate import describe_model
 
-from .case import (CASES, fixture_case, reviewed_runners, scripted_assessment, scripted_authoring, scripted_identification,
+from .case import (CASES, fixture_case, reviewed_runners, scripted_assessment, scripted_control_authoring, scripted_exploit_authoring, scripted_identification,
                    scripted_planning)
 
 SCRIPTED = {"identification": scripted_identification, "planning": scripted_planning,
-            "authoring": scripted_authoring, "assessment": scripted_assessment}
+            "control_authoring": scripted_control_authoring, "exploit_authoring": scripted_exploit_authoring, "assessment": scripted_assessment}
 async def record_run(evidence: Path, live: tuple[str, ...], config: LocalModelConfig | InferenceConfig | None, case: FixtureCase,
                      runners, runner: dict, profiles: dict | None = None, drain_seconds: float = 900, *,
                      stages: tuple[str, ...] = STAGES, scripted: dict | None = None,
@@ -64,7 +65,8 @@ async def record_run(evidence: Path, live: tuple[str, ...], config: LocalModelCo
         selected = {stage: models[configs[stage]] if stage in live else scripted[stage]() for stage in stages}
         budget = CompositionBudget()
         (evidence / "configuration.json").write_text(json.dumps({
-            "mode": "direct", "live_stages": list(live), "budget": budget.model_dump(),
+            "mode": "direct", "live_stages": list(live), "budget": budget.model_dump(), "budget_policy_sha256": BUDGET_POLICY_SHA256,
+                "effective_budget_sha256": budget_sha256(budget),
             "provider": config.model_dump() if config else None, "stage_profiles": profiles,
             "stage_providers": {stage: configs[stage].model_dump() for stage in live},
             "models": {stage: describe_model(selected[stage]) for stage in stages},
@@ -99,7 +101,8 @@ def scripted_for(case: str, discovery: tuple[str, ...]) -> dict:
     gates permit (the security test passes on both confined revisions), so a scripted control shows it admitted."""
     models = SCRIPTED | {"identification": lambda: scripted_identification(case),
                          "planning": lambda: scripted_planning(discovery, case),
-                         "authoring": lambda: scripted_authoring(case)}
+                         "control_authoring": lambda: scripted_control_authoring(case),
+                         "exploit_authoring": lambda: scripted_exploit_authoring(case)}
     if case != "exploitable":
         models["assessment"] = lambda: scripted_assessment(finding="not_reproduced", fix="not_verified")
     return models
@@ -107,7 +110,7 @@ def scripted_for(case: str, discovery: tuple[str, ...]) -> dict:
 
 async def main_async(evidence: Path, live: tuple[str, ...], config: LocalModelConfig | InferenceConfig | None,
                      profiles: dict | None = None, case: str = "exploitable") -> DirectRun:
-    """Reviewed host workspace: only the reviewed SPEC-0018 test bytes execute."""
+    """Reviewed host workspace: only the exact reviewed split-v2 test bytes execute."""
     evidence.mkdir(parents=True, exist_ok=False)
     (evidence / "work").mkdir(mode=0o700)
     (evidence / "artifacts").mkdir(mode=0o700)

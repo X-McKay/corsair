@@ -10,7 +10,7 @@ from corsair.composition.direct import UNOBSERVED, framework_names, StageModels,
 from corsair.nodes.runtime.contracts import RuntimeInputs
 from corsair.nodes.runtime.environment import RuntimeCatalog
 from corsair.nodes.runtime.matrix import load
-from evals.fixture_e2e.case import (fixture_case, reviewed_runners, scripted_assessment, scripted_authoring,
+from evals.fixture_e2e.case import (fixture_case, reviewed_runners, scripted_assessment, scripted_control_authoring, scripted_exploit_authoring,
                                     scripted_identification, scripted_planning)
 
 ROW = 'cpython-3.12-pytest'
@@ -31,7 +31,7 @@ def run(tmp_path):
     (tmp_path / 'artifacts').mkdir(mode=0o700)
     (tmp_path / 'work').mkdir()
     stage_models = StageModels(identification=scripted_identification(), planning=scripted_planning(),
-                               authoring=scripted_authoring(), assessment=scripted_assessment())
+                               control_authoring=scripted_control_authoring(), exploit_authoring=scripted_exploit_authoring(), assessment=scripted_assessment())
 
     def go(case, **options):
         with LocalArtifacts(tmp_path / 'artifacts', max_bytes=1024 * 1024) as store, models.override_allow_model_requests(False):
@@ -44,7 +44,8 @@ def test_a_supported_prepared_row_continues_and_is_recorded(run):
     assert (result.stopped_at, result.reason) == (None, 'complete')
     assert (result.runtime.status, result.runtime.selection.image_id) == ('supported', ROW)
     assert result.runtime.image.endswith(fixture_case().environment_identity.image_digest)
-    assert result.limitations[:len(UNOBSERVED) + 1] == UNOBSERVED + (
+    assert result.limitations[0].startswith("Unit tests validate the stated property")
+    assert result.limitations[1:3] == UNOBSERVED[2:] + (
         "Runtime selected from the baseline revision's build files; the candidate's were not read.",)
 
 

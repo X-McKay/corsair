@@ -15,6 +15,7 @@ from openai import APIConnectionError
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from pydantic_ai import capture_run_messages, models
 from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart, ToolReturnPart
+from evals.native_skills import load_skills
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RunUsage, UsageLimits
 from pydantic_evals import Case, Dataset, set_eval_attribute
@@ -22,6 +23,7 @@ from pydantic_evals.evaluators import Evaluator, HasMatchingSpan, MaxModelReques
 
 from corsair.agents.issue_analysis.contracts import IssueAnalysisInput
 from corsair.agents.issue_identification import (
+    MANIFEST_IDENTITY,
     CONFIG_VERSION, PROMPT_VERSION, TOOLSET_SHA256, create_issue_identification_agent, identification_prompt,
 )
 from corsair.agents.issue_identification.skills import SKILL_SHA256
@@ -79,11 +81,14 @@ def dataset() -> Dataset[IssueAnalysisInput, IssueIdentification, SelectionOracl
 def scripted_model(inputs: IssueAnalysisInput, oracle: SelectionOracle) -> FunctionModel:
     """Oracle injection is confined to the scripted plumbing model, never live task inputs."""
     async def respond(messages, info):
+        activation = load_skills(messages, info, ['identify-issue'])
+        if activation is not None:
+            return activation
         if oracle.status != "ready":
             draft = {"status": oracle.status, "scope": inputs.scope, "target": None, "reason": "The supplied inventory does not establish the requested target."}
         else:
             start, end = min(oracle.required_lines), max(oracle.required_lines)
-            if not any(isinstance(p, ToolReturnPart) for m in messages for p in m.parts):
+            if not any(isinstance(p, ToolReturnPart) and p.tool_name == "read_source" for m in messages for p in m.parts):
                 return ModelResponse(parts=[ToolCallPart("read_source", {"path": oracle.path, "start_line": start})])
             draft = {"status": "ready", "scope": inputs.scope, "target": {"symbol": oracle.symbol, "source": {"path": oracle.path, "start_line": start, "end_line": end}},
                      "reason": None}
@@ -94,18 +99,26 @@ def scripted_model(inputs: IssueAnalysisInput, oracle: SelectionOracle) -> Funct
 class EvaluationBudget(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     repeat: int = Field(default=2, ge=1, le=3, strict=True)
-    request_limit: int = Field(default=4, ge=1, le=6, strict=True)
-    tool_calls_limit: int = Field(default=3, ge=0, le=4, strict=True)
+    request_limit: int = Field(default=5, ge=1, le=6, strict=True)
+    tool_calls_limit: int = Field(default=4, ge=0, le=4, strict=True)
     total_tokens_limit: int = Field(default=32000, ge=1, le=64000, strict=True)
     task_seconds: int = Field(default=180, ge=1, le=300, strict=True)
     output_retries: int = Field(default=1, ge=0, le=1, strict=True)
 
 
-async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None):
+async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, corpus=None, dataset_identity=None):
+    """Native host harness; custom frozen corpora supply explicit operator dataset identity."""
+    if (corpus is None) != (dataset_identity is None):
+        raise ValueError("custom corpus and dataset_identity must be supplied together")
+    allowed_identity = {"dataset", "dataset_sha256", "evaluator_version", "source_manifest", "evaluator_source_sha256"}
+    if dataset_identity is not None and (not isinstance(dataset_identity, dict)
+            or not {"dataset", "dataset_sha256"} <= dataset_identity.keys()
+            or dataset_identity.keys() - allowed_identity):
+        raise ValueError("custom dataset identity must name its dataset/digest and only dataset fields")
     # Reserve before the first request; rerunning the same attempt is always refused.
     evidence.mkdir(parents=True, exist_ok=False)
     logfire.configure(send_to_logfire=False, console=False)
-    corpus = dataset()
+    corpus = dataset() if corpus is None else corpus
     scripted = model is None
     fixture_models = {case.inputs.input_digest: scripted_model(case.inputs, case.metadata) for case in corpus.cases} if scripted else {}
     actual_model = model if model is not None else next(iter(fixture_models.values()))
@@ -116,6 +129,9 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None):
                 "budget": budget.model_dump(), "task_retries": 0, "max_concurrency": 1,
                 "dataset_sha256": sha256((ROOT / "cases.yaml").read_bytes()).hexdigest(),
                 "output_contract": IssueIdentification.__name__, "draft_contract": IssueIdentificationDraft.__name__}
+    if dataset_identity is not None:
+        metadata.update(dataset_identity)
+    metadata |= MANIFEST_IDENTITY
     (evidence / "configuration.json").write_text(json.dumps(metadata, indent=2))
     corpus.evaluators.append(NoUnknownToolAttempts())
     if not scripted:
@@ -128,7 +144,7 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None):
         usage, messages, result, failure = RunUsage(), [], None, None
         started = perf_counter()
         selected = fixture_models[inputs.input_digest] if scripted else model
-        known_tools = frozenset({"read_source"}) | output_tool_names(selected)
+        known_tools = frozenset({"read_source", "load_capability"}) | output_tool_names(selected)
         agent = create_issue_identification_agent(selected, output_retries=budget.output_retries)
         try:
             with capture_run_messages() as messages, models.override_allow_model_requests(not scripted):

@@ -4,15 +4,19 @@ Same output contract and shared finalizer; separate factories and dependency typ
 between source modes. Repository mode is direct only: the tree is not serializable into a durable
 activity payload yet.
 """
+from pathlib import Path
 
 from pydantic_ai import Agent
-from pydantic_ai.capabilities import Capability, Instrumentation
+from pydantic_ai.capabilities import Instrumentation
+from pydantic_ai_harness import Skills
+from pydantic_ai.capabilities import LocalWorkspace
 from pydantic_ai.durable_exec.temporal import TemporalDurability
 from pydantic_ai.models import Model
 from pydantic_ai.models.instrumented import InstrumentationSettings
 
 from ..budget import tool_budget
 from ..prompted_output import prompted_output
+from ..agent_identity import factory_identity
 from .contracts import IssueIdentification
 from .dependencies import FixtureDependencies, RepositoryDependencies
 from .prompts import (
@@ -23,8 +27,16 @@ from .prompts import (
 from .tools import REPOSITORY_TOOLSET_SHA256, TOOL_RETRIES, TOOLSET_SHA256, identification_tools, repository_tools
 from .validation import finalize_identification, finalize_repository_identification
 
-CONFIG_VERSION = "issue-identification-config-v5-grounding-3"
-REPOSITORY_CONFIG_VERSION = "issue-identification-repository-config-v4-grounding-3"
+from .prompts import _SPEC
+from .prompts import _REPOSITORY_SPEC
+CONFIG_VERSION = _SPEC.metadata['config_version']
+REPOSITORY_CONFIG_VERSION = _REPOSITORY_SPEC.metadata['config_version']
+MANIFEST_IDENTITY = factory_identity(_SPEC, __file__, Path(__file__).with_name('agent.yaml'))
+SPEC_IDENTITY = MANIFEST_IDENTITY
+SPEC_SHA256 = MANIFEST_IDENTITY['spec_sha256']
+REPOSITORY_MANIFEST_IDENTITY = factory_identity(_REPOSITORY_SPEC, __file__, Path(__file__).with_name('repository-agent.yaml'))
+REPOSITORY_SPEC_IDENTITY = REPOSITORY_MANIFEST_IDENTITY
+REPOSITORY_SPEC_SHA256 = REPOSITORY_MANIFEST_IDENTITY['spec_sha256']
 
 
 def create_issue_identification_agent(
@@ -33,14 +45,18 @@ def create_issue_identification_agent(
 ) -> Agent[FixtureDependencies, IssueIdentification]:
     """Explicit model seam reusable by native durability; no configured provider fallback."""
     if not isinstance(model, Model):
-        raise TypeError("an explicit PydanticAI Model instance is required")
-    return Agent[FixtureDependencies, IssueIdentification](
-        model, name="issue_identification", deps_type=FixtureDependencies, output_type=finalize_identification,
-        instructions=INSTRUCTIONS, retries={"tools": TOOL_RETRIES, "output": output_retries},
-        capabilities=[Capability(id=SKILL_ID, instructions=SKILL_TEXT, toolsets=[identification_tools()]),
-                      tool_budget(), prompted_output(),
-                      Instrumentation(settings=InstrumentationSettings(include_content=False, version=5)),
-                      *([durability] if durability is not None else [])],
+        raise TypeError('an explicit native Model instance is required')
+    return Agent.from_spec(
+        _SPEC, model=model, deps_type=FixtureDependencies, output_type=finalize_identification,
+        retries={'tools': TOOL_RETRIES, 'output': output_retries},
+        toolsets=[identification_tools()],
+        capabilities=[
+            LocalWorkspace(Path(__file__).parent, read_only=True),
+            Skills('skills', include={SKILL_ID}),
+            tool_budget(), prompted_output(),
+            Instrumentation(settings=InstrumentationSettings(include_content=False, version=5)),
+                *([durability] if durability is not None else []),
+        ],
     )
 
 
@@ -49,18 +65,21 @@ def create_repository_identification_agent(
 ) -> Agent[RepositoryDependencies, IssueIdentification]:
     """Explicit model seam; no configured provider fallback and no inline-source fallback."""
     if not isinstance(model, Model):
-        raise TypeError("an explicit PydanticAI Model instance is required")
-    return Agent[RepositoryDependencies, IssueIdentification](
-        model, name="issue_identification_repository", deps_type=RepositoryDependencies,
-        output_type=finalize_repository_identification, instructions=REPOSITORY_INSTRUCTIONS,
-        retries={"tools": TOOL_RETRIES, "output": output_retries},
-        capabilities=[Capability(id=REPOSITORY_SKILL_ID, instructions=REPOSITORY_SKILL_TEXT, toolsets=[repository_tools()]),
-                      tool_budget(), prompted_output(),
-                      Instrumentation(settings=InstrumentationSettings(include_content=False, version=5))],
+        raise TypeError('an explicit native Model instance is required')
+    return Agent.from_spec(
+        _REPOSITORY_SPEC, model=model, deps_type=RepositoryDependencies,
+        output_type=finalize_repository_identification, retries={'tools': TOOL_RETRIES, 'output': output_retries},
+        toolsets=[repository_tools()],
+        capabilities=[
+            LocalWorkspace(Path(__file__).parent, read_only=True),
+            Skills('skills', include={REPOSITORY_SKILL_ID}),
+            tool_budget(), prompted_output(),
+            Instrumentation(settings=InstrumentationSettings(include_content=False, version=5)),
+        ],
     )
 
 
-__all__ = ["CONFIG_VERSION", "PROMPT_VERSION", "REPOSITORY_CONFIG_VERSION", "REPOSITORY_PROMPT_VERSION",
+__all__ = ["MANIFEST_IDENTITY", "SPEC_SHA256", "REPOSITORY_MANIFEST_IDENTITY", "REPOSITORY_SPEC_SHA256", "CONFIG_VERSION", "PROMPT_VERSION", "REPOSITORY_CONFIG_VERSION", "REPOSITORY_PROMPT_VERSION",
            "REPOSITORY_SKILL_SHA256", "REPOSITORY_TOOLSET_SHA256", "SKILL_SHA256", "SKILL_TEXT", "TOOLSET_SHA256",
            "create_issue_identification_agent", "create_repository_identification_agent", "identification_prompt",
            "repository_identification_prompt"]

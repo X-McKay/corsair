@@ -20,7 +20,7 @@ from corsair.nodes.runtime.contracts import AxisCheck, Supported
 from corsair.nodes.runtime.environment import framework_row
 from corsair.nodes.runtime.matrix import load
 from evals.case_e2e.case import case_request, entry, expected
-from evals.fixture_e2e.case import (reviewed_runners, scripted_assessment, scripted_authoring, scripted_identification,
+from evals.fixture_e2e.case import (reviewed_runners, scripted_assessment, scripted_control_authoring, scripted_exploit_authoring, scripted_identification,
                                     scripted_planning)
 from evals.fixture_e2e.run import AGENT_STAGES, record_run
 from tests.agents.test_chain_environment_stage import (BASELINE, BUILD, DISCOVER, OK, ROW, Sandboxes, case as env_case,
@@ -172,7 +172,7 @@ def test_a_case_run_records_the_environment_stage_and_its_ports(tmp_path):
     (tmp_path / "e2e").mkdir()
     scripted = {"environment": lambda: environment_model([BUILD, DISCOVER, BASELINE], ready_draft()),
                 "identification": scripted_identification, "planning": scripted_planning,
-                "authoring": scripted_authoring, "assessment": scripted_assessment}
+                "control_authoring": scripted_control_authoring, "exploit_authoring": scripted_exploit_authoring, "assessment": scripted_assessment}
     sandboxes = Sandboxes(OK)
     with LocalArtifacts(tmp_path / "artifacts", max_bytes=1024 * 1024) as store:
         run = asyncio.run(record_run(tmp_path / "e2e", (), None, env_case(), reviewed_runners(store, tmp_path / "work"),
@@ -191,7 +191,7 @@ def test_an_environment_framework_other_than_the_selected_one_stops_the_run(tmp_
     (tmp_path / "artifacts").mkdir(mode=0o700)
     (tmp_path / "work").mkdir()
     models = StageModels(identification=scripted_identification(), planning=scripted_planning(),
-                         authoring=scripted_authoring(), assessment=scripted_assessment(),
+                         control_authoring=scripted_control_authoring(), exploit_authoring=scripted_exploit_authoring(), assessment=scripted_assessment(),
                          environment=environment_model([BUILD, DISCOVER, BASELINE], ready_draft(framework="jest")))
     with LocalArtifacts(tmp_path / "artifacts", max_bytes=1024 * 1024) as store:
         run = asyncio.run(run_direct(env_case(), models, reviewed_runners(store, tmp_path / "work"), catalog=catalog(),

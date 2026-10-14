@@ -20,12 +20,12 @@ from corsair.composition.evidence import freeze, observation_plan, run_evidence
 from corsair.core.disposition import AssessmentEvidence, Disposition, Witness, assess
 from corsair.ports.test_runner import WitnessRequest
 from evals.fixture_e2e.case import (
-    SECURITY_ASSERTION_LINES, fixture_case, reviewed_runners, scripted_assessment, scripted_authoring,
+    SECURITY_ASSERTION_LINES, fixture_case, reviewed_runners, scripted_assessment, scripted_control_authoring, scripted_exploit_authoring,
     scripted_identification, scripted_planning,
 )
 
-CONTROL = "test_documents.py::test_benign_control"
-SECURITY = "test_documents.py::test_security_rejects_outside_read"
+CONTROL = "test_control.py::test_benign_control"
+SECURITY = "test_exploit.py::test_security_rejects_outside_read"
 
 
 @pytest.fixture(autouse=True)
@@ -43,7 +43,7 @@ def store(tmp_path):
 
 def stages(**overrides):
     values = dict(identification=scripted_identification(), planning=scripted_planning(),
-                  authoring=scripted_authoring(), assessment=scripted_assessment())
+                  control_authoring=scripted_control_authoring(), exploit_authoring=scripted_exploit_authoring(), assessment=scripted_assessment())
     return StageModels(**(values | overrides))
 
 
@@ -68,56 +68,37 @@ def prompts(run):
             if part.part_kind == "user-prompt"]
 
 
-def test_stages_compose_to_a_gate_verdict_that_stays_inconclusive_without_a_witness(store, tmp_path):
-    run = compose(store, tmp_path, witnessed=False)
+def test_native_unit_probes_can_verify_a_fix_without_a_witness(store, tmp_path):
+    run = compose(store, tmp_path, witnessed=False, assessment=scripted_assessment(finding="reproduced", fix="verified"))
     assert (run.stopped_at, run.reason) == (None, "complete")
-    assert [a.stage for a in run.attempts] == ["identification", "planning", "authoring", "assessment"]
+    assert [a.stage for a in run.attempts] == ["identification", "planning", "control_authoring", "exploit_authoring", "assessment", "assessment"]
     assert all(a.failure is None for a in run.attempts)
-
     expected = run.observation_plan
     assert (expected.control_test_id, expected.security_test_id) == (CONTROL, SECURITY)
-    assert expected.expected_failure.model_dump() == {"exception_type": "AssertionError", "path": "test_documents.py",
-                                                      "function": "test_security_rejects_outside_read",
-                                                      "assertion_lines": tuple(SECURITY_ASSERTION_LINES)}
-    assert expected.expected_safe_behavior == "ValueError"
+    assert expected.observation_mode == "unit_test"
     assert expected.frozen_patch_sha256 == run.patch.patch_sha256
-
-    # Both frozen runs executed the authored digest in fresh workspaces with confirmed cleanup.
+    assert {f.path for f in run.patch.files} == {"test_control.py", "test_exploit.py"}
     baseline, candidate = (e.observed for e in run.executions)
-    assert {e.revision for e in run.executions} == {"baseline", "candidate"}
     for observed in (baseline, candidate):
         assert (observed.failure_layer, observed.cleanup) == (None, "confirmed")
         assert observed.patch_sha256 == run.patch.patch_sha256
-    base_security, cand_security = baseline.execution.cases[1], candidate.execution.cases[1]
-    assert (base_security.outcome, cand_security.outcome) == ("failed", "passed")
-    failure = base_security.failure
-    assert (failure.type, failure.path, failure.function) == ("AssertionError", "test_documents.py",
-                                                              "test_security_rejects_outside_read")
-    assert failure.line in SECURITY_ASSERTION_LINES
-
-    # The only reason neither revision is usable is the missing witness, by design.
-    gate = run.gate
-    assert gate.permitted == Disposition(execution="completed", finding="inconclusive", fix="not_verified")
-    assert {(r.revision, r.classification) for r in gate.runs} == {("baseline", "unusable"), ("candidate", "unusable")}
-    assert {(l.code, l.revision) for l in gate.limitations} == {
-        ("witness_missing", "baseline"), ("witness_missing", "candidate"), ("no_valid_run", "baseline"),
-        ("baseline_not_reproduced", "candidate")}
-    assert run.assessment.admission.admitted and run.assessment.disposition == gate.permitted
-    assert run.limitations == UNOBSERVED + (UNSELECTED,) + tuple(f"{revision} witness not admitted: no witness was requested or "
-                                                 "captured for this run" for revision in ("baseline", "candidate"))
-
-    # Agents never see which variant is which.
+        assert observed.execution.cases[0].outcome == "passed"
+    assert (baseline.execution.cases[1].outcome, candidate.execution.cases[1].outcome) == ("failed", "passed")
+    assert baseline.execution.cases[1].failure.line in SECURITY_ASSERTION_LINES
+    assert run.gate.permitted == Disposition(execution="completed", finding="reproduced", fix="verified")
+    assert run.assessment.admission.admitted
+    assert all(e.observed.witness is None for e in run.executions)
     assert not any(label in prompt for prompt in prompts(run) for label in ("vulnerable", "fixed"))
 
 
-def test_an_over_claim_without_a_witness_item_is_refused_and_the_gate_verdict_stands(store, tmp_path):
+def test_a_result_contradicting_native_unit_evidence_is_refused_and_the_gate_verdict_stands(store, tmp_path):
     run = compose(store, tmp_path, witnessed=False,
-                  assessment=scripted_assessment(finding="reproduced", fix="verified"))
-    assert (run.stopped_at, run.assessment) == ("assessment", None)
-    assert run.gate.permitted == Disposition(execution="completed", finding="inconclusive", fix="not_verified")
+                  assessment=scripted_assessment(finding="not_reproduced", fix="verified"))
+    assert run.stopped_at is None and not run.assessment.admission.admitted
+    assert run.gate.permitted == Disposition(execution="completed", finding="reproduced", fix="verified")
     retries = [part.content for message in run.attempts[-1].messages for part in message.parts
                if part.part_kind == "retry-prompt"]
-    assert retries and all("no witness item for the baseline revision" in retry for retry in retries)
+    assert run.assessment.disposition == run.gate.permitted
 
 
 def test_the_probe_witness_lets_the_gate_reach_reproduced_and_verified(store, tmp_path):
@@ -134,7 +115,8 @@ def test_the_probe_witness_lets_the_gate_reach_reproduced_and_verified(store, tm
     gate = run.gate
     assert gate.permitted == Disposition(execution="completed", finding="reproduced", fix="verified")
     assert {(r.revision, r.classification) for r in gate.runs} == {("baseline", "reproduces"), ("candidate", "safe")}
-    assert gate.limitations == () and run.limitations == UNOBSERVED + (UNSELECTED,)
+    assert gate.limitations == () and UNSELECTED in run.limitations
+    assert any("Unit tests validate" in limitation for limitation in run.limitations)
     assert run.assessment.admission.admitted and run.assessment.disposition == gate.permitted
     # The assessor may read each record as its own item; the variant names never reach it.
     assert any("baseline-0-witness (kind witness" in prompt for prompt in prompts(run))
@@ -149,7 +131,7 @@ def test_handoff_builders_refuse_a_patch_that_is_not_this_plan(store, tmp_path):
         run_evidence(run.executions[0].observed, environment=fixture_case().environment_identity,
                      witness=Witness(artifact_sha256="0" * 64, path_reached=True, effect="observed"))
     with pytest.raises(ValueError, match="digest"):
-        freeze(run.patch.model_copy(update={"patch_sha256": "0" * 64}), ("test_documents.py",))
+        freeze(run.patch.model_copy(update={"patch_sha256": "0" * 64}), ("test_control.py", "test_exploit.py"))
 
 
 def test_identification_abstention_ends_the_run_before_planning(store, tmp_path):
@@ -176,23 +158,17 @@ def test_planning_unsupported_ends_the_run_before_authoring(store, tmp_path):
 
 
 def test_unreviewed_test_bytes_never_execute_on_the_host(store, tmp_path):
-    """A live author's test reaches no interpreter here: the reviewed workspace refuses it before execution."""
-    script = [ToolCallPart("write_test_file", {"path": "test_documents.py", "content": "def test_x():\n    assert True\n"}),
-              ToolCallPart("run_tests", {})]
-
-    async def respond(messages, info):
-        done = sum(isinstance(p, ToolReturnPart) for m in messages for p in m.parts)
-        if done < len(script):
-            return ModelResponse(parts=[replace(script[done], tool_call_id=f"call-{done}")])
-        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {"result": {
-            "status": "blocked", "layer": "sandbox", "reason": "The development workspace refused the patch"}})])
-    run = compose(store, tmp_path, authoring=FunctionModel(respond))
-    assert run.stopped_at == "authoring" and run.reason.startswith("authoring blocked at sandbox")
-    authored = run.attempts[-1].output
-    assert isinstance(authored, BlockedAuthoring) and not isinstance(authored, TestPatch)
-    (dev_run,) = authored.dev_runs
-    assert dev_run.status == "workspace_failure" and "reviewed SPEC-0018" in dev_run.errors
-    assert not (tmp_path / "work" / "development").exists() and run.executions == ()
+    from corsair.ports.test_runner import ApprovedPatch, PatchFile
+    from evals.fixture_e2e.reviewed import ReviewedWorkspace
+    from evals.fixture_e2e.case import split_reviewed_tests
+    workspace = ReviewedWorkspace(store, tmp_path / "refused", "vulnerable", split_reviewed_tests())
+    reference = split_reviewed_tests()
+    patch = ApprovedPatch((PatchFile("test_control.py", reference["test_control.py"].read_bytes()),
+                           PatchFile("test_exploit.py", b"def test_security_safety():\n    assert True\n")),
+                          ("test_control.py", "test_exploit.py"))
+    with pytest.raises(PermissionError, match="reviewed SPEC-0018"):
+        workspace.prepare(patch, uuid4())
+    assert not workspace.root.exists()
 
 
 def test_a_run_from_the_wrong_revision_is_never_labelled_as_the_requested_one(store, tmp_path):
@@ -211,9 +187,9 @@ def test_cli_keeps_every_native_run_with_its_bindings_and_failures(tmp_path):
     evidence = tmp_path / "evidence"
     result = asyncio.run(cli.main_async(evidence, (), None))
     entries = json.loads((evidence / "native-runs.json").read_text())
-    assert [e["purpose"] for e in entries] == ["development", "baseline", "candidate"]
+    assert [e["purpose"] for e in entries] == ["baseline", "candidate"]
     sources = fixture_case().revision_sources
-    for entry, execution in zip(entries[1:], result.executions):
+    for entry, execution in zip(entries, result.executions):
         observed = entry["observed"]
         assert entry["operation"] == observed["operation"] == str(execution.operation)
         assert observed["workspace"]["source"]["sha256"] == sources[execution.revision]
@@ -230,7 +206,8 @@ def test_journal_keeps_a_refused_development_run(store, tmp_path):
     from corsair.ports.test_runner import ApprovedPatch, PatchFile
     (tmp_path / "work").mkdir()
     journal = Journal(reviewed_runners(store, tmp_path / "work"))
-    patch = ApprovedPatch((PatchFile("test_documents.py", b"def test_x():\n    assert True\n"),), ("test_documents.py",))
+    patch = ApprovedPatch((PatchFile("test_control.py", b"def test_x():\n    assert True\n"),
+                           PatchFile("test_exploit.py", b"def test_y():\n    assert True\n")), ("test_control.py", "test_exploit.py"))
     journal("development").run(patch, control_test_id=CONTROL, security_test_id=SECURITY,
                                 discovery_command=("python",), operation=uuid4())
     (entry,) = journal.entries
@@ -249,7 +226,7 @@ def test_checked_in_stage_profiles_admit_per_stage_reasoning_budgets():
     profiles = json.loads((Path(cli.__file__).parent / "stage-profiles.json").read_text())
     configs = cli.stage_configs(base, profiles)
     assert {stage: (c.response_token_limit, c.thinking_token_budget) for stage, c in configs.items()} == {
-        "identification": (8192, None), "planning": (8192, 2048), "authoring": (8192, 2048),
+        "identification": (8192, None), "planning": (8192, 2048), "control_authoring": (8192, 2048), "exploit_authoring": (8192, 2048),
         "assessment": (16384, 2048)}
     assert all(c.model_dump(exclude=cli.PROFILE_FIELDS) == base.model_dump(exclude=cli.PROFILE_FIELDS)
                for c in configs.values())
@@ -270,23 +247,32 @@ def test_a_target_outside_the_operator_envelope_runs_without_a_witness(store, tm
     case = replace(fixture_case(), witness_envelope=envelope)
     run = asyncio.run(run_direct(case, stages(), reviewed_runners(store, tmp_path / "work")))
     assert run.stopped_at is None and all(e.observed.witness is None for e in run.executions)
-    assert run.gate.permitted == Disposition(execution="completed", finding="inconclusive", fix="not_verified")
-    assert f"no witness requested: {reason}" in run.limitations
+    assert run.gate.permitted == Disposition(execution="completed", finding="reproduced", fix="verified")
+    assert run.observation_plan.observation_mode == "unit_test"
     assert not any("witness (kind witness" in prompt for prompt in prompts(run))
+
+
+def _split_historical_paths(plan):
+    """Retain historical witness semantics while satisfying independent path authority."""
+    for role, path in (("control", "test_control.py"), ("security", "test_exploit.py")):
+        plan[role]["test_path"] = path
+        plan[role]["test_id"] = path + "::" + plan[role]["test_id"].split("::")[-1]
 
 
 def _process_start_planning():
     """The reference plan with both witnesses moved to a listed process_start facility the probe does not record."""
-    from evals.fixture_e2e.case import DISCOVER, _reads_then, reference_plan
-    plan = reference_plan(DISCOVER)
+    from evals.fixture_e2e.case import DISCOVER, _reads_then, historical_reference_plan
+    plan = historical_reference_plan(DISCOVER)
+    _split_historical_paths(plan)
     for name in ("control", "security"):
         plan[name] = plan[name] | {"witness": plan[name]["witness"] | {"facility": "audit_exec", "effect": "process_start"}}
     return _reads_then(["documents.py", "test_existing.py"], lambda info: {"plan": plan})
 
 
 def _security_subject_planning(subject):
-    from evals.fixture_e2e.case import DISCOVER, _reads_then, reference_plan
-    plan = reference_plan(DISCOVER)
+    from evals.fixture_e2e.case import DISCOVER, _reads_then, historical_reference_plan
+    plan = historical_reference_plan(DISCOVER)
+    _split_historical_paths(plan)
     plan["security"] = plan["security"] | {"witness": plan["security"]["witness"] | {"subject": subject}}
     return _reads_then(["documents.py", "test_existing.py"], lambda info: {"plan": plan})
 
@@ -302,28 +288,27 @@ def test_a_planned_witness_the_envelope_does_not_record_runs_without_a_witness(s
     other = "the planned witness subject is not the operator witness envelope effect"
     cases = [
         (unbound, replace(base, environment=environment), stages(planning=_process_start_planning())),
-        (other, replace(base, witness_envelope=WitnessRequest("documents.py", "read_document", "other.txt")), stages()),
+        (other, replace(base, witness_envelope=WitnessRequest("documents.py", "read_document", "other.txt")), stages(planning=_security_subject_planning("other.txt"))),
         # A directory-prefixed subject with the envelope's file name is another path, not the envelope's effect.
         (other, base, stages(planning=_security_subject_planning("different/outside.txt"))),
     ]
     for index, (reason, case, models_) in enumerate(cases):
         (tmp_path / f"work{index}").mkdir()
         run = asyncio.run(run_direct(case, models_, reviewed_runners(store, tmp_path / f"work{index}")))
-        assert run.stopped_at is None and all(e.observed.witness is None for e in run.executions)
-        assert run.gate.permitted == Disposition(execution="completed", finding="inconclusive", fix="not_verified")
-        assert f"no witness requested: {reason}" in run.limitations
+        assert run.stopped_at == "planning" and run.executions == ()
+        assert run.plan is None or "witness-only legacy plan is unsupported" in run.reason
 
 
 def test_a_planned_absence_is_verified_when_the_fix_never_opens_the_sentinel(store, tmp_path):
-    """SPEC-0040 `no_file_open` safe behavior: the fixed revision's rejection without the open is safe."""
-    from evals.fixture_e2e.case import DISCOVER, _reads_then, reference_plan
-    plan = reference_plan(DISCOVER)
+    from evals.fixture_e2e.case import DISCOVER, _reads_then, historical_reference_plan
+    plan = historical_reference_plan(DISCOVER)
+    _split_historical_paths(plan)
     plan["security_expectation"] = plan["security_expectation"] | {"safe_behavior": "no_file_open"}
     planning = _reads_then(["documents.py", "test_existing.py"], lambda info: {"plan": plan})
     (tmp_path / "work").mkdir()
     run = asyncio.run(run_direct(fixture_case(), stages(planning=planning), reviewed_runners(store, tmp_path / "work")))
-    assert run.observation_plan.expected_safe_behavior == "no_file_open"
-    assert run.gate.permitted == Disposition(execution="completed", finding="reproduced", fix="verified")
+    assert run.stopped_at == "planning" and run.executions == ()
+    assert "unit" in run.reason
 
 
 def _not_exploitable(store, root, **overrides):
@@ -335,8 +320,9 @@ def _not_exploitable(store, root, **overrides):
 
 
 def _absence_planning(control_subject=None):
-    from evals.fixture_e2e.case import DISCOVER, _reads_then, reference_plan
-    plan = reference_plan(DISCOVER, "not-exploitable")
+    from evals.fixture_e2e.case import DISCOVER, _reads_then, historical_reference_plan
+    plan = historical_reference_plan(DISCOVER, "not-exploitable")
+    _split_historical_paths(plan)
     plan["security_expectation"] = plan["security_expectation"] | {"safe_behavior": "no_file_open"}
     if control_subject:
         plan["control"] = plan["control"] | {"witness": plan["control"]["witness"] | {"subject": control_subject}}
@@ -358,20 +344,16 @@ def test_a_report_the_baseline_refuses_with_the_planned_exception_is_admitted_no
 
 
 def test_a_calibrated_absence_on_the_baseline_is_not_reproduced(store, tmp_path):
-    """SPEC-0040 calibration: the control's recorded open of its subject lets the baseline's `no_file_open` count."""
     run = _not_exploitable(store, tmp_path, planning=_absence_planning(),
                            assessment=scripted_assessment(finding="not_reproduced", fix="not_verified"))
-    assert [w.witness.safe_behavior for w in run.witnesses] == ["no_file_open", "no_file_open"]
-    assert run.gate.permitted == Disposition(execution="completed", finding="not_reproduced", fix="not_verified")
-    assert run.assessment.admission.admitted
+    assert run.stopped_at == "planning" and run.executions == ()
+    assert "unit" in run.reason
 
 
 def test_an_absence_the_control_does_not_calibrate_stays_inconclusive(store, tmp_path):
-    """A control subject the run never opens: the facility is not shown to record the effect, so no absence counts."""
     run = _not_exploitable(store, tmp_path, planning=_absence_planning("allowed/unopened.txt"))
-    assert all(w.witness is None and "absence not calibrated" in w.reason for w in run.witnesses)
-    assert run.gate.permitted == Disposition(execution="completed", finding="inconclusive", fix="not_verified")
-    assert any("baseline witness not admitted: absence not calibrated" in limitation for limitation in run.limitations)
+    assert run.stopped_at == "planning" and run.executions == ()
+    assert "unit" in run.reason
 
 
 def test_a_report_the_baseline_never_acts_on_is_not_reproduced_through_calibration(store, tmp_path):
@@ -379,13 +361,11 @@ def test_a_report_the_baseline_never_acts_on_is_not_reproduced_through_calibrati
     case = "not-exploitable-absent"
     (tmp_path / "work").mkdir()
     models = stages(identification=scripted_identification(case), planning=scripted_planning(case=case),
-                    authoring=scripted_authoring(case),
+                    control_authoring=scripted_control_authoring(case), exploit_authoring=scripted_exploit_authoring(case),
                     assessment=scripted_assessment(finding="not_reproduced", fix="not_verified"))
     run = asyncio.run(run_direct(fixture_case(case), models, reviewed_runners(store, tmp_path / "work", case)))
     assert run.observation_plan.expected_safe_behavior == "no_file_open"
-    for found in run.witnesses:
-        assert (found.witness.path_reached, found.witness.effect, found.witness.safe_behavior) == (
-            True, "absent", "no_file_open")
+    assert all(execution.observed.execution.cases[1].outcome == "passed" for execution in run.executions)
     assert run.gate.permitted == Disposition(execution="completed", finding="not_reproduced", fix="not_verified")
     assert run.assessment.admission.admitted
 
@@ -393,16 +373,17 @@ def test_a_report_the_baseline_never_acts_on_is_not_reproduced_through_calibrati
 def test_stage_limits_are_derived_from_each_stage_input_and_recorded(store, tmp_path):
     run = compose(store, tmp_path)
     limits = {a.stage: a.limits for a in run.attempts}
-    # Two saved files of one window each; authoring adds three runs of (two writes and one run) on one test path
-    # and one admission refusal; assessment reads every frozen evidence item once.
     assert (limits["identification"].read_windows, limits["identification"].tool_calls_limit) == (2, 4)
     assert (limits["planning"].read_windows, limits["planning"].tool_calls_limit) == (2, 4)
-    assert (limits["authoring"].work_tool_calls, limits["authoring"].tool_calls_limit) == (10, 14)
-    assert limits["assessment"].read_windows == 9 and limits["assessment"].tool_calls_limit == \
-        limits["assessment"].read_windows + 3
+    for role in ("control_authoring", "exploit_authoring"):
+        assert limits[role].read_windows == 2
+        assert limits[role].work_tool_calls == 3
+    reviews = [a for a in run.attempts if a.stage == "assessment"]
+    assert len(reviews) == 2 and reviews[0].limits.read_windows < reviews[1].limits.read_windows
     for attempt in run.attempts:
         assert attempt.exhausted is None and attempt.usage.tool_calls <= attempt.limits.tool_calls_limit
-        assert attempt.limits.request_limit == attempt.limits.tool_calls_limit + 3
+        from corsair.composition.direct import stage_output_retries
+        assert attempt.limits.request_limit == attempt.limits.tool_calls_limit + 2 + stage_output_retries(attempt.stage, CompositionBudget())
 
 
 def test_a_stage_that_cannot_finish_without_its_withdrawn_tools_is_tool_budget_exhausted(store, tmp_path):
@@ -415,19 +396,19 @@ def test_a_stage_that_cannot_finish_without_its_withdrawn_tools_is_tool_budget_e
     assert (assessment.exhausted.limit, assessment.exhausted.cap) == ("tool_calls_limit", 3)
     assert run.stopped_at == "assessment" and run.reason.startswith("assessment budget exhausted: tool_calls_limit 3")
     # The gate verdict over the frozen evidence does not depend on the assessor.
-    assert run.gate is not None
+    assert run.gate is None and run.executions == ()
 
 
 def test_a_stage_ending_on_its_cap_is_a_typed_budget_exhaustion(store, tmp_path):
-    budget = CompositionBudget(authoring=CompositionBudget().authoring.model_copy(update={"request_limit": 2}))
+    budget = CompositionBudget(control_authoring=CompositionBudget().control_authoring.model_copy(update={"request_limit": 2}))
     (tmp_path / "work").mkdir()
     run = asyncio.run(run_direct(fixture_case(), stages(), reviewed_runners(store, tmp_path / "work"), budget))
     authoring = run.attempts[-1]
-    assert run.stopped_at == "authoring" and authoring.output is None
+    assert run.stopped_at == "control_authoring" and authoring.output is None
     assert isinstance(authoring.exhausted, BudgetExhausted)
     assert (authoring.exhausted.limit, authoring.exhausted.cap) == ("request_limit", 2)
     # The test's ceiling of 2 requests is below the derivation, and the reason says so (first corpus case review).
-    assert run.reason.startswith("authoring budget exhausted: request_limit 2 (the operator's ceiling, below the "
+    assert run.reason.startswith("control_authoring budget exhausted: request_limit 2 (the operator's ceiling, below the "
                                  "derivation from 2 read windows")
     assert exhaustion("planning", authoring.limits, ValueError("x")) is None
     # Codex review on 78f1690: only the stage's own deadline is its timeout budget; a provider, tool or activity

@@ -1,0 +1,6 @@
+{
+  "sha256": "66c670f1b0a6627d815e594c06d3a640c3ec4e9e9536b98aa712f5ab8039cbcf",
+  "dataset": "development-v2",
+  "supersedes_sha256": "bc2b151d17d34ccc9d40035cf06b6b0338208f8745d8ae7dd97945a1c4cf00e6",
+  "change": "Visible repository command declarations now match exact recorded tuples; expected status/layer and frozen v1 evidence remain unchanged."
+}

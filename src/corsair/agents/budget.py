@@ -1,8 +1,9 @@
-"""Native tool-call budget disclosure: function tools are withdrawn once the run's own cap is reached.
+"""Native tool-call budget disclosure: domain function tools are withdrawn once the run's own cap is reached.
 
-``RunContext.usage_limits`` is the cap the run enforces; preparing tools against it leaves only the output
-contract, so a stage that spent its tool calls returns its typed output instead of dying on the next call
-(SPEC-0043). The cap itself stays operator configuration, never prompt text.
+``RunContext.usage_limits`` is the cap the run enforces; withdrawing domain tools lets a stage finish with its output
+contract rather than attempt another domain call
+(SPEC-0043). Native reserved tools such as load_capability can remain offered; UsageLimits still rejects
+any call beyond the hard cap before execution. The cap stays operator configuration, never prompt text.
 """
 
 from pydantic_ai import RunContext
