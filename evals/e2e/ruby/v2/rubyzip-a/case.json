@@ -17,7 +17,7 @@
     "source": "https://github.com/rubyzip/rubyzip",
     "license": "BSD-2-Clause",
     "record": "CVE-2018-1000544",
-    "fix_commit": null,
+    "fix_commit": "v1.2.2",
     "verbatim": false,
     "path": "benchmarks/corpus/permissive-reduced/ruby/rubyzip/a"
   }

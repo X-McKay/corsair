@@ -17,7 +17,7 @@
     "source": "https://github.com/rack/rack",
     "license": "MIT",
     "record": "CVE-2025-27610",
-    "fix_commit": null,
+    "fix_commit": "50caab74fa01ee8f5dbdee7bb2782126d20c6583",
     "verbatim": false,
     "path": "benchmarks/corpus/permissive-reduced/ruby/rack-static/b"
   }
