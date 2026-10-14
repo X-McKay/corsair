@@ -1,0 +1,6 @@
+{
+  "fixture_id": "missing-source-v1",
+  "issue": "A user supplied filename may escape the configured documents directory. No source was captured. Identify the facts needed for component analysis.",
+  "scope": "component",
+  "source_files": []
+}

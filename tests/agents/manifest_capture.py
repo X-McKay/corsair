@@ -91,7 +91,7 @@ def capture_root(role, *, activate=False):
         from corsair.agents.environment.dependencies import EnvironmentDependencies,SetupBudget
         from corsair.agents.environment.contracts import EnvironmentInput
         from evals.environment.evaluate import load_cases,RecordedExecution,HANDLE
-        _,cases=load_cases('development-v2');case=cases[0]
+        cases,_=load_cases('development-v2');case=cases[0]
         deps=EnvironmentDependencies(EnvironmentInput.model_validate(case['inputs']),RecordedExecution(case),HANDLE,
             case.get('toolchain_id','python-3.12'),'/sandbox/scratch',SetupBudget(max_commands=case['max_commands']))
         factory=create_environment_agent

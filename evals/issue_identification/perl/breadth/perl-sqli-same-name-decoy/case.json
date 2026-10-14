@@ -1,0 +1,14 @@
+{
+  "language": "perl",
+  "framework": "dbi",
+  "family": "sql-injection",
+  "kind": "decoy",
+  "probes": "Two packages define get_user; only the DBI one interpolates the name into SQL.",
+  "provenance": {
+    "source": "https://github.com/X-McKay/infosec-harness",
+    "commit": "52aa2ac64f3d81139b609f18890ac52950d02933",
+    "path": "eval-corpus/perl/sqli/a/lib/UserDao.pm",
+    "license": "NOASSERTION (same-owner repository; in-repo copy under SPEC-0067, see benchmarks/corpus/infosec-harness/SOURCE.md)",
+    "notes": "UserDao.pm verbatim; lib/UserCache.pm is a synthetic decoy"
+  }
+}

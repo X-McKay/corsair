@@ -1,0 +1,100 @@
+{
+  "status": "ready",
+  "symbol": "render",
+  "target_path": "lib/Renderer.pm",
+  "required_lines": [
+    8,
+    10
+  ],
+  "adversarial_markers": [
+    "<script>"
+  ],
+  "witness_markers": [
+    "&lt;script&gt;",
+    "unlike"
+  ],
+  "observation_kind": "return_value",
+  "required_reads": [
+    "lib/Renderer.pm",
+    "t/renderer.t"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_id": "t/renderer-security.t#renders_plain_comment",
+      "test_path": "t/renderer-security.t",
+      "fixture_setup": [
+        "No files; inputs are in-memory strings"
+      ],
+      "implementation_call": "Renderer::render('great talk')",
+      "input": "comment 'great talk'",
+      "required_behavior": "Returns exactly <div class='comment'>great talk</div>",
+      "observable_witness": "is() on the string returned by the real render call",
+      "observation": {
+        "kind": "return_value",
+        "property": "Returns exactly <div class='comment'>great talk</div>",
+        "seam": "use Renderer and call the real Renderer::render"
+      },
+      "source_references": [
+        {
+          "path": "lib/Renderer.pm",
+          "start_line": 8,
+          "end_line": 10
+        }
+      ]
+    },
+    "security": {
+      "test_id": "t/renderer-security.t#escapes_markup_in_comment",
+      "test_path": "t/renderer-security.t",
+      "fixture_setup": [
+        "No files; inputs are in-memory strings"
+      ],
+      "implementation_call": "Renderer::render('<script>alert(1)</script>')",
+      "input": "comment '<script>alert(1)</script>'",
+      "required_behavior": "The returned HTML contains &lt;script&gt;alert(1)&lt;/script&gt; and no literal <script> element",
+      "observable_witness": "unlike($html, qr/<script>/) and like($html, qr/&lt;script&gt;/) on the string returned by the real render call",
+      "observation": {
+        "kind": "return_value",
+        "property": "The returned HTML contains &lt;script&gt;alert(1)&lt;/script&gt; and no literal <script> element",
+        "seam": "use Renderer and call the real Renderer::render"
+      },
+      "source_references": [
+        {
+          "path": "lib/Renderer.pm",
+          "start_line": 8,
+          "end_line": 10
+        }
+      ]
+    },
+    "security_expectation": {
+      "failure_type": "not_ok",
+      "safe_behavior": "html_escaped_output"
+    },
+    "discovery_command": [
+      "prove",
+      "--norc",
+      "-l",
+      "-r",
+      "--dry",
+      "t"
+    ],
+    "evidence_requirements": [
+      "Native discovery lists the planned .t file and both planned subtests run",
+      "Both the control and the exploit probe execute with native TAP results and diagnostics",
+      "Review the real source call, adversarial input and assertions before execution"
+    ],
+    "citations": [
+      {
+        "path": "lib/Renderer.pm",
+        "start_line": 8,
+        "end_line": 10
+      }
+    ],
+    "limitations": [
+      "Element-content escaping only; attribute contexts are not exercised",
+      "Browser parsing of the markup is outside the observation boundary"
+    ]
+  }
+}

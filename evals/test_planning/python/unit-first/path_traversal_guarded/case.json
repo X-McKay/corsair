@@ -1,0 +1,12 @@
+{
+  "language": "python",
+  "framework": "pytest",
+  "family": "path_traversal_guarded",
+  "kind": "moved",
+  "probes": "Moved unchanged from evals/test_planning/cases-unit-first-v2.yaml (unit-first set); the suite README describes what it exercises.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Corsair-authored; previously evals/test_planning/cases-unit-first-v2.yaml"
+  }
+}

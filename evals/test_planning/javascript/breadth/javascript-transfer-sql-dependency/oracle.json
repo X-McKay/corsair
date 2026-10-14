@@ -1,0 +1,97 @@
+{
+  "status": "ready",
+  "symbol": "findAccount",
+  "target_path": "lib/accounts.js",
+  "required_lines": [
+    4,
+    5
+  ],
+  "adversarial_markers": [
+    "OR 1=1"
+  ],
+  "witness_markers": [
+    "sql",
+    "params"
+  ],
+  "observation_kind": "dependency_call",
+  "required_reads": [
+    "lib/accounts.js",
+    "test/accounts.test.js"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_id": "test/accounts.security.test.js::accounts::looks_up_plain_name",
+      "test_path": "test/accounts.security.test.js",
+      "fixture_setup": [
+        "Create a recording db double whose query is a jest.fn returning fixed rows through the callback"
+      ],
+      "implementation_call": "findAccount(db, 'alice', callback)",
+      "input": "name 'alice'",
+      "required_behavior": "The callback receives the fixed rows and the double records one query whose lookup value is alice",
+      "observable_witness": "Recorded db.query mock.calls (sql and params) from the real findAccount call",
+      "observation": {
+        "kind": "dependency_call",
+        "property": "The callback receives the fixed rows and the double records one query whose lookup value is alice",
+        "seam": "Call the real findAccount with an injected db double",
+        "controlled_dependency": "A recording db object whose query is a jest.fn storing (sql, params) unchanged and calling back with (null, [{ id: 1, balance: 25 }]); it does not construct or sanitize SQL"
+      },
+      "source_references": [
+        {
+          "path": "lib/accounts.js",
+          "start_line": 4,
+          "end_line": 5
+        }
+      ]
+    },
+    "security": {
+      "test_id": "test/accounts.security.test.js::accounts::keeps_hostile_name_out_of_sql",
+      "test_path": "test/accounts.security.test.js",
+      "fixture_setup": [
+        "Create a recording db double whose query is a jest.fn returning fixed rows through the callback"
+      ],
+      "implementation_call": "findAccount(db, \"alice' OR 1=1 --\", callback)",
+      "input": "name \"alice' OR 1=1 --\"",
+      "required_behavior": "The recorded SQL text does not contain the hostile name and the params array equals [\"alice' OR 1=1 --\"]",
+      "observable_witness": "Recorded db.query mock.calls: the sql string excludes 'OR 1=1' and the params array carries the hostile name",
+      "observation": {
+        "kind": "dependency_call",
+        "property": "The recorded SQL text does not contain the hostile name and the params array equals [\"alice' OR 1=1 --\"]",
+        "seam": "Call the real findAccount with an injected db double",
+        "controlled_dependency": "A recording db object whose query is a jest.fn storing (sql, params) unchanged and calling back with (null, [{ id: 1, balance: 25 }]); it does not construct or sanitize SQL"
+      },
+      "source_references": [
+        {
+          "path": "lib/accounts.js",
+          "start_line": 4,
+          "end_line": 5
+        }
+      ]
+    },
+    "security_expectation": {
+      "failure_type": "Error",
+      "safe_behavior": "bound_parameter"
+    },
+    "discovery_command": [
+      "node_modules/.bin/jest",
+      "--listTests"
+    ],
+    "evidence_requirements": [
+      "Native discovery lists the planned test file and both planned test ids run",
+      "Both the control and the exploit probe execute with native Jest outcomes and failure messages",
+      "Review the real source call, adversarial input and assertions before execution"
+    ],
+    "citations": [
+      {
+        "path": "lib/accounts.js",
+        "start_line": 4,
+        "end_line": 5
+      }
+    ],
+    "limitations": [
+      "Query construction only; database engine behavior is outside the observation boundary"
+    ]
+  }
+}

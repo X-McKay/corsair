@@ -1,0 +1,11 @@
+{
+  "fixture_id": "java-spring-annotated-download",
+  "issue": "GET /files/download?name=../../application.properties returns configuration from outside the upload directory. Locate the download endpoint implementation.",
+  "scope": "component",
+  "source_files": [
+    {
+      "path": "src/main/java/com/example/web/FileController.java",
+      "content": "package com.example.web;\n\nimport java.io.IOException;\nimport java.nio.file.Files;\nimport java.nio.file.Path;\nimport java.nio.file.Paths;\nimport java.util.List;\nimport java.util.stream.Collectors;\nimport org.springframework.http.ResponseEntity;\nimport org.springframework.web.bind.annotation.GetMapping;\nimport org.springframework.web.bind.annotation.RequestMapping;\nimport org.springframework.web.bind.annotation.RequestParam;\nimport org.springframework.web.bind.annotation.RestController;\n\n@RestController\n@RequestMapping(\"/files\")\npublic class FileController {\n    private final Path uploads = Paths.get(\"/srv/uploads\");\n\n    @GetMapping(\"/list\")\n    public List<String> list() throws IOException {\n        return Files.list(uploads).map(p -> p.getFileName().toString()).collect(Collectors.toList());\n    }\n\n    @GetMapping(\"/download\")\n    public ResponseEntity<byte[]> download(@RequestParam(\"name\") String name) throws IOException {\n        byte[] body = Files.readAllBytes(uploads.resolve(name));\n        return ResponseEntity.ok(body);\n    }\n}\n"
+    }
+  ]
+}

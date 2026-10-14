@@ -1,0 +1,22 @@
+{
+  "status": "unsupported",
+  "required_reads": [
+    "render_client.py",
+    "test_render_client_existing.py"
+  ],
+  "reference_plan": {
+    "status": "unsupported",
+    "scope": "component",
+    "missing_capability": "The local file read would happen inside the separate render service reached over the socket, which is neither in the saved inventory nor started in the prepared environment; the listed audit hooks observe only the test process, and submit_render only forwards the markup, so no listed facility can observe whether a server file is read or embedded",
+    "limitations": [
+      "No test specification is produced; the concern remains untested at this scope"
+    ],
+    "citations": [
+      {
+        "path": "render_client.py",
+        "start_line": 5,
+        "end_line": 9
+      }
+    ]
+  }
+}

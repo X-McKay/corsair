@@ -1,0 +1,10 @@
+{
+  "status": "ready",
+  "symbol": "mergePreferences",
+  "path": "src/merge.js",
+  "required_lines": [
+    2,
+    11
+  ],
+  "max_span": 12
+}

@@ -1,0 +1,27 @@
+{
+  "required_reads": [
+    "pom.xml"
+  ],
+  "commands": [],
+  "observations": [],
+  "draft": {
+    "status": "unsupported",
+    "requirement": "JDK 21 is required (maven.compiler.release 21) but the prepared toolchain is Temurin 17",
+    "citations": [
+      {
+        "path": "pom.xml",
+        "start_line": 8,
+        "end_line": 8
+      }
+    ]
+  },
+  "status": "unsupported",
+  "layer": null,
+  "max_commands": 12,
+  "toolchain_id": "temurin-17-maven",
+  "requirement_patterns": [
+    "(?i)\\b(?:Java|JDK|release)\\s+21\\b",
+    "(?i)\\b(?:Temurin|JDK|Java)\\s+17\\b"
+  ],
+  "checkout_paths": null
+}

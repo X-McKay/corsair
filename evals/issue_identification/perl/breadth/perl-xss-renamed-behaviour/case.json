@@ -1,0 +1,14 @@
+{
+  "language": "perl",
+  "framework": "perl",
+  "family": "xss",
+  "kind": "transfer",
+  "probes": "The issue describes the rendering behaviour without naming the sub; a second module formats dates.",
+  "provenance": {
+    "source": "https://github.com/X-McKay/infosec-harness",
+    "commit": "52aa2ac64f3d81139b609f18890ac52950d02933",
+    "path": "eval-corpus/perl/xss/b/lib/Renderer.pm",
+    "license": "NOASSERTION (same-owner repository; in-repo copy under SPEC-0067, see benchmarks/corpus/infosec-harness/SOURCE.md)",
+    "notes": "Renderer.pm verbatim; lib/Formatter.pm is synthetic"
+  }
+}

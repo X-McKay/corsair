@@ -1,0 +1,10 @@
+{
+  "status": "ready",
+  "symbol": "run",
+  "path": "src/main/java/com/example/Runner.java",
+  "required_lines": [
+    5,
+    6
+  ],
+  "max_span": 8
+}

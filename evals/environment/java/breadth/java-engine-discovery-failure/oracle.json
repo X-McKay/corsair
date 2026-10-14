@@ -1,0 +1,54 @@
+{
+  "required_reads": [
+    ".github/workflows/maven.yml"
+  ],
+  "commands": [
+    [
+      "mvn",
+      "-B",
+      "dependency:go-offline"
+    ],
+    [
+      "mvn",
+      "-B",
+      "-o",
+      "compile"
+    ],
+    [
+      "mvn",
+      "-B",
+      "-o",
+      "test",
+      "-DlistTests=true"
+    ]
+  ],
+  "observations": [
+    {
+      "exit": 0,
+      "stdout": ""
+    },
+    {
+      "exit": 0,
+      "stdout": "[INFO] BUILD SUCCESS\n"
+    },
+    {
+      "exit": 1,
+      "stdout": "[INFO]  T E S T S\n[ERROR] There was an error in the forked process\n[ERROR] TestEngine with ID 'junit-jupiter' failed to discover tests\n[ERROR] org.junit.platform.commons.JUnitException: TestEngine with ID 'junit-jupiter' failed to discover tests\n[INFO] BUILD FAILURE\n"
+    }
+  ],
+  "draft": {
+    "status": "blocked",
+    "layer": "discovery",
+    "evidence": "TestEngine with ID 'junit-jupiter' failed to discover tests",
+    "run_ids": [
+      3
+    ],
+    "citations": []
+  },
+  "status": "blocked",
+  "layer": "discovery",
+  "max_commands": 12,
+  "toolchain_id": "temurin-17-maven",
+  "requirement_patterns": [],
+  "checkout_paths": null
+}

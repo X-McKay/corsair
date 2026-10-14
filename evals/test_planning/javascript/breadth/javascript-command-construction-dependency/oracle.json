@@ -1,0 +1,97 @@
+{
+  "status": "ready",
+  "symbol": "countLines",
+  "target_path": "src/cmd.js",
+  "required_lines": [
+    4,
+    5
+  ],
+  "adversarial_markers": [
+    "; touch"
+  ],
+  "witness_markers": [
+    "mock.calls"
+  ],
+  "observation_kind": "dependency_call",
+  "required_reads": [
+    "src/cmd.js",
+    "__tests__/cmd.test.js"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_id": "__tests__/cmd.security.test.js::countLines::passes_plain_name",
+      "test_path": "__tests__/cmd.security.test.js",
+      "fixture_setup": [
+        "jest.mock('child_process') with recording exec and execFile doubles before requiring ../src/cmd"
+      ],
+      "implementation_call": "countLines('notes.txt', callback)",
+      "input": "file name 'notes.txt'",
+      "required_behavior": "The callback receives the double's stdout and exactly one child_process call names notes.txt",
+      "observable_witness": "Recorded exec/execFile mock.calls from the real countLines call, asserted with toEqual",
+      "observation": {
+        "kind": "dependency_call",
+        "property": "The callback receives the double's stdout and exactly one child_process call names notes.txt",
+        "seam": "Call the real countLines with child_process replaced by a recording module double",
+        "controlled_dependency": "jest.mock('child_process') replaces exec and execFile with jest.fn doubles that record their arguments and invoke the callback with (null, '1 notes.txt\\n'); they run nothing and do not build or sanitize the command"
+      },
+      "source_references": [
+        {
+          "path": "src/cmd.js",
+          "start_line": 4,
+          "end_line": 5
+        }
+      ]
+    },
+    "security": {
+      "test_id": "__tests__/cmd.security.test.js::countLines::keeps_hostile_name_out_of_shell",
+      "test_path": "__tests__/cmd.security.test.js",
+      "fixture_setup": [
+        "jest.mock('child_process') with recording exec and execFile doubles before requiring ../src/cmd"
+      ],
+      "implementation_call": "countLines('notes.txt; touch pwned', callback)",
+      "input": "file name 'notes.txt; touch pwned'",
+      "required_behavior": "exec is never called with a command string containing the hostile name; the name reaches execFile only as one whole argument array element",
+      "observable_witness": "Recorded exec.mock.calls contain no string including 'touch pwned' and an execFile mock call has 'notes.txt; touch pwned' as an exact array element",
+      "observation": {
+        "kind": "dependency_call",
+        "property": "exec is never called with a command string containing the hostile name; the name reaches execFile only as one whole argument array element",
+        "seam": "Call the real countLines with child_process replaced by a recording module double",
+        "controlled_dependency": "jest.mock('child_process') replaces exec and execFile with jest.fn doubles that record their arguments and invoke the callback with (null, '1 notes.txt\\n'); they run nothing and do not build or sanitize the command"
+      },
+      "source_references": [
+        {
+          "path": "src/cmd.js",
+          "start_line": 4,
+          "end_line": 5
+        }
+      ]
+    },
+    "security_expectation": {
+      "failure_type": "Error",
+      "safe_behavior": "argument_vector_without_shell"
+    },
+    "discovery_command": [
+      "node_modules/.bin/jest",
+      "--listTests"
+    ],
+    "evidence_requirements": [
+      "Native discovery lists the planned test file and both planned test ids run",
+      "Both the control and the exploit probe execute with native Jest outcomes and failure messages",
+      "Review the real source call, adversarial input and assertions before execution"
+    ],
+    "citations": [
+      {
+        "path": "src/cmd.js",
+        "start_line": 4,
+        "end_line": 5
+      }
+    ],
+    "limitations": [
+      "Command construction only; what wc does with the argument is outside the observation boundary",
+      "child_process is a module double; no process is started"
+    ]
+  }
+}

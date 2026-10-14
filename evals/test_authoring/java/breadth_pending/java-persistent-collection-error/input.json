@@ -1,0 +1,118 @@
+{
+  "fixture_id": "java-persistent-collection-error-v1",
+  "inputs": {
+    "plan": {
+      "status": "ready",
+      "scope": "component",
+      "security_expectation": {
+        "failure_type": "org.opentest4j.AssertionFailedError",
+        "safe_behavior": "escaped_label"
+      },
+      "discovery_command": [
+        "mvn",
+        "-q",
+        "-DskipTests",
+        "test-compile"
+      ],
+      "evidence_requirements": [
+        "Both control and exploit probe must execute with native outcomes",
+        "Review both real source calls, adversarial input and assertions before execution"
+      ],
+      "citations": [
+        {
+          "path": "src/main/java/com/example/badge/Badge.java",
+          "start_line": 8,
+          "end_line": 10,
+          "quote": "    public static String render(String label) {\n        return \"<span class=\\\"badge\\\">\" + label + \"</span>\";\n    }"
+        }
+      ],
+      "limitations": [
+        "Xss escaping at this one call only; callers and deployment configuration are outside the observation"
+      ],
+      "control": {
+        "test_id": "com.example.badge.BadgeSecurityTest#benignControl",
+        "test_path": "src/test/java/com/example/badge/BadgeSecurityTest.java",
+        "fixture_setup": [
+          "No files; the call takes only the label string"
+        ],
+        "implementation_call": "Badge.render(label)",
+        "input": "label \"ok\"",
+        "required_behavior": "Returns the badge markup containing the plain label",
+        "observable_witness": "Native junit5 assertion on returns the badge markup containing the plain label",
+        "observation": {
+          "kind": "return_value",
+          "property": "Returns the badge markup containing the plain label",
+          "seam": "Call the real Badge.render through its public interface"
+        },
+        "source_references": [
+          {
+            "path": "src/main/java/com/example/badge/Badge.java",
+            "start_line": 8,
+            "end_line": 10,
+            "quote": "    public static String render(String label) {\n        return \"<span class=\\\"badge\\\">\" + label + \"</span>\";\n    }"
+          }
+        ]
+      },
+      "security": {
+        "test_id": "com.example.badge.BadgeSecurityTest#securityEscapesMarkup",
+        "test_path": "src/test/java/com/example/badge/BadgeSecurityTest.java",
+        "fixture_setup": [
+          "No files; the call takes only the label string"
+        ],
+        "implementation_call": "Badge.render(label)",
+        "input": "label \"<script>alert(1)</script>\"",
+        "required_behavior": "Returned markup does not contain a literal <script> element from the label",
+        "observable_witness": "Native junit5 assertion on returned markup does not contain a literal <script> element from the label",
+        "observation": {
+          "kind": "return_value",
+          "property": "Returned markup does not contain a literal <script> element from the label",
+          "seam": "Call the real Badge.render through its public interface"
+        },
+        "source_references": [
+          {
+            "path": "src/main/java/com/example/badge/Badge.java",
+            "start_line": 8,
+            "end_line": 10,
+            "quote": "    public static String render(String label) {\n        return \"<span class=\\\"badge\\\">\" + label + \"</span>\";\n    }"
+          }
+        ]
+      }
+    },
+    "source_files": [
+      {
+        "path": "src/main/java/com/example/badge/Badge.java",
+        "content": "package com.example.badge;\n\n/** Renders a status badge for a user-supplied label. */\npublic final class Badge {\n    private Badge() {\n    }\n\n    public static String render(String label) {\n        return \"<span class=\\\"badge\\\">\" + label + \"</span>\";\n    }\n}\n"
+      },
+      {
+        "path": "src/test/java/com/example/badge/BadgeTest.java",
+        "content": "package com.example.badge;\n\nimport static org.junit.jupiter.api.Assertions.assertTrue;\n\nimport org.junit.jupiter.api.Test;\n\nclass BadgeTest {\n    @Test\n    void rendersLabel() {\n        assertTrue(Badge.render(\"ok\").contains(\"ok\"));\n    }\n}\n"
+      }
+    ],
+    "environment": {
+      "language": "Java",
+      "runtime": "JDK 17",
+      "framework": "junit5",
+      "discovery_command": [
+        "mvn",
+        "-q",
+        "-DskipTests",
+        "test-compile"
+      ],
+      "approved_test_paths": [
+        "src/test/java/com/example/badge/BadgeSecurityTest.java"
+      ],
+      "baseline_test": {
+        "test_id": "com.example.badge.BadgeTest#rendersLabel",
+        "path": "src/test/java/com/example/badge/BadgeTest.java"
+      },
+      "scratch_location": "A per-test JUnit @TempDir directory",
+      "observation_facilities": [
+        "Native Surefire report: outcome, failure type and failing line per test method"
+      ],
+      "assertion_facts": [
+        "JUnit 5 assertion failures, including assertThrows when nothing is thrown, report org.opentest4j.AssertionFailedError. Match the planned native failure type."
+      ],
+      "witness_facilities": []
+    }
+  }
+}

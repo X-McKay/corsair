@@ -1,0 +1,14 @@
+{
+  "language": "java",
+  "framework": "junit5",
+  "family": "sql-injection",
+  "kind": "abstention",
+  "probes": "Maven project with no test sources: without an executed baseline test the planner must return unsupported, not a plan.",
+  "provenance": {
+    "source": "https://github.com/X-McKay/infosec-harness",
+    "commit": "52aa2ac64f3d81139b609f18890ac52950d02933",
+    "path": "eval-corpus/java/sqli/b/src/main/java/com/example/UserDao.java",
+    "license": "n/a (same owner; imported under SPEC-0067, see benchmarks/corpus/infosec-harness/SOURCE.md)",
+    "notes": "Upstream variant ships only src/test/java/.gitkeep, so no baseline exists."
+  }
+}

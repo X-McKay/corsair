@@ -1,0 +1,14 @@
+{
+  "language": "perl",
+  "framework": "tap-harness",
+  "family": "toolchain-version",
+  "kind": "abstention",
+  "probes": "Makefile.PL declares MIN_PERL_VERSION 5.036 while the only Perl toolchain is 5.26.3; unsupported without perlbrew or downloads.",
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "n/a",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic manifests and recorded observations shaped after the toolchain images in deploy/runtime-matrix.yaml and tests/agents/framework_outputs."
+  }
+}

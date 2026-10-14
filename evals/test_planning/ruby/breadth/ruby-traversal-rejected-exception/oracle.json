@@ -1,0 +1,104 @@
+{
+  "status": "ready",
+  "symbol": "fetch_attachment",
+  "target_path": "lib/attachments.rb",
+  "required_lines": [
+    5,
+    6
+  ],
+  "adversarial_markers": [
+    "../"
+  ],
+  "witness_markers": [
+    "assert_raises",
+    "argumenterror"
+  ],
+  "observation_kind": "exception",
+  "required_reads": [
+    "lib/attachments.rb",
+    "test/attachments_test.rb"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_id": "test/attachments_security_test.rb::AttachmentsSecurityTest#test_reads_file_inside_root",
+      "test_path": "test/attachments_security_test.rb",
+      "fixture_setup": [
+        "Create a per-test directory dir with Dir.mktmpdir in setup and remove it in teardown",
+        "Create dir/files/ containing a.txt with a benign sentinel",
+        "Create dir/outside.txt, outside files/, containing a distinct outside sentinel"
+      ],
+      "implementation_call": "Attachments.fetch_attachment(File.join(dir, 'files'), 'a.txt')",
+      "input": "name 'a.txt' inside the attachment root",
+      "required_behavior": "Returns exactly the benign sentinel content",
+      "observable_witness": "assert_equal on the String returned by the real fetch_attachment call",
+      "observation": {
+        "kind": "exception",
+        "property": "Returns exactly the benign sentinel content",
+        "seam": "require 'attachments' and call the real Attachments.fetch_attachment"
+      },
+      "source_references": [
+        {
+          "path": "lib/attachments.rb",
+          "start_line": 5,
+          "end_line": 6
+        }
+      ]
+    },
+    "security": {
+      "test_id": "test/attachments_security_test.rb::AttachmentsSecurityTest#test_rejects_name_outside_root",
+      "test_path": "test/attachments_security_test.rb",
+      "fixture_setup": [
+        "Create a per-test directory dir with Dir.mktmpdir in setup and remove it in teardown",
+        "Create dir/files/ containing a.txt with a benign sentinel",
+        "Create dir/outside.txt, outside files/, containing a distinct outside sentinel",
+        "Read dir/outside.txt before the call to show the fixture exists and is readable"
+      ],
+      "implementation_call": "Attachments.fetch_attachment(File.join(dir, 'files'), '../outside.txt')",
+      "input": "name '../outside.txt', which resolves outside the attachment root",
+      "required_behavior": "The call raises ArgumentError and never returns the outside sentinel",
+      "observable_witness": "assert_raises(ArgumentError) around the real fetch_attachment call; a returned outside sentinel fails with Minitest::Assertion",
+      "observation": {
+        "kind": "exception",
+        "property": "The call raises ArgumentError and never returns the outside sentinel",
+        "seam": "require 'attachments' and call the real Attachments.fetch_attachment"
+      },
+      "source_references": [
+        {
+          "path": "lib/attachments.rb",
+          "start_line": 5,
+          "end_line": 6
+        }
+      ]
+    },
+    "security_expectation": {
+      "failure_type": "Minitest::Assertion",
+      "safe_behavior": "ArgumentError"
+    },
+    "discovery_command": [
+      "bundle",
+      "exec",
+      "rake",
+      "test",
+      "TESTOPTS=--verbose"
+    ],
+    "evidence_requirements": [
+      "Native discovery lists exactly the two planned test methods",
+      "Both the control and the exploit probe execute with native Minitest outcomes and failure classes",
+      "Review the real source call, adversarial input and assertions before execution"
+    ],
+    "citations": [
+      {
+        "path": "lib/attachments.rb",
+        "start_line": 5,
+        "end_line": 6
+      }
+    ],
+    "limitations": [
+      "Component scope only: the plan does not show that the controller passes the raw URL name",
+      "Only the raised exception and returned content are observed"
+    ]
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "status": "ready",
+  "symbol": "extract_bundle",
+  "target_path": "bundles.py",
+  "required_lines": [
+    5,
+    14
+  ],
+  "adversarial_markers": [
+    "../"
+  ],
+  "witness_markers": [
+    "open"
+  ],
+  "required_reads": [
+    "bundles.py",
+    "test_bundles_existing.py"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_path": "test_bundles_security.py",
+      "test_id": "test_bundles_security.py::test_benign_extraction",
+      "fixture_setup": [
+        "Create tmp_path/out/ as the destination",
+        "Create tmp_path/bundle.tar holding one member readme.txt with a benign sentinel"
+      ],
+      "implementation_call": "bundles.extract_bundle(tmp_path / 'bundle.tar', tmp_path / 'out')",
+      "input": "an archive whose only member is readme.txt",
+      "required_behavior": "Returns ['readme.txt'] and tmp_path/out/readme.txt holds the sentinel",
+      "observable_witness": "An open audit event for tmp_path/out/readme.txt is recorded during the call",
+      "source_references": [
+        {
+          "path": "bundles.py",
+          "start_line": 5,
+          "end_line": 14
+        }
+      ]
+    },
+    "security": {
+      "test_path": "test_bundles_security.py",
+      "test_id": "test_bundles_security.py::test_security_rejects_escaping_member",
+      "fixture_setup": [
+        "Create tmp_path/out/ as the destination",
+        "Create tmp_path/evil.tar holding one member named ../escaped.txt, which resolves to tmp_path/escaped.txt",
+        "Confirm tmp_path/escaped.txt does not exist before the call"
+      ],
+      "implementation_call": "bundles.extract_bundle(tmp_path / 'evil.tar', tmp_path / 'out')",
+      "input": "an archive whose member name ../escaped.txt resolves outside the destination",
+      "required_behavior": "The call is rejected with ValueError and tmp_path/escaped.txt is never created",
+      "observable_witness": "No open audit event for tmp_path/escaped.txt is recorded during the call; a sandbox denial is recorded separately and is not a rejection",
+      "source_references": [
+        {
+          "path": "bundles.py",
+          "start_line": 5,
+          "end_line": 14
+        }
+      ]
+    },
+    "security_expectation": {
+      "failure_type": "AssertionError",
+      "safe_behavior": "ValueError"
+    },
+    "discovery_command": [
+      "python",
+      "-m",
+      "pytest",
+      "--collect-only",
+      "-q"
+    ],
+    "evidence_requirements": [
+      "Native discovery finds exactly the two planned test ids",
+      "Open audit events captured per test",
+      "Native JUnit outcome per test"
+    ],
+    "citations": [
+      {
+        "path": "bundles.py",
+        "start_line": 5,
+        "end_line": 14
+      },
+      {
+        "path": "test_bundles_existing.py",
+        "start_line": 1,
+        "end_line": 18
+      }
+    ],
+    "limitations": [
+      "Component scope only",
+      "Audit events observe Python-level opens in the test process only"
+    ]
+  }
+}

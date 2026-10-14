@@ -1,8 +1,0 @@
-{
-  "shell_command_injection": "73a8d6590fc204349ab61809550024b6fc017f3498271e32e7be9f35a28e3f21",
-  "archive_extraction_guarded": "e0a25a9fd754be46c3aca5cfccd8c2af8973433977804fc62da4bfb00813b2dc",
-  "sql_query_injection": "66b5e010496629e23c69e26e185f1710fa356edd142908ab0d8b7560dab8b810",
-  "deserialization_injection_in_source": "83e971252125a67c80a7d94737a5b8878ea2dbddc629bf187f1802e773836bde",
-  "markup_injection_no_baseline": "2d62c66febcc8957c748da45b77314e48619ad12fa83416974825908ba44cdfe",
-  "timing_side_channel_unobservable": "bc3fa21807b9897608c3ae9415585e8ec83d199d76ad3cc0b976d9d8e43fc6ec"
-}

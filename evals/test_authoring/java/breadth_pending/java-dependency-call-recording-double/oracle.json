@@ -1,0 +1,27 @@
+{
+  "script": [
+    {
+      "write": "reference"
+    },
+    {
+      "run": true
+    }
+  ],
+  "runner_runs": [
+    {
+      "status": "discovered",
+      "control": "passed",
+      "security": "failed",
+      "security_failure": "org.opentest4j.AssertionFailedError"
+    }
+  ],
+  "status": "patch",
+  "runs": 1,
+  "security_assertion_lines": [
+    36,
+    37
+  ],
+  "files": {
+    "reference": "package com.example.accounts;\n\nimport static org.junit.jupiter.api.Assertions.assertEquals;\nimport static org.junit.jupiter.api.Assertions.assertFalse;\nimport static org.junit.jupiter.api.Assertions.assertTrue;\n\nimport java.util.ArrayList;\nimport java.util.Collections;\nimport java.util.List;\nimport org.junit.jupiter.api.Test;\n\nclass AccountsSecurityTest {\n    static final class RecordingDatabase implements Accounts.Database {\n        final List<String> queries = new ArrayList<>();\n        final List<List<String>> parameters = new ArrayList<>();\n\n        @Override\n        public List<Integer> query(String sql, List<String> values) {\n            queries.add(sql);\n            parameters.add(values);\n            return Collections.singletonList(25);\n        }\n    }\n\n    @Test\n    void benignControl() {\n        RecordingDatabase database = new RecordingDatabase();\n        assertEquals(Collections.singletonList(25), Accounts.balance(database, \"alice\"));\n        assertEquals(1, database.queries.size());\n    }\n\n    @Test\n    void securityBindsAccount() {\n        RecordingDatabase database = new RecordingDatabase();\n        Accounts.balance(database, \"alice' OR 1=1 --\");\n        assertFalse(database.queries.get(0).contains(\"alice' OR 1=1 --\"));\n        assertTrue(database.parameters.get(0).contains(\"alice' OR 1=1 --\"));\n    }\n}\n"
+  }
+}

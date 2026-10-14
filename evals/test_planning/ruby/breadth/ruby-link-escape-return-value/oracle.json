@@ -1,0 +1,99 @@
+{
+  "status": "ready",
+  "symbol": "profile_link",
+  "target_path": "lib/link_helper.rb",
+  "required_lines": [
+    5,
+    6
+  ],
+  "adversarial_markers": [
+    "<img"
+  ],
+  "witness_markers": [
+    "&lt;img",
+    "refute_includes"
+  ],
+  "observation_kind": "return_value",
+  "required_reads": [
+    "lib/link_helper.rb",
+    "test/link_helper_test.rb"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_id": "test/link_helper_security_test.rb::LinkHelperSecurityTest#test_renders_plain_label",
+      "test_path": "test/link_helper_security_test.rb",
+      "fixture_setup": [
+        "No files; inputs are in-memory strings"
+      ],
+      "implementation_call": "LinkHelper.profile_link('Ann', '/u/ann')",
+      "input": "label 'Ann', url '/u/ann'",
+      "required_behavior": "Returns exactly <a class=\"profile\" href=\"/u/ann\">Ann</a>",
+      "observable_witness": "assert_equal on the String returned by the real profile_link call",
+      "observation": {
+        "kind": "return_value",
+        "property": "Returns exactly <a class=\"profile\" href=\"/u/ann\">Ann</a>",
+        "seam": "require 'link_helper' and call the real LinkHelper.profile_link"
+      },
+      "source_references": [
+        {
+          "path": "lib/link_helper.rb",
+          "start_line": 5,
+          "end_line": 6
+        }
+      ]
+    },
+    "security": {
+      "test_id": "test/link_helper_security_test.rb::LinkHelperSecurityTest#test_escapes_markup_in_label",
+      "test_path": "test/link_helper_security_test.rb",
+      "fixture_setup": [
+        "No files; inputs are in-memory strings"
+      ],
+      "implementation_call": "LinkHelper.profile_link('<img src=x onerror=alert(1)>', '/u/ann')",
+      "input": "label '<img src=x onerror=alert(1)>', url '/u/ann'",
+      "required_behavior": "The returned markup contains &lt;img src=x onerror=alert(1)&gt; and no literal <img element",
+      "observable_witness": "refute_includes html, '<img' and assert_includes html, '&lt;img' on the String returned by the real call",
+      "observation": {
+        "kind": "return_value",
+        "property": "The returned markup contains &lt;img src=x onerror=alert(1)&gt; and no literal <img element",
+        "seam": "require 'link_helper' and call the real LinkHelper.profile_link"
+      },
+      "source_references": [
+        {
+          "path": "lib/link_helper.rb",
+          "start_line": 5,
+          "end_line": 6
+        }
+      ]
+    },
+    "security_expectation": {
+      "failure_type": "Minitest::Assertion",
+      "safe_behavior": "html_escaped_output"
+    },
+    "discovery_command": [
+      "bundle",
+      "exec",
+      "rake",
+      "test",
+      "TESTOPTS=--verbose"
+    ],
+    "evidence_requirements": [
+      "Native discovery lists exactly the two planned test methods",
+      "Both the control and the exploit probe execute with native Minitest outcomes and failure classes",
+      "Review the real source call, adversarial input and assertions before execution"
+    ],
+    "citations": [
+      {
+        "path": "lib/link_helper.rb",
+        "start_line": 5,
+        "end_line": 6
+      }
+    ],
+    "limitations": [
+      "Element-content escaping only; the href attribute and javascript: URLs are not exercised",
+      "Browser parsing of the markup is outside the observation boundary"
+    ]
+  }
+}

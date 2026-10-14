@@ -1,0 +1,26 @@
+{
+  "script": [
+    {
+      "write": "reference"
+    },
+    {
+      "run": true
+    }
+  ],
+  "runner_runs": [
+    {
+      "status": "discovered",
+      "control": "passed",
+      "security": "failed",
+      "security_failure": "not_ok"
+    }
+  ],
+  "status": "patch",
+  "runs": 1,
+  "security_assertion_lines": [
+    21
+  ],
+  "files": {
+    "reference": "use strict;\nuse warnings;\nuse Test::More;\nuse File::Temp qw(tempdir);\nuse File::Spec;\nuse Uploads;\n\nsubtest benign_control => sub {\n    my $root = tempdir(CLEANUP => 1);\n    my $dir = File::Spec->catdir($root, 'uploads');\n    mkdir $dir or die \"mkdir $dir: $!\";\n    Uploads::save($dir, 'photo.txt', 'payload');\n    ok(-e File::Spec->catfile($dir, 'photo.txt'), 'writes inside the upload directory');\n};\n\nsubtest security_keeps_writes_inside_directory => sub {\n    my $root = tempdir(CLEANUP => 1);\n    my $dir = File::Spec->catdir($root, 'uploads');\n    mkdir $dir or die \"mkdir $dir: $!\";\n    eval { Uploads::save($dir, '../escaped.txt', 'payload'); 1 };\n    ok(!-e File::Spec->catfile($root, 'escaped.txt'), 'writes nothing beside the upload directory');\n};\n\ndone_testing();\n"
+  }
+}

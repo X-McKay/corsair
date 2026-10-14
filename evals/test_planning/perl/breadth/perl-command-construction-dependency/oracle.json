@@ -1,0 +1,101 @@
+{
+  "status": "ready",
+  "symbol": "send_notice",
+  "target_path": "lib/Notify.pm",
+  "required_lines": [
+    6,
+    8
+  ],
+  "adversarial_markers": [
+    "; touch"
+  ],
+  "witness_markers": [
+    "recorded runner"
+  ],
+  "observation_kind": "dependency_call",
+  "required_reads": [
+    "lib/Notify.pm",
+    "t/notify.t"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_id": "t/notify-security.t#passes_plain_recipient",
+      "test_path": "t/notify-security.t",
+      "fixture_setup": [
+        "Create a recording code reference that pushes each argument list onto @calls and returns 0"
+      ],
+      "implementation_call": "Notify::send_notice($run, 'ann@example.test', 'Hi')",
+      "input": "recipient 'ann@example.test', subject 'Hi'",
+      "required_behavior": "Returns 0 and the runner records exactly one call naming ann@example.test",
+      "observable_witness": "Recorded runner argument lists in @calls from the real send_notice call, checked with is_deeply",
+      "observation": {
+        "kind": "dependency_call",
+        "property": "Returns 0 and the runner records exactly one call naming ann@example.test",
+        "seam": "Call the real Notify::send_notice with an injected runner code reference",
+        "controlled_dependency": "A recording code reference sub { push @calls, [@_]; return 0 } stores every argument list unchanged; it runs nothing and does not build or sanitize the command"
+      },
+      "source_references": [
+        {
+          "path": "lib/Notify.pm",
+          "start_line": 6,
+          "end_line": 8
+        }
+      ]
+    },
+    "security": {
+      "test_id": "t/notify-security.t#keeps_hostile_recipient_out_of_shell",
+      "test_path": "t/notify-security.t",
+      "fixture_setup": [
+        "Create a recording code reference that pushes each argument list onto @calls and returns 0"
+      ],
+      "implementation_call": "Notify::send_notice($run, 'ann@example.test; touch pwned', 'Hi')",
+      "input": "recipient 'ann@example.test; touch pwned', subject 'Hi'",
+      "required_behavior": "The runner receives an argument list in which the hostile recipient is one whole element, and no element is a single command string containing 'touch pwned'",
+      "observable_witness": "Recorded runner argument lists in @calls: ok(grep { $_ eq 'ann@example.test; touch pwned' } @args) and no element matching /mail .*touch pwned/",
+      "observation": {
+        "kind": "dependency_call",
+        "property": "The runner receives an argument list in which the hostile recipient is one whole element, and no element is a single command string containing 'touch pwned'",
+        "seam": "Call the real Notify::send_notice with an injected runner code reference",
+        "controlled_dependency": "A recording code reference sub { push @calls, [@_]; return 0 } stores every argument list unchanged; it runs nothing and does not build or sanitize the command"
+      },
+      "source_references": [
+        {
+          "path": "lib/Notify.pm",
+          "start_line": 6,
+          "end_line": 8
+        }
+      ]
+    },
+    "security_expectation": {
+      "failure_type": "not_ok",
+      "safe_behavior": "argument_vector_without_shell"
+    },
+    "discovery_command": [
+      "prove",
+      "--norc",
+      "-l",
+      "-r",
+      "--dry",
+      "t"
+    ],
+    "evidence_requirements": [
+      "Native discovery lists the planned .t file and both planned subtests run",
+      "Both the control and the exploit probe execute with native TAP results and diagnostics",
+      "Review the real source call, adversarial input and assertions before execution"
+    ],
+    "citations": [
+      {
+        "path": "lib/Notify.pm",
+        "start_line": 6,
+        "end_line": 8
+      }
+    ],
+    "limitations": [
+      "Command construction only; the mail program's behavior is outside the observation boundary",
+      "The production runner is not exercised"
+    ]
+  }
+}

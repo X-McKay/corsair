@@ -1,0 +1,26 @@
+{
+  "script": [
+    {
+      "write": "reference"
+    },
+    {
+      "run": true
+    }
+  ],
+  "runner_runs": [
+    {
+      "status": "discovered",
+      "control": "passed",
+      "security": "failed",
+      "security_failure": "org.opentest4j.AssertionFailedError"
+    }
+  ],
+  "status": "patch",
+  "runs": 1,
+  "security_assertion_lines": [
+    17
+  ],
+  "files": {
+    "reference": "package com.example.archive;\n\nimport static org.junit.jupiter.api.Assertions.assertEquals;\nimport static org.junit.jupiter.api.Assertions.assertThrows;\n\nimport java.nio.file.Paths;\nimport org.junit.jupiter.api.Test;\n\nclass ArchivePathsSecurityTest {\n    @Test\n    void benignControl() {\n        assertEquals(Paths.get(\"out\", \"docs\", \"a.txt\"), ArchivePaths.destination(Paths.get(\"out\"), \"docs/a.txt\"));\n    }\n\n    @Test\n    void securityRefusesEscapingEntry() {\n        assertThrows(IllegalArgumentException.class, () -> ArchivePaths.destination(Paths.get(\"out\"), \"../../etc/cron.d/job\"));\n    }\n}\n"
+  }
+}

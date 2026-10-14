@@ -1,0 +1,14 @@
+{
+  "language": "perl",
+  "framework": "tap-harness",
+  "family": "smoke-baseline",
+  "kind": "transfer",
+  "probes": "A distribution with no t/ tests and no prerequisites uses the operator smoke .t after prove --dry listed only it.",
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "n/a",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic manifests and recorded observations shaped after the toolchain images in deploy/runtime-matrix.yaml and tests/agents/framework_outputs."
+  }
+}

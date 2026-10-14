@@ -3,7 +3,6 @@
 import argparse
 import asyncio
 from dataclasses import dataclass
-from hashlib import sha256
 import json
 import re
 from pathlib import Path
@@ -44,6 +43,7 @@ from corsair.inference.config import load_agent_config
 from corsair.inference.models import configured_model
 from corsair.ports.execution import ExecutionReceipt, ExecutionError
 from corsair.ports.sandbox import SandboxHandle
+from evals.cases import LANGUAGES, load_set, set_digest, set_names
 from evals.issue_analysis.evaluate import describe_model, record_count
 from evals.issue_analysis.live import (
     NoUnknownToolAttempts,
@@ -221,25 +221,24 @@ class EvaluationBudget(BaseModel):
     output_retries: int = Field(default=1, ge=0, le=1, strict=True)
 
 
-CASE_SETS = {"development": ("cases.json", "manifest.json"),
-             "development-v2": ("cases-v2.json", "manifest-v2.json")}
+SUITE = "environment"
 
 
-def load_cases(cases: str = "development") -> tuple[bytes, list[dict]]:
-    if cases not in CASE_SETS:
-        raise ValueError(f"unknown frozen environment case set: {cases}")
-    case_path, manifest_path = CASE_SETS[cases]
-    raw = (ROOT / case_path).read_bytes()
-    if sha256(raw).hexdigest() != json.loads((ROOT / manifest_path).read_text())["sha256"]:
-        raise ValueError("frozen environment dataset digest changed")
-    return raw, [FrozenCase.model_validate(c).model_dump(mode="json") for c in json.loads(raw)]
+def load_cases(name="development", language=None):
+    """Frozen cases of one set (per-case directories, evals/cases.py) and that set's identity."""
+    if name not in set_names(SUITE):
+        raise ValueError(f"unknown frozen environment case set: {name}")
+    cases = [
+        FrozenCase.model_validate({"name": c.name, "inputs": c.input, **c.oracle}).model_dump(mode="json")
+        for c in load_set(SUITE, name, language)
+    ]
+    return cases, set_digest(SUITE, name)
 
 
-async def evaluate(evidence, budget, model=None, provider=None, *, cases="development"):
+async def evaluate(evidence, budget, model=None, provider=None, dataset="development", language=None):
     evidence.mkdir(parents=True, exist_ok=False)
     logfire.configure(send_to_logfire=False, console=False)
-    dataset_name = cases
-    raw, cases = load_cases(dataset_name)
+    cases, dataset_sha256 = load_cases(dataset, language)
     scripted_mode = model is None
     metadata = {
         "mode": "scripted_fixture" if scripted_mode else "direct_local_provider",
@@ -248,9 +247,9 @@ async def evaluate(evidence, budget, model=None, provider=None, *, cases="develo
         "setup_max_corrections": SetupBudget().max_corrections,
         "skill_sha256": SKILL_SHA256,
         "toolset_sha256": TOOLSET_SHA256,
-        "dataset": dataset_name,
-        "dataset_sha256": sha256(raw).hexdigest(),
-        "dataset_file": CASE_SETS[dataset_name][0],
+        "dataset": dataset,
+        "language": language,
+        "dataset_sha256": dataset_sha256,
         "model": describe_model(model or scripted(cases[0])),
         "execution": "synthetic_observations_not_executed",
         "budget": budget.model_dump(),
@@ -260,7 +259,7 @@ async def evaluate(evidence, budget, model=None, provider=None, *, cases="develo
     metadata |= MANIFEST_IDENTITY
     (evidence / "configuration.json").write_text(json.dumps(metadata, indent=2))
     corpus = Dataset(
-        name="environment-" + ("development-v1" if dataset_name == "development" else dataset_name),
+        name="environment-" + ("development-v1" if dataset == "development" else dataset),
         cases=[
             Case(
                 name=c["name"],
@@ -425,13 +424,14 @@ def main():
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--provider-config", type=Path)
     parser.add_argument("--repeat", type=int, default=2)
-    parser.add_argument("--cases", choices=tuple(CASE_SETS), default="development")
+    parser.add_argument("--cases", choices=set_names(SUITE), default="development")
+    parser.add_argument("--language", choices=LANGUAGES, help="only this language's cases of the set")
     args = parser.parse_args()
 
     async def run():
         budget = EvaluationBudget(repeat=args.repeat)
         if args.provider_config is None:
-            return await evaluate(args.evidence, budget, cases=args.cases)
+            return await evaluate(args.evidence, budget, dataset=args.cases, language=args.language)
         config = load_agent_config(args.provider_config, "environment")
         async with configured_model(config) as model:
             return await evaluate(
@@ -439,7 +439,8 @@ def main():
                 budget,
                 model,
                 config.model_dump(mode="json", exclude={"api_key_env"}),
-                cases=args.cases,
+                dataset=args.cases,
+                language=args.language,
             )
 
     report = asyncio.run(run())

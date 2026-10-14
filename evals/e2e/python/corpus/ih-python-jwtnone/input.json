@@ -1,0 +1,13 @@
+{
+  "schema": "corsair-issue-request/v1",
+  "issue": {
+    "provider": "manual",
+    "title": "Improper signature verification in verify_token",
+    "body": "Reported location: app.py line 29, in verify_token. Weakness class: CWE-347.\n\nverify_token reads the token header and returns the claims of a token it accepts.\n\nAnalyze this component only.",
+    "format": "markdown"
+  },
+  "repository": "evals/e2e/python/corpus/ih-python-jwtnone/repository.git",
+  "revision": "6057b78b76024e8c5ea8b9f1c0c0b43b859c9f1b",
+  "scope": "component",
+  "fixed_revision": "93af78c3a58b1af13b7f62c0409d88df60181a36"
+}

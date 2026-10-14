@@ -1,0 +1,100 @@
+{
+  "status": "ready",
+  "symbol": "readUpload",
+  "target_path": "lib/uploads.js",
+  "required_lines": [
+    6,
+    8
+  ],
+  "adversarial_markers": [
+    "../"
+  ],
+  "witness_markers": [
+    "tothrow"
+  ],
+  "observation_kind": "exception",
+  "required_reads": [
+    "lib/uploads.js",
+    "test/uploads.test.js"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_id": "test/uploads.security.test.js::uploads::reads_file_inside_directory",
+      "test_path": "test/uploads.security.test.js",
+      "fixture_setup": [
+        "Create a per-test directory dir with fs.mkdtempSync(path.join(os.tmpdir(), 'case-'))",
+        "Create dir/uploads/ containing a.txt with a benign sentinel",
+        "Create dir/outside.txt, outside uploads/, containing a distinct outside sentinel"
+      ],
+      "implementation_call": "readUpload(path.join(dir, 'uploads'), 'a.txt')",
+      "input": "name 'a.txt' inside the upload directory",
+      "required_behavior": "Returns exactly the benign sentinel content",
+      "observable_witness": "expect(...).toBe on the string returned by the real readUpload call",
+      "observation": {
+        "kind": "exception",
+        "property": "Returns exactly the benign sentinel content",
+        "seam": "require('../lib/uploads') and call the real readUpload"
+      },
+      "source_references": [
+        {
+          "path": "lib/uploads.js",
+          "start_line": 6,
+          "end_line": 8
+        }
+      ]
+    },
+    "security": {
+      "test_id": "test/uploads.security.test.js::uploads::rejects_name_outside_directory",
+      "test_path": "test/uploads.security.test.js",
+      "fixture_setup": [
+        "Create a per-test directory dir with fs.mkdtempSync(path.join(os.tmpdir(), 'case-'))",
+        "Create dir/uploads/ containing a.txt with a benign sentinel",
+        "Create dir/outside.txt, outside uploads/, containing a distinct outside sentinel",
+        "Read dir/outside.txt before the call to show the fixture exists and is readable"
+      ],
+      "implementation_call": "readUpload(path.join(dir, 'uploads'), '../outside.txt')",
+      "input": "name '../outside.txt', which resolves outside the upload directory",
+      "required_behavior": "The call throws an Error whose message names the rejected attachment path, and the outside sentinel is never returned; ENOENT cannot occur because the outside file exists",
+      "observable_witness": "expect(() => readUpload(...)).toThrow(/outside/) around the real call; a returned outside sentinel fails the test",
+      "observation": {
+        "kind": "exception",
+        "property": "The call throws an Error whose message names the rejected attachment path, and the outside sentinel is never returned; ENOENT cannot occur because the outside file exists",
+        "seam": "require('../lib/uploads') and call the real readUpload"
+      },
+      "source_references": [
+        {
+          "path": "lib/uploads.js",
+          "start_line": 6,
+          "end_line": 8
+        }
+      ]
+    },
+    "security_expectation": {
+      "failure_type": "Error",
+      "safe_behavior": "Error"
+    },
+    "discovery_command": [
+      "node_modules/.bin/jest",
+      "--listTests"
+    ],
+    "evidence_requirements": [
+      "Native discovery lists the planned test file and both planned test ids run",
+      "Both the control and the exploit probe execute with native Jest outcomes and failure messages",
+      "Review the real source call, adversarial input and assertions before execution"
+    ],
+    "citations": [
+      {
+        "path": "lib/uploads.js",
+        "start_line": 6,
+        "end_line": 8
+      }
+    ],
+    "limitations": [
+      "Component scope only: the plan does not show that the route passes the raw query value",
+      "Only the thrown error and the returned content are observed"
+    ]
+  }
+}

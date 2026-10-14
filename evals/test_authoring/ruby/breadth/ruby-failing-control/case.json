@@ -1,0 +1,12 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "header-injection",
+  "kind": "failure-mode",
+  "probes": "The control fails on its run, so the stage ends blocked at fixture instead of returning a patch",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Written for this set; the source shape follows common header injection reports"
+  }
+}

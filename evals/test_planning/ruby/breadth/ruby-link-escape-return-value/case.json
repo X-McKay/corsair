@@ -1,0 +1,12 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "xss",
+  "kind": "positive",
+  "probes": "Ruby string-interpolated HTML helper planned as a Minitest return-value assertion on escaped markup.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic interpolating link helper."
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "path-traversal",
+  "kind": "guarded",
+  "probes": "Guarded rack-protection path normaliser (backslash handling present): the plan must still drive encoded backslash traversal and assert the returned path.",
+  "provenance": {
+    "source": "https://github.com/sinatra/sinatra",
+    "commit": "4831ab658046ff12f8c3cb17a9833f942f49f7ff",
+    "path": "rack-protection/lib/rack/protection/path_traversal.rb",
+    "license": "MIT",
+    "notes": "Tag v2.0.1, file verbatim with the upstream License copyright line added as a comment; baseline test is synthetic."
+  }
+}

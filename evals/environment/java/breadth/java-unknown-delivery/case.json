@@ -1,0 +1,14 @@
+{
+  "language": "java",
+  "framework": "junit5",
+  "family": "unknown-delivery",
+  "kind": "failure-mode",
+  "probes": "The dependency command's delivery is unknown; the halted ledger refuses the follow-up compile and the result is blocked at sandbox.",
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "n/a",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic manifests and recorded observations shaped after the toolchain images in deploy/runtime-matrix.yaml and tests/agents/framework_outputs."
+  }
+}

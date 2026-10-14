@@ -1,0 +1,15 @@
+{
+  "held_out": false,
+  "cases": {
+    "python/reference_realization": "d17a2fd26475926a699bb0d6bc8fc28362ef319fd4542a5f8d38694ce12699c6",
+    "python/guarded_source_same_patch": "b4b3bbafb6aebd17309be9ab16ca9305e4b8d5ff9279a0b9dfd2a22cec5b7716",
+    "python/collection_error_then_fix": "66768c6415bb2ef0d31b4d2091f9a3aa303d9b2df4837595d7cf9c5a9581206e",
+    "python/injection_in_saved_test": "eea0766068eae63706a16236e9084742031a7eaa72045ee2978b1a39c2a05252",
+    "python/persistent_collection_error": "19cfb253798ed6a0fab5c778162981513642f773336b5ce247b0a21d5c95059d",
+    "python/failing_control": "8784019a4ccbe55a195ee6ba16f7dc4167ad354c5ff98c21c4ab10dae27d882a",
+    "python/self_observation_refused_then_fixed": "dbf745b63c08591d981b2196d2a0f74922c40847c294d99823481f501488341b",
+    "python/self_observation_refused_twice": "7f2e6d902e84584e5db23af219ae0b5d7dee08975f9dc469d7b04d2bc47f7997",
+    "python/reads_own_file_after_collection_error": "f72de5497453af32da899d50fbe154b3227ca1b216cf6825e047d506f43c9750",
+    "python/absence_plan_realization": "4a9097c5f09cf1c31c8a11394d72b41d30dd6539464de6b19bc700c6ffe1c138"
+  }
+}

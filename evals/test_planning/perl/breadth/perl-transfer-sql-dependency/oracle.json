@@ -1,0 +1,101 @@
+{
+  "status": "ready",
+  "symbol": "get_user",
+  "target_path": "lib/UserDao.pm",
+  "required_lines": [
+    6,
+    8
+  ],
+  "adversarial_markers": [
+    "OR '1'='1"
+  ],
+  "witness_markers": [
+    "sql",
+    "bind"
+  ],
+  "observation_kind": "dependency_call",
+  "required_reads": [
+    "lib/UserDao.pm",
+    "t/user_dao.t"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_id": "t/user_dao-security.t#looks_up_plain_name",
+      "test_path": "t/user_dao-security.t",
+      "fixture_setup": [
+        "Create a recording database handle (a blessed object) whose selectall_arrayref stores its arguments and returns fixed rows"
+      ],
+      "implementation_call": "UserDao::get_user($dbh, 'alice')",
+      "input": "name 'alice'",
+      "required_behavior": "Returns the fixed rows and the handle records one query whose lookup value is alice",
+      "observable_witness": "Recorded SQL and bind values from the real get_user call, checked with is_deeply",
+      "observation": {
+        "kind": "dependency_call",
+        "property": "Returns the fixed rows and the handle records one query whose lookup value is alice",
+        "seam": "Call the real UserDao::get_user with an injected database handle double",
+        "controlled_dependency": "A recording database handle object whose selectall_arrayref stores the SQL, attributes and bind values unchanged and returns [[1, 'alice']]; it does not construct or sanitize SQL"
+      },
+      "source_references": [
+        {
+          "path": "lib/UserDao.pm",
+          "start_line": 6,
+          "end_line": 8
+        }
+      ]
+    },
+    "security": {
+      "test_id": "t/user_dao-security.t#keeps_hostile_name_out_of_sql",
+      "test_path": "t/user_dao-security.t",
+      "fixture_setup": [
+        "Create a recording database handle (a blessed object) whose selectall_arrayref stores its arguments and returns fixed rows"
+      ],
+      "implementation_call": "UserDao::get_user($dbh, \"alice' OR '1'='1\")",
+      "input": "name \"alice' OR '1'='1\"",
+      "required_behavior": "The recorded SQL text does not contain the hostile name and the bind values equal (\"alice' OR '1'='1\")",
+      "observable_witness": "Recorded SQL and bind values: unlike($sql, qr/OR '1'='1/) and is_deeply on the bind list",
+      "observation": {
+        "kind": "dependency_call",
+        "property": "The recorded SQL text does not contain the hostile name and the bind values equal (\"alice' OR '1'='1\")",
+        "seam": "Call the real UserDao::get_user with an injected database handle double",
+        "controlled_dependency": "A recording database handle object whose selectall_arrayref stores the SQL, attributes and bind values unchanged and returns [[1, 'alice']]; it does not construct or sanitize SQL"
+      },
+      "source_references": [
+        {
+          "path": "lib/UserDao.pm",
+          "start_line": 6,
+          "end_line": 8
+        }
+      ]
+    },
+    "security_expectation": {
+      "failure_type": "not_ok",
+      "safe_behavior": "bound_parameter"
+    },
+    "discovery_command": [
+      "prove",
+      "--norc",
+      "-l",
+      "-r",
+      "--dry",
+      "t"
+    ],
+    "evidence_requirements": [
+      "Native discovery lists the planned .t file and both planned subtests run",
+      "Both the control and the exploit probe execute with native TAP results and diagnostics",
+      "Review the real source call, adversarial input and assertions before execution"
+    ],
+    "citations": [
+      {
+        "path": "lib/UserDao.pm",
+        "start_line": 6,
+        "end_line": 8
+      }
+    ],
+    "limitations": [
+      "Query construction only; DBI driver and database engine behavior are outside the observation boundary"
+    ]
+  }
+}

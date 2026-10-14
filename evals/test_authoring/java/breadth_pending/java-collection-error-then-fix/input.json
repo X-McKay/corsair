@@ -1,0 +1,118 @@
+{
+  "fixture_id": "java-collection-error-then-fix-v1",
+  "inputs": {
+    "plan": {
+      "status": "ready",
+      "scope": "component",
+      "security_expectation": {
+        "failure_type": "org.opentest4j.AssertionFailedError",
+        "safe_behavior": "home_for_offsite_target"
+      },
+      "discovery_command": [
+        "mvn",
+        "-q",
+        "-DskipTests",
+        "test-compile"
+      ],
+      "evidence_requirements": [
+        "Both control and exploit probe must execute with native outcomes",
+        "Review both real source calls, adversarial input and assertions before execution"
+      ],
+      "citations": [
+        {
+          "path": "src/main/java/com/example/redirects/Redirects.java",
+          "start_line": 8,
+          "end_line": 13,
+          "quote": "    public static String afterLogin(String target) {\n        if (target == null || target.isEmpty()) {\n            return \"/\";\n        }\n        return target;\n    }"
+        }
+      ],
+      "limitations": [
+        "Open redirect at this one call only; callers and deployment configuration are outside the observation"
+      ],
+      "control": {
+        "test_id": "com.example.redirects.RedirectsSecurityTest#benignControl",
+        "test_path": "src/test/java/com/example/redirects/RedirectsSecurityTest.java",
+        "fixture_setup": [
+          "No files; the call takes only the target string"
+        ],
+        "implementation_call": "Redirects.afterLogin(target)",
+        "input": "target \"/account\", a path on this site",
+        "required_behavior": "Returns the on-site path unchanged",
+        "observable_witness": "Native junit5 assertion on returns the on-site path unchanged",
+        "observation": {
+          "kind": "return_value",
+          "property": "Returns the on-site path unchanged",
+          "seam": "Call the real Redirects.afterLogin through its public interface"
+        },
+        "source_references": [
+          {
+            "path": "src/main/java/com/example/redirects/Redirects.java",
+            "start_line": 8,
+            "end_line": 13,
+            "quote": "    public static String afterLogin(String target) {\n        if (target == null || target.isEmpty()) {\n            return \"/\";\n        }\n        return target;\n    }"
+          }
+        ]
+      },
+      "security": {
+        "test_id": "com.example.redirects.RedirectsSecurityTest#securityRejectsOffsiteTarget",
+        "test_path": "src/test/java/com/example/redirects/RedirectsSecurityTest.java",
+        "fixture_setup": [
+          "No files; the call takes only the target string"
+        ],
+        "implementation_call": "Redirects.afterLogin(target)",
+        "input": "target \"//evil.example/phish\", a scheme-relative URL to another host",
+        "required_behavior": "Returns \"/\" instead of a target that leaves the site",
+        "observable_witness": "Native junit5 assertion on returns \"/\" instead of a target that leaves the site",
+        "observation": {
+          "kind": "return_value",
+          "property": "Returns \"/\" instead of a target that leaves the site",
+          "seam": "Call the real Redirects.afterLogin through its public interface"
+        },
+        "source_references": [
+          {
+            "path": "src/main/java/com/example/redirects/Redirects.java",
+            "start_line": 8,
+            "end_line": 13,
+            "quote": "    public static String afterLogin(String target) {\n        if (target == null || target.isEmpty()) {\n            return \"/\";\n        }\n        return target;\n    }"
+          }
+        ]
+      }
+    },
+    "source_files": [
+      {
+        "path": "src/main/java/com/example/redirects/Redirects.java",
+        "content": "package com.example.redirects;\n\n/** Where to send a user after sign-in. */\npublic final class Redirects {\n    private Redirects() {\n    }\n\n    public static String afterLogin(String target) {\n        if (target == null || target.isEmpty()) {\n            return \"/\";\n        }\n        return target;\n    }\n}\n"
+      },
+      {
+        "path": "src/test/java/com/example/redirects/RedirectsTest.java",
+        "content": "package com.example.redirects;\n\nimport static org.junit.jupiter.api.Assertions.assertEquals;\n\nimport org.junit.jupiter.api.Test;\n\nclass RedirectsTest {\n    @Test\n    void defaultsToHome() {\n        assertEquals(\"/\", Redirects.afterLogin(null));\n    }\n}\n"
+      }
+    ],
+    "environment": {
+      "language": "Java",
+      "runtime": "JDK 17",
+      "framework": "junit5",
+      "discovery_command": [
+        "mvn",
+        "-q",
+        "-DskipTests",
+        "test-compile"
+      ],
+      "approved_test_paths": [
+        "src/test/java/com/example/redirects/RedirectsSecurityTest.java"
+      ],
+      "baseline_test": {
+        "test_id": "com.example.redirects.RedirectsTest#defaultsToHome",
+        "path": "src/test/java/com/example/redirects/RedirectsTest.java"
+      },
+      "scratch_location": "A per-test JUnit @TempDir directory",
+      "observation_facilities": [
+        "Native Surefire report: outcome, failure type and failing line per test method"
+      ],
+      "assertion_facts": [
+        "JUnit 5 assertion failures, including assertThrows when nothing is thrown, report org.opentest4j.AssertionFailedError. Match the planned native failure type."
+      ],
+      "witness_facilities": []
+    }
+  }
+}

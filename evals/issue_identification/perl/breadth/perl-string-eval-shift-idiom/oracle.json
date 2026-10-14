@@ -1,0 +1,10 @@
+{
+  "status": "ready",
+  "symbol": "evaluate_rule",
+  "path": "lib/Pricing/Rules.pm",
+  "required_lines": [
+    7,
+    11
+  ],
+  "max_span": 8
+}

@@ -1,0 +1,11 @@
+{
+  "language": "python",
+  "framework": "sqlite3",
+  "family": "sql-injection",
+  "kind": "positive",
+  "probes": "Target is a method inside a class in a package path, with a module-level function of a different name beside it.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)"
+  }
+}

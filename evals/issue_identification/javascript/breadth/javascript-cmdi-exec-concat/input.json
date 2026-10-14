@@ -1,0 +1,15 @@
+{
+  "fixture_id": "javascript-cmdi-exec-concat",
+  "issue": "countLines passes a caller-supplied path to a shell. A path like `x; touch /tmp/owned` appears to run a second command. Locate the implementation.",
+  "scope": "component",
+  "source_files": [
+    {
+      "path": "package.json",
+      "content": "{\n  \"name\": \"cmdi\",\n  \"version\": \"1.0.0\",\n  \"private\": true,\n  \"scripts\": {\"test\": \"jest\"},\n  \"devDependencies\": {\"jest\": \"^29.7.0\"}\n}\n"
+    },
+    {
+      "path": "src/cmd.js",
+      "content": "const { exec } = require(\"child_process\");\n\n// Count lines in a file.\nfunction countLines(path, cb) {\n  exec(\"wc -l \" + path, (err, stdout) => cb(stdout));\n}\n\nmodule.exports = { countLines };\n"
+    }
+  ]
+}

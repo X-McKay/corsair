@@ -1,0 +1,11 @@
+{
+  "held_out": true,
+  "cases": {
+    "python/avatar_upload_extension_unchecked": "038e7a00337f3c558ffe4e8832308cfe1ba44b72e5d8e74b57088c1206914ff5",
+    "python/static_assets_hidden_file_guarded": "bb0347292c5a5f34a9c6c84599a66d95150202a5d64d7282bd85cec2ad071874",
+    "python/preference_update_mass_assignment": "068ae52ba46d6c36fcf752aa95f414464aaae028d77fe3728eef1f9cbdec9ce9",
+    "python/response_cache_private_injection_in_source": "f478fecfa44630818e927ad12a1bb97a4f9f61273c17b9451f6af58fba0ec57a",
+    "python/status_probe_certificate_unobservable": "3450b6c3d7fa79b90e28f32c1248edb37737443715827104395a0cfda8958c21",
+    "python/exporter_lookup_reflection_no_baseline": "76d6a31df5f2ba06b50457599e05c5216e0b3a6cf233799357ec03181dc0264a"
+  }
+}

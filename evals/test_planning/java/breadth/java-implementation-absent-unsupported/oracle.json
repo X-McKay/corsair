@@ -1,0 +1,22 @@
+{
+  "status": "unsupported",
+  "required_reads": [
+    "src/test/java/com/example/billing/InvoiceExporterTest.java"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "unsupported",
+    "scope": "component",
+    "missing_capability": "The identified implementation src/main/java/com/example/billing/InvoiceExporter.java is absent from the saved inventory, so the real exportCsv call cannot be confirmed or cited",
+    "limitations": [
+      "No test specification is produced; the concern remains untested at this scope"
+    ],
+    "citations": [
+      {
+        "path": "src/test/java/com/example/billing/InvoiceExporterTest.java",
+        "start_line": 1,
+        "end_line": 14
+      }
+    ]
+  }
+}

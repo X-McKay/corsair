@@ -1,0 +1,27 @@
+{
+  "required_reads": [
+    "package.json"
+  ],
+  "commands": [],
+  "observations": [],
+  "draft": {
+    "status": "unsupported",
+    "requirement": "Node >=18 is required by package.json engines but the prepared toolchain is Node 8.17.0",
+    "citations": [
+      {
+        "path": "package.json",
+        "start_line": 14,
+        "end_line": 14
+      }
+    ]
+  },
+  "status": "unsupported",
+  "layer": null,
+  "max_commands": 12,
+  "toolchain_id": "node-8.17.0-npm",
+  "requirement_patterns": [
+    "(?i)\\bNode(?:\\.js)?\\s*(?:>=\\s*)?18\\b",
+    "(?i)\\bNode(?:\\.js)?\\s*v?8\\.17(?:\\.0)?\\b"
+  ],
+  "checkout_paths": null
+}

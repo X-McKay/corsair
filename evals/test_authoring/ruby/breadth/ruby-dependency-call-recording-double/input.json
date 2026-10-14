@@ -1,0 +1,120 @@
+{
+  "fixture_id": "ruby-dependency-call-recording-double-v1",
+  "inputs": {
+    "plan": {
+      "status": "ready",
+      "scope": "component",
+      "security_expectation": {
+        "failure_type": "Minitest::Assertion",
+        "safe_behavior": "bound_parameter"
+      },
+      "discovery_command": [
+        "ruby",
+        "-Ilib",
+        "-Itest",
+        "test/accounts_test.rb"
+      ],
+      "evidence_requirements": [
+        "Both control and exploit probe must execute with native outcomes",
+        "Review both real source calls, adversarial input and assertions before execution"
+      ],
+      "citations": [
+        {
+          "path": "lib/accounts.rb",
+          "start_line": 3,
+          "end_line": 5,
+          "quote": "  def self.balance(database, account)\n    database.execute(\"SELECT balance FROM accounts WHERE account = '#{account}'\", [])\n  end"
+        }
+      ],
+      "limitations": [
+        "Sql injection at this one call only; callers and deployment configuration are outside the observation"
+      ],
+      "control": {
+        "test_id": "test/accounts_security_test.rb::AccountsSecurityTest#test_benign_control",
+        "test_path": "test/accounts_security_test.rb",
+        "fixture_setup": [
+          "Create an in-memory recording database returning [[25]] and recording each query with its parameters"
+        ],
+        "implementation_call": "Accounts.balance(database, account)",
+        "input": "account 'alice'",
+        "required_behavior": "Returns the database rows and issues exactly one query",
+        "observable_witness": "Native minitest assertion on returns the database rows and issues exactly one query",
+        "observation": {
+          "kind": "dependency_call",
+          "property": "Returns the database rows and issues exactly one query",
+          "seam": "Call the real Accounts.balance with an injected database object",
+          "controlled_dependency": "RecordingDatabase#execute records the query and parameters unchanged and returns fixed rows; it neither builds nor sanitizes SQL"
+        },
+        "source_references": [
+          {
+            "path": "lib/accounts.rb",
+            "start_line": 3,
+            "end_line": 5,
+            "quote": "  def self.balance(database, account)\n    database.execute(\"SELECT balance FROM accounts WHERE account = '#{account}'\", [])\n  end"
+          }
+        ]
+      },
+      "security": {
+        "test_id": "test/accounts_security_test.rb::AccountsSecurityTest#test_security_binds_account",
+        "test_path": "test/accounts_security_test.rb",
+        "fixture_setup": [
+          "Create an in-memory recording database returning [[25]] and recording each query with its parameters"
+        ],
+        "implementation_call": "Accounts.balance(database, account)",
+        "input": "account \"alice' OR 1=1 --\"",
+        "required_behavior": "The hostile account is passed as a bound parameter and never appears in the SQL text",
+        "observable_witness": "Native minitest assertion on the hostile account is passed as a bound parameter and never appears in the SQL text",
+        "observation": {
+          "kind": "dependency_call",
+          "property": "The hostile account is passed as a bound parameter and never appears in the SQL text",
+          "seam": "Call the real Accounts.balance with an injected database object",
+          "controlled_dependency": "RecordingDatabase#execute records the query and parameters unchanged and returns fixed rows; it neither builds nor sanitizes SQL"
+        },
+        "source_references": [
+          {
+            "path": "lib/accounts.rb",
+            "start_line": 3,
+            "end_line": 5,
+            "quote": "  def self.balance(database, account)\n    database.execute(\"SELECT balance FROM accounts WHERE account = '#{account}'\", [])\n  end"
+          }
+        ]
+      }
+    },
+    "source_files": [
+      {
+        "path": "lib/accounts.rb",
+        "content": "# Account balance lookups against an injected database connection.\nmodule Accounts\n  def self.balance(database, account)\n    database.execute(\"SELECT balance FROM accounts WHERE account = '#{account}'\", [])\n  end\nend\n"
+      },
+      {
+        "path": "test/accounts_test.rb",
+        "content": "require 'minitest/autorun'\nrequire 'accounts'\n\nclass AccountsTest < Minitest::Test\n  class Database\n    def execute(query, params)\n      [[25]]\n    end\n  end\n\n  def test_returns_rows\n    assert_equal [[25]], Accounts.balance(Database.new, 'alice')\n  end\nend\n"
+      }
+    ],
+    "environment": {
+      "language": "Ruby",
+      "runtime": "Ruby 3.1",
+      "framework": "minitest",
+      "discovery_command": [
+        "ruby",
+        "-Ilib",
+        "-Itest",
+        "test/accounts_test.rb"
+      ],
+      "approved_test_paths": [
+        "test/accounts_security_test.rb"
+      ],
+      "baseline_test": {
+        "test_id": "test/accounts_test.rb::AccountsTest#test_returns_rows",
+        "path": "test/accounts_test.rb"
+      },
+      "scratch_location": "A per-test Dir.mktmpdir directory removed after the block",
+      "observation_facilities": [
+        "Native Minitest outcomes and assertion failure locations"
+      ],
+      "assertion_facts": [
+        "Minitest assertion failures, including assert_raises when the expected exception is not raised, report Minitest::Assertion. Match the planned native failure type."
+      ],
+      "witness_facilities": []
+    }
+  }
+}

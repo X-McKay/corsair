@@ -1,0 +1,67 @@
+{
+  "scope": "component",
+  "plan": {
+    "control_test_id": "test/redirect_guard_test.rb::RedirectGuardTest#test_control_keeps_local_path",
+    "security_test_id": "test/redirect_guard_test.rb::RedirectGuardTest#test_exploit_redirects_external_host_to_root",
+    "expected_failure": {
+      "exception_type": "Minitest::Assertion",
+      "path": "test/redirect_guard_test.rb",
+      "function": "test_exploit_redirects_external_host_to_root",
+      "assertion_lines": [
+        22
+      ]
+    },
+    "expected_safe_behavior": "redirect_to_root",
+    "frozen_patch_sha256": "d247c1cb72c8f4f21b18870fde039b9329de6cb440fb1fbb9fcba5f101a9e5ba",
+    "observation_mode": "unit_test",
+    "test_plan_sha256": "b3e67a7026c91edfadddc596beeb7defd6f9587a5240de4de0ff25774676103d"
+  },
+  "revision_sources": {
+    "baseline": "ebf2ad93a1f7ceeeee8005e691dcf800711190b049cbf2dd8911e11056bcf6c6"
+  },
+  "items": [
+    {
+      "item_id": "plan",
+      "kind": "plan",
+      "revision": null,
+      "run": null,
+      "sha256": "a2210f75704f128f6002aea71bfb5ea2c1aef18048bf4e2a4f1076d8f13934e5",
+      "content": "{\n  \"control_test_id\": \"test/redirect_guard_test.rb::RedirectGuardTest#test_control_keeps_local_path\",\n  \"security_test_id\": \"test/redirect_guard_test.rb::RedirectGuardTest#test_exploit_redirects_external_host_to_root\",\n  \"expected_failure\": {\n    \"exception_type\": \"Minitest::Assertion\",\n    \"path\": \"test/redirect_guard_test.rb\",\n    \"function\": \"test_exploit_redirects_external_host_to_root\",\n    \"assertion_lines\": [\n      22\n    ]\n  },\n  \"expected_safe_behavior\": \"redirect_to_root\",\n  \"frozen_patch_sha256\": \"d247c1cb72c8f4f21b18870fde039b9329de6cb440fb1fbb9fcba5f101a9e5ba\",\n  \"observation_mode\": \"unit_test\",\n  \"test_plan_sha256\": \"b3e67a7026c91edfadddc596beeb7defd6f9587a5240de4de0ff25774676103d\"\n}"
+    },
+    {
+      "item_id": "test-plan",
+      "kind": "plan",
+      "revision": null,
+      "run": null,
+      "sha256": "b3e67a7026c91edfadddc596beeb7defd6f9587a5240de4de0ff25774676103d",
+      "content": "Exactly two Minitest probes in test/redirect_guard_test.rb. Control: RedirectGuard.safe_target(\"/account/settings\", [\"app.example\"]) returns the path unchanged. Exploit: safe_target(\"//evil.example/login\", [\"app.example\"]) returns /. RedirectGuard.safe_target in lib/redirect_guard.rb owns the decision."
+    },
+    {
+      "item_id": "reported-condition",
+      "kind": "plan",
+      "revision": null,
+      "run": null,
+      "sha256": "2bb8f9daedb85173843ead6151736f7c3b310c9d94127f14c89d4335563e313e",
+      "content": "The return_to parameter after sign-in is passed to RedirectGuard.safe_target. A scheme-relative value such as //evil.example/login may send users to another host."
+    },
+    {
+      "item_id": "baseline-source-0",
+      "kind": "source",
+      "revision": "baseline",
+      "run": 0,
+      "sha256": "2ed59d1affd333af47436704a89aa6e727393e47eb0d9422f7db1425e741e5bf",
+      "path": "lib/redirect_guard.rb",
+      "source_sha256": "ebf2ad93a1f7ceeeee8005e691dcf800711190b049cbf2dd8911e11056bcf6c6",
+      "content": "# frozen_string_literal: true\n\nrequire \"uri\"\n\nmodule RedirectGuard\n  def self.safe_target(target, allowed_hosts)\n    uri = URI.parse(target)\n    return target if uri.host.nil? && uri.scheme.nil? && target.start_with?(\"/\") && !target.start_with?(\"//\")\n    return target if %w[http https].include?(uri.scheme) && allowed_hosts.include?(uri.host)\n\n    \"/\"\n  rescue URI::InvalidURIError\n    \"/\"\n  end\nend\n"
+    },
+    {
+      "item_id": "patch-0",
+      "kind": "patch",
+      "revision": null,
+      "run": null,
+      "sha256": "457d0ccd72403480a6ad85cdbe38f0a2580f74420e729cab24c37bdf7a54402f",
+      "path": "test/redirect_guard_test.rb",
+      "content": "require \"minitest/autorun\"\nrequire \"uri\"\n\nclass RedirectGuardTest < Minitest::Test\n  ALLOWED = [\"app.example\"].freeze\n\n  def safe_target(target, allowed_hosts)\n    uri = URI.parse(target)\n    return target if uri.host.nil? && uri.scheme.nil? && target.start_with?(\"/\") && !target.start_with?(\"//\")\n    return target if %w[http https].include?(uri.scheme) && allowed_hosts.include?(uri.host)\n\n    \"/\"\n  rescue URI::InvalidURIError\n    \"/\"\n  end\n\n  def test_control_keeps_local_path\n    assert_equal \"/account/settings\", safe_target(\"/account/settings\", ALLOWED)\n  end\n\n  def test_exploit_redirects_external_host_to_root\n    assert_equal \"/\", safe_target(\"//evil.example/login\", ALLOWED)\n  end\nend\n"
+    }
+  ]
+}

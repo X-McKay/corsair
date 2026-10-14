@@ -1,0 +1,23 @@
+{
+  "script": [
+    {
+      "write": "reference"
+    },
+    {
+      "run": true
+    }
+  ],
+  "runner_runs": [
+    {
+      "status": "static"
+    }
+  ],
+  "status": "patch",
+  "runs": 1,
+  "security_assertion_lines": [
+    28
+  ],
+  "files": {
+    "reference": "const fs = require('fs');\nconst os = require('os');\nconst path = require('path');\nconst uploads = require('../lib/uploads');\n\nfunction scratch() {\n  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'uploads-'));\n  const dir = path.join(root, 'uploads');\n  fs.mkdirSync(dir);\n  return { root, dir };\n}\n\ntest('benign_control', () => {\n  const { dir } = scratch();\n  uploads.save(dir, 'photo.txt', 'payload');\n  expect(fs.readFileSync(path.join(dir, 'photo.txt'), 'utf8')).toBe('payload');\n});\n\ntest('security_keeps_writes_inside_directory', () => {\n  const { root, dir } = scratch();\n  try {\n    uploads.save(dir, '../escaped.txt', 'payload');\n  } catch (error) {\n    if (!(error instanceof RangeError)) {\n      throw error;\n    }\n  }\n  expect(fs.existsSync(path.join(root, 'escaped.txt'))).toBe(false);\n});\n"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "language": "python",
+  "framework": "pytest",
+  "family": "ready-older-runtime",
+  "kind": "positive",
+  "probes": "A project pinned to CPython 3.7 is prepared on the 3.7 toolchain with pytest 7.4.4 and admitted ready.",
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "n/a",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic manifests and recorded observations shaped after the toolchain images in deploy/runtime-matrix.yaml and tests/agents/framework_outputs."
+  }
+}

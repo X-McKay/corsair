@@ -1,9 +1,0 @@
-{
-  "real-seam-return-and-exception": "02bced5d725349347264bc45e739b80205a8731d5c1b094bb1aabbc23c054217",
-  "copied-implementation": "7000a5013e0d1b84333a9a98fed000571efdbb7f8d4586341adfae9c573170d1",
-  "mocked-entry-point": "0d3c9d1cc04b29190f9f1f41a917e3d38317b2c068aa5628fd3310781c2dcdef",
-  "vacuous-assertions": "f03e5ac8b4a28ddeda574946b8f4f7b19a162b178240fe00e38c470a2d9a292a",
-  "double-owns-security-guard": "757326b9c2ae4474632a47841d1c1a518bdf856297e1cd64c9fd8759c9ddee99",
-  "wrong-source-module": "612211dcb20901d675d9794f145e11116bb961d5a26f4a4211a53fe00884a9c6",
-  "benign-input-used-for-exploit": "1fc6268b6edf8247ec8cdd0f1dd64d0004ee7adcb1503f3a47cb6b17aa704080"
-}

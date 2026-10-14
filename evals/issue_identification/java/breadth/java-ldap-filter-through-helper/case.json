@@ -1,0 +1,11 @@
+{
+  "language": "java",
+  "framework": "jndi",
+  "family": "ldap-injection",
+  "kind": "positive",
+  "probes": "The search filter is produced by a neutral private helper called on the sink line; the range covers the method declaration and that search call.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "status": "unsupported",
+  "required_reads": [
+    "test/session.test.js"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "unsupported",
+    "scope": "component",
+    "missing_capability": "The identified implementation lib/session.js is absent from the saved inventory, so the real issueToken call cannot be confirmed or cited",
+    "limitations": [
+      "No test specification is produced; the concern remains untested at this scope"
+    ],
+    "citations": [
+      {
+        "path": "test/session.test.js",
+        "start_line": 1,
+        "end_line": 6
+      }
+    ]
+  }
+}

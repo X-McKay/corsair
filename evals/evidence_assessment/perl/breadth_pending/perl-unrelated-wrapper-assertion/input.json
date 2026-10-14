@@ -1,0 +1,67 @@
+{
+  "scope": "component",
+  "plan": {
+    "control_test_id": "t/view.t#control_renders_plain_comment",
+    "security_test_id": "t/view.t#exploit_escapes_script_tag",
+    "expected_failure": {
+      "exception_type": "Test::More::not_ok",
+      "path": "t/view.t",
+      "function": "exploit_escapes_script_tag",
+      "assertion_lines": [
+        13
+      ]
+    },
+    "expected_safe_behavior": "html_escaped",
+    "frozen_patch_sha256": "7d1b51431ca4e01734bbd8f76b4815c2a6b866ef8de67a05d9bc6411e5a744fe",
+    "observation_mode": "unit_test",
+    "test_plan_sha256": "41ccfec7adfba9322509a442ea02568a99f8e40b3e4be76ba972b2c92b81757c"
+  },
+  "revision_sources": {
+    "baseline": "a006a0293e78e3fbaa3433f0721a66856aaca13e4efddbbc6d9e6052a8bcd29b"
+  },
+  "items": [
+    {
+      "item_id": "plan",
+      "kind": "plan",
+      "revision": null,
+      "run": null,
+      "sha256": "f70afa011c256961c9fdb35db0c7498ee7c32431f0eb554e0af2fd66360ed8de",
+      "content": "{\n  \"control_test_id\": \"t/view.t#control_renders_plain_comment\",\n  \"security_test_id\": \"t/view.t#exploit_escapes_script_tag\",\n  \"expected_failure\": {\n    \"exception_type\": \"Test::More::not_ok\",\n    \"path\": \"t/view.t\",\n    \"function\": \"exploit_escapes_script_tag\",\n    \"assertion_lines\": [\n      13\n    ]\n  },\n  \"expected_safe_behavior\": \"html_escaped\",\n  \"frozen_patch_sha256\": \"7d1b51431ca4e01734bbd8f76b4815c2a6b866ef8de67a05d9bc6411e5a744fe\",\n  \"observation_mode\": \"unit_test\",\n  \"test_plan_sha256\": \"41ccfec7adfba9322509a442ea02568a99f8e40b3e4be76ba972b2c92b81757c\"\n}"
+    },
+    {
+      "item_id": "test-plan",
+      "kind": "plan",
+      "revision": null,
+      "run": null,
+      "sha256": "41ccfec7adfba9322509a442ea02568a99f8e40b3e4be76ba972b2c92b81757c",
+      "content": "Exactly two Test::More subtests in t/view.t. Control: render_comment('hello') returns <p class=\"comment\">hello</p>. Exploit: render_comment('<script>alert(1)</script>') returns exactly <p class=\"comment\">&lt;script&gt;alert(1)&lt;/script&gt;</p>, with no raw script tag. My::View::render_comment in lib/My/View.pm owns escaping."
+    },
+    {
+      "item_id": "reported-condition",
+      "kind": "plan",
+      "revision": null,
+      "run": null,
+      "sha256": "31f6f0bc0bbe89886c71f09997f445577d067ab67a126615d0217bdeec1ddacb",
+      "content": "Comment bodies are rendered with My::View::render_comment. A body containing <script>alert(1)</script> may run script in other readers' browsers."
+    },
+    {
+      "item_id": "baseline-source-0",
+      "kind": "source",
+      "revision": "baseline",
+      "run": 0,
+      "sha256": "9c3eb86a12c362054caeda021bcc0a4061432e44033d34c60d1686a1d07c8b70",
+      "path": "lib/My/View.pm",
+      "source_sha256": "a006a0293e78e3fbaa3433f0721a66856aaca13e4efddbbc6d9e6052a8bcd29b",
+      "content": "package My::View;\nuse strict;\nuse warnings;\nuse Exporter 'import';\nour @EXPORT_OK = qw(render_comment);\n\nmy %ESCAPE = ('&' => '&amp;', '<' => '&lt;', '>' => '&gt;', '\"' => '&quot;', \"'\" => '&#39;');\n\nsub render_comment {\n    my ($text) = @_;\n    (my $safe = $text) =~ s/([&<>\"'])/$ESCAPE{$1}/g;\n    return qq{<p class=\"comment\">$safe</p>};\n}\n\n1;\n"
+    },
+    {
+      "item_id": "patch-0",
+      "kind": "patch",
+      "revision": null,
+      "run": null,
+      "sha256": "0e6991917020729e02aaa048ef310fed0809a87990b67607df8f2e29cc6d7082",
+      "path": "t/view.t",
+      "content": "use strict;\nuse warnings;\nuse Test::More;\nuse lib 'lib';\nuse My::View qw(render_comment);\n\nsubtest control_renders_plain_comment => sub {\n    is(render_comment('hello'), '<p class=\"comment\">hello</p>', 'plain text unchanged');\n};\n\nsubtest exploit_escapes_script_tag => sub {\n    my $html = render_comment('<script>alert(1)</script>');\n    like($html, qr/^<p class=\"comment\">/, 'comment wrapper present');\n};\n\ndone_testing;\n"
+    }
+  ]
+}

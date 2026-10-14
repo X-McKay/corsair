@@ -18,7 +18,6 @@ from typing import Literal
 from uuid import uuid4
 
 import logfire
-import yaml
 from openai import APIConnectionError
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from pydantic_ai import capture_run_messages, models
@@ -40,12 +39,14 @@ from corsair.inference.config import load_agent_config
 from corsair.inference.models import configured_model
 from corsair.composition.direct import CompositionBudget, StageLimits, stage_limits
 from corsair.core.disposition import Disposition, admit, assess
+from evals.cases import load_set, set_digest
 from evals.issue_analysis.evaluate import describe_model, record_count
 from evals.issue_analysis.live import NoUnknownToolAttempts, ProviderUsageCoverage, message_counts, output_tool_names
 
 ROOT = Path(__file__).parent
-CASES = ROOT / "cases.yaml"
-HELD_OUT = ROOT / "held_out.json"
+SUITE = "evidence_assessment"
+# The gate-evidence sets: python/development and python/held_out (build.py writes both; sets/held_out.json is sealed).
+SPLITS = ("development", "held_out")
 Split = Literal["development", "held_out"]
 
 
@@ -154,16 +155,25 @@ class RepeatConsistency(ReportEvaluator[AssessmentInput, EvidenceAssessment, Ass
 CUSTOM = (ScoredAssessment, RequiredReads, FindingLabels)
 
 
-def load(path: Path = CASES) -> AssessmentDataset:
-    """The native YAML file, validated in JSON mode: the strict gate contracts admit a YAML list as a tuple only there."""
-    return AssessmentDataset.from_text(json.dumps(yaml.safe_load(path.read_text())), fmt="json",
-                                       custom_evaluator_types=CUSTOM, custom_report_evaluator_types=(RepeatConsistency,))
+def load() -> AssessmentDataset:
+    """Both splits' per-case directories, validated in JSON mode: the strict gate contracts admit a list as a
+    tuple only there."""
+    return AssessmentDataset(name="evidence-assessment-v1", cases=[
+        Case(name=case.name, inputs=AssessmentInput.model_validate_json(json.dumps(case.input)),
+             metadata=AssessmentOracle.model_validate_json(json.dumps(case.oracle)))
+        for split in SPLITS for case in load_set(SUITE, split)])
 
 
 def dataset(split: Split | Literal["all"] = "all") -> AssessmentDataset:
     corpus = load()
     corpus.cases = [case for case in corpus.cases if split == "all" or case.metadata.split == split]
     return corpus
+
+
+def dataset_sha256(split: Split | Literal["all"]) -> str:
+    """The split's set identity; ``all`` digests both, in split order."""
+    digests = [set_digest(SUITE, name) for name in SPLITS if split in ("all", name)]
+    return digests[0] if len(digests) == 1 else sha256("".join(digests).encode()).hexdigest()
 
 
 def scripted_model(inputs: AssessmentInput, oracle: AssessmentOracle, proposal: Disposition | None = None,
@@ -267,7 +277,7 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, split: Split | L
                 "toolset_sha256": TOOLSET_SHA256,
                 "budget": budget.model_dump(), "split": split, "cases": [case.name for case in corpus.cases],
                 "task_retries": 0, "max_concurrency": 1,
-                "dataset_sha256": sha256(CASES.read_bytes()).hexdigest(),
+                "dataset_sha256": dataset_sha256(split),
                 "output_contract": EvidenceAssessment.__name__, "witness_record_schema": "corsair-witness-v2"}
     if dataset_identity is not None:
         metadata.update(dataset_identity)

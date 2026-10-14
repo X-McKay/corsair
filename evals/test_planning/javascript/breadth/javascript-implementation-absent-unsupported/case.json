@@ -1,0 +1,12 @@
+{
+  "language": "javascript",
+  "framework": "jest",
+  "family": "weak-randomness",
+  "kind": "abstention",
+  "probes": "The identified Node module is missing from the inventory (only its Jest test is saved): the planner must abstain rather than plan against unseen code.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic; the implementation file is deliberately withheld from the inventory."
+  }
+}

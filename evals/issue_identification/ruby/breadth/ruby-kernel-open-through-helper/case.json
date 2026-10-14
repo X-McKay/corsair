@@ -1,0 +1,11 @@
+{
+  "language": "ruby",
+  "framework": "ruby",
+  "family": "command-injection",
+  "kind": "positive",
+  "probes": "Kernel#open receives the URL through a neutral helper on the sink line; the range must cover the declaration and that call.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)"
+  }
+}

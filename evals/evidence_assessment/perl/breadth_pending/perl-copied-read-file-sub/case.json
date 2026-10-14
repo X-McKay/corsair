@@ -1,0 +1,12 @@
+{
+  "language": "perl",
+  "framework": "test-more",
+  "family": "path-traversal",
+  "kind": "negative",
+  "probes": "The test file declares its own read_file with the containment logic and never loads My::Files.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Written for this set; the property under review is in the frozen test patch, not the source."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "language": "python",
+  "framework": "pytest",
+  "family": "real-seam-return-and-exception",
+  "kind": "moved",
+  "probes": "Moved unchanged from unit_test_cases.json (unit set, original boolean-review protocol); the suite README describes what it exercises.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Corsair-authored; previously evals/evidence_assessment/unit_test_cases.json"
+  }
+}
