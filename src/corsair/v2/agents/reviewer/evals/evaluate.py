@@ -18,6 +18,7 @@ on language, framework, family or case id.
 from __future__ import annotations
 
 import json
+import re
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
@@ -111,7 +112,11 @@ def _matches(expected: dict, judged: Any) -> bool:
         return False
     if expected["valid"]:
         return all(getattr(judged, name) for name in CHECKS)
-    return any(not getattr(judged, name) for name in expected["failed"]) and bool(judged.defects)
+    # ``failed`` lists the checks the defect can fail (alternatives for a multi-check defect); every other check
+    # must still hold, so blanket-rejecting with all four checks false is not a correct judgement
+    failed = set(expected["failed"])
+    return (any(not getattr(judged, name) for name in failed)
+            and all(getattr(judged, name) for name in CHECKS if name not in failed) and bool(judged.defects))
 
 
 def _file_lines(case: EvalCase) -> dict[str, list[str]]:
@@ -123,9 +128,20 @@ def _overlaps(citation: Any, path: str, start: int, end: int) -> bool:
     return citation.path == path and citation.start_line <= end and citation.end_line >= start
 
 
+def evidence_lines(case: EvalCase, role: str) -> tuple[set[int], set[int]]:
+    """Lines of a probe that carry its evidence: where it calls the target (the finding's symbol, last component,
+    followed by an opening parenthesis, outside import lines) and where it asserts (the line passing the run token)."""
+    name = re.escape(case.input["finding"]["symbol"].replace("::", ".").split(".")[-1])
+    lines = case.input["patch"][role]["source"].splitlines()
+    calls = {n for n, line in enumerate(lines, 1) if re.search(rf"\b{name}\s*\(", line)
+             and not re.match(r"\s*(import|from|require|use)\b", line)}
+    asserts = {n for n, line in enumerate(lines, 1) if "CORSAIR_TOKEN" in line}
+    return calls, asserts
+
+
 def _grounded(case: EvalCase, validity: Validity, expected: dict) -> bool:
-    """Every citation quotes its exact lines; a probe judged valid cites its own test file and the target's
-    definition; a probe the oracle rejects and the review rejects cites the test-file lines holding the defect."""
+    """Every citation quotes its exact lines; a probe judged valid cites the lines of its own test file where it calls
+    the target and where it asserts, and the target's definition; a probe the oracle rejects and the review rejects cites the test-file lines holding the defect."""
     files, definition = _file_lines(case), case.oracle["definition"]
     for role in ROLES:
         judged = getattr(validity, role)
@@ -137,7 +153,9 @@ def _grounded(case: EvalCase, validity: Validity, expected: dict) -> bool:
                 return False
         own = case.input["patch"][role]["test_file"]
         if judged.valid:
-            if not any(c.path == own for c in judged.citations) or not any(
+            calls, asserts = evidence_lines(case, role)
+            cited = {n for c in judged.citations if c.path == own for n in range(c.start_line, c.end_line + 1)}
+            if not (cited & calls and cited & asserts) or not any(
                     _overlaps(c, definition["path"], definition["start_line"], definition["end_line"])
                     for c in judged.citations):
                 return False

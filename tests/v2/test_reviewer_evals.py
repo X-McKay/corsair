@@ -158,6 +158,9 @@ def test_rejection_for_the_wrong_reason_fails_correctness(negative):
     wrong = {"assertion_relevant": True, "exercises_condition": False}
     assert check(case, _with(negative, exploit=wrong))["exploit_judged"] is False
     assert check(case, _with(negative, exploit={"defects": ()}))["exploit_judged"] is False
+    # Codex #165: rejecting with every check false is not the right reason either
+    blanket = {name: False for name in CHECKS}
+    assert check(case, _with(negative, exploit=blanket))["exploit_judged"] is False
 
 
 def test_citations_must_resolve_and_point_where_the_judgement_rests(negative, positive):
@@ -168,6 +171,11 @@ def test_citations_must_resolve_and_point_where_the_judgement_rests(negative, po
     own = case.input["patch"]["exploit"]["test_file"]
     tests_only = tuple(c for c in positive.output.exploit.citations if c.path == own)
     assert check(case, _with(positive, exploit={"citations": tests_only}))["citations_resolve"] is False
+    # Codex #165: a valid probe's own-file citation must cover its call of the target and its assertion
+    lines = case.input["patch"]["exploit"]["source"].splitlines()
+    first = Citation(path=own, start_line=1, end_line=1, quote=lines[0])
+    others = tuple(c for c in positive.output.exploit.citations if c.path != own)
+    assert check(case, _with(positive, exploit={"citations": (first,) + others}))["citations_resolve"] is False
     case = BY_KEY[NEGATIVE]
     start, _ = case.oracle["expected"]["exploit"]["defect_lines"]
     elsewhere = Citation(path=case.input["patch"]["exploit"]["test_file"], start_line=1, end_line=1,
