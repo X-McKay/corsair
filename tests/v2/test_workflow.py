@@ -94,15 +94,17 @@ def test_queue_layout_and_slots():
 
 
 def test_workflow_runs_the_same_review_loop_as_direct_mode(tmp_path):
-    setup = dict(rejections={"exploit": 1, "control": 2}, diagnose_outcomes={"exploit": "errored"})
-    fakes = Fakes(**setup)
+    def setup():  # fresh outcome lists per run: the fake reads them in order
+        return Fakes(rejections={"exploit": 1, "control": 2},
+                     diagnose_outcomes={"exploit": ["errored", "ok", "errored"]})
+    fakes = setup()
     verdict, run_dir = asyncio.run(_run(tmp_path, fakes, "durable-loop", fixed=True))
-    direct = Fakes(**setup)
+    direct = setup()
     record = RunRecorder.create(tmp_path, "direct-loop")
     expected = asyncio.run(run_case(case(tmp_path, True), stages=direct.stages(), models=models(),
                                     matrix_path=tmp_path / "matrix.yaml", record=record))
     assert verdict == expected and verdict.review_rounds == 3
-    assert verdict.revisions == {"control": 2, "exploit": 1}
+    assert verdict.revisions == {"control": 2, "exploit": 1} and verdict.mechanical_fixes == {"exploit": 2}
     assert _steps(run_dir) == _steps(record.run_dir)
     assert {"probe.exploit.r1", "probe.exploit.r1.revision", "probe.control.r2", "review.3"} <= set(_steps(run_dir))
     assert fakes.names() == direct.names()

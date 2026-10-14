@@ -47,6 +47,8 @@ rows:
     evidence: image-only
     build_network_hosts: [repo.maven.apache.org, repo1.maven.org]
     canary_setup: [cp, -R, /opt/corsair-m2, .corsair-m2]
+    # Known gap (kept visible, not fixed): test-compile compiles the whole test tree, so an unrelated broken test
+    # file in the project makes a valid probe read not_run.
     syntax_check: [/usr/share/maven/bin/mvn, -B, -ntp, -o, -q, -Dmaven.repo.local=.corsair-m2, test-compile]
     note: Temurin 17, Maven 3.10.0, JUnit Jupiter 5.14.4 and Surefire 3.6.0 in the image's offline closure.
   - id: junit4-maven-temurin8
@@ -68,6 +70,8 @@ rows:
     evidence: image-only
     build_network_hosts: [repo.maven.apache.org, repo1.maven.org]
     canary_setup: [cp, -R, /opt/corsair-m2, .corsair-m2]
+    # Known gap (kept visible, not fixed): test-compile compiles the whole test tree, so an unrelated broken test
+    # file in the project makes a valid probe read not_run.
     syntax_check: [/usr/share/maven/bin/mvn, -B, -ntp, -o, -q, -Dmaven.repo.local=.corsair-m2, test-compile]
     note: Temurin 8, Maven 3.10.0, JUnit 4.13.2 and Surefire 3.6.0 in the image's offline closure.
   - id: pytest-cpython312
@@ -137,6 +141,8 @@ rows:
     evidence: image-only
     build_network_hosts: [cpan.metacpan.org, www.cpan.org, fastapi.metacpan.org]
     # No syntax_check: `perl -c` runs BEGIN blocks and `use` imports, which is application code.
+    # Known gap (kept visible, not fixed): a Perl draft is therefore checked only by the D3 check run, so its
+    # author gets the fixed hint and no compiler output.
     note: Perl 5.26.3 with core Test::More and prove; GNU Make 4.2.1.
   - id: minitest-ruby31
     language: ruby
