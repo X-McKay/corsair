@@ -79,3 +79,27 @@ def test_historical_unattributed_failure_keeps_completion_unknown(tmp_path):
 
 def test_empty_attempts_have_unknown_completion():
     assert agent_summary.rollup([])["completion"]["rate"] is None
+
+
+@pytest.mark.parametrize("legacy", [True, False])
+def test_compare_preserves_baseline_completion_unknown_without_backfill(tmp_path, legacy):
+    from copy import deepcopy
+
+    evidence = tmp_path / "evidence"
+    assert asyncio.run(evaluate(_spec(_root(tmp_path)), evidence, "dev")) is False  # Java intentionally misanswers
+    current = _summary(evidence)
+    assert current["rollups"]["all"]["clean_attempts"] == 1
+    assert current["rollups"]["all"]["completion"]["completed"] == 2
+    reference = deepcopy(current)
+    reference["reference_kind"] = "committed_baseline"
+    if legacy:
+        reference["rollups"]["all"].pop("completion")
+    saved = deepcopy(reference)
+    report = agent_summary.compare(current, reference, "baseline")
+    assert "Task completion: 2/2" in report
+    if legacy:
+        assert "Reference task completion: unknown" in report
+        assert "Reference task completion: 2/2" not in report
+    else:
+        assert "Reference task completion: 2/2" in report
+    assert reference == saved  # comparisons must not regenerate a committed historical baseline

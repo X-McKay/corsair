@@ -92,11 +92,13 @@ def rollup(rows: list[dict]) -> dict:
     task_failures = sum(row.get("failure_kind") == "task" for row in rows)
     evaluator_failures = sum(row.get("failure_kind") == "evaluator" for row in rows)
     unknown_failures = sum(row.get("failure") is not None and row.get("failure_kind") is None for row in rows)
+    # Old receipts only: retain the legacy task count; those same failures remain unattributed in completion.
+    legacy_task_failures = sum(row["failure"] is not None and not row["assertions"]
+                              and row.get("failure_kind") is None for row in rows)
     completed = len(rows) - task_failures if not unknown_failures else None
     return {"cases": len({row["case"] for row in rows}), "attempts": len(rows),
             "clean_attempts": sum(row["passed"] for row in rows),
-            "task_failures": task_failures + sum(row["failure"] is not None and not row["assertions"]
-                                                  and row.get("failure_kind") is None for row in rows),
+            "task_failures": task_failures + legacy_task_failures,
             "completion": {"attempted": len(rows), "completed": completed, "task_failures": task_failures,
                            "evaluator_failures": evaluator_failures, "unknown_failures": unknown_failures,
                            "rate": completed / len(rows) if completed is not None and rows else None},
@@ -240,6 +242,12 @@ def compare(current: dict, reference: dict | None, reference_id: str | None) -> 
         (reference["rollups"]["by_language"].get(language) or {})
     lines += [f"Compared with {reference_id} ({reference.get('reference_kind')})"
               + (f", its {language} rollup" if language and reference.get("language") != language else "") + ".", ""]
+    reference_completion = before_scope.get("completion") or {}
+    if reference_completion.get("completed") is None:
+        lines += ["Reference task completion: unknown (missing or unattributed completion telemetry).", ""]
+    else:
+        lines += [f"Reference task completion: {reference_completion['completed']}/"
+                  f"{reference_completion['attempted']}.", ""]
     changed = {k: (reference["identity"].get(k), v) for k, v in current["identity"].items()
                if k not in ("git_commit", "git_dirty", "language", "repeat") and reference["identity"].get(k) != v}
     if changed:

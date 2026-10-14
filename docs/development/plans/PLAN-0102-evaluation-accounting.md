@@ -11,40 +11,45 @@ related: [SPEC-0082]
 
 ## Scope and boundaries
 
-Distinguish task/evaluator completion from conditional semantic accuracy and respect declared release-policy set/mode. Preserve upstream wall_s/tokens/retries/parameter fields, frozen policies, datasets and deferred promotion behavior.
+PR #174 distinguishes task/evaluator completion from conditional semantic accuracy and respects declared release-policy set/mode. Preserve native wall_s/tokens/retries/parameter fields, frozen policies/datasets, current D18 behavior and deferred promotion. This branch is independent of PRs #175/#176; the closed audit/roadmap PR #178 is not a dependency and is not pursued.
 
-This independent draft PR is based on develop integration snapshot `bdbb2a91135f61bb33cd19ec3a4421cf284094f5`. Other audit changes live in separate PRs, not prerequisites of this branch. The central source-backed audit/HANDOFF-0137 will be delivered in a separate documentation PR; this branch carries its own scoped record and current-work entry.
+## Review follow-up
 
-## Implementation and validation
+Rebased onto inspected develop `a00bbbc96d3b97838398693dea3dcae7c43da6bb` after #179/#182/#183, preserving their changes. Address the owner's 2026-10-14 review:
 
-Implementation is copied from the independently reviewed, reconciled integration worktree; native Temporal fixtures and all seven scripted evaluators passed there, but that does not replace standalone validation. Run `uv sync --locked --group dev`, focused tests, four-worker/serial full suites, final cleanup and re-test. Record actual results below before delivery.
+1. Document the additive `completion` block and legacy baseline compatibility below.
+2. Keep exactly one PR #174 row inside the CURRENT.md index table; preserve current corpus counts and other rows.
+3. Name/comment the legacy task-failure count. Its overlap with `unknown_failures` is intentional only for old receipts; it is not evidence of attributable task failure or completion.
+4. Test comparison against an old committed summary without a completion block; report unknown rather than inferring completion from clean-attempt or accuracy counts.
+5. Re-run focused and full checks on this branch, then cleanup/re-test and update the existing PR. Do not merge automatically.
 
-Unrun/unknown: production provider accuracy, Docker/kind/gateway policy and native platform qualification, true backend end-to-end dispositions and native Claude/Codex client compliance. No baselines/prompts are promoted and no production service is deployed.
+## Baseline compatibility
 
-## Next action
+`completion` is additive within `corsair-eval-summary/v1`. Live baselines committed before this merge have **no `completion` field**. They remain readable and unchanged; do not backfill them or infer zero/full completion. `compare` treats absent completion in the selected reference rollup as **unknown**, while continuing to compare existing accuracy/efficiency fields. A baseline with unattributed completion failures is also unknown. Known completion is shown separately from dimension rates, which remain conditional on evaluated attempts.
 
-Complete standalone validation and publish this draft for independent review. Do not merge automatically. Preserve failed evidence and explicit unknowns; follow current gate/coordinator decisions for any later live run.
+Committed baseline promotion still requires an eligible live run; live-only policies remain in scope for those runs. Scripted/out-of-set policies report `not_applicable`. This change does not promote a baseline or enable deferred gates.
 
-## Final standalone evidence
+## Validation
 
-Final base: `bdbb2a91135f61bb33cd19ec3a4421cf284094f5`; upstream D18 and native live-baseline/commit helpers preserved. Earlier `06d4cbe` validation is retained privately as history. This PR does not implement D18 verdict logic or claim native end-to-end model quality.
+Earlier independently tested snapshots are historical: bdbb2a91 (1637 passed/113 skipped), be80d47c (1688/113), and 92278eed (1702/113), both serial/four-worker. Private failed/intermediate receipts are retained. Review verification on a00bbbc is recorded below after execution, not inferred from these older counts.
 
-- Focused tests: **20 passed**.
-- `TEST_WORKERS=4 make test-v2`: **1637 passed, 113 skipped**.
-- `TEST_WORKERS=0 make test-v2`: **1637 passed, 113 skipped**.
-- Final `git diff --check`: passed; post-cleanup focused re-test: **20 passed**.
-- All seven affected scripted evaluator commands passed; live-only policies not_applicable; no promoted baseline.
+Review follow-up validation completed on the pinned a00bbbc base; commands/results below.
 
-The 113 live/runtime/conditional skips are not qualified behavior. Docker/kind/gateway, production provider, true native disposition/held-out benchmarking and external cleanup remain unrun. Raw `.runs/`, `.state/`, private logs/credentials and weights are excluded from this PR.
+Unrun: production provider accuracy, Docker/kind/OpenShell gateway, representative live/held-out disposition benchmarks and external cleanup. Offline/fixture checks and skips are not native platform/inference qualification. No `.runs/`, `.state/`, credentials, raw private diagnostics or model weights are committed.
 
-## Post-publication concurrency refresh
+## Completed owner-review validation
 
-PR #174 was refreshed onto be80d47c609c70307cf39308ad1da12ebcc62459 after upstream D18 implementation and six licensed imported JavaScript cases landed. The only manual conflict was CURRENT.md; preserve chain 106 and the upstream records. This PR does not take credit for that native implementation/corpus. Refreshed focused/post-cleanup tests: 21 passed; full serial and four-worker suites: 1688 passed, 113 skipped (138.04s / 52.17s). All seven scripted evaluators passed; chain now has 106 clean attempts; no baseline promoted. Earlier bdb evidence remains private history.
+Base: `a00bbbc96d3b97838398693dea3dcae7c43da6bb`.
 
-## Final delivery concurrency update
+| Check | Result |
+| --- | --- |
+| Focused boundary/configuration tests | 124 passed |
+| Four-worker make test-v2 | 1704 passed, 113 skipped |
+| Serial make test-v2 | 1704 passed, 113 skipped |
+| Diff cleanup and focused re-test | diff check passed; 124 passed |
 
-All four PRs are **draft/open**: [#174 — evaluation accounting](https://github.com/X-McKay/corsair/pull/174), [#175 — CLI/lifecycle](https://github.com/X-McKay/corsair/pull/175), [#176 — developer skills](https://github.com/X-McKay/corsair/pull/176), [#178 — audit/roadmap](https://github.com/X-McKay/corsair/pull/178). None was merged by this task.
+All seven affected scripted agent/chain commands passed; live-only policies reported not_applicable; no baseline promoted.
 
-After initial publication, develop added D18 execution, six imported JavaScript cases, four imported Ruby cases and Investigator repetition/validation changes. These are upstream improvements, not this audit patch. PR #174 alone was refreshed onto `92278eeddcf325104346c5f397f28f37476a2b9e`; its CURRENT.md row was placed below the stable index rather than rewriting changing corpus counts. Its final snapshot checks: **122 focused passed**, **1702 passed/113 skipped** in both full topologies and **14 post-cleanup passed**. The earlier 1688-case and bdb tables are historical. No model prompt or baseline was promoted by this task, and no native/live accuracy is inferred from these tests.
+An initial new test incorrectly expected the existing Java-misanswer fixture to pass. The fixture intentionally fails semantic correctness while both tasks complete; that test expectation was corrected and the failed receipt retained privately. It was not a production regression.
 
-The source ZIP is explicitly the **reviewed bdbb2a91 combined integration snapshot**, with all three originally validated audit code areas and final documentation, not a claim to be the continually advancing develop head or the newly rebased #174 head. It passed **1658 tests/113 skips** in both topologies and **128 post-cleanup tests**. Current individual PRs are the preferred source for independent review; the private bundle preserves all snapshot identities and measured/failed attempts. Native workspace/model benchmark accuracy and complete pipeline token/latency trade-offs remain unqualified here.
+All owner review items are addressed in this branch. The current PR/plan/index provide the next-session context: inspect source/CI, review the bounded diff and keep live qualification separate. PR #178 remains closed and no audit/roadmap continuation is part of this follow-up. Do not merge or promote automatically.
