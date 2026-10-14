@@ -85,6 +85,7 @@ def test_run_record_names_and_a_sum_with_an_unknown_is_unknown(tmp_path):
     rows = [json.loads(line) for line in (tmp_path / "evidence" / "attempts.jsonl").read_text().splitlines()[1:]]
     assert {"wall_s", "retries", "tokens", "parameters"} <= set(rows[0]) and "latency_s" not in rows[0]
     assert set(rows[0]["parameters"]) == set(agent_eval.PARAMETER_FIELDS)
+    assert all(row["retries"] == 0 for row in rows)  # counted from the captured history when usage left it null
     known = [{"case": "python/a", "language": "python", "kind": "positive", "dimensions": {}, "passed": True,
               "assertions": {"x": True}, "failure": None, "status": "ok", "parameters": {"temperature": 0.2},
               **{metric: 1 for metric in agent_summary.METRICS}}]
@@ -93,6 +94,19 @@ def test_run_record_names_and_a_sum_with_an_unknown_is_unknown(tmp_path):
     assert rolled["retries"]["observed"] == 1 and rolled["retries"]["total"] is None
     assert rolled["requests"]["total"] == 2 and rolled["statuses"] == {"ok": 2}
     assert rolled["parameters"]["temperature"] == [0.2, None]
+    failed = known[0] | {"case": "python/c", "status": None}
+    assert agent_summary.rollup(known + [failed])["statuses"] == {"ok": 1}
+    assert agent_summary.rollup(known + [failed])["status_unreported"] == 1
+
+
+def test_chain_parameters_are_kept_per_agent():
+    class Usage:
+        calls = [{"agent": "investigator", "temperature": 0.2, "request_limit": 40},
+                 {"agent": "control_prober", "temperature": 0.0},
+                 {"agent": "control_prober", "temperature": 0.7}]
+    found = agent_eval._parameters(Usage())
+    assert found["investigator"]["temperature"] == 0.2 and found["investigator"]["request_limit"] == 40
+    assert found["control_prober"]["temperature"] == [0.0, 0.7] and found["control_prober"]["model"] is None
 
 
 def test_chain_dispositions_keep_abstention_out_of_accuracy(tmp_path):

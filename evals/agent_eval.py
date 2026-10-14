@@ -35,6 +35,7 @@ from pydantic_ai.models import Model
 from pydantic_evals import Case, Dataset, set_eval_attribute
 from pydantic_evals.evaluators import Evaluator, EvaluatorContext
 
+from corsair.v2.agents.common.usage import count_retries
 from corsair.v2.contracts import AgentUsage
 from evals.cases import DIMENSIONS, LANGUAGES, EvalCase, agent_root, load_set, set_digest
 
@@ -120,6 +121,21 @@ def _model_name(model: Any) -> Any:
     return getattr(model, "model_name", None)
 
 
+def _parameters(usage: Any) -> dict[str, Any]:
+    """The run-record parameters of one agent call; for a composition (``usage.calls``, the chain) per agent, each
+    field a single value or, when that agent's calls differed, the list of distinct values."""
+    if usage is None or not hasattr(usage, "calls"):
+        return {name: getattr(usage, name, None) for name in PARAMETER_FIELDS}
+    by_agent: dict[str, dict[str, list]] = {}
+    for call in usage.calls:
+        fields = by_agent.setdefault(str(call.get("agent")), {name: [] for name in PARAMETER_FIELDS})
+        for name in PARAMETER_FIELDS:
+            if call.get(name) not in fields[name]:
+                fields[name].append(call.get(name))
+    return {agent: {name: values[0] if len(values) == 1 else values for name, values in fields.items()}
+            for agent, fields in by_agent.items()}
+
+
 def provider_identity(provider_config: Path, agents: tuple[str, ...]) -> dict[str, dict[str, str]]:
     """Per agent: the operator profile it resolved to, with the run record's names (``model``, ``provider_host``: the
     endpoint host only, no scheme, credentials, path or query). No credential is read."""
@@ -170,9 +186,14 @@ async def evaluate(spec: AgentEval, evidence: Path, set_name: str, *, language: 
                            "messages": TypeAdapter(list[ModelMessage]).dump_python(list(messages), mode="json")}
                 (evidence / "receipts" / f"{number:04d}.json").write_text(json.dumps(receipt, indent=2))
                 set_eval_attribute("receipt", f"{number:04d}")
-                for name in USAGE_FIELDS + PARAMETER_FIELDS + ("status",):
+                for name in USAGE_FIELDS + ("status",):
                     value = getattr(usage, name, None) if usage is not None else None
+                    if name == "retries" and value is None and usage is not None and messages \
+                            and not hasattr(usage, "calls"):
+                        # a stage that exhausted its retries returns retries=None; its history is captured here
+                        value = count_retries(messages)
                     set_eval_attribute(name, value)
+                set_eval_attribute("parameters", _parameters(usage))
                 for name in ROW_FACTS + LABEL_FACTS:
                     set_eval_attribute(name, attempt.facts.get(name) if attempt is not None else None)
 
@@ -212,7 +233,7 @@ def _row(spec: AgentEval, case: EvalCase, values: dict[str, bool], attributes: M
             "passed": bool(values) and failure is None and all(values.values()),
             "assertions": values, "dimensions": dimensions,
             "failed_assertions": sorted(name for name, value in values.items() if not value),
-            "failure": failure, **metrics, "parameters": {name: attributes.get(name) for name in PARAMETER_FIELDS},
+            "failure": failure, **metrics, "parameters": attributes.get("parameters") or {},
             **{name: attributes.get(name) for name in ROW_FACTS},
             **{name: attributes[name] for name in LABEL_FACTS if attributes.get(name) is not None}}
 

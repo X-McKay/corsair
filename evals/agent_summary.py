@@ -47,9 +47,11 @@ def _parameters(rows: list[dict]) -> dict:
 
 
 def _statuses(rows: list[dict]) -> dict:
+    """Run-record statuses only; an attempt that never reported one (the task raised) is counted apart."""
     counts: dict[str, int] = {}
     for row in rows:
-        counts[str(row.get("status"))] = counts.get(str(row.get("status")), 0) + 1
+        if row.get("status") is not None:
+            counts[row["status"]] = counts.get(row["status"], 0) + 1
     return dict(sorted(counts.items()))
 
 
@@ -94,7 +96,8 @@ def rollup(rows: list[dict]) -> dict:
                 "accepted_within_limit": {"passed": sum(row["accepted_within_limit"] is True for row in rows),
                                           "total": sum(row.get("accepted_within_limit") is not None for row in rows)}}
                if any(row.get("revisions") is not None for row in rows) else {}),
-            "statuses": _statuses(rows), "parameters": {k: [json.loads(v) for v in vs]
+            "statuses": _statuses(rows), "status_unreported": sum(row.get("status") is None for row in rows),
+            "parameters": {k: [json.loads(v) for v in vs]
                                                         for k, vs in _parameters(rows).items()},
             **{metric: _stats([row.get(metric) for row in rows]) for metric in METRICS}}
 
