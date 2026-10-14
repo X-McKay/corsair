@@ -7,8 +7,7 @@
   "probes": "Retrieval returned nothing at all: no own issue, no related issue, no degraded note.",
   "expected": "No brief and no model request: a brief from nothing could only be invented.",
   "dimensions": [
-    "contract",
-    "safety"
+    "contract"
   ],
   "provenance": {
     "source": "synthetic",

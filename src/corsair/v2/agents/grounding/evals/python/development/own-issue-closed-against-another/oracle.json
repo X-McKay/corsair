@@ -4,11 +4,17 @@
     "4122"
   ],
   "dispositions": {
-    "4120": "duplicate",
+    "4120": [
+      "duplicate",
+      "fixed"
+    ],
     "4122": "fixed"
   },
   "distractors": [],
-  "prior_disposition": "duplicate",
+  "prior_disposition": [
+    "duplicate",
+    "fixed"
+  ],
   "must_not_claim": [],
   "injection_markers": [],
   "script": [

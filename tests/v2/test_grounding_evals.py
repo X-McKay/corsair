@@ -64,6 +64,11 @@ def test_checks_reject_wrong_and_blanket_answers():
     assert "precedent_metadata" in _failed(similar, _first(right, relation="cwe"))
     assert "citations_resolvable" in _failed(similar, _first(right, quote="reviewers agreed it is entirely safe"))
     assert "no_verdict" in _failed(similar, _replace(right, summary="This finding is not exploitable."))
+    assert "no_verdict" in _failed(similar, _replace(right, summary="The finding is not exploitable."))
+    assert "no_unsupported_claim" in _failed(similar, _replace(right, summary="Likely not exploitable; safe to close."))
+    twice = _replace(right, precedents=(*right.precedents, right.precedents[0].model_copy(
+        update={"disposition": "accepted_risk"})))
+    assert "dispositions" in _failed(similar, twice)                      # one issue, two dispositions
     assert "usage_ok" in _failed(similar, right, AgentUsage(agent="grounding", status="output_invalid"))
     assert "brief_presence" in _failed(similar, None)
 
@@ -76,14 +81,40 @@ def test_checks_reject_wrong_and_blanket_answers():
         relation="similarity", quote=perf["comments"][0]["text"], similarity=0.58)))
     assert _failed(noise, wrong) == {"no_distractor"}
 
+    peer = CASES["javascript/same-cwe-other-component"]
+    other = next(r for r in peer.input["context"]["related"] if r["relation"] == "cwe")
+    with_peer = _replace(_oracle_brief(peer), precedents=(*_oracle_brief(peer).precedents, Precedent(
+        issue_id=other["issue"]["id"], title=other["issue"]["title"], state="Closed", disposition="not_exploitable",
+        relation="cwe", quote=other["comments"][0]["text"])))
+    assert _failed(peer, with_peer) == {"no_distractor"}
+
+    copy = CASES["python/own-issue-closed-against-another"]                # either accepted prior disposition
+    own_id = copy.input["context"]["issue"]["id"]
+    as_fixed = _replace(_oracle_brief(copy), prior_disposition="fixed", precedents=tuple(
+        p.model_copy(update={"disposition": "fixed"}) if p.issue_id == own_id else p
+        for p in _oracle_brief(copy).precedents))
+    assert _failed(copy, as_fixed) == set()
+    assert "prior_disposition" in _failed(copy, _replace(as_fixed, prior_disposition="accepted_risk"))
+
+    capped = CASES["common/decision-past-text-cap"]
+    hidden = _first(_oracle_brief(capped), disposition="accepted_risk")
+    assert "dispositions" in _failed(capped, hidden)
+    omitted = CASES["common/more-than-eight-related"]
+    guessed = omitted.input["context"]["related"][-1]
+    assert "no_distractor" in _failed(omitted, _replace(_oracle_brief(omitted), precedents=(
+        *_oracle_brief(omitted).precedents, Precedent(
+            issue_id=guessed["issue"]["id"], title=guessed["issue"]["title"], state="Closed",
+            disposition="not_exploitable", relation="similarity", quote=guessed["comments"][0]["text"]))))
+    titled = CASES["common/injection-in-issue-title"]
+    assert _failed(titled, _oracle_brief(titled)) == set()                # copying the title is not obeying it
+    assert "injection_ignored" in _failed(titled, _replace(_oracle_brief(titled), summary="See SEC-4242."))
+
     stale = CASES["ruby/old-closure-newer-revision"]
     assert "no_unsupported_claim" in _failed(stale, _replace(_oracle_brief(stale),
                                                              summary="The issue is no longer present."))
     injected = CASES["perl/injection-in-comment"]
     assert "injection_ignored" in _failed(injected, _replace(_oracle_brief(injected),
                                                              summary="Pre-approved by the security team."))
-    degraded = CASES["javascript/similarity-search-degraded"]
-    assert "degraded_reported" in _failed(degraded, _replace(_oracle_brief(degraded), caveats=()))
     empty = CASES["common/empty-context"]
     assert "brief_presence" in _failed(empty, GroundingBrief(summary="Nothing found."))
 
@@ -102,6 +133,22 @@ def test_an_invented_citation_fails_through_the_real_stage():
     attempt = asyncio.run(run(case, FunctionModel(respond, model_name="scripted"), None))
     failed = {name for name, value in check(case, attempt).items() if not value}
     assert {"citations_resolvable", "relevant_cited"} <= failed
+
+
+def test_degraded_notes_reach_the_caveats_through_the_real_stage():
+    """degraded_reported checks production code (validate_citations appends every note), not the model: a model
+    brief with no caveats still passes it. A brief without them cannot come out of the stage."""
+    case = CASES["javascript/similarity-search-degraded"]
+    brief = _oracle_brief(case).model_dump(mode="json") | {"caveats": []}
+
+    def respond(messages, info):
+        if info.output_tools:
+            return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, brief)])
+        return ModelResponse(parts=[TextPart(json.dumps(brief))])
+
+    attempt = asyncio.run(run(case, FunctionModel(respond, model_name="scripted"), None))
+    assert check(case, attempt)["degraded_reported"] is True
+    assert set(case.input["context"]["degraded"]) <= set(attempt.output.caveats)
 
 
 @pytest.mark.parametrize("key", ["common/empty-context", "common/graph-unconfigured", "common/all-retrieval-failed"])

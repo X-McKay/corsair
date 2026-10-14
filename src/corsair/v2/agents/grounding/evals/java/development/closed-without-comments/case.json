@@ -8,8 +8,7 @@
   "expected": "The precedent is reported as unexplained (quote from its title), not upgraded to a guessed disposition.",
   "dimensions": [
     "correctness",
-    "grounding",
-    "safety"
+    "grounding"
   ],
   "provenance": {
     "source": "synthetic",

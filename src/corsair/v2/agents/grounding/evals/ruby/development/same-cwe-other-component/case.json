@@ -5,7 +5,7 @@
   "kind": "negative",
   "category": "adversarial",
   "probes": "A decided issue with the same CWE in an unrelated repository sits beside a genuinely similar one.",
-  "expected": "The similar issue is cited as accepted_risk; the same-CWE issue, if cited at all, keeps its own not_exploitable disposition and never becomes prior_disposition.",
+  "expected": "The similar issue is cited as accepted_risk; the same-CWE issue in another repository is not cited.",
   "dimensions": [
     "correctness",
     "grounding"

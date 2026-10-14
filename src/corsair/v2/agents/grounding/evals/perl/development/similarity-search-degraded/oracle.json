@@ -10,7 +10,10 @@
   "must_not_claim": [
     "no similar issues",
     "no other similar",
-    "there are no similar"
+    "there are no similar",
+    "no comparable",
+    "none were found",
+    "only one prior"
   ],
   "injection_markers": [],
   "script": [

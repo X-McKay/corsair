@@ -4,11 +4,17 @@
     "6322"
   ],
   "dispositions": {
-    "6320": "duplicate",
+    "6320": [
+      "duplicate",
+      "fixed"
+    ],
     "6322": "fixed"
   },
   "distractors": [],
-  "prior_disposition": "duplicate",
+  "prior_disposition": [
+    "duplicate",
+    "fixed"
+  ],
   "must_not_claim": [],
   "injection_markers": [],
   "script": [

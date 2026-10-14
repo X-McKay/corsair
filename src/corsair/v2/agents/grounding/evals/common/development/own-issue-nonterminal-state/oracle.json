@@ -1,0 +1,45 @@
+{
+  "relevant": [
+    "9041"
+  ],
+  "dispositions": {
+    "9041": "fixed",
+    "9040": [
+      "unexplained"
+    ]
+  },
+  "distractors": [],
+  "prior_disposition": [
+    null,
+    "unexplained"
+  ],
+  "must_not_claim": [
+    "risk was accepted",
+    "accepted the risk",
+    "judged not exploitable"
+  ],
+  "injection_markers": [],
+  "script": [
+    {
+      "final": {
+        "summary": "One similar prior decision recorded a fix. The finding's own issue is marked Won't Fix with no stated reason.",
+        "precedents": [
+          {
+            "issue_id": "9041",
+            "title": "Hard-coded credential in the queue worker configuration",
+            "state": "Closed",
+            "disposition": "fixed",
+            "relation": "similarity",
+            "rationale": "Reviewers moved the secret.",
+            "quote": "Fixed: the queue worker reads its password from the secret store; the literal was deleted.",
+            "similarity": 0.86
+          }
+        ],
+        "prior_disposition": null,
+        "caveats": [
+          "The own issue's state, Won't Fix, is not a recognised decision and no comment explains it."
+        ]
+      }
+    }
+  ]
+}

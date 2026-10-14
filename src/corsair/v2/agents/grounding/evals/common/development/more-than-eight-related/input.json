@@ -1,0 +1,162 @@
+{
+  "finding": {
+    "title": "Hard-coded credential in service configuration",
+    "cwe": "CWE-798",
+    "description": "A password literal is assigned to the database client configuration."
+  },
+  "context": {
+    "issue": {
+      "id": "9060",
+      "title": "Hard-coded credential in service configuration",
+      "state": "Active",
+      "cwe": "CWE-798",
+      "description": ""
+    },
+    "related": [
+      {
+        "issue": {
+          "id": "9061",
+          "title": "Hard-coded credential in the mailer configuration",
+          "state": "Closed",
+          "cwe": "CWE-798",
+          "description": ""
+        },
+        "relation": "similarity",
+        "comments": [
+          {
+            "author": "reviewer",
+            "created_at": "2026-04-01",
+            "text": "Fixed: the mailer password now comes from the secret store and the literal is gone."
+          }
+        ],
+        "similarity": 0.92
+      },
+      {
+        "issue": {
+          "id": "9062",
+          "title": "Hard-coded credential in the scheduler configuration",
+          "state": "Closed",
+          "cwe": "CWE-798",
+          "description": ""
+        },
+        "relation": "similarity",
+        "comments": [
+          {
+            "author": "reviewer",
+            "created_at": "2026-04-02",
+            "text": "Not exploitable: the scheduler credential only opens a local fixture database in CI."
+          }
+        ],
+        "similarity": 0.9
+      },
+      {
+        "issue": {
+          "id": "9063",
+          "title": "Hard-coded value in configuration module 1",
+          "state": "Closed",
+          "cwe": "CWE-798",
+          "description": ""
+        },
+        "relation": "similarity",
+        "comments": [],
+        "similarity": 0.6
+      },
+      {
+        "issue": {
+          "id": "9064",
+          "title": "Hard-coded value in configuration module 2",
+          "state": "Closed",
+          "cwe": "CWE-798",
+          "description": ""
+        },
+        "relation": "similarity",
+        "comments": [],
+        "similarity": 0.6
+      },
+      {
+        "issue": {
+          "id": "9065",
+          "title": "Hard-coded value in configuration module 3",
+          "state": "Closed",
+          "cwe": "CWE-798",
+          "description": ""
+        },
+        "relation": "similarity",
+        "comments": [],
+        "similarity": 0.6
+      },
+      {
+        "issue": {
+          "id": "9066",
+          "title": "Hard-coded value in configuration module 4",
+          "state": "Closed",
+          "cwe": "CWE-798",
+          "description": ""
+        },
+        "relation": "similarity",
+        "comments": [],
+        "similarity": 0.6
+      },
+      {
+        "issue": {
+          "id": "9067",
+          "title": "Hard-coded value in configuration module 5",
+          "state": "Closed",
+          "cwe": "CWE-798",
+          "description": ""
+        },
+        "relation": "similarity",
+        "comments": [],
+        "similarity": 0.6
+      },
+      {
+        "issue": {
+          "id": "9068",
+          "title": "Hard-coded value in configuration module 6",
+          "state": "Closed",
+          "cwe": "CWE-798",
+          "description": ""
+        },
+        "relation": "similarity",
+        "comments": [],
+        "similarity": 0.6
+      },
+      {
+        "issue": {
+          "id": "Q-7731",
+          "title": "Hard-coded credential in the archive configuration",
+          "state": "Closed",
+          "cwe": "CWE-798",
+          "description": ""
+        },
+        "relation": "similarity",
+        "comments": [
+          {
+            "author": "reviewer",
+            "created_at": "2026-04-03",
+            "text": "Not exploitable: the archive credential is a placeholder replaced at deploy time."
+          }
+        ],
+        "similarity": 0.55
+      },
+      {
+        "issue": {
+          "id": "Q-8842",
+          "title": "Hard-coded credential in the archive configuration",
+          "state": "Closed",
+          "cwe": "CWE-798",
+          "description": ""
+        },
+        "relation": "similarity",
+        "comments": [
+          {
+            "author": "reviewer",
+            "created_at": "2026-04-03",
+            "text": "Not exploitable: the archive credential is a placeholder replaced at deploy time."
+          }
+        ],
+        "similarity": 0.55
+      }
+    ]
+  }
+}

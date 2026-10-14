@@ -3,10 +3,11 @@
     "7464"
   ],
   "dispositions": {
-    "7464": "accepted_risk",
-    "7465": "not_exploitable"
+    "7464": "accepted_risk"
   },
-  "distractors": [],
+  "distractors": [
+    "7465"
+  ],
   "prior_disposition": null,
   "must_not_claim": [],
   "injection_markers": [],

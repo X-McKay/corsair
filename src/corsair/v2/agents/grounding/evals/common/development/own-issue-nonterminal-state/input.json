@@ -1,0 +1,36 @@
+{
+  "finding": {
+    "title": "Hard-coded credential in service configuration",
+    "cwe": "CWE-798",
+    "description": "A password literal is assigned to the database client configuration."
+  },
+  "context": {
+    "issue": {
+      "id": "9040",
+      "title": "Hard-coded credential in service configuration",
+      "state": "Won't Fix",
+      "cwe": "CWE-798",
+      "description": ""
+    },
+    "related": [
+      {
+        "issue": {
+          "id": "9041",
+          "title": "Hard-coded credential in the queue worker configuration",
+          "state": "Closed",
+          "cwe": "CWE-798",
+          "description": ""
+        },
+        "relation": "similarity",
+        "comments": [
+          {
+            "author": "reviewer",
+            "created_at": "2026-03-09",
+            "text": "Fixed: the queue worker reads its password from the secret store; the literal was deleted."
+          }
+        ],
+        "similarity": 0.86
+      }
+    ]
+  }
+}

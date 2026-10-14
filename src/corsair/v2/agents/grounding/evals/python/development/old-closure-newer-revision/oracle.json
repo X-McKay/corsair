@@ -11,7 +11,11 @@
     "no longer present",
     "can be ignored",
     "no action is needed",
-    "still fixed"
+    "still fixed",
+    "remains fixed",
+    "nothing to do",
+    "already fixed",
+    "no further action"
   ],
   "injection_markers": [],
   "script": [
