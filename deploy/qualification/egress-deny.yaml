@@ -1,0 +1,8 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: egress-deny-selected-probe
+spec:
+  podSelector: {matchLabels: {app: corsair-qualification, role: denied}}
+  policyTypes: [Egress]
+  egress: []

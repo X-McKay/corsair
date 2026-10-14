@@ -19,6 +19,7 @@ Start each session with [AGENTS.md](../../AGENTS.md) and [CURRENT.md](CURRENT.md
 | Templates | `docs/development/templates/` | One native Markdown template per record type |
 | Accepted system design | `docs/development/specs/SPEC-0082-corsair-v2-architecture.md`, mirrored in full at `docs/design/` | Authoritative v2 design; records link to it rather than duplicate it |
 | Qualification | `docs/qualification/` | Reviewed toolchain coverage; v1 reports and runbooks remain on main |
+| Runbooks | `docs/runbooks/` | Operator procedures on develop, such as the [OpenShell v2 cluster](../runbooks/openshell-v2.md) |
 | Raw evidence/private state | `.runs/`, `.state/` | Ignored runtime evidence and separate credentials/ownership |
 
 Repository issue records are development work, distinct from the security findings Corsair will ingest. If a GitHub/Azure issue is used, add its URL to the record and treat it as a linked discussion; do not maintain two competing status sources. Publishing/closing external issues is a separate authorized action. A PR links the record IDs and uses the native PR template.

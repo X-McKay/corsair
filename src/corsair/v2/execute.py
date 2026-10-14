@@ -1,11 +1,12 @@
 """Trusted probe execution (stage 7, ``stages.Execute``) and the D3 mechanical check run.
 
-Each probe runs alone, exactly once, in a fresh offline container from the replayed Environment image, with only its
-own file written. Trusted code observes four things itself (D8): the exit code, sorted by the matrix row's exit-code
-map; the ``start`` and ``end`` marker files the test writes under ``$CORSAIR_MARKER_DIR``; the ``check`` marker it
-writes there immediately before its main assertion (``holds`` or ``violated``); and whether the per-run
-``$CORSAIR_TOKEN`` (given to both roles) appears in the output. ``outcome.classify`` turns those facts into an
-Outcome. Nothing here knows a language: the run argv comes from the row's template, filled generically.
+Each probe runs alone, exactly once, in a fresh offline sandbox opened from the replayed Environment (through the
+``Sandboxes`` port), with only its own file written. Trusted code observes four things itself (D8): the exit code,
+sorted by the matrix row's exit-code map; the ``start`` and ``end`` marker files the test writes under
+``$CORSAIR_MARKER_DIR``; the ``check`` marker it writes there immediately before its main assertion (``holds`` or
+``violated``); and whether the per-run ``$CORSAIR_TOKEN`` (given to both roles) appears in the output.
+``outcome.classify`` turns those facts into an Outcome. Nothing here knows a language: the run argv comes from the
+row's template, filled generically.
 """
 from __future__ import annotations
 
@@ -21,8 +22,8 @@ from .artifacts import ArtifactStore
 from .contracts import (CheckResult, Environment, ExitClass, FrozenPatch, Outcome, ProbeDraft, ProbeFacts, ProbeRun,
                         Runtime)
 from .outcome import classify, read_check
-from .workspace.docker import (ContainerExists, DockerConfig, create, exec_once, image_id, labels, remove,
-                               write_file)
+from .workspace import sandboxes as configured
+from .workspace.port import Sandboxes, SandboxExists, labels, sandbox_name
 
 PROBE_TIMEOUT_S = 300.0
 SYNTAX_LIMIT = 4 * 1024
@@ -62,7 +63,7 @@ class Observation:
     token: str
     cleanup_confirmed: bool | None
     syntax: tuple[int | None, bytes] | None = None  # (exit code, output) of the row's syntax check, when run
-    image_id: str | None = None  # the image the probe's container was created from, as Docker reports it
+    image_id: str | None = None  # the image the probe's sandbox was created from, as its backend reports it
 
 
 def _infra() -> ProbeFacts:
@@ -70,7 +71,8 @@ def _infra() -> ProbeFacts:
 
 
 def observe(environment: Environment, runtime: Runtime, draft: ProbeDraft, *, revision: str, run_id: str | None,
-            timeout: float, patch_sha256: str | None = None, syntax_check: bool = False) -> Observation:
+            timeout: float, patch_sha256: str | None = None, syntax_check: bool = False,
+            backend: Sandboxes | None = None) -> Observation:
     """Run one draft once and record what was observed. Never retried; any failure is a container failure fact.
 
     With ``syntax_check`` (the D3 check run only) the row's syntax check runs first in the same container, without
@@ -78,27 +80,27 @@ def observe(environment: Environment, runtime: Runtime, draft: ProbeDraft, *, re
     token = new_token()
     marker_dir = f"/tmp/corsair-markers-{secrets.token_hex(8)}"
     extra = {"revision": revision} | ({"patch": patch_sha256[:16]} if patch_sha256 else {})
-    config = DockerConfig(image=environment.image, workdir=environment.workdir, network="none",
-                          labels=labels(run_id or uuid.uuid4().hex[:12], "execute", draft.role, **extra))
+    backend = backend or configured()
+    sandbox_labels = labels(run_id or uuid.uuid4().hex[:12], "execute", draft.role, **extra)
     env = {MARKER_ENV: marker_dir, TOKEN_ENV: token}
     facts, output, duration, ours, syntax, image = _infra(), b"", None, True, None, None
     try:
-        name = create(config, adopt=False)
-        image = image_id(name, container=True)
-        write_file(name, posixpath.join(environment.workdir, draft.test_file), draft.source.encode())
-        made = exec_once(name, ["mkdir", "-p", marker_dir], workdir="/", timeout=60)
+        name = backend.open_environment(environment, sandbox_labels)
+        image = backend.image_id(name)
+        backend.write_file(name, posixpath.join(environment.workdir, draft.test_file), draft.source.encode())
+        made = backend.exec_once(name, ["mkdir", "-p", marker_dir], workdir="/", timeout=60)
         if made.exit_code != 0:
             raise RuntimeError(f"cannot create the marker directory: {made.stderr.decode(errors='replace')}")
         if syntax_check and runtime.syntax_check:
-            checked = exec_once(name, fill_template(runtime.syntax_check, draft), workdir=environment.workdir,
-                                timeout=timeout)
+            checked = backend.exec_once(name, fill_template(runtime.syntax_check, draft),
+                                        workdir=environment.workdir, timeout=timeout)
             syntax = (None if checked.timed_out else checked.exit_code, checked.stdout + checked.stderr)
         started = time.monotonic()
-        result = exec_once(name, fill_template(runtime.run_template, draft), workdir=environment.workdir, env=env,
-                           timeout=timeout)
+        result = backend.exec_once(name, fill_template(runtime.run_template, draft), workdir=environment.workdir,
+                                   env=env, timeout=timeout)
         duration = time.monotonic() - started
         output = b"--- stdout ---\n" + result.stdout + b"\n--- stderr ---\n" + result.stderr
-        markers = exec_once(name, ["sh", "-c", _MARKERS_SCRIPT, "sh", marker_dir], workdir="/", timeout=60)
+        markers = backend.exec_once(name, ["sh", "-c", _MARKERS_SCRIPT, "sh", marker_dir], workdir="/", timeout=60)
         if markers.exit_code != 0:
             output += b"\n[markers unreadable: container failed]\n"
         else:
@@ -109,10 +111,10 @@ def observe(environment: Environment, runtime: Runtime, draft: ProbeDraft, *, re
                                token_in_output=token.encode() in result.stdout + result.stderr,
                                check_marker=read_check(check) if check else None)
     except Exception as error:  # Create, write or control-plane failure: an infra fact, never retried.
-        ours = not isinstance(error, ContainerExists)
+        ours = not isinstance(error, SandboxExists)
         output += f"\n[infra: {type(error).__name__}: {error}]\n".encode()
     finally:
-        confirmed = remove(config.name) if ours else None
+        confirmed = backend.remove(sandbox_name(sandbox_labels)) if ours else None
     return Observation(facts, output, duration, token, confirmed, syntax, image)
 
 

@@ -180,29 +180,29 @@ def default_stages(*, grounding_context: Callable[[Case], Any] | None = None) ->
     from .execute import diagnose, run_probe
     from .matrix import select
     from .rules import decide
-    from .workspace.docker import image_id
+    from .workspace import sandboxes
 
     return Stages(select=select, investigate=investigate, build=build, replay=replay, control_probe=control_probe,
                   exploit_probe=exploit_probe, review=review, diagnose=diagnose, execute=run_probe, decide=decide,
-                  workspace=docker_workspace, ground=ground, grounding_context=grounding_context,
-                  inspect_image=image_id)
+                  workspace=agent_workspace, ground=ground, grounding_context=grounding_context,
+                  inspect_image=lambda reference: sandboxes().resolve_image(reference))
 
 
 @asynccontextmanager
-async def docker_workspace(case: Case, runtime: Runtime) -> AsyncIterator[object]:
-    """The Builder's disposable workspace: the runtime image with the revision's tree copied in, removed after.
+async def agent_workspace(case: Case, runtime: Runtime) -> AsyncIterator[object]:
+    """The Builder's disposable workspace on the configured backend: the runtime image with the revision's tree
+    copied in, with build network, removed after.
 
-    The Builder explores with network so it can install the project's declared dependencies; Docker cannot narrow
-    egress to the row's registry hosts, so that limit is a recorded gap until the OpenShell backend. Trusted replay
-    runs the recipe again in a fresh container, and probes never run where an agent typed.
+    The Builder explores with network so it can install the project's declared dependencies. Docker cannot narrow
+    egress to the row's registry hosts, so on Docker that limit is a recorded gap; OpenShell applies the operator's
+    build policy. Trusted replay runs the recipe again in a fresh sandbox, and probes never run where an agent typed.
     """
     from pydantic_ai.workspaces import Workspace
 
-    from .workspace.docker import DockerConfig, DockerWorkspace, labels
+    from .workspace import labels, sandboxes
 
     run_id = f"{re.sub(r'[^A-Za-z0-9_.-]', '-', case.case_id)}-{uuid.uuid4().hex[:8]}"
-    backend = DockerWorkspace(DockerConfig(image=runtime.image, labels=labels(run_id, "build-agent"),
-                                           network="bridge"))
+    backend = sandboxes().agent_workspace(runtime.image, labels(run_id, "build-agent"))
     try:
         await backend.copy_in(Path(case.revision.source))
         yield Workspace(backend)
