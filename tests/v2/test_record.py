@@ -1,6 +1,9 @@
 """The run recorder writes every stage, usage and the verdict, and keeps unknown usage unknown."""
 import asyncio
 import json
+from pathlib import Path
+
+import yaml
 
 import pytest
 
@@ -8,6 +11,9 @@ from chain_fakes import Fakes, case, models, usage
 from corsair.v2.chain import run_case
 from corsair.v2.contracts import AgentUsage, Label, TerminalReason, Verdict
 from corsair.v2.record import RunRecorder
+
+REVIEWER_SPEC = Path(__file__).parents[2] / "src/corsair/v2/agents/reviewer/agent.yaml"
+REVIEWER_VERSION = yaml.safe_load(REVIEWER_SPEC.read_text())["metadata"]["prompt_version"]
 
 
 def _load(path):
@@ -139,7 +145,7 @@ def test_usage_rows_carry_parameters_versions_and_retries(tmp_path):
     run_dir, _, _ = _schema_run(tmp_path)
     rows = {row["step"]: row for row in _load(run_dir / "usage.json")}
     reviewer = rows["review.1"]
-    assert reviewer["prompt_version"] == "reviewer-v2-3" and reviewer["config_version"] is None
+    assert reviewer["prompt_version"] == REVIEWER_VERSION and reviewer["config_version"] is None
     assert len(reviewer["spec_sha256"]) == 64
     assert rows["investigate"]["config_version"] == "v2-investigator-config-1"
     # TestModel has no settings and fake stages pass no limits: unknown, never zero.
@@ -164,7 +170,7 @@ def test_summary_has_outcome_agents_models_and_totals(tmp_path):
     reviewer = summary["agents"]["reviewer"]
     assert (reviewer["calls"], reviewer["requests"], reviewer["input_tokens"], reviewer["output_tokens"]) == (
         1, 1, 10, 5)
-    assert reviewer["statuses"] == {"ok": 1} and reviewer["prompt_versions"] == ["reviewer-v2-3"]
+    assert reviewer["statuses"] == {"ok": 1} and reviewer["prompt_versions"] == [REVIEWER_VERSION]
     assert reviewer["retries"] is None and summary["agents"]["investigator"]["retries"] == 0
     assert summary["totals"]["retries"] is None  # one unknown makes the total unknown
 
@@ -206,7 +212,7 @@ def test_parameters_come_from_native_settings_and_limits_and_retries_from_messag
                                                                                   "server_default")
     assert (usage.request_limit, usage.tool_calls_limit, usage.max_output_retries, usage.max_tool_retries) == (
         5, 3, 2, 1)
-    assert usage.prompt_version == "reviewer-v2-3" and usage.provider_host is None
+    assert usage.prompt_version == REVIEWER_VERSION and usage.provider_host is None
 
 
 def test_compare_prints_one_row_per_run(tmp_path, capsys):
@@ -218,6 +224,6 @@ def test_compare_prints_one_row_per_run(tmp_path, capsys):
     lines = capsys.readouterr().out.strip().splitlines()
     assert lines[0].split()[:6] == ["run", "case", "mode", "label", "rule", "reason"]
     assert len(lines) == 3
-    assert "LIKELY_EXPLOITABLE" in lines[1] and "R4" in lines[1] and "rev=reviewer-v2-3" in lines[1]
+    assert "LIKELY_EXPLOITABLE" in lines[1] and "R4" in lines[1] and f"rev={REVIEWER_VERSION}" in lines[1]
     assert "plan_unresolved" in lines[2] and "rev=" not in lines[2]
     assert lines[1].split()[7] == "75" and lines[2].split()[7] == "15"  # tokens
