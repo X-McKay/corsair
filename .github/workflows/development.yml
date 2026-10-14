@@ -1,15 +1,25 @@
 name: Development guards
 
+# Minimal PR path until something runs end to end (Al, 2026-10-14): only the v2 offline suite, no model. The v1 offline
+# suite (`make test-config`: unit, configuration, record and workflow guards) runs from `offline-v1.yml` on manual
+# dispatch and pushes to main; milestone gates (kind, OpenShell, admission, toolchain images) run on demand only. Full
+# CI, gates and release policies return once end-to-end runs and agent baselines exist.
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [develop]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# A newer push to the same PR supersedes its running check; branch pushes always finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  # Keeps the existing check name, so anything that requires `offline-guards` still has a green to wait for.
   offline-guards:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -21,4 +31,4 @@ jobs:
         with:
           version: "0.12.23"
           python-version: "3.12"
-      - run: make test-config
+      - run: make test-v2

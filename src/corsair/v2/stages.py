@@ -1,0 +1,78 @@
+"""Stage signatures shared by the chain, the workflow and the evals.
+
+Each module implements its function with exactly this shape, so ``chain.py`` composes them and each agent's eval
+calls its stage alone. Agent stages return their native usage beside the result; a missing value is None.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Protocol
+
+from pydantic_ai.models import Model
+
+from .contracts import (AgentUsage, BuildResult, Case, Environment, FrozenPatch, Outcome, ProbeBrief, ProbeDraft,
+                        ProbePlan, ProbeRun, Recipe, Runtime, Validity, Verdict)
+
+
+class Select(Protocol):
+    def __call__(self, case: Case, matrix: Path) -> Runtime | None: ...
+
+
+class Investigate(Protocol):
+    """Read-only source under ``source_root``; never executes anything."""
+
+    async def __call__(self, case: Case, runtime: Runtime, model: Model, *, source_root: Path
+                       ) -> tuple[ProbePlan, AgentUsage]: ...
+
+
+class BuildAgent(Protocol):
+    """Explores a disposable workspace container and proposes a Recipe; trusted replay decides if it holds."""
+
+    async def __call__(self, case: Case, runtime: Runtime, plan: ProbePlan, model: Model, *, workspace: object,
+                       feedback: str | None = None) -> tuple[Recipe | None, AgentUsage]: ...
+    # ``feedback`` is set only for the single extra episode after a failed replay (A2): the replay log's tail.
+
+
+class Replay(Protocol):
+    """Trusted: replays the recipe in a fresh container and requires the baseline test to pass."""
+
+    def __call__(self, case: Case, runtime: Runtime, recipe: Recipe, *, revision: str = "vulnerable"
+                 ) -> tuple[BuildResult, Environment | None]: ...
+
+
+class Probe(Protocol):
+    """One Prober. ``diagnostics`` is set only for the single D3 correction after a not_run or errored run."""
+
+    async def __call__(self, brief: ProbeBrief, runtime: Runtime, model: Model, *, source_root: Path,
+                       diagnostics: str | None = None, previous: ProbeDraft | None = None
+                       ) -> tuple[ProbeDraft | None, AgentUsage]: ...
+
+
+class Review(Protocol):
+    """Outcome-blind: sees the plan, the frozen patch and source, never a ProbeRun."""
+
+    async def __call__(self, case: Case, plan: ProbePlan, patch: FrozenPatch, model: Model, *, source_root: Path,
+                       revision: str = "vulnerable") -> tuple[Validity, AgentUsage]: ...
+
+
+class Execute(Protocol):
+    """Trusted: runs one probe alone, exactly once, with a fresh token, and classifies it."""
+
+    def __call__(self, environment: Environment, runtime: Runtime, patch: FrozenPatch, role: str, *,
+                 revision: str = "vulnerable") -> ProbeRun: ...
+
+
+class Diagnose(Protocol):
+    """Trusted D3 pre-check: runs one frozen probe once on the vulnerable revision, before review.
+
+    Returns the outcome and, only for ``not_run`` or ``errored``, that author's own diagnostics (the run output).
+    A completed run returns no diagnostics, so the author can fix mechanics but never steer toward an outcome.
+    """
+
+    def __call__(self, environment: Environment, runtime: Runtime, patch: FrozenPatch, role: str
+                 ) -> tuple[Outcome, str | None]: ...
+
+
+class Decide(Protocol):
+    def __call__(self, case: Case, *, runtime: Runtime | None, build: BuildResult | None, plan: ProbePlan | None,
+                 validity: tuple[Validity, ...], runs: tuple[ProbeRun, ...], stopped: str | None = None) -> Verdict: ...
