@@ -321,7 +321,7 @@ The proposal's decisions and their status:
 | D3 | Authors get no test-running tool; trusted code runs frozen drafts once and returns only mechanical diagnostics | Al, 07:49Z |
 | D4 | Deterministic rule table decides the label | Accepted with the build kickoff |
 | D5 | Live evals for the Builder and both probers may use local Docker | Accepted with the build kickoff |
-| D6 | Build on `develop` in `src/corsair`; main stays untouched until Al replaces it | Al, 08:09Z |
+| D6 | Build on `develop` in `src/corsair/v2`; main stays untouched until Al replaces it. Moved up to `src/corsair` on 2026-10-14 before the main cutover | Al, 08:09Z; move 2026-10-14 |
 | D7 | Reuse the verdict rule table, terminal reasons, per-stage replay and blinded runs from Al's InfoSec Harness v2 spec | Accepted with the build kickoff; Al also asked for the Grounding agent from that harness |
 | D8 | Deterministic outcome table with an exit-code map per framework and a canary pair per row | Al, 07:49Z |
 | D9 | Exactly two tests per attempt (revised by D18: at most two attempts per case); native parametrisation inside a test is allowed | Accepted with the build kickoff; revised 2026-10-14 by D18 |
