@@ -17,14 +17,14 @@ CASES = json.loads(MANIFEST.read_text())["cases"]
 @pytest.mark.parametrize("entry", CASES, ids=[c["name"] for c in CASES])
 def test_every_corpus_case_loads_without_truth(entry):
     case = intake.load_corpus_case(MANIFEST, entry["name"])
-    assert case.case_id == entry["name"]
+    assert case.case_id == intake.corpus_case_id(entry["name"]) and entry["name"] not in case.model_dump_json()
     assert Path(case.revision.source) == (MANIFEST.parent / entry["finding"]["repo_url"].removeprefix("eval-corpus/"))
     assert Path(case.revision.source).is_dir()
     finding = entry["finding"]
     assert (case.finding.title, case.finding.file_path, case.finding.start_line, case.finding.cwe) == (
         finding["title"], finding["file_path"], finding["start_line"], finding["cwe"])
-    # case_id is the maintainer's name for the case (it can read "unreachable"); it is opaque and never an agent input.
-    dumped = case.model_dump_json(exclude={"case_id"})
+    # The maintainer's name can read "unreachable"; the case carries only its digest.
+    dumped = case.model_dump_json()
     for key in ("truth", "expected_verdict", "reachability", "sink_file", "sink_line", "target_callable"):
         assert key not in dumped
     for key in ("expected_verdict", "reachability"):

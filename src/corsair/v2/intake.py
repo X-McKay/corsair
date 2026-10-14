@@ -69,12 +69,17 @@ def _manifest_case(manifest: Path, name: str) -> dict:
     return matches[0]
 
 
+def corpus_case_id(name: str) -> str:
+    """Opaque, stable id for a corpus case: the manifest name never appears in a run's inputs."""
+    return f"corpus:{hashlib.sha256(name.encode()).hexdigest()[:16]}"
+
+
 def load_corpus_case(manifest: Path, name: str) -> Case:
     """One corpus case as a Case: the finding and the variant's tree, never its ``truth``.
 
     ``repo_url`` looks like ``eval-corpus/<lang>/<topic>/<a|b>``; the ``eval-corpus/`` prefix is the manifest's
-    own directory. ``case_id`` is the manifest name, which is a maintainer label: it is opaque to agents and must
-    never be placed in an agent input.
+    own directory. Manifest names carry the answer (``sqli-vulnerable``), so ``case_id`` is an opaque digest of the
+    name (``corpus_case_id``); evaluators map it back through ``load_oracle``.
     """
     manifest = Path(manifest).resolve()
     entry = _manifest_case(manifest, name)
@@ -85,7 +90,7 @@ def load_corpus_case(manifest: Path, name: str) -> Case:
     source = (manifest.parent / repo_url[len(CORPUS_PREFIX):]).resolve()
     if not source.is_relative_to(manifest.parent):
         raise ValueError(f"{name}: repo_url {repo_url!r} leaves the corpus directory")
-    return Case(case_id=name, finding=Finding(**{key: finding.get(key) for key in FINDING_FIELDS
+    return Case(case_id=corpus_case_id(name), finding=Finding(**{key: finding.get(key) for key in FINDING_FIELDS
                                                  if finding.get(key) is not None}),
                 revision=revision(source))
 
@@ -97,7 +102,7 @@ def load_oracle(manifest: Path, name: str) -> dict:
     verdict = truth["expected_verdict"]
     if verdict not in EXPECTED_LABELS:
         raise ValueError(f"{name}: unmapped expected_verdict {verdict!r}")
-    return {"case_id": name, "language": entry.get("language"), "expected_label": EXPECTED_LABELS[verdict].value,
+    return {"case_id": corpus_case_id(name), "name": name, "language": entry.get("language"), "expected_label": EXPECTED_LABELS[verdict].value,
             **truth}
 
 
