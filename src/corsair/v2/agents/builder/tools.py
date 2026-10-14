@@ -46,9 +46,34 @@ async def run(ctx: RunContext[Any], argv: list[str], timeout_s: int = DEFAULT_TI
     return {"exit_code": result.exit_code, "output": clip(result.stdout + result.stderr)}
 
 
+MAX_FILE_CHARS = 16_000
+
+
+async def write_new_file(ctx: RunContext[Any], path: str, content: str) -> str:
+    """Create one NEW small file (for example a trivial smoke test when the project has no test) in the tree.
+
+    Existing files cannot be changed. Every file written here is replayed with the recipe.
+
+    Args:
+        path: Relative path inside the working directory, e.g. "tests/test_smoke.py".
+        content: The whole file.
+    """
+    parts = path.split("/")
+    if not path or path.startswith("/") or ".." in parts or "" in parts:
+        raise ModelRetry("path must be relative to the working directory, without '..'")
+    if len(content) > MAX_FILE_CHARS:
+        raise ModelRetry(f"files are limited to {MAX_FILE_CHARS} characters")
+    target = f"{(await ctx.workspace.working_dir()).rstrip('/')}/{path}"
+    if await ctx.workspace.exists(target):
+        raise ModelRetry(f"{path} already exists; only new files may be written")
+    await ctx.workspace.write_text(target, content)
+    return f"wrote {path}"
+
+
 def builder_tools() -> FunctionToolset[Any]:
     tools = FunctionToolset[Any](id=TOOLSET_ID)
     tools.add_function(run, name="run", retries=1)
+    tools.add_function(write_new_file, name="write_new_file", retries=1)
     return tools
 
 

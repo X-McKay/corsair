@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from pydantic_ai import ModelRetry
 from pydantic_ai.messages import ModelMessage, ToolCallPart, ToolReturnPart
 
-from corsair.v2.contracts import Recipe
+from corsair.v2.contracts import Recipe, RecipeFile
 
 
 def last_exit_codes(messages: Sequence[ModelMessage]) -> dict[tuple[str, ...], int | None]:
@@ -30,6 +30,22 @@ def last_exit_codes(messages: Sequence[ModelMessage]) -> dict[tuple[str, ...], i
     return codes
 
 
+def written_files(messages: Sequence[ModelMessage]) -> tuple[RecipeFile, ...]:
+    """The files ``write_new_file`` actually wrote in this episode, in order; the model's own list is ignored."""
+    calls: dict[str, tuple[str, str]] = {}
+    written: dict[str, str] = {}
+    for message in messages:
+        for part in message.parts:
+            if isinstance(part, ToolCallPart) and part.tool_name == "write_new_file":
+                args = part.args_as_dict()
+                calls[part.tool_call_id] = (str(args.get("path", "")), str(args.get("content", "")))
+            elif (isinstance(part, ToolReturnPart) and part.tool_name == "write_new_file"
+                  and part.tool_call_id in calls and str(part.content).startswith("wrote ")):
+                path, content = calls[part.tool_call_id]
+                written[path] = content
+    return tuple(RecipeFile(path=path, content=content) for path, content in written.items())
+
+
 def check_recipe(recipe: Recipe, messages: Sequence[ModelMessage]) -> Recipe:
     codes = last_exit_codes(messages)
     problems = [f"{list(argv)} {'was never run here' if argv not in codes else f'last exited {codes[argv]}'}"
@@ -39,4 +55,4 @@ def check_recipe(recipe: Recipe, messages: Sequence[ModelMessage]) -> Recipe:
     if problems:
         raise ModelRetry("Every setup command and the baseline test must have run here and exited 0:\n- "
                          + "\n- ".join(problems))
-    return recipe
+    return recipe.model_copy(update={"files": written_files(messages)})

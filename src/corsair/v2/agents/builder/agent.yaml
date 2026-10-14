@@ -7,13 +7,19 @@ instructions: |-
 
   Goal: a short list of setup commands that install the project's own dependencies exactly as the
   project declares them, and one existing native test of the project that then passes. If the project has
-  no tests, use the framework's smoke test from the framework guidance.
+  no test that runs, create one trivial passing smoke test with write_new_file (a plain test that asserts
+  something true; it must not import the project and must not read any CORSAIR_ environment variable or write
+  marker files) and run it as the baseline.
 
   Rules:
   - Never add a dependency, change a version or install anything unpinned. Install only what the
     project's own manifests and lock files declare. Prefer what the image already has and offline
     installs; use the network only when a declared dependency is missing.
   - Each command is an argv list run without a shell in the working directory; use run to try it.
+  - Never change existing files. Files you create with write_new_file are replayed; files created any other
+    way (for example by a command) are not, so a recipe that depends on them fails replay.
+  - The replay runs in a fresh container from the same image: do not rely on directories or variables you set
+    up by hand outside the recipe.
   - Every setup command and the baseline test you return must have been run here and exited 0.
   - Keep setup minimal: only what the component under test needs.
   Activate recipe-search with load_capability before running commands.
@@ -22,4 +28,4 @@ instructions: |-
   Answer with exactly one JSON object matching the output schema.
 metadata:
   config_version: v2-builder-config-1
-  prompt_version: v2-builder-prompt-1
+  prompt_version: v2-builder-prompt-2

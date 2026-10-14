@@ -97,9 +97,17 @@ class Runtime(Frozen):
 # --- 3. Build (Builder agent, then trusted replay) --------------------------------------------------------------
 
 
+class RecipeFile(Frozen):
+    """A small file the Builder added (a smoke test when the project has none); replay writes it before setup."""
+
+    path: SafePath
+    content: str = Field(max_length=16_000)
+
+
 class Recipe(Frozen):
     """A setup the Builder found, which trusted code replays in a fresh container before anything relies on it."""
 
+    files: tuple[RecipeFile, ...] = Field(default=(), max_length=4, description="New files, written before setup")
     setup: tuple[tuple[str, ...], ...] = Field(default=(), max_length=32, description="argv lists, run in order")
     network_during_setup: bool = False
     baseline_test: tuple[str, ...] = Field(min_length=1, description="argv of one existing native test, or smoke")
