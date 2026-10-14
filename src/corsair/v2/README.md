@@ -22,7 +22,8 @@ lives; it does not restate the design.
 Investigate runs before Build (amendment A1). After the drafts freeze, trusted code runs both probes once on the
 vulnerable revision as a mechanical check only (D3): it keeps `ok`, `not_run` or `errored` and discards the outcome.
 A `not_run` or `errored` author gets back only that class, a fixed hint and the row's optional syntax-check output,
-never the run's output, and revises once. The Reviewer then reviews the whole frozen pair, at most three times
+never the run's output, and corrects its draft; each correction is checked again, up to three corrections per
+author per draft version (`chain.MAX_MECHANICAL_FIXES`), stopping at the first `ok`. The Reviewer then reviews the whole frozen pair, at most three times
 (`chain.MAX_REVIEWS`): after a review, each author whose probe was judged invalid revises once from its own
 probe's review only (failed checks, at most four defects, cited lines into its own test or the source; never a run
 result or the other probe), the pair re-freezes, the D3 check re-runs on the changed draft and the pair is reviewed

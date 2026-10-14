@@ -10,15 +10,18 @@ the run keeps one of three results, each with a defined next step:
 
 - ``ok`` (any outcome other than not_run or errored; the outcome is discarded): the draft goes to review as is.
 - ``not_run`` or ``errored``: that author alone gets the class, a fixed hint and the row's syntax-check output
-  (never the run's output) and revises once (A2). The revision is not checked again; a failed revision keeps the original draft. Both drafts are then
-  re-frozen, and only that final patch is reviewed. Execute's own run of it is what Decide reads.
+  (never the run's output) and corrects its draft (A2). Each correction gets the syntax check and check run again,
+  up to ``MAX_MECHANICAL_FIXES`` corrections per author per draft version, stopping as soon as the check reads
+  ``ok``. A correction that returns no draft keeps the last draft and ends that author's corrections; a draft still
+  failing after the last correction goes on as is. Both drafts are then re-frozen, and only that final patch is
+  reviewed. Execute's own run of it is what Decide reads.
 
 Review loop (SPEC-0082): the Reviewer judges the whole frozen pair, at most ``MAX_REVIEWS`` times in total on the
 vulnerable revision (the first review plus re-reviews). After a review, each author whose probe was judged invalid
 revises once, fed only ``review_feedback`` of its own ``ProbeValidity`` (failed check names, at most
 ``FEEDBACK_DEFECTS`` defects, citations into its own test file or the source); never a run result, the other
 probe, Grounding or an oracle. The unrevised probe keeps its bytes; the pair re-freezes into a new digest, the D3
-check re-runs on each changed draft (with its own one correction), and the whole pair is reviewed again. A review
+check re-runs on each changed draft (with its own corrections), and the whole pair is reviewed again. A review
 revision that fails (no draft, or its own usage limit) keeps the previous draft and ends that author's revisions.
 Total-budget exhaustion inside the loop ends the loop. Nothing executes until both probes are valid on the latest
 review of the current digest; otherwise nothing runs and Decide reads R2 (``test_invalid``). The fixed revision is
@@ -73,6 +76,10 @@ LOG_TAIL = 4_000
 MAX_REVIEWS = 3
 """Reviews of the vulnerable revision per run: the first plus up to two re-reviews, so at most two review
 revisions per author. Operator-owned; every review and revision also spends the one total ``Budget``."""
+MAX_MECHANICAL_FIXES = 3
+"""D3 corrections per author per draft version (first drafts, and each review revision): each is followed by the
+syntax check and check run again, and the loop stops at the first ``ok``. Operator-owned; every correction also
+spends the one total ``Budget``."""
 FEEDBACK_DEFECTS = 4
 FEEDBACK_DEFECT_CHARS = 1_024
 CHECKS = tuple(name for name, field in ProbeValidity.model_fields.items() if field.annotation is bool and name != "valid")
@@ -451,6 +458,7 @@ class _Composition:
         self.fix_stopped: TerminalReason | None = None
         self.review_rounds = 0
         self.revisions: dict[str, int] = {}
+        self.mechanical_fixes: dict[str, int] = {}
         self.first_review_valid: dict[str, bool] = {}
 
     async def agent(self, start: Callable[[], Awaitable[StepResult]], *, stop_on_failure: bool = True
@@ -486,6 +494,7 @@ class _Composition:
                                         stopped.value if stopped else None,
                                         self.fix_stopped.value if self.fix_stopped else None)
         return verdict.model_copy(update={"review_rounds": self.review_rounds, "revisions": dict(self.revisions),
+                                          "mechanical_fixes": dict(self.mechanical_fixes),
                                           "first_review_valid": dict(self.first_review_valid)})
 
     async def steps(self) -> None:
@@ -630,33 +639,60 @@ class _Composition:
 
     async def check(self, environment: Environment, runtime: Runtime, plan: ProbePlan, drafts: dict[str, ProbeDraft],
                     roles: tuple[str, ...], round_: int = 0) -> FrozenPatch:
-        """Freeze, then the D3 check of ``roles``' drafts: a not_run or errored author gets one revision.
+        """Freeze, then the D3 check of ``roles``' drafts: a not_run or errored author corrects its draft, and each
+        correction is checked again, up to ``MAX_MECHANICAL_FIXES`` corrections, stopping at the first ``ok``.
 
-        Step names: ``diagnose-<role>`` and ``probe-<role>-revision`` for the first drafts, and
-        ``diagnose.<role>.r<n>`` and ``probe.<role>.r<n>.revision`` after review revision n.
+        Step names for the first drafts: ``diagnose-<role>``, then for correction k ``probe-<role>-revision`` (k=1)
+        or ``probe-<role>-revision.<k>`` and its check ``diagnose-<role>.<k>``. After review revision n the same
+        names are ``diagnose.<role>.r<n>``, ``probe.<role>.r<n>.revision[.<k>]`` and ``diagnose.<role>.r<n>.<k>``.
         """
-        ops, case = self.ops, self.case
-        briefs = {"control": plan.control, "exploit": plan.exploit}
+        ops = self.ops
         patch = freeze(drafts["control"], drafts["exploit"])
-        corrections: dict[str, str] = {}
+        failing: dict[str, str] = {}
         for role in roles:
-            step = f"diagnose.{role}.r{round_}" if round_ else f"diagnose-{role}"
-            diagnosis = (await self.code(ops.diagnose(step, environment, runtime, patch, role))).output
+            diagnosis = (await self.code(ops.diagnose(_diagnose_step(role, round_, 0), environment, runtime, patch,
+                                                      role))).output
             if diagnosis.check != "ok":
-                corrections[role] = diagnosis.diagnostics or ""
-        for role, diagnostics in corrections.items():
-            step = f"probe.{role}.r{round_}.revision" if round_ else f"probe-{role}-revision"
-            revised = (await self.agent(lambda: ops.probe(step, briefs[role], runtime, case, diagnostics,
-                                                          drafts[role]))).output
-            if revised is not None:  # a failed correction leaves the checked draft to be reviewed and run
-                drafts[role] = revised
-        return freeze(drafts["control"], drafts["exploit"]) if corrections else patch
+                failing[role] = diagnosis.diagnostics or ""
+        for role, diagnostics in failing.items():
+            await self.correct(environment, runtime, plan, drafts, role, diagnostics, round_)
+        return freeze(drafts["control"], drafts["exploit"]) if failing else patch
+
+    async def correct(self, environment: Environment, runtime: Runtime, plan: ProbePlan,
+                      drafts: dict[str, ProbeDraft], role: str, diagnostics: str, round_: int) -> None:
+        """Up to ``MAX_MECHANICAL_FIXES`` corrections of one author's failed draft, each checked again."""
+        ops, case = self.ops, self.case
+        brief = plan.control if role == "control" else plan.exploit
+        for k in range(1, MAX_MECHANICAL_FIXES + 1):
+            step = _correction_step(role, round_, k)
+            revised = (await self.agent(lambda: ops.probe(step, brief, runtime, case, diagnostics, drafts[role]))
+                       ).output
+            self.mechanical_fixes[role] = self.mechanical_fixes.get(role, 0) + 1
+            if revised is None:  # a failed correction leaves the last draft to be reviewed and run
+                return
+            drafts[role] = revised
+            patch = freeze(drafts["control"], drafts["exploit"])
+            diagnosis = (await self.code(ops.diagnose(_diagnose_step(role, round_, k), environment, runtime, patch,
+                                                      role))).output
+            if diagnosis.check == "ok":
+                return
+            diagnostics = diagnosis.diagnostics or ""
 
     async def execute(self, environment: Environment, runtime: Runtime, patch: FrozenPatch, revision: str) -> None:
         for role in ROLES:
             run = (await self.code(self.ops.execute(f"execute-{role}-{revision}", environment, runtime, patch, role,
                                                     revision))).output
             self.runs.append(run)
+
+
+def _diagnose_step(role: str, round_: int, k: int) -> str:
+    base = f"diagnose.{role}.r{round_}" if round_ else f"diagnose-{role}"
+    return f"{base}.{k}" if k else base
+
+
+def _correction_step(role: str, round_: int, k: int) -> str:
+    base = f"probe.{role}.r{round_}.revision" if round_ else f"probe-{role}-revision"
+    return f"{base}.{k}" if k > 1 else base
 
 
 def _both_valid(validity: Validity | None, patch: FrozenPatch) -> bool:
@@ -686,5 +722,5 @@ async def run_case(case: Case, *, stages: Stages, models: Mapping[str, Model], m
     return verdict
 
 
-__all__ = ["MAX_REVIEWS", "Budget", "Diagnosis", "LocalOps", "Replayed", "Stages", "StepResult", "compose",
-           "default_stages", "draft_digest", "freeze", "review_feedback", "run_case"]
+__all__ = ["MAX_MECHANICAL_FIXES", "MAX_REVIEWS", "Budget", "Diagnosis", "LocalOps", "Replayed", "Stages",
+           "StepResult", "compose", "default_stages", "draft_digest", "freeze", "review_feedback", "run_case"]

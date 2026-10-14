@@ -579,6 +579,11 @@ The Codex review of PR #134 found three gaps. All three are fixed in SPEC-0082, 
   - R4: vulnerable control passed and PoV passed, and the PoV did not also pass on the fixed revision, gives LIKELY\_EXPLOITABLE. R5: PoV assertion\_failed (not demonstrated) gives LIKELY\_NOT\_EXPLOITABLE with its calibration listed. A PoV that passes on both revisions gives INCONCLUSIVE (`not_differential`).
   - Fix verified: R4, and on the fixed revision the control passed and the PoV is assertion\_failed.
   - A passing test is easier to make vacuous, so the Reviewer also checks that the PoV assertion could fail on code without the condition.
+- **Proof-quality and scope decisions (14 October, D14 to D17).**
+  - **D14, scope is provability (Al, 09:33Z):** a finding is in scope when both probes can prove it inside the workspace, deterministically and with no outbound network, using local stand-ins such as a local server, a temporary file or an in-process double. The Investigator returns `unsupported_scope`, naming what is missing, only when proof needs something the workspace cannot supply: a real remote endpoint, the host trust store, a system-wide policy or a specific library build. There is no vulnerability-category list anywhere.
+  - **D15, counterfactual assertion:** the brief states `safe_observation`, what the test would see on a correct implementation, and the PoV assertion must be false there. Payload text echoed back in output, an argument list or a log is never proof.
+  - **D16, structure or effect:** input merely reaching a dependency is never proof, because correct code usually passes input on as data rather than rejecting it. The PoV must show the input crossing from data into structure, or into an effect it should not have.
+  - **D17, the Reviewer stays outcome-blind:** it judges whether each test is a valid experiment, never whether the code looks vulnerable. It must not call a PoV vacuous because the target looks safe, reject a control for not exercising the vulnerability, or steer an author toward what this code does.
 
 ### Later changes on 14 October
 

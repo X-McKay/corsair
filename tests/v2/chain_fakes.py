@@ -85,7 +85,8 @@ class Fakes:
     plan: ProbePlan | None = PLAN
     recipes: list[Recipe | None] = field(default_factory=lambda: [RECIPE])
     replays: list[bool] = field(default_factory=lambda: [True])
-    diagnose_outcomes: dict[str, str] = field(default_factory=dict)  # role -> ok, not_run or errored
+    # role -> ok, not_run or errored for every check of that role, or a list read in order (ok once it runs out)
+    diagnose_outcomes: dict[str, str | list[str]] = field(default_factory=dict)
     revised: dict[str, ProbeDraft | None] = field(default_factory=dict)
     rejections: dict[str, int] = field(default_factory=dict)  # role -> how many vulnerable reviews reject it first
     review_revised: dict[str, ProbeDraft | None] = field(default_factory=dict)  # role -> review revision output
@@ -149,6 +150,8 @@ class Fakes:
     def diagnose(self, environment, runtime, draft):
         self._log("diagnose", environment, runtime, draft)
         check = self.diagnose_outcomes.get(draft.role, "ok")
+        if isinstance(check, list):
+            check = check.pop(0) if check else "ok"
         return check, f"check: {check}\nhint: {draft.role} hint" if check != "ok" else None
 
     async def review(self, case, plan, patch, model, *, source_root, revision="vulnerable", runtime=None):

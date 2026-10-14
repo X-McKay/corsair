@@ -31,6 +31,7 @@ BASES = {
     'ruby31': 'docker.io/library/ruby@sha256:91627f55e8969006aab67d15c92fb930500ff73948803da1330b8a853fecebb5',
     'perl526': 'docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7',
     'node8': 'docker.io/library/node@sha256:c9025a77a42d87e95433337ac581c0d42810c1263f0e78802691046920d1560b',
+    'node22': 'docker.io/library/node@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392',
 }
 # Interpreter each Python toolchain directory is built for; its wheels are fetched hash-checked before an offline build.
 PYTHONS = {'python': 'python3.12', 'python37': 'python3.7'}
@@ -45,7 +46,7 @@ RUBY_RUN = ['/usr/bin/env', 'BUNDLE_FROZEN=true', '/usr/local/bin/bundle', 'exec
 PERLS = ('perl526',)
 TAP_TESTS = ('native_roundtrip', 'native_runtime')
 # Node toolchain directories; each fixture's package-lock.json pins every npm package by SHA-512 (SPEC-0055).
-NODES = ('node8',)
+NODES = ('node8', 'node22')
 NODE_TESTS = ('nativeRoundtrip', 'nativeRuntime')
 NPM = ('/usr/local/bin/node', '/usr/local/lib/node_modules/npm/bin/npm-cli.js', '--ignore-scripts', '--no-audit', '--no-update-notifier')
 JEST = ('/usr/local/bin/node', 'node_modules/jest/bin/jest.js', '--ci')

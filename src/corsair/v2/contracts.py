@@ -340,6 +340,8 @@ class Verdict(Frozen):
     review_rounds: int = Field(default=0, ge=0, description="Reviews of the vulnerable revision, first included")
     revisions: dict[Literal["control", "exploit"], int] = Field(
         default_factory=dict, description="Review revisions each author was asked for (D3 revisions not counted)")
+    mechanical_fixes: dict[Literal["control", "exploit"], int] = Field(
+        default_factory=dict, description="D3 corrections each author was asked for, over all its draft versions")
     first_review_valid: dict[Literal["control", "exploit"], bool] = Field(
         default_factory=dict, description="Each probe's validity at the first review; absent when that review did not bind "
                                   "or complete")

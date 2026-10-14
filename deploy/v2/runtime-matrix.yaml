@@ -24,13 +24,15 @@
 # the token): every row below classified pass -> passed (check safe) and fail -> assertion_failed (check unsafe)
 # with `uv run --locked python tools/v2_canary.py` under plain Docker (no network), and every declared
 # `syntax_check` accepted both canaries and rejected a broken copy. Image-only, not live.
+# 2026-10-14, later: the two Java rows moved to images rebuilt from their current sources (with the m2.sha256
+# check), node22's source was restored from commit aa417fc and its build reproduced the row's tag, and the java,
+# java8, node22 and ruby31 rows' canaries were rerun with the same results.
 schema_version: corsair-v2/runtime-matrix/1
 rows:
   - id: junit5-maven-temurin17
     language: java
-    # Built before the m2.sha256 check was added to the source (current source tag 109e2050ebebe84e). Its
-    # /opt/corsair-m2.sha256 equals the reviewed m2.sha256 as a set (only line order differs), checked 2026-10-14.
-    image: corsair-java:c7e6b24f0068035d
+    # Built by `make toolchain-images TOOLCHAINS=java` from the current source (with its m2.sha256 check).
+    image: corsair-java:109e2050ebebe84e
     base_image: docker.io/library/maven@sha256:5394efaabc436795b507ca400aaf86311db03543072e0e87ae66c595965d4aed
     image_source: deploy/qualification/toolchains/java
     framework: junit5
@@ -47,13 +49,14 @@ rows:
     evidence: image-only
     build_network_hosts: [repo.maven.apache.org, repo1.maven.org]
     canary_setup: [cp, -R, /opt/corsair-m2, .corsair-m2]
+    # Known gap (kept visible, not fixed): test-compile compiles the whole test tree, so an unrelated broken test
+    # file in the project makes a valid probe read not_run.
     syntax_check: [/usr/share/maven/bin/mvn, -B, -ntp, -o, -q, -Dmaven.repo.local=.corsair-m2, test-compile]
     note: Temurin 17, Maven 3.10.0, JUnit Jupiter 5.14.4 and Surefire 3.6.0 in the image's offline closure.
   - id: junit4-maven-temurin8
     language: java
-    # Built before the m2.sha256 check was added to the source (current source tag 996a570a7e03c327). Its
-    # /opt/corsair-m2.sha256 equals the reviewed m2.sha256 as a set (only line order differs), checked 2026-10-14.
-    image: corsair-java8:81777d352ab28226
+    # Built by `make toolchain-images TOOLCHAINS=java8` from the current source (with its m2.sha256 check).
+    image: corsair-java8:996a570a7e03c327
     base_image: docker.io/library/maven@sha256:f2cb52730ea0bde9dc8ba20e5e539d000dcdd7ab9e498d70c301fe04fbddb656
     image_source: deploy/qualification/toolchains/java8
     framework: junit4
@@ -68,6 +71,8 @@ rows:
     evidence: image-only
     build_network_hosts: [repo.maven.apache.org, repo1.maven.org]
     canary_setup: [cp, -R, /opt/corsair-m2, .corsair-m2]
+    # Known gap (kept visible, not fixed): test-compile compiles the whole test tree, so an unrelated broken test
+    # file in the project makes a valid probe read not_run.
     syntax_check: [/usr/share/maven/bin/mvn, -B, -ntp, -o, -q, -Dmaven.repo.local=.corsair-m2, test-compile]
     note: Temurin 8, Maven 3.10.0, JUnit 4.13.2 and Surefire 3.6.0 in the image's offline closure.
   - id: pytest-cpython312
@@ -100,7 +105,7 @@ rows:
     language: javascript
     image: corsair-node22:0d326e4d65c24e07
     base_image: docker.io/library/node@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392
-    image_source: deploy/qualification/toolchains/node22 (commit aa417fc, not on this branch)
+    image_source: deploy/qualification/toolchains/node22
     framework: jest
     skill: jest
     detect:
@@ -137,6 +142,8 @@ rows:
     evidence: image-only
     build_network_hosts: [cpan.metacpan.org, www.cpan.org, fastapi.metacpan.org]
     # No syntax_check: `perl -c` runs BEGIN blocks and `use` imports, which is application code.
+    # Known gap (kept visible, not fixed): a Perl draft is therefore checked only by the D3 check run, so its
+    # author gets the fixed hint and no compiler output.
     note: Perl 5.26.3 with core Test::More and prove; GNU Make 4.2.1.
   - id: minitest-ruby31
     language: ruby

@@ -25,21 +25,29 @@ def classify(facts: ProbeFacts) -> Outcome:
 
     | Exit class                                   | start | end | token | check    | Outcome              |
     | -------------------------------------------- | ----- | --- | ----- | -------- | -------------------- |
-    | timed out, no exit code, or harness_error    | any   | any | any   | any      | ``infra``            |
+    | timed out, or no exit code                   | any   | any | any   | any      | ``infra``            |
+    | harness_error                                | yes   | any | any   | any      | ``infra``            |
+    | harness_error                                | no    | any | any   | any      | ``not_run``          |
     | no_tests, or no ``start``                    | any   | any | any   | any      | ``not_run``          |
     | pass                                         | yes   | yes | no    | holds    | ``passed``           |
     | test_failed                                  | yes   | no  | yes   | violated | ``assertion_failed`` |
     | test_failed                                  | yes   | no  | no    | absent   | ``errored``          |
     | anything else                                |       |     |       |          | ``anomalous``        |
 
-    Infrastructure is read first: with no exit code, a timeout or a harness error there is nothing trustworthy to
-    read. ``errored`` means the test failed before reaching its assertion (no check written). ``anomalous`` covers,
+    Infrastructure is read first: with no exit code (a container failure) or a timeout there is nothing
+    trustworthy to read, whatever the markers say. A harness error is split by the start marker. Without it the
+    test body never started, which is what a collection, import or compile failure of the probe file looks like
+    (pytest, for example, exits 2 for those), so it reads ``not_run``: the author's mechanics, not the platform's.
+    With it the harness failed around a body that did run, so nothing in the run can be trusted: ``infra``.
+    ``errored`` means the test failed before reaching its assertion (no check written). ``anomalous`` covers,
     for example, an unknown exit code, a pass without ``end`` or with the token or a check other than ``holds``, a
     failure that left ``end`` behind, a token without a ``violated`` check, and a ``violated`` check without a token.
     """
     exit_class = facts.exit_class or ExitClass.UNKNOWN
-    if facts.timed_out or facts.exit_code is None or exit_class is ExitClass.HARNESS_ERROR:
+    if facts.timed_out or facts.exit_code is None:
         return Outcome.INFRA
+    if exit_class is ExitClass.HARNESS_ERROR:
+        return Outcome.INFRA if facts.start_marker else Outcome.NOT_RUN
     if exit_class is ExitClass.NO_TESTS or not facts.start_marker:
         return Outcome.NOT_RUN
     if (exit_class is ExitClass.PASS and facts.end_marker and not facts.token_in_output
