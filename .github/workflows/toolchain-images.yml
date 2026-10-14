@@ -3,11 +3,9 @@ name: Toolchain images (image-only)
 # Image-only tier (SPEC-0062): build each toolchain image a PR changes and run its trusted control in the container.
 # No cluster, no OpenShell: this is the evidence an `evidence: image-only` matrix row starts from, never sandbox
 # evidence. Real cases (tests/qualification/image_cases.py) are not run here until end-to-end runs exist (Al, 2026-10-13).
+# Deferred to a manual trigger with the other gates (Al, 2026-10-14) until end-to-end runs across languages and agent
+# baselines exist; run it from the Actions tab naming the image directories, or `make toolchain-images` locally.
 on:
-  pull_request:
-    paths:
-      - deploy/qualification/toolchains/**
-      - tests/qualification/prepare_toolchains.py
   workflow_dispatch:
     inputs:
       toolchains:
