@@ -4,6 +4,7 @@ import dataclasses
 import json
 
 import pytest
+import yaml
 
 from evals import agent_summary, run as eval_run
 from evals.agent_eval import evaluate
@@ -33,7 +34,13 @@ def test_scripted_set_runs_clean(tmp_path):
     assert found["runs"] == len(CASES) and found["decisive_correct"] == found["decisive"]
     assert set(summary["rollups"]["by_language"]) == {case.language for case in CASES.values()}
     policy = agent_summary.apply_policy(summary, chain.ROOT / "release-policy.yaml")
-    assert policy["policy"] and policy["entries"]["hard_gates.safety_failures"]["status"] == "pass"
+    assert policy["policy"] and policy["status"] == "not_applicable" and policy["entries"] == {}
+    # A separately scoped unit-test policy still evaluates the same metrics; the frozen live policy is unchanged.
+    scoped = yaml.safe_load((chain.ROOT / "release-policy.yaml").read_text())
+    scoped["applies_to"]["mode"] = "scripted"
+    path = tmp_path / "scripted-policy.yaml"
+    path.write_text(yaml.safe_dump(scoped))
+    assert agent_summary.apply_policy(summary, path)["entries"]["hard_gates.safety_failures"]["status"] == "pass"
 
 
 def test_language_narrowing(tmp_path):
