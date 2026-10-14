@@ -17,7 +17,7 @@ Corsair v2 validates one reported security issue against an exact revision, and 
 
 v2 keeps v1's contract:
 
-- Two native tests per investigated revision: a benign control and a security safety regression, both through the real application seam.
+- Two native tests per investigated revision: a benign control and a proof-of-vulnerability (PoV) test, both through the real application seam. The PoV test passes when it demonstrates the reported condition (Al, 2026-10-14).
 - One frozen patch, run on both revisions.
 - An outcome-blind validity review before execution.
 - The five labels: LIKELY_EXPLOITABLE, LIKELY_NOT_EXPLOITABLE, INCONCLUSIVE, UNABLE_TO_RUN and ERROR.
@@ -73,7 +73,7 @@ Each agent is self-contained under `src/corsair/v2/agents/<name>/`, holding `age
 | Investigator | Locate target and seam, form the conditional hypothesis, write the two briefs, declare the component | Read-only `read_file`, `list_files`, `search` | The ProbePlan validates and every citation resolves in the snapshot |
 | Builder | Find a setup that installs the project's own dependencies for the component and runs one existing native test | Shell in the build workspace (approved registries only), `read_file`, `list_files` | Trusted replay of its recipe in a fresh container passes the baseline test |
 | Control Prober | Write the benign control test from the control brief | `read_file`, `write_test_file` (own path only) | Its draft is frozen |
-| Exploit Prober | Write the security regression test from the exploit brief | `read_file`, `write_test_file` (own path only) | Its draft is frozen |
+| Exploit Prober | Write the proof-of-vulnerability test from the exploit brief: it asserts that the reported condition occurs | `read_file`, `write_test_file` (own path only) | Its draft is frozen |
 | Reviewer | Judge, without outcomes, whether each test calls the real target, exercises its condition, asserts a relevant property and keeps doubles to dependencies | Read-only access to the frozen inputs | Validity emitted per probe, with citations |
 
 The two probers are separate packages with separate evals and baselines. They share the probe-protocol skill, the framework skills, the test-file write tool and the draft contract. Each has its own AgentSpec, instructions, output check, budget and provider key. Neither ever sees the other's brief, draft or result.
@@ -131,8 +131,8 @@ Grounding:
 For each run, trusted code sets four environment variables: `CORSAIR_MARKER_START`, `CORSAIR_MARKER_CHECK` and `CORSAIR_MARKER_END` (paths inside the container) and `CORSAIR_TOKEN` (a fresh random string).
 
 - Each test writes the start marker as the first statement of its body and the end marker as the last, after its assertions.
-- Immediately before its security assertion, each test writes the check marker. It holds `safe` or `unsafe`, the value the assertion is about to test.
-- Each test puts the token in the failure message of the assertion that follows its check marker. For the exploit test that is the security assertion; for the control test it is the benign-behaviour assertion. The role, not the token, says which probe failed.
+- Immediately before its checked assertion, each test writes the check marker: `holds` when the property it is about to assert is true, `violated` when it is not. For the control the property is the benign behaviour; for the PoV test it is the reported condition.
+- Each test puts the token in the failure message of the assertion that follows its check marker. For the PoV test that is the assertion that the reported condition occurred; for the control test it is the benign-behaviour assertion. The role, not the token, says which probe failed.
 - Each probe runs alone, using the matrix row's run-one-test template filled with only the planned file and test name.
 - The container runtime gives the exit code, signal or timeout. The row's exit-code map sorts the code into `pass`, `test_failed`, `no_tests`, `harness_error` or `unknown`.
 
@@ -142,12 +142,22 @@ Rows are evaluated top to bottom, and the first match wins. Infrastructure exits
 | --- | --- | --- | --- | --- | --- |
 | harness_error, timeout, signal | any | any | any | any | infra |
 | no_tests, or no start marker | any | any | any | any | not_run |
-| pass | yes | safe | yes | no | passed |
-| test_failed | yes | unsafe | no | yes | assertion_failed |
+| pass | yes | holds | yes | no | passed |
+| test_failed | yes | violated | no | yes | assertion_failed |
 | test_failed | yes | absent | no | any | errored |
 | any other combination | | | | | anomalous |
 
 Only `passed` and `assertion_failed` are decisive.
+
+#### PoV polarity (Al, 2026-10-14)
+
+The exploit probe is a proof-of-vulnerability test in the sense of the DARPA Cyber Grand Challenge and Vul4J: it passes on the vulnerable revision and fails on the fixed one. A pass is positive proof that the reported condition occurs through the real seam. The classifier above does not change, because `passed` and `assertion_failed` already mean "the asserted property held" and "it did not". Only the rule table reads the PoV the other way round from the earlier security-regression form.
+
+A passing test is easier to make vacuous than a failing one: an assertion that is always true passes, and in this form it would read as LIKELY_EXPLOITABLE. Three checks carry that risk:
+
+- The Reviewer's `assertion_relevant` check also requires that the PoV assertion could fail on code without the reported condition. An assertion that holds whatever the target does is invalid (R2).
+- The check marker is written immediately before the asserting statement and the end marker only after it, so a test that passes without reaching the assertion reads as `anomalous`, not `passed`.
+- When a fixed revision is run, a PoV that also passes there gives INCONCLUSIVE (`not_differential`), not LIKELY_EXPLOITABLE. Only a decisive pass changes the label; an infrastructure or provider failure on the fixed revision still only makes the fix `not_verified`.
 
 A token in the output alone cannot attribute a failure, because the whole test process can read the token. The check marker is what does: an unrelated exception raised before the assertion leaves no check marker and reads as `errored`, even if repository code printed the token. Forging all three signals takes deliberate code in the test or the repository. The outcome-blind review reads the test, and the comparison across revisions covers the repository. That residual is recorded as a limitation, not hidden.
 
@@ -165,14 +175,14 @@ The label is a pure function of recorded facts. Rules are evaluated top to botto
 | R1 | Provider or infrastructure failure on the vulnerable revision: before any ProbeRun exists, or any vulnerable-revision probe whose outcome is `infra` | ERROR |
 | R2 | Review missing or negative for either probe on the vulnerable revision | INCONCLUSIVE (test_invalid) |
 | R3 | Vulnerable control not passed | INCONCLUSIVE (`control_failed` when the control's outcome is assertion_failed, otherwise the reason its outcome maps to) |
-| R4 | Vulnerable security assertion_failed | LIKELY_EXPLOITABLE |
-| R5 | Vulnerable security passed, with its calibration listed | LIKELY_NOT_EXPLOITABLE |
-| R6 | Anything else | INCONCLUSIVE (no_valid_observation) |
+| R4 | Vulnerable PoV passed, and the PoV did not also pass on the fixed revision | LIKELY_EXPLOITABLE |
+| R5 | Vulnerable PoV assertion_failed (the condition was not demonstrated), with its calibration listed | LIKELY_NOT_EXPLOITABLE |
+| R6 | Anything else | INCONCLUSIVE (`not_differential` when the PoV passed on both revisions, else as below) |
 
 Fix verification is a separate rule over the same facts. `verified` requires all of the following:
 
 - R4 on the vulnerable revision.
-- Control and security both passed on the fixed revision.
+- On the fixed revision, the control passed and the PoV is assertion_failed.
 - A positive review for the fixed revision.
 - The same frozen patch on both revisions.
 
@@ -180,7 +190,7 @@ Otherwise the result is `not_verified`, or `not_applicable` when there is no fix
 
 Calibration (a detector self-test or an ablation run) is recorded as calibration and never as proof of absence. `refuted_in_scope` stays disabled.
 
-The terminal reason comes from a closed enum: `ok`, `no_runtime`, `build_failed`, `plan_unresolved`, `unsupported_scope`, `probe_not_run`, `probe_errored`, `probe_anomalous`, `test_invalid`, `control_failed`, `no_valid_observation`, `budget_exhausted`, `provider_error`, `infra_error`, `cleanup_unconfirmed`. R3 and R6 take their terminal reason from the vulnerable-revision probes. R3 looks only at the control, R6 at both, checking `not_run` first, then `errored`, then `anomalous`:
+The terminal reason comes from a closed enum: `ok`, `no_runtime`, `build_failed`, `plan_unresolved`, `unsupported_scope`, `probe_not_run`, `probe_errored`, `probe_anomalous`, `test_invalid`, `control_failed`, `no_valid_observation`, `not_differential`, `budget_exhausted`, `provider_error`, `infra_error`, `cleanup_unconfirmed`. R3 and R6 take their terminal reason from the vulnerable-revision probes. R3 looks only at the control, R6 at both, checking `not_run` first, then `errored`, then `anomalous`:
 
 - `probe_not_run` when either probe was `not_run`.
 - `probe_errored` when either probe was `errored`.
@@ -302,6 +312,8 @@ The proposal's decisions and their status:
 | D7 | Reuse the verdict rule table, terminal reasons, per-stage replay and blinded runs from Al's InfoSec Harness v2 spec | Accepted with the build kickoff; Al also asked for the Grounding agent from that harness |
 | D8 | Deterministic outcome table with an exit-code map per framework and a canary pair per row | Al, 07:49Z |
 | D9 | Exactly two tests; native parametrisation inside a test is allowed | Accepted with the build kickoff |
+| D12 | The exploit probe is a proof-of-vulnerability test that passes when it demonstrates the reported condition (PoV polarity) | Decided by Al, 2026-10-14 09:17Z |
+| D13 | Reviewer feedback loop: three reviews in total, at most two review revisions per author | Decided by Al, 2026-10-14 09:09Z |
 
 "Accepted with the build kickoff" means Al started the build on this proposal without objecting to that decision. Any of them can be reopened.
 
