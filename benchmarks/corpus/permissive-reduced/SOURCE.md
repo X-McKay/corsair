@@ -36,8 +36,10 @@ SPDX licence, NVD CWE, pointer source and what the reduction removed.
 | cocoapods-git | ruby | CWE-88 | CocoaPods/cocoapods-downloader | CVE-2022-24440 | MIT |
 | pdfkit | ruby | CWE-78 | pdfkit/pdfkit | CVE-2022-25765 | MIT |
 | ruby-git-ls-files | ruby | CWE-94 | ruby-git/ruby-git | CVE-2022-46648 | MIT |
+| tomee | java | CWE-502 | apache/tomee | CVE-2015-8581 | Apache-2.0 |
+| plexus-utils | java | CWE-78 | codehaus-plexus/plexus-utils | CVE-2017-1000487 | Apache-2.0 |
 
 ## Pointer sources
 
 The CVE-to-commit pointers come from public vulnerability datasets used as metadata only (SecBench.js for
-JavaScript); none of those datasets' code is included. See each family's `provenance.json`.
+JavaScript, Vul4J for Java); none of those datasets' code is included. See each family's `provenance.json`.

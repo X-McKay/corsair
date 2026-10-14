@@ -122,6 +122,10 @@
     "ruby/ruby-git-ls-files-a": "a31e55185ad787244b8c34d9de33fc755a314fca682fbb8b3016b165857a05fb",
     "ruby/ruby-git-ls-files-b": "9c5ce82309cba2f6719eacb0bda915985240fd38167ee93d35c3377dba720e3c",
     "ruby/tzinfo-a": "b77b1d042d70aa8cfdd3a6c52a88b0aa04ebb77eb90c5320f78ea9d6a8287856",
-    "ruby/tzinfo-b": "fcdb6f941e5d57699b72a7080a1618305807f14c6f1bc215e179c71742a66359"
+    "ruby/tzinfo-b": "fcdb6f941e5d57699b72a7080a1618305807f14c6f1bc215e179c71742a66359",
+    "java/plexus-utils-a": "bb248be11c66aac23feacc8e681418859f3f8baf433c6866cea38c02bede7926",
+    "java/plexus-utils-b": "cf7c2c56d8f10cfc38119defb338e5430e78540264dd472f088f207e9cb182d7",
+    "java/tomee-a": "4a5f3ad8a43ce3461fbec40cccca9985078de6dbeca0ac6f837f5d5734cca5ea",
+    "java/tomee-b": "a6a4643cc14b8a0d35ce59dc0727abb72a22adc12ebd1f5a7bae53db8572dfbf"
   }
 }

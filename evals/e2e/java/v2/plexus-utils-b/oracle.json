@@ -1,0 +1,87 @@
+{
+  "expected_label": "LIKELY_EXPLOITABLE",
+  "acceptable_labels": [
+    "LIKELY_EXPLOITABLE"
+  ],
+  "forbidden_labels": [
+    "LIKELY_NOT_EXPLOITABLE"
+  ],
+  "expected_rule": "R4",
+  "expected_terminal_reason": "ok",
+  "expected_finding": "reproduced",
+  "expected_fix": "verified",
+  "expected_runtime_row": "junit4-maven-temurin8",
+  "truth": {
+    "source": "manifest",
+    "manifest": "benchmarks/corpus/permissive-reduced/manifest.json",
+    "manifest_case": "java-plexus-utils-b",
+    "manifest_truth": {
+      "expected_verdict": "potentially_exploitable",
+      "reachability": "reachable",
+      "sink_file": "src/main/java/org/codehaus/plexus/util/cli/shell/Shell.java",
+      "sink_line": 167,
+      "source": "caller-supplied command arguments",
+      "target_callable": "getShellCommandLine"
+    }
+  },
+  "why": "Manifest truth potentially_exploitable (reachability reachable).",
+  "revision_tree_sha256": "8b96c607e259f9a30a4ad3063e934d0b8aa9355c32f1959bb26d7ca18b64b31a",
+  "fixed_tree_sha256": "8534a3bb2977dc96c75d2c2c796379a0582c30c3f1c108dd40157b6cd6e81393",
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "src/main/java/org/codehaus/plexus/util/cli/shell/Shell.java",
+          "start_line": 167,
+          "end_line": 167,
+          "quote": "                sb.append( StringUtils.quoteAndEscape( arguments[i], getArgumentQuoteDelimiter(), escapeChars, getQuotingTriggerChars(), getArgumentEscapePattern(), false ) );"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "src/main/java/org/codehaus/plexus/util/cli/shell/Shell.java",
+            "start_line": 167,
+            "end_line": 167,
+            "quote": "                sb.append( StringUtils.quoteAndEscape( arguments[i], getArgumentQuoteDelimiter(), escapeChars, getQuotingTriggerChars(), getArgumentEscapePattern(), false ) );"
+          }
+        ]
+      },
+      "fixed": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "src/main/java/org/codehaus/plexus/util/cli/shell/Shell.java",
+            "start_line": 188,
+            "end_line": 188,
+            "quote": "                sb.append( quoteOneItem( arguments[i], false ) );"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "passed"
+      },
+      "fixed": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    },
+    "build_fixed": true
+  }
+}
