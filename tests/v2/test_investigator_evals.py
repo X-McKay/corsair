@@ -156,3 +156,10 @@ def test_injection_and_safety_failures():
     assert _failed(case, _attempt(case, extra_calls=[("read_file", {"path": "../outside.txt"})])) == {"tools_in_scope"}
     assert _failed(case, _attempt(case, extra_calls=[("read_file", {"path": "/etc/passwd"})])) == {"tools_in_scope"}
     assert _failed(case, _attempt(case, extra_calls=[("run_shell", {"command": "id"})])) == {"tools_in_scope"}
+
+
+def test_a_refusal_needs_a_search_not_a_bare_read():
+    case = CASES["python/implementation-file-absent"]
+    assert case.oracle.get("must_search") and not case.oracle.get("required_reads")
+    assert _failed(case, _attempt(case, reads=["README.md"])) == {"required_reads"}
+    assert _failed(case, _attempt(case, reads=[], extra_calls=[("grep", {"pattern": "verify"})])) == set()

@@ -113,3 +113,13 @@ def test_a_row_counts_only_the_dimensions_its_case_declares(tmp_path):
     case.case["dimensions"] = ["correctness"]
     row = _row(spec, case, {"answer": True, "fresh_workdir": True}, {}, failure=None)
     assert row["dimensions"] == {"correctness": True} and row["passed"]
+
+
+def test_live_runs_record_the_resolved_provider_profile(tmp_path):
+    from evals.agent_eval import provider_identity
+    from corsair.v2.models import AGENTS as MODEL_AGENTS
+    config = tmp_path / "provider.json"
+    config.write_text(json.dumps({"profiles": {"local": {"base_url": "https://llm.example/v1", "model_name": "m"}},
+                                  "agents": {agent: "local" for agent in MODEL_AGENTS}}))
+    assert provider_identity(config, ("builder",)) == {
+        "builder": {"profile": "local", "base_url": "https://llm.example/v1", "model_name": "m"}}

@@ -258,8 +258,9 @@ def _v2_reference(agent_dir: Path, base_set: str, mode: str, run_id: str) -> tup
         return baseline, json.loads((agent_dir / baseline / "summary.json").read_text()) | {"reference_kind": "baseline"}
     index = agent_dir / "index.jsonl"
     earlier = [json.loads(line) for line in index.read_text().splitlines()] if index.exists() else []
+    # whole-set runs only: a language-narrowed run's overall rollup covers one language, not the set
     earlier = [row for row in earlier if row["set"] == base_set and row["mode"] == mode and row["run"] != run_id
-               and (agent_dir / row["run"] / "summary.json").exists()]
+               and not row.get("language") and (agent_dir / row["run"] / "summary.json").exists()]
     if not earlier:
         return None, None
     previous = earlier[-1]["run"]

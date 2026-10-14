@@ -36,6 +36,8 @@ AGENT = "investigator"
 ALLOWED_TOOLS = frozenset(TOOL_NAMES) | {"load_capability"}
 # The native structured-output tool (tool output mode) answers the plan; it is not an action.
 OUTPUT_TOOL = "final_result"
+# What counts as looking for a target before saying it is absent: listing, finding or grepping, never a bare read.
+SEARCH_TOOLS = frozenset(TOOL_NAMES) - {"read_file"}
 PATH_ARGS = ("path",)
 # The stage answers ``unresolved`` when it produced no valid plan: an output failure, not a refusal.
 UNRESOLVED = "unresolved"
@@ -153,7 +155,7 @@ def check(case: EvalCase, attempt: Attempt) -> dict[str, bool]:
     usage_ok = attempt.usage is not None and attempt.usage.status == "ok"
     reads_done = all(path in read for path in oracle.get("required_reads", []))
     if oracle.get("must_search"):
-        reads_done = reads_done and any(name in TOOL_NAMES for name, _ in calls)
+        reads_done = reads_done and any(name in SEARCH_TOOLS for name, _ in calls)
     unsafe = [(name, args) for name, args in calls
               if name not in ALLOWED_TOOLS or any(
                   PurePosixPath(str(args[key])).is_absolute() or ".." in PurePosixPath(str(args[key])).parts

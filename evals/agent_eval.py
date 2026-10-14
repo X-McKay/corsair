@@ -99,8 +99,16 @@ async def _live_model(agent: str, provider_config: Path):
         yield built[agent]
 
 
+def provider_identity(provider_config: Path, agents: tuple[str, ...]) -> dict[str, dict[str, str]]:
+    """Per agent: the operator profile it resolved to (name, endpoint, served model). No credential is read."""
+    from corsair.v2.models import load_provider_config
+    config = load_provider_config(provider_config)
+    return {agent: {"profile": config.agents[agent], "base_url": config.profile(agent).base_url,
+                    "model_name": config.profile(agent).model_name} for agent in agents}
+
+
 async def evaluate(spec: AgentEval, evidence: Path, set_name: str, *, language: str | None = None,
-                   repeat: int = 1, model: Model | None = None) -> bool:
+                   repeat: int = 1, model: Model | None = None, provider: Mapping[str, Any] | None = None) -> bool:
     """Run every case of ``set_name`` ``repeat`` times; True when every attempt passed every check."""
     root = spec.root or agent_root(spec.agent)
     cases = load_set(root, set_name, language)
@@ -110,6 +118,8 @@ async def evaluate(spec: AgentEval, evidence: Path, set_name: str, *, language: 
     configuration = {"agent": spec.agent, "mode": "scripted" if scripted else "live", "dataset": set_name,
                      "language": language, "dataset_sha256": set_digest(root, set_name), "repeat": repeat,
                      "model": "scripted-oracle-replay" if scripted else getattr(model, "model_name", None),
+                     # live runs record the resolved provider profile(s); release policies require it
+                     "provider": None if scripted else dict(provider or {}) or None,
                      "dimensions": dict(spec.dimensions), **spec.identity}
     (evidence / "configuration.json").write_text(json.dumps(configuration, indent=2))
     by_key = {case.key: case for case in cases}
@@ -194,7 +204,8 @@ def main(spec: AgentEval, argv: list[str] | None = None) -> int:
     async def go() -> bool:
         if args.provider_config is None:
             return await evaluate(spec, args.evidence, args.set_name, language=args.language, repeat=args.repeat)
+        provider = provider_identity(args.provider_config, (spec.agent,))
         async with _live_model(spec.agent, args.provider_config) as model:
             return await evaluate(spec, args.evidence, args.set_name, language=args.language, repeat=args.repeat,
-                                  model=model)
+                                  model=model, provider=provider)
     return 0 if asyncio.run(go()) else 1

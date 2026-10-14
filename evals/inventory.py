@@ -21,7 +21,9 @@ SUITES = {"environment": "environment", "identification": "issue_identification"
           "authoring": "test_authoring", "assessment": "evidence_assessment", "e2e": "e2e",
           **{agent: agent_root(agent) for agent in AGENTS}}
 RETIRED = {("planning", "heldout"), ("planning", "heldout2"), ("assessment", "unit-v1")}
-PENDING = {("authoring", "breadth_pending"), ("assessment", "breadth_pending")}
+# a v2 agent set named `pending` waits on production behaviour and is outside every baseline
+PENDING = {("authoring", "breadth_pending"), ("assessment", "breadth_pending"),
+           *((agent, "pending") for agent in AGENTS)}
 # Issue requests run through `corsair run --issue-json`, not scored by `make eval`.
 REQUESTS = {("e2e", "corpus"), ("e2e", "corpus_negative")}
 
