@@ -7,7 +7,7 @@
       "language": "javascript",
       "finding": {
         "title": "Prototype pollution via property path in set()",
-        "repo_url": "javascript/dot-prop/a",
+        "repo_url": "eval-corpus/javascript/dot-prop/a",
         "revision": "HEAD",
         "file_path": "src/index.js",
         "start_line": 57,
@@ -31,7 +31,7 @@
       "language": "javascript",
       "finding": {
         "title": "Prototype pollution via property path in set()",
-        "repo_url": "javascript/dot-prop/b",
+        "repo_url": "eval-corpus/javascript/dot-prop/b",
         "revision": "HEAD",
         "file_path": "src/index.js",
         "start_line": 72,
@@ -55,7 +55,7 @@
       "language": "javascript",
       "finding": {
         "title": "Path traversal in static file request handler",
-        "repo_url": "javascript/angular-http-server/b",
+        "repo_url": "eval-corpus/javascript/angular-http-server/b",
         "revision": "HEAD",
         "file_path": "src/server.js",
         "start_line": 12,
@@ -79,7 +79,7 @@
       "language": "javascript",
       "finding": {
         "title": "Path traversal in static file request handler",
-        "repo_url": "javascript/angular-http-server/a",
+        "repo_url": "eval-corpus/javascript/angular-http-server/a",
         "revision": "HEAD",
         "file_path": "src/server.js",
         "start_line": 13,
@@ -103,7 +103,7 @@
       "language": "javascript",
       "finding": {
         "title": "Command injection in coverage file discovery",
-        "repo_url": "javascript/codecov-node/b",
+        "repo_url": "eval-corpus/javascript/codecov-node/b",
         "revision": "HEAD",
         "file_path": "src/codecov.js",
         "start_line": 9,
@@ -127,7 +127,7 @@
       "language": "javascript",
       "finding": {
         "title": "Command injection in coverage file discovery",
-        "repo_url": "javascript/codecov-node/a",
+        "repo_url": "eval-corpus/javascript/codecov-node/a",
         "revision": "HEAD",
         "file_path": "src/codecov.js",
         "start_line": 10,

@@ -17,7 +17,7 @@ Imported under the corpus-import thread (branch `claude/project-thread-a7mob0`),
 ## Layout
 
 `<language>/<family>/{a,b}/` — variant dirs `a` and `b`; the letter does not reveal which variant is vulnerable
-(recorded only in `manifest.json`). `manifest.json` is the evaluator-only answer key (one entry per variant) and
+(recorded only in `manifest.json`). `manifest.json` is the evaluator-only answer key (each entry's `finding.repo_url` uses the `eval-corpus/` prefix, the sentinel intake resolves against this manifest's own directory) (one entry per variant) and
 never enters an agent input. Each family has a `provenance.json` with its upstream repo, parent + fix commits,
 SPDX licence, NVD CWE, pointer source and what the reduction removed.
 
