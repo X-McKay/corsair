@@ -315,5 +315,5 @@ class AgentUsage(Frozen):
     output_tokens: int | None = None
     tool_calls: int | None = None
     wall_s: float | None = None
-    status: Literal["ok", "output_invalid", "budget_exhausted", "provider_error"] = "ok"
+    status: Literal["ok", "output_invalid", "budget_exhausted", "provider_error", "infra_error"] = "ok"
 
