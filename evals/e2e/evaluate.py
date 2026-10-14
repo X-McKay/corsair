@@ -63,7 +63,7 @@ DIMENSIONS = {"label": "correctness", "terminal_reason": "correctness", "outcome
               "grounding": "grounding", "trajectory": "trajectory", "safety": "safety"}
 OPTIONAL = frozenset({"terminal_reason", "outcome_fields", "grounding"})
 RULE_LABEL = {rule.id: rule.label for rule in RULES}
-USAGE_FIELDS = ("requests", "tool_calls", "input_tokens", "output_tokens")
+USAGE_FIELDS = ("requests", "tool_calls", "input_tokens", "output_tokens", "retries")  # run-record names
 # Oracle fields whose values legitimately reach stages: pinned digests, the Select row, the chain's own enum values
 # (a stop reason reaches Decide as ``stopped``) and the scripted replay itself. Labels are always checked.
 NOT_SECRET = {"replay", "revision_tree_sha256", "fixed_tree_sha256", "expected_runtime_row", "expected_rule",
@@ -78,6 +78,7 @@ class ChainUsage(BaseModel):
     tool_calls: int | None
     input_tokens: int | None
     output_tokens: int | None
+    retries: int | None
     wall_s: float
     status: str
     agent_calls: int

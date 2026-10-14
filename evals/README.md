@@ -42,8 +42,10 @@ PYTHONPATH=src:. python -m evals.run <agent> --set development --provider-config
 ```
 
 A run writes `command.json`, `attempts.jsonl`, `receipts/`, `summary.json` (schema `corsair-eval-summary/v1`:
-dimensions passed/total and latency, requests, tool calls and tokens, overall and by language and kind; a value the
-provider did not report is null, never zero; for labelled rows, the decisive rate, accuracy per label and abstention
+dimensions passed/total; `wall_s`, `requests`, `tool_calls`, `input_tokens`, `output_tokens`, `tokens` and `retries`;
+the parameters each agent ran with and status counts, overall and by language and kind. Names follow the run record
+`corsair-v2-run/1` ([RUN_RECORD.md](../src/corsair/v2/RUN_RECORD.md)): a value the provider did not report is null,
+never zero, and a total with an unknown in it is null; for labelled rows, the decisive rate, accuracy per label and abstention
 rates by terminal reason), `policy.json` (pass, fail, unknown or not_set per policy entry; gates are deferred, so it
 never changes the exit code) and `comparison.md` against the promoted baseline. A scripted run checks plumbing and
 oracle consistency only; baselines come from live runs.
