@@ -31,10 +31,13 @@ baseline-commit:
 # baseline-commit.
 eval-live-baselines:
 	@test -n "$(PROVIDER_CONFIG)" || { echo "PROVIDER_CONFIG is required"; exit 2; }
-	@for agent in $(or $(AGENTS),grounding investigator builder control_prober exploit_prober reviewer); do \
+	@failed=""; for agent in $(or $(AGENTS),grounding investigator builder control_prober exploit_prober reviewer); do \
+	  index=".runs/evals/$$agent/index.jsonl"; before=$$(cat "$$index" 2>/dev/null | wc -l); \
 	  uv run --locked python -m evals.run "$$agent" --provider-config "$(PROVIDER_CONFIG)" $(if $(NOTE),--note "$(NOTE)") || true; \
-	  tail -n 1 ".runs/evals/$$agent/index.jsonl"; \
-	done
+	  after=$$(cat "$$index" 2>/dev/null | wc -l); \
+	  if [ "$$after" -gt "$$before" ]; then tail -n +$$((before + 1)) "$$index"; \
+	  else echo "$$agent: no run recorded"; failed="$$failed $$agent"; fi; \
+	done; test -z "$$failed" || { echo "no run recorded for:$$failed"; exit 1; }
 
 # Classify each runtime-matrix row's known-passing and known-failing canary on its image (evidence under .runs/canary/).
 canary:

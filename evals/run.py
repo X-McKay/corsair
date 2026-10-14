@@ -265,8 +265,9 @@ def _v2_reference(agent_dir: Path, base_set: str, mode: str, run_id: str) -> tup
     """The promoted baseline for the base set and mode, else the latest earlier run of it; a language-narrowed run
     compares against that reference's language rollup, so no per-language baseline exists."""
     pointer = agent_dir / f"baseline-{base_set}-{mode}.json"
-    if pointer.exists():
-        baseline = json.loads(pointer.read_text())["run"]
+    baseline = json.loads(pointer.read_text())["run"] if pointer.exists() else None
+    # the pointer's run may have been pruned from .runs/; the committed baseline still stands
+    if baseline and (agent_dir / baseline / "summary.json").exists():
         return baseline, json.loads((agent_dir / baseline / "summary.json").read_text()) | {"reference_kind": "baseline"}
     committed = committed_baseline(agent_dir.name, base_set, mode)
     if committed is not None and committed.exists():
@@ -352,7 +353,9 @@ def commit_baseline(agent: str, run_id: str, results: Path = RESULTS) -> Path:
     identity = summary.get("identity") or {}
     if summary.get("language"):
         raise SystemExit("a language-narrowed run is not a baseline; commit a run of the whole set")
-    if summary.get("rollups") is None:
+    if summary.get("mode") != "live":
+        raise SystemExit(f"{run_id}: a {summary.get('mode')} run checks plumbing only; baselines come from live runs")
+    if not ((summary.get("rollups") or {}).get("all") or {}).get("attempts"):
         raise SystemExit(f"{run_id}: no attempts were reported; nothing to commit")
     if not identity.get("git_commit") or identity.get("git_dirty") is not False:
         raise SystemExit(f"{run_id}: ran from an unknown or dirty checkout; a baseline needs a clean commit")
