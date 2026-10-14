@@ -1,0 +1,27 @@
+# Corsair v2 local Docker development profile — unqualified.
+#
+# This policy is supplied by the operator at native sandbox creation.  It has
+# no provider profile, host mount, service exposure, forwarding, or egress
+# allowance.  Its effective loaded policy and runtime enforcement must still
+# be evidenced by a separate qualification certificate before Sandbox.qualified
+# can return true.
+version: 1
+filesystem_policy:
+  include_workdir: true
+  read_only:
+    - /bin
+    - /usr
+    - /lib
+    - /lib64
+    - /etc
+    - /proc
+    - /dev/urandom
+  read_write:
+    - /workspace
+    - /tmp
+landlock:
+  compatibility: hard_requirement
+process:
+  run_as_user: "1000"
+  run_as_group: "1000"
+network_policies: {}

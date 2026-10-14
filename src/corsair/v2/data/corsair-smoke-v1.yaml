@@ -1,0 +1,215 @@
+# SPDX-License-Identifier: Apache-2.0
+# Original Corsair-owned source-only wiring corpus. It is not an upstream benchmark.
+name: corsair-smoke-v1
+cases:
+  - name: corsair-smoke-v1/python-cwe22-vuln
+    inputs:
+      concern: Assess the supplied source for a security flaw.
+      files:
+        source/python-path.py: |-
+          import os
+          def read_file(root, user_path):
+              with open(os.path.join(root, user_path)) as handle:
+                  return handle.read()
+      language: python
+      framework: none
+      cwe: [CWE-22]
+    expected_output: vulnerable
+    metadata:
+      schema: corsair.benchmark-metadata.v2
+      input_kind: source
+      suite_id: corsair-smoke-v1
+      suite_kind: smoke
+      generated: true
+      promotion_eligible: false
+      split: public-dev
+      not_comparable_to_upstream: true
+      language: python
+      framework: none
+      cwe: [CWE-22]
+      source_digest: 86c8ede3e948bcc453a8411aad9053a1bfd48ee0c81ff8f28383ea07ef782a87
+      provenance: {license: Apache-2.0, origin: corsair-generated}
+  - name: corsair-smoke-v1/python-cwe78-safe
+    inputs:
+      concern: Assess the supplied source for a security flaw.
+      files:
+        source/python-command.py: |-
+          import subprocess
+          def convert(image):
+              return subprocess.run(["convert", image], check=True, shell=False)
+      language: python
+      framework: none
+      cwe: [CWE-78]
+    expected_output: safe_in_scope
+    metadata:
+      schema: corsair.benchmark-metadata.v2
+      input_kind: source
+      suite_id: corsair-smoke-v1
+      suite_kind: smoke
+      generated: true
+      promotion_eligible: false
+      split: public-dev
+      not_comparable_to_upstream: true
+      language: python
+      framework: none
+      cwe: [CWE-78]
+      source_digest: 77cfb8164421dede62308a30cdfca6259a7686c46863eee0c109a0335101050e
+      provenance: {license: Apache-2.0, origin: corsair-generated}
+  - name: corsair-smoke-v1/java-cwe22-vuln
+    inputs:
+      concern: Assess the supplied source for a security flaw.
+      files:
+        source/java-path.java: |-
+          import java.io.File;
+          class Reader {
+              String file(String root, String userPath) { return new File(root, userPath).getPath(); }
+          }
+      language: java
+      framework: none
+      cwe: [CWE-22]
+    expected_output: vulnerable
+    metadata:
+      schema: corsair.benchmark-metadata.v2
+      input_kind: source
+      suite_id: corsair-smoke-v1
+      suite_kind: smoke
+      generated: true
+      promotion_eligible: false
+      split: public-dev
+      not_comparable_to_upstream: true
+      language: java
+      framework: none
+      cwe: [CWE-22]
+      source_digest: 6ed96c917c4906276084c2e99e62a67db2adca387f6af15c116b8da30aeaffe6
+      provenance: {license: Apache-2.0, origin: corsair-generated}
+  - name: corsair-smoke-v1/java-cwe78-safe
+    inputs:
+      concern: Assess the supplied source for a security flaw.
+      files:
+        source/java-command.java: |-
+          import java.util.List;
+          class Convert {
+              ProcessBuilder command(String image) { return new ProcessBuilder(List.of("convert", image)); }
+          }
+      language: java
+      framework: none
+      cwe: [CWE-78]
+    expected_output: safe_in_scope
+    metadata:
+      schema: corsair.benchmark-metadata.v2
+      input_kind: source
+      suite_id: corsair-smoke-v1
+      suite_kind: smoke
+      generated: true
+      promotion_eligible: false
+      split: public-dev
+      not_comparable_to_upstream: true
+      language: java
+      framework: none
+      cwe: [CWE-78]
+      source_digest: b717697aa4d7c33c12855ac1e778914e2a9dc14d035f70489b9decba3295c563
+      provenance: {license: Apache-2.0, origin: corsair-generated}
+  - name: corsair-smoke-v1/javascript-cwe22-vuln
+    inputs:
+      concern: Assess the supplied source for a security flaw.
+      files:
+        source/js-path.js: |-
+          const path = require("path");
+          function load(root, userPath) { return path.join(root, userPath); }
+          module.exports = { load };
+      language: javascript
+      framework: none
+      cwe: [CWE-22]
+    expected_output: vulnerable
+    metadata:
+      schema: corsair.benchmark-metadata.v2
+      input_kind: source
+      suite_id: corsair-smoke-v1
+      suite_kind: smoke
+      generated: true
+      promotion_eligible: false
+      split: public-dev
+      not_comparable_to_upstream: true
+      language: javascript
+      framework: none
+      cwe: [CWE-22]
+      source_digest: 223b986d55f11bacdf59041982efa713d10695ff0d0cd686b508523126e74955
+      provenance: {license: Apache-2.0, origin: corsair-generated}
+  - name: corsair-smoke-v1/javascript-cwe78-safe
+    inputs:
+      concern: Assess the supplied source for a security flaw.
+      files:
+        source/js-command.js: |-
+          const { spawn } = require("child_process");
+          function convert(image) { return spawn("convert", [image], { shell: false }); }
+          module.exports = { convert };
+      language: javascript
+      framework: none
+      cwe: [CWE-78]
+    expected_output: safe_in_scope
+    metadata:
+      schema: corsair.benchmark-metadata.v2
+      input_kind: source
+      suite_id: corsair-smoke-v1
+      suite_kind: smoke
+      generated: true
+      promotion_eligible: false
+      split: public-dev
+      not_comparable_to_upstream: true
+      language: javascript
+      framework: none
+      cwe: [CWE-78]
+      source_digest: 29e09199ac771f07e1542358d5927295490c6e2ec6026543974b8cc322aa0185
+      provenance: {license: Apache-2.0, origin: corsair-generated}
+  - name: corsair-smoke-v1/c-cwe22-vuln
+    inputs:
+      concern: Assess the supplied source for a security flaw.
+      files:
+        source/c-path.c: |-
+          #include <stdio.h>
+          void load(const char *name) { FILE *file = fopen(name, "r"); if (file) fclose(file); }
+      language: c
+      framework: none
+      cwe: [CWE-22]
+    expected_output: vulnerable
+    metadata:
+      schema: corsair.benchmark-metadata.v2
+      input_kind: source
+      suite_id: corsair-smoke-v1
+      suite_kind: smoke
+      generated: true
+      promotion_eligible: false
+      split: public-dev
+      not_comparable_to_upstream: true
+      language: c
+      framework: none
+      cwe: [CWE-22]
+      source_digest: 5db9abdfa6ef38f7f9439ed1fd80caa1a1ff718a9522cd1436e5b8d101e7d1c8
+      provenance: {license: Apache-2.0, origin: corsair-generated}
+  - name: corsair-smoke-v1/c-cwe78-safe
+    inputs:
+      concern: Assess the supplied source for a security flaw.
+      files:
+        source/c-command.c: |-
+          #include <unistd.h>
+          void convert(const char *file) { char *args[] = {"convert", (char *)file, 0}; execvp(args[0], args); }
+      language: c
+      framework: none
+      cwe: [CWE-78]
+    expected_output: safe_in_scope
+    metadata:
+      schema: corsair.benchmark-metadata.v2
+      input_kind: source
+      suite_id: corsair-smoke-v1
+      suite_kind: smoke
+      generated: true
+      promotion_eligible: false
+      split: public-dev
+      not_comparable_to_upstream: true
+      language: c
+      framework: none
+      cwe: [CWE-78]
+      source_digest: dbed2108fecdb7cd320e35e40a6f2ee065bfab5d76bc42786cc9ccb4d923feb5
+      provenance: {license: Apache-2.0, origin: corsair-generated}
+evaluators: []
+report_evaluators: []

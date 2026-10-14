@@ -13,7 +13,10 @@ def main(argv: list[str] | None = None) -> int:
     if argv[0] == "run":
         from corsair.investigate import main as run
         return run(argv[1:], prog="corsair run")
-    print(f"corsair: unknown command {argv[0]!r}; commands: run", file=sys.stderr)
+    if argv[0] == "v2":
+        from corsair.v2.cli import main as v2
+        return v2(argv[1:])
+    print(f"corsair: unknown command {argv[0]!r}; commands: run, v2", file=sys.stderr)
     return 2
 
 
