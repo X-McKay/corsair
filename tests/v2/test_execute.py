@@ -26,7 +26,7 @@ def draft(role: str, holds: str, test_file: str = "tests/corsair/test_probe.py",
               "    open(marker + '/start', 'w').close()\n"
               f"    {before}\n"
               f"    holds = {holds}\n"
-              "    open(marker + '/check', 'w').write('safe' if holds else 'unsafe')\n"
+              "    open(marker + '/check', 'w').write('holds' if holds else 'violated')\n"
               "    assert holds, os.environ['CORSAIR_TOKEN']\n"
               "    open(marker + '/end', 'w').close()\n")
     return ProbeDraft(role=role, test_file=test_file, test_name=name, source=source)
@@ -64,13 +64,13 @@ def facts(exit_code, cls, start, end=False, token=False, check=None, timed_out=F
 
 @pytest.mark.parametrize(("seen", "expected"), [
     (facts(5, ExitClass.NO_TESTS, False), ("not_run", "not discovered")),
-    (facts(5, ExitClass.NO_TESTS, True, True, False, "safe"), ("not_run", "not discovered")),
+    (facts(5, ExitClass.NO_TESTS, True, True, False, "holds"), ("not_run", "not discovered")),
     (facts(2, ExitClass.HARNESS_ERROR, False), ("not_run", "harness error")),
     (facts(1, ExitClass.TEST_FAILED, False), ("not_run", "body did not start")),
     (facts(0, ExitClass.PASS, False, True), ("not_run", "body did not start")),
     (facts(1, ExitClass.TEST_FAILED, True), ("errored", "raised before the check marker")),
-    (facts(0, ExitClass.PASS, True, True, False, "safe"), ("ok", None)),
-    (facts(1, ExitClass.TEST_FAILED, True, False, True, "unsafe"), ("ok", None)),
+    (facts(0, ExitClass.PASS, True, True, False, "holds"), ("ok", None)),
+    (facts(1, ExitClass.TEST_FAILED, True, False, True, "violated"), ("ok", None)),
     (facts(0, ExitClass.PASS, True, False), ("ok", None)),  # anomalous: discarded like any other outcome
     (facts(2, ExitClass.HARNESS_ERROR, True), ("ok", None)),  # infra after the body started
     (facts(None, None, True, timed_out=True), ("ok", None)),
@@ -85,9 +85,9 @@ def _environment():
 
 @pytest.mark.parametrize(("seen", "result"), [
     (facts(1, ExitClass.TEST_FAILED, True), "errored"), (facts(5, ExitClass.NO_TESTS, False), "not_run"),
-    (facts(0, ExitClass.PASS, True, True, False, "safe"), "ok"),
-    (facts(1, ExitClass.TEST_FAILED, True, False, True, "unsafe"), "ok"),
-    (facts(0, ExitClass.PASS, True, True, True, "safe"), "ok"), (facts(None, None, False), "ok")])
+    (facts(0, ExitClass.PASS, True, True, False, "holds"), "ok"),
+    (facts(1, ExitClass.TEST_FAILED, True, False, True, "violated"), "ok"),
+    (facts(0, ExitClass.PASS, True, True, True, "holds"), "ok"), (facts(None, None, False), "ok")])
 def test_diagnose_never_returns_run_output(monkeypatch, seen, result):
     token = "f" * 32
     output = f"ImportError in tests/corsair/test_probe.py line 3: application said {token} secret".encode()
@@ -126,13 +126,13 @@ def test_probe_pair_end_to_end(environment, tmp_path):
     failed = execute.run_probe(environment, RUNTIME, patch, "exploit", run_id=run_id, artifacts=tmp_path)
     assert failed.facts.exit_code == 1 and failed.facts.exit_class is ExitClass.TEST_FAILED
     assert failed.facts.start_marker and not failed.facts.end_marker and failed.facts.token_in_output
-    assert failed.facts.check_marker == "unsafe"
+    assert failed.facts.check_marker == "violated"
     assert failed.outcome is Outcome.ASSERTION_FAILED and failed.cleanup_confirmed
     assert failed.duration_s is not None and failed.output is not None and failed.patch_sha256 == patch.sha256
 
     passed = execute.run_probe(environment, RUNTIME, patch, "control", run_id=run_id, artifacts=tmp_path)
     assert passed.facts.exit_code == 0 and passed.facts.start_marker and passed.facts.end_marker
-    assert not passed.facts.token_in_output and passed.facts.check_marker == "safe"
+    assert not passed.facts.token_in_output and passed.facts.check_marker == "holds"
     assert passed.outcome is Outcome.PASSED
     output = (tmp_path / passed.output.sha256[:2] / passed.output.sha256).read_bytes()
     assert b"1 passed" in output
@@ -141,7 +141,7 @@ def test_probe_pair_end_to_end(environment, tmp_path):
     bad_control = draft("control", "parse('plain') == 'other'", test_file="tests/corsair/test_control.py")
     run = execute.run_probe(environment, RUNTIME, frozen(bad_control, exploit), "control", run_id=run_id,
                             artifacts=tmp_path)
-    assert run.outcome is Outcome.ASSERTION_FAILED and run.facts.check_marker == "unsafe"
+    assert run.outcome is Outcome.ASSERTION_FAILED and run.facts.check_marker == "violated"
     assert docker("ps", "-a", "--filter", f"label=corsair.v2.run={run_id}", "--format", "{{.Names}}").stdout == b""
 
 

@@ -5,7 +5,7 @@ class CanaryTest < Minitest::Test
     File.write(File.join(ENV.fetch('CORSAIR_MARKER_DIR'), 'start'), '')
     total = 1 + 1
     holds = total == 3
-    File.write(File.join(ENV.fetch('CORSAIR_MARKER_DIR'), 'check'), holds ? 'safe' : 'unsafe')
+    File.write(File.join(ENV.fetch('CORSAIR_MARKER_DIR'), 'check'), holds ? 'holds' : 'violated')
     assert holds, ENV.fetch('CORSAIR_TOKEN')
     File.write(File.join(ENV.fetch('CORSAIR_MARKER_DIR'), 'end'), '')
   end

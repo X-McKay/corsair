@@ -40,7 +40,7 @@ workflow per case on three task queues: `model` (one slot), `workspace` and `con
 - No branch on language, framework, CWE, issue, CVE, corpus id, repository, fixture or verdict. Language knowledge
   lives only in matrix rows (`deploy/v2/runtime-matrix.yaml`), framework skills (`skills/frameworks/<name>/`) and
   guidance text.
-- Exactly two probes per investigated revision: a benign control and a security regression. Native
+- Exactly two probes per investigated revision: a benign control and a proof-of-vulnerability (PoV) test. Native
   parametrisation inside one test is allowed (D9).
 - The label comes from the rule table over recorded facts (D4). No model runs after execution.
 - A probe's outcome comes from the exit-code map, the `start`, `check` and `end` marker files and the per-run token

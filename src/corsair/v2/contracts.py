@@ -189,8 +189,8 @@ class ProbeDraft(Frozen):
     @field_validator("source")
     @classmethod
     def _markers(cls, value: str) -> str:
-        # D8 marker protocol: the test writes the files ``start`` (first statement), ``check`` (``safe`` or
-        # ``unsafe``, immediately before its main assertion) and ``end`` (last, after its assertions) inside the
+        # D8 marker protocol: the test writes the files ``start`` (first statement), ``check`` (``holds`` or
+        # ``violated``, immediately before its main assertion) and ``end`` (last, after its assertions) inside the
         # directory named by the CORSAIR_MARKER_DIR environment variable.
         if "CORSAIR_MARKER_DIR" not in value:
             raise ValueError("a probe must write the start, check and end marker files under $CORSAIR_MARKER_DIR")
@@ -251,9 +251,9 @@ class ProbeFacts(Frozen):
     start_marker: bool
     end_marker: bool
     token_in_output: bool
-    check_marker: Literal["safe", "unsafe"] | None = Field(
+    check_marker: Literal["holds", "violated"] | None = Field(
         default=None, description="Content of the check file the test writes before its main assertion; None when "
-                                  "absent or not exactly safe/unsafe after stripping whitespace")
+                                  "absent or not exactly holds/violated after stripping whitespace")
 
 
 class ProbeRun(Frozen):
@@ -291,6 +291,7 @@ class TerminalReason(StrEnum):
     TEST_INVALID = "test_invalid"
     CONTROL_FAILED = "control_failed"
     NO_VALID_OBSERVATION = "no_valid_observation"
+    NOT_DIFFERENTIAL = "not_differential"
     BUDGET_EXHAUSTED = "budget_exhausted"
     PROVIDER_ERROR = "provider_error"
     INFRA_ERROR = "infra_error"

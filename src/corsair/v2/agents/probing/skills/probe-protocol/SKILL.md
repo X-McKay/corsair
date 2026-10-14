@@ -8,23 +8,33 @@ Trusted code runs your test alone, exactly once, with the framework's own runner
 exit code, three marker files, and whether the run token appears in the output. It never parses a report. Both
 probes, control and exploit, follow the same rules.
 
+Each probe asserts one property, and the test passes when that property is true:
+
+- the control asserts the ordinary behaviour a correct implementation keeps;
+- the exploit is a proof-of-vulnerability (PoV) test: it asserts that the reported condition OCCURS (for example
+  the injected command ran, the path escaped, the query structure changed), so it passes when the issue is real.
+
 ## Markers
 
 The environment variable `CORSAIR_MARKER_DIR` names a directory that exists when the test runs.
 
 - The FIRST statement of the test body creates a file named `start` in that directory (content does not matter).
-- IMMEDIATELY BEFORE the main assertion, the test writes a file named `check` whose content is `safe` when the
-  asserted property holds and `unsafe` when it does not. Compute it from the very same condition the assertion
-  checks: evaluate the condition once into a variable, write `check` from that variable, then assert that
-  variable. Never hard-code `safe` or `unsafe`, and never compute `check` from anything else.
+- IMMEDIATELY BEFORE the main assertion (the one statement that asserts the probe's property), the test writes
+  a file named `check` whose content is `holds` when the property about to be asserted is true and `violated`
+  when it is not. For the exploit, `holds` means the reported condition occurred. Compute it from the very same
+  condition the assertion checks: evaluate the condition once into a variable, write `check` from that variable,
+  then assert that variable. Never hard-code `holds` or `violated`, and never compute `check` from anything else.
 - The LAST statement of the test body, after every assertion, creates a file named `end` (content does not
   matter).
 - Write them inside the test body itself, not in a fixture, setup or teardown hook, helper class or module-level
-  code, and not inside a guard, loop or exception handler. Use the language's standard library.
+  code, and not inside a loop or exception handler. Use the language's standard library. Where the framework skill
+  shows a sanctioned form (for example a guarded `end` in a framework that keeps running after a failed
+  assertion), follow it exactly.
 - Nothing that can fail goes before `start`. Nothing goes after `end`.
 
-So `start` without `check` means the body began but raised before reaching its assertion; `check` = `unsafe`
-without `end` means the assertion failed; no `start` means the test never ran.
+So `start` without `check` means the body began but raised before reaching its assertion; `check` = `violated`
+without `end` means the assertion failed; `check` = `holds` with `end` means it held; no `start` means the test
+never ran. A test that passes without reaching its assertion leaves no `check` and never counts as a pass.
 
 ## Token
 

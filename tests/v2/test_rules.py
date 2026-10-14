@@ -1,4 +1,7 @@
-"""The Decide rule table: one table-driven case per rule and terminal reason, then fix verification and origins."""
+"""The Decide rule table: one table-driven case per rule and terminal reason, then fix verification and origins.
+
+The exploit probe is a proof-of-vulnerability test (SPEC-0082 D12): ``passed`` on the vulnerable revision means the
+reported condition was demonstrated."""
 import pytest
 
 from corsair.v2.contracts import (BuildResult, Case, Citation, ExitClass, Finding, Label, Origin, Outcome, ProbeBrief,
@@ -42,7 +45,7 @@ def run(role, outcome, revision="vulnerable", patch=PATCH):
     return ProbeRun(role=role, revision=revision, patch_sha256=patch, facts=facts, outcome=Outcome(outcome))
 
 
-def runs(control="passed", exploit="assertion_failed", revision="vulnerable", patch=PATCH):
+def runs(control="passed", exploit="passed", revision="vulnerable", patch=PATCH):
     return tuple(r for r in (control and run("control", control, revision, patch),
                              exploit and run("exploit", exploit, revision, patch)) if r)
 
@@ -100,8 +103,18 @@ CASES = [
     ("control missing", full(runs=runs(control=None)),
      ("R3", Label.INCONCLUSIVE, T.PROBE_NOT_RUN, "inconclusive")),
     ("reproduced", full(), ("R4", Label.LIKELY_EXPLOITABLE, T.OK, "reproduced")),
-    ("not reproduced", full(runs=runs(exploit="passed")),
+    ("not reproduced", full(runs=runs(exploit="assertion_failed")),
      ("R5", Label.LIKELY_NOT_EXPLOITABLE, T.OK, "not_reproduced")),
+    ("PoV passed on both revisions", full(runs=runs() + runs(control="passed", exploit="passed", revision="fixed")),
+     ("R6", Label.INCONCLUSIVE, T.NOT_DIFFERENTIAL, "inconclusive")),
+    ("PoV passed on the fix with a failing fixed control",
+     full(runs=runs() + runs(control="assertion_failed", exploit="passed", revision="fixed")),
+     ("R6", Label.INCONCLUSIVE, T.NOT_DIFFERENTIAL, "inconclusive")),
+    ("fixed PoV errored keeps the label", full(runs=runs() + runs(exploit="errored", revision="fixed")),
+     ("R4", Label.LIKELY_EXPLOITABLE, T.OK, "reproduced")),
+    ("fixed PoV on another patch never reaches the label",
+     full(runs=runs() + runs(exploit="passed", revision="fixed", patch=OTHER)),
+     ("R4", Label.LIKELY_EXPLOITABLE, T.OK, "reproduced")),
     ("exploit anomalous", full(runs=runs(exploit="anomalous")),
      ("R6", Label.INCONCLUSIVE, T.PROBE_ANOMALOUS, "inconclusive")),
     ("exploit not run", full(runs=runs(exploit="not_run")),
@@ -110,8 +123,7 @@ CASES = [
      ("R6", Label.INCONCLUSIVE, T.PROBE_ERRORED, "inconclusive")),
     ("exploit missing", full(runs=runs(exploit=None)),
      ("R6", Label.INCONCLUSIVE, T.PROBE_NOT_RUN, "inconclusive")),
-    ("exploit run on another patch", full(runs=(run("control", "passed"), run("exploit", "assertion_failed",
-                                                                              patch=OTHER))),
+    ("exploit run on another patch", full(runs=(run("control", "passed"), run("exploit", "passed", patch=OTHER))),
      ("R6", Label.INCONCLUSIVE, T.PROBE_NOT_RUN, "inconclusive")),
     ("other stop falls through to evidence", full(stopped="probe_errored", runs=runs(exploit="errored")),
      ("R6", Label.INCONCLUSIVE, T.PROBE_ERRORED, "inconclusive")),
@@ -120,7 +132,8 @@ CASES = [
     ("R1 outranks a decisive run", full(stopped="infra_error"), ("R1", Label.ERROR, T.INFRA_ERROR, "none")),
     ("fix stop never reaches the label", full(fix_stopped="infra_error"),
      ("R4", Label.LIKELY_EXPLOITABLE, T.OK, "reproduced")),
-    ("fixed infra run never reaches the label", full(runs=runs() + runs(control="infra", revision="fixed")),
+    ("fixed infra run never reaches the label",
+     full(runs=runs() + runs(control="infra", exploit="assertion_failed", revision="fixed")),
      ("R4", Label.LIKELY_EXPLOITABLE, T.OK, "reproduced")),
 ]
 
@@ -142,7 +155,7 @@ def test_every_rule_is_covered_and_ids_are_unique():
 def fixed(**changes):
     kwargs = full()
     kwargs["validity"] = (review(), review("fixed"))
-    kwargs["runs"] = runs() + runs(exploit="passed", revision="fixed")
+    kwargs["runs"] = runs() + runs(exploit="assertion_failed", revision="fixed")
     kwargs.update(changes)
     return kwargs
 
@@ -154,11 +167,11 @@ FIX_CASES = [
      T.TEST_INVALID),
     ("fixed review other patch", fixed(validity=(review(), review("fixed", patch=OTHER))), "not_verified",
      T.TEST_INVALID),
-    ("still fails on fix", fixed(runs=runs() + runs(exploit="assertion_failed", revision="fixed")), "not_verified",
-     T.NO_VALID_OBSERVATION),
-    ("fixed control errored", fixed(runs=runs() + runs(control="errored", exploit="passed", revision="fixed")),
-     "not_verified", T.PROBE_ERRORED),
-    ("fixed control assertion failed", fixed(runs=runs() + runs(control="assertion_failed", exploit="passed",
+    ("PoV still passes on the fix", fixed(runs=runs() + runs(exploit="passed", revision="fixed")), "not_verified",
+     T.NOT_DIFFERENTIAL),
+    ("fixed control errored", fixed(runs=runs() + runs(control="errored", exploit="assertion_failed",
+                                                         revision="fixed")), "not_verified", T.PROBE_ERRORED),
+    ("fixed control assertion failed", fixed(runs=runs() + runs(control="assertion_failed", exploit="assertion_failed",
                                                                 revision="fixed")), "not_verified", T.CONTROL_FAILED),
     ("fixed exploit anomalous", fixed(runs=runs() + runs(exploit="anomalous", revision="fixed")), "not_verified",
      T.PROBE_ANOMALOUS),
@@ -168,17 +181,21 @@ FIX_CASES = [
     ("errored outranks anomalous", fixed(runs=runs() + runs(control="anomalous", exploit="errored",
                                                              revision="fixed")), "not_verified", T.PROBE_ERRORED),
     ("fixed runs missing", fixed(runs=runs()), "not_verified", T.PROBE_NOT_RUN),
-    ("fixed runs other patch", fixed(runs=runs() + runs(exploit="passed", revision="fixed", patch=OTHER)),
+    ("fixed runs other patch", fixed(runs=runs() + runs(exploit="assertion_failed", revision="fixed", patch=OTHER)),
      "not_verified", T.PROBE_NOT_RUN),
-    ("fixed infra run", fixed(runs=runs() + runs(control="infra", revision="fixed")), "not_verified",
-     T.INFRA_ERROR),
+    ("fixed infra run", fixed(runs=runs() + runs(control="infra", exploit="assertion_failed", revision="fixed")),
+     "not_verified", T.INFRA_ERROR),
     ("fixed revision stopped", fixed(runs=runs(), fix_stopped="provider_error"), "not_verified",
      T.PROVIDER_ERROR),
     ("fixed replay failed", fixed(runs=runs(), fix_stopped="build_failed"), "not_verified", T.BUILD_FAILED),
-    ("not reproduced first", fixed(runs=runs(exploit="passed") + runs(exploit="passed", revision="fixed")),
+    ("not reproduced first", fixed(runs=runs(exploit="assertion_failed") + runs(exploit="assertion_failed",
+                                                                                revision="fixed")),
      "not_verified", T.NO_VALID_OBSERVATION),
-    ("vulnerable exploit errored", fixed(runs=runs(exploit="errored") + runs(exploit="passed", revision="fixed")),
+    ("vulnerable exploit errored", fixed(runs=runs(exploit="errored") + runs(exploit="assertion_failed",
+                                                                            revision="fixed")),
      "not_verified", T.PROBE_ERRORED),
+    ("fixed provider error with a decisive vulnerable PoV", fixed(runs=runs(), fix_stopped="provider_error"),
+     "not_verified", T.PROVIDER_ERROR),
 ]
 
 
@@ -204,7 +221,7 @@ def test_infra_on_the_fixed_revision_keeps_a_reproduced_finding():
 
 def test_duplicate_runs_and_reviews_are_refused():
     with pytest.raises(ValueError):
-        decide(CASE, **full(runs=runs() + (run("exploit", "passed"),)))
+        decide(CASE, **full(runs=runs() + (run("exploit", "assertion_failed"),)))
     with pytest.raises(ValueError):
         decide(CASE, **full(validity=(review(), review())))
     with pytest.raises(ValueError):

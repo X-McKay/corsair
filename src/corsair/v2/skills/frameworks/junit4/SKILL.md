@@ -12,8 +12,8 @@ project's `pom.xml` already declares; the run is offline. Write source for the p
 level: below 1.8 there are no lambdas, and below 10 there is no `var`.
 
 **Markers.** The environment variable `CORSAIR_MARKER_DIR` names a directory. The first statement of the method
-writes a file named `start` there. Immediately before the main assertion it writes `check`, containing `safe` if
-the asserted condition holds and `unsafe` if not, computed from the same variable the assertion checks. The last
+writes a file named `start` there. Immediately before the main assertion it writes `check`, containing `holds` if
+the asserted condition holds and `violated` if not, computed from the same variable the assertion checks. The last
 statement, after every assertion, writes `end`:
 
 ```java
@@ -23,7 +23,7 @@ public void name() throws Exception {
     Result result = target.call(input);
     boolean holds = propertyHolds(result);
     java.nio.file.Files.write(java.nio.file.Paths.get(System.getenv("CORSAIR_MARKER_DIR"), "check"),
-            (holds ? "safe" : "unsafe").getBytes("UTF-8"));
+            (holds ? "holds" : "violated").getBytes("UTF-8"));
     assertTrue(System.getenv("CORSAIR_TOKEN"), holds);
     new java.io.FileOutputStream(new java.io.File(System.getenv("CORSAIR_MARKER_DIR"), "end")).close();
 }

@@ -51,10 +51,15 @@ class Probe(Protocol):
 
 
 class Review(Protocol):
-    """Outcome-blind: sees the plan, the frozen patch and source, never a ProbeRun."""
+    """Outcome-blind: sees the plan, the frozen patch and source, never a ProbeRun.
+
+    ``runtime`` names the run's framework skill, which the Reviewer reads the way the Probers do, so it judges
+    marker placement by that framework's sanctioned pattern. It is optional so a Review written before it composes.
+    """
 
     async def __call__(self, case: Case, plan: ProbePlan, patch: FrozenPatch, model: Model, *, source_root: Path,
-                       revision: str = "vulnerable") -> tuple[Validity, AgentUsage]: ...
+                       revision: str = "vulnerable", runtime: Runtime | None = None
+                       ) -> tuple[Validity, AgentUsage]: ...
 
 
 class Execute(Protocol):

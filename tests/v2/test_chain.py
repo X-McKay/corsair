@@ -1,4 +1,3 @@
-import json
 """Chain routing with fake stages: order, early stops, A2/D3 correction bounds and review blindness."""
 import asyncio
 import json
@@ -35,6 +34,9 @@ def test_fixed_revision_is_reviewed_replayed_and_executed(tmp_path):
     go(fakes, tmp_path, fixed=True)
     assert [kw["revision"] for _, kw in fakes.of("review")] == ["vulnerable", "fixed"]
     assert [kw["revision"] for _, kw in fakes.of("replay")] == ["vulnerable", "fixed"]
+    # The Reviewer gets the run's runtime (its framework skill) on both revisions, as the Probers do.
+    probe_runtime = fakes.of("probe-control")[0][0][1]
+    assert [kw["runtime"] for _, kw in fakes.of("review")] == [probe_runtime, probe_runtime]
     assert [(a[3], kw["revision"]) for a, kw in fakes.of("execute")] == [
         ("control", "vulnerable"), ("exploit", "vulnerable"), ("control", "fixed"), ("exploit", "fixed")]
     # Review of both revisions comes before any execution.
@@ -322,7 +324,7 @@ def test_real_rules_read_a_still_invalid_pair_as_test_invalid(tmp_path):
     fakes = Fakes(rejections={"control": 1})
     fakes.decide = lambda case, **kw: (fakes._log("decide", case, **kw), decide(case, **kw))[1]
     verdict, _ = go(fakes, tmp_path / "b")
-    assert verdict.rule_id == "R5"  # the fake runs pass: executed, so no longer R2
+    assert verdict.rule_id == "R4"  # the fake runs pass (a PoV pass): executed, so no longer R2
     summary = json.loads((tmp_path / "b" / "runs" / "run" / "summary.json").read_text())
     assert summary["review"]["authors"]["control"]["recovered"] is True
 

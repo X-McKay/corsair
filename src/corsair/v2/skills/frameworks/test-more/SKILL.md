@@ -11,8 +11,8 @@ single `subtest` is allowed but not needed.
 End the file with `done_testing();`.
 
 **Markers.** The environment variable `CORSAIR_MARKER_DIR` names a directory. Write a file named `start` there
-before anything else the test does. Immediately before the main `ok`, write `check` containing `safe` if the
-asserted condition holds and `unsafe` if not, computed from the same variable the `ok` checks. Write `end` as the
+before anything else the test does. Immediately before the main `ok`, write `check` containing `holds` if the
+asserted condition holds and `violated` if not, computed from the same variable the `ok` checks. Write `end` as the
 last step, only when every assertion passed (Test::More keeps going after a failed `ok`, so the guard matters):
 
 ```perl
@@ -29,7 +29,7 @@ sub corsair_marker {
 corsair_marker('start');
 my $result = Target::call($input);
 my $holds = property_holds($result) ? 1 : 0;
-corsair_marker('check', $holds ? 'safe' : 'unsafe');
+corsair_marker('check', $holds ? 'holds' : 'violated');
 ok($holds, 'property holds') or diag($ENV{CORSAIR_TOKEN});
 corsair_marker('end') if Test::More->builder->is_passing;
 done_testing();

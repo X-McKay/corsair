@@ -57,6 +57,8 @@ def test_workflow_runs_the_same_chain_as_direct_mode(tmp_path):
     assert _steps(run_dir) == _steps(record.run_dir)
     assert verdict == expected
     assert fakes.names() == direct.names()
+    assert [kw["runtime"] for _, kw in fakes.of("review")] == [kw["runtime"] for _, kw in direct.of("review")]
+    assert all(kw["runtime"] is not None for _, kw in fakes.of("review"))
 
 
 def test_container_activity_failure_runs_once_and_is_infra(tmp_path):
