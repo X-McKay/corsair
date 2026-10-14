@@ -1,0 +1,12 @@
+{
+  "schema": "corsair-issue-request/v1",
+  "issue": {
+    "provider": "manual",
+    "title": "SQL string construction in build_query",
+    "body": "Reported location: tests/test_helpers.py line 4, in build_query. Weakness class: CWE-89.\n\nbuild_query builds a query string by concatenation.\n\nAnalyze this component only.",
+    "format": "markdown"
+  },
+  "repository": "evals/e2e/python/corpus/ih-python-queryhelper/repository.git",
+  "revision": "15b78efea6c486f3a67d54c0f64f5dbab038d70d",
+  "scope": "component"
+}

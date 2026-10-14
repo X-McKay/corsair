@@ -1,0 +1,118 @@
+{
+  "fixture_id": "java-exception-plan-v1",
+  "inputs": {
+    "plan": {
+      "status": "ready",
+      "scope": "component",
+      "security_expectation": {
+        "failure_type": "org.opentest4j.AssertionFailedError",
+        "safe_behavior": "IllegalArgumentException"
+      },
+      "discovery_command": [
+        "mvn",
+        "-q",
+        "-DskipTests",
+        "test-compile"
+      ],
+      "evidence_requirements": [
+        "Both control and exploit probe must execute with native outcomes",
+        "Review both real source calls, adversarial input and assertions before execution"
+      ],
+      "citations": [
+        {
+          "path": "src/main/java/com/example/archive/ArchivePaths.java",
+          "start_line": 10,
+          "end_line": 12,
+          "quote": "    public static Path destination(Path dest, String entryName) {\n        return dest.resolve(entryName);\n    }"
+        }
+      ],
+      "limitations": [
+        "Archive path traversal at this one call only; callers and deployment configuration are outside the observation"
+      ],
+      "control": {
+        "test_id": "com.example.archive.ArchivePathsSecurityTest#benignControl",
+        "test_path": "src/test/java/com/example/archive/ArchivePathsSecurityTest.java",
+        "fixture_setup": [
+          "No files; the call only computes a path"
+        ],
+        "implementation_call": "ArchivePaths.destination(dest, entryName)",
+        "input": "entry name \"docs/a.txt\" under destination \"out\"",
+        "required_behavior": "Returns the entry path resolved under the destination",
+        "observable_witness": "Native junit5 assertion on returns the entry path resolved under the destination",
+        "observation": {
+          "kind": "exception",
+          "property": "Returns the entry path resolved under the destination",
+          "seam": "Call the real ArchivePaths.destination through its public interface"
+        },
+        "source_references": [
+          {
+            "path": "src/main/java/com/example/archive/ArchivePaths.java",
+            "start_line": 10,
+            "end_line": 12,
+            "quote": "    public static Path destination(Path dest, String entryName) {\n        return dest.resolve(entryName);\n    }"
+          }
+        ]
+      },
+      "security": {
+        "test_id": "com.example.archive.ArchivePathsSecurityTest#securityRefusesEscapingEntry",
+        "test_path": "src/test/java/com/example/archive/ArchivePathsSecurityTest.java",
+        "fixture_setup": [
+          "No files; the call only computes a path"
+        ],
+        "implementation_call": "ArchivePaths.destination(dest, entryName)",
+        "input": "entry name \"../../etc/cron.d/job\" under destination \"out\"",
+        "required_behavior": "Throws IllegalArgumentException for an entry whose path leaves the destination",
+        "observable_witness": "Native junit5 assertion on throws IllegalArgumentException for an entry whose path leaves the destination",
+        "observation": {
+          "kind": "exception",
+          "property": "Throws IllegalArgumentException for an entry whose path leaves the destination",
+          "seam": "Call the real ArchivePaths.destination through its public interface"
+        },
+        "source_references": [
+          {
+            "path": "src/main/java/com/example/archive/ArchivePaths.java",
+            "start_line": 10,
+            "end_line": 12,
+            "quote": "    public static Path destination(Path dest, String entryName) {\n        return dest.resolve(entryName);\n    }"
+          }
+        ]
+      }
+    },
+    "source_files": [
+      {
+        "path": "src/main/java/com/example/archive/ArchivePaths.java",
+        "content": "package com.example.archive;\n\nimport java.nio.file.Path;\n\n/** Where each entry of an uploaded archive is extracted. */\npublic final class ArchivePaths {\n    private ArchivePaths() {\n    }\n\n    public static Path destination(Path dest, String entryName) {\n        return dest.resolve(entryName);\n    }\n}\n"
+      },
+      {
+        "path": "src/test/java/com/example/archive/ArchivePathsTest.java",
+        "content": "package com.example.archive;\n\nimport static org.junit.jupiter.api.Assertions.assertEquals;\n\nimport java.nio.file.Paths;\nimport org.junit.jupiter.api.Test;\n\nclass ArchivePathsTest {\n    @Test\n    void joinsEntry() {\n        assertEquals(Paths.get(\"out\", \"a.txt\"), ArchivePaths.destination(Paths.get(\"out\"), \"a.txt\"));\n    }\n}\n"
+      }
+    ],
+    "environment": {
+      "language": "Java",
+      "runtime": "JDK 17",
+      "framework": "junit5",
+      "discovery_command": [
+        "mvn",
+        "-q",
+        "-DskipTests",
+        "test-compile"
+      ],
+      "approved_test_paths": [
+        "src/test/java/com/example/archive/ArchivePathsSecurityTest.java"
+      ],
+      "baseline_test": {
+        "test_id": "com.example.archive.ArchivePathsTest#joinsEntry",
+        "path": "src/test/java/com/example/archive/ArchivePathsTest.java"
+      },
+      "scratch_location": "A per-test JUnit @TempDir directory",
+      "observation_facilities": [
+        "Native Surefire report: outcome, failure type and failing line per test method"
+      ],
+      "assertion_facts": [
+        "JUnit 5 assertion failures, including assertThrows when nothing is thrown, report org.opentest4j.AssertionFailedError. Match the planned native failure type."
+      ],
+      "witness_facilities": []
+    }
+  }
+}

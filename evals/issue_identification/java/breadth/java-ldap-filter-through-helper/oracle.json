@@ -1,0 +1,10 @@
+{
+  "status": "ready",
+  "symbol": "findUser",
+  "path": "src/main/java/com/example/directory/DirectoryService.java",
+  "required_lines": [
+    21,
+    24
+  ],
+  "max_span": 8
+}

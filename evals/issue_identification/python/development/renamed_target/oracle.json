@@ -1,0 +1,10 @@
+{
+  "status": "ready",
+  "symbol": "fetch_note",
+  "path": "notes.py",
+  "required_lines": [
+    3,
+    5
+  ],
+  "max_span": 8
+}

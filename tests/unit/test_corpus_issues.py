@@ -32,21 +32,22 @@ def test_a_pair_becomes_two_unrelated_reproducible_commits_and_a_neutral_issue(t
 
 
 def test_the_python_cohort_is_written_case_by_case(tmp_path, capsys):
-    assert main(['--root', str(tmp_path), '--set', 'corpus-python']) == 0
+    assert main(['--root', str(tmp_path), '--set', 'corpus']) == 0
     lines = capsys.readouterr().out.splitlines()
     assert len(lines) == 17 and all((tmp_path / line.split()[0] / 'issue.json').is_file() for line in lines)
 
 
 def test_the_committed_cohort_issue_files_are_what_the_generator_writes(tmp_path):
     import shutil
-    from evals.corpus.issues import COHORTS, ISSUES
-    for case_id in json.loads(COHORTS.read_text())['corpus-python']:
-        committed = json.loads((ISSUES / case_id / 'issue.json').read_text())
-        assert committed['repository'] == f'evals/corpus/issues/{case_id}/repository.git'
+    from evals.cases import load_set
+    from evals.corpus.issues import ISSUES
+    for frozen in load_set('e2e', 'corpus'):
+        case_id, committed = frozen.name, frozen.input
+        assert committed['repository'] == f'evals/e2e/python/corpus/{case_id}/repository.git'
         case = next(c for c in load() if c.case_id == case_id)
         fresh, expected = capture(case, tmp_path)
         assert {**committed, 'repository': None} == {**fresh, 'repository': None}
-        assert json.loads((ISSUES / case_id / 'expected.json').read_text()) == expected
+        assert frozen.oracle == expected
         # The committed bare repository (as a clone has it, without empty directories) holds both commits.
         clone = tmp_path / 'clone' / case_id
         shutil.copytree(ISSUES / case_id / 'repository.git', clone)

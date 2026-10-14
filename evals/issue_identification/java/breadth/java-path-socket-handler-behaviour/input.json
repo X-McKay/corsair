@@ -1,0 +1,11 @@
+{
+  "fixture_id": "java-path-socket-handler-behaviour",
+  "issue": "The plain-socket file server reads one line from the client and streams back the file with that name. A client sending /etc/passwd receives the host's password file. Locate the code that opens the requested file.",
+  "scope": "component",
+  "source_files": [
+    {
+      "path": "src/main/java/com/example/net/FileServer.java",
+      "content": "// Adapted from github/codeql java/ql/src/Security/CWE/CWE-022/examples/TaintedPath.java\n// Copyright (c) 2006-2025 GitHub, Inc. (MIT)\npackage com.example.net;\n\nimport java.io.BufferedReader;\nimport java.io.FileReader;\nimport java.io.InputStreamReader;\nimport java.net.Socket;\n\npublic class FileServer {\n    public void sendBanner(Socket sock) throws java.io.IOException {\n        sock.getOutputStream().write(\"file-server 1.0\\n\".getBytes(\"UTF-8\"));\n    }\n\n    public void sendUserFile(Socket sock, String user) {\n        BufferedReader filenameReader = new BufferedReader(\n                new InputStreamReader(sock.getInputStream(), \"UTF-8\"));\n        String filename = filenameReader.readLine();\n        BufferedReader fileReader = new BufferedReader(new FileReader(filename));\n        String fileLine = fileReader.readLine();\n        while(fileLine != null) {\n            sock.getOutputStream().write(fileLine.getBytes());\n            fileLine = fileReader.readLine();\n        }\n    }\n}\n"
+    }
+  ]
+}

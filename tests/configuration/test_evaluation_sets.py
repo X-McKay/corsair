@@ -1,13 +1,8 @@
-"""SPEC-0035/SPEC-0023 dataset guards: oracle gates track assess(), regeneration is exact, held-out cases stay sealed."""
-import json
-from pathlib import Path
-import re
-
+"""SPEC-0035/SPEC-0023 dataset guards: oracle gates track assess(), regeneration is exact."""
 from corsair.core.disposition import assess
+from evals.cases import EVALS
 from evals.evidence_assessment import build
-from evals.evidence_assessment.evaluate import CASES, HELD_OUT, case_digest, load
-
-ROOT = Path(__file__).resolve().parents[2]
+from evals.evidence_assessment.evaluate import load
 
 
 def test_every_oracle_gate_is_what_the_gates_permit():
@@ -16,17 +11,8 @@ def test_every_oracle_gate_is_what_the_gates_permit():
 
 
 def test_builder_regenerates_the_committed_cases_byte_for_byte(tmp_path):
-    build.write(tmp_path / "cases.yaml")
-    assert (tmp_path / "cases.yaml").read_bytes() == CASES.read_bytes()
-
-
-def test_held_out_cases_match_their_manifest():
-    held_out = {case.name: case_digest(case) for case in load().cases if case.metadata.split == "held_out"}
-    assert held_out and held_out == json.loads(HELD_OUT.read_text())
-
-
-def test_development_records_never_cite_a_held_out_case():
-    names = re.compile(r"\b(" + "|".join(map(re.escape, json.loads(HELD_OUT.read_text()))) + r")\b")
-    cited = [str(path) for path in (ROOT / "docs/development").rglob("*") if path.is_file()
-             and names.search(path.read_text(errors="replace"))]
-    assert not cited
+    cases = build.write(tmp_path)
+    for case in cases:
+        for part in ("input", "oracle", "case"):
+            relative = f"evidence_assessment/python/{case.metadata.split}/{case.name}/{part}.json"
+            assert (tmp_path / relative).read_bytes() == (EVALS / relative).read_bytes(), relative

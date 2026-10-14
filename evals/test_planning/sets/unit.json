@@ -1,0 +1,7 @@
+{
+  "held_out": false,
+  "cases": {
+    "python/sql_dependency_unsafe": "acae98537af37c23d5b6b881bc50f5086089019d39e91384a7e1fd4a7d281824",
+    "python/sql_dependency_safe": "11dcc6d225c809dfd38f0cae0362d81340bdebfa1fd77b8dda5a291750f25964"
+  }
+}

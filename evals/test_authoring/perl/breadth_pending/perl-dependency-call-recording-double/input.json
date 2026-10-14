@@ -1,0 +1,118 @@
+{
+  "fixture_id": "perl-dependency-call-recording-double-v1",
+  "inputs": {
+    "plan": {
+      "status": "ready",
+      "scope": "component",
+      "security_expectation": {
+        "failure_type": "not_ok",
+        "safe_behavior": "bound_parameter"
+      },
+      "discovery_command": [
+        "prove",
+        "-l",
+        "t/accounts.t"
+      ],
+      "evidence_requirements": [
+        "Both control and exploit probe must execute with native outcomes",
+        "Review both real source calls, adversarial input and assertions before execution"
+      ],
+      "citations": [
+        {
+          "path": "lib/Accounts.pm",
+          "start_line": 6,
+          "end_line": 9,
+          "quote": "sub balance {\n    my ($dbh, $account) = @_;\n    return $dbh->selectall_arrayref(\"SELECT balance FROM accounts WHERE account = '$account'\");\n}"
+        }
+      ],
+      "limitations": [
+        "Sql injection at this one call only; callers and deployment configuration are outside the observation"
+      ],
+      "control": {
+        "test_id": "t/accounts_security.t#benign_control",
+        "test_path": "t/accounts_security.t",
+        "fixture_setup": [
+          "Create an in-memory recording database handle returning [[25]] and recording each statement with its bind values"
+        ],
+        "implementation_call": "Accounts::balance($dbh, $account)",
+        "input": "account 'alice'",
+        "required_behavior": "Returns the database rows and issues exactly one statement",
+        "observable_witness": "Native tap-harness assertion on returns the database rows and issues exactly one statement",
+        "observation": {
+          "kind": "dependency_call",
+          "property": "Returns the database rows and issues exactly one statement",
+          "seam": "Call the real Accounts::balance with an injected database handle object",
+          "controlled_dependency": "RecordingDb::selectall_arrayref records the SQL and bind values unchanged and returns fixed rows; it neither builds nor quotes SQL"
+        },
+        "source_references": [
+          {
+            "path": "lib/Accounts.pm",
+            "start_line": 6,
+            "end_line": 9,
+            "quote": "sub balance {\n    my ($dbh, $account) = @_;\n    return $dbh->selectall_arrayref(\"SELECT balance FROM accounts WHERE account = '$account'\");\n}"
+          }
+        ]
+      },
+      "security": {
+        "test_id": "t/accounts_security.t#security_binds_account",
+        "test_path": "t/accounts_security.t",
+        "fixture_setup": [
+          "Create an in-memory recording database handle returning [[25]] and recording each statement with its bind values"
+        ],
+        "implementation_call": "Accounts::balance($dbh, $account)",
+        "input": "account \"alice' OR 1=1 --\"",
+        "required_behavior": "The hostile account is passed as a bind value and never appears in the SQL text",
+        "observable_witness": "Native tap-harness assertion on the hostile account is passed as a bind value and never appears in the SQL text",
+        "observation": {
+          "kind": "dependency_call",
+          "property": "The hostile account is passed as a bind value and never appears in the SQL text",
+          "seam": "Call the real Accounts::balance with an injected database handle object",
+          "controlled_dependency": "RecordingDb::selectall_arrayref records the SQL and bind values unchanged and returns fixed rows; it neither builds nor quotes SQL"
+        },
+        "source_references": [
+          {
+            "path": "lib/Accounts.pm",
+            "start_line": 6,
+            "end_line": 9,
+            "quote": "sub balance {\n    my ($dbh, $account) = @_;\n    return $dbh->selectall_arrayref(\"SELECT balance FROM accounts WHERE account = '$account'\");\n}"
+          }
+        ]
+      }
+    },
+    "source_files": [
+      {
+        "path": "lib/Accounts.pm",
+        "content": "package Accounts;\n# Account balance lookups against an injected database handle.\nuse strict;\nuse warnings;\n\nsub balance {\n    my ($dbh, $account) = @_;\n    return $dbh->selectall_arrayref(\"SELECT balance FROM accounts WHERE account = '$account'\");\n}\n\n1;\n"
+      },
+      {
+        "path": "t/accounts.t",
+        "content": "use strict;\nuse warnings;\nuse Test::More;\nuse Accounts;\n\n{\n    package FixedDb;\n    sub new { return bless {}, shift }\n    sub selectall_arrayref { return [[25]] }\n}\n\nis_deeply(Accounts::balance(FixedDb->new, 'alice'), [[25]], 'returns rows');\n\ndone_testing();\n"
+      }
+    ],
+    "environment": {
+      "language": "Perl",
+      "runtime": "Perl 5.26",
+      "framework": "tap-harness",
+      "discovery_command": [
+        "prove",
+        "-l",
+        "t/accounts.t"
+      ],
+      "approved_test_paths": [
+        "t/accounts_security.t"
+      ],
+      "baseline_test": {
+        "test_id": "t/accounts.t",
+        "path": "t/accounts.t"
+      },
+      "scratch_location": "A per-subtest File::Temp tempdir with CLEANUP",
+      "observation_facilities": [
+        "Native TAP stream: outcome, failure location and diagnostics per top-level subtest"
+      ],
+      "assertion_facts": [
+        "A failed Test::More assertion is reported with failure type not_ok and a subtest that dies with die. Match the planned native failure type."
+      ],
+      "witness_facilities": []
+    }
+  }
+}

@@ -1,0 +1,118 @@
+{
+  "fixture_id": "java-failing-control-v1",
+  "inputs": {
+    "plan": {
+      "status": "ready",
+      "scope": "component",
+      "security_expectation": {
+        "failure_type": "org.opentest4j.AssertionFailedError",
+        "safe_behavior": "single_header_line"
+      },
+      "discovery_command": [
+        "mvn",
+        "-q",
+        "-DskipTests",
+        "test-compile"
+      ],
+      "evidence_requirements": [
+        "Both control and exploit probe must execute with native outcomes",
+        "Review both real source calls, adversarial input and assertions before execution"
+      ],
+      "citations": [
+        {
+          "path": "src/main/java/com/example/downloads/DownloadHeaders.java",
+          "start_line": 8,
+          "end_line": 10,
+          "quote": "    public static String disposition(String filename) {\n        return \"attachment; filename=\\\"\" + filename + \"\\\"\";\n    }"
+        }
+      ],
+      "limitations": [
+        "Header injection at this one call only; callers and deployment configuration are outside the observation"
+      ],
+      "control": {
+        "test_id": "com.example.downloads.DownloadHeadersSecurityTest#benignControl",
+        "test_path": "src/test/java/com/example/downloads/DownloadHeadersSecurityTest.java",
+        "fixture_setup": [
+          "No files; the call takes only the filename string"
+        ],
+        "implementation_call": "DownloadHeaders.disposition(filename)",
+        "input": "filename \"report.txt\"",
+        "required_behavior": "Returns the attachment header value naming the file",
+        "observable_witness": "Native junit5 assertion on returns the attachment header value naming the file",
+        "observation": {
+          "kind": "return_value",
+          "property": "Returns the attachment header value naming the file",
+          "seam": "Call the real DownloadHeaders.disposition through its public interface"
+        },
+        "source_references": [
+          {
+            "path": "src/main/java/com/example/downloads/DownloadHeaders.java",
+            "start_line": 8,
+            "end_line": 10,
+            "quote": "    public static String disposition(String filename) {\n        return \"attachment; filename=\\\"\" + filename + \"\\\"\";\n    }"
+          }
+        ]
+      },
+      "security": {
+        "test_id": "com.example.downloads.DownloadHeadersSecurityTest#securityKeepsOneHeaderLine",
+        "test_path": "src/test/java/com/example/downloads/DownloadHeadersSecurityTest.java",
+        "fixture_setup": [
+          "No files; the call takes only the filename string"
+        ],
+        "implementation_call": "DownloadHeaders.disposition(filename)",
+        "input": "filename \"report.txt\\r\\nSet-Cookie: session=x\" carrying a CR LF pair",
+        "required_behavior": "The returned header value contains no carriage return or line feed",
+        "observable_witness": "Native junit5 assertion on the returned header value contains no carriage return or line feed",
+        "observation": {
+          "kind": "return_value",
+          "property": "The returned header value contains no carriage return or line feed",
+          "seam": "Call the real DownloadHeaders.disposition through its public interface"
+        },
+        "source_references": [
+          {
+            "path": "src/main/java/com/example/downloads/DownloadHeaders.java",
+            "start_line": 8,
+            "end_line": 10,
+            "quote": "    public static String disposition(String filename) {\n        return \"attachment; filename=\\\"\" + filename + \"\\\"\";\n    }"
+          }
+        ]
+      }
+    },
+    "source_files": [
+      {
+        "path": "src/main/java/com/example/downloads/DownloadHeaders.java",
+        "content": "package com.example.downloads;\n\n/** Response headers for file downloads. */\npublic final class DownloadHeaders {\n    private DownloadHeaders() {\n    }\n\n    public static String disposition(String filename) {\n        return \"attachment; filename=\\\"\" + filename + \"\\\"\";\n    }\n}\n"
+      },
+      {
+        "path": "src/test/java/com/example/downloads/DownloadHeadersTest.java",
+        "content": "package com.example.downloads;\n\nimport static org.junit.jupiter.api.Assertions.assertTrue;\n\nimport org.junit.jupiter.api.Test;\n\nclass DownloadHeadersTest {\n    @Test\n    void namesAttachment() {\n        assertTrue(DownloadHeaders.disposition(\"a.txt\").startsWith(\"attachment\"));\n    }\n}\n"
+      }
+    ],
+    "environment": {
+      "language": "Java",
+      "runtime": "JDK 17",
+      "framework": "junit5",
+      "discovery_command": [
+        "mvn",
+        "-q",
+        "-DskipTests",
+        "test-compile"
+      ],
+      "approved_test_paths": [
+        "src/test/java/com/example/downloads/DownloadHeadersSecurityTest.java"
+      ],
+      "baseline_test": {
+        "test_id": "com.example.downloads.DownloadHeadersTest#namesAttachment",
+        "path": "src/test/java/com/example/downloads/DownloadHeadersTest.java"
+      },
+      "scratch_location": "A per-test JUnit @TempDir directory",
+      "observation_facilities": [
+        "Native Surefire report: outcome, failure type and failing line per test method"
+      ],
+      "assertion_facts": [
+        "JUnit 5 assertion failures, including assertThrows when nothing is thrown, report org.opentest4j.AssertionFailedError. Match the planned native failure type."
+      ],
+      "witness_facilities": []
+    }
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "required_reads": [
+    "README.md",
+    ".github/workflows/ci.yml"
+  ],
+  "commands": [
+    [
+      "cpanm",
+      "--notest",
+      "--installdeps",
+      "."
+    ],
+    [
+      "perl",
+      "Makefile.PL"
+    ],
+    [
+      "make"
+    ],
+    [
+      "prove",
+      "--dry",
+      "-l",
+      "t"
+    ],
+    [
+      "prove",
+      "--norc",
+      "-lv",
+      "t/rotate.t"
+    ]
+  ],
+  "observations": [
+    {
+      "exit": 0,
+      "stdout": "--> Working on .\nConfiguring /sandbox/work ... OK\n==> Found dependencies: URI\n--> Working on URI\nSuccessfully installed URI-5.28\n<== Installed dependencies for .. Finishing.\n1 distribution installed\n"
+    },
+    {
+      "exit": 0,
+      "stdout": "Checking if your kit is complete...\nLooks good\nGenerating a Unix-style Makefile\nWriting Makefile for Log::Rotate::Daily\nWriting MYMETA.yml and MYMETA.json\n"
+    },
+    {
+      "exit": 0,
+      "stdout": "cp lib/x.pm blib/lib/x.pm\n"
+    },
+    {
+      "exit": 0,
+      "stdout": "t/rotate.t\n"
+    },
+    {
+      "exit": 0,
+      "stdout": "t/rotate.t .. \n1..2\nok 1 - rotates at midnight\nok 2 - keeps seven files\nok\nAll tests successful.\nFiles=1, Tests=2,  0 wallclock secs ( 0.02 usr  0.00 sys +  0.04 cusr  0.00 csys =  0.06 CPU)\nResult: PASS\n"
+    }
+  ],
+  "draft": {
+    "status": "ready",
+    "toolchain_id": "perl-5.26-make",
+    "recipe": [
+      {
+        "phase": "dependency",
+        "command": [
+          "cpanm",
+          "--notest",
+          "--installdeps",
+          "."
+        ],
+        "source": {
+          "path": ".github/workflows/ci.yml",
+          "start_line": 9,
+          "end_line": 9
+        }
+      },
+      {
+        "phase": "build",
+        "command": [
+          "perl",
+          "Makefile.PL"
+        ],
+        "source": {
+          "path": ".github/workflows/ci.yml",
+          "start_line": 10,
+          "end_line": 10
+        }
+      }
+    ],
+    "build_command": [
+      "make"
+    ],
+    "discovery_command": [
+      "prove",
+      "--dry",
+      "-l",
+      "t"
+    ],
+    "framework": "tap-harness",
+    "baseline_test_id": "t/rotate.t",
+    "baseline_test_path": "t/rotate.t",
+    "baseline_test_command": [
+      "prove",
+      "--norc",
+      "-lv",
+      "t/rotate.t"
+    ],
+    "approved_test_paths": [
+      "t/corsair_control.t",
+      "t/corsair_security.t"
+    ]
+  },
+  "status": "ready",
+  "layer": null,
+  "max_commands": 12,
+  "toolchain_id": "perl-5.26-make",
+  "requirement_patterns": [],
+  "checkout_paths": null
+}

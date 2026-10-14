@@ -1,0 +1,59 @@
+{
+  "scope": "component",
+  "identification": {
+    "status": "ready",
+    "scope": "component",
+    "reason": null,
+    "reported_issue": "store_avatar saves an upload under whatever file name the user sends, into the upload directory the web server publishes as-is. Only .png and .jpg images are meant to be accepted; an upload named portrait.html would be served as a page from our own origin. Analyze this component only.",
+    "target": {
+      "symbol": "store_avatar",
+      "source": {
+        "path": "avatars.py",
+        "start_line": 4,
+        "end_line": 8,
+        "quote": "def store_avatar(upload_dir: Path, filename: str, data: bytes) -> Path:\n    \"\"\"Save an uploaded profile picture under the public upload directory.\"\"\"\n    destination = upload_dir / filename\n    destination.write_bytes(data)\n    return destination"
+      }
+    }
+  },
+  "source_files": [
+    {
+      "path": "avatars.py",
+      "content": "from pathlib import Path\n\n\ndef store_avatar(upload_dir: Path, filename: str, data: bytes) -> Path:\n    \"\"\"Save an uploaded profile picture under the public upload directory.\"\"\"\n    destination = upload_dir / filename\n    destination.write_bytes(data)\n    return destination\n"
+    },
+    {
+      "path": "test_avatars_existing.py",
+      "content": "from pathlib import Path\n\nimport avatars\n\n\ndef test_stores_png_avatar(tmp_path: Path):\n    saved = avatars.store_avatar(tmp_path, \"me.png\", b\"png-bytes\")\n    assert saved.read_bytes() == b\"png-bytes\"\n"
+    }
+  ],
+  "environment": {
+    "language": "Python",
+    "runtime": "CPython 3.12",
+    "framework": "pytest 9.0.2",
+    "discovery_command": [
+      "python",
+      "-m",
+      "pytest",
+      "--collect-only",
+      "-q"
+    ],
+    "approved_test_paths": [
+      "test_avatars_security.py"
+    ],
+    "baseline_test": {
+      "test_id": "test_avatars_existing.py::test_stores_png_avatar",
+      "path": "test_avatars_existing.py"
+    },
+    "scratch_location": "The per-test pytest tmp_path directory; fixtures must not be created elsewhere",
+    "observation_facilities": [
+      "Python sys.addaudithook 'open' audit events recording the file paths opened during a test",
+      "Native JUnit XML outcomes and captured stdout per test"
+    ],
+    "witness_facilities": [
+      {
+        "id": "open_events",
+        "kind": "file_open",
+        "description": "Python sys.addaudithook 'open' events recording each path the test process opens during the call"
+      }
+    ]
+  }
+}

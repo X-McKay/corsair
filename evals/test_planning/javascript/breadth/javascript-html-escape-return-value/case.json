@@ -1,0 +1,12 @@
+{
+  "language": "javascript",
+  "framework": "jest",
+  "family": "xss",
+  "kind": "positive",
+  "probes": "Template-literal HTML rendering in Node planned as a Jest return-value assertion on escaped markup.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic template-literal renderer."
+  }
+}

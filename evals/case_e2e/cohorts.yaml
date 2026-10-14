@@ -1,3 +1,0 @@
-# Named case cohorts for `make eval AGENT=chain SET=<cohort>` (evals/case_e2e/evaluate.py): benchmark case ids, each
-# run once per eval run with a fresh run directory and no retries. Membership is evaluator data; agents never see it.
-jest: [CVE-2020-15123, CVE-2020-7730]

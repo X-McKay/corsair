@@ -1,0 +1,14 @@
+{
+  "language": "ruby",
+  "framework": "rack",
+  "family": "path-traversal",
+  "kind": "negative",
+  "probes": "Guarded upstream middleware: call delegates to cleanup, which normalises dot segments; the guard method is the target.",
+  "provenance": {
+    "source": "https://github.com/sinatra/sinatra",
+    "commit": "5de64980e0f0fe146d8b60ca3b009f183113e68b",
+    "path": "rack-protection/lib/rack/protection/path_traversal.rb",
+    "license": "MIT",
+    "notes": "tag v2.0.0, verbatim; Copyright (c) 2007, 2008, 2009 Blake Mizerany (LICENSE)"
+  }
+}

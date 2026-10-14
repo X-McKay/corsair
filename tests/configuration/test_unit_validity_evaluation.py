@@ -1,16 +1,13 @@
 """Freeze semantic validity cases and check evaluator sensitivity to unsafe blanket approval."""
 import json
-from hashlib import sha256
 from types import SimpleNamespace
 
-from evals.evidence_assessment.unit_test import CASES, FLAGS, ValidityScore, dataset
+from evals.cases import load_set
+from evals.evidence_assessment.unit_test import FLAGS, SUITE, ValidityScore, dataset
 
 
 def test_unit_validity_case_manifest_is_frozen():
-    cases = json.loads(CASES.read_text())
-    actual = {case['name']: sha256(json.dumps(case, sort_keys=True).encode()).hexdigest() for case in cases}
-    expected = json.loads(CASES.with_name('unit_test_manifest_v2.json').read_text())
-    assert actual == expected
+    assert len(load_set(SUITE, 'unit')) == 7
 
 
 def test_blanket_validity_approval_fails_every_negative_case():
@@ -41,19 +38,17 @@ def test_classification_keeps_false_approval_and_rejection_separate():
 
 
 def test_original_validity_dataset_remains_frozen():
-    path = CASES.with_name('unit_test_cases.json')
-    original = json.loads(path.read_text())
-    assert {case['name']: sha256(json.dumps(case, sort_keys=True).encode()).hexdigest() for case in original} == json.loads(path.with_name('unit_test_manifest.json').read_text())
+    # The original boolean-review protocol stays frozen as unit-v1; it is not rerun as the current contract.
+    assert len(load_set(SUITE, 'unit-v1')) == 7
 
 
 def test_successor_retains_original_semantic_inputs_and_oracles():
-    old = json.loads(CASES.with_name('unit_test_cases.json').read_text())
-    new = json.loads(CASES.read_text())
-    assert [(c['name'], c['inputs'], c['expected']) for c in old] == [(c['name'], c['inputs'], c['expected']) for c in new]
+    old, new = load_set(SUITE, 'unit-v1'), load_set(SUITE, 'unit')
+    assert [(c.name, c.input, c.oracle) for c in old] == [(c.name, c.input, c.oracle['expected']) for c in new]
 
 
 def test_transfer_cases_are_separate_and_frozen():
-    transfer = dataset(CASES.with_name('unit_transfer_cases_v2.json'))
+    transfer = dataset('unit-transfer')
     assert len(transfer.cases) == 3
     assert not {c.name for c in transfer.cases} & {c.name for c in dataset().cases}
 

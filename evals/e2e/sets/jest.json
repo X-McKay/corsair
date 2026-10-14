@@ -1,0 +1,7 @@
+{
+  "held_out": false,
+  "cases": {
+    "javascript/CVE-2020-15123": "f4e216c8e9a997e921276f23b033d81900aa32db787fbb92679bc77935a40a3a",
+    "javascript/CVE-2020-7730": "e8ccf0b015a8f59636ff3ac9483157c5eaa5436974bdc6e4e5843eb66193cedc"
+  }
+}

@@ -11,14 +11,14 @@ from pydantic_ai.models.function import FunctionModel
 from corsair.agents.environment.agent import create_environment_agent, environment_prompt
 from corsair.agents.environment.contracts import EnvironmentInput
 from corsair.agents.environment.dependencies import EnvironmentDependencies, SetupBudget
+from evals.cases import set_digest
 from evals.environment.evaluate import ROOT, HANDLE, load_cases, RecordedExecution, EnvironmentChecks
 
 
 def test_v2_preserves_v1_and_declares_every_known_command_in_source():
-    old, before = load_cases('development')
-    raw, after = load_cases('development-v2')
-    assert sha256(old).hexdigest() == 'bc2b151d17d34ccc9d40035cf06b6b0338208f8745d8ae7dd97945a1c4cf00e6'
-    assert raw != old
+    before, old = load_cases('development')
+    after, new = load_cases('development-v2')
+    assert old == set_digest('environment', 'development') and new != old
     assert [(c['name'],c['status'],c['layer'],c['max_commands']) for c in after] == [
         (c['name'],c['status'],c['layer'],c['max_commands']) for c in before]
     for case in after:
@@ -29,7 +29,7 @@ def test_v2_preserves_v1_and_declares_every_known_command_in_source():
 
 
 def test_v2_does_not_approve_an_early_halt_as_unknown_delivery_trajectory():
-    _, cases = load_cases('development-v2')
+    cases, _ = load_cases('development-v2')
     case = next(c for c in cases if c['name']=='unknown-delivery')
     assert case['observations'][0]['unknown'] and not case['observations'][1]['unknown']
     def checks(commands):
@@ -49,7 +49,7 @@ def test_v2_does_not_approve_an_early_halt_as_unknown_delivery_trajectory():
      'run_ids':[1,2],'citations':[]},
 ])
 def test_native_sdk_refuses_post_halt_status_or_invented_run_id(final):
-    _, cases = load_cases('development-v2')
+    cases, _ = load_cases('development-v2')
     case = next(c for c in cases if c['name']=='unknown-delivery')
     inputs = EnvironmentInput.model_validate(case['inputs'])
     execution = RecordedExecution(case)
@@ -78,7 +78,7 @@ def test_native_sdk_refuses_post_halt_status_or_invented_run_id(final):
 
 def test_v10_native_sdk_admits_distinct_recipe_and_terminal_execution_once():
     from corsair.agents.environment.agent import SKILL_TEXT, PROMPT_VERSION
-    _, cases = load_cases('development-v2')
+    cases, _ = load_cases('development-v2')
     case = next(c for c in cases if c['name']=='ready')
     inputs = EnvironmentInput.model_validate(case['inputs'])
     execution = RecordedExecution(case)

@@ -1,0 +1,118 @@
+{
+  "fixture_id": "javascript-reads-own-file-after-error-v1",
+  "inputs": {
+    "plan": {
+      "status": "ready",
+      "scope": "component",
+      "security_expectation": {
+        "failure_type": "Error",
+        "safe_behavior": "escaped_label"
+      },
+      "discovery_command": [
+        "npx",
+        "jest",
+        "--listTests",
+        "test/badge.test.js"
+      ],
+      "evidence_requirements": [
+        "Both control and exploit probe must execute with native outcomes",
+        "Review both real source calls, adversarial input and assertions before execution"
+      ],
+      "citations": [
+        {
+          "path": "lib/badge.js",
+          "start_line": 2,
+          "end_line": 4,
+          "quote": "function render(label) {\n  return '<span class=\"badge\">' + label + '</span>';\n}"
+        }
+      ],
+      "limitations": [
+        "Xss escaping at this one call only; callers and deployment configuration are outside the observation"
+      ],
+      "control": {
+        "test_id": "test/badge.security.test.js::benign_control",
+        "test_path": "test/badge.security.test.js",
+        "fixture_setup": [
+          "No files; the call takes only the label string"
+        ],
+        "implementation_call": "badge.render(label)",
+        "input": "label 'ok'",
+        "required_behavior": "Returns the badge markup containing the plain label",
+        "observable_witness": "Native jest assertion on returns the badge markup containing the plain label",
+        "observation": {
+          "kind": "return_value",
+          "property": "Returns the badge markup containing the plain label",
+          "seam": "Call the real badge.render through its public interface"
+        },
+        "source_references": [
+          {
+            "path": "lib/badge.js",
+            "start_line": 2,
+            "end_line": 4,
+            "quote": "function render(label) {\n  return '<span class=\"badge\">' + label + '</span>';\n}"
+          }
+        ]
+      },
+      "security": {
+        "test_id": "test/badge.security.test.js::security_escapes_markup",
+        "test_path": "test/badge.security.test.js",
+        "fixture_setup": [
+          "No files; the call takes only the label string"
+        ],
+        "implementation_call": "badge.render(label)",
+        "input": "label '<script>alert(1)</script>'",
+        "required_behavior": "Returned markup does not contain a literal <script> element from the label",
+        "observable_witness": "Native jest assertion on returned markup does not contain a literal <script> element from the label",
+        "observation": {
+          "kind": "return_value",
+          "property": "Returned markup does not contain a literal <script> element from the label",
+          "seam": "Call the real badge.render through its public interface"
+        },
+        "source_references": [
+          {
+            "path": "lib/badge.js",
+            "start_line": 2,
+            "end_line": 4,
+            "quote": "function render(label) {\n  return '<span class=\"badge\">' + label + '</span>';\n}"
+          }
+        ]
+      }
+    },
+    "source_files": [
+      {
+        "path": "lib/badge.js",
+        "content": "// Renders a status badge for a user-supplied label.\nfunction render(label) {\n  return '<span class=\"badge\">' + label + '</span>';\n}\n\nmodule.exports = { render };\n"
+      },
+      {
+        "path": "test/badge.test.js",
+        "content": "const badge = require('../lib/badge');\n\ntest('renders the label', () => {\n  expect(badge.render('ok')).toContain('ok');\n});\n"
+      }
+    ],
+    "environment": {
+      "language": "JavaScript",
+      "runtime": "Node 8.17",
+      "framework": "jest",
+      "discovery_command": [
+        "npx",
+        "jest",
+        "--listTests",
+        "test/badge.test.js"
+      ],
+      "approved_test_paths": [
+        "test/badge.security.test.js"
+      ],
+      "baseline_test": {
+        "test_id": "test/badge.test.js",
+        "path": "test/badge.test.js"
+      },
+      "scratch_location": "A per-test fs.mkdtempSync directory under os.tmpdir()",
+      "observation_facilities": [
+        "Native Jest JSON report: outcome, failure message and failing line per test"
+      ],
+      "assertion_facts": [
+        "Jest expect() matcher failures report Error with the matcher message. Match the planned native failure type."
+      ],
+      "witness_facilities": []
+    }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "scope": "component",
+  "plan": {
+    "control_test_id": "test/avatar_fetcher_test.rb::AvatarFetcherTest#test_control_fetches_public_avatar",
+    "security_test_id": "test/avatar_fetcher_test.rb::AvatarFetcherTest#test_exploit_rejects_metadata_address",
+    "expected_failure": {
+      "exception_type": "Minitest::Assertion",
+      "path": "test/avatar_fetcher_test.rb",
+      "function": "test_exploit_rejects_metadata_address",
+      "assertion_lines": [
+        38,
+        40
+      ]
+    },
+    "expected_safe_behavior": "ArgumentError",
+    "frozen_patch_sha256": "4449a58b838b90ad825c07a7335e2c65b9faf94611f2fa70cfec956336ae7cc0",
+    "observation_mode": "unit_test",
+    "test_plan_sha256": "a71917de64dce6d8bb5ce8009196716f14d0d4c5ae12ac4243eac838db4613ea"
+  },
+  "revision_sources": {
+    "baseline": "2227dc97f2f9682a4beee8dc524e88e47ca3ce732ffbc6589db1428ee8b0f1b2"
+  },
+  "items": [
+    {
+      "item_id": "plan",
+      "kind": "plan",
+      "revision": null,
+      "run": null,
+      "sha256": "896de3ae1a77eefc3fd75d1517745443bf5767f604d00db4953e94f2e2c9c4f2",
+      "content": "{\n  \"control_test_id\": \"test/avatar_fetcher_test.rb::AvatarFetcherTest#test_control_fetches_public_avatar\",\n  \"security_test_id\": \"test/avatar_fetcher_test.rb::AvatarFetcherTest#test_exploit_rejects_metadata_address\",\n  \"expected_failure\": {\n    \"exception_type\": \"Minitest::Assertion\",\n    \"path\": \"test/avatar_fetcher_test.rb\",\n    \"function\": \"test_exploit_rejects_metadata_address\",\n    \"assertion_lines\": [\n      38,\n      40\n    ]\n  },\n  \"expected_safe_behavior\": \"ArgumentError\",\n  \"frozen_patch_sha256\": \"4449a58b838b90ad825c07a7335e2c65b9faf94611f2fa70cfec956336ae7cc0\",\n  \"observation_mode\": \"unit_test\",\n  \"test_plan_sha256\": \"a71917de64dce6d8bb5ce8009196716f14d0d4c5ae12ac4243eac838db4613ea\"\n}"
+    },
+    {
+      "item_id": "test-plan",
+      "kind": "plan",
+      "revision": null,
+      "run": null,
+      "sha256": "a71917de64dce6d8bb5ce8009196716f14d0d4c5ae12ac4243eac838db4613ea",
+      "content": "Exactly two Minitest probes in test/avatar_fetcher_test.rb. Control: fetch https://cdn.example/a.png with a resolver double answering 203.0.113.10 and a recording HTTP double, and assert the returned body. Exploit: fetch http://metadata.internal/latest with the resolver answering 169.254.169.254, assert ArgumentError private address and assert the HTTP double received no request. AvatarFetcher#fetch owns the address check; the resolver and HTTP client are dependencies that may be doubled without deciding safety."
+    },
+    {
+      "item_id": "reported-condition",
+      "kind": "plan",
+      "revision": null,
+      "run": null,
+      "sha256": "618958e7f6b0fb8c2a11f913dc94ffe705f270d549b6883612b965ae37567cf2",
+      "content": "Profile avatar URLs are fetched server-side by AvatarFetcher#fetch. A host that resolves to 169.254.169.254 may expose cloud instance metadata."
+    },
+    {
+      "item_id": "baseline-source-0",
+      "kind": "source",
+      "revision": "baseline",
+      "run": 0,
+      "sha256": "39f73b5f2f371a4fed536a09105c291ae73734a5e90426ed967d015912e99b9e",
+      "path": "lib/avatar_fetcher.rb",
+      "source_sha256": "2227dc97f2f9682a4beee8dc524e88e47ca3ce732ffbc6589db1428ee8b0f1b2",
+      "content": "# frozen_string_literal: true\n\nrequire \"ipaddr\"\nrequire \"uri\"\n\nclass AvatarFetcher\n  PRIVATE = %w[10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 127.0.0.0/8 169.254.0.0/16].map { |c| IPAddr.new(c) }\n\n  def initialize(resolver:, http:)\n    @resolver = resolver\n    @http = http\n  end\n\n  def fetch(url)\n    uri = URI.parse(url)\n    address = IPAddr.new(@resolver.address_for(uri.host))\n    raise ArgumentError, \"private address\" if PRIVATE.any? { |range| range.include?(address) }\n\n    @http.get(uri)\n  end\nend\n"
+    },
+    {
+      "item_id": "patch-0",
+      "kind": "patch",
+      "revision": null,
+      "run": null,
+      "sha256": "7cf15e0f552194e6026edf65d0e413961fcef98de907341c7979d101ba1373e1",
+      "path": "test/avatar_fetcher_test.rb",
+      "content": "require \"minitest/autorun\"\nrequire_relative \"../lib/avatar_fetcher\"\n\nclass AvatarFetcherTest < Minitest::Test\n  class StaticResolver\n    def initialize(answers)\n      @answers = answers\n    end\n\n    def address_for(host)\n      @answers.fetch(host)\n    end\n  end\n\n  class RecordingHttp\n    attr_reader :requests\n\n    def initialize\n      @requests = []\n    end\n\n    def get(uri)\n      @requests << uri.to_s\n      \"image-bytes\"\n    end\n  end\n\n  def test_control_fetches_public_avatar\n    http = RecordingHttp.new\n    fetcher = AvatarFetcher.new(resolver: StaticResolver.new(\"cdn.example\" => \"203.0.113.10\"), http: http)\n    assert_equal \"image-bytes\", fetcher.fetch(\"https://cdn.example/a.png\")\n  end\n\n  def test_exploit_rejects_metadata_address\n    http = RecordingHttp.new\n    resolver = StaticResolver.new(\"metadata.internal\" => \"169.254.169.254\")\n    fetcher = AvatarFetcher.new(resolver: resolver, http: http)\n    error = assert_raises(ArgumentError) { fetcher.fetch(\"http://metadata.internal/latest\") }\n    assert_equal \"private address\", error.message\n    assert_empty http.requests\n  end\nend\n"
+    }
+  ]
+}

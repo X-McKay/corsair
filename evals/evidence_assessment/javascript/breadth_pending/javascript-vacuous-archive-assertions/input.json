@@ -1,0 +1,67 @@
+{
+  "scope": "component",
+  "plan": {
+    "control_test_id": "test/archive.test.js::control_archives_report",
+    "security_test_id": "test/archive.test.js::exploit_rejects_shell_name",
+    "expected_failure": {
+      "exception_type": "Error",
+      "path": "test/archive.test.js",
+      "function": "exploit_rejects_shell_name",
+      "assertion_lines": [
+        19
+      ]
+    },
+    "expected_safe_behavior": "Error",
+    "frozen_patch_sha256": "d0a45b1578853728aa51777268bb01b9d73f2e65902e13cf2a6a22cfee5c5c8e",
+    "observation_mode": "unit_test",
+    "test_plan_sha256": "3ebd9d86879c8d40dcb56e18a575706a7dba45c178c805af5931b81ac4af57c9"
+  },
+  "revision_sources": {
+    "baseline": "96e0c7ef2337f1f4cfad21186b89a6e879fda7484ce720f2deb8538124a80380"
+  },
+  "items": [
+    {
+      "item_id": "plan",
+      "kind": "plan",
+      "revision": null,
+      "run": null,
+      "sha256": "3db0220365aa1f2b5b021e6ce6a2465e020294a00683dd61d9e29a9f639da394",
+      "content": "{\n  \"control_test_id\": \"test/archive.test.js::control_archives_report\",\n  \"security_test_id\": \"test/archive.test.js::exploit_rejects_shell_name\",\n  \"expected_failure\": {\n    \"exception_type\": \"Error\",\n    \"path\": \"test/archive.test.js\",\n    \"function\": \"exploit_rejects_shell_name\",\n    \"assertion_lines\": [\n      19\n    ]\n  },\n  \"expected_safe_behavior\": \"Error\",\n  \"frozen_patch_sha256\": \"d0a45b1578853728aa51777268bb01b9d73f2e65902e13cf2a6a22cfee5c5c8e\",\n  \"observation_mode\": \"unit_test\",\n  \"test_plan_sha256\": \"3ebd9d86879c8d40dcb56e18a575706a7dba45c178c805af5931b81ac4af57c9\"\n}"
+    },
+    {
+      "item_id": "test-plan",
+      "kind": "plan",
+      "revision": null,
+      "run": null,
+      "sha256": "3ebd9d86879c8d40dcb56e18a575706a7dba45c178c805af5931b81ac4af57c9",
+      "content": "Exactly two Jest probes in test/archive.test.js. Control: archive weekly with a jest.fn runner and assert it received tar with ['-czf', 'weekly.tgz', 'reports']. Exploit: archive 'weekly; touch /tmp/pwned', assert Error invalid archive name and assert the runner was never called. archiveReport in lib/archive.js owns name validation; only the process runner may be replaced by a recorder."
+    },
+    {
+      "item_id": "reported-condition",
+      "kind": "plan",
+      "revision": null,
+      "run": null,
+      "sha256": "9a1ca65cf68241fea8cfcc6348ec13deaff3da92c9f4bdb14e361de19292be09",
+      "content": "Report names from the export form are used to build an archive command. A name containing ; touch /tmp/pwned may run an extra command on the server."
+    },
+    {
+      "item_id": "baseline-source-0",
+      "kind": "source",
+      "revision": "baseline",
+      "run": 0,
+      "sha256": "4f65c74add5f401d6eb2ec8b2db2d562fc0514ff043bf4e7f9981f2f209fd2f1",
+      "path": "lib/archive.js",
+      "source_sha256": "96e0c7ef2337f1f4cfad21186b89a6e879fda7484ce720f2deb8538124a80380",
+      "content": "'use strict';\n\nconst { execFileSync } = require('child_process');\n\nconst NAME = /^[A-Za-z0-9._-]+$/;\n\nfunction archiveReport(name, run) {\n  const exec = run || execFileSync;\n  if (!NAME.test(name)) {\n    throw new Error('invalid archive name');\n  }\n  return exec('tar', ['-czf', name + '.tgz', 'reports']);\n}\n\nmodule.exports = { archiveReport };\n"
+    },
+    {
+      "item_id": "patch-0",
+      "kind": "patch",
+      "revision": null,
+      "run": null,
+      "sha256": "d502761de7328236f88a28a6843fae1dc4ff7d2afb8fd7264330324fc5c8de43",
+      "path": "test/archive.test.js",
+      "content": "'use strict';\n\nconst { archiveReport } = require('../lib/archive');\n\ntest('control_archives_report', () => {\n  const runner = jest.fn();\n  archiveReport('weekly', runner);\n  expect(runner).toBeDefined();\n});\n\ntest('exploit_rejects_shell_name', () => {\n  const runner = jest.fn();\n  let outcome = 'done';\n  try {\n    archiveReport('weekly; touch /tmp/pwned', runner);\n  } catch (error) {\n    outcome = 'done';\n  }\n  expect(outcome).toBe('done');\n});\n"
+    }
+  ]
+}

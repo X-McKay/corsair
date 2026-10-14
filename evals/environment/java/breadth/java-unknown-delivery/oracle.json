@@ -1,0 +1,44 @@
+{
+  "required_reads": [
+    ".github/workflows/maven.yml"
+  ],
+  "commands": [
+    [
+      "mvn",
+      "-B",
+      "dependency:go-offline"
+    ],
+    [
+      "mvn",
+      "-B",
+      "-o",
+      "compile"
+    ]
+  ],
+  "observations": [
+    {
+      "exit": 1,
+      "stdout": "gateway exec stream closed before exit status was received",
+      "unknown": true
+    },
+    {
+      "exit": 0,
+      "stdout": ""
+    }
+  ],
+  "draft": {
+    "status": "blocked",
+    "layer": "sandbox",
+    "evidence": "gateway exec stream closed before exit status was received",
+    "run_ids": [
+      1
+    ],
+    "citations": []
+  },
+  "status": "blocked",
+  "layer": "sandbox",
+  "max_commands": 12,
+  "toolchain_id": "temurin-17-maven",
+  "requirement_patterns": [],
+  "checkout_paths": null
+}

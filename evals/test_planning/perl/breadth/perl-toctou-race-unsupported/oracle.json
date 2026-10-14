@@ -1,0 +1,28 @@
+{
+  "status": "unsupported",
+  "required_reads": [
+    "lib/Spool.pm",
+    "t/spool.t"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "unsupported",
+    "scope": "component",
+    "missing_capability": "The concern is a check-then-open race: showing it needs a concurrent actor that replaces the path between the -l check and open, with controlled scheduling, and the environment offers no concurrency or scheduling control, only native TAP outcomes",
+    "limitations": [
+      "No test specification is produced; a symlink created before the call exercises only the existing check, which the baseline already covers"
+    ],
+    "citations": [
+      {
+        "path": "lib/Spool.pm",
+        "start_line": 6,
+        "end_line": 13
+      },
+      {
+        "path": "t/spool.t",
+        "start_line": 1,
+        "end_line": 13
+      }
+    ]
+  }
+}

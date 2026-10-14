@@ -1,0 +1,108 @@
+{
+  "required_reads": [
+    ".github/workflows/maven.yml"
+  ],
+  "commands": [
+    [
+      "mvn",
+      "-B",
+      "dependency:go-offline"
+    ],
+    [
+      "mvn",
+      "-B",
+      "-o",
+      "compile"
+    ],
+    [
+      "mvn",
+      "-B",
+      "-o",
+      "test",
+      "-DlistTests=true"
+    ],
+    [
+      "mvn",
+      "-B",
+      "-o",
+      "test",
+      "-Dtest=CorsairSmokeTest#environmentRuns"
+    ]
+  ],
+  "observations": [
+    {
+      "exit": 0,
+      "stdout": ""
+    },
+    {
+      "exit": 0,
+      "stdout": "[INFO] BUILD SUCCESS\n"
+    },
+    {
+      "exit": 0,
+      "stdout": "CorsairSmokeTest#environmentRuns\n"
+    },
+    {
+      "exit": 0,
+      "stdout": "[INFO] -------------------------------------------------------\n[INFO]  T E S T S\n[INFO] -------------------------------------------------------\n[INFO] Running CorsairSmokeTest\n[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.042 s -- in CorsairSmokeTest\n[INFO] \n[INFO] Results:\n[INFO] \n[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0\n[INFO] \n[INFO] ------------------------------------------------------------------------\n[INFO] BUILD SUCCESS\n[INFO] ------------------------------------------------------------------------\n"
+    }
+  ],
+  "draft": {
+    "status": "ready",
+    "toolchain_id": "temurin-17-maven",
+    "recipe": [
+      {
+        "phase": "dependency",
+        "command": [
+          "mvn",
+          "-B",
+          "dependency:go-offline"
+        ],
+        "source": {
+          "path": ".github/workflows/maven.yml",
+          "start_line": 12,
+          "end_line": 12
+        }
+      }
+    ],
+    "build_command": [
+      "mvn",
+      "-B",
+      "-o",
+      "compile"
+    ],
+    "discovery_command": [
+      "mvn",
+      "-B",
+      "-o",
+      "test",
+      "-DlistTests=true"
+    ],
+    "framework": "junit5",
+    "baseline_test_id": "CorsairSmokeTest#environmentRuns",
+    "baseline_test_path": "src/test/java/CorsairSmokeTest.java",
+    "baseline_test_command": [
+      "mvn",
+      "-B",
+      "-o",
+      "test",
+      "-Dtest=CorsairSmokeTest#environmentRuns"
+    ],
+    "approved_test_paths": [
+      "src/test/java/CorsairControlTest.java",
+      "src/test/java/CorsairSecurityTest.java"
+    ]
+  },
+  "status": "ready",
+  "layer": null,
+  "max_commands": 12,
+  "toolchain_id": "temurin-17-maven",
+  "requirement_patterns": [],
+  "checkout_paths": [
+    ".github/workflows/maven.yml",
+    "pom.xml",
+    "src/main/java/org/acme/checksum/Crc32c.java",
+    "src/main/java/org/acme/checksum/Adler.java",
+    "src/test/java/CorsairSmokeTest.java"
+  ]
+}

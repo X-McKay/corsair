@@ -1,0 +1,12 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "open-redirect",
+  "kind": "negative",
+  "probes": "The test class defines its own safe_target with the guard's logic and never loads lib/redirect_guard.rb.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Written for this set; the property under review is in the frozen test patch, not the source."
+  }
+}

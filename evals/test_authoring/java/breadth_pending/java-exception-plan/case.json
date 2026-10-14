@@ -1,0 +1,17 @@
+{
+  "language": "java",
+  "framework": "junit5",
+  "family": "archive-path-traversal",
+  "kind": "pending-reader",
+  "probes": "An exception plan: the security test asserts the planned rejection exception with the framework's raise assertion",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Written for this set; the source shape follows common archive path traversal reports"
+  },
+  "behaviour_kind": "positive",
+  "pending": {
+    "missing": "authoring id grammar and JUnit assertion reader",
+    "note": "TestAuthoringInput refuses JUnit `Class#method` ids, and static.assertion_lines has no Java reader (the planned per-framework reader registry)"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "language": "java",
+  "framework": "junit5",
+  "family": "command-budget",
+  "kind": "failure-mode",
+  "probes": "An operator budget of two commands ends setup before discovery; blocked without cited runs, and no command beyond the budget is dispatched.",
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "n/a",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic manifests and recorded observations shaped after the toolchain images in deploy/runtime-matrix.yaml and tests/agents/framework_outputs."
+  }
+}

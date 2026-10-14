@@ -1,0 +1,10 @@
+{
+  "status": "ready",
+  "symbol": "getUser",
+  "path": "src/main/java/com/example/UserDao.java",
+  "required_lines": [
+    10,
+    12
+  ],
+  "max_span": 8
+}

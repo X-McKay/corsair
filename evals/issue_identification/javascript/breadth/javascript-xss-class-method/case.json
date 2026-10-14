@@ -1,0 +1,11 @@
+{
+  "language": "javascript",
+  "framework": "node",
+  "family": "xss",
+  "kind": "positive",
+  "probes": "Target is a method of an exported ES2015 class; a sibling method escapes its input.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)"
+  }
+}

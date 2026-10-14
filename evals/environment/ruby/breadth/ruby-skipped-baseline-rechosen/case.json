@@ -1,0 +1,14 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "baseline-not-passed",
+  "kind": "negative",
+  "probes": "A Minitest file with one skip exits 0 but is not a pass; ready only on another file with no failures, errors or skips.",
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "n/a",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic manifests and recorded observations shaped after the toolchain images in deploy/runtime-matrix.yaml and tests/agents/framework_outputs."
+  }
+}

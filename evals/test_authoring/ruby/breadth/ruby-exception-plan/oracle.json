@@ -1,0 +1,23 @@
+{
+  "script": [
+    {
+      "write": "reference"
+    },
+    {
+      "run": true
+    }
+  ],
+  "runner_runs": [
+    {
+      "status": "static"
+    }
+  ],
+  "status": "patch",
+  "runs": 1,
+  "security_assertion_lines": [
+    11
+  ],
+  "files": {
+    "reference": "require 'minitest/autorun'\nrequire 'tmpdir'\nrequire 'archive_paths'\n\nclass ArchivePathsSecurityTest < Minitest::Test\n  def test_benign_control\n    assert_equal File.join('out', 'docs/a.txt'), ArchivePaths.destination('out', 'docs/a.txt')\n  end\n\n  def test_security_refuses_escaping_entry\n    assert_raises(ArgumentError) { ArchivePaths.destination('out', '../../etc/cron.d/job') }\n  end\nend\n"
+  }
+}

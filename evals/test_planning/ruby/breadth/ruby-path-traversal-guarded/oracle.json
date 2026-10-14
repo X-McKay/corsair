@@ -1,0 +1,98 @@
+{
+  "status": "ready",
+  "symbol": "cleanup",
+  "target_path": "lib/rack/protection/path_traversal.rb",
+  "required_lines": [
+    22,
+    46
+  ],
+  "adversarial_markers": [
+    "%5c"
+  ],
+  "witness_markers": [
+    "assert_equal"
+  ],
+  "observation_kind": "return_value",
+  "required_reads": [
+    "lib/rack/protection/path_traversal.rb",
+    "test/path_traversal_test.rb"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_id": "test/path_traversal_security_test.rb::PathTraversalSecurityTest#test_keeps_plain_static_path",
+      "test_path": "test/path_traversal_security_test.rb",
+      "fixture_setup": [
+        "Build Rack::Protection::PathTraversal around a lambda app returning [200, {}, []]; no files are needed"
+      ],
+      "implementation_call": "protection.cleanup('/static/app.css')",
+      "input": "path '/static/app.css'",
+      "required_behavior": "Returns exactly '/static/app.css'",
+      "observable_witness": "assert_equal on the String returned by the real cleanup call",
+      "observation": {
+        "kind": "return_value",
+        "property": "Returns exactly '/static/app.css'",
+        "seam": "Call the real PathTraversal#cleanup on an instance wrapping a stub Rack app"
+      },
+      "source_references": [
+        {
+          "path": "lib/rack/protection/path_traversal.rb",
+          "start_line": 22,
+          "end_line": 46
+        }
+      ]
+    },
+    "security": {
+      "test_id": "test/path_traversal_security_test.rb::PathTraversalSecurityTest#test_resolves_encoded_backslash_traversal",
+      "test_path": "test/path_traversal_security_test.rb",
+      "fixture_setup": [
+        "Build Rack::Protection::PathTraversal around a lambda app returning [200, {}, []]; no files are needed"
+      ],
+      "implementation_call": "protection.cleanup('/static/..%5c..%5csecret.txt')",
+      "input": "path '/static/..%5c..%5csecret.txt'",
+      "required_behavior": "Returns exactly '/secret.txt': no .. segment and no backslash remain in the cleaned path",
+      "observable_witness": "assert_equal '/secret.txt' and refute_includes '..' on the String returned by the real cleanup call",
+      "observation": {
+        "kind": "return_value",
+        "property": "Returns exactly '/secret.txt': no .. segment and no backslash remain in the cleaned path",
+        "seam": "Call the real PathTraversal#cleanup on an instance wrapping a stub Rack app"
+      },
+      "source_references": [
+        {
+          "path": "lib/rack/protection/path_traversal.rb",
+          "start_line": 22,
+          "end_line": 46
+        }
+      ]
+    },
+    "security_expectation": {
+      "failure_type": "Minitest::Assertion",
+      "safe_behavior": "normalized_path_without_dot_segments"
+    },
+    "discovery_command": [
+      "bundle",
+      "exec",
+      "rake",
+      "test",
+      "TESTOPTS=--verbose"
+    ],
+    "evidence_requirements": [
+      "Native discovery lists exactly the two planned test methods",
+      "Both the control and the exploit probe execute with native Minitest outcomes and failure classes",
+      "Review the real source call, adversarial input and assertions before execution"
+    ],
+    "citations": [
+      {
+        "path": "lib/rack/protection/path_traversal.rb",
+        "start_line": 22,
+        "end_line": 46
+      }
+    ],
+    "limitations": [
+      "Only cleanup's returned path is observed; serving the file is outside this component",
+      "Double-encoded sequences (%252e) are not exercised by these two tests"
+    ]
+  }
+}

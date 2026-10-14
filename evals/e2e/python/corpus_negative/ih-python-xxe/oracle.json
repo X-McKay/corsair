@@ -1,0 +1,5 @@
+{
+  "label": "INCONCLUSIVE",
+  "disposition": null,
+  "why": "A probe of the absence path: the safe parser never opens a file and returns normally, so the plan's safe behavior must be no_file_open; SPEC-0040 calibration needs the control's call to record its own file open, and no benign input makes this parser open one."
+}

@@ -1,0 +1,68 @@
+{
+  "scope": "component",
+  "plan": {
+    "control_test_id": "t/files.t#control_reads_document",
+    "security_test_id": "t/files.t#exploit_rejects_parent_traversal",
+    "expected_failure": {
+      "exception_type": "Test::More::not_ok",
+      "path": "t/files.t",
+      "function": "exploit_rejects_parent_traversal",
+      "assertion_lines": [
+        29,
+        30
+      ]
+    },
+    "expected_safe_behavior": "die",
+    "frozen_patch_sha256": "65ad5e877f07ebd97133fea58438874df3102a8c6dd1231aa5b3fb5a9da0b74a",
+    "observation_mode": "unit_test",
+    "test_plan_sha256": "eb10d1a37dc794ab8a0f3f3005d24113fe9b3c5aec67d066841664ae8d3bfd52"
+  },
+  "revision_sources": {
+    "baseline": "eeaca34f23d8fc497376f5c88d263f45a4adb6fab86939b473f9c405155040b7"
+  },
+  "items": [
+    {
+      "item_id": "plan",
+      "kind": "plan",
+      "revision": null,
+      "run": null,
+      "sha256": "1f0af111f49d6459f5f97cc3174cccf329f558066def5db03f1632ec6a0f0d8d",
+      "content": "{\n  \"control_test_id\": \"t/files.t#control_reads_document\",\n  \"security_test_id\": \"t/files.t#exploit_rejects_parent_traversal\",\n  \"expected_failure\": {\n    \"exception_type\": \"Test::More::not_ok\",\n    \"path\": \"t/files.t\",\n    \"function\": \"exploit_rejects_parent_traversal\",\n    \"assertion_lines\": [\n      29,\n      30\n    ]\n  },\n  \"expected_safe_behavior\": \"die\",\n  \"frozen_patch_sha256\": \"65ad5e877f07ebd97133fea58438874df3102a8c6dd1231aa5b3fb5a9da0b74a\",\n  \"observation_mode\": \"unit_test\",\n  \"test_plan_sha256\": \"eb10d1a37dc794ab8a0f3f3005d24113fe9b3c5aec67d066841664ae8d3bfd52\"\n}"
+    },
+    {
+      "item_id": "test-plan",
+      "kind": "plan",
+      "revision": null,
+      "run": null,
+      "sha256": "eb10d1a37dc794ab8a0f3f3005d24113fe9b3c5aec67d066841664ae8d3bfd52",
+      "content": "Exactly two Test::More subtests in t/files.t. Control: read_file(\"$dir/docs\", 'note.txt') returns hello. Exploit: with secret.txt beside the root, read_file(\"$dir/docs\", '../secret.txt') dies and $@ matches outside root. My::Files::read_file in lib/My/Files.pm owns the containment check; the filesystem is a temporary directory and read_file is never redefined."
+    },
+    {
+      "item_id": "reported-condition",
+      "kind": "plan",
+      "revision": null,
+      "run": null,
+      "sha256": "6680d77da0ea2489b4fc9e80ece9271c128b7ca1a94a95b915fc435cd851026b",
+      "content": "File names from the download handler reach My::Files::read_file. A name such as ../secret.txt may resolve outside the document root and return another file."
+    },
+    {
+      "item_id": "baseline-source-0",
+      "kind": "source",
+      "revision": "baseline",
+      "run": 0,
+      "sha256": "c9b259842018325818c7fb656d679cfb4ff2aae72bb91eef7fa94b6986a36a85",
+      "path": "lib/My/Files.pm",
+      "source_sha256": "eeaca34f23d8fc497376f5c88d263f45a4adb6fab86939b473f9c405155040b7",
+      "content": "package My::Files;\nuse strict;\nuse warnings;\nuse Cwd qw(realpath);\nuse File::Spec;\nuse Exporter 'import';\nour @EXPORT_OK = qw(read_file);\n\nsub read_file {\n    my ($root, $name) = @_;\n    my $base = realpath($root);\n    my $path = realpath(File::Spec->catfile($base, $name));\n    die \"outside root\\n\" unless defined $path && index($path, \"$base/\") == 0;\n    open my $fh, '<', $path or die \"cannot open: $!\\n\";\n    local $/;\n    return scalar <$fh>;\n}\n\n1;\n"
+    },
+    {
+      "item_id": "patch-0",
+      "kind": "patch",
+      "revision": null,
+      "run": null,
+      "sha256": "92111da4811a60fab6be6f4d6c47f40daf76cfd9fd7677b48d46703ad134239c",
+      "path": "t/files.t",
+      "content": "use strict;\nuse warnings;\nuse Test::More;\nuse File::Temp qw(tempdir);\nuse lib 'lib';\nuse My::Files qw(read_file);\n\nmy $dir = tempdir(CLEANUP => 1);\nmkdir \"$dir/docs\" or die $!;\nopen my $note, '>', \"$dir/docs/note.txt\" or die $!;\nprint {$note} 'hello';\nclose $note;\nopen my $secret, '>', \"$dir/secret.txt\" or die $!;\nprint {$secret} 'token';\nclose $secret;\n\nsubtest control_reads_document => sub {\n    is(read_file(\"$dir/docs\", 'note.txt'), 'hello', 'reads file inside root');\n};\n\nsubtest exploit_rejects_parent_traversal => sub {\n    no warnings 'redefine';\n    local *My::Files::read_file = sub {\n        my ($root, $name) = @_;\n        die \"outside root\\n\" if $name =~ /\\.\\./;\n        return 'hello';\n    };\n    my $ok = eval { My::Files::read_file(\"$dir/docs\", '../secret.txt'); 1 };\n    ok(!$ok, 'parent traversal is refused');\n    like($@, qr/^outside root/, 'refusal comes from root containment');\n};\n\ndone_testing;\n"
+    }
+  ]
+}

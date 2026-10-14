@@ -1,0 +1,46 @@
+{
+  "scope": "component",
+  "identification": {
+    "status": "ready",
+    "scope": "component",
+    "reason": null,
+    "reported_issue": "UserDao.getUser builds its query from the name parameter. A name such as ' OR '1'='1 may change the SQL statement. Assess query construction only.",
+    "target": {
+      "symbol": "getUser",
+      "source": {
+        "path": "src/main/java/com/example/UserDao.java",
+        "start_line": 10,
+        "end_line": 12,
+        "quote": "    public ResultSet getUser(Connection conn, String name) throws SQLException {\n        Statement st = conn.createStatement();\n        return st.executeQuery(\"SELECT id, name, secret FROM users WHERE name = '\" + name + \"'\");"
+      }
+    }
+  },
+  "source_files": [
+    {
+      "path": "src/main/java/com/example/UserDao.java",
+      "content": "package com.example;\n\nimport java.sql.Connection;\nimport java.sql.ResultSet;\nimport java.sql.SQLException;\nimport java.sql.Statement;\n\npublic class UserDao {\n    /** Look up a user by name. */\n    public ResultSet getUser(Connection conn, String name) throws SQLException {\n        Statement st = conn.createStatement();\n        return st.executeQuery(\"SELECT id, name, secret FROM users WHERE name = '\" + name + \"'\");\n    }\n}\n"
+    }
+  ],
+  "environment": {
+    "language": "Java",
+    "runtime": "OpenJDK 17",
+    "framework": "junit5",
+    "discovery_command": [
+      "mvn",
+      "-o",
+      "-B",
+      "-q",
+      "test-compile"
+    ],
+    "approved_test_paths": [
+      "src/test/java/com/example/UserDaoSecurityTest.java"
+    ],
+    "baseline_test": null,
+    "scratch_location": "The per-test JUnit @TempDir directory; fixtures must not be created elsewhere",
+    "observation_facilities": [
+      "Native Maven Surefire XML outcomes per test with failure type and location; JUnit 5 assertion failures, including assertThrows when no exception is thrown, report org.opentest4j.AssertionFailedError",
+      "JUnit 5 @TempDir per-test directories and assertThrows for a specific exception type"
+    ],
+    "witness_facilities": []
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "fixture_id": "python-path-flask-route-siblings",
+  "issue": "GET /user_picture2?p=../../../etc/passwd appears to return files from outside /server/static/images. Locate the implementation that resolves the p parameter for that route.",
+  "scope": "component",
+  "source_files": [
+    {
+      "path": "app.py",
+      "content": "import os.path\nfrom flask import Flask, request, abort\n\napp = Flask(__name__)\n\n@app.route(\"/user_picture1\")\ndef user_picture1():\n    filename = request.args.get('p')\n    data = open(filename, 'rb').read()\n    return data\n\n@app.route(\"/user_picture2\")\ndef user_picture2():\n    base_path = '/server/static/images'\n    filename = request.args.get('p')\n    data = open(os.path.join(base_path, filename), 'rb').read()\n    return data\n\n@app.route(\"/user_picture3\")\ndef user_picture3():\n    base_path = '/server/static/images'\n    filename = request.args.get('p')\n    fullpath = os.path.normpath(os.path.join(base_path, filename))\n    if not fullpath.startswith(base_path):\n        raise Exception(\"not allowed\")\n    data = open(fullpath, 'rb').read()\n    return data\n"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "fixture_id": "java-missing-service-only-caller",
+  "issue": "ResetTokenService.validateResetToken compares the submitted reset token with the stored one using String.equals, which may leak timing. Locate validateResetToken.",
+  "scope": "component",
+  "source_files": [
+    {
+      "path": "src/main/java/com/example/auth/PasswordResetController.java",
+      "content": "package com.example.auth;\n\nimport org.springframework.http.ResponseEntity;\nimport org.springframework.web.bind.annotation.PostMapping;\nimport org.springframework.web.bind.annotation.RequestParam;\nimport org.springframework.web.bind.annotation.RestController;\n\n@RestController\npublic class PasswordResetController {\n    private final ResetTokenService resetTokenService;\n\n    public PasswordResetController(ResetTokenService resetTokenService) {\n        this.resetTokenService = resetTokenService;\n    }\n\n    @PostMapping(\"/reset\")\n    public ResponseEntity<Void> reset(@RequestParam String user, @RequestParam String token) {\n        if (!resetTokenService.validateResetToken(user, token)) {\n            return ResponseEntity.status(403).build();\n        }\n        return ResponseEntity.noContent().build();\n    }\n}\n"
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "scope": "component",
+  "identification": {
+    "status": "ready",
+    "scope": "component",
+    "reason": null,
+    "reported_issue": "Backup#archive receives the project name from the admin form. A name such as site; touch pwned may be executed by a shell. Assess command construction only.",
+    "target": {
+      "symbol": "archive",
+      "source": {
+        "path": "lib/backup.rb",
+        "start_line": 9,
+        "end_line": 10,
+        "quote": "  def archive(project)\n    @runner.call(\"tar czf backups/#{project}.tgz projects/#{project}\")"
+      }
+    }
+  },
+  "source_files": [
+    {
+      "path": "lib/backup.rb",
+      "content": "# frozen_string_literal: true\n\nclass Backup\n  def initialize(runner = Kernel.method(:system))\n    @runner = runner\n  end\n\n  # Archive one project directory into the backups folder.\n  def archive(project)\n    @runner.call(\"tar czf backups/#{project}.tgz projects/#{project}\")\n  end\nend\n"
+    },
+    {
+      "path": "test/backup_test.rb",
+      "content": "# frozen_string_literal: true\n\nrequire 'minitest/autorun'\nrequire 'backup'\n\nclass BackupTest < Minitest::Test\n  def test_returns_runner_result\n    assert_equal true, Backup.new(->(*_args) { true }).archive('site')\n  end\nend\n"
+    }
+  ],
+  "environment": {
+    "language": "Ruby",
+    "runtime": "Ruby 3.1",
+    "framework": "minitest",
+    "discovery_command": [
+      "bundle",
+      "exec",
+      "rake",
+      "test",
+      "TESTOPTS=--verbose"
+    ],
+    "approved_test_paths": [
+      "test/backup_security_test.rb"
+    ],
+    "baseline_test": {
+      "test_id": "test/backup_test.rb::BackupTest#test_returns_runner_result",
+      "path": "test/backup_test.rb"
+    },
+    "scratch_location": "Per-test in-memory recording dependency only",
+    "observation_facilities": [
+      "Native Minitest results per test with failure class and location",
+      "Minitest assert_raises for a specific exception class and Dir.mktmpdir per-test directories"
+    ],
+    "assertion_facts": [
+      "Minitest assertion failures, including assert_raises when the expected exception is not raised, report Minitest::Assertion. Match the planned native failure type."
+    ],
+    "witness_facilities": []
+  }
+}

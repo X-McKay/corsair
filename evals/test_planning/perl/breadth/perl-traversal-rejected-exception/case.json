@@ -1,0 +1,12 @@
+{
+  "language": "perl",
+  "framework": "tap-harness",
+  "family": "path-traversal",
+  "kind": "positive",
+  "probes": "Perl three-argument open traversal planned as a die-message exception observation (eval plus like on $@) in a tempdir fixture.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic Docs module."
+  }
+}

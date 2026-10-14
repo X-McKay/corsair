@@ -1,7 +1,6 @@
 """Frozen outcome-blind semantic review evaluation; scripted mode checks plumbing, live mode judges skill behavior."""
 import argparse
 import asyncio
-from hashlib import sha256
 import json
 from pathlib import Path
 from time import perf_counter
@@ -22,21 +21,21 @@ from corsair.agents.evidence_assessment.contracts import ValidityInput
 from corsair.agents.evidence_assessment.dependencies import AssessmentDependencies
 from corsair.inference.config import load_agent_config
 from corsair.inference.models import configured_model
+from evals.cases import LANGUAGES, load_set, set_digest
 from evals.evidence_assessment.evaluate import EvaluationBudget, describe_model, record_count
 
 EVALUATOR_VERSION = 'unit-validity-v2-structured-classification'
-CASES = Path(__file__).with_name('unit_test_cases_v2.json')
+SUITE = 'evidence_assessment'
+# Pre-execution validity sets (per-case directories, evals/cases.py). Each oracle holds the expected flags and the
+# structured review the scripted model replays. breadth_pending predates the structured review (no scripted_review).
+SETS = ('unit', 'unit-transfer', 'breadth_pending')
 FLAGS = ('source_linked', 'condition_exercised', 'assertions_relevant', 'dependency_scope_valid')
 
 
-def dataset(path=CASES):
-    raw = json.loads(path.read_text())
-    manifest = path.with_name(path.name.replace('cases', 'manifest'))
-    hashes = {case['name']: sha256(json.dumps(case, sort_keys=True).encode()).hexdigest() for case in raw}
-    if hashes != json.loads(manifest.read_text()):
-        raise ValueError('validity cases differ from their frozen manifest')
-    return Dataset(name="unit-test-validity-v2", cases=[Case(name=c['name'], inputs=ValidityInput.model_validate_json(json.dumps(c['inputs'])),
-        metadata={'expected': c['expected'], 'scripted_review': c['scripted_review']}) for c in raw])
+def dataset(cases='unit', language=None):
+    return Dataset(name=f"unit-test-validity-{cases}", cases=[Case(name=c.name,
+        inputs=ValidityInput.model_validate_json(json.dumps(c.input)), metadata=c.oracle)
+        for c in load_set(SUITE, cases, language)])
 
 
 def review_classification(output, expected):
@@ -68,6 +67,7 @@ def outcome_summary(report):
             ('validationerror', 'maximum output retries', 'output validation')) else 'task_failure'] += 1
     return {'evaluator_version': EVALUATOR_VERSION, 'attempts': len(report.cases) + len(report.failures),
         'outcomes': dict(counts), 'report_evaluator_defects': len(report.report_evaluator_failures)}
+
 
 
 
@@ -105,9 +105,9 @@ def scripted_model(inputs, expected):
     return FunctionModel(respond)
 
 
-async def evaluate(destination, repeat=1, model=None, cases=CASES):
+async def evaluate(destination, repeat=1, model=None, cases='unit', language=None):
     destination.mkdir(parents=True, exist_ok=False)
-    corpus = dataset(cases)
+    corpus = dataset(cases, language)
     corpus.evaluators.append(ValidityScore())
     offline = model is None
     budget = EvaluationBudget(repeat=repeat)
@@ -116,8 +116,8 @@ async def evaluate(destination, repeat=1, model=None, cases=CASES):
         'model': describe_model(model or next(iter(selected.values()))),
         'prompt_version': PROMPT_VERSION, 'config_version': CONFIG_VERSION,
         'skill_sha256': SKILL_SHA256, 'toolset_sha256': TOOLSET_SHA256,
-        'evaluator_version': EVALUATOR_VERSION, 'dataset_file': cases.name,
-        'dataset_sha256': sha256(cases.read_bytes()).hexdigest(), 'budget': budget.model_dump(),
+        'evaluator_version': EVALUATOR_VERSION, 'dataset': cases, 'language': language,
+        'dataset_sha256': set_digest(SUITE, cases), 'budget': budget.model_dump(),
         'task_retries': 0, 'max_concurrency': 1}
     metadata |= MANIFEST_IDENTITY
     (destination / 'configuration.json').write_text(json.dumps(metadata, indent=2))
@@ -154,17 +154,17 @@ async def evaluate(destination, repeat=1, model=None, cases=CASES):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--evidence', type=Path, required=True)
-    parser.add_argument('--cases', choices=('unit', 'transfer'), default='unit')
     parser.add_argument('--repeat', type=int, default=1)
     parser.add_argument('--provider-config', type=Path)
+    parser.add_argument('--cases', choices=SETS, default='unit')
+    parser.add_argument('--language', choices=LANGUAGES, help="only this language's cases of the set")
     args = parser.parse_args()
-    cases = CASES if args.cases == 'unit' else CASES.with_name('unit_transfer_cases_v2.json')
     async def run():
         if args.provider_config is None:
-            return await evaluate(args.evidence, args.repeat, cases=cases)
+            return await evaluate(args.evidence, args.repeat, cases=args.cases, language=args.language)
         config = load_agent_config(args.provider_config, 'assessment')
         async with configured_model(config) as model:
-            return await evaluate(args.evidence, args.repeat, model, cases=cases)
+            return await evaluate(args.evidence, args.repeat, model, cases=args.cases, language=args.language)
     raise SystemExit(0 if asyncio.run(run()) else 1)
 
 if __name__ == '__main__':

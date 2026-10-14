@@ -16,11 +16,15 @@ def test_experiment_rubric_and_before_inputs_stay_frozen():
     path = EXPERIMENT / 'rubric-v1.json'
     assert sha256(path.read_bytes()).hexdigest() == path.with_suffix('.sha256').read_text().strip()
     rubric = json.loads(path.read_text())
+    from evals.cases import load_set
+    # The frozen rubric names the single files these sets were moved from; each now lives as a per-case set.
+    moved = {'evals/evidence_assessment/unit_test_cases_v2.json': 'unit',
+             'evals/evidence_assessment/unit_transfer_cases_v2.json': 'unit-transfer'}
     for group in rubric['validity_sets'].values():
-        cases = json.loads((ROOT / group['source']).read_text())
-        assert {case['name']: sha256(json.dumps(case['inputs'], sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+        cases = load_set('evidence_assessment', moved[group['source']])
+        assert {case.name: sha256(json.dumps(case.input, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
                 for case in cases} == group['inputs']
-        assert {case['name']: all(case['expected'].values()) for case in cases} == group['expected_valid']
+        assert {case.name: all(case.oracle['expected'].values()) for case in cases} == group['expected_valid']
 
 
 @pytest.mark.parametrize('expected,decision,result', [
@@ -57,8 +61,9 @@ def test_native_calibration_exposes_copied_and_vacuous_pairs(tmp_path):
 
 def structured_review():
     from corsair.agents.evidence_assessment.contracts import ValidityReview, EvidenceReference
-    cases = json.loads((ROOT / 'evals/evidence_assessment/unit_test_cases_v2.json').read_text())
-    return ValidityReview[EvidenceReference].model_validate(cases[0]['scripted_review'])
+    from evals.cases import load_set
+    case = load_set('evidence_assessment', 'unit')[0]
+    return ValidityReview[EvidenceReference].model_validate(case.oracle['scripted_review'])
 
 
 def test_shared_projection_distinguishes_known_defect_from_uncertainty():

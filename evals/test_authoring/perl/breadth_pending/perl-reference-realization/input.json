@@ -1,0 +1,118 @@
+{
+  "fixture_id": "perl-reference-realization-v1",
+  "inputs": {
+    "plan": {
+      "status": "ready",
+      "scope": "component",
+      "security_expectation": {
+        "failure_type": "not_ok",
+        "safe_behavior": "undef_outside_root"
+      },
+      "discovery_command": [
+        "prove",
+        "-l",
+        "t/notes.t"
+      ],
+      "evidence_requirements": [
+        "Both control and exploit probe must execute with native outcomes",
+        "Review both real source calls, adversarial input and assertions before execution"
+      ],
+      "citations": [
+        {
+          "path": "lib/Notes.pm",
+          "start_line": 7,
+          "end_line": 16,
+          "quote": "sub read_note {\n    my ($root, $name) = @_;\n    my $file = File::Spec->catfile($root, $name);\n    return undef unless -f $file;\n    open my $fh, '<', $file or return undef;\n    local $/;\n    my $text = <$fh>;\n    close $fh;\n    return $text;\n}"
+        }
+      ],
+      "limitations": [
+        "Path traversal at this one call only; callers and deployment configuration are outside the observation"
+      ],
+      "control": {
+        "test_id": "t/notes_security.t#benign_control",
+        "test_path": "t/notes_security.t",
+        "fixture_setup": [
+          "Create a temporary directory with a notes root inside it",
+          "Write todo.txt inside the notes root and secret.txt in the parent directory"
+        ],
+        "implementation_call": "Notes::read_note($root, $name)",
+        "input": "name 'todo.txt' for a note inside the notes root",
+        "required_behavior": "Returns the content of a note stored inside the root",
+        "observable_witness": "Native tap-harness assertion on returns the content of a note stored inside the root",
+        "observation": {
+          "kind": "return_value",
+          "property": "Returns the content of a note stored inside the root",
+          "seam": "Call the real Notes::read_note through its public interface"
+        },
+        "source_references": [
+          {
+            "path": "lib/Notes.pm",
+            "start_line": 7,
+            "end_line": 16,
+            "quote": "sub read_note {\n    my ($root, $name) = @_;\n    my $file = File::Spec->catfile($root, $name);\n    return undef unless -f $file;\n    open my $fh, '<', $file or return undef;\n    local $/;\n    my $text = <$fh>;\n    close $fh;\n    return $text;\n}"
+          }
+        ]
+      },
+      "security": {
+        "test_id": "t/notes_security.t#security_stays_inside_root",
+        "test_path": "t/notes_security.t",
+        "fixture_setup": [
+          "Create a temporary directory with a notes root inside it",
+          "Write todo.txt inside the notes root and secret.txt in the parent directory"
+        ],
+        "implementation_call": "Notes::read_note($root, $name)",
+        "input": "name '../secret.txt' naming a file beside, not inside, the notes root",
+        "required_behavior": "Returns undef for a name that resolves outside the notes root instead of the file's content",
+        "observable_witness": "Native tap-harness assertion on returns undef for a name that resolves outside the notes root instead of the file's content",
+        "observation": {
+          "kind": "return_value",
+          "property": "Returns undef for a name that resolves outside the notes root instead of the file's content",
+          "seam": "Call the real Notes::read_note through its public interface"
+        },
+        "source_references": [
+          {
+            "path": "lib/Notes.pm",
+            "start_line": 7,
+            "end_line": 16,
+            "quote": "sub read_note {\n    my ($root, $name) = @_;\n    my $file = File::Spec->catfile($root, $name);\n    return undef unless -f $file;\n    open my $fh, '<', $file or return undef;\n    local $/;\n    my $text = <$fh>;\n    close $fh;\n    return $text;\n}"
+          }
+        ]
+      }
+    },
+    "source_files": [
+      {
+        "path": "lib/Notes.pm",
+        "content": "package Notes;\n# Plain-file notes kept under one directory.\nuse strict;\nuse warnings;\nuse File::Spec;\n\nsub read_note {\n    my ($root, $name) = @_;\n    my $file = File::Spec->catfile($root, $name);\n    return undef unless -f $file;\n    open my $fh, '<', $file or return undef;\n    local $/;\n    my $text = <$fh>;\n    close $fh;\n    return $text;\n}\n\n1;\n"
+      },
+      {
+        "path": "t/notes.t",
+        "content": "use strict;\nuse warnings;\nuse Test::More;\nuse File::Temp qw(tempdir);\nuse File::Spec;\nuse Notes;\n\nsub write_file {\n    my ($path, $text) = @_;\n    open my $fh, '>', $path or die \"cannot write $path: $!\";\n    print {$fh} $text;\n    close $fh;\n}\n\nmy $root = tempdir(CLEANUP => 1);\nwrite_file(File::Spec->catfile($root, 'todo.txt'), 'milk');\nis(Notes::read_note($root, 'todo.txt'), 'milk', 'reads an existing note');\n\ndone_testing();\n"
+      }
+    ],
+    "environment": {
+      "language": "Perl",
+      "runtime": "Perl 5.26",
+      "framework": "tap-harness",
+      "discovery_command": [
+        "prove",
+        "-l",
+        "t/notes.t"
+      ],
+      "approved_test_paths": [
+        "t/notes_security.t"
+      ],
+      "baseline_test": {
+        "test_id": "t/notes.t",
+        "path": "t/notes.t"
+      },
+      "scratch_location": "A per-subtest File::Temp tempdir with CLEANUP",
+      "observation_facilities": [
+        "Native TAP stream: outcome, failure location and diagnostics per top-level subtest"
+      ],
+      "assertion_facts": [
+        "A failed Test::More assertion is reported with failure type not_ok and a subtest that dies with die. Match the planned native failure type."
+      ],
+      "witness_facilities": []
+    }
+  }
+}

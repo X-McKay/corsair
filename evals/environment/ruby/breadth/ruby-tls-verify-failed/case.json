@@ -1,0 +1,14 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "tls",
+  "kind": "failure-mode",
+  "probes": "Bundler cannot verify rubygems.org's certificate; blocked at the tls layer without switching to an http source.",
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "n/a",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic manifests and recorded observations shaped after the toolchain images in deploy/runtime-matrix.yaml and tests/agents/framework_outputs."
+  }
+}

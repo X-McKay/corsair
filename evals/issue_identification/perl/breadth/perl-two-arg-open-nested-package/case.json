@@ -1,0 +1,11 @@
+{
+  "language": "perl",
+  "framework": "perl",
+  "family": "command-injection",
+  "kind": "positive",
+  "probes": "Method-style sub ($self from @_) in a nested package path using two-argument open, beside a list method.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)"
+  }
+}

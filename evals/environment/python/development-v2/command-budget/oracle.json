@@ -1,0 +1,69 @@
+{
+  "required_reads": [
+    ".github/workflows/ci.yml"
+  ],
+  "commands": [
+    [
+      "python3.12",
+      "-m",
+      "pip",
+      "install",
+      "--require-hashes",
+      "--only-binary",
+      ":all:",
+      "--no-compile",
+      "-r",
+      "requirements.txt"
+    ],
+    [
+      "python3.12",
+      "-m",
+      "compileall",
+      "-q",
+      "-b",
+      "documents.py"
+    ],
+    [
+      "python3.12",
+      "-m",
+      "pytest",
+      "--collect-only",
+      "-q"
+    ],
+    [
+      "python3.12",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_documents.py::test_reads_document"
+    ]
+  ],
+  "observations": [
+    {
+      "exit": 0,
+      "stdout": ""
+    },
+    {
+      "exit": 0,
+      "stdout": ""
+    },
+    {
+      "exit": 0,
+      "stdout": "tests/test_documents.py::test_reads_document\n1 test collected\n"
+    },
+    {
+      "exit": 0,
+      "stdout": "1 passed in 0.01s\n"
+    }
+  ],
+  "draft": {
+    "status": "blocked",
+    "layer": "unknown",
+    "evidence": "budget exhausted before setup completed",
+    "run_ids": [],
+    "citations": []
+  },
+  "status": "blocked",
+  "layer": "unknown",
+  "max_commands": 1
+}

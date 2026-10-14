@@ -1,0 +1,31 @@
+{
+  "case_class": "true_pair",
+  "split": "held_out",
+  "gate": {
+    "execution": "completed",
+    "finding": "reproduced",
+    "fix": "verified"
+  },
+  "honest": {
+    "execution": "completed",
+    "finding": "reproduced",
+    "fix": "verified"
+  },
+  "honest_note": null,
+  "required_reads": [
+    "plan",
+    "baseline-0-junit",
+    "baseline-0-witness",
+    "candidate-0-junit",
+    "candidate-0-witness"
+  ],
+  "witness_items": {
+    "baseline": [
+      "baseline-0-witness"
+    ],
+    "candidate": [
+      "candidate-0-witness"
+    ]
+  },
+  "injection_markers": []
+}
