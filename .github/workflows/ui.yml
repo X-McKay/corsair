@@ -1,0 +1,53 @@
+name: UI checks
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: '0.12.23'
+          python-version: '3.12'
+      - run: make ui-install ui-check
+      - run: npx playwright install --with-deps chromium
+        working-directory: ui
+      - run: make ui-test
+      - name: Build production image
+        run: docker build -f deploy/ui/Dockerfile -t corsair-ui:ci .
+      - name: Check production image against actual scripted v2 records
+        run: |
+          data=$(mktemp -d /tmp/corsair-ui-ci-XXXXXX)
+          chmod 755 "$data"
+          uv run --locked python -m evals.run chain --results "$data/evals"
+          # File three of the chain eval's own run records the way `corsair-v2 run` writes them.
+          mkdir -p "$data/v2/runs"
+          for record in $(ls -d "$data"/evals/chain/*/evidence/runs/* | head -3); do
+            cp -r "$record" "$data/v2/runs/$(jq -r .run_id "$record/run.json")"
+          done
+          python3 deploy/ui/smoke.py --image corsair-ui:ci --data "$data" --runtime-matrix deploy/v2/runtime-matrix.yaml
+      - name: Retain browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ui-browser-failures
+          path: ui/test-results/
+          if-no-files-found: ignore
+          retention-days: 7

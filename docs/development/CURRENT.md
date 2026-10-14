@@ -6,6 +6,7 @@ Develop started fresh on 2026-10-14: the v1 records, qualification reports and r
 
 | Active or latest work | State | Records |
 | --- | --- | --- |
+| Read-only UI over v2 records (supersedes PR #107) | This PR: `make ui` reads run records (`corsair-v2-run/1`, incl. each chain eval attempt), eval runs, baselines, the v2 matrix, Temporal `corsair.v2.Investigation` and OpenShell health; tests/ui and Playwright over real scripted output pass; image smoke in CI; no live deployment | [SPEC-0084](specs/SPEC-0084-v2-results-ui.md), [PLAN-0105](plans/PLAN-0105-v2-results-ui.md), [HANDOFF-0139](handoffs/HANDOFF-0139-v2-results-ui.md) |
 | Evaluation accounting and declared policy scope (PR #174) | Independent draft; rebased to a00bbbc; owner feedback addressed; independent full/focused/post-cleanup checks passed (see plan); no automatic merge/live qualification | [PLAN-0102](plans/PLAN-0102-evaluation-accounting.md) |
 | CLI presentation, JSON and direct lifecycle receipts (PR #175) | Independent draft; rebased to a00bbbc; owner feedback addressed; independent full/focused/post-cleanup checks passed (see plan); no automatic merge/live qualification | [PLAN-0103](plans/PLAN-0103-cli-lifecycle-polish.md) |
 | Shared developer skills and configuration golden path (PR #176) | Independent draft; rebased to a00bbbc; owner feedback addressed; independent full/focused/post-cleanup checks passed (see plan); no automatic merge/live qualification | [PLAN-0104](plans/PLAN-0104-developer-golden-path.md) |

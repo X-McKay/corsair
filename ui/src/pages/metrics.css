@@ -1,0 +1,274 @@
+.agent-cards {
+  display: grid;
+  gap: 20px;
+}
+.agent-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 22px;
+  min-width: 0;
+}
+.agent-card-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.agent-card-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+}
+.agent-card-heading p,
+.agent-cohort-label,
+.metrics-caption {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.agent-card-heading p {
+  margin-top: 6px;
+}
+.agent-cohort-label {
+  margin: 12px 0 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.metrics-caption {
+  margin-bottom: 18px;
+}
+.cohort-picker {
+  font-size: 11px;
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  max-width: 100%;
+}
+.cohort-picker select {
+  max-width: 340px;
+  width: 100%;
+  font-size: 12px;
+}
+.agent-card-body {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.95fr) minmax(0, 1.2fr) minmax(0, 1.2fr);
+  gap: 24px;
+}
+.agent-outcomes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-content: start;
+  gap: 20px 12px;
+}
+.agent-stat {
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+.agent-stat span {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+}
+.agent-stat strong {
+  display: block;
+  font-size: 20px;
+  margin: 8px 0 5px;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+.agent-stat small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  display: block;
+}
+.accuracy-status {
+  grid-column: 1/-1;
+}
+.accuracy-status strong {
+  font-size: 15px;
+}
+.distribution {
+  min-width: 0;
+}
+.distribution h3 {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+.distribution-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+  font-variant-numeric: tabular-nums;
+}
+.distribution-summary strong {
+  font-size: 20px;
+  font-weight: 550;
+}
+.distribution-summary span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.histogram-container {
+  min-height: 123px;
+  margin-top: 5px;
+}
+.histogram {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.chart-axis {
+  stroke: var(--border);
+}
+.chart-bar {
+  fill: var(--accent);
+  opacity: 0.28;
+}
+.chart-frequency {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.chart-label {
+  fill: var(--muted);
+  font-family: inherit;
+  font-size: 11px;
+}
+.distribution-empty {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 30px 0;
+  line-height: 1.6;
+}
+.distribution-note {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 8px 0;
+}
+.distribution-data summary,
+.agent-evidence summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 12px;
+}
+.distribution-data table {
+  table-layout: fixed;
+  margin-top: 10px;
+}
+.distribution-data th,
+.distribution-data td {
+  white-space: normal;
+  padding: 8px;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.agent-evidence {
+  margin-top: 18px;
+  border-top: 1px solid var(--border);
+  padding-top: 15px;
+}
+.agent-evidence p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 16px 0;
+}
+.agent-evidence code {
+  overflow-wrap: anywhere;
+}
+.agent-evidence .identity {
+  padding: 0;
+}
+.agent-usage {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin: 15px 0;
+  font-size: 12px;
+}
+.agent-usage dt {
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+.agent-usage dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.agent-usage small {
+  color: var(--muted);
+}
+.agent-card > .notice {
+  margin: 16px 0 0;
+}
+.overview-distributions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+.overview-distributions > .panel {
+  padding: 22px;
+  margin: 0;
+}
+.distribution-mode {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 16px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.distribution-mode select {
+  font-size: 12px;
+}
+@media (max-width: 1150px) {
+  .agent-card-body {
+    grid-template-columns: 1fr 1fr;
+  }
+  .agent-outcomes {
+    grid-column: 1/-1;
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+  .accuracy-status {
+    grid-column: auto;
+  }
+}
+@media (max-width: 600px) {
+  .agent-card {
+    padding: 18px;
+  }
+  .agent-card-body,
+  .overview-distributions {
+    grid-template-columns: 1fr;
+  }
+  .agent-outcomes {
+    grid-template-columns: 1fr 1fr;
+  }
+  .accuracy-status {
+    grid-column: 1/-1;
+  }
+  .cohort-picker {
+    width: 100%;
+  }
+  .cohort-picker select {
+    max-width: 100%;
+  }
+  .agent-card-heading h2 {
+    font-size: 17px;
+  }
+  .agent-card-body {
+    gap: 20px;
+  }
+}

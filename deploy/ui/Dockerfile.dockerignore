@@ -1,0 +1,21 @@
+# Allowlist build inputs: private results/state and browser fixtures never enter context.
+**
+!pyproject.toml
+!uv.lock
+!src/
+!src/corsair/
+!src/corsair/**
+!evals/e2e/baselines
+!evals/e2e/baselines/**
+!ui/
+!ui/NOTICE.md
+!ui/package.json
+!ui/package-lock.json
+!ui/index.html
+!ui/tsconfig.json
+!ui/vite.config.ts
+!ui/src/
+!ui/src/**
+**/__pycache__/**
+**/*.pyc
+ui/src/**/*.test.ts
