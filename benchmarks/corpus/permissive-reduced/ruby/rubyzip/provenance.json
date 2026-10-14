@@ -8,8 +8,8 @@
   "pointer_source": "Ruby Advisory Database / eval-thread pick (metadata only)",
   "upstream_spdx": "BSD-2-Clause",
   "spdx_verified": "raw.githubusercontent LICENSE.md, 2026-10-14",
-  "parent_ref": "v1.2.1",
-  "fix_ref": "v1.2.2",
+  "parent_commit": "v1.2.1",
+  "fix_commit": "v1.2.2",
   "verbatim": false,
   "kept_files": [
     {

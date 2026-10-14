@@ -8,8 +8,8 @@
   "pointer_source": "GitHub Advisory Database / candidate survey (metadata only)",
   "upstream_spdx": "Apache-2.0",
   "spdx_verified": "secure_headers.gemspec gem.license = 'Apache Public License 2.0' at fix commit 3a2b548, 2026-10-14",
-  "parent_ref": "3a2b548223de854ab9768ae07acedfcd2ac211e3~1",
-  "fix_ref": "3a2b548223de854ab9768ae07acedfcd2ac211e3",
+  "parent_commit": "3a2b548223de854ab9768ae07acedfcd2ac211e3~1",
+  "fix_commit": "3a2b548223de854ab9768ae07acedfcd2ac211e3",
   "verbatim": false,
   "kept_files": [
     {
