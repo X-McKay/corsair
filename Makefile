@@ -1,4 +1,4 @@
-.PHONY: test test-v2 eval eval-baseline canary toolchain-images maven-hashes
+.PHONY: test test-v2 eval eval-baseline baseline-commit eval-live-baselines canary toolchain-images maven-hashes
 export UV_CACHE_DIR ?= $(CURDIR)/.cache/uv
 # pytest otherwise infers its root from argument paths, so an evidence dir inside another checkout (for example
 # the main repository's .runs from a worktree) would load that checkout's config and code.
@@ -21,6 +21,20 @@ eval:
 
 eval-baseline:
 	uv run --locked python -m evals.run "$(AGENT)" --promote "$(RUN)"
+
+# v2: promote RUN and write <agent evals>/baselines/<set>-<mode>.json for committing (whole set, clean checkout).
+baseline-commit:
+	uv run --locked python -m evals.run "$(AGENT)" --commit-baseline "$(RUN)"
+
+# Live baselines, one agent after another (one live inference user at a time). AGENTS defaults to the six v2
+# agents; the chain (AGENTS=chain) also needs Docker. Prints each run id; commit the ones you choose with
+# baseline-commit.
+eval-live-baselines:
+	@test -n "$(PROVIDER_CONFIG)" || { echo "PROVIDER_CONFIG is required"; exit 2; }
+	@for agent in $(or $(AGENTS),grounding investigator builder control_prober exploit_prober reviewer); do \
+	  uv run --locked python -m evals.run "$$agent" --provider-config "$(PROVIDER_CONFIG)" $(if $(NOTE),--note "$(NOTE)") || true; \
+	  tail -n 1 ".runs/evals/$$agent/index.jsonl"; \
+	done
 
 # Classify each runtime-matrix row's known-passing and known-failing canary on its image (evidence under .runs/canary/).
 canary:

@@ -2,6 +2,7 @@
 
     make eval AGENT=<agent> [SET=<set>] [PROVIDER_CONFIG=<providers.json>] [REPEAT=3] [NOTE=...]
     make eval-baseline AGENT=<agent> RUN=<run id>
+    make baseline-commit AGENT=<agent> RUN=<run id>     v2: also write the committed baseline file
 
 Each suite keeps its own CLI and native report; this wrapper only chooses an evidence directory, runs the
 suite in a subprocess with the repository's PYTHONPATH, and writes a summary and a comparison against the
@@ -15,6 +16,10 @@ promoted baseline (or else the previous run) with the same set and mode. Nothing
         evidence/                        the suite's configuration.json, report.json and attempt receipts
         summary.json                     versions, model, dataset digest, assertion pass rates, efficiency means
         comparison.md                    differences against the reference run
+
+A v2 baseline is also committed beside the agent's cases, ``<agent evals>/baselines/<set>-<mode>.json``: the run's
+summary without per-attempt rows, plus its policy status. A checkout without that run's ``.runs/`` (another host,
+CI) compares against the committed file.
 """
 
 import argparse
@@ -263,6 +268,10 @@ def _v2_reference(agent_dir: Path, base_set: str, mode: str, run_id: str) -> tup
     if pointer.exists():
         baseline = json.loads(pointer.read_text())["run"]
         return baseline, json.loads((agent_dir / baseline / "summary.json").read_text()) | {"reference_kind": "baseline"}
+    committed = committed_baseline(agent_dir.name, base_set, mode)
+    if committed is not None and committed.exists():
+        record = json.loads(committed.read_text())
+        return record["run"], record | {"reference_kind": "committed baseline"}
     index = agent_dir / "index.jsonl"
     earlier = [json.loads(line) for line in index.read_text().splitlines()] if index.exists() else []
     # whole-set runs only: a language-narrowed run's overall rollup covers one language, not the set
@@ -327,6 +336,39 @@ def promote(agent: str, run_id: str, results: Path = RESULTS) -> None:
     print(f"{pointer}: {run_id}")
 
 
+def committed_baseline(agent: str, set_name: str, mode: str) -> Path | None:
+    """Where a v2 agent's committed baseline for a set and mode lives (None for a non-v2 suite)."""
+    if agent not in V2_AGENTS:
+        return None
+    return agent_root(agent) / "baselines" / f"{set_name}-{mode}.json"
+
+
+def commit_baseline(agent: str, run_id: str, results: Path = RESULTS) -> Path:
+    """Promote ``run_id`` and write its committed baseline: the summary without per-attempt rows (rollups by
+    language and kind, identity, dispositions) and the policy status. Only a whole-set run from a clean checkout
+    with a report qualifies; a person chooses the run, nothing selects one automatically."""
+    run_dir = results / agent / run_id
+    summary = json.loads((run_dir / "summary.json").read_text())
+    identity = summary.get("identity") or {}
+    if summary.get("language"):
+        raise SystemExit("a language-narrowed run is not a baseline; commit a run of the whole set")
+    if summary.get("rollups") is None:
+        raise SystemExit(f"{run_id}: no attempts were reported; nothing to commit")
+    if not identity.get("git_commit") or identity.get("git_dirty") is not False:
+        raise SystemExit(f"{run_id}: ran from an unknown or dirty checkout; a baseline needs a clean commit")
+    policy = json.loads((run_dir / "policy.json").read_text()) if (run_dir / "policy.json").exists() else {}
+    record = {key: value for key, value in summary.items() if key != "attempts"} | {
+        "policy_status": policy.get("status"), "committed": datetime.now(timezone.utc).isoformat()}
+    target = committed_baseline(agent, summary["set"], summary["mode"])
+    if target is None:
+        raise SystemExit(f"{agent}: committed baselines are for v2 agents")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(record, indent=2) + "\n")
+    promote(agent, run_id, results)
+    print(f"{target.relative_to(REPOSITORY) if target.is_relative_to(REPOSITORY) else target}: commit this file")
+    return target
+
+
 def main(argv: list[str] | None = None) -> int:
     agents = sorted(SUITES) + sorted(V2_AGENTS) + sorted(MISSING)
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -337,13 +379,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--language", help="Only this language's cases of the set (python, java, javascript, ruby, perl, common)")
     parser.add_argument("--note", default="", help="Free text recorded with the run, e.g. what changed")
     parser.add_argument("--promote", metavar="RUN", help="Make RUN the baseline for its set and mode instead of running")
+    parser.add_argument("--commit-baseline", metavar="RUN",
+                        help="v2: promote RUN and write its committed baseline file instead of running")
     parser.add_argument("--results", type=Path, default=RESULTS, help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     if args.agent in MISSING:
         parser.error(f"{args.agent}: {MISSING[args.agent]}")
-    if args.promote:
-        if not re.fullmatch(r"[0-9TZ]+-[a-z0-9_-]+(\.[a-z]+)?-(scripted|live)", args.promote):
+    for chosen in filter(None, (args.promote, args.commit_baseline)):
+        if not re.fullmatch(r"[0-9TZ]+-[a-z0-9_-]+(\.[a-z]+)?-(scripted|live)", chosen):
             parser.error("RUN must be a run id from index.jsonl")
+    if args.commit_baseline:
+        if args.agent not in V2_AGENTS:
+            parser.error("--commit-baseline is for v2 agents")
+        commit_baseline(args.agent, args.commit_baseline, args.results)
+        return 0
+    if args.promote:
         promote(args.agent, args.promote, args.results)
         return 0
     suite = SUITES.get(args.agent) or v2_suite(args.agent)
