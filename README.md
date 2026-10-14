@@ -1,82 +1,42 @@
 # Corsair
 
-Corsair is a planned system for validating a reported security issue against an exact repository revision and, when available, a proposed fix. It produces reproducible tests and evidence for InfoSec review. Implementation proceeds through independently qualified components before the complete agent graph is connected.
+Corsair validates a reported security issue against an exact repository revision. Agents write exactly two native
+unit tests, a benign control probe and a security-regression (exploit) probe, against the real code; trusted code runs
+both in a sandbox and a fixed rule table labels the issue `LIKELY_EXPLOITABLE`, `LIKELY_NOT_EXPLOITABLE`,
+`INCONCLUSIVE`, `UNABLE_TO_RUN` or `ERROR`. No model runs after execution.
 
-Status: bounded native OpenShell 1A–1F qualification is recorded for the selected Linux amd64 tuple. Application lifecycle and bounded execution adapters, independent local immutable source/artifact storage and [controlled native single-file upload](docs/qualification/openshell-native-upload.md) are qualified within their stated envelopes. The fixed [captured-source execution/output composition](docs/qualification/openshell-source-execution.md) and [original-forward transport-loss case](docs/qualification/openshell-execution-transport.md) also passed on two fresh admitted nodes with confirmed cleanup. The fixed [bounded untrusted-file collection](docs/qualification/openshell-untrusted-file.md) also passed on two fresh nodes for inert files up to 4096 bytes through native raw execution and immutable artifacts. General native application transfers remain blocked by [retry/resource admission](docs/development/issues/ISSUE-0006-native-transfer-retry-admission.md). Fresh-process receipt observation and the [bounded report-claim consumer](docs/qualification/bounded-test-report.md) also passed on two fresh admitted nodes; literal report claims do not prove application tests ran. The full application milestone, real-provider durable/OpenShell composition and production reliability remain unqualified. [Current work](docs/development/CURRENT.md) links the active gate, coverage limits and qualification evidence; offline check counts alone do not establish runtime readiness.
+This branch carries Corsair v2, a rebuild on native PydanticAI agents and skills, the PydanticAI workspace interface
+(a Docker backend today) and Temporal durability. The v1 implementation remains on `main`.
+[src/corsair/v2/README.md](src/corsair/v2/README.md) describes the chain, its stages and the rules every module keeps.
 
-Independent foundations now include a [native Temporal fixture composition](docs/qualification/temporal-fixture-foundation.md) and a [read-only PydanticAI issue-analysis template](docs/qualification/issue-analysis-fixture.md). The former exercises a real local persistent service; the latter checks deterministic fixture contracts and local evaluation traces. The same issue-analysis factory now also passes [native direct/durable fixture composition](docs/qualification/issue-analysis-temporal-fixture.md), including local traces and six saved-history replays. The [local-model assessment](docs/qualification/issue-analysis-local-provider.md) reached typed/source-grounded output but failed semantic/consistency qualification under the selected budgets. Real-provider durable/OpenShell composition, production Temporal and the complete graph remain unqualified.
+## Commands
 
-## Development across sessions
-
-Start with [AGENTS.md](AGENTS.md) and [current work](docs/development/CURRENT.md). The [development workflow](docs/development/README.md) defines shared Codex/Claude skills, principles, record templates, reviews, and handoff prompts. Ideas, specs, plans, development issues and handoffs have stable IDs under `docs/development/`; existing system design docs remain authoritative. Offline workflow guards run with `make test-config` and in GitHub Actions.
-
-## Run the first slice
-
-Requirements: Linux amd64, Python 3.12, `uv`, and a local Docker daemon capable of running privileged kind nodes and nested containerd workloads. These commands create a dedicated `corsair` cluster; they do not install into an existing cluster.
+Requirements: Linux, Python 3.12, `uv`; Docker for workspace, build and canary runs.
 
 ```shell
-make tools
-make test-config
-make kind-up
-make qualify-network
-make kind-down
+make test-v2                     # offline suite (alias: make test); no model, no cluster; Docker tests skip without Docker
+make eval AGENT=<agent> [SET=<set>] [PROVIDER_CONFIG=<providers.json>]   # one agent's isolated eval
+make eval-baseline AGENT=<agent> RUN=<run id>                             # promote a run as that agent's baseline
+make canary                      # classify each runtime-matrix row's passing and failing canary on its image
+make toolchain-images TOOLCHAINS=python   # build toolchain images and run their trusted controls
+uv run --locked corsair-v2 run --case <name> [--mode direct|temporal]     # one case through the chain
 ```
 
-Setup and qualification are separate commands. Failed prerequisites produce errors, and evidence is retained under `.runs/`. Local ownership and kubeconfig state live separately under `.state/`. Both directories are excluded from Git. The [local platform runbook](docs/runbooks/local-platform.md) explains setup, failure diagnosis, and safe cleanup.
+Evidence lands under `.runs/` and is never committed.
 
-The remaining 1A admission commands and limitations are documented in the [admission runbook](docs/runbooks/openshell-admission.md). They install prerequisites and stage the trusted runtime probe without deploying a gateway. The [gateway runbook](docs/runbooks/openshell-gateway.md) adds an explicit node-admission-gated native installation and separate 1B probes. The [policy runbook](docs/runbooks/openshell-policy.md) stages a fixed canary artifact and runs the separately qualified native 1D matrix.
+## Layout
 
-## Provider configuration
+```text
+src/corsair/v2/           the chain: contracts, stages, intake, matrix selection, build, execute, rules, workflow, CLI
+  skills/frameworks/      per-framework guidance and canaries (the only place framework knowledge lives, with the matrix)
+  workspace/              Docker workspace backend (pydantic_ai.workspaces)
+deploy/v2/runtime-matrix.yaml   operator-owned runtime rows: image, framework, exit-code map
+deploy/qualification/toolchains/ toolchain image sources; tools/toolchain_images.py builds them
+config/v2/                provider configuration
+evals/                    frozen per-case eval data and sets, the corpus loader, and `make eval` (evals/run.py)
+benchmarks/               benchmark inventory and the imported infosec-harness corpus
+tools/                    canary runner and toolchain image builder
+tests/v2/                 offline tests
+```
 
-[Configure inference per agent and GitHub/Azure ticket capture](docs/runbooks/provider-configuration.md). Named model profiles select vLLM, OpenAI-compatible Chat Completions or Bedrock independently for each agent, with an explicit optional default. Live integration qualification remains separate.
-
-## Agreed decisions
-
-- Deploy to Kubernetes; develop and test the complete configuration locally in kind.
-- Use PydanticAI agents, native Temporal durability, OpenShell, Pydantic Evals, and supported OpenTelemetry integrations.
-- Keep a fixed graph of six focused agent roles and deterministic evidence gates.
-- Use small ports and SDK-backed adapters for external capabilities. Local model endpoints and Bedrock, and GitHub and Azure DevOps, must be interchangeable through explicit configuration.
-- Support isolated agent execution with and without Temporal, and with fixture/local execution or OpenShell.
-- Give independent control and exploit authors separate inputs, own-file writes, contexts and budgets; freeze both source-only drafts and review validity before native execution.
-- Default to exactly two native unit tests through existing application seams across languages and frameworks; use inputs, outputs, specific exceptions, fixture state and controlled dependencies, and require integration evidence when the property needs it.
-- Preserve scope, test validity, and application observations separately from execution and sandbox enforcement. Witness instrumentation supports evidence where useful; missing low-level telemetry alone does not invalidate a sound unit test.
-- Use immutable artifacts, explicit invalidation, attributable failures, and tested recovery and cleanup.
-- Measure outcomes, trajectories, consistency, grounding, robustness, security, durability, efficiency, and composition.
-- Exclude repository-supplied environment hint files from the initial release. Discover setup from existing repository documentation, manifests, and CI.
-- Keep analyst usefulness as a separate pilot proposal; it does not block the first technical milestones.
-
-These incorporate improvement items 1, 2, 3, 4, 6, 7, 8, and 9. Item 10 is captured in the analyst pilot plan. Item 5 is outside initial scope.
-
-## Reading order
-
-1. [Investigation contract](docs/investigation-contract.md): supported scope, two tests, evidence, and conclusions.
-2. [Architecture](docs/architecture.md): graph, agent boundaries, ports, and organization.
-3. [Execution and recovery](docs/execution-and-recovery.md): modes, artifacts, invalidation, retries, cleanup, and failure attribution.
-4. [Evaluation and acceptance](docs/evaluation-and-acceptance.md): evaluation types, datasets, metrics, and gates.
-5. [Implementation plan](docs/implementation-plan.md): progressive milestones and required evidence.
-6. [Analyst pilot plan](docs/analyst-pilot-plan.md): proposed measurement of practical InfoSec value.
-7. [Benchmark datasets](docs/benchmark-datasets.md): researched sources, 50 candidate issue pairs, licensing, and progressive qualification across Java/Maven, Python, JavaScript, Perl, and Ruby.
-8. [OpenShell milestone](docs/openshell-milestone.md): proposed directory structure, native runtime qualification slices, diagnostics, testing, and acceptance gates.
-
-Production split transition: [SPEC-0079](docs/development/specs/SPEC-0079-independent-probe-authoring.md) and [PLAN-0094](docs/development/plans/PLAN-0094-independent-probe-authoring.md) track independent source-only control/exploit authors, per-probe assertion anchors and immutable outcome-blind validity before execution. The six roles are environment, identification, planning, control authoring, exploit authoring and assessment. Assessment uses separate validity and result calls. Focused native reviewed-fixture checks and the pre-cleanup broad offline checkpoint (2,326 passed, 6 skipped, 10 warnings in 39.71 seconds) pass. All scripted suites pass; seven native-manifest factory variants have byte-parity evidence. Corrected pre-manifest live results and historical partial runs are retained in the [baseline report](docs/qualification/independent-probe-agent-baselines.md); final offline checks pass; fresh post-manifest live measurements are deferred by the user. This transition does not qualify the full graph, semantic-review gate or additional runtimes/frameworks.
-
-## Initial support envelope
-
-The first qualification targets Python 3.12 with pytest and Java 17 with Maven and JUnit 5, on Linux OCI images in the selected OpenShell Kubernetes runtime. Actual tool versions and image digests are frozen during runtime qualification. Frameworks and vulnerability classes are admitted individually through real execution cases; a language label alone does not establish support.
-
-The initial security cases are path traversal and command injection using bounded synthetic fixtures. Validation starts at component and application-path scope. Deployment-scope validation, additional runtimes, service-dependent findings, and other vulnerability classes require additional qualified fixtures. A local SSRF fixture is a later boundary-interference test, not an initial supported class.
-
-## Design source references
-
-- [Existing harness architecture](https://github.com/X-McKay/infosec-harness/blob/main/docs/architecture/TRIAGE_SYSTEM.md)
-- [Zetra sandbox validation](https://github.com/X-McKay/zetra/blob/main/integrations/openshell-LIVE-VALIDATION.md)
-- [Playbooks reference architecture](https://github.com/X-McKay/playbooks/blob/main/agent-playbook/02-reference-architecture.md)
-- [OpenShell Kubernetes setup](https://github.com/NVIDIA/OpenShell/blob/v0.1.2/docs/kubernetes/setup.mdx)
-- [PydanticAI Temporal integration](https://pydantic.dev/docs/ai/capabilities/durable_execution/temporal/)
-- [Pydantic Evals](https://pydantic.dev/docs/ai/evals/evals/)
-
-Implementation must pin compatible SDK and runtime releases. Upstream capabilities are not qualified merely by being documented.
-
-Final publication checkpoint (2026-10-13): implementation and identity/ownership cleanup complete. Root reports full offline **2,329 passed, six skipped, ten warnings in 51.95 seconds**, final targeted **60 passed**, and seven native factory parity **22 passed**. Final scripted suites pass: environment16/16, identification8/8, planning5/5, each author8/8, validity7/7, final disposition4/4 and chain5/5. Offline wheel inspection confirms ten YAML/shared-skill assets byte-equal to current source (`native-yaml-wheel-final-check.json` private receipt); the431-file source-freeze manifest remains ignored. These are offline/parity/fixture claims, not model quality or composition qualification.
-
-The user explicitly deferred fresh post-manifest live baselines and requested the PR now. All seven planned live jobs are **UNRUN / deferred**. Automatic approval review rejected their earlier launch before any model calls. Corrected pre-manifest environment4/8, identification8/8 and planning1/5 remain historical measurements. ISSUE-0009 stays open. No endpoint calls occurred in this documentation lane; raw `.runs` exports remain private.
+Development rules are in [AGENTS.md](AGENTS.md).

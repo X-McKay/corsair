@@ -1,1 +1,0 @@
-{"schema":"corsair-minitest-v1","tests":[{"class":"Widget::CorsairTest","name":"test_fixed","outcome":"passed","failure":null},{"class":"Widget::CorsairTest","name":"test_control","outcome":"passed","failure":null}]}

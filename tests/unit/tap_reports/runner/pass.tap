@@ -1,9 +1,0 @@
-# Subtest: test_control
-    ok 1 - control holds
-    1..1
-ok 1 - test_control
-# Subtest: test_security
-    ok 1 - security holds
-    1..1
-ok 2 - test_security
-1..2

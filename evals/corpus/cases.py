@@ -6,8 +6,7 @@ revision and the other variant the candidate, so a full run should reach complet
 unpaired topics have only a baseline and should reach completed / not_reproduced / not_applicable. Both expectations
 are hypotheses until a chain run observes them.
 
-Agents see only `agent_input()` (the shared finding text and the baseline variant's files) and, later, the variant
-trees themselves. Variant names, verdicts, the manifest, the corpus README (it holds the answer key) and the
+Agents see only the shared finding text (`issue_text()`) and the variant trees themselves. Variant names, verdicts, the manifest, the corpus README (it holds the answer key) and the
 verification tests never enter an agent input. The loader refuses verdict words in anything an agent can read, as
 the upstream corpus hygiene test does, so a copy that drifts is caught here too.
 """
@@ -20,11 +19,6 @@ import re
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
-
-from corsair.agents.issue_analysis.contracts import IssueAnalysisInput
-from corsair.agents.source.contracts import SourceFile
-from corsair.core.disposition import Disposition
-from evals.fixture_chain.evaluate import ChainOracle
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 CORPUS = REPOSITORY / "benchmarks/corpus/infosec-harness"
@@ -105,11 +99,13 @@ class CorpusCase:
     split: Literal["development", "held_out"]
 
     @property
-    def oracle(self) -> ChainOracle:
+    def oracle(self) -> dict:
+        """The evaluator-only chain oracle, in the JSON shape the committed oracle.json files and held_out.json
+        digests were frozen with (v1's ChainOracle with a completed gate)."""
         fix = "verified" if self.candidate else "not_applicable"
         finding = "reproduced" if self.baseline.truth.expected_verdict == "potentially_exploitable" else "not_reproduced"
-        return ChainOracle(stopped_at=None, gate=Disposition(execution="completed", finding=finding, fix=fix),
-                           assessment_admitted=True)
+        return {"stopped_at": None, "gate": {"execution": "completed", "finding": finding, "fix": fix},
+                "assessment_admitted": True}
 
     def verification(self, role: Literal["baseline", "candidate"]) -> Path | None:
         """The upstream verification tests for a revision's variant (evaluator-only oracle), if the corpus has any."""
@@ -189,7 +185,7 @@ def load(corpus: Path = CORPUS) -> tuple[CorpusCase, ...]:
 def case_digest(case: CorpusCase, corpus: Path = CORPUS) -> str:
     """SHA-256 over a case's finding, oracle and both variant trees, so a changed held-out case is caught."""
     digest = sha256(json.dumps(dict(finding=case.finding.model_dump(mode="json"),
-                                    oracle=case.oracle.model_dump(mode="json")), sort_keys=True).encode())
+                                    oracle=case.oracle), sort_keys=True).encode())
     for role, entry in (("baseline", case.baseline), ("candidate", case.candidate)):
         for path, data in snapshot(corpus / str(entry.variant)).items() if entry else ():
             digest.update(f"\0{role}\0{path}\0".encode() + sha256(data).digest())
@@ -208,14 +204,6 @@ def issue_text(finding: Finding) -> str:
     """Neutral issue text from the finding fields upstream submits to its investigator."""
     return (f"{finding.title}\n\nReported location: {finding.file_path} line {finding.start_line}, in {finding.symbol}. "
             f"Weakness class: {finding.cwe}.\n\n{finding.description}\n\nAnalyze this component only.")
-
-
-def agent_input(case: CorpusCase, corpus: Path = CORPUS) -> IssueAnalysisInput:
-    """The identification input: the issue text and the baseline variant's non-empty files under a neutral id."""
-    tree = snapshot(corpus / str(case.baseline.variant))
-    sources = tuple(SourceFile(path=path, content=data.decode("utf-8")) for path, data in tree.items() if data)
-    return IssueAnalysisInput(fixture_id=case.case_id, issue=issue_text(case.finding), scope="component",
-                              source_files=sources)
 
 
 def freeze_held_out(path: Path = HELD_OUT) -> None:
