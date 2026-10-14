@@ -89,4 +89,6 @@ Decisions are recorded in SPEC-0082. Defaults this plan uses until Al decides ot
 - D11: v1 is removed from develop in phase 0.
 - R5 lists its calibration without requiring it.
 
+D18 (Al, 2026-10-14 11:26Z) adds a phase 3/4 step: before R5, run one independent second exploit attempt reusing the first control, decide over both attempts, and stamp every R5 `sensitivity: unverified` until the corpus measures LNE precision per language and vulnerability class.
+
 Next action: phase 0 and the phase 1 contracts, in the "v2 build on develop" thread.
