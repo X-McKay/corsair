@@ -1,0 +1,28 @@
+{
+  "profiles": {
+    "local": {
+      "base_url": "https://llm.almckay.io/v1",
+      "model_name": "Qwen3.6-35B-A3B-NVFP4",
+      "timeout_s": 300,
+      "max_tokens": 8192,
+      "temperature": 0,
+      "thinking_token_budget": 2048
+    },
+    "local-long": {
+      "base_url": "https://llm.almckay.io/v1",
+      "model_name": "Qwen3.6-35B-A3B-NVFP4",
+      "timeout_s": 300,
+      "max_tokens": 16384,
+      "temperature": 0,
+      "thinking_token_budget": 2048
+    }
+  },
+  "agents": {
+    "grounding": "local",
+    "builder": "local",
+    "investigator": "local",
+    "control_prober": "local",
+    "exploit_prober": "local",
+    "reviewer": "local-long"
+  }
+}
