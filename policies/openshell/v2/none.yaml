@@ -1,6 +1,6 @@
 # Operator-owned OpenShell policy for v2 sandboxes with no network: probes, baselines and every replayed
 # environment after setup. Agents and project files never edit it; the backend refuses a document outside this
-# shape (src/corsair/v2/workspace/openshell.py, check_policy).
+# shape (src/corsair/workspace/openshell.py, check_policy).
 #
 # NOT YET TRUSTED: this document is v1's qualified identity policy (`git show 9c3bc62:policies/openshell/identity.yaml`)
 # plus /opt read-only (where the Java images keep the JDK and the offline Maven closure; v1's toolchain gate granted

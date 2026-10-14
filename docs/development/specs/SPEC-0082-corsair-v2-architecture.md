@@ -59,13 +59,13 @@ Each stage is a function of three things: its typed input, its config digest and
 | 8 | Execute | Code | ProbeRun per probe per revision |
 | 9 | Decide | Code | Verdict: label, rule id, terminal reason, report |
 
-Every contract is a versioned Pydantic model in `src/corsair/v2/contracts.py`. Large content (source, logs, patches) travels as `ArtifactRef(uri, sha256, size)` and never inline in Temporal history. A schema change bumps the contract version, and replay only compares runs of the same version.
+Every contract is a versioned Pydantic model in `src/corsair/contracts.py`. Large content (source, logs, patches) travels as `ArtifactRef(uri, sha256, size)` and never inline in Temporal history. A schema change bumps the contract version, and replay only compares runs of the same version.
 
 Investigate runs before Build (A1). The Investigator plans on read-only source with search and declares the component it needs. The Builder prepares only that component. Code checks the plan against the measured environment, and one budgeted replan is allowed.
 
 ### Agents
 
-Each agent is self-contained under `src/corsair/v2/agents/<name>/`, holding `agent.yaml` (a native `AgentSpec`), `agent.py`, `tools.py`, `skills/`, `evals/` (its cases and promoted baseline) and a placeholder `release-policy.yaml`. The release policy stays empty and nothing enforces it until the gates resume. This is the package shape the v1 manifest and Harness specs (SPEC-0080, SPEC-0081) adopted; those records remain on main. Guidance lives in native Harness Skills.
+Each agent is self-contained under `src/corsair/agents/<name>/`, holding `agent.yaml` (a native `AgentSpec`), `agent.py`, `tools.py`, `skills/`, `evals/` (its cases and promoted baseline) and a placeholder `release-policy.yaml`. The release policy stays empty and nothing enforces it until the gates resume. This is the package shape the v1 manifest and Harness specs (SPEC-0080, SPEC-0081) adopted; those records remain on main. Guidance lives in native Harness Skills.
 
 | Agent | Job | Tools | Done when |
 | --- | --- | --- | --- |
@@ -251,8 +251,8 @@ Committed data:
 | Path | Holds |
 | --- | --- |
 | `evals/e2e/<language>/<set>/<case-id>/` | Chain cases in three files: `input.json` (agent-visible), `oracle.json` (evaluator-only), `case.json` (pins, source, licence). Corpus pairs, benchmark cases and fixtures all live here, as sets named `corpus`, `benchmark` and `fixtures` |
-| `src/corsair/v2/agents/<name>/evals/<language>/<set>/<case-id>/` | Per-agent cases in the same three files; `common` holds language-free cases |
-| `src/corsair/v2/agents/<name>/evals/baselines/<set>.json` | That agent's promoted baseline, with metrics keyed by language and eval type |
+| `src/corsair/agents/<name>/evals/<language>/<set>/<case-id>/` | Per-agent cases in the same three files; `common` holds language-free cases |
+| `src/corsair/agents/<name>/evals/baselines/<set>.json` | That agent's promoted baseline, with metrics keyed by language and eval type |
 
 Run output, ignored by git:
 
@@ -321,7 +321,7 @@ The proposal's decisions and their status:
 | D3 | Authors get no test-running tool; trusted code runs frozen drafts once and returns only mechanical diagnostics | Al, 07:49Z |
 | D4 | Deterministic rule table decides the label | Accepted with the build kickoff |
 | D5 | Live evals for the Builder and both probers may use local Docker | Accepted with the build kickoff |
-| D6 | Build on `develop` in `src/corsair/v2`; main stays untouched until Al replaces it | Al, 08:09Z |
+| D6 | Build on `develop` in `src/corsair/v2`; main stays untouched until Al replaces it. Moved up to `src/corsair` on 2026-10-14 before the main cutover | Al, 08:09Z; move 2026-10-14 |
 | D7 | Reuse the verdict rule table, terminal reasons, per-stage replay and blinded runs from Al's InfoSec Harness v2 spec | Accepted with the build kickoff; Al also asked for the Grounding agent from that harness |
 | D8 | Deterministic outcome table with an exit-code map per framework and a canary pair per row | Al, 07:49Z |
 | D9 | Exactly two tests per attempt (revised by D18: at most two attempts per case); native parametrisation inside a test is allowed | Accepted with the build kickoff; revised 2026-10-14 by D18 |

@@ -590,8 +590,8 @@ The Codex review of PR #134 found three gaps. All three are fixed in SPEC-0082, 
 
 These came after section 14 was written and supersede it where they differ.
 
-- **Package path.** v2 lives in `src/corsair/v2` on develop (PR #133). Its matrix is `deploy/v2/runtime-matrix.yaml`.
-- **Evals live inside each agent package.** Each agent is self-contained under `src/corsair/v2/agents/<name>/`, holding `agent.yaml`, `agent.py`, `tools.py`, `skills/`, `evals/` (its cases and its promoted baseline) and a placeholder `release-policy.yaml`. The release policy is empty and enforced by nothing until the gates come back. Chain cases stay in `evals/e2e/<language>/<set>/<case-id>/`, and run output keeps the `.runs/` layout above.
+- **Package path.** v2 was built in `src/corsair/v2` on develop (PR #133) and moved up to `src/corsair` on 2026-10-14 (PR #193) before the main cutover. Its matrix is `deploy/v2/runtime-matrix.yaml`.
+- **Evals live inside each agent package.** Each agent is self-contained under `src/corsair/agents/<name>/`, holding `agent.yaml`, `agent.py`, `tools.py`, `skills/`, `evals/` (its cases and its promoted baseline) and a placeholder `release-policy.yaml`. The release policy is empty and enforced by nothing until the gates come back. Chain cases stay in `evals/e2e/<language>/<set>/<case-id>/`, and run output keeps the `.runs/` layout above.
 - **CI is one job.** Until something runs end to end, develop's PR path runs a single offline job, `make test-v2`, with no model, and nothing else. The v1 shards, the image gate, the qualification and record guards all leave the PR path. They stay runnable by hand so they can return with the gates and release policies.
 - **D10 and D11 are in force.** Al has not overridden either default. The Investigator does not read Grounding output, and the build's next PR removes v1 from develop.
 - **The build must adopt the review corrections.** The contracts on develop still need two changes: a `check_marker` fact in `ProbeFacts`, and a `probe_anomalous` terminal reason. `unsupported_scope` joins the spec's terminal-reason list, matching the contracts.

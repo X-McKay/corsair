@@ -5,8 +5,8 @@ import json
 
 from pydantic_ai.messages import ModelResponse, ToolCallPart
 
-from corsair.v2.agents.investigator.evals.evaluate import DIMENSIONS, SPEC, check
-from corsair.v2.contracts import AgentUsage, ProbePlan
+from corsair.agents.investigator.evals.evaluate import DIMENSIONS, SPEC, check
+from corsair.contracts import AgentUsage, ProbePlan
 from evals.agent_eval import Attempt, evaluate
 from evals.cases import CATEGORIES, DIMENSIONS as ALL_DIMENSIONS, agent_root, load_set
 
@@ -149,7 +149,7 @@ def test_contract_grounding_and_trajectory_failures():
 
 def test_repeated_read_must_be_answered_by_the_notice():
     from pydantic_ai.messages import ModelRequest, ToolReturnPart
-    from corsair.v2.agents.common.repetition import NOTICE
+    from corsair.agents.common.repetition import NOTICE
     for language in ("python", "java", "javascript", "perl", "ruby"):
         case = CASES[f"{language}/repeated-identical-read"]
         reads = case.oracle["replay"]["reads"]

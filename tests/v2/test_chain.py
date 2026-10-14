@@ -6,9 +6,9 @@ import pytest
 from pydantic_ai.exceptions import ModelHTTPError, UsageLimitExceeded
 
 from chain_fakes import PLAN, RECIPE, Fakes, case, draft, models
-from corsair.v2.chain import MAX_REVIEWS, Budget, draft_digest, freeze, review_feedback, run_case
-from corsair.v2.contracts import FrozenPatch, ProbePlan, ProbeRun
-from corsair.v2.record import RunRecorder
+from corsair.chain import MAX_REVIEWS, Budget, draft_digest, freeze, review_feedback, run_case
+from corsair.contracts import FrozenPatch, ProbePlan, ProbeRun
+from corsair.record import RunRecorder
 
 
 def go(fakes: Fakes, tmp_path, *, fixed=False, budget=Budget()):
@@ -312,7 +312,7 @@ def test_at_most_three_reviews_and_then_nothing_executes(tmp_path):
 
 
 def test_real_rules_read_a_still_invalid_pair_as_test_invalid(tmp_path):
-    from corsair.v2.rules import decide
+    from corsair.rules import decide
     fakes = Fakes(rejections={"control": 99})
     fakes.decide = lambda case, **kw: (fakes._log("decide", case, **kw), decide(case, **kw))[1]
     verdict, _ = go(fakes, tmp_path)
@@ -418,7 +418,7 @@ def test_review_feedback_is_built_from_one_probe_validity_only():
 
 
 def test_a_builder_refusal_stops_at_build_failed_with_its_reason_and_no_second_episode(tmp_path):
-    from corsair.v2.contracts import Recipe
+    from corsair.contracts import Recipe
     fakes = Fakes(recipes=[Recipe(blocked="no compiler in this image")])
     _, decided = go(fakes, tmp_path)
     assert decided["stopped"] == "build_failed" and "replay" not in fakes.names()
@@ -427,7 +427,7 @@ def test_a_builder_refusal_stops_at_build_failed_with_its_reason_and_no_second_e
 
 @pytest.mark.parametrize("failures", [1, 2, 3])
 def test_d3_corrects_until_the_check_reads_ok(tmp_path, failures):
-    from corsair.v2.chain import MAX_MECHANICAL_FIXES
+    from corsair.chain import MAX_MECHANICAL_FIXES
     # The first draft and the first failures - 1 corrections fail; correction number ``failures`` reads ok.
     fakes = Fakes(diagnose_outcomes={"control": ["errored"] * failures})
     verdict, _ = go(fakes, tmp_path)
@@ -449,7 +449,7 @@ def test_d3_corrects_until_the_check_reads_ok(tmp_path, failures):
 
 
 def test_d3_stops_after_the_last_correction_and_reviews_the_last_draft(tmp_path):
-    from corsair.v2.chain import MAX_MECHANICAL_FIXES
+    from corsair.chain import MAX_MECHANICAL_FIXES
     fakes = Fakes(diagnose_outcomes={"exploit": "not_run"})  # every check of the exploit fails
     verdict, _ = go(fakes, tmp_path)
     assert len(fakes.of("probe-exploit")) == 1 + MAX_MECHANICAL_FIXES
@@ -469,7 +469,7 @@ def test_d3_budget_exhaustion_mid_corrections_stops_the_run(tmp_path):
 
 
 def test_d3_corrections_after_a_review_revision_are_bounded_per_draft_version(tmp_path):
-    from corsair.v2.chain import MAX_MECHANICAL_FIXES
+    from corsair.chain import MAX_MECHANICAL_FIXES
     # The first draft fails twice then reads ok; the review revision fails every check.
     outcomes = ["errored", "errored", "ok"] + ["not_run"] * 4
     fakes = Fakes(rejections={"exploit": 1}, diagnose_outcomes={"exploit": outcomes})

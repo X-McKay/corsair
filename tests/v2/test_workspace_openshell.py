@@ -29,12 +29,12 @@ from pydantic_ai.workspaces import (
 from pydantic_ai.workspaces import conformance
 from pydantic_ai.workspaces.conformance import WorkspaceBackendSuite
 
-from corsair.v2.contracts import Environment, Recipe, RecipeFile
-from corsair.v2.intake import tree_sha256
-from corsair.v2.workspace import SandboxExists, SandboxSpec, labels
-from corsair.v2.workspace import openshell as backend
-from corsair.v2.workspace.openshell import WORKDIR
-from corsair.v2.workspace.openshell import (
+from corsair.contracts import Environment, Recipe, RecipeFile
+from corsair.intake import tree_sha256
+from corsair.workspace import SandboxExists, SandboxSpec, labels
+from corsair.workspace import openshell as backend
+from corsair.workspace.openshell import WORKDIR
+from corsair.workspace.openshell import (
     OpenShellConfig,
     OpenShellSandboxes,
     OpenShellWorkspace,
@@ -586,11 +586,11 @@ def test_seal_keeps_replay_timeouts_and_resolves_the_environment_tag(sandboxes, 
 def test_every_replayed_step_on_open_shares_one_budget(sandboxes, gateway, tmp_path, monkeypatch):
     environment, tree = _environment(tmp_path, RECIPE)
     sandboxes.seal_environment("b", environment.image, "k", "", recipe=RECIPE, tree_source=tree, base_image=IMAGE)
-    monkeypatch.setattr("corsair.v2.build.REPLAY_BUDGET_S", 100.0)
+    monkeypatch.setattr("corsair.build.REPLAY_BUDGET_S", 100.0)
     sandboxes.open_environment(environment, labels("run-1", "execute", "control"))
     timeouts = {tuple(call.command): call.timeout_seconds for call in gateway.execs}
     assert 0 < timeouts[tuple(RECIPE.setup[0])] <= 100 and 0 < timeouts[tuple(RECIPE.baseline_test)] <= 100
-    monkeypatch.setattr("corsair.v2.build.REPLAY_BUDGET_S", 0.0)
+    monkeypatch.setattr("corsair.build.REPLAY_BUDGET_S", 0.0)
     with pytest.raises(WorkspaceError, match="setup step 1: replay budget of 0s exhausted"):
         sandboxes.open_environment(environment, labels("run-1", "execute", "exploit"))
 

@@ -22,7 +22,7 @@ test-config:
 
 # One agent's isolated eval suite on the host; results under .runs/evals/<agent>/.
 # AGENT=grounding|builder|investigator|control_prober|exploit_prober|reviewer (cases, sets and release policy in
-# src/corsair/v2/agents/<agent>/evals/; summary.json, comparison.md and policy.json per run). Optional SET,
+# src/corsair/agents/<agent>/evals/; summary.json, comparison.md and policy.json per run). Optional SET,
 # EVAL_LANGUAGE (one language of a per-case set: python|java|javascript|ruby|perl|common), PROVIDER_CONFIG, REPEAT, NOTE.
 eval:
 	uv run --locked python -m evals.run "$(AGENT)" $(if $(SET),--set "$(SET)") $(if $(EVAL_LANGUAGE),--language "$(EVAL_LANGUAGE)") $(if $(PROVIDER_CONFIG),--provider-config "$(PROVIDER_CONFIG)") $(if $(REPEAT),--repeat "$(REPEAT)") $(if $(NOTE),--note "$(NOTE)")

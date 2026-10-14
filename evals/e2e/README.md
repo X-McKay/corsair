@@ -13,8 +13,8 @@ Whole-chain cases in the [eval layout](../README.md): `evals/e2e/<language>/<set
 
 ## v2 whole-chain set (`v2`)
 
-`evals/e2e/<language>/v2/<case>/`, manifest `sets/v2.json`: 122 cases for the v2 chain (`src/corsair/v2/`), each
-ending in a `Verdict` from the D4 rule table (`src/corsair/v2/rules.py`).
+`evals/e2e/<language>/v2/<case>/`, manifest `sets/v2.json`: 122 cases for the v2 chain (`src/corsair/`), each
+ending in a `Verdict` from the D4 rule table (`src/corsair/rules.py`).
 
 | Language | Cases | Positive | Negative | Injection | Ineffective fix | No runtime | Missing target | Unbuildable |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -25,7 +25,7 @@ ending in a `Verdict` from the D4 rule table (`src/corsair/v2/rules.py`).
 | ruby | 31 | 13 | 13 | 1 | 1 | 1 | 1 | 1 |
 | common (C) | 4 | | | | | 4 | | |
 
-- **Input** is a v2 issue request, exactly what `corsair.v2.intake.from_issue_json` accepts (`finding`, `source`,
+- **Input** is a v2 issue request, exactly what `corsair.intake.from_issue_json` accepts (`finding`, `source`,
   optional `fixed_source`, `case_id`); `source` is relative to the `input.json`. Run one case with
   `uv run corsair-v2 run --issue-json evals/e2e/<language>/v2/<case>/input.json` (Docker and a provider config).
   Corpus cases point into `benchmarks/corpus/infosec-harness/` and reuse its finding and the opaque
@@ -92,7 +92,7 @@ The generator for the original 100 cases lives outside the repository; regenerat
     PYTHONPATH=src:. .venv/bin/python -m evals.run chain --set v2 [--language perl]     # make eval AGENT=chain SET=v2
     PYTHONPATH=src:. .venv/bin/python -m evals.run chain --set v2 --provider-config providers.json   # live
 
-Every attempt builds the `Case` with `intake.from_issue_json` and runs `corsair.v2.chain.run_case` with a
+Every attempt builds the `Case` with `intake.from_issue_json` and runs `corsair.chain.run_case` with a
 `RunRecorder` in a fresh directory: the real routing (review loop, D3 check, budget), the real Select over
 `deploy/v2/runtime-matrix.yaml` and the real `rules.decide`.
 
@@ -106,7 +106,7 @@ Every attempt builds the `Case` with `intake.from_issue_json` and runs `corsair.
   the same `check`, `review` and `outcomes` keys; without one it repeats attempt 1's last exploit check, last review
   per revision and recorded outcomes. These are reference trajectories authored from each oracle's own expected
   path, not observations of live runs; a stage whose observation is missing raises, which the chain records as `infra_error`.
-- **Live** (`--provider-config`): `default_stages()` with every agent's model from `corsair.v2.models`; it needs
+- **Live** (`--provider-config`): `default_stages()` with every agent's model from `corsair.models`; it needs
   Docker and a reachable endpoint and exits 2 with the reason when Docker does not answer.
 
 Assertions (each one dimension; a dimension counts only where `case.json` declares it):

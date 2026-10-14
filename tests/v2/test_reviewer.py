@@ -9,9 +9,9 @@ from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.models.test import TestModel
 
-from corsair.v2.agents import reviewer
-from corsair.v2.agents.reviewer.review import ReviewDeps
-from corsair.v2.contracts import (Case, Citation, ExitClass, Finding, FrozenPatch, Outcome, ProbeBrief, ProbeDraft,
+from corsair.agents import reviewer
+from corsair.agents.reviewer.review import ReviewDeps
+from corsair.contracts import (Case, Citation, ExitClass, Finding, FrozenPatch, Outcome, ProbeBrief, ProbeDraft,
                                   ProbeFacts, ProbePlan, ProbeRun, Revision, Runtime)
 
 pytestmark = pytest.mark.anyio

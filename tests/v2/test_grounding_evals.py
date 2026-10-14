@@ -7,9 +7,9 @@ import pytest
 from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import FunctionModel
 
-from corsair.v2.agents.grounding.contracts import GroundingBrief, Precedent
-from corsair.v2.agents.grounding.evals.evaluate import SPEC, check, run
-from corsair.v2.contracts import AgentUsage
+from corsair.agents.grounding.contracts import GroundingBrief, Precedent
+from corsair.agents.grounding.evals.evaluate import SPEC, check, run
+from corsair.contracts import AgentUsage
 from evals.agent_eval import Attempt, evaluate
 from evals.cases import DIMENSIONS, agent_root, load_set
 

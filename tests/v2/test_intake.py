@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from corsair.v2 import intake
-from corsair.v2.contracts import Label
+from corsair import intake
+from corsair.contracts import Label
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = ROOT / "benchmarks/corpus/infosec-harness/manifest.json"

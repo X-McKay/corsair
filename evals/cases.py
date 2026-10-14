@@ -7,7 +7,7 @@
     evals/<suite>/sets/<set>.json
       {"held_out": false, "cases": {"<language>/<case id>": "<sha256>", ...}}
 
-A v2 agent keeps the same layout in its own package, ``src/corsair/v2/agents/<agent>/evals/`` (``agent_root``),
+A v2 agent keeps the same layout in its own package, ``src/corsair/agents/<agent>/evals/`` (``agent_root``),
 beside its ``release-policy.yaml``; every function here takes either a suite name under evals/ or that root path.
 v2 cases also name the eval types they measure in ``case.json`` ``dimensions`` (``DIMENSIONS``).
 
@@ -34,7 +34,7 @@ from typing import Any
 EVALS = Path(__file__).resolve().parent
 # v2 agents keep their evals in their own package: <agent package>/evals/ (same layout, rooted there). This is the
 # one place that names the package; it changes once if the v2 tree moves.
-AGENTS_PACKAGE = "corsair.v2.agents"
+AGENTS_PACKAGE = "corsair.agents"
 AGENTS = ("grounding", "builder", "investigator", "control_prober", "exploit_prober", "reviewer")
 # The whole chain is scored like an agent (`make eval AGENT=chain`) over the end-to-end cases in evals/e2e/.
 CHAIN = "chain"

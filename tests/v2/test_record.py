@@ -8,11 +8,11 @@ import yaml
 import pytest
 
 from chain_fakes import Fakes, case, models, usage
-from corsair.v2.chain import run_case
-from corsair.v2.contracts import AgentUsage, Label, TerminalReason, Verdict
-from corsair.v2.record import RunRecorder
+from corsair.chain import run_case
+from corsair.contracts import AgentUsage, Label, TerminalReason, Verdict
+from corsair.record import RunRecorder
 
-REVIEWER_SPEC = Path(__file__).parents[2] / "src/corsair/v2/agents/reviewer/agent.yaml"
+REVIEWER_SPEC = Path(__file__).parents[2] / "src/corsair/agents/reviewer/agent.yaml"
 REVIEWER_VERSION = yaml.safe_load(REVIEWER_SPEC.read_text())["metadata"]["prompt_version"]
 
 
@@ -183,8 +183,8 @@ def test_parameters_come_from_native_settings_and_limits_and_retries_from_messag
     from pydantic_ai.models.function import FunctionModel
     from pydantic_ai.usage import UsageLimits
 
-    from corsair.v2.agents.common.usage import model_parameters, run_recorded
-    from corsair.v2.models import ModelProfile, build_model
+    from corsair.agents.common.usage import model_parameters, run_recorded
+    from corsair.models import ModelProfile, build_model
 
     profile = ModelProfile(base_url="https://llm.example/v1", model_name="m",
                            temperature=0.2, max_tokens=4096, thinking_token_budget=1024)
@@ -217,7 +217,7 @@ def test_parameters_come_from_native_settings_and_limits_and_retries_from_messag
 
 
 def test_compare_prints_one_row_per_run(tmp_path, capsys):
-    from corsair.v2.cli import main
+    from corsair.cli import main
 
     first, _, _ = _schema_run(tmp_path / "a")
     second, _, _ = _schema_run(tmp_path / "b", plan=None)

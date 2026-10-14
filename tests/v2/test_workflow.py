@@ -10,9 +10,9 @@ from temporalio.exceptions import ApplicationError
 from temporalio.worker import Worker
 
 from chain_fakes import Fakes, case, models
-from corsair.v2 import workflow
-from corsair.v2.chain import run_case
-from corsair.v2.record import RunRecorder
+from corsair import workflow
+from corsair.chain import run_case
+from corsair.record import RunRecorder
 
 
 async def _environment():
@@ -148,7 +148,7 @@ def test_workflow_runs_the_same_second_attempt_as_direct_mode(tmp_path):
 @pytest.mark.parametrize("execution", ["activity", "worker"])
 def test_progress_records_only_the_requested_run_not_client_or_worker_default(tmp_path, monkeypatch, execution):
     from temporalio.testing import ActivityEnvironment
-    from corsair.v2.presentation import StageReporter
+    from corsair.presentation import StageReporter
 
     client_record = RunRecorder.create(tmp_path / "client", "untouched")
     client_record.begin(case(tmp_path), mode="temporal")

@@ -59,7 +59,7 @@ class Suite:
     set_modules: dict[str, str] = field(default_factory=dict)
 
 
-# v2 agents register their suites here as they gain one (src/corsair/v2/README.md); the v1 suites were removed.
+# v2 agents register their suites here as they gain one (src/corsair/README.md); the v1 suites were removed.
 SUITES: dict[str, Suite] = {}
 
 # Scorers whose CLI narrows a per-case set to one language (`--language`, evals/cases.py); every other set refuses

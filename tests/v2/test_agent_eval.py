@@ -7,7 +7,7 @@ from pydantic_ai.messages import ModelResponse, TextPart
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RunUsage
 
-from corsair.v2.agents.common.usage import to_agent_usage
+from corsair.agents.common.usage import to_agent_usage
 from evals import agent_eval, agent_summary
 from evals.agent_eval import AgentEval, Attempt, evaluate
 from evals.cases import freeze, write_case
@@ -148,7 +148,7 @@ def test_a_row_counts_only_the_dimensions_its_case_declares(tmp_path):
 
 def test_live_runs_record_the_resolved_provider_profile(tmp_path):
     from evals.agent_eval import provider_identity
-    from corsair.v2.models import AGENTS as MODEL_AGENTS
+    from corsair.models import AGENTS as MODEL_AGENTS
     config = tmp_path / "provider.json"
     config.write_text(json.dumps({"profiles": {"local": {"base_url": "https://llm.example/v1", "model_name": "m"}},
                                   "agents": {agent: "local" for agent in MODEL_AGENTS}}))

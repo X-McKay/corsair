@@ -8,7 +8,7 @@ both in a sandbox and a fixed rule table labels the issue `LIKELY_EXPLOITABLE`, 
 This branch carries Corsair v2, a rebuild on native PydanticAI agents and skills, the PydanticAI workspace interface
 (Docker is the default; the explicitly selected OpenShell backend is implemented but not live-qualified) and
 Temporal durability. The v1 implementation remains on `main`.
-[src/corsair/v2/README.md](src/corsair/v2/README.md) describes the chain, its stages and the rules every module keeps.
+[src/corsair/README.md](src/corsair/README.md) describes the chain, its stages and the rules every module keeps.
 
 ## Commands
 
@@ -46,7 +46,7 @@ Evidence lands under `.runs/` and is never committed.
 ## Layout
 
 ```text
-src/corsair/v2/           the chain: contracts, stages, intake, matrix selection, build, execute, rules, workflow, CLI
+src/corsair/           the chain: contracts, stages, intake, matrix selection, build, execute, rules, workflow, CLI
   skills/frameworks/      per-framework guidance and canaries (the only place framework knowledge lives, with the matrix)
   workspace/              sandbox port and explicit Docker/OpenShell backends (pydantic_ai.workspaces)
 deploy/v2/runtime-matrix.yaml   operator-owned runtime rows: image, framework, exit-code map

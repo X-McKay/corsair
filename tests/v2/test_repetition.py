@@ -3,7 +3,7 @@ import asyncio
 from pydantic_ai import Agent
 from pydantic_ai.messages import ToolReturnPart
 
-from corsair.v2.agents.common.repetition import ALLOWED, read_loop_guard
+from corsair.agents.common.repetition import ALLOWED, read_loop_guard
 
 from tests.v2.agent_scripts import Script
 
@@ -38,7 +38,7 @@ def test_tools_outside_the_read_set_are_never_guarded():
 
 def test_tools_are_withdrawn_before_either_cap_so_the_agent_can_answer():
     from pydantic_ai.usage import RunUsage, UsageLimits
-    from corsair.v2.agents.common.budget import HEADROOM, within_tool_budget
+    from corsair.agents.common.budget import HEADROOM, within_tool_budget
 
     class Ctx:
         def __init__(self, tool_calls, requests):

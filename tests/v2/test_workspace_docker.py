@@ -5,8 +5,8 @@ import pytest
 from pydantic_ai.workspaces import Workspace, WorkspaceRef, WorkspaceUnavailableError
 from pydantic_ai.workspaces.conformance import WorkspaceBackendSuite
 
-from corsair.v2.workspace import DockerConfig, DockerWorkspace, labels
-from corsair.v2.workspace.docker import docker, docker_available, remove, run_args
+from corsair.workspace import DockerConfig, DockerWorkspace, labels
+from corsair.workspace.docker import docker, docker_available, remove, run_args
 
 IMAGE = "corsair-python:ebf057997574de59"
 

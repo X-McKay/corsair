@@ -29,7 +29,7 @@ Lanes within a phase can run in parallel. A phase starts once the contracts it c
 
 Phase 0, develop setup:
 
-- [ ] Remove v1's `src`, `tests` and eval runners from develop (D11 default). Keep images, the matrix, corpus and benchmark data, and the docs records. v2 lives in `src/corsair/v2` (PR #133) and declares its runtime dependencies in `[project]`, not in the dev group.
+- [ ] Remove v1's `src`, `tests` and eval runners from develop (D11 default). Keep images, the matrix, corpus and benchmark data, and the docs records. v2 lives in `src/corsair/v2` (PR #133) and moved up to `src/corsair` on 2026-10-14 (Al: package move before the main cutover) and declares its runtime dependencies in `[project]`, not in the dev group.
 - [ ] Cut develop's PR path to one offline job, `make test-v2`, until something runs end to end (Al, 08:28Z). The v1 suites, the image gate and the qualification and record guards stay runnable by hand. The "Shorter CI with gates deferred" thread owns this step.
 
 Phase 1, contracts and layout:

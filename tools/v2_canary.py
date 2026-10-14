@@ -32,11 +32,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from corsair.v2 import matrix  # noqa: E402
-from corsair.v2.contracts import ProbeFacts  # noqa: E402
-from corsair.v2.outcome import classify, exit_class, read_check  # noqa: E402
+from corsair import matrix  # noqa: E402
+from corsair.contracts import ProbeFacts  # noqa: E402
+from corsair.outcome import classify, exit_class, read_check  # noqa: E402
 
-SKILLS = ROOT / "src/corsair/v2/skills/frameworks"
+SKILLS = ROOT / "src/corsair/skills/frameworks"
 EVIDENCE = ROOT / ".runs/canary"
 WORKDIR = "/work"
 MARKERS = "/corsair/markers"
