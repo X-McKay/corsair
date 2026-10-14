@@ -3,6 +3,7 @@ from datetime import date
 from pathlib import Path
 import re
 
+import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -84,13 +85,44 @@ def test_repository_markdown_links_resolve():
             assert not local or (path.parent / local).exists(), f"Broken link: {path} -> {target}"
 
 
-def test_development_ci_has_only_read_permissions_and_pinned_actions():
-    config = yaml.safe_load((ROOT / ".github/workflows/development.yml").read_text())
+WORKFLOWS = ("development.yml", "offline-v1.yml", "toolchain-images.yml")
+
+
+@pytest.mark.parametrize("name", WORKFLOWS)
+def test_ci_has_only_read_permissions_and_pinned_actions(name):
+    config = yaml.safe_load((ROOT / ".github/workflows" / name).read_text())
     assert config["permissions"] == {"contents": "read"}
-    steps = config["jobs"]["offline-guards"]["steps"]
-    for step in steps:
-        if "uses" in step:
-            assert re.fullmatch(r"[a-z0-9-]+/[a-z0-9-]+@[0-9a-f]{40}", step["uses"])
-        if step.get("uses", "").startswith("actions/checkout@"):
-            assert step["with"]["persist-credentials"] is False
-    assert [s["run"] for s in steps if "run" in s] == ["make test-config"]
+    for job in config["jobs"].values():
+        for step in job["steps"]:
+            if "uses" in step:
+                assert re.fullmatch(r"[a-z0-9-]+/[a-z0-9-]+@[0-9a-f]{40}", step["uses"])
+            if step.get("uses", "").startswith("actions/checkout@"):
+                assert step["with"]["persist-credentials"] is False
+
+
+def test_pr_path_runs_only_the_v2_suite_and_v1_shards_cover_the_whole_suite():
+    """Until end-to-end runs exist the PR check `offline-guards` runs `make test-v2`; every v1 shard k/n of 1..n runs
+    `make test-config`, off the PR path."""
+    pr = yaml.safe_load((ROOT / ".github/workflows/development.yml").read_text())["jobs"]
+    assert list(pr) == ["offline-guards"]
+    assert [step["run"] for step in pr["offline-guards"]["steps"] if "run" in step] == ["make test-v2"]
+    v1 = yaml.safe_load((ROOT / ".github/workflows/offline-v1.yml").read_text())
+    assert "pull_request" not in v1[True]  # PyYAML reads the bare `on` key as True
+    shards = v1["jobs"]["offline-shard"]
+    count = len(shards["strategy"]["matrix"]["shard"])
+    assert shards["strategy"]["matrix"]["shard"] == list(range(1, count + 1))
+    runs = [step for step in shards["steps"] if "run" in step]
+    assert [step["run"] for step in runs] == ["make test-config"]
+    assert runs[0]["env"]["TEST_SHARD"] == "${{ matrix.shard }}/" + str(count)
+
+
+def test_test_shards_partition_the_collection():
+    from tests.conftest import shard
+    items = list(range(23))
+    parts = [shard(items, f"{k}/4") for k in range(1, 5)]
+    assert sorted(i for part in parts for i in part) == items
+    assert max(map(len, parts)) - min(map(len, parts)) <= 1
+    for bad in ("0/3", "4/3"):
+        with pytest.raises(ValueError):
+            shard(items, bad)
+

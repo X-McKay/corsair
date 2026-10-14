@@ -1,0 +1,178 @@
+"""The Decide rule table: one table-driven case per rule and terminal reason, then fix verification and origins."""
+import pytest
+
+from corsair.v2.contracts import (BuildResult, Case, Citation, ExitClass, Finding, Label, Origin, Outcome, ProbeBrief,
+                                  ProbeFacts, ProbePlan, ProbeRun, ProbeValidity, Recipe, Revision, Runtime,
+                                  TerminalReason as T, Validity)
+from corsair.v2.rules import RULES, decide
+
+PATCH, OTHER = "a" * 64, "b" * 64
+REV = Revision(source="/tmp/rev", tree_sha256="c" * 64)
+CASE = Case(case_id="case-1", finding=Finding(title="t"), revision=REV)
+FIXED_CASE = Case(case_id="case-1", finding=Finding(title="t"), revision=REV,
+                  fixed_revision=Revision(source="/tmp/fix", tree_sha256="d" * 64))
+RUNTIME = Runtime(row_id="r", image="img", framework="f", skill="f", run_template=("run",),
+                  exit_codes={0: ExitClass.PASS}, evidence="image-only")
+BUILD_OK = BuildResult(recipe=Recipe(baseline_test=("t",)), replayed=True, baseline_exit_code=0)
+BUILD_FAILED = BuildResult(recipe=None, replayed=False, reason="no recipe")
+CITE = (Citation(path="app.py", start_line=1, end_line=1),)
+
+
+def brief(role):
+    return ProbeBrief(role=role, test_file="tests/test_x.py", test_name="test_x", target="t", seam="s",
+                      input_description="i", property_to_assert="p", citations=CITE)
+
+
+PLAN = ProbePlan(status="planned", target="t", control=brief("control"), exploit=brief("exploit"))
+
+
+def pv(role, valid=True):
+    return ProbeValidity(role=role, valid=valid, calls_real_target=valid, exercises_condition=valid,
+                         assertion_relevant=valid, doubles_only_dependencies=valid)
+
+
+def review(revision="vulnerable", control=True, exploit=True, patch=PATCH):
+    return Validity(patch_sha256=patch, revision=revision, control=pv("control", control),
+                    exploit=pv("exploit", exploit))
+
+
+def run(role, outcome, revision="vulnerable", patch=PATCH):
+    facts = ProbeFacts(exit_code=0, exit_class=ExitClass.PASS, start_marker=True, end_marker=True,
+                       token_in_output=False)
+    return ProbeRun(role=role, revision=revision, patch_sha256=patch, facts=facts, outcome=Outcome(outcome))
+
+
+def runs(control="passed", exploit="assertion_failed", revision="vulnerable", patch=PATCH):
+    return tuple(r for r in (control and run("control", control, revision, patch),
+                             exploit and run("exploit", exploit, revision, patch)) if r)
+
+
+def full(**overrides):
+    kwargs = dict(runtime=RUNTIME, build=BUILD_OK, plan=PLAN, validity=(review(),), runs=runs(), stopped=None)
+    kwargs.update(overrides)
+    return kwargs
+
+
+UNSUPPORTED = ProbePlan(status="unsupported_scope", reason="needs a real database")
+NOT_FOUND = ProbePlan(status="target_not_found")
+
+# id, decide kwargs, expected (rule, label, terminal reason, finding)
+CASES = [
+    ("no runtime", full(runtime=None, build=None, plan=None, validity=(), runs=()),
+     ("R0", Label.UNABLE_TO_RUN, T.NO_RUNTIME, "none")),
+    ("stopped no_runtime", full(stopped="no_runtime", validity=(), runs=()),
+     ("R0", Label.UNABLE_TO_RUN, T.NO_RUNTIME, "none")),
+    ("build failed", full(build=BUILD_FAILED, validity=(), runs=()),
+     ("R0", Label.UNABLE_TO_RUN, T.BUILD_FAILED, "none")),
+    ("plan unsupported", full(plan=UNSUPPORTED, build=None, validity=(), runs=()),
+     ("R0", Label.UNABLE_TO_RUN, T.UNSUPPORTED_SCOPE, "none")),
+    ("plan target not found", full(plan=NOT_FOUND, build=None, validity=(), runs=()),
+     ("R0", Label.UNABLE_TO_RUN, T.PLAN_UNRESOLVED, "none")),
+    ("stopped plan_unresolved", full(stopped="plan_unresolved", validity=(), runs=()),
+     ("R0", Label.UNABLE_TO_RUN, T.PLAN_UNRESOLVED, "none")),
+    ("provider error", full(stopped="provider_error", validity=(), runs=()),
+     ("R1", Label.ERROR, T.PROVIDER_ERROR, "none")),
+    ("infra error", full(stopped="infra_error"), ("R1", Label.ERROR, T.INFRA_ERROR, "none")),
+    ("cleanup unconfirmed", full(stopped="cleanup_unconfirmed"), ("R1", Label.ERROR, T.CLEANUP_UNCONFIRMED, "none")),
+    ("infra run", full(runs=runs(exploit="infra")), ("R1", Label.ERROR, T.INFRA_ERROR, "none")),
+    ("budget exhausted", full(stopped="budget_exhausted", validity=(), runs=()),
+     ("R7", Label.INCONCLUSIVE, T.BUDGET_EXHAUSTED, "inconclusive")),
+    ("review missing", full(validity=()), ("R2", Label.INCONCLUSIVE, T.TEST_INVALID, "inconclusive")),
+    ("control invalid", full(validity=(review(control=False),)),
+     ("R2", Label.INCONCLUSIVE, T.TEST_INVALID, "inconclusive")),
+    ("exploit invalid", full(validity=(review(exploit=False),)),
+     ("R2", Label.INCONCLUSIVE, T.TEST_INVALID, "inconclusive")),
+    ("review of another patch", full(validity=(review(patch=OTHER),)),
+     ("R2", Label.INCONCLUSIVE, T.TEST_INVALID, "inconclusive")),
+    ("only fixed review", full(validity=(review("fixed"),)),
+     ("R2", Label.INCONCLUSIVE, T.TEST_INVALID, "inconclusive")),
+    ("control assertion failed", full(runs=runs(control="assertion_failed")),
+     ("R3", Label.INCONCLUSIVE, T.CONTROL_FAILED, "inconclusive")),
+    ("control anomalous", full(runs=runs(control="anomalous")),
+     ("R3", Label.INCONCLUSIVE, T.CONTROL_FAILED, "inconclusive")),
+    ("control not run", full(runs=runs(control="not_run")),
+     ("R3", Label.INCONCLUSIVE, T.PROBE_NOT_RUN, "inconclusive")),
+    ("control errored", full(runs=runs(control="errored")),
+     ("R3", Label.INCONCLUSIVE, T.PROBE_ERRORED, "inconclusive")),
+    ("control missing", full(runs=runs(control=None)),
+     ("R3", Label.INCONCLUSIVE, T.PROBE_NOT_RUN, "inconclusive")),
+    ("reproduced", full(), ("R4", Label.LIKELY_EXPLOITABLE, T.OK, "reproduced")),
+    ("not reproduced", full(runs=runs(exploit="passed")),
+     ("R5", Label.LIKELY_NOT_EXPLOITABLE, T.OK, "not_reproduced")),
+    ("exploit anomalous", full(runs=runs(exploit="anomalous")),
+     ("R6", Label.INCONCLUSIVE, T.NO_VALID_OBSERVATION, "inconclusive")),
+    ("exploit not run", full(runs=runs(exploit="not_run")),
+     ("R6", Label.INCONCLUSIVE, T.PROBE_NOT_RUN, "inconclusive")),
+    ("exploit errored", full(runs=runs(exploit="errored")),
+     ("R6", Label.INCONCLUSIVE, T.PROBE_ERRORED, "inconclusive")),
+    ("exploit missing", full(runs=runs(exploit=None)),
+     ("R6", Label.INCONCLUSIVE, T.PROBE_NOT_RUN, "inconclusive")),
+    ("exploit run on another patch", full(runs=(run("control", "passed"), run("exploit", "assertion_failed",
+                                                                              patch=OTHER))),
+     ("R6", Label.INCONCLUSIVE, T.PROBE_NOT_RUN, "inconclusive")),
+    ("other stop falls through to evidence", full(stopped="probe_errored", runs=runs(exploit="errored")),
+     ("R6", Label.INCONCLUSIVE, T.PROBE_ERRORED, "inconclusive")),
+    ("R0 outranks R1", full(runtime=None, stopped="provider_error"),
+     ("R0", Label.UNABLE_TO_RUN, T.NO_RUNTIME, "none")),
+    ("R1 outranks a decisive run", full(stopped="infra_error"), ("R1", Label.ERROR, T.INFRA_ERROR, "none")),
+]
+
+
+@pytest.mark.parametrize(("kwargs", "expected"), [c[1:] for c in CASES], ids=[c[0] for c in CASES])
+def test_rule_table(kwargs, expected):
+    verdict = decide(CASE, **kwargs)
+    assert (verdict.rule_id, verdict.label, verdict.terminal_reason, verdict.finding) == expected
+    assert verdict.fix == "not_applicable"
+    assert verdict.case_id == "case-1"
+
+
+def test_every_rule_is_covered_and_ids_are_unique():
+    ids = [rule.id for rule in RULES]
+    assert len(ids) == len(set(ids)) and ids[-1] == "R6"
+    assert {c[2][0] for c in CASES} == set(ids)
+
+
+def fixed(**changes):
+    kwargs = full()
+    kwargs["validity"] = (review(), review("fixed"))
+    kwargs["runs"] = runs() + runs(exploit="passed", revision="fixed")
+    kwargs.update(changes)
+    return kwargs
+
+
+@pytest.mark.parametrize(("kwargs", "fix"), [
+    (fixed(), "verified"),
+    (fixed(validity=(review(),)), "not_verified"),
+    (fixed(validity=(review(), review("fixed", exploit=False))), "not_verified"),
+    (fixed(validity=(review(), review("fixed", patch=OTHER))), "not_verified"),
+    (fixed(runs=runs() + runs(exploit="assertion_failed", revision="fixed")), "not_verified"),
+    (fixed(runs=runs() + runs(control="errored", exploit="passed", revision="fixed")), "not_verified"),
+    (fixed(runs=runs() + runs(exploit="passed", revision="fixed", patch=OTHER)), "not_verified"),
+    (fixed(runs=runs(exploit="passed") + runs(exploit="passed", revision="fixed")), "not_verified"),  # R5, not R4
+], ids=["verified", "no fixed review", "fixed review negative", "fixed review other patch", "still fails on fix",
+        "fixed control errored", "fixed runs other patch", "not reproduced first"])
+def test_fix_verification(kwargs, fix):
+    assert decide(FIXED_CASE, **kwargs).fix == fix
+
+
+def test_fix_not_applicable_without_fixed_revision():
+    assert decide(CASE, **fixed()).fix == "not_applicable"
+
+
+def test_duplicate_runs_and_reviews_are_refused():
+    with pytest.raises(ValueError):
+        decide(CASE, **full(runs=runs() + (run("exploit", "passed"),)))
+    with pytest.raises(ValueError):
+        decide(CASE, **full(validity=(review(), review())))
+    with pytest.raises(ValueError):
+        decide(CASE, **full(stopped="not_a_reason"))
+
+
+def test_facts_origin_and_evidence_kept():
+    verdict = decide(FIXED_CASE, **fixed())
+    assert verdict.facts_origin["runtime"] is Origin.DECLARED
+    assert verdict.facts_origin["build"] is Origin.PLATFORM_OBSERVED
+    assert verdict.facts_origin["vulnerable.validity"] is Origin.MODEL_REVIEWED
+    assert verdict.facts_origin["vulnerable.exploit.exit_class"] is Origin.NATIVE_TEST_REPORTED
+    assert verdict.facts_origin["fixed.control.markers"] is Origin.PLATFORM_OBSERVED
+    assert len(verdict.runs) == 4 and len(verdict.validity) == 2

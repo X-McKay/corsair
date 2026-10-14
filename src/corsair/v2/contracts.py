@@ -185,8 +185,10 @@ class ProbeDraft(Frozen):
     @field_validator("source")
     @classmethod
     def _markers(cls, value: str) -> str:
-        if "CORSAIR_START" not in value or "CORSAIR_END" not in value:
-            raise ValueError("a probe must write the CORSAIR_START and CORSAIR_END markers")
+        # The probe protocol (D8): the test writes files `start` and `end` into the directory named by the
+        # CORSAIR_MARKER_DIR environment variable. A draft that never reads it cannot write either marker.
+        if "CORSAIR_MARKER_DIR" not in value:
+            raise ValueError("a probe must write its start and end markers into CORSAIR_MARKER_DIR")
         return value
 
 
@@ -315,5 +317,5 @@ class AgentUsage(Frozen):
     output_tokens: int | None = None
     tool_calls: int | None = None
     wall_s: float | None = None
-    status: Literal["ok", "output_invalid", "budget_exhausted", "provider_error"] = "ok"
+    status: Literal["ok", "output_invalid", "budget_exhausted", "provider_error", "infra_error"] = "ok"
 

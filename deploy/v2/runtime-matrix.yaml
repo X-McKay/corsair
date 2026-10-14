@@ -1,0 +1,146 @@
+# Corsair v2 runtime matrix (redesign sections 6 and 13, D8). Operator-owned data: agents and project files never
+# edit it, and trusted code never branches on `language`, which is carried for reports only.
+#
+# One row per (image, framework). Select (src/corsair/v2/matrix.py) walks rows in order and takes the first whose
+# `detect` hints match the revision tree's root: a file glob, optionally with a substring the file must contain.
+# Execute fills `run_template` with {file} (the probe's test file), {name} (its test name), {class} (the file's
+# stem) and {module} (the file's path without extension, dotted), runs it once in the prepared environment with
+# no network, and maps the exit code through `exit_codes`; an unlisted code is `unknown`. Docker's own codes
+# (125 daemon, 126 not executable, 127 not found, 137 SIGKILL, 143 SIGTERM) are harness errors in every row.
+#
+# `evidence` is `canary-only` until tools/v2_canary.py classifies the row's two canaries (in
+# src/corsair/v2/skills/frameworks/<skill>/canary/) as `passed` and `assertion_failed` on the image; then
+# `image-only`. `live` needs the kind/OpenShell gate. Evidence JSON lands in .runs/canary/<row>.json.
+# `canary_setup` runs before each canary only (offline); a real case gets its dependencies from Build.
+# `build_network_hosts` lists the registries Build may reach; it is data for the workspace policy, nothing more.
+# `image` is a local tag for now; `base_image` is the digest-pinned upstream base from deploy/runtime-matrix.yaml
+# (or the image source, where that file has no row yet).
+#
+# Canary evidence, 2026-10-14: every row below classified pass -> passed and fail -> assertion_failed with
+# `uv run --locked python tools/v2_canary.py` under plain Docker (no network); a raise after `start` read errored
+# and a source that does not load read not_run on every row (ad hoc, not recorded). Image-only, not live.
+schema_version: corsair-v2/runtime-matrix/1
+rows:
+  - id: junit5-maven-temurin17
+    language: java
+    # Built before the m2.sha256 check was added to the source (current source tag 109e2050ebebe84e). Its
+    # /opt/corsair-m2.sha256 equals the reviewed m2.sha256 as a set (only line order differs), checked 2026-10-14.
+    image: corsair-java:c7e6b24f0068035d
+    base_image: docker.io/library/maven@sha256:5394efaabc436795b507ca400aaf86311db03543072e0e87ae66c595965d4aed
+    image_source: deploy/qualification/toolchains/java
+    framework: junit5
+    skill: junit5
+    detect:
+      - {file: pom.xml, contains: junit-jupiter}
+    # Dependencies come from the tree-local repository Build fills (.corsair-m2), so the run needs no network and
+    # never writes the image's read-only closure. Surefire prints each failure's message in its summary.
+    run_template: [/usr/share/maven/bin/mvn, -B, -ntp, -o, -Dmaven.repo.local=.corsair-m2, '-Dtest={class}#{name}',
+                   -DtrimStackTrace=false, test]
+    exit_codes: {0: pass, 1: test_failed, 125: harness_error, 126: harness_error, 127: harness_error,
+                 137: harness_error, 143: harness_error}
+    test_dir: src/test/java
+    evidence: image-only
+    build_network_hosts: [repo.maven.apache.org, repo1.maven.org]
+    canary_setup: [cp, -R, /opt/corsair-m2, .corsair-m2]
+    note: Temurin 17, Maven 3.10.0, JUnit Jupiter 5.14.4 and Surefire 3.6.0 in the image's offline closure.
+  - id: junit4-maven-temurin8
+    language: java
+    # Built before the m2.sha256 check was added to the source (current source tag 996a570a7e03c327). Its
+    # /opt/corsair-m2.sha256 equals the reviewed m2.sha256 as a set (only line order differs), checked 2026-10-14.
+    image: corsair-java8:81777d352ab28226
+    base_image: docker.io/library/maven@sha256:f2cb52730ea0bde9dc8ba20e5e539d000dcdd7ab9e498d70c301fe04fbddb656
+    image_source: deploy/qualification/toolchains/java8
+    framework: junit4
+    skill: junit4
+    detect:
+      - {file: pom.xml, contains: <artifactId>junit</artifactId>}
+    run_template: [/usr/share/maven/bin/mvn, -B, -ntp, -o, -Dmaven.repo.local=.corsair-m2, '-Dtest={class}#{name}',
+                   -DtrimStackTrace=false, test]
+    exit_codes: {0: pass, 1: test_failed, 125: harness_error, 126: harness_error, 127: harness_error,
+                 137: harness_error, 143: harness_error}
+    test_dir: src/test/java
+    evidence: image-only
+    build_network_hosts: [repo.maven.apache.org, repo1.maven.org]
+    canary_setup: [cp, -R, /opt/corsair-m2, .corsair-m2]
+    note: Temurin 8, Maven 3.10.0, JUnit 4.13.2 and Surefire 3.6.0 in the image's offline closure.
+  - id: pytest-cpython312
+    language: python
+    image: corsair-python:61a3e8db1afb1726
+    base_image: docker.io/library/python@sha256:2ed6491b93cd49272ee6de2b5a38440c3448360322c089fc23e370722d74179d
+    image_source: deploy/qualification/toolchains/python
+    framework: pytest
+    skill: pytest
+    detect:
+      - {file: requirements.txt}
+      - {file: pyproject.toml}
+      - {file: setup.py}
+      - {file: setup.cfg}
+      - {file: Pipfile}
+    # Minimal-component mode (A4): no project config, conftest or plugin autoload; Build installs the project's
+    # dependencies into .corsair-deps, found after the code. pytest prints the assertion message on failure.
+    run_template: [/usr/bin/env, PYTEST_DISABLE_PLUGIN_AUTOLOAD=1, PYTHONDONTWRITEBYTECODE=1,
+                   'PYTHONPATH=.:.corsair-deps', /usr/local/bin/python3, -m, pytest, -c, /dev/null, --rootdir, .,
+                   --noconftest, --import-mode=importlib, -p, no:cacheprovider, -v, '{file}::{name}']
+    exit_codes: {0: pass, 1: test_failed, 2: harness_error, 3: harness_error, 4: harness_error, 5: no_tests,
+                 125: harness_error, 126: harness_error, 127: harness_error, 137: harness_error, 143: harness_error}
+    test_dir: tests
+    evidence: image-only
+    build_network_hosts: [pypi.org, files.pythonhosted.org]
+    note: CPython 3.12.15 with pytest 9.0.3 from the image's hash-pinned wheels.
+  - id: jest29-node22
+    language: javascript
+    image: corsair-node22:0d326e4d65c24e07
+    base_image: docker.io/library/node@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392
+    image_source: deploy/qualification/toolchains/node22 (commit aa417fc, not on this branch)
+    framework: jest
+    skill: jest
+    detect:
+      - {file: package.json, contains: '"jest"'}
+    run_template: [/usr/local/bin/node, node_modules/jest/bin/jest.js, --ci, --runInBand, --verbose,
+                   --runTestsByPath, '{file}', -t, '^{name}$']
+    exit_codes: {0: pass, 1: test_failed, 125: harness_error, 126: harness_error, 127: harness_error,
+                 137: harness_error, 143: harness_error}
+    test_dir: __tests__
+    evidence: image-only
+    build_network_hosts: [registry.npmjs.org]
+    canary_setup: [/bin/sh, -ec, 'cp /opt/corsair-fixture/package.json /opt/corsair-fixture/package-lock.json .;
+                   cp -R /opt/corsair-npm /tmp/npm; npm ci --offline --ignore-scripts --no-audit --no-update-notifier
+                   --cache /tmp/npm']
+    note: Node 22.23.3, npm 10.9.9; Jest 29.7.0 from the image's offline npm cache (canary only).
+  - id: prove-perl526
+    language: perl
+    image: corsair-perl526:336b7d9d2f876fab
+    base_image: docker.io/library/perl@sha256:c7e412792cb4f1a5b9b7a632c01a02fb469c615e6745279b4ae1821d03105bc7
+    image_source: deploy/qualification/toolchains/perl526
+    framework: test-more
+    skill: test-more
+    detect:
+      - {file: cpanfile}
+      - {file: Makefile.PL}
+      - {file: Build.PL}
+      - {file: t/*.t}
+    # One probe is one .t file; prove -v shows the TAP stream with each failed test's name (the token).
+    run_template: [/usr/local/bin/prove, -v, -Iblib/lib, -Iblib/arch, -Ilib, '{file}']
+    exit_codes: {0: pass, 1: test_failed, 125: harness_error, 126: harness_error, 127: harness_error,
+                 137: harness_error, 143: harness_error}
+    test_dir: t
+    evidence: image-only
+    build_network_hosts: [cpan.metacpan.org, www.cpan.org, fastapi.metacpan.org]
+    note: Perl 5.26.3 with core Test::More and prove; GNU Make 4.2.1.
+  - id: minitest-ruby31
+    language: ruby
+    image: corsair-ruby31:b4ce10447abbe241
+    base_image: docker.io/library/ruby@sha256:91627f55e8969006aab67d15c92fb930500ff73948803da1330b8a853fecebb5
+    image_source: deploy/qualification/toolchains/ruby31
+    framework: minitest
+    skill: minitest
+    detect:
+      - {file: Gemfile}
+    run_template: [/usr/bin/env, BUNDLE_FROZEN=true, /usr/local/bin/bundle, exec, /usr/local/bin/ruby, -Itest, -Ilib,
+                   '{file}', -v, -n, '{name}']
+    exit_codes: {0: pass, 1: test_failed, 125: harness_error, 126: harness_error, 127: harness_error,
+                 137: harness_error, 143: harness_error}
+    test_dir: test
+    evidence: image-only
+    build_network_hosts: [rubygems.org, index.rubygems.org]
+    note: Ruby 3.1.7, Bundler 2.3.27 and bundled Minitest 5.15.0.

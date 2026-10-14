@@ -21,12 +21,13 @@ kind-down:
 workspace-storage:
 	uv run --locked python deploy/kind/bootstrap.py workspace-storage
 
-# The offline suite is CPU-bound; pytest-xdist spreads it over the cores (PLAN-0085). `TEST_WORKERS=0 make test-config`
-# runs it serially; set it in the environment, since the qualify-image guard test refuses command-line variables that
-# reach its sub-make through MAKEFLAGS.
+# The offline suite is CPU-bound; pytest-xdist spreads it over the cores (PLAN-0085), work stealing so a few slow tests
+# do not leave the other workers idle at the end. `TEST_WORKERS=0 make test-config` runs it serially; set it in the
+# environment, since the qualify-image guard test refuses command-line variables that reach its sub-make through
+# MAKEFLAGS. CI sets TEST_SHARD=k/n in the environment to split the suite over parallel jobs (tests/conftest.py).
 TEST_WORKERS ?= auto
 test-config:
-	uv run --locked python -m pytest $(PYTEST_ROOT) -n $(TEST_WORKERS) tests/configuration tests/unit tests/agents tests/temporal/test_fixture_contracts.py tests/temporal/test_issue_analysis_composition.py tests/temporal/test_chain_composition.py
+	uv run --locked python -m pytest $(PYTEST_ROOT) -n $(TEST_WORKERS) $(if $(filter 0,$(TEST_WORKERS)),,--dist worksteal) $(if $(TEST_SHARD),--test-shard $(TEST_SHARD)) tests/configuration tests/unit tests/agents tests/temporal/test_fixture_contracts.py tests/temporal/test_issue_analysis_composition.py tests/temporal/test_chain_composition.py
 
 # Corsair v2 offline suite (no model, no cluster); Docker-backed tests skip when Docker is unavailable.
 .PHONY: test-v2

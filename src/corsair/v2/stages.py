@@ -10,8 +10,8 @@ from typing import Protocol
 
 from pydantic_ai.models import Model
 
-from .contracts import (AgentUsage, BuildResult, Case, Environment, FrozenPatch, ProbeBrief, ProbeDraft, ProbePlan,
-                        ProbeRun, Recipe, Runtime, Validity, Verdict)
+from .contracts import (AgentUsage, BuildResult, Case, Environment, FrozenPatch, Outcome, ProbeBrief, ProbeDraft,
+                        ProbePlan, ProbeRun, Recipe, Runtime, Validity, Verdict)
 
 
 class Select(Protocol):
@@ -28,8 +28,9 @@ class Investigate(Protocol):
 class BuildAgent(Protocol):
     """Explores a disposable workspace container and proposes a Recipe; trusted replay decides if it holds."""
 
-    async def __call__(self, case: Case, runtime: Runtime, plan: ProbePlan, model: Model, *, workspace: object
-                       ) -> tuple[Recipe | None, AgentUsage]: ...
+    async def __call__(self, case: Case, runtime: Runtime, plan: ProbePlan, model: Model, *, workspace: object,
+                       feedback: str | None = None) -> tuple[Recipe | None, AgentUsage]: ...
+    # ``feedback`` is set only for the single extra episode after a failed replay (A2): the replay log's tail.
 
 
 class Replay(Protocol):
@@ -59,6 +60,17 @@ class Execute(Protocol):
 
     def __call__(self, environment: Environment, runtime: Runtime, patch: FrozenPatch, role: str, *,
                  revision: str = "vulnerable") -> ProbeRun: ...
+
+
+class Diagnose(Protocol):
+    """Trusted D3 pre-check: runs one frozen probe once on the vulnerable revision, before review.
+
+    Returns the outcome and, only for ``not_run`` or ``errored``, that author's own diagnostics (the run output).
+    A completed run returns no diagnostics, so the author can fix mechanics but never steer toward an outcome.
+    """
+
+    def __call__(self, environment: Environment, runtime: Runtime, patch: FrozenPatch, role: str
+                 ) -> tuple[Outcome, str | None]: ...
 
 
 class Decide(Protocol):
