@@ -76,3 +76,28 @@ def test_unreported_usage_is_unknown_not_zero(tmp_path):
              "tool_calls": None, "input_tokens": None, "output_tokens": None}]
     rolled = agent_summary.rollup(rows)
     assert rolled["input_tokens"] == {"observed": 0, "mean": None, "p50": None, "p90": None, "total": None}
+
+
+def test_chain_dispositions_keep_abstention_out_of_accuracy(tmp_path):
+    def row(language, label, expected, reason):
+        return {"case": f"{language}/{label}-{expected}", "language": language, "kind": "positive",
+                "dimensions": {"correctness": label == expected}, "passed": label == expected, "assertions": {},
+                "failure": None, "label": label, "expected_label": expected, "terminal_reason": reason,
+                **{metric: None for metric in agent_summary.METRICS}}
+    rows = [row("python", "LIKELY_EXPLOITABLE", "LIKELY_EXPLOITABLE", "completed"),
+            row("python", "INCONCLUSIVE", "LIKELY_NOT_EXPLOITABLE", "probe_not_run"),
+            row("java", "UNABLE_TO_RUN", "LIKELY_EXPLOITABLE", "no_runtime"),
+            row("java", "LIKELY_NOT_EXPLOITABLE", "LIKELY_EXPLOITABLE", "completed")]
+    found = agent_summary.rollup(rows)["dispositions"]
+    assert found["decisive_rate"] == 0.5 and found["decisive_correct"] == 1
+    assert found["accuracy_by_expected_label"]["LIKELY_EXPLOITABLE"] == {"passed": 1, "total": 3}
+    assert found["abstentions"]["INCONCLUSIVE"] == {"count": 1, "rate": 0.25, "by_terminal_reason": {"probe_not_run": 1}}
+    policy_path = tmp_path / "policy.yaml"
+    policy_path.write_text("schema_version: 1\nthresholds:\n  decisive_rate: {min: 0.6, by_language: {python: null}}\n"
+                           "  inconclusive_rate: {max: null}\n  accuracy_by_label: {LIKELY_EXPLOITABLE: {min: null}}\n")
+    summary = {"set": "v2", "mode": "live", "identity": {},
+               "attempts": rows, "rollups": {"all": agent_summary.rollup(rows),
+                                             "by_language": {"python": agent_summary.rollup(rows[:2])}}}
+    entries = agent_summary.apply_policy(summary, policy_path)["entries"]
+    assert entries["decisive_rate"]["status"] == "fail" and entries["decisive_rate.python"]["status"] == "not_set"
+    assert entries["inconclusive_rate"]["status"] == "not_set"

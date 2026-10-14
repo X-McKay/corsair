@@ -19,6 +19,10 @@ import yaml
 
 SCHEMA = "corsair-eval-summary/v1"
 METRICS = ("latency_s", "requests", "tool_calls", "input_tokens", "output_tokens")
+# Chain dispositions (contracts.Label). Decisive = one of the two exploitability labels; abstentions are reported as
+# their own rates by terminal reason so they are never hidden inside accuracy.
+DECISIVE = ("LIKELY_EXPLOITABLE", "LIKELY_NOT_EXPLOITABLE")
+ABSTAIN = ("INCONCLUSIVE", "UNABLE_TO_RUN", "ERROR")
 
 
 def _p90(values: list[float]) -> float:
@@ -34,6 +38,31 @@ def _stats(values: list[float | None]) -> dict:
             "p90": round(_p90(seen), 3), "total": round(sum(seen), 3)}
 
 
+def dispositions(rows: list[dict]) -> dict | None:
+    """Rows carrying ``label`` (chain runs): decisive rate, accuracy per expected label, abstention rates by
+    terminal reason. None when no row has a label (agent runs)."""
+    labelled = [row for row in rows if row.get("label") is not None]
+    if not labelled:
+        return None
+    total = len(labelled)
+    decisive = [row for row in labelled if row["label"] in DECISIVE]
+    per_label = {}
+    for label in sorted({row.get("expected_label") for row in labelled} - {None}):
+        expected = [row for row in labelled if row.get("expected_label") == label]
+        per_label[label] = {"passed": sum(row["label"] == label for row in expected), "total": len(expected)}
+    abstentions = {}
+    for label in ABSTAIN:
+        hits = [row for row in labelled if row["label"] == label]
+        reasons: dict[str, int] = {}
+        for row in hits:
+            reasons[str(row.get("terminal_reason"))] = reasons.get(str(row.get("terminal_reason")), 0) + 1
+        abstentions[label] = {"count": len(hits), "rate": round(len(hits) / total, 4),
+                              "by_terminal_reason": dict(sorted(reasons.items()))}
+    return {"runs": total, "decisive": len(decisive), "decisive_rate": round(len(decisive) / total, 4),
+            "decisive_correct": sum(row["label"] == row.get("expected_label") for row in decisive),
+            "accuracy_by_expected_label": per_label, "abstentions": abstentions}
+
+
 def rollup(rows: list[dict]) -> dict:
     dimensions: dict[str, dict[str, int]] = {}
     for row in rows:
@@ -45,6 +74,7 @@ def rollup(rows: list[dict]) -> dict:
             "clean_attempts": sum(row["passed"] for row in rows),
             "task_failures": sum(row["failure"] is not None and not row["assertions"] for row in rows),
             "dimensions": dict(sorted(dimensions.items())),
+            **({"dispositions": found} if (found := dispositions(rows)) is not None else {}),
             **{metric: _stats([row.get(metric) for row in rows]) for metric in METRICS}}
 
 
@@ -113,6 +143,21 @@ def apply_policy(summary: dict, policy_path: Path) -> dict:
         for language, limit in (rule.get("by_language") or {}).items():
             group = ((rollups.get("by_language") or {}).get(language) or {}).get("dimensions") or {}
             entries[f"accuracy.{dimension}.{language}"] = _judge(_rate(group.get(dimension)), limit, "min")
+    labels = overall.get("dispositions")
+    for name in ("decisive_rate", "inconclusive_rate", "unable_to_run_rate"):
+        rule = thresholds.get(name)
+        if rule is None:
+            continue
+        kind = "min" if name == "decisive_rate" else "max"
+        pick = lambda d: None if d is None else (d["decisive_rate"] if name == "decisive_rate" else
+                                                 d["abstentions"][name.removesuffix("_rate").upper()]["rate"])
+        entries[name] = _judge(pick(labels), rule.get(kind), kind)
+        for language, limit in (rule.get("by_language") or {}).items():
+            group = ((rollups.get("by_language") or {}).get(language) or {}).get("dispositions")
+            entries[f"{name}.{language}"] = _judge(pick(group), limit, kind)
+    for label, rule in (thresholds.get("accuracy_by_label") or {}).items():
+        entry = ((labels or {}).get("accuracy_by_expected_label") or {}).get(label)
+        entries[f"accuracy_by_label.{label}"] = _judge(_rate(entry), rule.get("min"), "min")
     if "clean_attempt_rate" in thresholds:
         attempts = overall.get("attempts")
         entries["clean_attempt_rate"] = _judge(overall["clean_attempts"] / attempts if attempts else None,
