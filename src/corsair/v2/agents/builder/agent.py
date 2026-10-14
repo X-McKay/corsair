@@ -22,6 +22,7 @@ from pydantic_ai_harness import Skills
 from corsair.v2.contracts import AgentUsage, Case, ProbePlan, Recipe, Runtime
 
 from ..common.budget import tool_budget
+from ..common.repetition import read_loop_guard
 from ..common.prompted_output import prompted_output
 from ..common.usage import run_recorded
 from .tools import builder_tools, file_tools
@@ -50,6 +51,7 @@ def create_agent(model: Model, *, durability: TemporalDurability | None = None,
             file_tools(),
             Skills("skills", include=[SKILL_ID], workspace=LocalWorkspaceBackend(PACKAGE)),
             tool_budget(),
+            read_loop_guard(),
             prompted_output(),
             *([durability] if durability is not None else []),
         ])

@@ -23,6 +23,7 @@ from pydantic_ai_harness import Skills
 
 from ...contracts import AgentUsage, ProbeBrief, ProbeDraft, Runtime
 from ..common.budget import tool_budget
+from ..common.repetition import read_loop_guard
 from ..common.prompted_output import prompted_output
 from ..common.usage import AgentName, run_recorded
 from .draft import ProbeDeps, finalize_draft, write_test_file
@@ -70,6 +71,7 @@ def build_prober(spec: AgentSpec, role_skills: str, toolset_id: str, model: Mode
                                Skills([role_skills, PROTOCOL_SKILLS], workspace=skills_home()),
                                *framework_skills(framework),
                                tool_budget(),
+            read_loop_guard(),
                                prompted_output(),
                                Instrumentation(settings=InstrumentationSettings(include_content=False, version=5)),
                                *([durability] if durability is not None else []),
