@@ -9,7 +9,9 @@ public class CanaryTest {
     public void test_canary() throws Exception {
         Files.write(Paths.get(System.getenv("CORSAIR_MARKER_DIR"), "start"), new byte[0]);
         int total = 1 + 1;
-        assertTrue(System.getenv("CORSAIR_TOKEN"), total == 2);
+        boolean holds = total == 2;
+        Files.write(Paths.get(System.getenv("CORSAIR_MARKER_DIR"), "check"), (holds ? "safe" : "unsafe").getBytes("UTF-8"));
+        assertTrue(System.getenv("CORSAIR_TOKEN"), holds);
         Files.write(Paths.get(System.getenv("CORSAIR_MARKER_DIR"), "end"), new byte[0]);
     }
 }

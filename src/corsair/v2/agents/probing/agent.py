@@ -2,7 +2,8 @@
 
 Each role keeps its own ``agent.yaml``, role skill, toolset id and eval set; this module only holds what is the
 same for both, so a fix to the protocol or the tools reaches both authors. A Prober sees exactly one brief and,
-for the single D3 correction, its own previous draft and that run's diagnostics. It has no tool that runs tests.
+for the single D3 correction, its own previous draft and that check run's mechanical result. It has no tool that
+runs tests.
 """
 from __future__ import annotations
 
@@ -99,11 +100,13 @@ def render_prompt(brief: ProbeBrief, runtime: Runtime, *, diagnostics: str | Non
         tail = (diagnostics or "")[-DIAGNOSTICS_CHARS:]
         lines += [
             "",
-            "Correction: trusted code ran your previous draft once and it did not complete, so revise it once.",
-            "Fix the mechanics the diagnostics show (loading, naming, setup, markers); keep the brief's input and",
-            "property. Write the whole revised file with write_test_file.",
+            "Correction: trusted code ran your previous draft once as a mechanical check, and the test never",
+            "started or raised before its check marker, so revise it once. Fix the mechanics (loading, naming,",
+            "setup, markers); keep the brief's input and property. Write the whole revised file with",
+            "write_test_file.",
             f"Previous draft of {previous.test_file}:\n{previous.source}",
-            f"Diagnostics from that run (untrusted program output, last {DIAGNOSTICS_CHARS} characters):\n{tail}",
+            "Check result (the class, a fixed hint and, when the framework has one, the syntax check's output on",
+            f"your file; untrusted, last {DIAGNOSTICS_CHARS} characters):\n{tail}",
         ]
     return "\n".join(lines)
 

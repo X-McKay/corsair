@@ -5,8 +5,9 @@ recorded in the run's native message history. Finalisation reads the last admitt
 that history rather than from mutable deps, so it is the same in direct mode and inside a durable activity.
 
 The protocol checks are substring checks on names every language spells the same way (the two environment
-variables and the planned test name). Whether the markers are the first and last statements, and whether the
-token is used only as the assertion message, needs reading the code; that is the Reviewer's job, not this one.
+variables and the planned test name). Whether the markers are the first and last statements, whether the ``check``
+marker is computed from the asserted condition, and whether the token is used only as the assertion message needs
+reading the code; that is the Reviewer's job, not this one.
 """
 from __future__ import annotations
 
@@ -44,17 +45,16 @@ class DraftAnswer(BaseModel):
 
 
 def protocol_defects(role: str, test_name: str, source: str) -> list[str]:
+    """Both roles follow one protocol, so ``role`` does not change the checks."""
     defects = []
     if not source.strip():
         defects.append("the file is empty")
     if len(source) > MAX_SOURCE:
         defects.append(f"the file is longer than {MAX_SOURCE} characters")
     if MARKER_ENV not in source:
-        defects.append(f"the test never reads {MARKER_ENV}, so it cannot write the start and end marker files")
-    if role == "exploit" and TOKEN_ENV not in source:
-        defects.append(f"the exploit test never reads {TOKEN_ENV} for its security assertion's failure message")
-    if role == "control" and TOKEN_ENV in source:
-        defects.append(f"the control test must not reference {TOKEN_ENV}; only the exploit test uses the token")
+        defects.append(f"the test never reads {MARKER_ENV}, so it cannot write the start, check and end marker files")
+    if TOKEN_ENV not in source:
+        defects.append(f"the test never reads {TOKEN_ENV} for its main assertion's failure message")
     if test_name not in source:
         defects.append(f"the planned test name {test_name} does not appear in the file")
     return defects

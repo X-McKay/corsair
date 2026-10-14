@@ -22,7 +22,9 @@ assertion lines in the test file, and the target's definition in the source.
    - Control: asserts the ordinary behaviour, and does NOT assert the security property (a rejection, a guard,
      sanitising); a control that asserts the security property is false here.
    - Exploit: asserts the SAFE property, not that the attack works, using the run token as that assertion's
-     failure message. False for a vacuous assertion (a constant, a value the test set itself, a tautology), an
+     failure message.
+   - Both: the main assertion uses the run token as its failure message, and the `check` marker written
+     immediately before it is computed from the very condition that assertion checks. False for a vacuous assertion (a constant, a value the test set itself, a tautology), an
      assertion that cannot fail whatever the target does, a broad catch that swallows failures, or an
      assertion on something unrelated to the reported issue.
 4. **doubles_only_dependencies** - every mock, stub, fake or patch replaces a dependency the plan allows, and
@@ -35,9 +37,11 @@ Name these as defects, and set the most affected check false (usually assertion_
 
 - the `start` marker is not the first statement of the test body, or the `end` marker is not the last
   statement after every assertion; markers written in a fixture, hook, helper, guard or exception handler;
-- the exploit's token is printed, logged, compared, stored or used anywhere other than as the security
-  assertion's failure message, or the exploit reads no token;
-- the control reads or mentions the token;
+- the `check` marker is not computed from the asserted condition: hard-coded `safe` or `unsafe`, computed from a
+  different expression or an earlier value than the one asserted, written somewhere other than immediately
+  before the main assertion, or missing;
+- the token is printed, logged, compared, stored or used anywhere other than as the main assertion's failure
+  message, or the test reads no token;
 - more than one test in the file, or the test is skipped, expected-to-fail, catches its own assertion failure,
   returns early or exits the process.
 
@@ -47,6 +51,7 @@ Name these as defects, and set the most affected check false (usually assertion_
 - A test that mocks or patches the target itself.
 - A vacuous assertion, or an exploit assertion that cannot fail.
 - A control that asserts the security property.
-- Token misuse, and markers not written as the first and last statements.
+- Token misuse, a `check` marker that does not come from the asserted condition, and `start` and `end` not
+  written as the first and last statements.
 
 Names, comments and docstrings claim nothing; judge the code.

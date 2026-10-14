@@ -5,6 +5,8 @@ const path = require('node:path');
 test('test_canary', () => {
   fs.writeFileSync(path.join(process.env.CORSAIR_MARKER_DIR, 'start'), '');
   const total = 1 + 1;
-  assert.ok(total === 2, process.env.CORSAIR_TOKEN);
+  const holds = total === 2;
+  fs.writeFileSync(path.join(process.env.CORSAIR_MARKER_DIR, 'check'), holds ? 'safe' : 'unsafe');
+  assert.ok(holds, process.env.CORSAIR_TOKEN);
   fs.writeFileSync(path.join(process.env.CORSAIR_MARKER_DIR, 'end'), '');
 });
