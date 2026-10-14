@@ -68,7 +68,7 @@ agent's `agents/<name>/agent.yaml`.
 | `requests`, `input_tokens`, `output_tokens`, `tool_calls` | int \| null | native `RunUsage`; tokens null when the provider reported none |
 | `retries` | int \| null | retry prompts (`RetryPromptPart`: invalid output or failed tool call) in the run's message history; null when no history was captured |
 | `status` | str | `ok`, `output_invalid`, `budget_exhausted`, `provider_error`, `infra_error` |
-| `error` | str \| null | upstream failure detail |
+| `error` | str \| null | upstream failure detail; for `output_invalid`, followed by the last refusal as `<kind>: <feedback>` (`reasoning_only`, `multiple_objects`, `invalid_output`) |
 
 ## `summary.json`: outcome and cost
 

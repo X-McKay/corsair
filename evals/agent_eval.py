@@ -14,7 +14,8 @@ must mean the same for every agent:
   null in it is null.
 
 Evidence written under ``--evidence``: ``configuration.json`` (identity), ``attempts.jsonl`` (one row per attempt,
-the input of ``evals/run.py``'s summary.json) and ``receipts/<n>.json`` (output, usage, messages per attempt).
+the input of ``evals/run.py``'s summary.json) and ``receipts/<n>.json`` (output, usage, messages per attempt) and, for a stage that records its own run directory (the
+chain), ``runs/<n>/`` with that directory, per-agent message histories included (``receipt.run_dir``).
 """
 from __future__ import annotations
 
@@ -25,6 +26,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 import json
 from pathlib import Path
+import shutil
 import tempfile
 from typing import Any
 
@@ -59,6 +61,8 @@ class Attempt:
     usage: AgentUsage | None
     facts: dict[str, Any] = field(default_factory=dict)
     messages: list[ModelMessage] = field(default_factory=list)
+    # a run directory the stage recorded inside its working directory (the chain's RunRecorder); kept as evidence
+    run_dir: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -183,7 +187,8 @@ async def evaluate(spec: AgentEval, evidence: Path, set_name: str, *, language: 
                 receipt = {"case": key, "failure": failure,
                            "output": _dump(attempt.output) if attempt is not None else None,
                            "usage": _dump(usage), "facts": _dump(attempt.facts) if attempt is not None else None,
-                           "messages": TypeAdapter(list[ModelMessage]).dump_python(list(messages), mode="json")}
+                           "messages": TypeAdapter(list[ModelMessage]).dump_python(list(messages), mode="json"),
+                           "run_dir": _keep_run_dir(attempt, evidence, number)}
                 (evidence / "receipts" / f"{number:04d}.json").write_text(json.dumps(receipt, indent=2))
                 set_eval_attribute("receipt", f"{number:04d}")
                 for name in USAGE_FIELDS + ("status",):
@@ -215,6 +220,15 @@ async def evaluate(spec: AgentEval, evidence: Path, set_name: str, *, language: 
         for row in rows:
             out.write(json.dumps(row) + "\n")
     return bool(rows) and all(row["passed"] for row in rows)
+
+
+def _keep_run_dir(attempt: Attempt | None, evidence: Path, number: int) -> str | None:
+    """Copy the attempt's run directory out of its temporary working directory; its path relative to evidence."""
+    if attempt is None or attempt.run_dir is None or not attempt.run_dir.is_dir():
+        return None
+    kept = evidence / "runs" / f"{number:04d}"
+    shutil.copytree(attempt.run_dir, kept)
+    return str(kept.relative_to(evidence))
 
 
 def _row(spec: AgentEval, case: EvalCase, values: dict[str, bool], attributes: Mapping[str, Any], *,
