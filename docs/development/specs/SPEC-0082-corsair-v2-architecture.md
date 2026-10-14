@@ -9,7 +9,7 @@ related: [PLAN-0097, SPEC-0078, SPEC-0079, SPEC-0080, SPEC-0081]
 
 # Corsair v2 architecture
 
-This record is the numbered form of the redesign proposal Al reviewed on 2026-10-14 (Claude Doc "Corsair redesign: design, spec and architecture", https://claude.ai/code/artifact/7901a435-2b5b-4c99-95d5-984d4fa42bb8, sections 1 to 14). Where the two differ, this record and its amendments win. [PLAN-0097](../plans/PLAN-0097-corsair-v2-build.md) is the build plan.
+This record is the numbered form of the redesign proposal Al reviewed on 2026-10-14 (Claude Doc "Corsair redesign: design, spec and architecture", https://claude.ai/code/artifact/7901a435-2b5b-4c99-95d5-984d4fa42bb8, sections 1 to 14). The repository mirror is [docs/design/corsair-v2-proposal.md](../../design/corsair-v2-proposal.md), regenerated from the doc whenever it changes. Where the proposal and this record differ, this record and its amendments win. [PLAN-0097](../plans/PLAN-0097-corsair-v2-build.md) is the build plan.
 
 ## Goal and scope
 
@@ -59,13 +59,13 @@ Each stage is a function of three things: its typed input, its config digest and
 | 8 | Execute | Code | ProbeRun per probe per revision |
 | 9 | Decide | Code | Verdict: label, rule id, terminal reason, report |
 
-Every contract is a versioned Pydantic model in `src/corsair`. Large content (source, logs, patches) travels as `ArtifactRef(uri, sha256, size)` and never inline in Temporal history. A schema change bumps the contract version, and replay only compares runs of the same version.
+Every contract is a versioned Pydantic model in `src/corsair/v2/contracts.py`. Large content (source, logs, patches) travels as `ArtifactRef(uri, sha256, size)` and never inline in Temporal history. A schema change bumps the contract version, and replay only compares runs of the same version.
 
 Investigate runs before Build (A1). The Investigator plans on read-only source with search and declares the component it needs. The Builder prepares only that component. Code checks the plan against the measured environment, and one budgeted replan is allowed.
 
 ### Agents
 
-Each agent is a native `AgentSpec` file plus a small Python module for its tools and output check. This is the package shape [SPEC-0080](SPEC-0080-native-agent-manifests.md) and [SPEC-0081](SPEC-0081-native-harness-capabilities.md) adopted. Guidance lives in native Harness Skills.
+Each agent is self-contained under `src/corsair/v2/agents/<name>/`, holding `agent.yaml` (a native `AgentSpec`), `agent.py`, `tools.py`, `skills/`, `evals/` (its cases and promoted baseline) and a placeholder `release-policy.yaml`. The release policy stays empty and nothing enforces it until the gates resume. This is the package shape [SPEC-0080](SPEC-0080-native-agent-manifests.md) and [SPEC-0081](SPEC-0081-native-harness-capabilities.md) adopted. Guidance lives in native Harness Skills.
 
 | Agent | Job | Tools | Done when |
 | --- | --- | --- | --- |
@@ -166,7 +166,7 @@ Otherwise the result is `not_verified`, or `not_applicable` when there is no fix
 
 Calibration (a detector self-test or an ablation run) is recorded as calibration and never as proof of absence. `refuted_in_scope` stays disabled.
 
-The terminal reason comes from a closed enum: `ok`, `no_runtime`, `build_failed`, `plan_unresolved`, `probe_not_run`, `probe_errored`, `probe_anomalous`, `test_invalid`, `control_failed`, `no_valid_observation`, `budget_exhausted`, `provider_error`, `infra_error`, `cleanup_unconfirmed`. R6 records `probe_anomalous` when either vulnerable-revision probe was `anomalous`, and `no_valid_observation` otherwise. A model may write a rationale once the label is fixed. It cannot change the label.
+The terminal reason comes from a closed enum: `ok`, `no_runtime`, `build_failed`, `plan_unresolved`, `unsupported_scope`, `probe_not_run`, `probe_errored`, `probe_anomalous`, `test_invalid`, `control_failed`, `no_valid_observation`, `budget_exhausted`, `provider_error`, `infra_error`, `cleanup_unconfirmed`. R6 records `probe_anomalous` when either vulnerable-revision probe was `anomalous`, and `no_valid_observation` otherwise. A model may write a rationale once the label is fixed. It cannot change the label.
 
 ### Corrections, caches, modes and fact origins
 
@@ -180,7 +180,7 @@ The terminal reason comes from a closed enum: `ok`, `no_runtime`, `build_failed`
 
 | Place | Holds |
 | --- | --- |
-| Matrix row (`deploy/runtime-matrix.yaml`) | Image digest, versions, evidence level, detection hints, approved build registries, run-one-test template, exit-code map |
+| Matrix row (`deploy/v2/runtime-matrix.yaml`) | Image digest, versions, evidence level, detection hints, approved build registries, run-one-test template, exit-code map |
 | Framework skill | How to name and place one test, read an environment variable, write a file, put a message on an assertion; the canary pair |
 | CWE family skill (optional) | Benign and adversarial input shapes, the property to assert, which doubles keep production logic |
 | Eval cases | Language-specific inputs and oracles, read by evaluators only |
@@ -207,8 +207,8 @@ Committed data:
 | Path | Holds |
 | --- | --- |
 | `evals/e2e/<language>/<set>/<case-id>/` | Chain cases in three files: `input.json` (agent-visible), `oracle.json` (evaluator-only), `case.json` (pins, source, licence). Corpus pairs, benchmark cases and fixtures all live here, as sets named `corpus`, `benchmark` and `fixtures` |
-| `evals/<agent>/<language>/<set>/<case-id>/` | Per-agent cases in the same three files; `common` holds language-free cases |
-| `evals/baselines/<agent>/<set>.json` | Promoted baseline with metrics keyed by language and eval type |
+| `src/corsair/v2/agents/<name>/evals/<language>/<set>/<case-id>/` | Per-agent cases in the same three files; `common` holds language-free cases |
+| `src/corsair/v2/agents/<name>/evals/baselines/<set>.json` | That agent's promoted baseline, with metrics keyed by language and eval type |
 
 Run output, ignored by git:
 
@@ -249,7 +249,7 @@ Gates are deferred (Al, 2026-10-14 08:09Z). No kind or OpenShell gate, witness, 
 1. At least three end-to-end runs reach the correct decisive label on both revisions, in at least three languages.
 2. Every agent has a promoted baseline tracking accuracy, latency and tokens, split by language and eval type.
 
-Canary pairs and failure-injection fixtures still run as ordinary development tests where they are cheap. CI on develop runs lint, type checks and the v2 unit tests only, with a target of under three minutes.
+Canary pairs and failure-injection fixtures still run as ordinary development tests where they are cheap. Until something runs end to end, develop's PR path runs one offline job, `make test-v2`, with no model (Al, 08:28Z). The v1 suites, the image gate and the qualification and record guards stay runnable by hand and return with the gates and release policies.
 
 Acceptance for the build:
 
@@ -277,14 +277,14 @@ The proposal's decisions and their status:
 | D3 | Authors get no test-running tool; trusted code runs frozen drafts once and returns only mechanical diagnostics | Al, 07:49Z |
 | D4 | Deterministic rule table decides the label | Accepted with the build kickoff |
 | D5 | Live evals for the Builder and both probers may use local Docker | Accepted with the build kickoff |
-| D6 | Build on `develop`; main stays untouched until Al replaces it | Al, 08:09Z |
+| D6 | Build on `develop` in `src/corsair/v2`; main stays untouched until Al replaces it | Al, 08:09Z |
 | D7 | Reuse the verdict rule table, terminal reasons, per-stage replay and blinded runs from Al's InfoSec Harness v2 spec | Accepted with the build kickoff; Al also asked for the Grounding agent from that harness |
 | D8 | Deterministic outcome table with an exit-code map per framework and a canary pair per row | Al, 07:49Z |
 | D9 | Exactly two tests; native parametrisation inside a test is allowed | Accepted with the build kickoff |
 
 "Accepted with the build kickoff" means Al started the build on this proposal without objecting to that decision. Any of them can be reopened.
 
-Open, with the default the build uses until Al decides:
+Defaults in force until Al decides otherwise:
 
 - **D10:** may the Investigator read Grounding precedents with their dispositions removed? Default: no, until Grounding has a baseline.
 - **D11:** does the first build PR remove v1's source, tests and eval runners from develop? Default: yes; v1 runs from main to supply its baseline.

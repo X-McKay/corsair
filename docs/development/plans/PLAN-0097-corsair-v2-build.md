@@ -17,8 +17,8 @@ The build runs in parallel lanes with Opus sub-agents. It reaches a first goal b
 
 Inputs:
 
-- **Eval corpus:** the #131 eval corpus branch (layout `evals/<agent>/<language>/<set>/<case-id>/` and `evals/e2e/...`), ported to develop rather than merged to main.
-- **Images and matrix:** the toolchain images and `deploy/runtime-matrix.yaml`.
+- **Eval corpus:** the #131 eval corpus branch ported to develop rather than merged to main. Its chain cases go to `evals/e2e/`, and its per-agent cases go into each agent package's `evals/`.
+- **Images and matrix:** the toolchain images and `deploy/v2/runtime-matrix.yaml`.
 - **Grounding placeholder:** Al's description of the ADO intake and grounding agent, attached on 2026-10-14.
 
 Every model call goes to llm.almckay.io. Execution goes through Docker only. Nothing needs kind or OpenShell.
@@ -29,8 +29,8 @@ Lanes within a phase can run in parallel. A phase starts once the contracts it c
 
 Phase 0, develop setup:
 
-- [ ] Remove v1's `src`, `tests` and eval runners from develop (D11 default). Keep images, the matrix, corpus and benchmark data, and the docs records. Start a fresh `src/corsair` package that declares its runtime dependencies in `[project]`, not in the dev group.
-- [ ] Shorten CI on develop to lint, type checks and the v2 unit tests, with no image builds; the target is under three minutes. The "Shorter CI with gates deferred" thread owns this step. The records guard keeps running.
+- [ ] Remove v1's `src`, `tests` and eval runners from develop (D11 default). Keep images, the matrix, corpus and benchmark data, and the docs records. v2 lives in `src/corsair/v2` (PR #133) and declares its runtime dependencies in `[project]`, not in the dev group.
+- [ ] Cut develop's PR path to one offline job, `make test-v2`, until something runs end to end (Al, 08:28Z). The v1 suites, the image gate and the qualification and record guards stay runnable by hand. The "Shorter CI with gates deferred" thread owns this step.
 
 Phase 1, contracts and layout:
 
@@ -39,7 +39,7 @@ Phase 1, contracts and layout:
   - Port the #131 corpus to develop.
   - Move `benchmarks/cases`, `benchmarks/corpus` and the fixtures into `evals/e2e/<language>/<set>/`.
   - Keep held-out sets frozen by manifest.
-  - Add `evals/baselines/`.
+  - Give every agent package an `evals/` folder with its baselines and an empty placeholder `release-policy.yaml`.
 - [ ] Run-directory writer for `.runs/chain`, `.runs/evals` and `.runs/campaigns`, with `index.jsonl`. Add `corsair report` over any root, and `make eval AGENT= SET= [LANG=] [MODE=]` with the four eval types.
 
 Phase 2, trusted spine without a model:
