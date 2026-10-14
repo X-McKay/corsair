@@ -337,6 +337,198 @@
         "source": "source value",
         "target_callable": "build_source_list_directive"
       }
+    },
+    {
+      "name": "ruby-tzinfo-a",
+      "language": "ruby",
+      "finding": {
+        "title": "Timezone identifier loading in TZInfo::RubyDataSource",
+        "repo_url": "eval-corpus/ruby/tzinfo/a",
+        "revision": "HEAD",
+        "file_path": "lib/tzinfo/ruby_data_source.rb",
+        "start_line": 27,
+        "symbol": "load_timezone_info",
+        "cwe": "CWE-22",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "TZInfo::RubyDataSource#load_timezone_info validates a timezone identifier and loads the matching definition file from the data directory."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "lib/tzinfo/ruby_data_source.rb",
+        "sink_line": 49,
+        "source": "identifier",
+        "target_callable": "load_timezone_info"
+      }
+    },
+    {
+      "name": "ruby-tzinfo-b",
+      "language": "ruby",
+      "finding": {
+        "title": "Timezone identifier loading in TZInfo::RubyDataSource",
+        "repo_url": "eval-corpus/ruby/tzinfo/b",
+        "revision": "HEAD",
+        "file_path": "lib/tzinfo/ruby_data_source.rb",
+        "start_line": 27,
+        "symbol": "load_timezone_info",
+        "cwe": "CWE-22",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "TZInfo::RubyDataSource#load_timezone_info validates a timezone identifier and loads the matching definition file from the data directory."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "lib/tzinfo/ruby_data_source.rb",
+        "sink_line": 49,
+        "source": "identifier",
+        "target_callable": "load_timezone_info"
+      }
+    },
+    {
+      "name": "ruby-cocoapods-git-a",
+      "language": "ruby",
+      "finding": {
+        "title": "Argument list construction in Pod::Downloader::Git.preprocess_options",
+        "repo_url": "eval-corpus/ruby/cocoapods-git/a",
+        "revision": "HEAD",
+        "file_path": "lib/cocoapods-downloader/git.rb",
+        "start_line": 16,
+        "symbol": "preprocess_options",
+        "cwe": "CWE-88",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "Pod::Downloader::Git.preprocess_options builds the argument list for the git ls-remote subcommand from the download options and passes it to the process runner."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "lib/cocoapods-downloader/git.rb",
+        "sink_line": 16,
+        "source": "git option",
+        "target_callable": "preprocess_options"
+      }
+    },
+    {
+      "name": "ruby-cocoapods-git-b",
+      "language": "ruby",
+      "finding": {
+        "title": "Argument list construction in Pod::Downloader::Git.preprocess_options",
+        "repo_url": "eval-corpus/ruby/cocoapods-git/b",
+        "revision": "HEAD",
+        "file_path": "lib/cocoapods-downloader/git.rb",
+        "start_line": 17,
+        "symbol": "preprocess_options",
+        "cwe": "CWE-88",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "Pod::Downloader::Git.preprocess_options builds the argument list for the git ls-remote subcommand from the download options and passes it to the process runner."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "lib/cocoapods-downloader/git.rb",
+        "sink_line": 17,
+        "source": "git option",
+        "target_callable": "preprocess_options"
+      }
+    },
+    {
+      "name": "ruby-pdfkit-a",
+      "language": "ruby",
+      "finding": {
+        "title": "Process invocation construction in PDFKit#command",
+        "repo_url": "eval-corpus/ruby/pdfkit/a",
+        "revision": "HEAD",
+        "file_path": "lib/pdfkit/pdfkit.rb",
+        "start_line": 57,
+        "symbol": "command",
+        "cwe": "CWE-78",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "PDFKit#command builds the invocation for the wkhtmltopdf process from the configured executable, options and source."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "lib/pdfkit/pdfkit.rb",
+        "sink_line": 67,
+        "source": "source value",
+        "target_callable": "command"
+      }
+    },
+    {
+      "name": "ruby-pdfkit-b",
+      "language": "ruby",
+      "finding": {
+        "title": "Process invocation construction in PDFKit#command",
+        "repo_url": "eval-corpus/ruby/pdfkit/b",
+        "revision": "HEAD",
+        "file_path": "lib/pdfkit/pdfkit.rb",
+        "start_line": 59,
+        "symbol": "command",
+        "cwe": "CWE-78",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "PDFKit#command builds the invocation for the wkhtmltopdf process from the configured executable, options and source."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "lib/pdfkit/pdfkit.rb",
+        "sink_line": 69,
+        "source": "source value",
+        "target_callable": "command"
+      }
+    },
+    {
+      "name": "ruby-ruby-git-ls-files-a",
+      "language": "ruby",
+      "finding": {
+        "title": "Path unquoting in Git::Lib#ls_files",
+        "repo_url": "eval-corpus/ruby/ruby-git-ls-files/a",
+        "revision": "HEAD",
+        "file_path": "lib/git/lib.rb",
+        "start_line": 14,
+        "symbol": "ls_files",
+        "cwe": "CWE-94",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "Git::Lib#ls_files parses the output of the git ls-files subcommand into a hash keyed by path, unquoting quoted path strings."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "lib/git/lib.rb",
+        "sink_line": 14,
+        "source": "ls-files output",
+        "target_callable": "ls_files"
+      }
+    },
+    {
+      "name": "ruby-ruby-git-ls-files-b",
+      "language": "ruby",
+      "finding": {
+        "title": "Path unquoting in Git::Lib#ls_files",
+        "repo_url": "eval-corpus/ruby/ruby-git-ls-files/b",
+        "revision": "HEAD",
+        "file_path": "lib/git/lib.rb",
+        "start_line": 15,
+        "symbol": "ls_files",
+        "cwe": "CWE-94",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "Git::Lib#ls_files parses the output of the git ls-files subcommand into a hash keyed by path, unquoting quoted path strings."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "lib/git/lib.rb",
+        "sink_line": 15,
+        "source": "ls-files output",
+        "target_callable": "ls_files"
+      }
     }
   ]
 }
