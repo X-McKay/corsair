@@ -41,11 +41,13 @@ class Replay(Protocol):
 
 
 class Probe(Protocol):
-    """One Prober. ``diagnostics`` is set only for the single D3 correction after a not_run or errored run."""
+    """One Prober. ``diagnostics`` is set only for the single D3 correction after a not_run or errored run;
+    ``review_feedback`` only for a review revision, and holds the Reviewer's judgement of this author's own draft
+    (failed checks, defects, cited lines), never a run result or the other probe. Either comes with ``previous``."""
 
     async def __call__(self, brief: ProbeBrief, runtime: Runtime, model: Model, *, source_root: Path,
-                       diagnostics: str | None = None, previous: ProbeDraft | None = None
-                       ) -> tuple[ProbeDraft | None, AgentUsage]: ...
+                       diagnostics: str | None = None, previous: ProbeDraft | None = None,
+                       review_feedback: str | None = None) -> tuple[ProbeDraft | None, AgentUsage]: ...
 
 
 class Review(Protocol):

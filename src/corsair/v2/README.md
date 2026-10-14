@@ -22,8 +22,14 @@ lives; it does not restate the design.
 Investigate runs before Build (amendment A1). After the drafts freeze, trusted code runs both probes once on the
 vulnerable revision as a mechanical check only (D3): it keeps `ok`, `not_run` or `errored` and discards the outcome.
 A `not_run` or `errored` author gets back only that class, a fixed hint and the row's optional syntax-check output,
-never the run's output, and revises once. The Reviewer then reviews the final frozen bytes, and Execute runs only
-reviewed bytes. Authors have no test-running tool.
+never the run's output, and revises once. The Reviewer then reviews the whole frozen pair, at most three times
+(`chain.MAX_REVIEWS`): after a review, each author whose probe was judged invalid revises once from its own
+probe's review only (failed checks, at most four defects, cited lines into its own test or the source; never a run
+result or the other probe), the pair re-freezes, the D3 check re-runs on the changed draft and the pair is reviewed
+again. Execute runs only once both probes are valid on the current digest; otherwise nothing executes and the case
+is INCONCLUSIVE `test_invalid` (R2). Each review (`review.<n>`) and revision (`probe.<role>.r<n>`) is its own
+recorded step; the Verdict and `summary.json` carry review rounds and per-author revision counts. Authors have no
+test-running tool.
 
 `contracts.py` holds every type that crosses a stage boundary. `chain.py` composes the stages as plain async
 functions (direct mode, used by evals and `corsair-v2 run`); `workflow.py` runs the same functions in one Temporal

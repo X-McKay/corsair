@@ -85,3 +85,20 @@ def test_queue_layout_and_slots():
     assert built["corsair-v2-workspace"]["max_concurrent_activities"] == 7
     assert built["corsair-v2-control"]["workflows"] == [workflow.InvestigationWorkflow]
     assert {a.__name__ for a in built["corsair-v2-workspace"]["activities"]} == {"replay", "diagnose", "execute"}
+
+
+def test_workflow_runs_the_same_review_loop_as_direct_mode(tmp_path):
+    setup = dict(rejections={"exploit": 1, "control": 2}, diagnose_outcomes={"exploit": "errored"})
+    fakes = Fakes(**setup)
+    verdict, run_dir = asyncio.run(_run(tmp_path, fakes, "durable-loop", fixed=True))
+    direct = Fakes(**setup)
+    record = RunRecorder.create(tmp_path, "direct-loop")
+    expected = asyncio.run(run_case(case(tmp_path, True), stages=direct.stages(), models=models(),
+                                    matrix_path=tmp_path / "matrix.yaml", record=record))
+    assert verdict == expected and verdict.review_rounds == 3
+    assert verdict.revisions == {"control": 2, "exploit": 1}
+    assert _steps(run_dir) == _steps(record.run_dir)
+    assert {"probe.exploit.r1", "probe.exploit.r1.revision", "probe.control.r2", "review.3"} <= set(_steps(run_dir))
+    assert fakes.names() == direct.names()
+    feedback = [kw["review_feedback"] for _, kw in fakes.of("probe-exploit") if kw["review_feedback"]]
+    assert len(feedback) == 1 and "exploit defect 0" in feedback[0]
