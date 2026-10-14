@@ -100,6 +100,12 @@
     "javascript/ineffective-fix": "20fb94d8032baa4ced9c8d088be2f18647a42d01b7ce5d656431aa9d8bd5f8e7",
     "perl/ineffective-fix": "e7d3ec77b3add7e822fd7a2f6996ba59657642612299a2e5ca1e0b2b60e4bd76",
     "python/ineffective-fix": "c5c0facbfa2bbf3469d84219daa46a8457d9d9770ad256830308d2f504b04f9d",
-    "ruby/ineffective-fix": "3043853e864252d6059667f40fb70f0e7bc401479bca7325841a3767e9018c07"
+    "ruby/ineffective-fix": "3043853e864252d6059667f40fb70f0e7bc401479bca7325841a3767e9018c07",
+    "javascript/angular-http-server-a": "2e6e205511dfb7b9a0889f2d6e499c95388a0c33e1c00c1a934785d485f8bf09",
+    "javascript/angular-http-server-b": "fa514e6e4095357186f2505d07d294c930779898b1c5f36c11a413812973e1d1",
+    "javascript/codecov-node-a": "8690c7dd820b5b48f063999b642fe943c1aef4ed62af9a0d2e915153965dee49",
+    "javascript/codecov-node-b": "758f0b6fcdfdf60a4d601f6b58260338c768de3a8dced8550dbfaa3065bef956",
+    "javascript/dot-prop-a": "6e6e13e56c4349b7d78b8329e00173ebf91a32a3c79f000c7b6730e126918bba",
+    "javascript/dot-prop-b": "2c7564f6b61add279f88900d9f9edf446ae96d741438e5aa83c02ad686b98ce4"
   }
 }

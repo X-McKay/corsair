@@ -101,12 +101,12 @@ def test_corpus_cases_match_the_manifest_route():
     corpus = [case for case in CASES if case.input.get("case_id", "").startswith("corpus:")]
     assert corpus
     for case in corpus:
-        name = case.oracle["truth"]["manifest_case"]
-        expected = intake.load_corpus_case(MANIFEST, name)
+        name, manifest = case.oracle["truth"]["manifest_case"], ROOT / case.oracle["truth"]["manifest"]
+        expected = intake.load_corpus_case(manifest, name)
         loaded = intake.from_issue_json(_path(case))
         assert (loaded.case_id, loaded.finding, loaded.revision) == (
             expected.case_id, expected.finding, expected.revision), case.key
-        assert intake.load_oracle(MANIFEST, name)["expected_label"] in (
+        assert intake.load_oracle(manifest, name)["expected_label"] in (
             case.oracle["expected_label"], *case.oracle["acceptable_labels"]) or case.oracle[
             "expected_terminal_reason"] == "no_runtime", case.key
 
@@ -119,6 +119,6 @@ def test_no_held_out_family_is_used():
         assert not any(re.search(rf"{re.escape(family)}(?![a-z0-9])", text) for family in held for text in texts), \
             case.key
         name = case.oracle.get("truth", {}).get("manifest_case")
-        if name is not None:
+        if name is not None and ROOT / case.oracle["truth"]["manifest"] == MANIFEST:
             _, language, topic, _ = entries[name]["finding"]["repo_url"].split("/")
             assert f"ih-{language}-{topic}" not in held
