@@ -22,6 +22,8 @@ make toolchain-images TOOLCHAINS=python   # build toolchain images and run their
 uv run --locked corsair-v2 run --case <name> [--mode direct|temporal]     # one case through the chain
 ```
 
+The kind + OpenShell cluster for the v2 OpenShell backend (`make tools kind-up ... openshell-config qualify-openshell-v2`) is in the [OpenShell v2 runbook](docs/runbooks/openshell-v2.md).
+
 Evidence lands under `.runs/` and is never committed.
 
 ## Layout
