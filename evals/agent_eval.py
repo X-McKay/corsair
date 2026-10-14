@@ -38,6 +38,9 @@ from evals.cases import DIMENSIONS, LANGUAGES, EvalCase, agent_root, load_set, s
 
 SCHEMA = "corsair-agent-attempts/v1"
 USAGE_FIELDS = ("requests", "tool_calls", "input_tokens", "output_tokens")
+# Attempt.facts keys copied into the attempt row when an agent reports them (D3 corrections: at most two revisions
+# per probe author, three reviews in total).
+ROW_FACTS = ("revisions", "accepted_within_limit")
 
 
 @dataclass
@@ -136,6 +139,8 @@ async def evaluate(spec: AgentEval, evidence: Path, set_name: str, *, language: 
                 for name in USAGE_FIELDS + ("wall_s", "status"):
                     value = getattr(usage, name, None) if usage is not None else None
                     set_eval_attribute(name, value)
+                for name in ROW_FACTS:
+                    set_eval_attribute(name, attempt.facts.get(name) if attempt is not None else None)
 
     dataset = Dataset(name=f"{spec.agent}-{set_name}", cases=[Case(name=case.key, inputs=case.key, metadata=case)
                                                              for case in cases], evaluators=[_Checks(spec)])
@@ -168,7 +173,8 @@ def _row(spec: AgentEval, case: EvalCase, values: dict[str, bool], attributes: M
             "passed": bool(values) and failure is None and all(values.values()),
             "assertions": values, "dimensions": dimensions,
             "failed_assertions": sorted(name for name, value in values.items() if not value),
-            "failure": failure, "latency_s": attributes.get("wall_s"), **metrics}
+            "failure": failure, "latency_s": attributes.get("wall_s"), **metrics,
+            **{name: attributes.get(name) for name in ROW_FACTS}}
 
 
 def main(spec: AgentEval, argv: list[str] | None = None) -> int:

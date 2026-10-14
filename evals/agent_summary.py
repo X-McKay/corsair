@@ -75,6 +75,10 @@ def rollup(rows: list[dict]) -> dict:
             "task_failures": sum(row["failure"] is not None and not row["assertions"] for row in rows),
             "dimensions": dict(sorted(dimensions.items())),
             **({"dispositions": found} if (found := dispositions(rows)) is not None else {}),
+            **({"revisions": _stats([row.get("revisions") for row in rows]),
+                "accepted_within_limit": {"passed": sum(row["accepted_within_limit"] is True for row in rows),
+                                          "total": sum(row.get("accepted_within_limit") is not None for row in rows)}}
+               if any(row.get("revisions") is not None for row in rows) else {}),
             **{metric: _stats([row.get(metric) for row in rows]) for metric in METRICS}}
 
 
