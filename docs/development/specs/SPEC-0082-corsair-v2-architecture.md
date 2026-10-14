@@ -13,7 +13,7 @@ This record is the numbered form of the redesign proposal Al reviewed on 2026-10
 
 ## Goal and scope
 
-Corsair v2 validates one reported security issue against an exact revision, and against a fix revision when one exists, with exactly two native tests. It should work across languages, frameworks and CWEs without branching on any of them. It should be simpler than v1 and easy to evaluate agent by agent.
+Corsair v2 validates one reported security issue against an exact revision, and against a fix revision when one exists, with exactly two native tests per attempt (a second exploit attempt only before LIKELY_NOT_EXPLOITABLE, D18). It should work across languages, frameworks and CWEs without branching on any of them. It should be simpler than v1 and easy to evaluate agent by agent.
 
 v2 keeps v1's contract:
 
@@ -178,7 +178,7 @@ The label is a pure function of recorded facts. Rules are evaluated top to botto
 | R2 | Review missing or negative for either probe on the vulnerable revision | INCONCLUSIVE (test_invalid) |
 | R3 | Vulnerable control not passed | INCONCLUSIVE (`control_failed` when the control's outcome is assertion_failed, otherwise the reason its outcome maps to) |
 | R4 | Vulnerable PoV passed, and the PoV did not also pass on the fixed revision | LIKELY_EXPLOITABLE |
-| R5 | Vulnerable PoV assertion_failed (the condition was not demonstrated), with its calibration listed | LIKELY_NOT_EXPLOITABLE |
+| R5 | Vulnerable PoV assertion_failed (the condition was not demonstrated) on both independent exploit attempts (D18), with its `sensitivity` or `lne_precision` field and its calibration listed | LIKELY_NOT_EXPLOITABLE |
 | R6 | Anything else | INCONCLUSIVE (`not_differential` when the PoV passed on both revisions, else as below) |
 
 Fix verification is a separate rule over the same facts. `verified` requires all of the following:
@@ -189,6 +189,17 @@ Fix verification is a separate rule over the same facts. `verified` requires all
 - The same frozen patch on both revisions.
 
 Otherwise the result is `not_verified`, or `not_applicable` when there is no fixed revision. A provider or infrastructure failure on the fixed revision gives `not_verified`, with its terminal reason recorded in the fix result. It never changes the label decided from the vulnerable revision.
+
+### Evidence for LIKELY_NOT_EXPLOITABLE (D18)
+
+A PoV that fails shows only that this one test did not demonstrate the condition; a malformed payload fails the same way as a safe target. A false LIKELY_NOT_EXPLOITABLE is the costliest error, so R5 needs more than one failed test.
+
+- **Second independent attempt.** When the first attempt's vulnerable PoV is `assertion_failed` after a positive review, the chain runs one more exploit attempt before deciding. A new Exploit Prober call writes it from the same brief and never sees the first draft, its review or its outcome. A case runs at most two attempts.
+- **Test count (revises D9).** On this negative path the vulnerable revision runs three native tests in total: one control and two independent PoVs. D9 therefore reads "exactly two tests per attempt, at most two attempts per case", and the verdict is always decided on one attempt's pair. The positive path is unchanged at two tests.
+- **Second-attempt review and binding.** The second attempt's control is the first attempt's control, byte for byte, frozen with the new PoV into a new pair with its own digest. That pair gets a fresh outcome-blind review; no earlier validity counts for it (D13). In its review loop only the Exploit Prober may revise; the control is fixed. If the review rejects the control, or the pair is still invalid after three reviews, the second attempt is invalid and the case is R2 (INCONCLUSIVE, `test_invalid`), never R5. A valid pair gets one vulnerable run, and on a decisive pass also the fixed run.
+- **Deciding over both attempts.** If the second PoV is reviewed, passes, and is differential, the case is R4 (LIKELY_EXPLOITABLE) on the second attempt's facts. R5 applies only when both attempts' PoVs are `assertion_failed` with positive reviews. Any other second-attempt outcome (invalid review, `not_run`, `errored`, `anomalous`, `infra`) gives the rule that outcome would give on its own, so it can make the case INCONCLUSIVE or ERROR, never LIKELY_NOT_EXPLOITABLE. Both attempts are recorded; the verdict names the attempt its rule used.
+- **Cost on the negative path only.** No second attempt runs after R0 to R4, R6, or a first-attempt review that stays negative.
+- **Sensitivity flag and LNE precision.** Every R5 verdict carries `sensitivity: unverified`, meaning it is not yet known how often a failed PoV pair misses a real vulnerability. The flag stays until the labelled corpus has measured LIKELY_NOT_EXPLOITABLE precision for the case's language and vulnerability class. From then on the verdict carries `lne_precision` (the measured rate and the set it came from) instead. That is negative-verdict precision, not the reproduction sensitivity defined under the chain metrics, and is never reported under the sensitivity name. The rate is evaluator data read from the promoted baseline, never an agent input, and the merge-to-main gate reads it. Neither field changes the label.
 
 Calibration (a detector self-test or an ablation run) is recorded as calibration and never as proof of absence. `refuted_in_scope` stays disabled.
 
@@ -313,13 +324,14 @@ The proposal's decisions and their status:
 | D6 | Build on `develop` in `src/corsair/v2`; main stays untouched until Al replaces it | Al, 08:09Z |
 | D7 | Reuse the verdict rule table, terminal reasons, per-stage replay and blinded runs from Al's InfoSec Harness v2 spec | Accepted with the build kickoff; Al also asked for the Grounding agent from that harness |
 | D8 | Deterministic outcome table with an exit-code map per framework and a canary pair per row | Al, 07:49Z |
-| D9 | Exactly two tests; native parametrisation inside a test is allowed | Accepted with the build kickoff |
+| D9 | Exactly two tests per attempt (revised by D18: at most two attempts per case); native parametrisation inside a test is allowed | Accepted with the build kickoff; revised 2026-10-14 by D18 |
 | D12 | The exploit probe is a proof-of-vulnerability test that passes when it demonstrates the reported condition (PoV polarity) | Decided by Al, 2026-10-14 09:17Z |
 | D13 | Reviewer feedback loop: three reviews in total, at most two review revisions per author | Decided by Al, 2026-10-14 09:09Z |
 | D14 | Scope is provability, not category: a finding is in scope when both probes can prove it inside the workspace, deterministically and with no outbound network, using local stand-ins (a local server, a temporary file, an in-process double). The Investigator returns `unsupported_scope`, with the missing piece named, only when proof needs something the workspace cannot supply (a real remote endpoint, the host trust store, a system-wide policy, a specific library build). No vulnerability-category list exists anywhere | Decided by Al, 2026-10-14 09:33Z; implemented in #154 |
 | D15 | Counterfactual assertion: the brief states `safe_observation`, what the test would see on a correct implementation, and the PoV assertion must be false there. Payload text echoed back in output, an argument list or a log is never proof | Implemented in #155 |
 | D16 | Proof shows structure or effect: input merely reaching a dependency is never proof, because correct code usually passes input on as data rather than rejecting it. The PoV must show the input crossing from data into structure or into an effect it should not have | Implemented in #156 |
 | D17 | The Reviewer stays outcome-blind: it judges whether each test is a valid experiment, never whether the code looks vulnerable. It must not call a PoV vacuous because the target looks safe, reject a control for not exercising the vulnerability, or steer an author toward what this code does | Implemented in #157 |
+| D18 | LIKELY_NOT_EXPLOITABLE needs two independent failed exploit attempts, each reviewed, reusing the first attempt's control unchanged under a fresh review, so the negative path runs three tests (two per attempt, revising D9); every R5 carries `sensitivity: unverified` until the corpus measures LNE precision per language and vulnerability class, then `lne_precision` | Decided by Al, 2026-10-14 11:26Z |
 
 "Accepted with the build kickoff" means Al started the build on this proposal without objecting to that decision. Any of them can be reopened.
 
@@ -327,5 +339,5 @@ Defaults in force until Al decides otherwise:
 
 - **D10:** may the Investigator read Grounding precedents with their dispositions removed? Default: no, until Grounding has a baseline.
 - **D11:** does the first build PR remove v1's source, tests and eval runners from develop? Default: yes; v1 runs from main to supply its baseline.
-- **Calibration for R5:** whether R5 should require calibration at all is still open. Default: R5 lists its calibration and does not require it.
+- **Calibration for R5:** R5 lists its calibration and does not require it; D18's second attempt and sensitivity flag are what R5 requires.
 - **Grounding unknowns:** the grounding agent's second and third structural guarantees and its tool signatures are not legible in the source description. The placeholder stubs only what is legible.

@@ -374,14 +374,14 @@ The biggest risk is that the probe protocol is untested: nothing in this documen
 
 ### Open question: evidence for a negative
 
-Rule R5 needs some sign that the security assertion could have failed. Today SPEC-0040 calibration covers part of this, and #130 weakened it for unit plans. Options, none recommended yet:
+Rule R5 needs some sign that the security assertion could have failed. Today SPEC-0040 calibration covers part of this, and #130 weakened it for unit plans. Options considered (decided as D18, below):
 
 1. **Review only.** The Reviewer affirms the security probe exercises the reported condition; the label carries `sensitivity: unverified`. Simplest, weakest.
 2. **Revision difference when available.** A fixed or known-vulnerable sibling revision showing `assertion_failed` proves sensitivity. Strong, but most negatives have no such revision.
 3. **Ablation run.** Trusted code reruns the security probe with the cited target file replaced by a stub that raises. If the outcome does not change, the probe never depended on the target, which catches the copied-target failure the campaign measured. It is language-neutral, but in compiled modules a broken file fails the whole build, so it proves less there.
 4. **A third, positive-control test** against an unsafe dependency double. Strongest, but it breaks the two-test rule.
 
-I lean to 1 plus 3 where 3 is informative, with 2 used whenever it exists, but this needs measurement on the negative cases first.
+**Decided (D18, Al, 14 October 11:26Z): retry plus flag.** A failing PoV alone is weak proof, as the python-vuln false negative showed. Before any LIKELY\_NOT\_EXPLOITABLE, the chain runs one independent second exploit attempt: a new Exploit Prober call that never sees the first draft, its review or its outcome, with its own review loop and one vulnerable run, reusing the first attempt's control byte for byte. The new pair gets a fresh outcome-blind review in which only the Exploit Prober may revise; if the control is rejected or the pair stays invalid, the case is INCONCLUSIVE, never LIKELY\_NOT\_EXPLOITABLE. The negative path therefore runs three tests, so D9 becomes exactly two tests per attempt and at most two attempts per case, with each verdict decided on one attempt's pair. If the second PoV passes, reviewed and differential, the case is R4 (LIKELY\_EXPLOITABLE). R5 applies only when both attempts' PoVs are assertion\_failed after positive reviews; any other second-attempt outcome gives INCONCLUSIVE or ERROR as its own rule says. This costs one more author call on the negative path only. Every R5 also carries `sensitivity: unverified` until the labelled corpus measures LNE precision per language and vulnerability class; after that it carries lne\_precision instead (negative-verdict precision with its set, not reproduction sensitivity), which the merge-to-main gate reads. Options 2 and 3 stay recorded as calibration, never as proof of absence.
 
 ### Risks
 
@@ -453,7 +453,7 @@ A framework whose exit code cannot separate a failed test from a harness error (
 
 **D9, test cardinality.** The spec allows control and security groups of several tests. Your standing rule is exactly two tests. I recommend keeping two and allowing native parametrisation inside a test.
 
-**On negatives, the spec settles part of section 12's open question.** A detector self-test or an ablation run is calibration and is recorded as such, never as proof of absence. `refuted_in_scope` stays disabled, as today's kernel already does. R5 therefore yields `not_reproduced` (LIKELY\_NOT\_EXPLOITABLE) with its calibration listed. What remains open is whether R5 should require calibration at all.
+**On negatives, the spec settles part of section 12's open question.** A detector self-test or an ablation run is calibration and is recorded as such, never as proof of absence. `refuted_in_scope` stays disabled, as today's kernel already does. R5 therefore yields `not_reproduced` (LIKELY\_NOT\_EXPLOITABLE) with its calibration listed. D18 settles the rest: R5 lists calibration without requiring it, and instead needs a second independent failed attempt and carries a sensitivity flag.
 
 ### Not adopted
 
@@ -576,14 +576,15 @@ The Codex review of PR #134 found three gaps. All three are fixed in SPEC-0082, 
 - **PoV polarity (Al, 14 October; supersedes the security-regression form).**
   - The exploit probe is a proof-of-vulnerability (PoV) test, the DARPA Cyber Grand Challenge and Vul4J term: it passes on the vulnerable revision by demonstrating the reported condition, and fails on the fixed one.
   - The outcome classifier is unchanged. The check marker values are renamed `holds` and `violated`: whether the property about to be asserted is true.
-  - R4: vulnerable control passed and PoV passed, and the PoV did not also pass on the fixed revision, gives LIKELY\_EXPLOITABLE. R5: PoV assertion\_failed (not demonstrated) gives LIKELY\_NOT\_EXPLOITABLE with its calibration listed. A PoV that passes on both revisions gives INCONCLUSIVE (`not_differential`).
+  - R4: vulnerable control passed and PoV passed, and the PoV did not also pass on the fixed revision, gives LIKELY\_EXPLOITABLE. R5: PoV assertion\_failed (not demonstrated) on both independent attempts (D18) gives LIKELY\_NOT\_EXPLOITABLE with a sensitivity flag and its calibration listed. A PoV that passes on both revisions gives INCONCLUSIVE (`not_differential`).
   - Fix verified: R4, and on the fixed revision the control passed and the PoV is assertion\_failed.
   - A passing test is easier to make vacuous, so the Reviewer also checks that the PoV assertion could fail on code without the condition.
-- **Proof-quality and scope decisions (14 October, D14 to D17).**
+- **Proof-quality and scope decisions (14 October, D14 to D18).**
   - **D14, scope is provability (Al, 09:33Z):** a finding is in scope when both probes can prove it inside the workspace, deterministically and with no outbound network, using local stand-ins such as a local server, a temporary file or an in-process double. The Investigator returns `unsupported_scope`, naming what is missing, only when proof needs something the workspace cannot supply: a real remote endpoint, the host trust store, a system-wide policy or a specific library build. There is no vulnerability-category list anywhere.
   - **D15, counterfactual assertion:** the brief states `safe_observation`, what the test would see on a correct implementation, and the PoV assertion must be false there. Payload text echoed back in output, an argument list or a log is never proof.
   - **D16, structure or effect:** input merely reaching a dependency is never proof, because correct code usually passes input on as data rather than rejecting it. The PoV must show the input crossing from data into structure, or into an effect it should not have.
   - **D17, the Reviewer stays outcome-blind:** it judges whether each test is a valid experiment, never whether the code looks vulnerable. It must not call a PoV vacuous because the target looks safe, reject a control for not exercising the vulnerability, or steer an author toward what this code does.
+  - **D18, LIKELY\_NOT\_EXPLOITABLE needs two failed attempts:** before R5 one independent second exploit attempt runs, reusing the first control unchanged under a fresh review, so the negative path runs three tests (two per attempt, revising D9); R5 only when both PoVs fail after positive reviews, and every R5 carries sensitivity: unverified until the corpus measures LNE precision per language and vulnerability class, then lne\_precision (Al, 11:26Z).
 
 ### Later changes on 14 October
 
