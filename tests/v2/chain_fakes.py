@@ -126,10 +126,10 @@ class Fakes:
     async def exploit_probe(self, brief, runtime, model, **kwargs):
         return await self._probe("exploit", brief, runtime, model, **kwargs)
 
-    def diagnose(self, environment, runtime, patch, role):
-        self._log("diagnose", environment, runtime, patch, role)
-        check = self.diagnose_outcomes.get(role, "ok")
-        return check, f"check: {check}\nhint: {role} hint" if check != "ok" else None
+    def diagnose(self, environment, runtime, draft):
+        self._log("diagnose", environment, runtime, draft)
+        check = self.diagnose_outcomes.get(draft.role, "ok")
+        return check, f"check: {check}\nhint: {draft.role} hint" if check != "ok" else None
 
     async def review(self, case, plan, patch, model, *, source_root, revision="vulnerable"):
         self._log("review", case, plan, patch, source_root=source_root, revision=revision)

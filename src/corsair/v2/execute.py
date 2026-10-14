@@ -154,8 +154,8 @@ def check_result(facts: ProbeFacts) -> tuple[CheckResult, str | None]:
     return "ok", None
 
 
-def diagnose(environment: Environment, runtime: Runtime, patch: FrozenPatch, role: str, *,
-             run_id: str | None = None, timeout: float = PROBE_TIMEOUT_S) -> tuple[CheckResult, str | None]:
+def diagnose(environment: Environment, runtime: Runtime, draft: ProbeDraft, *, run_id: str | None = None,
+             timeout: float = PROBE_TIMEOUT_S) -> tuple[CheckResult, str | None]:
     """D3 mechanical check (``stages.Diagnose``): run one frozen draft once on the vulnerable revision, before review.
 
     Returns ``ok`` with no feedback, or ``not_run`` / ``errored`` with the class, a fixed hint (``check_result``)
@@ -163,11 +163,8 @@ def diagnose(environment: Environment, runtime: Runtime, patch: FrozenPatch, rol
     never reaches the author: even a line naming its own file can carry what application code printed. So an author
     can fix mechanics but never learns whether its assertion held.
     """
-    if role not in ("control", "exploit"):
-        raise ValueError("role must be control or exploit")
-    draft = patch.control if role == "control" else patch.exploit
     seen = observe(environment, runtime, draft, revision="vulnerable", run_id=run_id, timeout=timeout,
-                   patch_sha256=patch.sha256, syntax_check=True)
+                   syntax_check=True)
     result, hint = check_result(seen.facts)
     if result == "ok":
         return result, None

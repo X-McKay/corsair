@@ -70,7 +70,7 @@ class Diagnose(Protocol):
     redacted). Nothing from this run counts as evidence; only reviewed bytes are executed later.
     """
 
-    def __call__(self, environment: Environment, runtime: Runtime, patch: FrozenPatch, role: str
+    def __call__(self, environment: Environment, runtime: Runtime, draft: ProbeDraft
                  ) -> tuple[CheckResult, str | None]: ...
 
 

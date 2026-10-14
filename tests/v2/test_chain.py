@@ -133,7 +133,7 @@ def test_d3_ok_gets_no_revision_and_the_frozen_patch_is_reviewed_and_executed(tm
     go(fakes, tmp_path)
     assert len(fakes.of("probe-control")) == 1 and len(fakes.of("probe-exploit")) == 1
     patch = freeze(draft("control"), draft("exploit"))
-    assert [a[2] for a, _ in fakes.of("diagnose")] == [patch, patch]
+    assert [a[2] for a, _ in fakes.of("diagnose")] == [patch.control, patch.exploit]
     assert fakes.of("review")[0][0][2] == patch
     assert all(a[2] == patch for a, _ in fakes.of("execute"))
 

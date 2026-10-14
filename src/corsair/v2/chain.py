@@ -324,7 +324,8 @@ class LocalOps:
     async def diagnose(self, step: str, environment: Environment, runtime: Runtime, patch: FrozenPatch,
                        role: str) -> StepResult[Diagnosis]:
         def call() -> Diagnosis:
-            check, diagnostics = self.stages.diagnose(environment, runtime, patch, role)
+            draft = patch.control if role == "control" else patch.exploit
+            check, diagnostics = self.stages.diagnose(environment, runtime, draft)
             return Diagnosis(check=check, diagnostics=diagnostics if check != "ok" else None)
 
         return await self._code(step, {"environment": environment, "patch_sha256": patch.sha256, "role": role}, call)

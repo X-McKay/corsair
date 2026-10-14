@@ -96,8 +96,7 @@ def test_diagnose_never_returns_run_output(monkeypatch, seen, result):
                                    syntax=syntax)
     calls = []
     monkeypatch.setattr(execute, "observe", lambda *a, **kw: calls.append(kw) or observed)
-    patch = frozen(draft("control", "True"), draft("exploit", "True"))
-    got, text = execute.diagnose(_environment(), RUNTIME, patch, "exploit")
+    got, text = execute.diagnose(_environment(), RUNTIME, draft("exploit", "True"))
     assert got == result and calls[0]["syntax_check"] is True and calls[0]["revision"] == "vulnerable"
     if result == "ok":
         assert text is None
@@ -105,8 +104,6 @@ def test_diagnose_never_returns_run_output(monkeypatch, seen, result):
         assert text.startswith(f"check: {result}\nhint: ")
         assert "secret" not in text and token not in text and "ImportError" not in text
         assert "SyntaxError" in text and len(text.encode()) <= execute.SYNTAX_LIMIT + 200
-    with pytest.raises(ValueError):
-        execute.diagnose(_environment(), RUNTIME, patch, "both")
 
 
 @pytest.fixture(scope="module")
@@ -151,7 +148,7 @@ def test_probe_pair_end_to_end(environment, tmp_path):
 @needs_docker
 def test_diagnose_returns_a_class_and_hint_but_never_a_result(environment):
     def check(probe):
-        return execute.diagnose(environment, SYNTAX_RUNTIME, frozen(draft("control", "True"), probe), "exploit")
+        return execute.diagnose(environment, SYNTAX_RUNTIME, probe)
 
     result, text = check(draft("exploit", "True", before="parse(undefined_name)"))
     assert result == "errored" and "raised before the check marker" in text and "NameError" not in text
