@@ -314,6 +314,10 @@ The proposal's decisions and their status:
 | D9 | Exactly two tests; native parametrisation inside a test is allowed | Accepted with the build kickoff |
 | D12 | The exploit probe is a proof-of-vulnerability test that passes when it demonstrates the reported condition (PoV polarity) | Decided by Al, 2026-10-14 09:17Z |
 | D13 | Reviewer feedback loop: three reviews in total, at most two review revisions per author | Decided by Al, 2026-10-14 09:09Z |
+| D14 | Scope is provability, not category: a finding is in scope when both probes can prove it inside the workspace, deterministically and with no outbound network, using local stand-ins (a local server, a temporary file, an in-process double). The Investigator returns `unsupported_scope`, with the missing piece named, only when proof needs something the workspace cannot supply (a real remote endpoint, the host trust store, a system-wide policy, a specific library build). No vulnerability-category list exists anywhere | Decided by Al, 2026-10-14 09:33Z; implemented in #154 |
+| D15 | Counterfactual assertion: the brief states `safe_observation`, what the test would see on a correct implementation, and the PoV assertion must be false there. Payload text echoed back in output, an argument list or a log is never proof | Implemented in #155 |
+| D16 | Proof shows structure or effect: input merely reaching a dependency is never proof, because correct code usually passes input on as data rather than rejecting it. The PoV must show the input crossing from data into structure or into an effect it should not have | Implemented in #156 |
+| D17 | The Reviewer stays outcome-blind: it judges whether each test is a valid experiment, never whether the code looks vulnerable. It must not call a PoV vacuous because the target looks safe, reject a control for not exercising the vulnerability, or steer an author toward what this code does | Implemented in #157 |
 
 "Accepted with the build kickoff" means Al started the build on this proposal without objecting to that decision. Any of them can be reopened.
 
