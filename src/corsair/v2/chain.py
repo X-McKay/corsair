@@ -278,6 +278,9 @@ class LocalOps:
         self.grounding = stages.ground is not None and stages.grounding_context is not None
 
     def _report(self, step: str, text: str) -> None:
+        if text == "started":
+            # Activities open this recorder from their request's run_dir; progress is presentation only.
+            self.record.started(step)
         if self.progress is not None:
             self.progress(step, text)
 
@@ -323,6 +326,7 @@ class LocalOps:
     async def _code(self, step: str, inputs: dict[str, Any], call: Callable[[], Any]) -> StepResult:
         output, failure, error = None, None, None
         started = perf_counter()
+        self._report(step, "started")
         try:
             output = await asyncio.to_thread(call)
         except Exception as exc:
@@ -815,7 +819,14 @@ async def run_case(case: Case, *, stages: Stages, models: Mapping[str, Model], m
     if missing:
         raise ValueError(f"no model configured for agents: {', '.join(missing)}")
     record.begin(case, mode="direct", provider_config=provider_config, matrix=matrix_path)
-    verdict = await compose(case, ops, budget)
+    try:
+        verdict = await compose(case, ops, budget)
+    except asyncio.CancelledError as exc:
+        try:
+            record.cancelled()
+        except (OSError, ValueError) as receipt_error:
+            exc.add_note(f"Cancellation receipt could not be persisted ({type(receipt_error).__name__})")
+        raise
     record.finish(verdict)
     return verdict
 

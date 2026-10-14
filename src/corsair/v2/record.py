@@ -110,6 +110,7 @@ class RunRecorder:
             self._write("run.json", {
                 "schema": SCHEMA, "run_id": self.run_id, "case_id": case.case_id, "mode": mode,
                 "hostname": socket.gethostname(), "started_at": _now(), "finished_at": None,
+                "state": "recorded", "stopped_at": None, "last_started_step": None,
                 "git_commit": commit, "git_dirty": dirty,
                 "provider_config_sha256": _file_sha256(provider_config),
                 "matrix_sha256": _file_sha256(matrix),
@@ -118,6 +119,16 @@ class RunRecorder:
                 "environments": {},
             })
         self._write("case.json", case)
+
+    def started(self, step: str) -> None:
+        """Persist the last observed dispatch; this alone does not prove a process is still running."""
+        if not _STEP.match(step):
+            raise ValueError(f"invalid step name: {step!r}")
+        self._update("run.json", last_started_step=step)
+
+    def cancelled(self) -> None:
+        """Record direct-call cancellation without inventing a Verdict, finish time, or final usage."""
+        self._update("run.json", state="cancelled", stopped_at=_now())
 
     def runtime(self, runtime: Runtime, image_id: str | None) -> None:
         """The selected matrix row, its image reference and the local image id it resolved to (None: unknown)."""
@@ -154,7 +165,7 @@ class RunRecorder:
     def finish(self, verdict: Verdict) -> dict[str, Any]:
         self._write("verdict.json", verdict)
         finished = _now()
-        self._update("run.json", finished_at=finished)
+        self._update("run.json", finished_at=finished, state="completed")
         run = self._read("run.json", {})
         rows = self._read("usage.json", [])
         usage = self.usage()
