@@ -328,7 +328,11 @@ def test_native_evals_repeat_with_local_span_coverage():
 
 
 def test_native_evals_missing_agent_spans_fail_coverage():
+    import logfire
     from pydantic_evals import Case, Dataset
+    # Span capture needs a configured logfire, as every eval entry point does; without it the evaluator errors
+    # instead of reporting the missing span, and this test passed only when an earlier test had configured it.
+    logfire.configure(send_to_logfire=False, console=False)
     from pydantic_evals.evaluators import HasMatchingSpan
     async def uninstrumented_task(value):
         return value
