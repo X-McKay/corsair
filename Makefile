@@ -28,6 +28,11 @@ TEST_WORKERS ?= auto
 test-config:
 	uv run --locked python -m pytest $(PYTEST_ROOT) -n $(TEST_WORKERS) tests/configuration tests/unit tests/agents tests/temporal/test_fixture_contracts.py tests/temporal/test_issue_analysis_composition.py tests/temporal/test_chain_composition.py
 
+# Corsair v2 offline suite (no model, no cluster); Docker-backed tests skip when Docker is unavailable.
+.PHONY: test-v2
+test-v2:
+	uv run --locked python -m pytest $(PYTEST_ROOT) -n $(TEST_WORKERS) tests/v2
+
 # One agent's isolated eval suite on the host (SPEC-0044); results under .runs/evals/<agent>/.
 # AGENT=identification|planning|control_authoring|exploit_authoring|authoring|environment|assessment|chain; optional SET, PROVIDER_CONFIG, REPEAT, NOTE.
 eval:
