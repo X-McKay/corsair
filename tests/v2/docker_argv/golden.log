@@ -1,0 +1,45 @@
+["info", "--format", "{{.ServerVersion}}"] stdin=0
+["image", "inspect", "corsair-python:ebf057997574de59"] stdin=0
+["image", "inspect", "--format", "{{json .Config.Labels}}", "corsair-v2-env:0e72649f00018765b229ca8efc5b4c59"] stdin=0
+["run", "-d", "--init", "--name", "corsair-v2-run1-build-baa37928855d", "--label", "corsair.v2=1", "--label", "corsair.v2.env=0e72649f00018765", "--label", "corsair.v2.revision=vulnerable", "--label", "corsair.v2.run=run1", "--label", "corsair.v2.stage=build", "--network=none", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--cpus=2.0", "--memory=4g", "--memory-swap=4g", "--pids-limit=1024", "--entrypoint", "sleep", "corsair-python:ebf057997574de59", "infinity"] stdin=0
+["exec", "-w", "/", "corsair-v2-run1-build-baa37928855d", "sh", "-c", "id -u; id -g"] stdin=0
+["cp", "-a", "-", "corsair-v2-run1-build-baa37928855d:/"] stdin=10240
+["cp", "-a", "-", "corsair-v2-run1-build-baa37928855d:/work"] stdin=10240
+["exec", "-w", "/work", "corsair-v2-run1-build-baa37928855d", "pip", "install", "-e", "."] stdin=0
+["exec", "-w", "/work", "corsair-v2-run1-build-baa37928855d", "python", "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests/test_smoke.py"] stdin=0
+["commit", "--change", "LABEL corsair.v2.env.key=0e72649f00018765b229ca8efc5b4c595d6cec569bfc453b854b8fe911883b76 corsair.v2.env.log=fc035decc8ec83d4fd50ff8102d4aea79f2318928bcc14e2ee17acb91f759dc8", "corsair-v2-run1-build-baa37928855d", "corsair-v2-env:0e72649f00018765b229ca8efc5b4c59"] stdin=0
+["rm", "--force", "--volumes", "corsair-v2-run1-build-baa37928855d"] stdin=0
+["inspect", "--format", "{{.Id}}", "corsair-v2-run1-build-baa37928855d"] stdin=0
+["image", "inspect", "--format", "{{json .Config.Labels}}", "corsair-v2-env:a71db631428bb878d5eeec9b65004065"] stdin=0
+["run", "-d", "--init", "--name", "corsair-v2-run1-build-92a0e09f8a82", "--label", "corsair.v2=1", "--label", "corsair.v2.env=a71db631428bb878", "--label", "corsair.v2.revision=vulnerable", "--label", "corsair.v2.run=run1", "--label", "corsair.v2.stage=build", "--network=bridge", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--cpus=2.0", "--memory=4g", "--memory-swap=4g", "--pids-limit=1024", "--entrypoint", "sleep", "corsair-python:ebf057997574de59", "infinity"] stdin=0
+["exec", "-w", "/", "corsair-v2-run1-build-92a0e09f8a82", "sh", "-c", "id -u; id -g"] stdin=0
+["cp", "-a", "-", "corsair-v2-run1-build-92a0e09f8a82:/"] stdin=10240
+["cp", "-a", "-", "corsair-v2-run1-build-92a0e09f8a82:/work"] stdin=20480
+["exec", "-w", "/work", "corsair-v2-run1-build-92a0e09f8a82", "pip", "install", "-e", "."] stdin=0
+["network", "disconnect", "--force", "bridge", "corsair-v2-run1-build-92a0e09f8a82"] stdin=0
+["exec", "-w", "/work", "corsair-v2-run1-build-92a0e09f8a82", "python", "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests/test_smoke.py"] stdin=0
+["commit", "--change", "LABEL corsair.v2.env.key=a71db631428bb878d5eeec9b6500406518c518bdb8b51974fb01687b065f776d corsair.v2.env.log=fc035decc8ec83d4fd50ff8102d4aea79f2318928bcc14e2ee17acb91f759dc8", "corsair-v2-run1-build-92a0e09f8a82", "corsair-v2-env:a71db631428bb878d5eeec9b65004065"] stdin=0
+["rm", "--force", "--volumes", "corsair-v2-run1-build-92a0e09f8a82"] stdin=0
+["inspect", "--format", "{{.Id}}", "corsair-v2-run1-build-92a0e09f8a82"] stdin=0
+["run", "-d", "--init", "--name", "corsair-v2-run1-execute-exploit-7eb8f9c3cb94", "--label", "corsair.v2=1", "--label", "corsair.v2.patch=e6d546d3b4488e80", "--label", "corsair.v2.revision=vulnerable", "--label", "corsair.v2.role=exploit", "--label", "corsair.v2.run=run1", "--label", "corsair.v2.stage=execute", "--network=none", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--cpus=2.0", "--memory=4g", "--memory-swap=4g", "--pids-limit=1024", "--entrypoint", "sleep", "corsair-v2-env:abc", "infinity"] stdin=0
+["inspect", "--format", "{{.Image}}", "corsair-v2-run1-execute-exploit-7eb8f9c3cb94"] stdin=0
+["exec", "-i", "-w", "/", "corsair-v2-run1-execute-exploit-7eb8f9c3cb94", "sh", "-c", "mkdir -p \"$(dirname \"$1\")\" && cat > \"$1\"", "sh", "/work/tests/corsair/test_probe.py"] stdin=329
+["exec", "-w", "/", "corsair-v2-run1-execute-exploit-7eb8f9c3cb94", "mkdir", "-p", "/tmp/corsair-markers-tttttttttttttttt"] stdin=0
+["exec", "-w", "/work", "-e", "CORSAIR_MARKER_DIR=/tmp/corsair-markers-tttttttttttttttt", "-e", "CORSAIR_TOKEN=tttttttttttttttttttttttttttttttt", "corsair-v2-run1-execute-exploit-7eb8f9c3cb94", "python", "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests/corsair/test_probe.py::test_probe"] stdin=0
+["exec", "-w", "/", "corsair-v2-run1-execute-exploit-7eb8f9c3cb94", "sh", "-c", "for f in start end; do test -e \"$1/$f\" && echo \"$f\"; done; echo ---; test -f \"$1/check\" && head -c 64 \"$1/check\"; true", "sh", "/tmp/corsair-markers-tttttttttttttttt"] stdin=0
+["rm", "--force", "--volumes", "corsair-v2-run1-execute-exploit-7eb8f9c3cb94"] stdin=0
+["inspect", "--format", "{{.Id}}", "corsair-v2-run1-execute-exploit-7eb8f9c3cb94"] stdin=0
+["run", "-d", "--init", "--name", "corsair-v2-run1-execute-control-621a94648e6c", "--label", "corsair.v2=1", "--label", "corsair.v2.revision=vulnerable", "--label", "corsair.v2.role=control", "--label", "corsair.v2.run=run1", "--label", "corsair.v2.stage=execute", "--network=none", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--cpus=2.0", "--memory=4g", "--memory-swap=4g", "--pids-limit=1024", "--entrypoint", "sleep", "corsair-v2-env:abc", "infinity"] stdin=0
+["inspect", "--format", "{{.Image}}", "corsair-v2-run1-execute-control-621a94648e6c"] stdin=0
+["exec", "-i", "-w", "/", "corsair-v2-run1-execute-control-621a94648e6c", "sh", "-c", "mkdir -p \"$(dirname \"$1\")\" && cat > \"$1\"", "sh", "/work/tests/corsair/test_control.py"] stdin=328
+["exec", "-w", "/", "corsair-v2-run1-execute-control-621a94648e6c", "mkdir", "-p", "/tmp/corsair-markers-tttttttttttttttt"] stdin=0
+["exec", "-w", "/work", "corsair-v2-run1-execute-control-621a94648e6c", "/usr/bin/env", "PYTHONPYCACHEPREFIX=/tmp/corsair-pycache", "python3", "-m", "py_compile", "tests/corsair/test_control.py"] stdin=0
+["exec", "-w", "/work", "-e", "CORSAIR_MARKER_DIR=/tmp/corsair-markers-tttttttttttttttt", "-e", "CORSAIR_TOKEN=tttttttttttttttttttttttttttttttt", "corsair-v2-run1-execute-control-621a94648e6c", "python", "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests/corsair/test_control.py::test_probe"] stdin=0
+["exec", "-w", "/", "corsair-v2-run1-execute-control-621a94648e6c", "sh", "-c", "for f in start end; do test -e \"$1/$f\" && echo \"$f\"; done; echo ---; test -f \"$1/check\" && head -c 64 \"$1/check\"; true", "sh", "/tmp/corsair-markers-tttttttttttttttt"] stdin=0
+["rm", "--force", "--volumes", "corsair-v2-run1-execute-control-621a94648e6c"] stdin=0
+["inspect", "--format", "{{.Id}}", "corsair-v2-run1-execute-control-621a94648e6c"] stdin=0
+["ps", "--all", "--no-trunc", "--filter", "label=corsair.v2=1", "--filter", "label=corsair.v2.run=run1", "--format", "{{.Names}}"] stdin=0
+["rm", "--force", "--volumes", "corsair-v2-a"] stdin=0
+["inspect", "--format", "{{.Id}}", "corsair-v2-a"] stdin=0
+["rm", "--force", "--volumes", "corsair-v2-b"] stdin=0
+["inspect", "--format", "{{.Id}}", "corsair-v2-b"] stdin=0
