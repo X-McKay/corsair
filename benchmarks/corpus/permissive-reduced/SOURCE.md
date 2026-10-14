@@ -38,6 +38,9 @@ SPDX licence, NVD CWE, pointer source and what the reduction removed.
 | ruby-git-ls-files | ruby | CWE-94 | ruby-git/ruby-git | CVE-2022-46648 | MIT |
 | tomee | java | CWE-502 | apache/tomee | CVE-2015-8581 | Apache-2.0 |
 | plexus-utils | java | CWE-78 | codehaus-plexus/plexus-utils | CVE-2017-1000487 | Apache-2.0 |
+| commons-io | java | CWE-20 | apache/commons-io | CVE-2021-29425 | Apache-2.0 |
+| rdf4j | java | CWE-22 | eclipse/rdf4j | CVE-2018-20227 | BSD-3-Clause (EDL-1.0) |
+| spring-security | java | CWE-522 | spring-projects/spring-security | CVE-2019-11272 | Apache-2.0 |
 
 ## Pointer sources
 

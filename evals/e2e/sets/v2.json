@@ -126,6 +126,12 @@
     "java/plexus-utils-a": "bb248be11c66aac23feacc8e681418859f3f8baf433c6866cea38c02bede7926",
     "java/plexus-utils-b": "cf7c2c56d8f10cfc38119defb338e5430e78540264dd472f088f207e9cb182d7",
     "java/tomee-a": "4a5f3ad8a43ce3461fbec40cccca9985078de6dbeca0ac6f837f5d5734cca5ea",
-    "java/tomee-b": "a6a4643cc14b8a0d35ce59dc0727abb72a22adc12ebd1f5a7bae53db8572dfbf"
+    "java/tomee-b": "a6a4643cc14b8a0d35ce59dc0727abb72a22adc12ebd1f5a7bae53db8572dfbf",
+    "java/commons-io-a": "18596f408d82b693e6ea4462086a25eb2fdf296d08ca082df6600226b43b4085",
+    "java/commons-io-b": "acdb4de4ed4e6eaf8a8a619a80735d3b80477f9618a362ce4bc3898d3c9407b8",
+    "java/rdf4j-a": "f4bc11ffb4b957232f191b2647bffab7935e73fcae13ccb7594534835213e03b",
+    "java/rdf4j-b": "bbe4cc42b3803dc5b6113855b2433e42cefcdef49fc32fc77b151b245d7e9669",
+    "java/spring-security-a": "a01667b5ec31b5d4475cd42aab13d74cc5ce2480ea71c99c2a3937cd2e86bef3",
+    "java/spring-security-b": "fc49686cbb30d87dfd0521b836735070a510d074a245cd95f485b4f87c33e867"
   }
 }
