@@ -1,3 +1,4 @@
+import json
 """Chain routing with fake stages: order, early stops, A2/D3 correction bounds and review blindness."""
 import asyncio
 
@@ -194,6 +195,9 @@ def test_grounding_runs_first_only_when_configured_and_is_never_passed_on(tmp_pa
     fakes = Fakes(grounding=True, raises={"ground": ModelHTTPError(500, "m")})
     _, decided = go(fakes, tmp_path / "h")
     assert decided["stopped"] is None
+    # ...and it still says why there is no brief, so a failure never reads as "no precedent".
+    recorded = json.loads((tmp_path / "h" / "runs" / "run" / "grounding.json").read_text())
+    assert recorded["brief"] is None and recorded["status"] == "provider_error"
 
 
 def test_missing_model_is_an_explicit_error(tmp_path):
