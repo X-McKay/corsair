@@ -37,3 +37,9 @@ namespace = true
 testpaths = ["tests"]
 pythonpath = ["src", "."]
 addopts = "--strict-markers"
+markers = [
+    "platform: live kind and CNI qualification; requires explicit kubeconfig (make qualify-network)",
+    "admission: live storage and native OpenShell kernel admission; requires installed prerequisites (make qualify-admission)",
+    "gateway: live gateway TLS and generated identity qualification; uninstalls the gateway afterwards (make qualify-gateway)",
+    "openshell: live v2 OpenShell sandbox backend against .state/openshell/config.json (make qualify-openshell-v2)",
+]

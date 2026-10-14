@@ -1,0 +1,86 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: admission-deny-network
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress: []
+---
+apiVersion: agents.x-k8s.io/v1beta1
+kind: Sandbox
+metadata:
+  name: admission
+spec:
+  podTemplate:
+    metadata:
+      labels:
+        app: corsair-admission
+    spec:
+      automountServiceAccountToken: false
+      hostNetwork: false
+      hostPID: false
+      hostIPC: false
+      shareProcessNamespace: false
+      dnsPolicy: None
+      dnsConfig:
+        nameservers: [127.0.0.53]
+      securityContext:
+        runAsUser: 10001
+        runAsGroup: 10001
+        runAsNonRoot: true
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        supplementalGroups: []
+        supplementalGroupsPolicy: Strict
+        seccompProfile:
+          type: RuntimeDefault
+        sysctls:
+        - name: net.ipv4.ip_unprivileged_port_start
+          value: "0"
+      initContainers:
+      - name: runtime-stage
+        image: admission-runtime
+        command: [/openshell-sandbox, copy-self, /runtime/openshell-sandbox]
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: [ALL]
+        resources:
+          requests: {cpu: 100m, memory: 32Mi}
+          limits: {cpu: "1", memory: 128Mi}
+        volumeMounts:
+        - name: runtime
+          mountPath: /runtime
+      containers:
+      - name: agent
+        image: admission-workload
+        command: [/bin/sleep, "1800"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: [ALL]
+        resources:
+          requests: {cpu: 100m, memory: 64Mi}
+          limits: {cpu: "1", memory: 256Mi}
+        volumeMounts:
+        - name: runtime
+          mountPath: /runtime
+          readOnly: true
+        - name: workspace
+          mountPath: /sandbox
+      volumes:
+      - name: runtime
+        emptyDir:
+          medium: Memory
+  volumeClaimTemplates:
+  - metadata:
+      name: workspace
+    spec:
+      storageClassName: standard
+      accessModes: [ReadWriteOnce]
+      resources:
+        requests:
+          storage: 128Mi
