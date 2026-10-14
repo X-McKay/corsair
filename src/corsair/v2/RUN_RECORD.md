@@ -9,6 +9,14 @@ values with one `null` is `null`. A known zero (no agent calls, no retries in a 
 
 Compare runs with `corsair-v2 runs compare <run_dir> [<run_dir> ...]` (one line per run).
 
+Use `--format json` for one versioned `corsair-v2-cli/1` stdout object, preserving JSON nulls;
+`--agents` adds recorded per-agent telemetry to text comparison. Missing/malformed record directories
+return exit 2 rather than an all-unknown success row. An unfinished file only proves an **incomplete**
+record, never that a process or remote workflow is still running.
+Client cancellation emits one JSON object and exit 130: `verdict` is null, `totals` is null when no
+summary exists, and `client_interrupted: true` does not claim a remote workflow or command stopped.
+Its `state` comes only from the persisted receipt (direct cancellation: `cancelled`).
+
 ## `run.json`: what produced the run
 
 | field | type | meaning |
@@ -18,6 +26,8 @@ Compare runs with `corsair-v2 runs compare <run_dir> [<run_dir> ...]` (one line 
 | `mode` | `direct` \| `temporal` | how the chain ran |
 | `hostname` | str | host that began the run (Temporal: the control worker) |
 | `started_at`, `finished_at` | str \| null | UTC ISO-8601 with `Z`; `finished_at` null until the verdict is written |
+| `state` | str | additive lifecycle receipt: `recorded`, `completed` or direct-call `cancelled`; not proof of active work |
+| `stopped_at`, `last_started_step` | str \| null | direct cancellation time and last observed stage dispatch; cancellation does not prove external command termination or cleanup |
 | `git_commit` | str \| null | HEAD of the checkout the code ran from |
 | `git_dirty` | bool \| null | that checkout had changes, untracked files included |
 | `provider_config_sha256` | str \| null | sha256 of the provider config file the models were built from |
