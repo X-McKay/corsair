@@ -415,6 +415,9 @@ class DockerSandboxes:
 
     provider = PROVIDER
 
+    def __init__(self) -> None:
+        self._owners: dict[str, tuple[int, int]] = {}  # uid, gid read once per created container
+
     @staticmethod
     def _config(spec: SandboxSpec) -> DockerConfig:
         return DockerConfig(image=spec.image, labels=spec.labels, workdir=spec.workdir,
@@ -422,12 +425,12 @@ class DockerSandboxes:
 
     def create(self, spec: SandboxSpec) -> str:
         name = create(self._config(spec), adopt=False)
-        uid, gid = owner(name)
+        self._owners[name] = uid, gid = owner(name)
         make_workdir(name, spec.workdir, uid, gid)
         return name
 
     def copy_tree_in(self, name: str, source: Path, destination: str) -> None:
-        uid, gid = owner(name)
+        uid, gid = self._owners.get(name) or owner(name)
         copy_tree_in(name, source, destination, uid, gid)
 
     def write_file(self, name: str, path: str, data: bytes) -> None:
@@ -448,7 +451,11 @@ class DockerSandboxes:
     def image_id(self, name: str) -> str | None:
         return image_id(name, container=True)
 
+    def resolve_image(self, reference: str) -> str | None:
+        return image_id(reference)
+
     def remove(self, name: str) -> bool:
+        self._owners.pop(name, None)
         return remove(name)
 
     def labelled(self, run_id: str | None = None) -> list[str]:

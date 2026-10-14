@@ -1,9 +1,11 @@
 """Trusted build replay (stage 4, ``stages.Replay``).
 
-The Builder agent only proposes a Recipe. Trusted code replays it here in a fresh container that no agent touched,
-requires the baseline test to pass with no network, and commits the result as an Environment image keyed by
-(runtime row and image, recipe, revision tree): the exact-environment cache of amendment A3. Every command runs
-exactly once; a timeout or container failure is recorded, never retried. The container is always removed.
+The Builder agent only proposes a Recipe. Trusted code replays it here in a fresh sandbox that no agent touched,
+requires the baseline test to pass with no network, and seals the result as an Environment keyed by (runtime row and
+image, recipe, revision tree): the exact-environment cache of amendment A3. Docker seals it as an image; a backend
+that cannot snapshot replays the sealed recipe into each probe's fresh sandbox. Every command runs exactly once; a
+timeout or sandbox failure is recorded, never retried. The sandbox is always removed. All of it goes through the
+``Sandboxes`` port (``workspace.sandboxes()`` unless one is passed).
 """
 from __future__ import annotations
 
@@ -15,14 +17,12 @@ from pathlib import Path
 
 from .artifacts import ArtifactStore
 from .contracts import BuildResult, Case, Environment, Recipe, Runtime
-from .workspace.docker import (LABEL, ContainerExists, DockerConfig, Exec, copy_tree_in, create, docker, exec_once,
-                               labels, make_workdir, owner, remove, write_file)
+from .workspace import sandboxes as configured
+from .workspace.port import Exec, Sandboxes, SandboxExists, SandboxSpec, labels
 
 SETUP_TIMEOUT_S = 1800.0
 BASELINE_TIMEOUT_S = 600.0
 ENV_REPOSITORY = "corsair-v2-env"
-LOG_LABEL = f"{LABEL}.env.log"
-KEY_LABEL = f"{LABEL}.env.key"
 
 
 def recipe_sha256(recipe: Recipe) -> str:
@@ -52,7 +52,8 @@ def _failure(result: Exec, what: str) -> str:
 
 def replay(case: Case, runtime: Runtime, recipe: Recipe, *, revision: str = "vulnerable", run_id: str | None = None,
            artifacts: Path | str | None = None, workdir: str = "/work", setup_timeout: float = SETUP_TIMEOUT_S,
-           baseline_timeout: float = BASELINE_TIMEOUT_S) -> tuple[BuildResult, Environment | None]:
+           baseline_timeout: float = BASELINE_TIMEOUT_S, backend: Sandboxes | None = None
+           ) -> tuple[BuildResult, Environment | None]:
     if revision not in ("vulnerable", "fixed"):
         raise ValueError("revision must be 'vulnerable' or 'fixed'")
     tree = case.revision if revision == "vulnerable" else case.fixed_revision
@@ -69,58 +70,57 @@ def replay(case: Case, runtime: Runtime, recipe: Recipe, *, revision: str = "vul
     environment = Environment(image=tag, workdir=workdir, runtime_row=runtime.row_id, recipe_sha256=digest,
                               tree_sha256=tree.tree_sha256)
 
-    cached = docker("image", "inspect", "--format", "{{json .Config.Labels}}", tag)
-    if cached.returncode == 0:
-        found = json.loads(cached.stdout) or {}
-        if found.get(KEY_LABEL) == key:
-            log = store.ref(found.get(LOG_LABEL, "")) if found.get(LOG_LABEL) else None
-            return BuildResult(recipe=recipe, replayed=True, baseline_exit_code=0, log=log,
-                               reason=f"exact-environment cache hit: {tag}"), environment
+    backend = backend or configured()
+    cached = backend.find_environment(tag, key)
+    if cached is not None:
+        log = store.ref(cached) if cached else None
+        return BuildResult(recipe=recipe, replayed=True, baseline_exit_code=0, log=log,
+                           reason=f"exact-environment cache hit: {tag}"), environment
 
-    config = DockerConfig(image=runtime.image, workdir=workdir,
-                          labels=labels(run_id or uuid.uuid4().hex[:12], "build", revision=revision, env=key[:16]),
-                          network="bridge" if recipe.network_during_setup else "none")
+    spec = SandboxSpec(image=runtime.image, workdir=workdir,
+                       labels=labels(run_id or uuid.uuid4().hex[:12], "build", revision=revision, env=key[:16]),
+                       network="build" if recipe.network_during_setup else "none")
     log: list[bytes] = []
     baseline_exit: int | None = None
     reason = ""
     log_ref = None
     ours = True
     try:
-        name = create(config, adopt=False)
-        uid, gid = owner(name)
-        make_workdir(name, workdir, uid, gid)
-        copy_tree_in(name, Path(tree.source), workdir, uid, gid)
+        name = backend.create(spec)
+        backend.copy_tree_in(name, Path(tree.source), workdir)
         for added in recipe.files:
-            write_file(name, f"{workdir}/{added.path}", added.content.encode())
+            backend.write_file(name, f"{workdir}/{added.path}", added.content.encode())
         for index, step in enumerate(recipe.setup, 1):
-            result = exec_once(name, step, workdir=workdir, timeout=setup_timeout)
+            result = backend.exec_once(name, step, workdir=workdir, timeout=setup_timeout)
             _record(log, step, result)
             if result.exit_code != 0:
                 reason = _failure(result, f"setup step {index}")
                 break
         if not reason and recipe.network_during_setup:
-            detached = docker("network", "disconnect", "--force", "bridge", name)
-            if detached.returncode != 0:
-                reason = f"cannot remove the network before the baseline: {detached.stderr.decode(errors='replace')}"
+            try:
+                backend.drop_network(name)
+            except Exception as error:
+                reason = f"cannot remove the network before the baseline: {error}"
         if not reason:
-            result = exec_once(name, recipe.baseline_test, workdir=workdir, timeout=baseline_timeout)
+            result = backend.exec_once(name, recipe.baseline_test, workdir=workdir, timeout=baseline_timeout)
             _record(log, recipe.baseline_test, result)
             baseline_exit = result.exit_code
             if result.exit_code != 0:
                 reason = _failure(result, "baseline test")
         log_ref = store.put(b"".join(log))
         if not reason:
-            committed = docker("commit", "--change", f"LABEL {KEY_LABEL}={key} {LOG_LABEL}={log_ref.sha256}", name,
-                               tag, timeout=1800)
-            if committed.returncode != 0:
-                reason = f"docker commit failed: {committed.stderr.decode(errors='replace')[-1000:]}"
+            try:
+                backend.seal_environment(name, tag, key, log_ref.sha256, recipe=recipe, tree_source=Path(tree.source),
+                                         base_image=runtime.image)
+            except Exception as error:
+                reason = str(error)
     except Exception as error:  # A create, copy or control-plane failure is recorded as the build's reason.
-        ours = not isinstance(error, ContainerExists)
+        ours = not isinstance(error, SandboxExists)
         reason = f"infra: {type(error).__name__}: {error}"
         log_ref = store.put(b"".join(log)) if log else None
     finally:
-        # Never remove a container another attempt owns; the reconciler sweeps it with its run.
-        confirmed = remove(config.name) if ours else None
+        # Never remove a sandbox another attempt owns; the reconciler sweeps it with its run.
+        confirmed = backend.remove(spec.name) if ours else None
     ok = not reason
     built = BuildResult(recipe=recipe, replayed=ok, baseline_exit_code=baseline_exit, log=log_ref,
                         reason=reason[:2000], cleanup_confirmed=confirmed)

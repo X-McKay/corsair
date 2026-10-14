@@ -124,6 +124,11 @@ class Sandboxes(Protocol):
         """The immutable id of the image the sandbox was created from; None when the backend cannot say."""
         ...
 
+    def resolve_image(self, reference: str) -> str | None:
+        """The immutable id of an image reference (provenance of a runtime row's image); None when unknown. Never
+        raises."""
+        ...
+
     def remove(self, name: str) -> bool:
         ...
 
