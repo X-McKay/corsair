@@ -72,7 +72,7 @@ def test_no_oracle_content_in_input(case):
     if "manifest_case" in truth:
         assert truth["manifest_case"] not in text  # manifest names carry the answer
     # A case id that names the behaviour (target-absent, ...) carries the answer; such cases let intake assign one.
-    assert "case_id" not in case.input or re.fullmatch(r"[a-z-]+-[a-z]", case.name), case.key
+    assert "case_id" not in case.input or re.fullmatch(r"[a-z0-9-]+-[a-z]", case.name), case.key
 
 
 @pytest.mark.parametrize("case", CASES, ids=[case.key for case in CASES])

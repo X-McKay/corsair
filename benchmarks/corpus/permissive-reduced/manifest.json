@@ -625,6 +625,150 @@
         "source": "caller-supplied command arguments",
         "target_callable": "getShellCommandLine"
       }
+    },
+    {
+      "name": "java-commons-io-a",
+      "language": "java",
+      "finding": {
+        "title": "Prefix handling of double-separator paths in FilenameUtils.getPrefixLength",
+        "repo_url": "eval-corpus/java/commons-io/a",
+        "revision": "HEAD",
+        "file_path": "src/main/java/org/apache/commons/io/FilenameUtils.java",
+        "start_line": 679,
+        "symbol": "getPrefixLength",
+        "cwe": "CWE-20",
+        "severity": "medium",
+        "source_tool": "candidate-survey",
+        "description": "FilenameUtils.getPrefixLength computes the prefix of a file name; for names starting with two separators it treats the text up to the next separator as a UNC server prefix, which FilenameUtils.normalize then keeps out of its '..' resolution."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "src/main/java/org/apache/commons/io/FilenameUtils.java",
+        "sink_line": 679,
+        "source": "file name argument",
+        "target_callable": "getPrefixLength"
+      }
+    },
+    {
+      "name": "java-commons-io-b",
+      "language": "java",
+      "finding": {
+        "title": "Prefix handling of double-separator paths in FilenameUtils.getPrefixLength",
+        "repo_url": "eval-corpus/java/commons-io/b",
+        "revision": "HEAD",
+        "file_path": "src/main/java/org/apache/commons/io/FilenameUtils.java",
+        "start_line": 685,
+        "symbol": "getPrefixLength",
+        "cwe": "CWE-20",
+        "severity": "medium",
+        "source_tool": "candidate-survey",
+        "description": "FilenameUtils.getPrefixLength computes the prefix of a file name; for names starting with two separators it treats the text up to the next separator as a UNC server prefix, which FilenameUtils.normalize then keeps out of its '..' resolution."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "src/main/java/org/apache/commons/io/FilenameUtils.java",
+        "sink_line": 685,
+        "source": "file name argument",
+        "target_callable": "getPrefixLength"
+      }
+    },
+    {
+      "name": "java-rdf4j-a",
+      "language": "java",
+      "finding": {
+        "title": "Entry path handling in ZipUtil.writeEntry",
+        "repo_url": "eval-corpus/java/rdf4j/a",
+        "revision": "HEAD",
+        "file_path": "src/main/java/org/eclipse/rdf4j/common/io/ZipUtil.java",
+        "start_line": 92,
+        "symbol": "writeEntry",
+        "cwe": "CWE-22",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "ZipUtil.writeEntry writes one archive entry to a file under the destination directory, building the output path from the entry name stored in the archive."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "src/main/java/org/eclipse/rdf4j/common/io/ZipUtil.java",
+        "sink_line": 92,
+        "source": "archive entry name",
+        "target_callable": "writeEntry"
+      }
+    },
+    {
+      "name": "java-rdf4j-b",
+      "language": "java",
+      "finding": {
+        "title": "Entry path handling in ZipUtil.writeEntry",
+        "repo_url": "eval-corpus/java/rdf4j/b",
+        "revision": "HEAD",
+        "file_path": "src/main/java/org/eclipse/rdf4j/common/io/ZipUtil.java",
+        "start_line": 93,
+        "symbol": "writeEntry",
+        "cwe": "CWE-22",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "ZipUtil.writeEntry writes one archive entry to a file under the destination directory, building the output path from the entry name stored in the archive."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "src/main/java/org/eclipse/rdf4j/common/io/ZipUtil.java",
+        "sink_line": 93,
+        "source": "archive entry name",
+        "target_callable": "writeEntry"
+      }
+    },
+    {
+      "name": "java-spring-security-a",
+      "language": "java",
+      "finding": {
+        "title": "Stored-password comparison in PlaintextPasswordEncoder.isPasswordValid",
+        "repo_url": "eval-corpus/java/spring-security/a",
+        "revision": "HEAD",
+        "file_path": "src/main/java/org/springframework/security/authentication/encoding/PlaintextPasswordEncoder.java",
+        "start_line": 54,
+        "symbol": "isPasswordValid",
+        "cwe": "CWE-522",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "PlaintextPasswordEncoder.isPasswordValid compares the stored encoded password with the presented raw password (merged with the salt) and returns whether they match."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "src/main/java/org/springframework/security/authentication/encoding/PlaintextPasswordEncoder.java",
+        "sink_line": 54,
+        "source": "presented raw password and stored encoded password",
+        "target_callable": "isPasswordValid"
+      }
+    },
+    {
+      "name": "java-spring-security-b",
+      "language": "java",
+      "finding": {
+        "title": "Stored-password comparison in PlaintextPasswordEncoder.isPasswordValid",
+        "repo_url": "eval-corpus/java/spring-security/b",
+        "revision": "HEAD",
+        "file_path": "src/main/java/org/springframework/security/authentication/encoding/PlaintextPasswordEncoder.java",
+        "start_line": 57,
+        "symbol": "isPasswordValid",
+        "cwe": "CWE-522",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "PlaintextPasswordEncoder.isPasswordValid compares the stored encoded password with the presented raw password (merged with the salt) and returns whether they match."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "src/main/java/org/springframework/security/authentication/encoding/PlaintextPasswordEncoder.java",
+        "sink_line": 57,
+        "source": "presented raw password and stored encoded password",
+        "target_callable": "isPasswordValid"
+      }
     }
   ]
 }
