@@ -23,9 +23,9 @@ Compare runs with `corsair-v2 runs compare <run_dir> [<run_dir> ...]` (one line 
 | `provider_config_sha256` | str \| null | sha256 of the provider config file the models were built from |
 | `matrix_sha256` | str \| null | sha256 of the runtime matrix file |
 | `runtime_row`, `runtime_image` | str \| null | selected matrix row id and its image reference |
-| `runtime_image_id` | str \| null | local image id (`sha256:...`, `docker image inspect`) of `runtime_image` |
+| `runtime_image_id` | str \| null | immutable id of `runtime_image` as the backend resolves it: on Docker the local image id (`sha256:...`, `docker image inspect`), on OpenShell the digest ref it creates sandboxes from (`docker.io/library/<repo>@sha256:...`) |
 | `revision`, `fixed_revision` | {`tree_sha256`, `commit`} \| null | the case's trees; `commit` null for a snapshot |
-| `environments` | {revision: env} | per revision (`vulnerable`, `fixed`), the replayed environment: `image` (local tag), `image_id`, `tree_sha256`, `recipe_sha256`, `runtime_row` |
+| `environments` | {revision: env} | per revision (`vulnerable`, `fixed`), the replayed environment: `image` (its tag; a committed local image on Docker, a sealed manifest on OpenShell), `image_id` (Docker: the committed image's local `sha256:` id; OpenShell: the base image's digest ref, which every probe sandbox replays the recipe on), `tree_sha256`, `recipe_sha256`, `runtime_row` |
 
 ## `usage.json`: one row per agent call, in order
 
@@ -66,6 +66,6 @@ agent's `agents/<name>/agent.yaml`.
 ## Other files
 
 `case.json` (the Case), `verdict.json` (the Verdict; each `ProbeRun` carries `image_digest`, the image id its
-container ran from, and `tree_sha256`, the environment's tree; Decide drops a run whose tree is not the case
+sandbox ran from (a Docker local `sha256:` id, or on OpenShell the runtime image's digest ref), and `tree_sha256`, the environment's tree; Decide drops a run whose tree is not the case
 revision it claims), `timings.json` (per-stage wall time), `stages/<step>.json`, `agents/<step>.messages.json`
 (native message history) and `grounding.json`.

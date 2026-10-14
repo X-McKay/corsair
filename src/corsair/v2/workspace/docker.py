@@ -414,6 +414,7 @@ class DockerSandboxes:
     build-log digest; ``build`` network is the default bridge, removed before the baseline."""
 
     provider = PROVIDER
+    workdir = "/work"
 
     def __init__(self) -> None:
         self._owners: dict[str, tuple[int, int]] = {}  # uid, gid read once per created container
@@ -473,7 +474,9 @@ class DockerSandboxes:
         return found.get(ENV_LOG_LABEL, "") if found.get(ENV_KEY_LABEL) == key else None
 
     def seal_environment(self, name: str, tag: str, key: str, log_sha256: str, *, recipe: Recipe,
-                         tree_source: Path, base_image: str) -> None:
+                         tree_source: Path, base_image: str, setup_timeout: float | None = None,
+                         baseline_timeout: float | None = None) -> None:
+        # The committed image holds the environment; nothing is replayed on open, so the timeouts are unused.
         committed = docker("commit", "--change", f"LABEL {ENV_KEY_LABEL}={key} {ENV_LOG_LABEL}={log_sha256}", name,
                            tag, timeout=1800)
         if committed.returncode != 0:

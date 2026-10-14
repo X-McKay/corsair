@@ -110,3 +110,14 @@ def test_workflow_runs_the_same_review_loop_as_direct_mode(tmp_path):
     assert fakes.names() == direct.names()
     feedback = [kw["review_feedback"] for _, kw in fakes.of("probe-exploit") if kw["review_feedback"]]
     assert len(feedback) == 1 and "exploit defect 0" in feedback[0]
+
+
+def test_sandbox_timeouts_follow_the_backend():
+    assert workflow.container_timeout("docker", "execute") == workflow.CONTAINER_TIMEOUT
+    assert workflow.container_timeout("docker", "diagnose") == workflow.CONTAINER_TIMEOUT
+    assert workflow.container_timeout("openshell", "replay") == workflow.CONTAINER_TIMEOUT
+    for step in ("diagnose", "execute"):
+        assert workflow.container_timeout("openshell", step) == workflow.CONTAINER_TIMEOUT + workflow.REPLAY_ON_OPEN
+    assert workflow.REPLAY_ON_OPEN.total_seconds() == 2400
+    assert workflow.RunRequest.model_fields["workspace"].default == "docker"
+    assert workflow.execute.__name__ == "execute" and workflow.diagnose.__name__ == "diagnose"

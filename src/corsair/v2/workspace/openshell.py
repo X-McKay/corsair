@@ -81,6 +81,9 @@ STDIN_CHUNK_BYTES = 1024 * 1024
 MAX_TRANSFER_BYTES = 512 * 1024 * 1024
 RESOURCES = {"limits": {"cpu": "2", "memory": "4Gi"}}
 """Mirrors the Docker backend's 2 CPUs / 4 GiB, in the nested shape the v1 recovery gate used."""
+WORKDIR = "/sandbox"
+"""OpenShell's native workdir: the root ``include_workdir`` makes writable and the root v1 qualified transfers
+into. The toolchain images run as uid 10001 and have no ``/work``, so trusted code works here instead."""
 GATEWAY_TIMEOUT_EXIT = 124
 STDIN_OVERFLOW_EXIT = 74
 MISSING_EXIT = 3
@@ -89,7 +92,9 @@ POLICY_FIELDS = frozenset({"version", "landlock", "filesystem_policy", "process"
 _DIGEST_REF = re.compile(r"^docker\.io/library/[a-z0-9]+(?:[._-][a-z0-9]+)*@sha256:[0-9a-f]{64}$")
 _ENDPOINT = re.compile(r"^[A-Za-z0-9.-]+:[0-9]{1,5}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
-_NAME = re.compile(r"^[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?$")
+NAME_LIMIT = 19
+"""OpenShell 0.1.3's gateway refuses longer sandbox names (``name exceeds maximum length (51 > 19)``, RIG0 live run)."""
+_NAME = re.compile(r"^[a-z](?:[-a-z0-9]{0,17}[a-z0-9])?$")
 _LABEL_VALUE = re.compile(r"^(?:[A-Za-z0-9](?:[A-Za-z0-9._-]{0,61}[A-Za-z0-9])?)?$")
 _HOST = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$")
 _LABEL_KEY = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,61}[A-Za-z0-9])?$")
@@ -108,14 +113,16 @@ def _digest(value: str) -> str:
 
 
 def native_name(name: str) -> str:
-    """A valid OpenShell (DNS label) name for a port name. Already-valid names map to themselves, so the mapping is
-    idempotent and every method accepts either form; others become a slug plus a digest of the whole name."""
+    """A valid OpenShell sandbox name (a DNS label of at most ``NAME_LIMIT`` = 19 characters) for a port name.
+
+    A name that is already valid maps to itself, so the mapping is idempotent and every method accepts either form.
+    Any other name becomes ``cv2-`` plus the first 15 hex digits (60 bits) of its sha256: deterministic, so a retried
+    create finds the same identity. Two port names collide with probability about n^2 / 2^61 for n live names
+    (under 1e-6 below a million), and a collision can only surface as ``SandboxExists`` or a label mismatch, never
+    as adopting another run's sandbox, because the full port name is also a label (``NAME_LABEL``)."""
     if _NAME.fullmatch(name):
         return name
-    slug = re.sub(r"[^a-z0-9-]+", "-", name.lower()).strip("-")[:46].strip("-")
-    if not slug or not slug[0].isalpha():
-        slug = f"cv2-{slug}".strip("-")[:46].strip("-")
-    return f"{slug}-{_digest(name)[:12]}"
+    return f"cv2-{_digest(name)[:15]}"
 
 
 def label_value(value: str) -> str:
@@ -127,12 +134,18 @@ def label_value(value: str) -> str:
     return f"{slug}-{_digest(value)[:12]}" if slug else _digest(value)[:12]
 
 
-def native_labels(sandbox_labels: Mapping[str, str]) -> dict[str, str]:
+NAME_LABEL = f"{LABEL}.name"
+"""The full port name of a sandbox, sanitized like any label value (the native name is only its digest)."""
+
+
+def native_labels(sandbox_labels: Mapping[str, str], name: str | None = None) -> dict[str, str]:
     found = {LABEL: "1"}
     for key, value in sandbox_labels.items():
         if not _LABEL_KEY.fullmatch(key):
             raise ValueError(f"not a valid label key: {key!r}")
         found[key] = label_value(value)
+    if name is not None:
+        found[NAME_LABEL] = label_value(name)
     return found
 
 
@@ -146,6 +159,8 @@ def check_policy(document: Any, kind: str) -> dict:
     filesystem = document.get("filesystem_policy")
     if not isinstance(filesystem, dict) or not isinstance(filesystem.get("read_write"), list):
         raise ValueError(f"{kind} policy needs a filesystem_policy with read_write paths")
+    if filesystem.get("include_workdir") is not True:
+        raise ValueError(f"{kind} policy must include the sandbox workdir ({WORKDIR}), as v1 qualified")
     network = document.get("network_policies") or {}
     if not isinstance(network, dict):
         raise ValueError(f"{kind} policy network_policies must be a mapping")
@@ -188,6 +203,14 @@ def loads_requested(native: Mapping, requested: Mapping) -> bool:
 
 def _covered(path: str, roots: Sequence[str]) -> bool:
     return any(path == root or path.startswith(root.rstrip("/") + "/") for root in roots)
+
+
+def _writable(path: str, document: Mapping) -> bool:
+    """Whether the policy lets the command user write ``path``: a ``read_write`` root, or the native workdir that
+    ``include_workdir`` grants."""
+    filesystem = document["filesystem_policy"]
+    return _covered(path, filesystem["read_write"]) or bool(
+        filesystem.get("include_workdir") and _covered(path, [WORKDIR]))
 
 
 # --- operator configuration ---------------------------------------------------------------------------------------
@@ -297,7 +320,7 @@ class _Ran:
     elapsed: float = 0.0
 
 
-_INSTANCES: dict[Path, OpenShellSandboxes] = {}
+_INSTANCES: dict[tuple[Path, int], OpenShellSandboxes] = {}
 _INSTANCES_LOCK = threading.Lock()
 
 
@@ -306,6 +329,7 @@ class OpenShellSandboxes:
     offline double); ``cli`` runs one CLI argv; ``clock`` is monotonic seconds. Building it does no gateway I/O."""
 
     provider = PROVIDER
+    workdir = WORKDIR
 
     def __init__(self, config: OpenShellConfig, client: Any, *, cli: CliRunner = run_cli,
                  clock: Callable[[], float] = time.monotonic):
@@ -318,13 +342,15 @@ class OpenShellSandboxes:
 
     @classmethod
     def from_config(cls, path: Path) -> OpenShellSandboxes:
-        """One instance (one gRPC channel) per resolved config path per process; the config is read once."""
+        """One instance (one gRPC channel) per resolved config path and its mtime per process, so a rewritten config
+        (``make openshell-config`` after a new port-forward) is read again."""
         from openshell import SandboxClient, TlsConfig
 
-        key = Path(path).resolve()
+        resolved = Path(path).resolve()
+        key = (resolved, resolved.stat().st_mtime_ns)
         with _INSTANCES_LOCK:
             if key not in _INSTANCES:
-                config = OpenShellConfig.from_json(key)
+                config = OpenShellConfig.from_json(resolved)
                 client = SandboxClient(config.endpoint, tls=TlsConfig(ca_path=config.ca, cert_path=config.cert,
                                                                       key_path=config.key), timeout=CONTROL_TIMEOUT_S)
                 _INSTANCES[key] = cls(config, client)
@@ -493,11 +519,10 @@ class OpenShellSandboxes:
     def _create_native(self, spec: SandboxSpec) -> tuple[str, str]:
         """Create the sandbox and record its gateway id; returns (name, id). No setup that can fail happens here,
         so a caller can hold the identity before preparing it."""
-        roots = self.config.policies[spec.network]["filesystem_policy"]["read_write"]
-        if not _covered(spec.workdir, roots):
+        if not _writable(spec.workdir, self.config.policies[spec.network]):
             raise WorkspaceError(f"workdir {spec.workdir} is not writable under the operator's {spec.network} policy")
         image_ref = self._image_ref(spec.image)
-        name, wanted = native_name(spec.name), native_labels(spec.labels)
+        name, wanted = native_name(spec.name), native_labels(spec.labels, spec.name)
         try:
             native = self.client.create(workspace=self._workspace, name=name, labels=wanted,
                                         spec=self._native_spec(image_ref, spec.network))
@@ -633,9 +658,15 @@ class OpenShellSandboxes:
             return None
 
     def resolve_image(self, reference: str) -> str | None:
-        """The digest ref an image tag maps to (what a sandbox would be created from); None when unmapped."""
+        """The digest ref an image tag maps to (what a sandbox would be created from). A sealed environment tag
+        resolves to the base image ref its manifest pinned, since every probe sandbox is created from that. None when
+        neither is known; never raises."""
         try:
-            return self.config.images.get(reference)
+            found = self.config.images.get(reference)
+            if found is None:
+                manifest = self._manifest(reference)
+                found = manifest.get("base_image_ref") if manifest is not None else None
+            return found
         except Exception:
             return None
 
@@ -691,11 +722,24 @@ class OpenShellSandboxes:
         return found if found.get("tag") == tag else None
 
     def find_environment(self, tag: str, key: str) -> str | None:
+        """None also when the sealed tree is gone or no longer hashes to what was sealed: every open would fail,
+        so replay should rebuild instead."""
+        from ..intake import tree_sha256
+
         found = self._manifest(tag)
-        return found.get("log_sha256", "") if found is not None and found.get("key") == key else None
+        if found is None or found.get("key") != key:
+            return None
+        tree = Path(found.get("tree_source", ""))
+        try:
+            if not tree.is_dir() or tree_sha256(tree) != found.get("tree_sha256"):
+                return None
+        except (OSError, ValueError):
+            return None
+        return found.get("log_sha256", "")
 
     def seal_environment(self, name: str, tag: str, key: str, log_sha256: str, *, recipe: Recipe,
-                         tree_source: Path, base_image: str) -> None:
+                         tree_source: Path, base_image: str, setup_timeout: float | None = None,
+                         baseline_timeout: float | None = None) -> None:
         from ..build import BASELINE_TIMEOUT_S, SETUP_TIMEOUT_S
         from ..intake import tree_sha256
 
@@ -706,7 +750,8 @@ class OpenShellSandboxes:
             "recipe_sha256": hashlib.sha256(json.dumps(recipe_json, sort_keys=True).encode()).hexdigest(),
             "tree_source": str(Path(tree_source).resolve()), "tree_sha256": tree_sha256(Path(tree_source)),
             "base_image": base_image, "base_image_ref": base_ref,
-            "setup_timeout": SETUP_TIMEOUT_S, "baseline_timeout": BASELINE_TIMEOUT_S})
+            "setup_timeout": SETUP_TIMEOUT_S if setup_timeout is None else setup_timeout,
+            "baseline_timeout": BASELINE_TIMEOUT_S if baseline_timeout is None else baseline_timeout})
 
     def open_environment(self, environment: Environment, sandbox_labels: Mapping[str, str]) -> str:
         from ..contracts import Recipe
@@ -772,7 +817,8 @@ class OpenShellSandboxes:
         return hashlib.sha256(data).hexdigest()
 
     def agent_workspace(self, image: str, sandbox_labels: Mapping[str, str]) -> OpenShellWorkspace:
-        return OpenShellWorkspace(self, SandboxSpec(image=image, labels=sandbox_labels, network="build"))
+        return OpenShellWorkspace(self, SandboxSpec(image=image, labels=sandbox_labels, network="build",
+                                                    workdir=self.workdir))
 
 
 # --- the native WorkspaceBackend ----------------------------------------------------------------------------------
@@ -821,7 +867,7 @@ class OpenShellWorkspace(WorkspaceBackend, SupportsCommands):
         except SandboxExists:
             name = native_name(self.spec.name)
             native = self.sandboxes._get(name)
-            wanted = native_labels(self.spec.labels)
+            wanted = native_labels(self.spec.labels, self.spec.name)
             record = self.sandboxes._record(name)
             if any(native.labels.get(key) != value for key, value in wanted.items()) or (
                     record is not None and record["id"] != native.id):
@@ -876,13 +922,13 @@ class OpenShellWorkspace(WorkspaceBackend, SupportsCommands):
             return bytes(buffer).decode(errors="replace")
 
         try:
-            with anyio.fail_after(None if timeout is None else timeout + 15):
+            with anyio.fail_after(limit + 15):
                 await anyio.to_thread.run_sync(dispatch, abandon_on_cancel=True)
         except BaseException as error:
             with anyio.CancelScope(shield=True):
                 await self._kill(name, pidfile)
             if isinstance(error, TimeoutError):
-                raise WorkspaceTimeoutError(f"command timed out after {timeout:g}s and was killed",
+                raise WorkspaceTimeoutError(f"command timed out after {limit:g}s and was killed",
                                             stdout=text(ran.stdout), stderr=text(ran.stderr)) from error
             raise
         if ran.overflowed:
@@ -890,12 +936,16 @@ class OpenShellWorkspace(WorkspaceBackend, SupportsCommands):
             raise WorkspaceOutputLimitError("command output exceeded its cap", limit=MAX_OUTPUT_BYTES,
                                             stdout=text(ran.stdout), stderr=text(ran.stderr))
         if ran.error is not None:
+            if _code(ran.error) == grpc.StatusCode.DEADLINE_EXCEEDED:
+                await self._kill(name, pidfile)
+                raise WorkspaceTimeoutError(f"command passed its {limit:g}s deadline and was killed",
+                                            stdout=text(ran.stdout), stderr=text(ran.stderr)) from ran.error
             if await anyio.to_thread.run_sync(self._gone):
                 raise WorkspaceUnavailableError(f"sandbox {name} is gone") from ran.error
-            raise ran.error
-        if timeout is not None and self.sandboxes._gateway_timed_out(ran, timeout):
+            raise WorkspaceError(f"command delivery uncertain: {_detail(ran.error)}") from ran.error
+        if self.sandboxes._gateway_timed_out(ran, limit):
             await self._kill(name, pidfile)
-            raise WorkspaceTimeoutError(f"command timed out after {timeout:g}s", stdout=text(ran.stdout),
+            raise WorkspaceTimeoutError(f"command timed out after {limit:g}s", stdout=text(ran.stdout),
                                         stderr=text(ran.stderr))
         assert ran.exit_code is not None
         if ran.exit_code != 0 and await anyio.to_thread.run_sync(self._gone):

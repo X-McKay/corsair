@@ -28,14 +28,14 @@ The backend is implemented, not qualified: nothing has run against a gateway.
 
 Open facts only the live run settles:
 
-- **Workdir and Landlock:** whether Landlock accepts `read_write: /work` before the directory exists, and whether the exec user can create it.
+- **Workdir:** the OpenShell backend now works in `/sandbox` (post-merge follow-up: the images run as uid 10001 with no `/work`). Still to see live: that `/sandbox` exists and is writable by the exec user under `include_workdir`.
 - **Exec user:** which user commands run as under the gateway's default process policy.
 - **Exec behaviour:** the stdin limit (1 MiB chunks are assumed safe), how `no_login_shell` handles the environment, and when exit 124 arrives.
 - **Policy readback:** the `sandbox get` / `policy get` JSON keys, and whether `sandbox get` shows the image at all.
 - **Build policy:** the binary paths, TLS for each registry client, and that POST and unlisted hosts are denied.
 - **Names and selectors:** whether native names and label selectors are accepted as assumed.
 - **Resource limits:** the shape of the limits field.
-- **Recipes writing outside the policy:** recipes that write to `$HOME` or system site-packages (only `/work`, `/tmp` and `/dev/null` are writable).
+- **Recipes writing outside the policy:** recipes that write to `$HOME` or system site-packages (only `/sandbox`, `/tmp` and `/dev/null` are writable).
 
 ## Decisions and next steps
 

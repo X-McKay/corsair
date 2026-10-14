@@ -5,7 +5,9 @@
 direct mode runs. Three task queues:
 
 - ``corsair-v2-model``: every agent step (one slot on its worker, so one model episode at a time across all runs).
-- ``corsair-v2-workspace``: container work (replay, diagnose, execute); slots sized to the Docker host.
+- ``corsair-v2-workspace``: sandbox work (replay, diagnose, execute); ``workspace_slots`` sized to the host or
+  gateway that serves it. Its timeouts depend on the backend the run uses (``RunRequest.workspace``):
+  ``container_timeout``.
 - ``corsair-v2-control``: the workflow itself, select, decide and the run-record bookends.
 
 Durability granularity: each agent stage is ONE activity, not native ``TemporalDurability`` per model request. The
@@ -32,7 +34,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 from temporalio import activity, workflow
@@ -42,6 +44,7 @@ from temporalio.exceptions import ActivityError
 with workflow.unsafe.imports_passed_through():
     from pydantic_ai.models import Model
 
+    from .build import BASELINE_TIMEOUT_S, SETUP_TIMEOUT_S
     from .chain import Budget, Diagnosis, LocalOps, Progress, Replayed, Stages, StepResult, compose
     from .contracts import (BuildResult, Case, Environment, FrozenPatch, ProbeBrief, ProbeDraft, ProbePlan, ProbeRun,
                             Recipe, Runtime, TerminalReason, Validity, Verdict)
@@ -54,6 +57,8 @@ CONTROL_QUEUE = "corsair-v2-control"
 AGENT_TIMEOUT = timedelta(hours=1)
 BUILD_TIMEOUT = timedelta(hours=2)
 CONTAINER_TIMEOUT = timedelta(hours=1)
+REPLAY_ON_OPEN = timedelta(seconds=SETUP_TIMEOUT_S + BASELINE_TIMEOUT_S)
+"""What an OpenShell probe sandbox adds before the probe: it replays the recipe's setup and baseline on open."""
 CONTROL_TIMEOUT = timedelta(minutes=2)
 
 MODEL_RETRY = RetryPolicy(maximum_attempts=3, initial_interval=timedelta(seconds=5))
@@ -67,6 +72,16 @@ class RunRequest(BaseModel):
     run_dir: str
     budget: Budget = Budget()
     grounding: bool = False
+    workspace: Literal["docker", "openshell"] = "docker"
+    """The sandbox backend the workspace workers use (``CORSAIR_WORKSPACE``); it sizes the sandbox timeouts."""
+
+
+def container_timeout(workspace: str, step: str) -> timedelta:
+    """The start-to-close bound of one sandbox activity. Docker's is unchanged; on OpenShell diagnose and execute
+    open an environment by replaying its setup and baseline first, so they get that bound on top."""
+    if workspace == "openshell" and step in ("diagnose", "execute"):
+        return CONTAINER_TIMEOUT + REPLAY_ON_OPEN
+    return CONTAINER_TIMEOUT
 
 
 # --- Worker configuration -----------------------------------------------------------------------------------------
@@ -189,8 +204,8 @@ CONTROL_ACTIVITIES = (begin_run, finish_run, note_failure, select, decide)
 class ActivityOps:
     """``compose``'s operations as activities. An activity-level failure is uncertain, so it is ``infra_error``."""
 
-    def __init__(self, run_dir: str, grounding: bool):
-        self.run_dir, self.grounding = run_dir, grounding
+    def __init__(self, run_dir: str, grounding: bool, workspace: str = "docker"):
+        self.run_dir, self.grounding, self.workspace = run_dir, grounding, workspace
 
     async def _call(self, fn: Any, step: str, *args: Any, queue: str, timeout: timedelta, retry: RetryPolicy
                     ) -> StepResult:
@@ -208,7 +223,8 @@ class ActivityOps:
         return self._call(fn, step, *args, queue=MODEL_QUEUE, timeout=timeout, retry=retry)
 
     def _container(self, fn: Any, step: str, *args: Any):
-        return self._call(fn, step, *args, queue=WORKSPACE_QUEUE, timeout=CONTAINER_TIMEOUT, retry=ONCE)
+        timeout = container_timeout(self.workspace, fn.__name__)
+        return self._call(fn, step, *args, queue=WORKSPACE_QUEUE, timeout=timeout, retry=ONCE)
 
     def ground(self, step, case):
         return self._agent(ground, step, case)
@@ -252,7 +268,7 @@ class InvestigationWorkflow:
     async def run(self, request: RunRequest) -> Verdict:
         bookend = {"task_queue": CONTROL_QUEUE, "start_to_close_timeout": CONTROL_TIMEOUT, "retry_policy": READ_RETRY}
         await workflow.execute_activity(begin_run, args=[request.run_dir, request.case], **bookend)
-        verdict = await compose(request.case, ActivityOps(request.run_dir, request.grounding), request.budget)
+        verdict = await compose(request.case, ActivityOps(request.run_dir, request.grounding, request.workspace), request.budget)
         await workflow.execute_activity(finish_run, args=[request.run_dir, verdict], **bookend)
         return verdict
 

@@ -93,6 +93,9 @@ class Sandboxes(Protocol):
     """One backend's trusted operations. Every method is synchronous and bounded by the backend's own limits."""
 
     provider: str
+    workdir: str
+    """The directory trusted code works in on this backend: writable by the command user under its own policy
+    (Docker ``/work``; OpenShell its native workdir ``/sandbox``). Replay records it in the Environment."""
 
     def create(self, spec: SandboxSpec) -> str:
         """Create and start the sandbox named ``spec.name`` with ``spec.workdir`` existing and owned by the user
@@ -137,12 +140,15 @@ class Sandboxes(Protocol):
         ...
 
     def find_environment(self, tag: str, key: str) -> str | None:
-        """The build-log digest of a sealed environment with this tag and key; None when none is sealed."""
+        """The build-log digest of a sealed environment with this tag and key; None when none is sealed or what it
+        was sealed from can no longer be opened (so replay rebuilds it)."""
         ...
 
     def seal_environment(self, name: str, tag: str, key: str, log_sha256: str, *, recipe: Recipe,
-                         tree_source: Path, base_image: str) -> None:
-        """Record the replayed sandbox ``name`` as the environment ``tag`` (whose baseline passed)."""
+                         tree_source: Path, base_image: str, setup_timeout: float | None = None,
+                         baseline_timeout: float | None = None) -> None:
+        """Record the replayed sandbox ``name`` as the environment ``tag`` (whose baseline passed). The timeouts are
+        the ones replay used, for a backend that replays the recipe again on open."""
         ...
 
     def open_environment(self, environment: Environment, sandbox_labels: Mapping[str, str]) -> str:
