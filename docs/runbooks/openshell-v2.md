@@ -43,7 +43,19 @@ make qualify-openshell-v2 CORSAIR_QUAL_RUN=$RUN/openshell-v2
 - **Gateway controls.** `make qualify-gateway CORSAIR_QUAL_RUN=$RUN/gateway` is optional. It checks TLS, caller authentication, generated identity and workload access isolation against the installed gateway. It then **uninstalls the gateway and deletes `.state/openshell`**. Run `openshell-install` again with the same admission evidence before `openshell-images-load`.
 - **Image tags.** `toolchain-images` refuses to run when an earlier attempt is still in `.cache/toolchains/<dir>`. Inspect or archive that directory first; never delete it to force a rebuild. A build tags the image `corsair-<dir>:<source hash>`. `openshell-images-load` loads only the `image` tags listed in [deploy/v2/runtime-matrix.yaml](../../deploy/v2/runtime-matrix.yaml), and only those already in local Docker. Docker is shared across worktrees, so images built earlier still count. A tag that is not in local Docker is printed and left out of `images.json`. A rebuild from changed sources produces a new tag, and that tag only counts after the matrix row is updated.
 - **Config refresh.** `openshell-config` can be rerun at any time. It stops the forward it recorded earlier, exports the client identity again, starts a new forward and rewrites the config. Set `OPENSHELL_PORT=<port>` to pin the local port; by default it picks a free one.
-- **Backend tests.** `qualify-openshell-v2` runs `pytest tests/v2 -m openshell` with `CORSAIR_WORKSPACE=openshell`, `CORSAIR_OPENSHELL_CONFIG=<worktree>/.state/openshell/config.json`, `CORSAIR_EVIDENCE_DIR=<absolute $CORSAIR_QUAL_RUN>` and `--evidence-dir`. pytest exits 5 if no test carries the `openshell` marker yet.
+- **Backend tests.** `qualify-openshell-v2` runs `pytest tests/v2 -m openshell` with `CORSAIR_WORKSPACE=openshell`, `CORSAIR_OPENSHELL_CONFIG=<worktree>/.state/openshell/config.json`, `CORSAIR_EVIDENCE_DIR=<absolute $CORSAIR_QUAL_RUN>` and `--evidence-dir`. It runs the live half of `tests/v2/test_sandboxes_port.py` (the port suite Docker also runs) and of `tests/v2/test_workspace_openshell.py` (PydanticAI's `WorkspaceBackendSuite` against `OpenShellWorkspace`). The port suite uses the first tag in `images.json` unless `CORSAIR_OPENSHELL_IMAGE` names another.
+
+## One case on OpenShell and on Docker
+
+After `qualify-openshell-v2` passes, run the same case once per backend, one model user at a time (the live-inference rule), and compare the verdict, terminal reason, per-probe outcomes and cleanup in the two run records:
+
+```shell
+CORSAIR_WORKSPACE=openshell CORSAIR_OPENSHELL_CONFIG=$PWD/.state/openshell/config.json \
+  uv run --locked corsair-v2 run --case <case> --provider-config <provider.json> --run-root $RUN/e2e-openshell
+uv run --locked corsair-v2 run --case <case> --provider-config <provider.json> --run-root $RUN/e2e-docker
+```
+
+On OpenShell an Environment is not an image: replay seals a manifest under `state_dir`, and each probe's fresh sandbox replays that recipe on the runtime image before the probe file is written. Only the runtime-matrix images need loading. A `cmdi` case already decisive on Docker is the natural first choice.
 
 ## Backend config
 
