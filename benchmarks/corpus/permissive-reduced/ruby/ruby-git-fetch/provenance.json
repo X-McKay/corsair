@@ -8,8 +8,8 @@
   "pointer_source": "Ruby Advisory Database / candidate survey (metadata only)",
   "upstream_spdx": "MIT",
   "spdx_verified": "git.gemspec s.license = 'MIT' at commit 291ca0946, 2026-10-14",
-  "parent_ref": "291ca0946bec7164b90ad5c572ac147f512c7159~1",
-  "fix_ref": "291ca0946bec7164b90ad5c572ac147f512c7159",
+  "parent_commit": "291ca0946bec7164b90ad5c572ac147f512c7159~1",
+  "fix_commit": "291ca0946bec7164b90ad5c572ac147f512c7159",
   "verbatim": false,
   "kept_files": [
     {

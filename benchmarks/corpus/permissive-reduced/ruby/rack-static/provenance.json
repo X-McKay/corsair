@@ -7,9 +7,9 @@
   "record": "CVE-2025-27610",
   "pointer_source": "Ruby Advisory Database / eval-thread pick (metadata only)",
   "upstream_spdx": "MIT",
-  "spdx_verified": "MIT-LICENSE at commit 50caab74, 2026-10-14",
-  "parent_ref": "50caab74~1",
-  "fix_ref": "50caab74",
+  "spdx_verified": "MIT-LICENSE at commit 50caab74fa01ee8f5dbdee7bb2782126d20c6583, 2026-10-14",
+  "parent_commit": "50caab74fa01ee8f5dbdee7bb2782126d20c6583~1",
+  "fix_commit": "50caab74fa01ee8f5dbdee7bb2782126d20c6583",
   "verbatim": false,
   "kept_files": [
     {
