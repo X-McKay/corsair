@@ -41,7 +41,7 @@ class Replay(Protocol):
 
 
 class Probe(Protocol):
-    """One Prober. ``diagnostics`` is set only for the single D3 correction after a not_run or errored run;
+    """One Prober. ``diagnostics`` is set only for a D3 correction after a not_run or errored check run;
     ``review_feedback`` only for a review revision, and holds the Reviewer's judgement of this author's own draft
     (failed checks, defects, cited lines), never a run result or the other probe. Either comes with ``previous``."""
 

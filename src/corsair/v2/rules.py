@@ -28,7 +28,7 @@ Choices the design left open, recorded here:
   stop is never misreported as ``test_invalid`` because the review never ran.
 - R1 also fires when a vulnerable-revision run is ``infra``: an uncertain execution is never a decisive one.
 - ``cleanup_unconfirmed`` from the chain is an infrastructure fault (R1).
-- A ``stopped`` reason that none of R0, R1 and R7 owns (for example ``probe_not_run`` after the single D3
+- A ``stopped`` reason that none of R0, R1 and R7 owns (for example ``probe_not_run`` after the last D3
   correction) is not a label by itself: the evidence rules below still read the recorded runs.
 - R3 names ``control_failed`` only when the control's own assertion failed (``assertion_failed``); any other
   non-passing control maps to ``probe_not_run``, ``probe_errored`` or ``probe_anomalous``.
