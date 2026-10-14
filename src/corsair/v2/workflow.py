@@ -1,6 +1,6 @@
 """Durable mode: one Temporal workflow per case, running the same routing and stage functions as direct mode.
 
-``InvestigationWorkflow`` runs ``chain.compose`` unchanged; each step is one activity whose body is
+``InvestigationWorkflow`` runs ``chain.compose`` unchanged (the review loop included); each step is one activity whose body is
 ``chain.LocalOps`` on the worker, so stage calls, wall-time measurement, recording and error mapping are the code
 direct mode runs. Three task queues:
 
@@ -144,8 +144,8 @@ async def replay(run_dir: str, step: str, case: Case, runtime: Runtime, recipe: 
 
 @activity.defn(name="corsair.v2.probe")
 async def probe(run_dir: str, step: str, brief: ProbeBrief, runtime: Runtime, case: Case, diagnostics: str | None,
-                previous: ProbeDraft | None) -> StepResult[ProbeDraft]:
-    return await _ops(run_dir).probe(step, brief, runtime, case, diagnostics, previous)
+                previous: ProbeDraft | None, review_feedback: str | None = None) -> StepResult[ProbeDraft]:
+    return await _ops(run_dir).probe(step, brief, runtime, case, diagnostics, previous, review_feedback)
 
 
 @activity.defn(name="corsair.v2.diagnose")
@@ -221,8 +221,8 @@ class ActivityOps:
     def replay(self, step, case, runtime, recipe, revision):
         return self._container(replay, step, case, runtime, recipe, revision)
 
-    def probe(self, step, brief, runtime, case, diagnostics, previous):
-        return self._agent(probe, step, brief, runtime, case, diagnostics, previous)
+    def probe(self, step, brief, runtime, case, diagnostics, previous, review_feedback=None):
+        return self._agent(probe, step, brief, runtime, case, diagnostics, previous, review_feedback)
 
     def diagnose(self, step, environment, runtime, patch, role):
         return self._container(diagnose, step, environment, runtime, patch, role)

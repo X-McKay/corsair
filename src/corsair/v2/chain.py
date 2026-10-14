@@ -11,7 +11,18 @@ the run keeps one of three results, each with a defined next step:
 - ``ok`` (any outcome other than not_run or errored; the outcome is discarded): the draft goes to review as is.
 - ``not_run`` or ``errored``: that author alone gets the class, a fixed hint and the row's syntax-check output
   (never the run's output) and revises once (A2). The revision is not checked again; a failed revision keeps the original draft. Both drafts are then
-  re-frozen, and only that final patch is reviewed and executed. Execute's own run of it is what Decide reads.
+  re-frozen, and only that final patch is reviewed. Execute's own run of it is what Decide reads.
+
+Review loop (SPEC-0082): the Reviewer judges the whole frozen pair, at most ``MAX_REVIEWS`` times in total on the
+vulnerable revision (the first review plus re-reviews). After a review, each author whose probe was judged invalid
+revises once, fed only ``review_feedback`` of its own ``ProbeValidity`` (failed check names, at most
+``FEEDBACK_DEFECTS`` defects, citations into its own test file or the source); never a run result, the other
+probe, Grounding or an oracle. The unrevised probe keeps its bytes; the pair re-freezes into a new digest, the D3
+check re-runs on each changed draft (with its own one correction), and the whole pair is reviewed again. A review
+revision that fails (no draft, or its own usage limit) keeps the previous draft and ends that author's revisions.
+Total-budget exhaustion inside the loop ends the loop. Nothing executes until both probes are valid on the latest
+review of the current digest; otherwise nothing runs and Decide reads R2 (``test_invalid``). The fixed revision is
+reviewed once, on the final pair only, and only when that pair is valid; it never triggers revisions.
 
 A container failure of the check step itself stops the run as ``infra_error``, like any vulnerable-revision step.
 Failures on the fixed revision (its review, replay or execution) never stop the run: they are passed to Decide as
@@ -51,13 +62,20 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic_ai.models import Model
 
 from .contracts import (AgentUsage, BuildResult, Case, CheckResult, Environment, FrozenPatch, ProbeBrief, ProbeDraft,
-                        ProbePlan, ProbeRun, Recipe, Runtime, TerminalReason, Validity, Verdict)
+                        ProbePlan, ProbeRun, ProbeValidity, Recipe, Runtime, TerminalReason, Validity, Verdict)
 from .record import RunRecorder
 from .stages import BuildAgent, Decide, Diagnose, Execute, Investigate, Probe, Replay, Review, Select
 
 T = TypeVar("T")
 ROLES = ("control", "exploit")
 LOG_TAIL = 4_000
+MAX_REVIEWS = 3
+"""Reviews of the vulnerable revision per run: the first plus up to two re-reviews, so at most two review
+revisions per author. Operator-owned; every review and revision also spends the one total ``Budget``."""
+FEEDBACK_DEFECTS = 4
+FEEDBACK_DEFECT_CHARS = 1_024
+CHECKS = tuple(name for name, field in ProbeValidity.model_fields.items() if field.annotation is bool and name != "valid")
+"""The Reviewer's named checks, read from the contract so the two cannot drift."""
 
 
 class Budget(BaseModel):
@@ -102,6 +120,25 @@ def freeze(control: ProbeDraft, exploit: ProbeDraft) -> FrozenPatch:
     """Both drafts under one digest; review and execution bind to it."""
     body = json.dumps([control.model_dump(mode="json"), exploit.model_dump(mode="json")], sort_keys=True)
     return FrozenPatch(control=control, exploit=exploit, sha256=hashlib.sha256(body.encode()).hexdigest())
+
+
+def review_feedback(judgement: ProbeValidity, other_test_file: str) -> str:
+    """What a rejected author is told: its own probe's failed checks, defects and cited lines, as data.
+
+    Built only from that probe's ``ProbeValidity``. Citations of the other probe's test file are dropped, so the
+    other probe's bytes never reach this author; every other citation was resolved by code against this author's
+    own test file or the source tree it may read.
+    """
+    failed = [name for name in CHECKS if not getattr(judgement, name)]
+    lines = [f"Failed checks: {', '.join(failed) or 'none named'}", "Defects:"]
+    lines += [f"- {defect[:FEEDBACK_DEFECT_CHARS]}" for defect in judgement.defects[:FEEDBACK_DEFECTS]] or ["- none"]
+    cited = [c for c in judgement.citations if c.path != other_test_file]
+    if cited:
+        lines.append("Cited lines:")
+        for c in cited:
+            lines.append(f"- {c.path}:{c.start_line}-{c.end_line}")
+            lines += [f"    {text}" for text in c.quote.splitlines()]
+    return "\n".join(lines)
 
 
 # --- Stage implementations ---------------------------------------------------------------------------------------
@@ -305,13 +342,15 @@ class LocalOps:
                                        "revision": revision}, call)
 
     async def probe(self, step: str, brief: ProbeBrief, runtime: Runtime, case: Case, diagnostics: str | None,
-                    previous: ProbeDraft | None) -> StepResult[ProbeDraft]:
+                    previous: ProbeDraft | None, review_feedback: str | None = None) -> StepResult[ProbeDraft]:
         author = self.stages.control_probe if brief.role == "control" else self.stages.exploit_probe
+        # Only a review revision passes the new keyword, so a Probe written before it still composes.
+        extra = {} if review_feedback is None else {"review_feedback": review_feedback}
         result = await self._agent(
             step, f"{brief.role}_prober",
-            {"brief": brief, "runtime": runtime, "diagnostics": diagnostics, "previous": previous},
+            {"brief": brief, "runtime": runtime, "diagnostics": diagnostics, "previous": previous, **extra},
             lambda model: author(brief, runtime, model, source_root=Path(case.revision.source),
-                                 diagnostics=diagnostics, previous=previous))
+                                 diagnostics=diagnostics, previous=previous, **extra))
         draft = result.output
         if draft is not None and (draft.role, draft.test_file, draft.test_name) != (
                 brief.role, brief.test_file, brief.test_name):
@@ -378,9 +417,12 @@ class _Composition:
         self.runtime: Runtime | None = None
         self.build: BuildResult | None = None
         self.plan: ProbePlan | None = None
-        self.validity: list[Validity] = []
+        self.reviews: dict[str, Validity] = {}  # revision -> the review bound to the current patch
         self.runs: list[ProbeRun] = []
         self.fix_stopped: TerminalReason | None = None
+        self.review_rounds = 0
+        self.revisions: dict[str, int] = {}
+        self.first_review_valid: dict[str, bool] = {}
 
     async def agent(self, start: Callable[[], Awaitable[StepResult]], *, stop_on_failure: bool = True
                     ) -> StepResult:
@@ -410,9 +452,12 @@ class _Composition:
             await self.steps()
         except _Stop as stop:
             stopped = stop.reason
-        return await self.ops.decide("decide", self.case, self.runtime, self.build, self.plan, tuple(self.validity),
-                                     tuple(self.runs), stopped.value if stopped else None,
-                                     self.fix_stopped.value if self.fix_stopped else None)
+        verdict = await self.ops.decide("decide", self.case, self.runtime, self.build, self.plan,
+                                        tuple(self.reviews.values()), tuple(self.runs),
+                                        stopped.value if stopped else None,
+                                        self.fix_stopped.value if self.fix_stopped else None)
+        return verdict.model_copy(update={"review_rounds": self.review_rounds, "revisions": dict(self.revisions),
+                                          "first_review_valid": dict(self.first_review_valid)})
 
     async def steps(self) -> None:
         case, ops = self.case, self.ops
@@ -433,20 +478,20 @@ class _Composition:
             raise _Stop(TerminalReason.PLAN_UNRESOLVED)
 
         environment = await self.prepare(runtime, plan)
-        patch = await self.author(runtime, plan, environment)
+        drafts = await self.author(runtime, plan, environment)
+        patch = await self.check(environment, runtime, plan, drafts, ROLES)
+        patch = await self.review_loop(runtime, plan, environment, drafts, patch)
+        if not _both_valid(self.reviews.get("vulnerable"), patch):
+            return  # nothing executes until both probes are valid on this digest; Decide reads R2
 
-        # Review the final frozen bytes before any execution that counts.
-        reviewed = {"vulnerable": await self.review(plan, patch, "vulnerable")}
         if case.fixed_revision is not None:
             try:
-                reviewed["fixed"] = await self.review(plan, patch, "fixed")
+                await self.review(plan, patch, "fixed", "review-fixed")
             except _Stop as stop:  # a fixed-revision failure only leaves the fix not verified
                 self.fix_stopped = stop.reason
-        if not reviewed["vulnerable"]:
-            return  # nothing reviewed is executed; Decide reads the missing review (R2)
 
         await self.execute(environment, runtime, patch, "vulnerable")
-        if reviewed.get("fixed") and self.build is not None and self.build.recipe is not None:
+        if "fixed" in self.reviews and self.build is not None and self.build.recipe is not None:
             try:
                 fixed = (await self.code(ops.replay("replay-fixed", case, runtime, self.build.recipe, "fixed"))
                          ).output
@@ -456,14 +501,69 @@ class _Composition:
             except _Stop as stop:
                 self.fix_stopped = stop.reason
 
-    async def review(self, plan: ProbePlan, patch: FrozenPatch, revision: str) -> bool:
-        """One outcome-blind review of ``patch`` on ``revision``; True when it bound to that patch and revision."""
-        validity = (await self.agent(lambda: self.ops.review(f"review-{revision}", self.case, plan, patch, revision))
-                    ).output
-        if validity is None:
-            return False
-        self.validity.append(validity)
-        return True
+    async def review(self, plan: ProbePlan, patch: FrozenPatch, revision: str, step: str) -> Validity | None:
+        """One outcome-blind review of the whole ``patch`` on ``revision``.
+
+        Returns the validity when it bound to that patch and revision and the review completed; a review that did
+        not complete (its validity is negative with no judgement) is recorded but gives no feedback.
+        """
+        self.reviews.pop(revision, None)  # an earlier digest's review never counts for this patch
+        result = await self.agent(lambda: self.ops.review(step, self.case, plan, patch, revision))
+        if result.output is None:
+            return None
+        self.reviews[revision] = result.output
+        completed = result.usage is None or result.usage.status == "ok"
+        return result.output if completed else None
+
+    async def review_loop(self, runtime: Runtime, plan: ProbePlan, environment: Environment,
+                          drafts: dict[str, ProbeDraft], patch: FrozenPatch) -> FrozenPatch:
+        """Review, then let each rejected author revise from its own review only, up to ``MAX_REVIEWS`` reviews.
+
+        Returns the final frozen patch; ``self.reviews["vulnerable"]`` holds its review when one bound to it.
+        Total-budget exhaustion after the first review ends the loop instead of the run (Decide then reads R2).
+        """
+        ops, case = self.ops, self.case
+        briefs = {"control": plan.control, "exploit": plan.exploit}
+        judged = await self.review(plan, patch, "vulnerable", "review.1")
+        self.review_rounds = 1
+        if judged is not None:
+            self.first_review_valid = {role: getattr(judged, role).valid for role in ROLES}
+        open_authors = set(ROLES)  # authors still allowed to revise
+        for n in range(1, MAX_REVIEWS):
+            if judged is None or _both_valid(judged, patch):
+                break
+            revised = []
+            try:
+                for role in ROLES:
+                    judgement = getattr(judged, role)
+                    if judgement.valid or role not in open_authors:
+                        continue
+                    other = drafts["exploit" if role == "control" else "control"].test_file
+                    feedback = review_feedback(judgement, other)
+                    result = await self.agent(
+                        lambda: ops.probe(f"probe.{role}.r{n}", briefs[role], runtime, case, None, drafts[role],
+                                          feedback), stop_on_failure=False)
+                    self.revisions[role] = self.revisions.get(role, 0) + 1
+                    if result.failure not in (None, TerminalReason.BUDGET_EXHAUSTED):
+                        raise _Stop(result.failure)
+                    if result.output is None:  # keeps its previous draft; no further revisions for this author
+                        open_authors.discard(role)
+                        continue
+                    drafts[role] = result.output
+                    revised.append(role)
+                if not revised:
+                    break
+                patch = await self.check(environment, runtime, plan, drafts, tuple(revised), n)
+                judged = await self.review(plan, patch, "vulnerable", f"review.{n + 1}")
+                self.review_rounds = n + 1
+            except _Stop as stop:
+                if stop.reason is not TerminalReason.BUDGET_EXHAUSTED:
+                    raise
+                if revised:  # bytes changed after the last review, so no review binds to them
+                    patch = freeze(drafts["control"], drafts["exploit"])
+                    self.reviews.pop("vulnerable", None)
+                break
+        return patch
 
     async def prepare(self, runtime: Runtime, plan: ProbePlan) -> Environment:
         """One Builder episode, trusted replay, and at most one more episode fed the failure's tail (A2)."""
@@ -481,8 +581,8 @@ class _Composition:
             feedback = replayed.failure_tail
         raise _Stop(TerminalReason.BUILD_FAILED)
 
-    async def author(self, runtime: Runtime, plan: ProbePlan, environment: Environment) -> FrozenPatch:
-        """Each Prober sees only its own brief; the D3 check gives a not_run or errored author one revision."""
+    async def author(self, runtime: Runtime, plan: ProbePlan, environment: Environment) -> dict[str, ProbeDraft]:
+        """Each Prober sees only its own brief."""
         ops, case = self.ops, self.case
         briefs = {"control": plan.control, "exploit": plan.exploit}
         drafts: dict[str, ProbeDraft] = {}
@@ -492,17 +592,29 @@ class _Composition:
             if draft is None:
                 raise _Stop(TerminalReason.PROBE_NOT_RUN)
             drafts[role] = draft
-        patch = freeze(drafts["control"], drafts["exploit"])
+        return drafts
 
+    async def check(self, environment: Environment, runtime: Runtime, plan: ProbePlan, drafts: dict[str, ProbeDraft],
+                    roles: tuple[str, ...], round_: int = 0) -> FrozenPatch:
+        """Freeze, then the D3 check of ``roles``' drafts: a not_run or errored author gets one revision.
+
+        Step names: ``diagnose-<role>`` and ``probe-<role>-revision`` for the first drafts, and
+        ``diagnose.<role>.r<n>`` and ``probe.<role>.r<n>.revision`` after review revision n.
+        """
+        ops, case = self.ops, self.case
+        briefs = {"control": plan.control, "exploit": plan.exploit}
+        patch = freeze(drafts["control"], drafts["exploit"])
         corrections: dict[str, str] = {}
-        for role in ROLES:
-            diagnosis = (await self.code(ops.diagnose(f"diagnose-{role}", environment, runtime, patch, role))).output
+        for role in roles:
+            step = f"diagnose.{role}.r{round_}" if round_ else f"diagnose-{role}"
+            diagnosis = (await self.code(ops.diagnose(step, environment, runtime, patch, role))).output
             if diagnosis.check != "ok":
                 corrections[role] = diagnosis.diagnostics or ""
         for role, diagnostics in corrections.items():
-            revised = (await self.agent(lambda: ops.probe(f"probe-{role}-revision", briefs[role], runtime, case,
-                                                          diagnostics, drafts[role]))).output
-            if revised is not None:  # a failed correction leaves the original draft to be reviewed and run
+            step = f"probe.{role}.r{round_}.revision" if round_ else f"probe-{role}-revision"
+            revised = (await self.agent(lambda: ops.probe(step, briefs[role], runtime, case, diagnostics,
+                                                          drafts[role]))).output
+            if revised is not None:  # a failed correction leaves the checked draft to be reviewed and run
                 drafts[role] = revised
         return freeze(drafts["control"], drafts["exploit"]) if corrections else patch
 
@@ -511,6 +623,11 @@ class _Composition:
             run = (await self.code(self.ops.execute(f"execute-{role}-{revision}", environment, runtime, patch, role,
                                                     revision))).output
             self.runs.append(run)
+
+
+def _both_valid(validity: Validity | None, patch: FrozenPatch) -> bool:
+    return (validity is not None and validity.patch_sha256 == patch.sha256 and validity.control.valid
+            and validity.exploit.valid)
 
 
 async def compose(case: Case, ops: Any, budget: Budget = Budget()) -> Verdict:
@@ -532,5 +649,5 @@ async def run_case(case: Case, *, stages: Stages, models: Mapping[str, Model], m
     return verdict
 
 
-__all__ = ["Budget", "Diagnosis", "LocalOps", "Replayed", "Stages", "StepResult", "compose", "default_stages",
-           "draft_digest", "freeze", "run_case"]
+__all__ = ["MAX_REVIEWS", "Budget", "Diagnosis", "LocalOps", "Replayed", "Stages", "StepResult", "compose",
+           "default_stages", "draft_digest", "freeze", "review_feedback", "run_case"]

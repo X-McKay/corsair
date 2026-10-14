@@ -182,7 +182,8 @@ class ProbeDraft(Frozen):
     test_file: SafePath
     test_name: str = Field(pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
     source: str = Field(min_length=1, max_length=64_000)
-    revision_of: str | None = Field(default=None, description="sha256 of the draft this one corrects (D3, one)")
+    revision_of: str | None = Field(default=None, description="sha256 of the draft this one replaces (a D3 or "
+                                                             "a review revision)")
 
     @field_validator("source")
     @classmethod
@@ -316,6 +317,12 @@ class Verdict(Frozen):
     runs: tuple[ProbeRun, ...] = ()
     validity: tuple[Validity, ...] = ()
     facts_origin: dict[str, Origin] = Field(default_factory=dict)
+    review_rounds: int = Field(default=0, ge=0, description="Reviews of the vulnerable revision, first included")
+    revisions: dict[Literal["control", "exploit"], int] = Field(
+        default_factory=dict, description="Review revisions each author was asked for (D3 revisions not counted)")
+    first_review_valid: dict[Literal["control", "exploit"], bool] = Field(
+        default_factory=dict, description="Each probe's validity at the first review; absent when that review did not bind "
+                                  "or complete")
 
 
 # --- Telemetry, recorded per agent call -------------------------------------------------------------------------

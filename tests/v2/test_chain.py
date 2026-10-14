@@ -1,11 +1,12 @@
 """Chain routing with fake stages: order, early stops, A2/D3 correction bounds and review blindness."""
 import asyncio
+import json
 
 import pytest
 from pydantic_ai.exceptions import ModelHTTPError, UsageLimitExceeded
 
 from chain_fakes import PLAN, RECIPE, Fakes, case, draft, models
-from corsair.v2.chain import Budget, draft_digest, freeze, run_case
+from corsair.v2.chain import MAX_REVIEWS, Budget, draft_digest, freeze, review_feedback, run_case
 from corsair.v2.contracts import FrozenPatch, ProbePlan, ProbeRun
 from corsair.v2.record import RunRecorder
 
@@ -230,8 +231,177 @@ def test_unreviewed_bytes_are_never_executed(tmp_path):
     fakes = Fakes(unbound={"vulnerable"})
     _, decided = go(fakes, tmp_path, fixed=True)
     assert fakes.of("execute") == [] and decided["runs"] == ()
-    assert [v.revision for v in decided["validity"]] == ["fixed"]
+    # Nothing on the vulnerable revision bound, so the fixed revision is not reviewed either.
+    assert decided["validity"] == () and [kw["revision"] for _, kw in fakes.of("review")] == ["vulnerable"]
     fakes = Fakes(unbound={"fixed"})
     _, decided = go(fakes, tmp_path / "f", fixed=True)
     assert [kw["revision"] for _, kw in fakes.of("execute")] == ["vulnerable", "vulnerable"]
     assert decided["stopped"] is None and decided["fix_stopped"] is None
+
+
+# --- Review loop (SPEC-0082): feedback from the Reviewer, at most MAX_REVIEWS reviews ----------------------------
+
+def _steps(tmp_path, run="run"):
+    return [t["step"] for t in json.loads((tmp_path / "runs" / run / "timings.json").read_text())]
+
+
+def test_a_rejected_exploit_gets_only_its_own_review_and_the_control_is_untouched(tmp_path):
+    fakes = Fakes(rejections={"exploit": 1})
+    verdict, decided = go(fakes, tmp_path)
+    controls, exploits = fakes.of("probe-control"), fakes.of("probe-exploit")
+    assert len(controls) == 1 and controls[0][1]["review_feedback"] is None
+    assert len(exploits) == 2
+    feedback = exploits[1][1]["review_feedback"]
+    assert exploits[1][1]["previous"] == draft("exploit") and exploits[1][1]["diagnostics"] is None
+    assert feedback.startswith("Failed checks: calls_real_target, assertion_relevant")
+    assert [line for line in feedback.splitlines() if line.startswith("- exploit defect")] == [
+        f"- exploit defect {i}" for i in range(4)]  # at most four defects
+    assert "tests/test_exploit.x:1-1" in feedback and "exploit own line" in feedback
+    assert "src/a.x:1-2" in feedback and "return x" in feedback
+    # Nothing of the other probe, and nothing from any run.
+    assert "control" not in feedback and "secret" not in feedback
+    for word in ("outcome", "passed", "assertion_failed", "exit_code", "marker", "token", "patch_sha256"):
+        assert word not in feedback
+    # The revised exploit replaces the old bytes; the control keeps its own.
+    final = fakes.of("review")[1][0][2]
+    assert final.control == draft("control") and "review-revised" in final.exploit.source
+    assert final.exploit.revision_of == draft_digest(draft("exploit"))
+    assert (verdict.review_rounds, verdict.revisions, verdict.first_review_valid) == (
+        2, {"exploit": 1}, {"control": True, "exploit": False})
+    assert _steps(tmp_path) == ["select", "investigate", "build", "replay-build", "probe-control", "probe-exploit",
+                                "diagnose-control", "diagnose-exploit", "review.1", "probe.exploit.r1",
+                                "diagnose.exploit.r1", "review.2", "execute-control-vulnerable",
+                                "execute-exploit-vulnerable", "decide"]
+
+
+def test_execution_runs_only_the_last_reviewed_digest(tmp_path):
+    fakes = Fakes(rejections={"control": 1, "exploit": 2})
+    _, decided = go(fakes, tmp_path, fixed=True)
+    reviews = [(a[2].sha256, kw["revision"]) for a, kw in fakes.of("review")]
+    assert [r for _, r in reviews] == ["vulnerable", "vulnerable", "vulnerable", "fixed"]
+    final = reviews[2][0]
+    assert len({sha for sha, _ in reviews[:3]}) == 3 and reviews[3][0] == final
+    assert {a[2].sha256 for a, _ in fakes.of("execute")} == {final}
+    assert [v.patch_sha256 for v in decided["validity"]] == [final, final]
+    assert all(v.control.valid and v.exploit.valid for v in decided["validity"])
+    # The control was rejected once only, so it revised once; the exploit twice.
+    assert len(fakes.of("probe-control")) == 2 and len(fakes.of("probe-exploit")) == 3
+    steps = _steps(tmp_path)
+    assert steps.index("review.3") < steps.index("review-fixed") < steps.index("execute-control-vulnerable")
+    assert {"probe.control.r1", "probe.exploit.r1", "probe.exploit.r2", "review.2"} <= set(steps)
+    assert "probe.control.r2" not in steps
+
+
+def test_at_most_three_reviews_and_then_nothing_executes(tmp_path):
+    fakes = Fakes(rejections={"exploit": 99})
+    verdict, decided = go(fakes, tmp_path, fixed=True)
+    assert [kw["revision"] for _, kw in fakes.of("review")] == ["vulnerable"] * MAX_REVIEWS == ["vulnerable"] * 3
+    assert len(fakes.of("probe-exploit")) == 1 + (MAX_REVIEWS - 1)
+    assert fakes.of("execute") == [] and decided["runs"] == () and decided["stopped"] is None
+    # Decide sees only the last review, bound to the last digest, negative for the exploit (R2).
+    (last,) = decided["validity"]
+    assert last.patch_sha256 == fakes.of("review")[-1][0][2].sha256 and not last.exploit.valid
+    assert verdict.review_rounds == 3 and verdict.revisions == {"exploit": 2}
+
+
+def test_real_rules_read_a_still_invalid_pair_as_test_invalid(tmp_path):
+    from corsair.v2.rules import decide
+    fakes = Fakes(rejections={"control": 99})
+    fakes.decide = lambda case, **kw: (fakes._log("decide", case, **kw), decide(case, **kw))[1]
+    verdict, _ = go(fakes, tmp_path)
+    assert (verdict.label.value, verdict.rule_id, verdict.terminal_reason.value) == ("INCONCLUSIVE", "R2",
+                                                                                     "test_invalid")
+    summary = json.loads((tmp_path / "runs" / "run" / "summary.json").read_text())
+    assert summary["review"]["authors"]["control"] == {"first_review_valid": False, "revisions_used": 2,
+                                                       "final_valid": False, "recovered": False}
+    fakes = Fakes(rejections={"control": 1})
+    fakes.decide = lambda case, **kw: (fakes._log("decide", case, **kw), decide(case, **kw))[1]
+    verdict, _ = go(fakes, tmp_path / "b")
+    assert verdict.rule_id == "R5"  # the fake runs pass: executed, so no longer R2
+    summary = json.loads((tmp_path / "b" / "runs" / "run" / "summary.json").read_text())
+    assert summary["review"]["authors"]["control"]["recovered"] is True
+
+
+@pytest.mark.parametrize("calls, reviews, stale", [(5, 1, False), (6, 1, True)])
+def test_budget_exhaustion_ends_the_loop_and_nothing_executes(tmp_path, calls, reviews, stale):
+    # Calls: investigate, build, two probes, review.1 (= 5), then probe.exploit.r1 (= 6), then review.2.
+    fakes = Fakes(rejections={"exploit": 99})
+    _, decided = go(fakes, tmp_path, budget=Budget(max_agent_calls=calls))
+    assert len(fakes.of("review")) == reviews and fakes.of("execute") == []
+    assert decided["stopped"] is None and decided["runs"] == ()
+    # A revision that was never reviewed leaves no validity: the earlier digest's review never counts.
+    assert decided["validity"] == () if stale else not decided["validity"][0].exploit.valid
+
+
+def test_budget_exhausted_at_the_first_review_stays_a_budget_stop(tmp_path):
+    fakes = Fakes(rejections={"exploit": 99})
+    _, decided = go(fakes, tmp_path, budget=Budget(max_agent_calls=4))
+    assert decided["stopped"] == "budget_exhausted" and fakes.of("review") == []
+
+
+def test_a_failed_review_revision_keeps_the_previous_draft_and_ends_that_author(tmp_path):
+    fakes = Fakes(rejections={"control": 99, "exploit": 99}, review_revised={"control": None})
+    verdict, decided = go(fakes, tmp_path)
+    assert len(fakes.of("probe-control")) == 2  # one failed revision, never asked again
+    assert len(fakes.of("probe-exploit")) == 3
+    reviewed = [a[2] for a, _ in fakes.of("review")]
+    assert all(p.control == draft("control") for p in reviewed)
+    assert verdict.revisions == {"control": 1, "exploit": 2} and fakes.of("execute") == []
+    # When no author can revise, no further review is spent.
+    fakes = Fakes(rejections={"exploit": 99}, review_revised={"exploit": None})
+    go(fakes, tmp_path / "b")
+    assert len(fakes.of("review")) == 1
+
+
+def test_a_revision_over_its_own_usage_limit_keeps_the_previous_draft(tmp_path):
+    fakes = Fakes(rejections={"exploit": 99})
+    original = fakes.exploit_probe
+
+    async def limited(*args, **kwargs):
+        if kwargs.get("review_feedback") is not None:
+            fakes._log("probe-exploit", *args, **kwargs)
+            raise UsageLimitExceeded("request_limit")
+        return await original(*args, **kwargs)
+    fakes.exploit_probe = limited
+    _, decided = go(fakes, tmp_path)
+    assert decided["stopped"] is None and len(fakes.of("review")) == 1 and fakes.of("execute") == []
+
+
+def test_a_provider_error_in_a_review_revision_stops_the_run(tmp_path):
+    fakes = Fakes(rejections={"exploit": 99})
+    original = fakes.exploit_probe
+
+    async def failing(*args, **kwargs):
+        if kwargs.get("review_feedback") is not None:
+            raise ModelHTTPError(503, "m")
+        return await original(*args, **kwargs)
+    fakes.exploit_probe = failing
+    _, decided = go(fakes, tmp_path)
+    assert decided["stopped"] == "provider_error"
+
+
+def test_the_mechanical_check_reruns_on_a_review_revision_with_its_own_correction(tmp_path):
+    fakes = Fakes(rejections={"exploit": 1}, diagnose_outcomes={"exploit": "errored"})
+    go(fakes, tmp_path)
+    steps = _steps(tmp_path)
+    assert steps[steps.index("review.1"):steps.index("review.2") + 1] == [
+        "review.1", "probe.exploit.r1", "diagnose.exploit.r1", "probe.exploit.r1.revision", "review.2"]
+    corrected = fakes.of("probe-exploit")[-1][1]
+    assert corrected["review_feedback"] is None and "check: errored" in corrected["diagnostics"]
+    assert "review-revised" in corrected["previous"].source
+    assert len(fakes.of("diagnose")) == 3  # both first drafts, then only the revised exploit
+
+
+def test_an_incomplete_review_gives_no_feedback(tmp_path):
+    from chain_fakes import usage
+    fakes = Fakes(rejections={"exploit": 99}, usages={"reviewer": usage("reviewer", status="output_invalid")})
+    verdict, decided = go(fakes, tmp_path)
+    assert len(fakes.of("probe-exploit")) == 1 and len(fakes.of("review")) == 1 and fakes.of("execute") == []
+    assert verdict.first_review_valid == {} and verdict.review_rounds == 1
+
+
+def test_review_feedback_is_built_from_one_probe_validity_only():
+    from chain_fakes import rejected
+    text = review_feedback(rejected("control"), "tests/test_exploit.x")
+    assert "control own line" in text and "exploit" not in text
+    assert max(len(line) for line in text.splitlines()) <= 1_024 + 2
