@@ -53,3 +53,11 @@ Final PR bases were aligned to `bdbb2a91135f61bb33cd19ec3a4421cf284094f5` after 
 | [176](https://github.com/X-McKay/corsair/pull/176) | Shared developer skills and configuration golden path | 1637 passed, 113 skipped (both) | 107 passed |
 
 All are base-aligned to `bdbb2a91135f61bb33cd19ec3a4421cf284094f5`; none is merged. The separate documentation-only PR contains no code from these three areas. Final combined reviewed source: **1658 passed, 113 skipped**, both serial and four-worker; post-cleanup re-test **128 passed**. Documentation configuration checks: **101 passed**. Skips and fixture passes are not native platform or inference/disposition qualification.
+
+## Final delivery concurrency update
+
+All four PRs are **draft/open**: [#174 — evaluation accounting](https://github.com/X-McKay/corsair/pull/174), [#175 — CLI/lifecycle](https://github.com/X-McKay/corsair/pull/175), [#176 — developer skills](https://github.com/X-McKay/corsair/pull/176), [#178 — audit/roadmap](https://github.com/X-McKay/corsair/pull/178). None was merged by this task.
+
+After initial publication, develop added D18 execution, six imported JavaScript cases, four imported Ruby cases and Investigator repetition/validation changes. These are upstream improvements, not this audit patch. PR #174 alone was refreshed onto `92278eeddcf325104346c5f397f28f37476a2b9e`; its CURRENT.md row was placed below the stable index rather than rewriting changing corpus counts. Its final snapshot checks: **122 focused passed**, **1702 passed/113 skipped** in both full topologies and **14 post-cleanup passed**. The earlier 1688-case and bdb tables are historical. No model prompt or baseline was promoted by this task, and no native/live accuracy is inferred from these tests.
+
+The source ZIP is explicitly the **reviewed bdbb2a91 combined integration snapshot**, with all three originally validated audit code areas and final documentation, not a claim to be the continually advancing develop head or the newly rebased #174 head. It passed **1658 tests/113 skips** in both topologies and **128 post-cleanup tests**. Current individual PRs are the preferred source for independent review; the private bundle preserves all snapshot identities and measured/failed attempts. Native workspace/model benchmark accuracy and complete pipeline token/latency trade-offs remain unqualified here.

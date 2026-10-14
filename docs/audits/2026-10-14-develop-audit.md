@@ -17,7 +17,7 @@ Important updates to the earlier findings:
 The remaining high-leverage priorities are **native Temporal retry/durability boundaries**, effective release/shared artifact provenance, cited and bounded negative review/counterfactual validation, mode-separated paired live evaluations and licensed native benchmark admission, plus evidence-based qualification of the actual OpenShell adapter. The initial audit sections below remain traceable source findings at the starting snapshot; this update prevents resolved gaps from being misreported as current.
 
 
-**Final PR-base alignment:** all four independent PRs are based on `bdbb2a91135f61bb33cd19ec3a4421cf284094f5`, the last inspected develop snapshot. Upstream PR #168 added native serial live-baseline/commit helpers and eligible live-whole-run baseline checks; these are preserved, not reimplemented. PR #170 records D18: the independent second failed exploit attempt, artifact-bound review and LNE sensitivity/separate precision standard. This audit does not implement or claim to qualify that newly recorded verdict change. The earlier `06d4cbe` source findings/validation remain historical; final-base standalone and combined results are recorded in the delivery table. No baseline was promoted and no production prompt/model/gateway was run.
+**Final PR-base alignment:** all four independent PRs were initially based on `bdbb2a91135f61bb33cd19ec3a4421cf284094f5`, the last inspected develop snapshot. Upstream PR #168 added native serial live-baseline/commit helpers and eligible live-whole-run baseline checks; these are preserved, not reimplemented. PR #170 records D18: the independent second failed exploit attempt, artifact-bound review and LNE sensitivity/separate precision standard. This audit does not implement or claim to qualify that newly recorded verdict change. The earlier `06d4cbe` source findings/validation remain historical; final-base standalone and combined results are recorded in the delivery table. No baseline was promoted and no production prompt/model/gateway was run.
 
 ## Most important confirmed findings at the starting snapshot
 
@@ -375,6 +375,14 @@ No native Temporal migration, new OpenShell backend, production prompt, public b
 | [176](https://github.com/X-McKay/corsair/pull/176) | Shared developer skills and configuration golden path | 1637 passed, 113 skipped (both) | 107 passed |
 
 All are base-aligned to `bdbb2a91135f61bb33cd19ec3a4421cf284094f5`; none is merged. The separate documentation-only PR contains no code from these three areas. Final combined reviewed source: **1658 passed, 113 skipped**, both serial and four-worker; post-cleanup re-test **128 passed**. Documentation configuration checks: **101 passed**. Skips and fixture passes are not native platform or inference/disposition qualification.
+
+## Final delivery concurrency update
+
+All four PRs are **draft/open**: [#174 — evaluation accounting](https://github.com/X-McKay/corsair/pull/174), [#175 — CLI/lifecycle](https://github.com/X-McKay/corsair/pull/175), [#176 — developer skills](https://github.com/X-McKay/corsair/pull/176), [#178 — audit/roadmap](https://github.com/X-McKay/corsair/pull/178). None was merged by this task.
+
+After initial publication, develop added D18 execution, six imported JavaScript cases, four imported Ruby cases and Investigator repetition/validation changes. These are upstream improvements, not this audit patch. PR #174 alone was refreshed onto `92278eeddcf325104346c5f397f28f37476a2b9e`; its CURRENT.md row was placed below the stable index rather than rewriting changing corpus counts. Its final snapshot checks: **122 focused passed**, **1702 passed/113 skipped** in both full topologies and **14 post-cleanup passed**. The earlier 1688-case and bdb tables are historical. No model prompt or baseline was promoted by this task, and no native/live accuracy is inferred from these tests.
+
+The source ZIP is explicitly the **reviewed bdbb2a91 combined integration snapshot**, with all three originally validated audit code areas and final documentation, not a claim to be the continually advancing develop head or the newly rebased #174 head. It passed **1658 tests/113 skips** in both topologies and **128 post-cleanup tests**. Current individual PRs are the preferred source for independent review; the private bundle preserves all snapshot identities and measured/failed attempts. Native workspace/model benchmark accuracy and complete pipeline token/latency trade-offs remain unqualified here.
 
 ## Remaining qualification limits
 
