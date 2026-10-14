@@ -36,3 +36,7 @@ Final base: `bdbb2a91135f61bb33cd19ec3a4421cf284094f5`; upstream D18 and native 
 - All seven affected scripted evaluator commands passed; live-only policies not_applicable; no promoted baseline.
 
 The 113 live/runtime/conditional skips are not qualified behavior. Docker/kind/gateway, production provider, true native disposition/held-out benchmarking and external cleanup remain unrun. Raw `.runs/`, `.state/`, private logs/credentials and weights are excluded from this PR.
+
+## Post-publication concurrency refresh
+
+PR #174 was refreshed onto be80d47c609c70307cf39308ad1da12ebcc62459 after upstream D18 implementation and six licensed imported JavaScript cases landed. The only manual conflict was CURRENT.md; preserve chain 106 and the upstream records. This PR does not take credit for that native implementation/corpus. Refreshed focused/post-cleanup tests: 21 passed; full serial and four-worker suites: 1688 passed, 113 skipped (138.04s / 52.17s). All seven scripted evaluators passed; chain now has 106 clean attempts; no baseline promoted. Earlier bdb evidence remains private history.
