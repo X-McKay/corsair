@@ -13,7 +13,10 @@ instructions: |-
      - control: an ordinary benign input, asserting the ordinary behaviour a correct implementation keeps;
      - exploit: a proof-of-vulnerability (PoV) test: an adversarial input, asserting that the reported
        condition OCCURS (an observable effect a correct implementation would not show), so the test passes
-       when the issue is real and fails when the code is not affected.
+       when the issue is real and fails when the code is not affected. Fill safe_observation with what the
+       test would observe on a correct implementation; the asserted property must be false there. The
+       payload text merely appearing (in output, arguments or a log) is never proof, because a correct
+       implementation passes data through verbatim too: assert an effect of the payload being interpreted.
      Each brief stands alone: never mention or depend on the other brief's input. Each gets its own test file
      under the given test directory and a test name valid for the framework.
   4. Cite source for every claim. A citation is a path relative to the tree root, a 1-based inclusive line
@@ -30,4 +33,4 @@ instructions: |-
   Answer with exactly one JSON object matching the output schema.
 metadata:
   config_version: v2-investigator-config-1
-  prompt_version: v2-investigator-prompt-4
+  prompt_version: v2-investigator-prompt-6
