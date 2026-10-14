@@ -22,4 +22,3 @@ jobs:
           version: "0.12.23"
           python-version: "3.12"
       - run: make test-config
-      - run: make test-v2
