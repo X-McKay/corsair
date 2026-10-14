@@ -1,6 +1,6 @@
 # Paired corpus cases
 
-[SPEC-0067](../../docs/development/specs/SPEC-0067-eval-corpus-import.md) turns the infosec-harness corpus copied under [`benchmarks/corpus/infosec-harness/`](../../benchmarks/corpus/infosec-harness/SOURCE.md) into Corsair cases. Offline only: nothing here runs a case or reaches the chain.
+SPEC-0067 (v1 record, removed) turns the infosec-harness corpus copied under [`benchmarks/corpus/infosec-harness/`](../../benchmarks/corpus/infosec-harness/SOURCE.md) into Corsair cases. Offline only: nothing here runs a case or reaches the chain.
 
 `cases.load()` returns one `CorpusCase` per topic directory: 40 pairs and 2 unpaired topics across Python, Java, JavaScript, Perl and C. The variant whose upstream truth is `potentially_exploitable` is the baseline revision and the other variant the candidate, so the hypothesised chain oracle is completed / reproduced / verified; an unpaired topic has only a baseline and is expected at completed / not_reproduced / not_applicable. Variant directories, verdicts, the manifest, the corpus README and the verification tests stay evaluator-only, and the loader refuses verdict words in anything an agent can read (the upstream hygiene rule, ported).
 
