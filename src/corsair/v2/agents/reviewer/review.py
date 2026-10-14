@@ -73,6 +73,7 @@ def render_prompt(case: Case, plan: ProbePlan, patch: FrozenPatch, runtime: Runt
         if brief is not None:
             lines += [f"Planned {brief.role} probe: seam: {brief.seam}", f"  input: {brief.input_description}",
                       f"  property: {brief.property_to_assert}",
+                      *([f"  safe_observation: {brief.safe_observation}"] if brief.safe_observation else []),
                       f"  dependencies that may be doubled: {brief.doubles or 'none named'}"]
     lines += ["", _probe_block(patch.control), "", _probe_block(patch.exploit)]
     return "\n".join(lines)
