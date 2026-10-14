@@ -43,6 +43,23 @@ The composition is split in two so direct and durable mode run the same logic:
 
 A stage that stops the chain passes its terminal reason to Decide as ``stopped``. One ``Budget`` covers the whole
 run, corrections included (A2); it is never reset per stage. The grounding brief is recorded and never passed on.
+
+Second exploit attempt (SPEC-0082 D18). When attempt 1's executed pair would read R5 (control passed, reviewed PoV
+``assertion_failed`` on the vulnerable revision), the chain runs attempt 2 before Decide instead of deciding R5:
+
+- A fresh Exploit Prober call from the same brief, with no previous draft, diagnostics or review feedback, so it
+  never sees attempt 1's draft, review or outcome.
+- Attempt 1's final control, byte for byte, is frozen with the new PoV into a new pair. The D3 check runs on the
+  exploit only (with its ``MAX_MECHANICAL_FIXES`` corrections), then a fresh outcome-blind review loop of
+  ``MAX_REVIEWS`` reviews in which only the Exploit Prober may revise; a rejected control ends the loop at once.
+  No earlier review counts for the new digest (D13).
+- A valid pair gets one vulnerable run of the new PoV (the control is not run again: Decide reads attempt 1's
+  control run), and on a decisive pass also the fixed-revision review, replay and run of the pair.
+
+Attempt 2's steps carry an ``a2`` marker: ``probe-exploit.a2``, ``diagnose-exploit.a2``, ``review.a2.<n>``,
+``probe.exploit.r<n>.a2``, ``execute-exploit-vulnerable.a2``, ``review-fixed.a2`` and so on. Decide receives both
+attempts' digests (``Attempt``) and decides on the last one. No second attempt runs after any other first-attempt
+result. Everything stays inside the one total ``Budget``.
 """
 from __future__ import annotations
 
@@ -65,8 +82,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic_ai.models import Model
 
 from .agents.common.usage import call_parameters, count_retries
-from .contracts import (AgentUsage, BuildResult, Case, CheckResult, Environment, FrozenPatch, ProbeBrief, ProbeDraft,
-                        ProbePlan, ProbeRun, ProbeValidity, Recipe, Runtime, TerminalReason, Validity, Verdict)
+from .contracts import (AgentUsage, Attempt, BuildResult, Case, CheckResult, Environment, FrozenPatch, Outcome,
+                        ProbeBrief, ProbeDraft, ProbePlan, ProbeRun, ProbeValidity, Recipe, Runtime, TerminalReason,
+                        Validity, Verdict)
 from .record import RunRecorder
 from .stages import BuildAgent, Decide, Diagnose, Execute, Investigate, Probe, Replay, Review, Select
 
@@ -124,9 +142,13 @@ def draft_digest(draft: ProbeDraft) -> str:
     return hashlib.sha256(json.dumps(draft.model_dump(mode="json"), sort_keys=True).encode()).hexdigest()
 
 
-def freeze(control: ProbeDraft, exploit: ProbeDraft) -> FrozenPatch:
-    """Both drafts under one digest; review and execution bind to it."""
-    body = json.dumps([control.model_dump(mode="json"), exploit.model_dump(mode="json")], sort_keys=True)
+def freeze(control: ProbeDraft, exploit: ProbeDraft, attempt: int = 1) -> FrozenPatch:
+    """Both drafts under one digest; review and execution bind to it.
+
+    A second attempt's pair (D18) folds its attempt number into the digest, so it has its own digest even when the
+    new PoV happens to repeat attempt 1's bytes; attempt 1's digest is the plain pair's."""
+    pair: list[Any] = [control.model_dump(mode="json"), exploit.model_dump(mode="json")]
+    body = json.dumps(pair if attempt == 1 else [*pair, {"attempt": attempt}], sort_keys=True)
     return FrozenPatch(control=control, exploit=exploit, sha256=hashlib.sha256(body.encode()).hexdigest())
 
 
@@ -425,13 +447,14 @@ class LocalOps:
 
     async def decide(self, step: str, case: Case, runtime: Runtime | None, build: BuildResult | None,
                      plan: ProbePlan | None, validity: tuple[Validity, ...], runs: tuple[ProbeRun, ...],
-                     stopped: str | None, fix_stopped: str | None = None) -> Verdict:
+                     stopped: str | None, fix_stopped: str | None = None,
+                     attempts: tuple[Attempt, ...] = ()) -> Verdict:
         started = perf_counter()
         verdict = self.stages.decide(case, runtime=runtime, build=build, plan=plan, validity=validity, runs=runs,
-                                     stopped=stopped, fix_stopped=fix_stopped)
+                                     stopped=stopped, fix_stopped=fix_stopped, attempts=attempts)
         self.record.stage(step, inputs={"case_id": case.case_id, "runtime": runtime, "build": build, "plan": plan,
                                         "validity": validity, "runs": runs, "stopped": stopped,
-                                        "fix_stopped": fix_stopped},
+                                        "fix_stopped": fix_stopped, "attempts": attempts},
                           output=verdict, wall_s=round(perf_counter() - started, 3))
         self._report(step, f"{verdict.label.value} {verdict.rule_id} {verdict.terminal_reason.value}")
         return verdict
@@ -453,9 +476,14 @@ class _Composition:
         self.runtime: Runtime | None = None
         self.build: BuildResult | None = None
         self.plan: ProbePlan | None = None
-        self.reviews: dict[str, Validity] = {}  # revision -> the review bound to the current patch
+        self.reviews: dict[str, Validity] = {}  # revision -> the review bound to the current attempt's patch
         self.runs: list[ProbeRun] = []
         self.fix_stopped: TerminalReason | None = None
+        # The current attempt (D18): its number, step-name marker, latest frozen pair and counters.
+        self.attempt, self.tag = 1, ""
+        self.patch: FrozenPatch | None = None
+        self.done: list[Attempt] = []  # finished attempts
+        self.done_reviews: list[Validity] = []  # their final reviews
         self.review_rounds = 0
         self.revisions: dict[str, int] = {}
         self.mechanical_fixes: dict[str, int] = {}
@@ -483,19 +511,35 @@ class _Composition:
             raise _Stop(result.failure)
         return result
 
+    def snapshot(self) -> Attempt:
+        """The current attempt as Decide reads it: its final pair's digests and its review and correction counts."""
+        patch = self.patch
+        return Attempt(number=self.attempt, patch_sha256=patch.sha256 if patch else None,
+                       control_sha256=draft_digest(patch.control) if patch else None,
+                       review_rounds=self.review_rounds, revisions=dict(self.revisions),
+                       mechanical_fixes=dict(self.mechanical_fixes), first_review_valid=dict(self.first_review_valid))
+
+    def freeze(self, drafts: dict[str, ProbeDraft]) -> FrozenPatch:
+        self.patch = freeze(drafts["control"], drafts["exploit"], self.attempt)
+        return self.patch
+
     async def run(self) -> Verdict:
         stopped: TerminalReason | None = None
         try:
             await self.steps()
         except _Stop as stop:
             stopped = stop.reason
+        current = self.snapshot() if self.patch is not None or self.attempt > 1 else None
+        attempts = tuple(self.done) + ((current,) if current is not None else ())
         verdict = await self.ops.decide("decide", self.case, self.runtime, self.build, self.plan,
-                                        tuple(self.reviews.values()), tuple(self.runs),
+                                        tuple(self.done_reviews) + tuple(self.reviews.values()), tuple(self.runs),
                                         stopped.value if stopped else None,
-                                        self.fix_stopped.value if self.fix_stopped else None)
-        return verdict.model_copy(update={"review_rounds": self.review_rounds, "revisions": dict(self.revisions),
-                                          "mechanical_fixes": dict(self.mechanical_fixes),
-                                          "first_review_valid": dict(self.first_review_valid)})
+                                        self.fix_stopped.value if self.fix_stopped else None, attempts)
+        first = attempts[0] if attempts else self.snapshot()  # the top-level counters describe attempt 1
+        return verdict.model_copy(update={"review_rounds": first.review_rounds, "revisions": dict(first.revisions),
+                                          "mechanical_fixes": dict(first.mechanical_fixes),
+                                          "first_review_valid": dict(first.first_review_valid),
+                                          "attempts": attempts})
 
     async def steps(self) -> None:
         case, ops = self.case, self.ops
@@ -531,15 +575,60 @@ class _Composition:
                 self.fix_stopped = stop.reason
 
         await self.execute(environment, runtime, patch, "vulnerable")
+        await self.run_fixed(runtime, patch)
+        if self.not_demonstrated(patch):
+            await self.second_attempt(runtime, plan, environment, patch)
+
+    async def run_fixed(self, runtime: Runtime, patch: FrozenPatch) -> None:
+        """Replay and run the reviewed pair on the fixed revision; a failure only leaves the fix not verified."""
         if "fixed" in self.reviews and self.build is not None and self.build.recipe is not None:
             try:
-                fixed = (await self.code(ops.replay("replay-fixed", case, runtime, self.build.recipe, "fixed"))
-                         ).output
+                fixed = (await self.code(self.ops.replay(f"replay-fixed{self.tag}", self.case, runtime,
+                                                         self.build.recipe, "fixed"))).output
                 if not fixed.build.replayed or fixed.environment is None:
                     raise _Stop(TerminalReason.BUILD_FAILED)
                 await self.execute(fixed.environment, runtime, patch, "fixed")
             except _Stop as stop:
                 self.fix_stopped = stop.reason
+
+    def not_demonstrated(self, patch: FrozenPatch) -> bool:
+        """Attempt 1's executed pair would read R5: its control passed and its PoV assertion_failed (D18)."""
+        outcome = {run.role: run.outcome for run in self.runs
+                   if run.revision == "vulnerable" and run.patch_sha256 == patch.sha256}
+        return outcome.get("control") is Outcome.PASSED and outcome.get("exploit") is Outcome.ASSERTION_FAILED
+
+    async def second_attempt(self, runtime: Runtime, plan: ProbePlan, environment: Environment,
+                             first: FrozenPatch) -> None:
+        """Attempt 2 (D18): a new PoV, blind to attempt 1, paired with attempt 1's control byte for byte.
+
+        Nothing of attempt 1 but its control's bytes reaches this attempt; its reviews, counters and fix-revision
+        stop are set aside so none of them counts for the new pair.
+        """
+        self.done.append(self.snapshot())
+        self.done_reviews.extend(self.reviews.values())
+        self.reviews, self.fix_stopped, self.patch = {}, None, None
+        self.attempt, self.tag = 2, ".a2"
+        self.review_rounds, self.revisions, self.mechanical_fixes, self.first_review_valid = 0, {}, {}, {}
+        ops, case = self.ops, self.case
+        draft = (await self.agent(lambda: ops.probe(f"probe-exploit{self.tag}", plan.exploit, runtime, case, None,
+                                                    None))).output
+        if draft is None:
+            return  # no pair to review: Decide reads R2 for attempt 2
+        drafts = {"control": first.control, "exploit": draft}
+        patch = await self.check(environment, runtime, plan, drafts, ("exploit",))
+        patch = await self.review_loop(runtime, plan, environment, drafts, patch, revisable=("exploit",))
+        if not _both_valid(self.reviews.get("vulnerable"), patch):
+            return
+        await self.execute(environment, runtime, patch, "vulnerable", roles=("exploit",))
+        demonstrated = any(run.outcome is Outcome.PASSED for run in self.runs
+                           if (run.revision, run.role, run.patch_sha256) == ("vulnerable", "exploit", patch.sha256))
+        if demonstrated and case.fixed_revision is not None:
+            try:
+                await self.review(plan, patch, "fixed", f"review-fixed{self.tag}")
+            except _Stop as stop:
+                self.fix_stopped = stop.reason
+                return
+            await self.run_fixed(runtime, patch)
 
     async def review(self, plan: ProbePlan, patch: FrozenPatch, revision: str, step: str) -> Validity | None:
         """One outcome-blind review of the whole ``patch`` on ``revision``.
@@ -556,21 +645,26 @@ class _Composition:
         return result.output if completed else None
 
     async def review_loop(self, runtime: Runtime, plan: ProbePlan, environment: Environment,
-                          drafts: dict[str, ProbeDraft], patch: FrozenPatch) -> FrozenPatch:
+                          drafts: dict[str, ProbeDraft], patch: FrozenPatch,
+                          revisable: tuple[str, ...] = ROLES) -> FrozenPatch:
         """Review, then let each rejected author revise from its own review only, up to ``MAX_REVIEWS`` reviews.
 
         Returns the final frozen patch; ``self.reviews["vulnerable"]`` holds its review when one bound to it.
         Total-budget exhaustion after the first review ends the loop instead of the run (Decide then reads R2).
+        Only ``revisable`` authors may revise; a rejected probe whose author may not (attempt 2's control) ends the
+        loop at once, since no revision can make that pair valid.
         """
         ops, case = self.ops, self.case
         briefs = {"control": plan.control, "exploit": plan.exploit}
-        judged = await self.review(plan, patch, "vulnerable", "review.1")
+        judged = await self.review(plan, patch, "vulnerable", self.review_step(1))
         self.review_rounds = 1
         if judged is not None:
             self.first_review_valid = {role: getattr(judged, role).valid for role in ROLES}
-        open_authors = set(ROLES)  # authors still allowed to revise
+        open_authors = set(revisable)  # authors still allowed to revise
         for n in range(1, MAX_REVIEWS):
             if judged is None or _both_valid(judged, patch):
+                break
+            if any(not getattr(judged, role).valid for role in ROLES if role not in revisable):
                 break
             revised = []
             try:
@@ -581,8 +675,8 @@ class _Composition:
                     other = drafts["exploit" if role == "control" else "control"].test_file
                     feedback = review_feedback(judgement, other)
                     result = await self.agent(
-                        lambda: ops.probe(f"probe.{role}.r{n}", briefs[role], runtime, case, None, drafts[role],
-                                          feedback), stop_on_failure=False)
+                        lambda: ops.probe(f"probe.{role}.r{n}{self.tag}", briefs[role], runtime, case, None,
+                                          drafts[role], feedback), stop_on_failure=False)
                     self.revisions[role] = self.revisions.get(role, 0) + 1
                     if result.failure not in (None, TerminalReason.BUDGET_EXHAUSTED):
                         raise _Stop(result.failure)
@@ -594,16 +688,19 @@ class _Composition:
                 if not revised:
                     break
                 patch = await self.check(environment, runtime, plan, drafts, tuple(revised), n)
-                judged = await self.review(plan, patch, "vulnerable", f"review.{n + 1}")
+                judged = await self.review(plan, patch, "vulnerable", self.review_step(n + 1))
                 self.review_rounds = n + 1
             except _Stop as stop:
                 if stop.reason is not TerminalReason.BUDGET_EXHAUSTED:
                     raise
                 if revised:  # bytes changed after the last review, so no review binds to them
-                    patch = freeze(drafts["control"], drafts["exploit"])
+                    patch = self.freeze(drafts)
                     self.reviews.pop("vulnerable", None)
                 break
         return patch
+
+    def review_step(self, n: int) -> str:
+        return f"review.a{self.attempt}.{n}" if self.attempt > 1 else f"review.{n}"
 
     async def prepare(self, runtime: Runtime, plan: ProbePlan) -> Environment:
         """One Builder episode, trusted replay, and at most one more episode fed the failure's tail (A2)."""
@@ -647,16 +744,16 @@ class _Composition:
         names are ``diagnose.<role>.r<n>``, ``probe.<role>.r<n>.revision[.<k>]`` and ``diagnose.<role>.r<n>.<k>``.
         """
         ops = self.ops
-        patch = freeze(drafts["control"], drafts["exploit"])
+        patch = self.freeze(drafts)
         failing: dict[str, str] = {}
         for role in roles:
-            diagnosis = (await self.code(ops.diagnose(_diagnose_step(role, round_, 0), environment, runtime, patch,
-                                                      role))).output
+            diagnosis = (await self.code(ops.diagnose(_diagnose_step(role, round_, 0) + self.tag, environment, runtime,
+                                                      patch, role))).output
             if diagnosis.check != "ok":
                 failing[role] = diagnosis.diagnostics or ""
         for role, diagnostics in failing.items():
             await self.correct(environment, runtime, plan, drafts, role, diagnostics, round_)
-        return freeze(drafts["control"], drafts["exploit"]) if failing else patch
+        return self.freeze(drafts) if failing else patch
 
     async def correct(self, environment: Environment, runtime: Runtime, plan: ProbePlan,
                       drafts: dict[str, ProbeDraft], role: str, diagnostics: str, round_: int) -> None:
@@ -664,24 +761,25 @@ class _Composition:
         ops, case = self.ops, self.case
         brief = plan.control if role == "control" else plan.exploit
         for k in range(1, MAX_MECHANICAL_FIXES + 1):
-            step = _correction_step(role, round_, k)
+            step = _correction_step(role, round_, k) + self.tag
             revised = (await self.agent(lambda: ops.probe(step, brief, runtime, case, diagnostics, drafts[role]))
                        ).output
             self.mechanical_fixes[role] = self.mechanical_fixes.get(role, 0) + 1
             if revised is None:  # a failed correction leaves the last draft to be reviewed and run
                 return
             drafts[role] = revised
-            patch = freeze(drafts["control"], drafts["exploit"])
-            diagnosis = (await self.code(ops.diagnose(_diagnose_step(role, round_, k), environment, runtime, patch,
-                                                      role))).output
+            patch = self.freeze(drafts)
+            diagnosis = (await self.code(ops.diagnose(_diagnose_step(role, round_, k) + self.tag, environment,
+                                                      runtime, patch, role))).output
             if diagnosis.check == "ok":
                 return
             diagnostics = diagnosis.diagnostics or ""
 
-    async def execute(self, environment: Environment, runtime: Runtime, patch: FrozenPatch, revision: str) -> None:
-        for role in ROLES:
-            run = (await self.code(self.ops.execute(f"execute-{role}-{revision}", environment, runtime, patch, role,
-                                                    revision))).output
+    async def execute(self, environment: Environment, runtime: Runtime, patch: FrozenPatch, revision: str,
+                      roles: tuple[str, ...] = ROLES) -> None:
+        for role in roles:
+            run = (await self.code(self.ops.execute(f"execute-{role}-{revision}{self.tag}", environment, runtime,
+                                                    patch, role, revision))).output
             self.runs.append(run)
 
 

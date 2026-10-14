@@ -84,3 +84,15 @@ def test_a_wrong_fix_result_fails_outcome_fields(tmp_path):
     assert results["outcome_fields"]
     attempt = dataclasses.replace(attempt, output=attempt.output.model_copy(update={"fix": "not_verified"}))
     assert chain.check(case, attempt)["outcome_fields"] is False
+
+
+def test_an_r5_case_runs_a_second_attempt_and_its_trajectory_is_checked(tmp_path):
+    case = next(case for case in CASES.values() if case.oracle["expected_rule"] == "R5")
+    attempt, results = _attempt(case, tmp_path)
+    verdict = attempt.output
+    assert (verdict.rule_id, verdict.sensitivity, len(verdict.attempts)) == ("R5", "unverified", 2)
+    assert results["trajectory"] is True and "probe-exploit.a2" in attempt.facts["steps"]
+    # A second attempt that ran its own control would break the trajectory.
+    steps = list(attempt.facts["steps"])
+    steps.insert(steps.index("decide"), "execute-control-vulnerable.a2")
+    assert chain.trajectory(steps, verdict) is False

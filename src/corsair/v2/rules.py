@@ -35,15 +35,28 @@ Choices the design left open, recorded here:
 - A review or run bound to a different frozen patch than the vulnerable runs counts as missing.
 - A run whose environment tree (``ProbeRun.tree_sha256``) is not the tree of the case revision it claims counts
   as missing, like a patch mismatch: it ran on other code. An unrecorded tree (None) is not a mismatch.
+
+Two exploit attempts (SPEC-0082 D18). LIKELY_NOT_EXPLOITABLE needs two independent PoVs that both read
+``assertion_failed`` after positive reviews. The chain runs attempt 2 only when attempt 1's pair would otherwise be
+R5; attempt 2 keeps attempt 1's control byte for byte with a new PoV, frozen into its own pair. ``attempts`` names
+each attempt's final pair digest, and the table is evaluated on one attempt's facts: the last attempt's. Each
+attempt's reviews and runs bind to its own digest (a review or run of another digest counts as missing for it), and
+attempt 2's vulnerable control result is attempt 1's run, counted only when both attempts name the same control
+digest. R5 matches only when the deciding attempt is attempt 2 and both attempts show a valid pair, a passing
+control and an ``assertion_failed`` PoV; a single failed PoV is R6 ``no_valid_observation``. Every other attempt-2
+result gives the rule it would give on its own (R2 for a still-invalid or rejected pair, R4 for a differential pass,
+R1, R3 or R6 otherwise). Every R5 carries ``sensitivity: unverified``. Without ``attempts`` (older records), the
+pair is the one the vulnerable runs, or else the vulnerable review, bound to.
 """
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal
 
-from .contracts import (BuildResult, Case, Label, Origin, Outcome, ProbePlan, ProbeRun, Runtime, TerminalReason,
-                        Validity, Verdict)
+from .contracts import (Attempt, BuildResult, Case, Label, Origin, Outcome, ProbePlan, ProbeRun, Runtime,
+                        TerminalReason, Validity, Verdict)
 
 R = TerminalReason
 
@@ -61,6 +74,9 @@ class Facts:
     runs: dict[tuple[str, str], ProbeRun]
     validity: dict[str, Validity]
     patch_sha256: str | None
+    attempt: int | None = None
+    previous: Facts | None = None
+    """Attempt 1's facts when deciding on attempt 2 (D18); None otherwise."""
 
     def outcome(self, revision: str, role: str) -> Outcome | None:
         run = self.runs.get((revision, role))
@@ -151,8 +167,18 @@ def _r4(f: Facts) -> TerminalReason | None:
     return R.OK if f.outcome("vulnerable", "exploit") is Outcome.PASSED and _differential(f) else None
 
 
+def _not_demonstrated(f: Facts) -> bool:
+    """One attempt's pair is valid, its control passed and its PoV did not demonstrate the condition."""
+    validity = f.bound_validity("vulnerable")
+    return (validity is not None and validity.control.valid and validity.exploit.valid and _r1(f) is None
+            and f.outcome("vulnerable", "control") is Outcome.PASSED
+            and f.outcome("vulnerable", "exploit") is Outcome.ASSERTION_FAILED)
+
+
 def _r5(f: Facts) -> TerminalReason | None:
-    return R.OK if f.outcome("vulnerable", "exploit") is Outcome.ASSERTION_FAILED else None
+    """Both independent attempts failed to demonstrate the condition (D18); one failed PoV is never enough."""
+    both = f.attempt == 2 and f.previous is not None and _not_demonstrated(f.previous) and _not_demonstrated(f)
+    return R.OK if both else None
 
 
 def _r6(f: Facts) -> TerminalReason | None:
@@ -173,11 +199,13 @@ RULES: tuple[Rule, ...] = (
          "probe_errored or probe_anomalous", Label.INCONCLUSIVE, "inconclusive", _r3),
     Rule("R4", "Vulnerable PoV (exploit) passed: the reported condition was demonstrated, and the PoV did not also "
          "pass on the fixed revision", Label.LIKELY_EXPLOITABLE, "reproduced", _r4),
-    Rule("R5", "Vulnerable PoV (exploit) assertion_failed: the condition was not demonstrated; calibration, when "
-         "recorded, is listed and never counts as proof of absence", Label.LIKELY_NOT_EXPLOITABLE, "not_reproduced",
-         _r5),
+    Rule("R5", "Vulnerable PoV (exploit) assertion_failed on both independent exploit attempts (D18), each pair "
+         "positively reviewed with a passing control: the condition was not demonstrated; carries sensitivity "
+         "unverified; calibration, when recorded, is listed and never counts as proof of absence",
+         Label.LIKELY_NOT_EXPLOITABLE, "not_reproduced", _r5),
     Rule("R6", "Anything else: not_differential when the PoV passed on both revisions, else probe_not_run, "
-         "probe_errored or probe_anomalous from the vulnerable exploit, else no_valid_observation",
+         "probe_errored or probe_anomalous from the vulnerable exploit, else no_valid_observation (including a "
+         "single failed PoV without a second attempt)",
          Label.INCONCLUSIVE, "inconclusive", _r6),
 )
 """Evaluation order is the tuple order; ids name rules, not ranks (R7 is checked after R1)."""
@@ -215,7 +243,12 @@ def _fix(f: Facts, rule: Rule, reason: TerminalReason
 
 
 def _origins(f: Facts) -> dict[str, Origin]:
-    """Where each fact the verdict rests on came from (A5)."""
+    """Where each fact the verdict rests on came from (A5); attempt 2's evidence is keyed under ``a2.``."""
+    if f.previous is not None:
+        first = _origins(f.previous)
+        second = _origins(dataclasses.replace(f, previous=None))
+        return {**first, **{key if key in ("stopped", "fix_stopped", "runtime", "build", "plan") else f"a2.{key}": value
+                            for key, value in second.items()}}
     origins: dict[str, Origin] = {}
     if f.stopped is not None:
         origins["stopped"] = Origin.PLATFORM_OBSERVED
@@ -239,41 +272,64 @@ def _origins(f: Facts) -> dict[str, Origin]:
 
 def _gather(case: Case, runtime: Runtime | None, build: BuildResult | None, plan: ProbePlan | None,
             validity: tuple[Validity, ...], runs: tuple[ProbeRun, ...], stopped: str | None,
-            fix_stopped: str | None) -> Facts:
-    by_key: dict[tuple[str, str], ProbeRun] = {}
+            fix_stopped: str | None, attempts: tuple[Attempt, ...] = ()) -> Facts:
+    seen_runs: set[tuple[str, str, str]] = set()
     for run in runs:
-        key = (run.revision, run.role)
-        if key in by_key:
-            raise ValueError(f"more than one {run.role} run on the {run.revision} revision; a probe runs exactly once")
-        by_key[key] = run
-    reviews: dict[str, Validity] = {}
+        key = (run.patch_sha256, run.revision, run.role)
+        if key in seen_runs:
+            raise ValueError(f"more than one {run.role} run of one pair on the {run.revision} revision; a probe "
+                             "runs exactly once")
+        seen_runs.add(key)
+    seen_reviews: set[tuple[str, str]] = set()
     for item in validity:
-        if item.revision in reviews:
-            raise ValueError(f"more than one review of the {item.revision} revision")
-        reviews[item.revision] = item
-    vulnerable = [run.patch_sha256 for run in runs if run.revision == "vulnerable"]
-    patch = vulnerable[0] if vulnerable else (reviews["vulnerable"].patch_sha256 if "vulnerable" in reviews else None)
-    # A run bound to another patch than the vulnerable one, or run on another tree than the revision it claims, is
-    # not this experiment's evidence.
+        if (item.patch_sha256, item.revision) in seen_reviews:
+            raise ValueError(f"more than one review of one pair on the {item.revision} revision")
+        seen_reviews.add((item.patch_sha256, item.revision))
+    if [a.number for a in attempts] not in ([], [1], [1, 2]):
+        raise ValueError("attempts must be attempt 1, optionally followed by attempt 2")
+    # A run on another tree than the revision it claims is not this experiment's evidence.
     trees = {"vulnerable": case.revision.tree_sha256,
              "fixed": case.fixed_revision.tree_sha256 if case.fixed_revision is not None else None}
-    by_key = {key: run for key, run in by_key.items() if run.patch_sha256 == patch
-              and (run.tree_sha256 is None or run.tree_sha256 == trees[run.revision])}
-    return Facts(case, runtime, build, plan, TerminalReason(stopped) if stopped is not None else None,
-                 TerminalReason(fix_stopped) if fix_stopped is not None else None, by_key, reviews, patch)
+    runs = tuple(run for run in runs if run.tree_sha256 is None or run.tree_sha256 == trees[run.revision])
+    common = dict(case=case, runtime=runtime, build=build, plan=plan,
+                  stopped=TerminalReason(stopped) if stopped is not None else None,
+                  fix_stopped=TerminalReason(fix_stopped) if fix_stopped is not None else None)
+
+    def bound(patch: str | None, attempt: int | None, reused: ProbeRun | None = None,
+              previous: Facts | None = None) -> Facts:
+        """One pair's facts: only the runs and reviews bound to ``patch`` (and attempt 1's reused control)."""
+        by_key = {(run.revision, run.role): run for run in runs if patch is not None and run.patch_sha256 == patch}
+        if reused is not None:
+            by_key.setdefault(("vulnerable", "control"), reused)
+        reviews = {item.revision: item for item in validity if patch is not None and item.patch_sha256 == patch}
+        return Facts(**common, runs=by_key, validity=reviews, patch_sha256=patch, attempt=attempt,
+                     previous=previous)
+
+    if not attempts:  # an older record: the pair the vulnerable runs, or else the vulnerable review, bound to
+        vulnerable = [run.patch_sha256 for run in runs if run.revision == "vulnerable"]
+        reviewed = [item.patch_sha256 for item in validity if item.revision == "vulnerable"]
+        return bound(vulnerable[0] if vulnerable else (reviewed[0] if reviewed else None), None)
+    first = bound(attempts[0].patch_sha256, 1)
+    if len(attempts) == 1:
+        return first
+    second = attempts[1]
+    same_control = second.control_sha256 is not None and second.control_sha256 == attempts[0].control_sha256
+    reused = first.runs.get(("vulnerable", "control")) if same_control else None
+    return bound(second.patch_sha256, 2, reused, first)
 
 
 def decide(case: Case, *, runtime: Runtime | None, build: BuildResult | None, plan: ProbePlan | None,
            validity: tuple[Validity, ...], runs: tuple[ProbeRun, ...], stopped: str | None = None,
-           fix_stopped: str | None = None) -> Verdict:
+           fix_stopped: str | None = None, attempts: tuple[Attempt, ...] = ()) -> Verdict:
     """The label, rule id, terminal reason, finding and fix verification for one case, from recorded facts only.
 
     ``stopped`` is the terminal reason a stage reported when the chain stopped early (a ``TerminalReason`` value);
-    ``fix_stopped`` is the reason the fixed-revision steps stopped, which only affects the fix result. An unknown
-    string raises ValueError. Duplicate runs for one (revision, role), or two reviews of one revision,
-    raise ValueError: the chain runs each probe exactly once.
+    ``fix_stopped`` is the reason the fixed-revision steps stopped, which only affects the fix result. ``attempts``
+    names each exploit attempt's pair (D18); the table reads the last one. An unknown string raises ValueError.
+    Duplicate runs for one (pair, revision, role), two reviews of one pair on one revision, or attempts out of order
+    raise ValueError: the chain runs each probe of a pair exactly once.
     """
-    facts = _gather(case, runtime, build, plan, validity, runs, stopped, fix_stopped)
+    facts = _gather(case, runtime, build, plan, validity, runs, stopped, fix_stopped, attempts)
     for rule in RULES:
         reason = rule.match(facts)
         if reason is not None:
@@ -283,4 +339,5 @@ def decide(case: Case, *, runtime: Runtime | None, build: BuildResult | None, pl
     fix, fix_reason = _fix(facts, rule, reason)
     return Verdict(case_id=case.case_id, label=rule.label, rule_id=rule.id, terminal_reason=reason,
                    finding=rule.finding, fix=fix, fix_reason=fix_reason, runs=tuple(runs), validity=tuple(validity),
-                   facts_origin=_origins(facts))
+                   facts_origin=_origins(facts), attempts=tuple(attempts), attempt=facts.attempt,
+                   sensitivity="unverified" if rule.id == "R5" else None)
