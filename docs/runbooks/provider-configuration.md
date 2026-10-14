@@ -6,7 +6,7 @@ Copy [the example](../../config/examples/providers.json) to an operator-owned fi
 
 `inference.models` defines complete, reusable profiles. `inference.agents` selects a profile for each agent; `inference.default` is used only when an agent has no explicit selection. Omitting the default requires each used agent to be named. Unknown agent names, unknown profiles and missing selections fail before model requests. There is no fallback after errors. Switching a profile replaces the entire provider/model/settings tuple.
 
-Agent keys are `identification`, `repository_identification`, `environment`, `planning`, `authoring`, and `assessment`. A model profile supports:
+Agent keys are `identification`, `repository_identification`, `environment`, `planning`, `control_authoring`, `exploit_authoring`, and `assessment`. The `authoring` key remains available for historical two-probe evaluations only; production composition requires each independent author key or an explicitly configured default. A model profile supports:
 
 - `vllm`: the existing HTTPS `/v1` OpenAI Chat Completions path and measured vLLM-specific settings (`thinking_mode`, `thinking_token_budget`, response cap and timeout).
 - `openai_compatible`: explicit HTTPS `/v1` endpoint and model name; optional `api_key_env: CORSAIR_MODEL_API_KEY` (omission explicitly means anonymous), response cap, timeout and optional temperature. Uses native OpenAI Chat Completions with conservative tool-output capabilities. It does not send vLLM thinking extensions. The chosen endpoint/model must support the agent's tool calling; protocol compatibility alone does not establish agent quality.
@@ -16,15 +16,35 @@ Resolved per-agent profiles and native model identities are recorded by the chai
 
 ```sh
 make eval AGENT=planning PROVIDER_CONFIG=/absolute/path/providers.json
-make eval AGENT=authoring PROVIDER_CONFIG=/absolute/path/providers.json
+make eval AGENT=control_authoring PROVIDER_CONFIG=/absolute/path/providers.json
+make eval AGENT=exploit_authoring PROVIDER_CONFIG=/absolute/path/providers.json
 PYTHONPATH=src:. .venv/bin/python -m evals.fixture_chain.evaluate \
   --evidence .runs/mixed-provider-chain --provider-config /absolute/path/providers.json \
-  --live identification,planning,authoring,assessment
+  --live identification,planning,control_authoring,exploit_authoring,assessment
 ```
 
 The chain's `--temporal-address` selects its existing durable route with the same per-agent instances registered on the worker; credentials and clients never enter workflow payloads. `evals.fixture_e2e.run` and the OpenShell fixture gate use the same resolution. Existing `LocalModelConfig` JSON and imports continue to work as one shared vLLM profile. Existing stage-profile JSON still overrides only request controls; vLLM-only controls are rejected for other providers. The historical `evals.issue_analysis.live` CLI remains explicitly vLLM-only.
 
 `corsair.inference.models.agent_models(config, agents)` is the reusable application context manager, while `configured_model(config.resolve('environment'))` serves a single agent. Environment selection is supported by its isolated eval; this change does not connect the environment agent into the currently incomplete full real-case chain.
+
+## Explicit operator policy files
+
+`corsair.inference.config.load_inference(Path(...))` accepts explicit JSON or `.yaml`/`.yml` files with the same validated named-profile or legacy vLLM shape. The packaged `src/corsair/policy/model.yaml` is an inert example with an `example.invalid` endpoint; it is never an automatic provider selection. Select a real operator-owned configuration explicitly.
+
+`corsair.policy.budget.load_budget()` returns the validated packaged defaults. Passing an explicit JSON or YAML path loads a **flat `CompositionBudget` override**, for example:
+
+```yaml
+author_output_retries: 1
+control_authoring:
+  request_limit: 12
+  tool_calls_limit: 10
+  total_tokens_limit: 100000
+  timeout_seconds: 800
+```
+
+Omitted root fields retain packaged defaults. A supplied stage requires all four ceilings; its optional derivation settings retain their validated defaults. The internal packaged `stage_defaults`/`composition` wrapper is not the public override format. Unknown roles, fields and out-of-range values fail validation. These loading functions do not imply a new CLI option or automatic policy discovery.
+
+Record the selected model-policy file and resolved inference configuration separately from the inert example. `BUDGET_POLICY_SHA256` identifies the packaged default resource; `budget_sha256(resolved_budget)` identifies effective validated budget values, including explicit overrides. Preserve both where applicable, alongside manifest identity, effective settings, retries and input-derived stage limits. Policy files stay outside investigated-agent write authority.
 
 ## Ticket sources
 

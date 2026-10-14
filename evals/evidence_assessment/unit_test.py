@@ -9,12 +9,13 @@ from uuid import uuid4
 from pydantic import TypeAdapter
 from pydantic_ai import capture_run_messages, models
 from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart, ToolReturnPart
+from evals.native_skills import load_skills
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RunUsage
 from pydantic_evals import Case, Dataset, set_eval_attribute
 from pydantic_evals.evaluators import Evaluator
 
-from corsair.agents.evidence_assessment import (CONFIG_VERSION, PROMPT_VERSION, SKILL_SHA256,
+from corsair.agents.evidence_assessment import (MANIFEST_IDENTITY, CONFIG_VERSION, PROMPT_VERSION, SKILL_SHA256,
     TOOLSET_SHA256, assessment_prompt, create_evidence_assessment_agent)
 from corsair.agents.evidence_assessment.contracts import ValidityInput
 from corsair.agents.evidence_assessment.dependencies import AssessmentDependencies
@@ -23,9 +24,11 @@ from corsair.inference.models import configured_model
 from evals.cases import LANGUAGES, load_set, set_digest
 from evals.evidence_assessment.evaluate import EvaluationBudget, describe_model, record_count
 
+EVALUATOR_VERSION = 'unit-validity-v2-structured-classification'
 SUITE = 'evidence_assessment'
-# Pre-execution validity sets (per-case directories, evals/cases.py): unit (python) and breadth (other languages).
-SETS = ('unit', 'breadth')
+# Pre-execution validity sets (per-case directories, evals/cases.py). Each oracle holds the expected flags and the
+# structured review the scripted model replays. breadth_pending predates the structured review (no scripted_review).
+SETS = ('unit', 'unit-transfer', 'breadth_pending')
 FLAGS = ('source_linked', 'condition_exercised', 'assertions_relevant', 'dependency_scope_valid')
 
 
@@ -35,18 +38,55 @@ def dataset(cases='unit', language=None):
         for c in load_set(SUITE, cases, language)])
 
 
+def review_classification(output, expected):
+    validity = output.bound_validity.get('baseline')
+    if validity is None:
+        return 'missing_review'
+    approved = all(getattr(validity, flag) for flag in FLAGS)
+    valid = all(expected.values())
+    if approved:
+        return 'correct_approval' if valid else 'dangerous_false_approval'
+    if valid:
+        return 'false_rejection'
+    return ('correct_rejection' if all(getattr(validity, flag) == value for flag, value in expected.items())
+            else 'rejection_wrong_reason')
+
+
+def outcome_summary(report):
+    from collections import Counter
+    counts = Counter()
+    for case in report.cases:
+        if case.evaluator_failures:
+            counts['evaluator_defect'] += 1
+        else:
+            label = case.labels.get('review_classification')
+            counts[label.value if label else 'evaluator_defect'] += 1
+    for failure in report.failures:
+        detail = failure.error_message.lower()
+        counts['contract_failure' if any(marker in detail for marker in
+            ('validationerror', 'maximum output retries', 'output validation')) else 'task_failure'] += 1
+    return {'evaluator_version': EVALUATOR_VERSION, 'attempts': len(report.cases) + len(report.failures),
+        'outcomes': dict(counts), 'report_evaluator_defects': len(report.report_evaluator_failures)}
+
+
+
+
 class ValidityScore(Evaluator):
     def evaluate(self, ctx):
-        reviews = {review.revision: review for review in ctx.output.validity_reviews}
-        review = reviews.get('baseline')
+        review = ctx.output.bound_validity.get('baseline')
+        expected = ctx.metadata['expected']
         return {'semantic_validity': review is not None and all(
-            getattr(review, flag) == ctx.metadata[flag] for flag in ctx.metadata),
+            getattr(review, flag) == expected[flag] for flag in expected),
             'outcome_blind_contract': ctx.output.evidence is None and ctx.output.gate_result is None,
-            'bound_review': 'baseline' in ctx.output.bound_validity}
+            'bound_review': 'baseline' in ctx.output.bound_validity,
+            'review_classification': review_classification(ctx.output, expected)}
 
 
 def scripted_model(inputs, expected):
     async def respond(messages, info):
+        activation = load_skills(messages, info, ['assess-evidence'])
+        if activation is not None:
+            return activation
         reads = [p.content for m in messages for p in m.parts if isinstance(p, ToolReturnPart)
                  and p.tool_name == 'read_evidence']
         for item in inputs.items:
@@ -61,8 +101,7 @@ def scripted_model(inputs, expected):
             'application_observations': [], 'sandbox_observations': [],
             'interpretation': {'statement': 'Reviewed frozen inputs before execution', 'citations': citations[:1]},
             'limitations': ['Scripted oracle replay measures plumbing, not semantic judgment'],
-            'validity_reviews': [{'revision': 'baseline', **dict.fromkeys(FLAGS, True), **expected,
-                'rationale': {'statement': 'Frozen semantic review case', 'citations': citations}}]})])
+            'validity_reviews': [expected['scripted_review']]})])
     return FunctionModel(respond)
 
 
@@ -77,9 +116,10 @@ async def evaluate(destination, repeat=1, model=None, cases='unit', language=Non
         'model': describe_model(model or next(iter(selected.values()))),
         'prompt_version': PROMPT_VERSION, 'config_version': CONFIG_VERSION,
         'skill_sha256': SKILL_SHA256, 'toolset_sha256': TOOLSET_SHA256,
-        'dataset': cases, 'language': language, 'dataset_sha256': set_digest(SUITE, cases),
-        'budget': budget.model_dump(),
+        'evaluator_version': EVALUATOR_VERSION, 'dataset': cases, 'language': language,
+        'dataset_sha256': set_digest(SUITE, cases), 'budget': budget.model_dump(),
         'task_retries': 0, 'max_concurrency': 1}
+    metadata |= MANIFEST_IDENTITY
     (destination / 'configuration.json').write_text(json.dumps(metadata, indent=2))
 
     async def task(inputs):
@@ -106,7 +146,8 @@ async def evaluate(destination, repeat=1, model=None, cases='unit', language=Non
                     record_count('observed_' + key, getattr(usage, key))
     report = await corpus.evaluate(task, repeat=repeat, max_concurrency=1, retry_task=None, progress=False)
     (destination / 'report.json').write_bytes(TypeAdapter(type(report)).dump_json(report, indent=2))
-    return not report.failures and all(not c.evaluator_failures and all(a.value for a in c.assertions.values())
+    (destination / 'outcomes.json').write_text(json.dumps(outcome_summary(report), indent=2))
+    return not report.failures and not report.report_evaluator_failures and all(not c.evaluator_failures and all(a.value for a in c.assertions.values())
                                       for c in report.cases)
 
 

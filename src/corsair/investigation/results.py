@@ -13,10 +13,11 @@ from .build import Investigation
 from .docker import SETUP_NETWORK
 
 # "admission": refused before any model request (request, acquisition, runtime selection or framework table).
-STAGES = ("admission", "runtime", "environment", "identification", "planning", "authoring", "execution", "assessment",
+STAGES = ("admission", "runtime", "environment", "identification", "planning", "control_authoring", "exploit_authoring", "authoring", "execution", "assessment",
           "complete")
 
 
+# authoring remains recognizable in historical records; current routing uses the two own-role stages.
 # The headline label, one table (Al, 2026-10-13): what kind of outcome a run had, with the stage and reason under it.
 # The eval match keeps comparing the three-part result, never this label.
 FINDING_LABELS = {"reproduced": "LIKELY_EXPLOITABLE", "not_reproduced": "LIKELY_NOT_EXPLOITABLE",
@@ -24,7 +25,7 @@ FINDING_LABELS = {"reproduced": "LIKELY_EXPLOITABLE", "not_reproduced": "LIKELY_
 EXECUTION_LABELS = {"failed": "ERROR", "unknown": "ERROR", "blocked": "UNABLE_TO_RUN", "unsupported": "UNABLE_TO_RUN"}
 # Stops before the model stages for a case reason: the request, its runtime, route or environment cannot be run.
 BEFORE_MODEL = ("admission", "runtime", "environment")
-MODEL_STAGES = ("identification", "planning", "authoring", "assessment")
+MODEL_STAGES = ("identification", "planning", "control_authoring", "exploit_authoring", "authoring", "assessment")
 LABELS = ("LIKELY_EXPLOITABLE", "LIKELY_NOT_EXPLOITABLE", "INCONCLUSIVE", "UNABLE_TO_RUN", "ERROR")
 
 

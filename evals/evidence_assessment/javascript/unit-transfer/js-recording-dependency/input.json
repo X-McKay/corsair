@@ -1,0 +1,67 @@
+{
+  "scope": "component",
+  "plan": {
+    "control_test_id": "preview.test.js::control",
+    "security_test_id": "preview.test.js::exploit",
+    "expected_failure": {
+      "exception_type": "Error",
+      "path": "preview.test.js",
+      "function": "exploit",
+      "assertion_lines": [
+        11
+      ]
+    },
+    "expected_safe_behavior": "data_remains_value",
+    "frozen_patch_sha256": "bb64cb62c635d994f6314697f0e22807f3013e0955f9ae60a15eb7940d159dc7",
+    "observation_mode": "unit_test",
+    "test_plan_sha256": "c4b1f5439924e1057e6b7fc3d8097c489901b22068f1cfd6e3ed5226d6f61f2c"
+  },
+  "revision_sources": {
+    "baseline": "dfbc1f7c32f3969e31f0a44a99e5b493448f97c80cb38699d3208a9e1d91f509"
+  },
+  "items": [
+    {
+      "item_id": "plan",
+      "kind": "plan",
+      "revision": null,
+      "run": null,
+      "sha256": "1aa099ffeead31b40d1945164f8b3c607a4bf96347acad1559ac37c6a06c7b09",
+      "content": "{\"control_test_id\": \"preview.test.js::control\", \"security_test_id\": \"preview.test.js::exploit\", \"expected_failure\": {\"exception_type\": \"Error\", \"path\": \"preview.test.js\", \"function\": \"exploit\", \"assertion_lines\": [11]}, \"expected_safe_behavior\": \"data_remains_value\", \"frozen_patch_sha256\": \"bb64cb62c635d994f6314697f0e22807f3013e0955f9ae60a15eb7940d159dc7\", \"observation_mode\": \"unit_test\", \"test_plan_sha256\": \"c4b1f5439924e1057e6b7fc3d8097c489901b22068f1cfd6e3ed5226d6f61f2c\"}"
+    },
+    {
+      "item_id": "test-plan",
+      "kind": "plan",
+      "revision": null,
+      "run": null,
+      "sha256": "e1d40a60ac68053d83928d9bae4008fde005a8232c9108a2e741a8d88b5e39e4",
+      "content": "Call the real production renderPreview/render_preview through its import. Control supplies Alice; exploit supplies {{admin}}. Both assert fixed return ok and recorded template preview with unchanged value. Double only the rendering client: it must record arguments without parsing or sanitizing. Both probes require source linkage. This establishes argument construction, not template engine behavior."
+    },
+    {
+      "item_id": "reported-condition",
+      "kind": "plan",
+      "revision": null,
+      "run": null,
+      "sha256": "f029f484ec545774de04e43b9a47ea29acfdde5a760f62e44268088195cf313a",
+      "content": "Untrusted preview names may alter the template selection. Check that {{admin}} remains a value and the template argument remains preview."
+    },
+    {
+      "item_id": "patch",
+      "kind": "patch",
+      "revision": null,
+      "run": null,
+      "sha256": "bb64cb62c635d994f6314697f0e22807f3013e0955f9ae60a15eb7940d159dc7",
+      "path": "preview.test.js",
+      "content": "import {renderPreview} from './preview.js';\nfunction recorder() { const calls = []; return {calls, render: args => { calls.push(args); return 'ok'; }}; }\ntest('control', () => {\n  const client = recorder();\n  expect(renderPreview(client, 'Alice')).toBe('ok');\n  expect(client.calls).toEqual([{template: 'preview', value: 'Alice'}]);\n});\ntest('exploit', () => {\n  const client = recorder();\n  expect(renderPreview(client, '{{admin}}')).toBe('ok');\n  expect(client.calls).toEqual([{template: 'preview', value: '{{admin}}'}]);\n});\n"
+    },
+    {
+      "item_id": "baseline-source",
+      "kind": "source",
+      "revision": "baseline",
+      "run": 0,
+      "sha256": "dfbc1f7c32f3969e31f0a44a99e5b493448f97c80cb38699d3208a9e1d91f509",
+      "path": "preview.js",
+      "source_sha256": "dfbc1f7c32f3969e31f0a44a99e5b493448f97c80cb38699d3208a9e1d91f509",
+      "content": "export function renderPreview(client, name) {\n  return client.render({template: 'preview', value: name});\n}\n"
+    }
+  ]
+}

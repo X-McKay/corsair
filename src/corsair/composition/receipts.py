@@ -14,8 +14,8 @@ from pydantic_ai.usage import RunUsage
 from corsair.agents.environment import agent as environment
 from corsair.agents.evidence_assessment import agent as assessment
 from corsair.agents.issue_identification import agent as identification
-from corsair.agents.test_authoring import agent as authoring
-from corsair.agents.test_authoring.skills import SKILL_SHA256 as AUTHORING_SKILL
+from corsair.agents.control_authoring import agent as control_authoring
+from corsair.agents.exploit_authoring import agent as exploit_authoring
 from corsair.agents.test_planning import agent as planning
 from corsair.agents.test_planning.skills import SKILL_SHA256 as PLANNING_SKILL
 
@@ -24,7 +24,7 @@ from corsair.inference.config import InferenceConfig, inference_config
 
 from .direct import DirectRun
 
-STAGES = ("identification", "planning", "authoring", "assessment")
+STAGES = ("identification", "planning", "control_authoring", "exploit_authoring", "assessment")
 # A case that carries setup source runs the environment stage first (SPEC-0068); the fixture carries none.
 AGENT_STAGES = ("environment",) + STAGES
 # Per-stage request controls an operator profile may set on top of the base provider configuration.
@@ -47,14 +47,29 @@ def stage_configs(base: LocalModelConfig | InferenceConfig, profiles: dict, stag
 # Per-stage identity as each stage's own eval reports it (SPEC-0044, SPEC-0052).
 VERSION_FIELDS = ("prompt_version", "config_version", "skill_sha256", "toolset_sha256")
 VERSIONS = {
-    "environment": (environment.PROMPT_VERSION, None, environment.SKILL_SHA256, environment.TOOLSET_SHA256),
+    "environment": (environment.PROMPT_VERSION, environment.CONFIG_VERSION, environment.SKILL_SHA256, environment.TOOLSET_SHA256),
     "identification": (identification.PROMPT_VERSION, identification.CONFIG_VERSION, identification.SKILL_SHA256,
                        identification.TOOLSET_SHA256),
     "planning": (planning.PROMPT_VERSION, planning.CONFIG_VERSION, PLANNING_SKILL, planning.TOOLSET_SHA256),
-    "authoring": (authoring.PROMPT_VERSION, authoring.CONFIG_VERSION, AUTHORING_SKILL, authoring.TOOLSET_SHA256),
+    "control_authoring": (control_authoring.PROMPT_VERSION, control_authoring.CONFIG_VERSION, control_authoring.SKILL_SHA256, control_authoring.TOOLSET_SHA256),
+    "exploit_authoring": (exploit_authoring.PROMPT_VERSION, exploit_authoring.CONFIG_VERSION, exploit_authoring.SKILL_SHA256, exploit_authoring.TOOLSET_SHA256),
     "assessment": (assessment.PROMPT_VERSION, assessment.CONFIG_VERSION, assessment.SKILL_SHA256,
                    assessment.TOOLSET_SHA256),
 }
+
+# Bind identity to the same package spec loaded by each factory, rather than a later file read.
+_MANIFESTS = {
+    "environment": environment.MANIFEST_IDENTITY,
+    "identification": identification.MANIFEST_IDENTITY,
+    "planning": planning.MANIFEST_IDENTITY,
+    "control_authoring": control_authoring.MANIFEST_IDENTITY,
+    "exploit_authoring": exploit_authoring.MANIFEST_IDENTITY,
+    "assessment": assessment.MANIFEST_IDENTITY,
+}
+VERSION_FIELDS += ("spec_sha256", "factory_source_sha256", "shared_helper_source_sha256", "harness_version", "pydantic_ai_version")
+VERSIONS = {stage: version + tuple(_MANIFESTS[stage][key] for key in VERSION_FIELDS[-5:])
+            for stage, version in VERSIONS.items()}
+
 
 def encode(value):
     """Lossless JSON for native runner observations: dataclasses by field, bytes with digest and base64."""
@@ -136,13 +151,21 @@ def result_record(run: DirectRun) -> dict:
             "environment": _dump(run.environment), "identification": _dump(run.identification),
             "plan": _dump(run.plan), "patch": _dump(run.patch), "observation_plan": _dump(run.observation_plan),
             "executions": executions, "gate": _dump(run.gate), "assessment": _dump(run.assessment),
+            "validity_review": _dump(run.validity_review),
             "witnesses": [{"witness": _dump(w.witness), "sandbox_events": None if w.sandbox_events is None else
                            [_dump(e) for e in w.sandbox_events], "reason": w.reason} for w in run.witnesses],
             "limitations": list(run.limitations)}
 
 
 def attempt_record(attempt) -> dict:
-    return {"stage": attempt.stage, "elapsed_seconds": attempt.elapsed_seconds,
+    from pydantic_ai.messages import ToolCallPart, ToolReturnPart
+    parts = [part for message in attempt.messages for part in message.parts]
+    completed = {part.tool_call_id for part in parts if isinstance(part, ToolReturnPart)
+                 and part.tool_name == "load_capability"}
+    loaded = sorted({part.args_as_dict()["id"] for part in parts if isinstance(part, ToolCallPart)
+                     and part.tool_name == "load_capability" and part.tool_call_id in completed})
+    return {"loaded_capability_ids": None if getattr(attempt, "messages_omitted", False) else loaded,
+"stage": attempt.stage, "elapsed_seconds": attempt.elapsed_seconds,
             "failure": None if attempt.failure is None else {"type": type(attempt.failure).__name__,
                                                              "detail": str(attempt.failure)[:4096]},
             "output": _dump(attempt.output) if hasattr(attempt.output, "model_dump_json") else None,

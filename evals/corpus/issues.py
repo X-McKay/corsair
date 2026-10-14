@@ -8,7 +8,7 @@ variant names and the upstream verification tests stay in `expected.json`, which
 
     python -m evals.corpus.issues --root <operator-allowlisted dir> (--set corpus | --case <id> ...)
 
-The committed requests are the end-to-end `corpus` set (evals/e2e/python/corpus/<case id>/, PLAN-0094): there the
+The committed requests are the end-to-end `corpus` set (evals/e2e/python/corpus/<case id>/, PLAN-0098): there the
 issue JSON is `input.json` and the expected file `oracle.json`, and the set manifest lists the cohort.
 """
 import argparse

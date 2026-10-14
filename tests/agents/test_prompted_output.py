@@ -21,6 +21,7 @@ from corsair.agents.test_authoring.agent import create_test_authoring_agent
 from corsair.agents.test_planning import PlanningDependencies, TestPlanningInput, create_test_planning_agent
 from corsair.agents.test_planning.prompts import planning_prompt
 from corsair.composition.direct import output_refusals
+from evals.test_planning.drafts import component_draft
 
 RECORD = json.loads((Path(__file__).parent / "recorded" / "corpus-pathtraversal-2-planning.json").read_text())
 PROMPTED = OpenAIModelProfile(default_structured_output_mode="prompted")
@@ -145,8 +146,13 @@ def test_corpus_rerun_planning_stop_names_both_refusals():
 def test_corpus_rerun_fenced_plan_parses_and_its_next_refusal_is_the_directory_approved_as_a_test_path():
     """With a limitation stated, the same fenced answer still fails the contract, not the parser: the environment
     stage approved the directory ``tests`` where approved test paths name the files the tests will create."""
-    limited = '"limitations": ["Fixtures are created under the module data directory."]'
-    failure, messages = planning_replay(lambda text: text.replace('"limitations": []', limited))
+    def current_draft(text):
+        # Adapt the recorded protocol at the fixture boundary; preserve its frozen bytes.
+        answer = json.loads(trailing_object(text)[1])
+        answer["plan"] = component_draft(answer["plan"])
+        answer["plan"]["limitations"] = ["Fixtures are created under the module data directory."]
+        return "```json\n" + json.dumps(answer) + "\n```"
+    failure, messages = planning_replay(current_draft)
     assert isinstance(failure, UnexpectedModelBehavior)
     assert "tests/test_read_doc_control.py is not an approved test path" in str(failure.__cause__)
     assert output_refusals(messages) == (NO_OUTPUT.format(9008) + "; return the final JSON object as text",)

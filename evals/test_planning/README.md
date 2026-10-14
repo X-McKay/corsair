@@ -28,6 +28,12 @@ A local-provider run adds `--provider-config PATH` (an explicit `LocalModelConfi
 
 `make eval AGENT=planning SET=unit` runs the frozen `unit` set (`python/unit/`): the same SQL construction concern over safe and unsafe source, using a recording dependency and no effect recorder. The reviewed plan calls the real function and limits its claim to query construction. This development set is not held out and does not replace the unchanged legacy comparison. Scripted results establish contracts and curated anchors, not live semantic accuracy.
 
+## Versioned unit-first policy evaluation
+
+`make eval AGENT=planning SET=unit-first` runs the frozen `unit-first` set (`python/unit-first/`, manifest `sets/unit-first.json`) under evaluator identity `planning-v2`. Its six inputs are identical to the legacy development set. Three traversal cases now expect native properties instead of an effect witness; the former `unsupported_observation` case is separately named `native_dependency_observation` and now admits a request-dispatch dependency double while excluding network-engine claims. Missing baseline and missing implementation cases still expect abstention. Original development files/results remain unchanged; witness-only legacy scores must not be presented as unit-first semantic regressions.
+
+`SET=unit-v2` (`python/unit-v2/`) retains the two SQL unit inputs and updates the evaluator-only input criterion to explicit reviewed alternative breakout/tautology patterns. Those patterns require the quote breakout and matching operands for this fixture, reject ordinary account text containing OR or unequal operands, and admit the observed alternate `alice' OR '1'='1` (the application supplies the final closing quote). The shared evaluator has no language/CWE branch: patterns and property anchors belong to case metadata, never agent inputs. These are conservative curated anchors, not a general semantic proof or acceptance of arbitrary generated payloads. `SET=unit` preserves the v1 literal criterion and its frozen manifest for historical comparison. New reports record evaluator version; older reports are not rescored in place.
+
 ## Breadth set
 
 `make eval AGENT=planning SET=breadth` (`--cases breadth`) runs the cases under `<language>/breadth/<case-id>/` (`input.json`, evaluator-only `oracle.json`, `case.json` metadata), frozen by `sets/breadth.json`; `dataset_sha256` is `evals.cases.set_digest` of that manifest. It is a development set, not held out; `RETIRED` is unchanged.

@@ -1,0 +1,8 @@
+{
+  "held_out": false,
+  "cases": {
+    "javascript/js-recording-dependency": "765553123e3df4b9711a58a78fb142d7e68317c6acaec9fa076127f7642e19ff",
+    "javascript/js-copied-target": "a329a8ccf401c2db9553b0ffd0f3ed6ae0a7b6113d9efdfb29acace562ad0e1e",
+    "ruby/ruby-alias-benign-exploit": "81be63a7b008ffca87de9027c0da06c0d6178b917556eddd878f7dd9a87bdf92"
+  }
+}

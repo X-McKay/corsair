@@ -1,6 +1,6 @@
 # Eval cases
 
-Every frozen eval case is one directory, grouped by agent, language and set ([PLAN-0094](../docs/development/plans/PLAN-0094-eval-corpus-breadth.md); loader [`cases.py`](cases.py)):
+Every frozen eval case is one directory, grouped by agent, language and set ([PLAN-0098](../docs/development/plans/PLAN-0098-eval-corpus-breadth.md); loader [`cases.py`](cases.py)):
 
 ```text
 evals/<suite>/<language>/<set>/<case id>/

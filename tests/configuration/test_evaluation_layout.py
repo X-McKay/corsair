@@ -1,4 +1,4 @@
-"""PLAN-0094 eval layout guards: every set matches its frozen manifest, no case directory is outside a set, and a
+"""PLAN-0098 eval layout guards: every set matches its frozen manifest, no case directory is outside a set, and a
 held-out set's case ids are never cited in development records (SPEC-0023)."""
 from pathlib import Path
 

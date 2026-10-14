@@ -19,6 +19,7 @@ from pydantic_ai.messages import (
     ToolCallPart,
     ToolReturnPart,
 )
+from evals.native_skills import load_skills
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RunUsage, UsageLimits
 from pydantic_evals import Case, Dataset, set_eval_attribute
@@ -29,6 +30,7 @@ from pydantic_evals.evaluators import (
     HasMatchingSpan,
 )
 from corsair.agents.environment.agent import (
+    MANIFEST_IDENTITY,
     PROMPT_VERSION,
     SKILL_SHA256,
     TOOLSET_SHA256,
@@ -135,6 +137,9 @@ def scripted(case):
 
     async def respond(messages, info):
         nonlocal position
+        activation = load_skills(messages, info, ['prepare-environment'])
+        if activation is not None:
+            return activation
         if position < len(calls):
             name, args = calls[position]
             position += 1
@@ -221,6 +226,8 @@ SUITE = "environment"
 
 def load_cases(name="development", language=None):
     """Frozen cases of one set (per-case directories, evals/cases.py) and that set's identity."""
+    if name not in set_names(SUITE):
+        raise ValueError(f"unknown frozen environment case set: {name}")
     cases = [
         FrozenCase.model_validate({"name": c.name, "inputs": c.input, **c.oracle}).model_dump(mode="json")
         for c in load_set(SUITE, name, language)
@@ -236,7 +243,7 @@ async def evaluate(evidence, budget, model=None, provider=None, dataset="develop
     metadata = {
         "mode": "scripted_fixture" if scripted_mode else "direct_local_provider",
         "prompt_version": PROMPT_VERSION,
-        "config_version": "environment-eval-v2-corrections",
+        "config_version": "environment-eval-v3-versioned-fixtures",
         "setup_max_corrections": SetupBudget().max_corrections,
         "skill_sha256": SKILL_SHA256,
         "toolset_sha256": TOOLSET_SHA256,
@@ -249,9 +256,10 @@ async def evaluate(evidence, budget, model=None, provider=None, dataset="develop
         "provider": provider,
         "task_retries": 0,
     }
+    metadata |= MANIFEST_IDENTITY
     (evidence / "configuration.json").write_text(json.dumps(metadata, indent=2))
     corpus = Dataset(
-        name=f"environment-{dataset}-v1",
+        name="environment-" + ("development-v1" if dataset == "development" else dataset),
         cases=[
             Case(
                 name=c["name"],
@@ -344,6 +352,7 @@ async def evaluate(evidence, budget, model=None, provider=None, dataset="develop
                 messages,
                 frozenset(
                     {
+                        "load_capability",
                         "read_source",
                         "list_toolchains",
                         "run_setup_command",

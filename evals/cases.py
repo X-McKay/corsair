@@ -1,4 +1,4 @@
-"""Eval cases as one directory each, grouped by language and set, with frozen set manifests (PLAN-0094).
+"""Eval cases as one directory each, grouped by language and set, with frozen set manifests (PLAN-0098).
 
     evals/<suite>/<language>/<set>/<case id>/
       input.json        exactly what the suite's task receives (the agent's input)

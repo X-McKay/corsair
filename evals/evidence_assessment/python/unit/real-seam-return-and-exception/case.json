@@ -3,10 +3,10 @@
   "framework": "pytest",
   "family": "real-seam-return-and-exception",
   "kind": "moved",
-  "probes": "Moved unchanged from unit_test_cases.json (unit set); the suite README describes what it exercises.",
+  "probes": "Moved unchanged from evals/evidence_assessment/unit_test_cases_v2.json (unit set); the suite README describes what it exercises.",
   "provenance": {
     "source": "synthetic",
     "license": "n/a (synthetic)",
-    "notes": "Corsair-authored; previously evals/evidence_assessment/unit_test_cases.json"
+    "notes": "Corsair-authored; previously evals/evidence_assessment/unit_test_cases_v2.json"
   }
 }

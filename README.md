@@ -34,9 +34,10 @@ The remaining 1A admission commands and limitations are documented in the [admis
 
 - Deploy to Kubernetes; develop and test the complete configuration locally in kind.
 - Use PydanticAI agents, native Temporal durability, OpenShell, Pydantic Evals, and supported OpenTelemetry integrations.
-- Keep a fixed graph of five focused agents and deterministic evidence gates.
+- Keep a fixed graph of six focused agent roles and deterministic evidence gates.
 - Use small ports and SDK-backed adapters for external capabilities. Local model endpoints and Bedrock, and GitHub and Azure DevOps, must be interchangeable through explicit configuration.
 - Support isolated agent execution with and without Temporal, and with fixture/local execution or OpenShell.
+- Give independent control and exploit authors separate inputs, own-file writes, contexts and budgets; freeze both source-only drafts and review validity before native execution.
 - Default to exactly two native unit tests through existing application seams across languages and frameworks; use inputs, outputs, specific exceptions, fixture state and controlled dependencies, and require integration evidence when the property needs it.
 - Preserve scope, test validity, and application observations separately from execution and sandbox enforcement. Witness instrumentation supports evidence where useful; missing low-level telemetry alone does not invalidate a sound unit test.
 - Use immutable artifacts, explicit invalidation, attributable failures, and tested recovery and cleanup.
@@ -57,6 +58,8 @@ These incorporate improvement items 1, 2, 3, 4, 6, 7, 8, and 9. Item 10 is captu
 7. [Benchmark datasets](docs/benchmark-datasets.md): researched sources, 50 candidate issue pairs, licensing, and progressive qualification across Java/Maven, Python, JavaScript, Perl, and Ruby.
 8. [OpenShell milestone](docs/openshell-milestone.md): proposed directory structure, native runtime qualification slices, diagnostics, testing, and acceptance gates.
 
+Production split transition: [SPEC-0079](docs/development/specs/SPEC-0079-independent-probe-authoring.md) and [PLAN-0094](docs/development/plans/PLAN-0094-independent-probe-authoring.md) track independent source-only control/exploit authors, per-probe assertion anchors and immutable outcome-blind validity before execution. The six roles are environment, identification, planning, control authoring, exploit authoring and assessment. Assessment uses separate validity and result calls. Focused native reviewed-fixture checks and the pre-cleanup broad offline checkpoint (2,326 passed, 6 skipped, 10 warnings in 39.71 seconds) pass. All scripted suites pass; seven native-manifest factory variants have byte-parity evidence. Corrected pre-manifest live results and historical partial runs are retained in the [baseline report](docs/qualification/independent-probe-agent-baselines.md); final offline checks pass; fresh post-manifest live measurements are deferred by the user. This transition does not qualify the full graph, semantic-review gate or additional runtimes/frameworks.
+
 ## Initial support envelope
 
 The first qualification targets Python 3.12 with pytest and Java 17 with Maven and JUnit 5, on Linux OCI images in the selected OpenShell Kubernetes runtime. Actual tool versions and image digests are frozen during runtime qualification. Frameworks and vulnerability classes are admitted individually through real execution cases; a language label alone does not establish support.
@@ -73,3 +76,7 @@ The initial security cases are path traversal and command injection using bounde
 - [Pydantic Evals](https://pydantic.dev/docs/ai/evals/evals/)
 
 Implementation must pin compatible SDK and runtime releases. Upstream capabilities are not qualified merely by being documented.
+
+Final publication checkpoint (2026-10-13): implementation and identity/ownership cleanup complete. Root reports full offline **2,329 passed, six skipped, ten warnings in 51.95 seconds**, final targeted **60 passed**, and seven native factory parity **22 passed**. Final scripted suites pass: environment16/16, identification8/8, planning5/5, each author8/8, validity7/7, final disposition4/4 and chain5/5. Offline wheel inspection confirms ten YAML/shared-skill assets byte-equal to current source (`native-yaml-wheel-final-check.json` private receipt); the431-file source-freeze manifest remains ignored. These are offline/parity/fixture claims, not model quality or composition qualification.
+
+The user explicitly deferred fresh post-manifest live baselines and requested the PR now. All seven planned live jobs are **UNRUN / deferred**. Automatic approval review rejected their earlier launch before any model calls. Corrected pre-manifest environment4/8, identification8/8 and planning1/5 remain historical measurements. ISSUE-0009 stays open. No endpoint calls occurred in this documentation lane; raw `.runs` exports remain private.

@@ -53,3 +53,21 @@ The observations are hand-written in the shape of `tests/agents/framework_output
 captured runs, so the set measures trajectory and contract adherence across languages, not setup judgement or
 admission on real repositories. `tests/configuration/test_breadth_environment.py` checks counts and that wrong
 status, wrong layer, versionless unsupported wording and a skipped first candidate fail the checks.
+
+Versioned correction: the `development-v2` set (`python/development-v2/`, `java/development-v2/`,
+`sets/development-v2.json`). Select it with `make eval AGENT=environment SET=development-v2`. The original
+`development` set and historical receipts remain unchanged. V2 declares the
+recorded locked pip, build, collection, baseline-test and offline Maven command
+arguments in the agent-visible repository source. It preserves the eight case
+statuses, failure layers and command budgets; unknown delivery still requires the
+first dispatched receipt, and the budget case still requires the admitted prefix.
+The exact-command double and oracle remain unchanged: no alternative spelling is
+silently accepted, and an early unrelated refusal does not satisfy the trajectory.
+
+Prompt v9 adds a generic runtime precheck before setup and concise halt feedback:
+no follow-up setup commands after a halt, no invented run ID for a refused call,
+and blocked output after an observed failure. Native correction admission remains
+unchanged. Comparing original v1/live with v2/current changes both fixture source
+and procedure; it cannot isolate a prompt effect. The corrected scripted 8/8 result
+checks fixture/contracts, not provider capability or runtime readiness. A fresh
+explicit v2 provider run at unchanged caps is needed for that narrower comparison.

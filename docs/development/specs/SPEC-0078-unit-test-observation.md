@@ -35,3 +35,7 @@ Optional instrumentation remains additional evidence. Contradictions prevent con
 ## Decisions and open questions
 
 Accepted by the user on 2026-10-13. Existing agent responsibilities suffice: planning states the property, authoring realizes it, assessment reviews its validity and interprets execution, deterministic code limits conclusions. Semantic review quality needs measured live evaluation; unsupported source visibility must be reported rather than guessed.
+
+## Accepted live-evaluation follow-up
+
+The first live unit assessment admitted benign input as an exploit and drafted affirmative reviews of copied/wrong-module targets. User approved a bounded correction: explicit cited findings for each probe’s actual production binding, input/preconditions, assertion and dependency substitutions, with revision validity derived from both probes. Simplify planner native-ID construction at the runner boundary and expose review evidence requirements explicitly. Aggregate actionable contract feedback; do not loosen semantic requirements to obtain clean outputs. Track semantic false approvals separately from contract/evaluator failures and version evaluator corrections while preserving historical measurements. No additional agent or mandatory recorder is introduced. Implementation and live qualification of this follow-up are separate from PR130’s merged status.

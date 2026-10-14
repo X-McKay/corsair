@@ -1,0 +1,132 @@
+[
+  {
+    "name": "copied_target",
+    "expected_validity": "invalid",
+    "reason": "A test-local copy does not bind immutable production implementation.",
+    "review_input": {
+      "scope": "component",
+      "reported_condition": "User-controlled report name may select shell interpretation.",
+      "source_files": [
+        {
+          "path": "commands.js",
+          "content": "function runReport(runner, name) { return runner.run('report ' + name, true); }\nmodule.exports = { runReport };\n"
+        }
+      ],
+      "probe_files": [
+        {
+          "path": "tests/control.test.js",
+          "content": "const test = require('node:test');\nconst assert = require('node:assert/strict');\nconst { runReport } = require('../commands');\ntest('benign_control', () => {\n  let observed;\n  const runner = { run(command, shell) { observed = { command, shell }; return 'result'; } };\n  assert.equal(runReport(runner, 'quarterly'), 'result');\n  assert.equal(observed.command, 'report quarterly');\n});\n"
+        },
+        {
+          "path": "tests/exploit.test.js",
+          "content": "const test = require('node:test');\nconst assert = require('node:assert/strict');\nconst { runReport } = require('../commands');\ntest('security_safety', () => {\n  function copiedReport(runner, name) { return runner.run(['report', name], false); }\n  let observed; const runner = { run(command, shell) { observed = {command, shell}; } };\n  copiedReport(runner, 'quarterly; echo injected');\n  assert.deepEqual(observed, {command:['report','quarterly; echo injected'], shell:false});\n});\n"
+        }
+      ],
+      "scope_limit": "Command construction only; no actual shell execution claim."
+    }
+  },
+  {
+    "name": "mocked_target",
+    "expected_validity": "invalid",
+    "reason": "Replacing the production callable bypasses the property owner.",
+    "review_input": {
+      "scope": "component",
+      "reported_condition": "User-controlled report name may select shell interpretation.",
+      "source_files": [
+        {
+          "path": "commands.js",
+          "content": "function runReport(runner, name) { return runner.run('report ' + name, true); }\nmodule.exports = { runReport };\n"
+        }
+      ],
+      "probe_files": [
+        {
+          "path": "tests/control.test.js",
+          "content": "const test = require('node:test');\nconst assert = require('node:assert/strict');\nconst { runReport } = require('../commands');\ntest('benign_control', () => {\n  let observed;\n  const runner = { run(command, shell) { observed = { command, shell }; return 'result'; } };\n  assert.equal(runReport(runner, 'quarterly'), 'result');\n  assert.equal(observed.command, 'report quarterly');\n});\n"
+        },
+        {
+          "path": "tests/exploit.test.js",
+          "content": "const test = require('node:test');\nconst assert = require('node:assert/strict');\nconst { runReport } = require('../commands');\ntest('security_safety', () => {\n  const replacement = (runner, name) => runner.run(['report', name], false);\n  let observed; const runner = { run(command, shell) { observed = {command, shell}; } };\n  replacement(runner, 'quarterly; echo injected');\n  assert.equal(observed.shell, false);\n});\n"
+        }
+      ],
+      "scope_limit": "Command construction only; no actual shell execution claim."
+    }
+  },
+  {
+    "name": "vacuous_assertion",
+    "expected_validity": "invalid",
+    "reason": "The target result or relevant dependency observation does not affect the assertion.",
+    "review_input": {
+      "scope": "component",
+      "reported_condition": "User-controlled report name may select shell interpretation.",
+      "source_files": [
+        {
+          "path": "commands.js",
+          "content": "function runReport(runner, name) { return runner.run('report ' + name, true); }\nmodule.exports = { runReport };\n"
+        }
+      ],
+      "probe_files": [
+        {
+          "path": "tests/control.test.js",
+          "content": "const test = require('node:test');\nconst assert = require('node:assert/strict');\nconst { runReport } = require('../commands');\ntest('benign_control', () => {\n  let observed;\n  const runner = { run(command, shell) { observed = { command, shell }; return 'result'; } };\n  assert.equal(runReport(runner, 'quarterly'), 'result');\n  assert.equal(observed.command, 'report quarterly');\n});\n"
+        },
+        {
+          "path": "tests/exploit.test.js",
+          "content": "const test = require('node:test');\nconst assert = require('node:assert/strict');\nconst { runReport } = require('../commands');\ntest('security_safety', () => {\n  const runner = { run() { return 'result'; } };\n  runReport(runner, 'quarterly; echo injected');\n  assert.equal(1, 1);\n});\n"
+        }
+      ],
+      "scope_limit": "Command construction only; no actual shell execution claim."
+    }
+  },
+  {
+    "name": "fixture_denial",
+    "expected_validity": "inconclusive",
+    "reason": "Denied fixture access cannot establish application rejection.",
+    "review_input": {
+      "scope": "component",
+      "reported_condition": "User-controlled report name may select shell interpretation.",
+      "source_files": [
+        {
+          "path": "commands.js",
+          "content": "function runReport(runner, name) { return runner.run('report ' + name, true); }\nmodule.exports = { runReport };\n"
+        }
+      ],
+      "probe_files": [
+        {
+          "path": "tests/control.test.js",
+          "content": "const test = require('node:test');\nconst assert = require('node:assert/strict');\nconst { runReport } = require('../commands');\ntest('benign_control', () => {\n  let observed;\n  const runner = { run(command, shell) { observed = { command, shell }; return 'result'; } };\n  assert.equal(runReport(runner, 'quarterly'), 'result');\n  assert.equal(observed.command, 'report quarterly');\n});\n"
+        },
+        {
+          "path": "tests/exploit.test.js",
+          "content": "const test = require('node:test');\nconst assert = require('node:assert/strict');\nconst { runReport } = require('../commands');\ntest('security_safety', () => {\n  const runner = { run() { const e = new Error('fixture inaccessible'); e.code = 'EACCES'; throw e; } };\n  assert.throws(() => runReport(runner, 'quarterly; echo injected'), {code:'EACCES'});\n});\n"
+        }
+      ],
+      "scope_limit": "Command construction only; no actual shell execution claim."
+    }
+  },
+  {
+    "name": "missing_seam",
+    "expected_validity": "inconclusive",
+    "reason": "Missing necessary application seam cannot establish the reported condition.",
+    "review_input": {
+      "scope": "component",
+      "reported_condition": "User-controlled report name may select shell interpretation.",
+      "source_files": [
+        {
+          "path": "commands.js",
+          "content": "module.exports = {};\n"
+        }
+      ],
+      "probe_files": [
+        {
+          "path": "tests/control.test.js",
+          "content": "const test = require('node:test');\nconst assert = require('node:assert/strict');\nconst { runReport } = require('../commands');\ntest('benign_control', () => {\n  let observed;\n  const runner = { run(command, shell) { observed = { command, shell }; return 'result'; } };\n  assert.equal(runReport(runner, 'quarterly'), 'result');\n  assert.equal(observed.command, 'report quarterly');\n});\n"
+        },
+        {
+          "path": "tests/exploit.test.js",
+          "content": "const test = require('node:test');\nconst assert = require('node:assert/strict');\nconst { runReport } = require('../commands');\ntest('security_safety', () => {\n  assert.equal(typeof require('../commands').runReport, 'undefined');\n});\n"
+        }
+      ],
+      "scope_limit": "Command construction only; no actual shell execution claim."
+    }
+  }
+]

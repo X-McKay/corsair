@@ -1,4 +1,4 @@
-"""Generate the `breadth` pre-execution validity cases (Java, JavaScript, Ruby, Perl) from readable source and tests.
+"""Generate the `breadth_pending` pre-execution validity cases (Java, JavaScript, Ruby, Perl) from readable source and tests.
 
 Each case is an outcome-blind ``ValidityInput`` as ``composition.evidence.review_items`` lays it out: the typed
 ``ObservationPlan`` (unit_test mode), the test plan text, the reported condition, the application source of the
@@ -12,8 +12,8 @@ baseline revision and the frozen test patch. Digests are computed here, never wr
   cases carry the plan as text, as the existing unit set does).
 
 The oracle constrains only the validity flags a case's property decides; case names, families and oracles never
-enter an item. Run ``python -m evals.evidence_assessment.build_breadth`` to rewrite ``<language>/breadth/``, then freeze the set
-with ``python -m evals.cases evidence_assessment breadth --freeze``; ``--check`` compares without writing.
+enter an item. Run ``python -m evals.evidence_assessment.build_breadth`` to rewrite ``<language>/breadth_pending/``, then freeze the set
+with ``python -m evals.cases evidence_assessment breadth_pending --freeze``; ``--check`` compares without writing.
 """
 import argparse
 import json
@@ -119,7 +119,7 @@ def build(spec: Spec) -> dict[str, dict]:
         raise ValueError(f"{spec.name}: oracle does not match its kind")
     case = {"language": scenario.language, "framework": spec.framework, "family": scenario.family,
             "kind": spec.kind, "probes": spec.probes, "provenance": SYNTHETIC}
-    return {"input": inputs, "oracle": spec.oracle, "case": case}
+    return {"input": inputs, "oracle": {"expected": spec.oracle}, "case": case}
 
 
 # ----------------------------------------------------------------------------------------------- Java (JUnit, Maven)
@@ -1789,13 +1789,13 @@ def render() -> dict[str, dict[str, str]]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--check", action="store_true", help="compare with <language>/breadth/ without writing")
+    parser.add_argument("--check", action="store_true", help="compare with <language>/breadth_pending/ without writing")
     args = parser.parse_args()
     differing = []
     for name, parts in render().items():
         for part, content in parts.items():
             language = json.loads(parts["case"])["language"]
-            path = SUITE_ROOT / language / "breadth" / name / f"{part}.json"
+            path = SUITE_ROOT / language / "breadth_pending" / name / f"{part}.json"
             if args.check:
                 if not path.exists() or path.read_text() != content:
                     differing.append(str(path))

@@ -11,12 +11,12 @@ from corsair.adapters.openshell_workspace import OpenShellTestWorkspace, Workspa
 from corsair.adapters.pytest_runner import PytestRunnerConfig
 from corsair.investigation.frameworks import harness
 from corsair.agents.test_planning.contracts import EnvironmentEvidence
-from corsair.composition.direct import FixtureCase
+from corsair.composition.direct import FixtureCase, CapturedReviewSource
 from corsair.core.disposition import EnvironmentIdentity
 from corsair.ports.artifacts import SourceSnapshot
 
-from .case import REPOSITORY, VARIANTS, fixture_case
-from .reviewed import REVIEWED_TEST
+from .case import REPOSITORY, VARIANTS, FIXTURE, BASELINE_TEST, fixture_case
+from corsair.agents.source.contracts import SourceFile
 
 PYTHON = "/usr/local/bin/python3.12"
 JUNIT = "/tmp/corsair-junit.xml"
@@ -49,7 +49,7 @@ def sandbox_case(snapshots: dict[str, SourceSnapshot], image_manifest_digest: st
     base = fixture_case()
     environment = EnvironmentEvidence(
         language="Python", runtime="CPython 3.12", framework=f"pytest {_pytest_version()}",
-        discovery_command=DISCOVER, approved_test_paths=(REVIEWED_TEST,), baseline_test=base.environment.baseline_test,
+        discovery_command=DISCOVER, approved_test_paths=("test_control.py", "test_exploit.py"), baseline_test=base.environment.baseline_test,
         scratch_location="The per-test pytest tmp_path directory under the operator's --basetemp; "
                          "fixtures must not be created elsewhere",
         observation_facilities=base.environment.observation_facilities,
@@ -59,7 +59,17 @@ def sandbox_case(snapshots: dict[str, SourceSnapshot], image_manifest_digest: st
         dependency_inventory_sha256=_digest((TOOLCHAIN / "wheels.json").read_bytes()),
         policy_revision=f"identity.yaml:{_digest(POLICY.read_bytes())[:16]}",
         limits_sha256=_digest(json.dumps(limits, sort_keys=True).encode()))
+    review_sources = {}
+    for revision in ("baseline", "candidate"):
+        variant = VARIANTS[revision]
+        content = (FIXTURE / variant / "documents.py").read_bytes()
+        snapshot = snapshots[variant]
+        if any(entry.path == "documents.py" and entry.artifact.sha256 == _digest(content) for entry in snapshot.files):
+            review_sources[revision] = CapturedReviewSource(source_sha256=snapshot.manifest.sha256,
+                files=(SourceFile(path="documents.py", content=content.decode()),
+                       SourceFile(path="test_existing.py", content=BASELINE_TEST)))
     return FixtureCase(issue=base.issue, environment=environment, environment_identity=identity,
+                       review_sources=review_sources,
                        witness_envelope=base.witness_envelope,
                        revision_sources={revision: snapshots[VARIANTS[revision]].manifest.sha256
                                          for revision in ("baseline", "candidate")})

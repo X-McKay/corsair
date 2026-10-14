@@ -11,6 +11,7 @@ from contextlib import AsyncExitStack
 from dataclasses import dataclass, replace
 from hashlib import sha256
 import json
+from corsair.policy.budget import BUDGET_POLICY_SHA256, budget_sha256
 from pathlib import Path
 import sys
 from typing import Literal
@@ -32,10 +33,10 @@ from corsair.agents.issue_analysis.contracts import IssueAnalysisInput
 from corsair.inference.config import InferenceConfig, inference_config, load_inference
 from corsair.inference.models import agent_models
 from corsair.agents.source.contracts import SourceFile
-from corsair.composition.direct import CompositionBudget, DirectRun, FixtureCase, Stage, StageModels, run_direct
+from corsair.composition.direct import CompositionBudget, DirectRun, FixtureCase, CapturedReviewSource, Stage, StageModels, run_direct
 from corsair.core.disposition import Disposition
-from evals.fixture_e2e.case import (BASELINE_TEST, _reads_then, fixture_case, scripted_assessment, scripted_authoring,
-                                    scripted_identification, scripted_planning)
+from evals.fixture_e2e.case import (BASELINE_TEST, _reads_then, fixture_case, scripted_assessment, scripted_control_authoring, scripted_exploit_authoring,
+                                    scripted_identification, scripted_planning, split_reviewed_tests)
 from evals.fixture_e2e.reviewed import FIXTURE, PREFIX, ReviewedLocalExecution, ReviewedWorkspace
 from evals.fixture_e2e.run import STAGES, VERSION_FIELDS, VERSIONS, Journal, attempt_record, result_record
 from corsair.workflows.chain import run_durable
@@ -44,7 +45,7 @@ from evals.cases import load_set, set_digest
 from evals.issue_analysis.evaluate import describe_model, record_count
 
 ROOT = Path(__file__).parent
-# The fixture chain's cases: the end-to-end `fixture` set (evals/e2e/python/fixture/<case>/, PLAN-0094).
+# The fixture chain's cases: the end-to-end `fixture` set (evals/e2e/python/fixture/<case>/, PLAN-0098).
 SUITE, SET = "e2e", "fixture"
 Purpose = Literal["development", "baseline", "candidate"]
 Variant = Literal["vulnerable", "fixed"]
@@ -126,14 +127,19 @@ def chain_case(inputs: ChainInput) -> FixtureCase:
                    *sources)
     return replace(base, issue=IssueAnalysisInput(fixture_id=base.issue.fixture_id, issue=base.issue.issue,
                                                   scope=base.issue.scope, source_files=sources),
-                   revision_sources={r: _digest(FIXTURE / revisions[r] / "documents.py") for r in ("baseline", "candidate")})
+                   revision_sources={r: _digest(FIXTURE / revisions[r] / "documents.py") for r in ("baseline", "candidate")},
+                   review_sources={r: CapturedReviewSource(
+                       source_sha256=_digest(FIXTURE / revisions[r] / "documents.py"),
+                       files=(SourceFile(path="documents.py", content=(FIXTURE / revisions[r] / "documents.py").read_text()),
+                              SourceFile(path="test_existing.py", content=BASELINE_TEST)))
+                       for r in ("baseline", "candidate")})
 
 
 def chain_runners(store, root: Path, revisions: dict[Purpose, Variant]):
     """A fresh private reviewed workspace per purpose holding this case's variant."""
     def runner(purpose):
         workspace = root / purpose
-        return harness("pytest").runner(ReviewedWorkspace(store, workspace, revisions[purpose]), ReviewedLocalExecution(workspace),
+        return harness("pytest").runner(ReviewedWorkspace(store, workspace, revisions[purpose], split_reviewed_tests()), ReviewedLocalExecution(workspace),
                             store, PytestRunnerConfig(PREFIX, ".corsair-junit.xml", str(workspace),
                                                       witness_record_path=".corsair-witness.json"))
     return runner
@@ -149,7 +155,7 @@ def scripted_stages(inputs: ChainInput, oracle: ChainOracle) -> dict[str, object
     """Plumbing only; the assessment proposes the oracle gate triple."""
     gate = oracle.gate or Disposition(execution="completed", finding="inconclusive", fix="not_verified")
     return {"identification": scripted_identification() if inputs.source == "saved" else scripted_abstention(),
-            "planning": scripted_planning(), "authoring": scripted_authoring(),
+            "planning": scripted_planning(), "control_authoring": scripted_control_authoring(), "exploit_authoring": scripted_exploit_authoring(),
             "assessment": scripted_assessment(gate.execution, gate.finding, gate.fix)}
 
 
@@ -195,7 +201,8 @@ async def evaluate(evidence: Path, budget: CompositionBudget = CompositionBudget
     corpus = dataset()
     stages = {input_key(case.inputs): (case.inputs, case.metadata) for case in corpus.cases}
     metadata = {"mode": mode, "composition": f"{run.__module__}.{run.__qualname__}", "live_stages": list(live),
-                "budget": budget.model_dump(), "provider": config.model_dump() if config else None,
+                "budget": budget.model_dump(), "budget_policy_sha256": BUDGET_POLICY_SHA256,
+                "effective_budget_sha256": budget_sha256(budget), "provider": config.model_dump() if config else None,
                 "model": ({stage: describe_model(model[stage]) for stage in live} if isinstance(model, dict)
                           else describe_model(model) if model is not None else "scripted"),
                 "stage_providers": {stage: inference_config(config).resolve(stage).model_dump() for stage in live} if config else {},

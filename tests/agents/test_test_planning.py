@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from pydantic_ai import models
 from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.messages import ModelResponse, ToolCallPart
+from tests.agents.native_skills import activate_skill
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import UsageLimits
 
@@ -20,6 +21,7 @@ from corsair.agents.test_planning import (
 )
 from corsair.agents.test_planning.skills import SKILL_TEXT
 from evals.cases import manifest
+from evals.test_planning.drafts import component_draft
 from evals.test_planning.evaluate import (
     DATASETS, RETIRED, SUITE, EvaluationBudget, dataset, evaluate, passed, plan_checks,
 )
@@ -43,9 +45,12 @@ def run(agent, inputs, **kwargs):
 def responding(plan, *, reads=("documents.py", "test_existing.py"), offered=None):
     calls, offered = [], [] if offered is None else offered
     async def respond(messages, info):
+        activation = activate_skill(messages, info, 'plan-two-tests', SKILL_TEXT)
+        if activation is not None:
+            return activation
         calls.append(1)
-        assert "Plan exactly one benign control" in info.instructions and SKILL_TEXT.strip() in info.instructions
-        offered.append([t.name for t in info.function_tools])
+        assert 'Plan exactly one benign control' in info.instructions
+        offered.append([t.name for t in info.function_tools if t.name != "load_capability"])
         if len(calls) <= len(reads):
             return ModelResponse(parts=[ToolCallPart("read_source", {"path": reads[len(calls) - 1]})])
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {"plan": plan})])
@@ -53,7 +58,7 @@ def responding(plan, *, reads=("documents.py", "test_existing.py"), offered=None
 
 
 def reference():
-    return json.loads(json.dumps(case().metadata.reference_plan))
+    return component_draft(case().metadata.reference_plan)
 
 
 def test_reference_plan_is_admitted_with_trusted_quotations_and_no_labels_in_prompt():
@@ -153,7 +158,7 @@ def edit(path, value):
 
 @pytest.mark.parametrize("plan", [
     reference() | {"regression": reference()["control"]},                                      # third test
-    edit(("security", "test_id"), "test_documents.py::test_benign_control"),                    # duplicate ids
+    edit(("security", "test_name"), "test_benign_control"),                    # duplicate ids
     edit(("security", "test_path"), "tests/test_elsewhere.py"),                                  # unapproved path
     edit(("discovery_command",), ["python", "-m", "pytest", "--collect-only", "-q", "-k", "control"]),  # altered tokens
     edit(("citations",), []),                                                                    # uncited
@@ -206,13 +211,16 @@ def test_contract_checks_environment_only_with_run_context_and_always_checks_ids
 def test_planned_ids_must_name_a_test_in_their_approved_file(path, other, native):
     environment = case().inputs.environment.model_copy(update={"approved_test_paths": (path, other)})
     inputs = case().inputs.model_copy(update={"environment": environment})
-    plan = reference()
+    plan = json.loads(json.dumps(case().metadata.reference_plan))
+    for refs in (plan["citations"], plan["control"]["source_references"], plan["security"]["source_references"]):
+        for ref in refs:
+            ref["quote"] = "Captured source"
     for name in ("control", "security"):
         plan[name].update(test_path=path, test_id=native(path, f"test_{name}"))
-    ReadyTestPlanDraft.model_validate(plan, context=inputs)
+    ReadyTestPlan.model_validate(plan, context=inputs)
     plan["security"]["test_id"] = native(other, "test_security")
     with pytest.raises(ValidationError, match="does not name a test in its test path"):
-        ReadyTestPlanDraft.model_validate(plan, context=inputs)
+        ReadyTestPlan.model_validate(plan, context=inputs)
 
 
 def test_previous_run_reads_do_not_authorize_citations():
@@ -279,14 +287,18 @@ def test_native_provider_wire_carries_skill_schema_and_only_reader():
     async def respond(request):
         body = json.loads(request.content); bodies.append(body)
         system = body["messages"][0]["content"]
-        assert SKILL_TEXT.strip() in system and '"missing_capability"' in system and '"observable_witness"' in system
+        assert SKILL_TEXT.split('---',2)[2].strip() not in system and '"missing_capability"' in system and '"observable_witness"' in system
         assert '"quote"' not in system and '"verdict"' not in system
         reads = ("documents.py", "test_existing.py")
         offered = [t["function"]["name"] for t in body.get("tools", ())]
-        assert offered == ["read_source"] if len(bodies) <= len(reads) else "read_source" not in offered
-        if len(bodies) <= len(reads):
+        assert set(offered) == {"load_capability", "read_source"} if len(bodies) <= len(reads) + 1 else "read_source" not in offered
+        if len(bodies) == 1:
+            message = {'role':'assistant','content':None,'tool_calls':[{'id':'skill1','type':'function','function':{'name':'load_capability','arguments':json.dumps({'id':'plan-two-tests'})}}]}
+            finish = 'tool_calls'
+        elif len(bodies) <= len(reads) + 1:
+            assert any(m.get('role') == 'tool' and '# Skill: plan-two-tests' in str(m.get('content')) for m in body['messages'])
             message = {"role": "assistant", "content": None, "tool_calls": [{"id": f"read{len(bodies)}", "type": "function",
-                "function": {"name": "read_source", "arguments": json.dumps({"path": reads[len(bodies) - 1]})}}]}
+                "function": {"name": "read_source", "arguments": json.dumps({"path": reads[len(bodies) - 2]})}}]}
             finish = "tool_calls"
         else:
             message = {"role": "assistant", "content": json.dumps({"plan": reference()})}; finish = "stop"
@@ -301,7 +313,7 @@ def test_native_provider_wire_carries_skill_schema_and_only_reader():
                 result = await create_test_planning_agent(model).run(planning_prompt(c.inputs), deps=PlanningDependencies(c.inputs))
             assert all(plan_checks(c.inputs, result.output, c.metadata).values())
     asyncio.run(exercise())
-    assert client.is_closed and len(bodies) == 3
+    assert client.is_closed and len(bodies) == 4
 
 
 def test_scratch_check_rejects_fixtures_outside_the_scratch_location():
@@ -446,3 +458,44 @@ def test_unit_observation_contract_refuses_incomplete_or_mixed_evidence(change):
         plan["security"]["observation"]["kind"] = "dependency_call"
     with pytest.raises(ValidationError):
         ReadyTestPlanDraft.model_validate(plan, context=case().inputs)
+
+
+def test_explicit_test_names_finalize_to_native_ids_without_new_output_fields():
+    draft = reference()
+    expected = {role: case().metadata.reference_plan[role]['test_id'] for role in ('control', 'security')}
+    output = run(create_test_planning_agent(responding(draft)), case().inputs).output
+    for role in ('control', 'security'):
+        assert getattr(output, role).test_id == expected[role]
+        assert 'test_name' not in getattr(output, role).model_dump()
+        assert 'test_container' not in getattr(output, role).model_dump()
+
+
+@pytest.mark.parametrize('change', [
+    {'test_name': None},
+    {'test_id': 'test_documents.py::test_control'},
+    {'test_id': None},
+])
+def test_draft_refuses_ambiguous_or_missing_native_identity(change):
+    draft = reference()
+    draft['control'].update(change)
+    with pytest.raises(ValidationError):
+        ReadyTestPlanDraft.model_validate(draft)
+
+
+def test_duplicate_explicit_names_are_refused_after_native_formatting():
+    draft = reference()
+    for role in ('control', 'security'):
+        draft[role]['test_name'] = 'test_same'
+    with pytest.raises(UnexpectedModelBehavior):
+        run(create_test_planning_agent(responding(draft), output_retries=0), case().inputs)
+
+
+def test_frozen_reference_conversion_preserves_original_and_excludes_native_id_from_model_schema():
+    from corsair.agents.test_planning.contracts import TestSpecificationDraft
+    frozen = json.loads(json.dumps(case().metadata.reference_plan))
+    original = json.loads(json.dumps(frozen))
+    converted = component_draft(frozen)
+    assert frozen == original
+    assert all('test_id' not in converted[role] for role in ('control', 'security'))
+    assert 'test_id' not in TestSpecificationDraft.model_json_schema()['properties']
+    assert all(converted[role]['test_name'] for role in ('control', 'security'))
