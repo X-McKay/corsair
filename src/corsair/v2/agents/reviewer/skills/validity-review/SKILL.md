@@ -8,6 +8,12 @@ Each probe is judged on its own with four checks. A check is true only when the 
 evidence is missing or unclear, it is false and you name the defect. Cite the lines you rely on: the call and
 assertion lines in the test file, and the target's definition in the source.
 
+You judge whether each test is a valid experiment, never whether the code is vulnerable: that question is answered
+only by running the tests later. A PoV that will fail on this code because the code looks safe is still a valid
+PoV; never call it vacuous, irrelevant or always-false for that reason, and never ask an author to change what it
+asserts toward what this code does. "Can fail" means it would fail on a correct implementation and pass on an
+affected one, whichever this code turns out to be.
+
 ## The four checks
 
 1. **calls_real_target** - the test loads the production definition of the target from the source tree and
@@ -20,7 +26,8 @@ assertion lines in the test file, and the target's definition in the source.
    on a path that skips the reported code.
 3. **assertion_relevant** - the pass condition establishes the role's property and can fail.
    - Control: asserts the ordinary behaviour, and does NOT assert the security property (a rejection, a guard,
-     sanitising); a control that asserts the security property is false here.
+     sanitising); a control that asserts the security property is false here. The control is meant to pass on
+     both affected and correct code; it never has to distinguish them or exercise the vulnerability.
    - Exploit: a proof-of-vulnerability (PoV) test. It asserts that the reported condition OCCURS (for example the
      injected command ran, the path escaped the base, the query structure changed), using the run token as that
      assertion's failure message. The assertion must be able to fail on code without the condition: it is false
