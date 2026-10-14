@@ -9,7 +9,7 @@ lives; it does not restate the design.
 
 | # | Stage | Owner | Module |
 | --- | --- | --- | --- |
-| 0 | Ground | Grounding agent (placeholder) | `agents/grounding/` |
+| 0 | Ground | Grounding agent (advisory placeholder; nothing downstream reads its brief) | `agents/grounding/` |
 | 1 | Intake | code | `intake.py` |
 | 2 | Select | code | `matrix.py` |
 | 3 | Investigate | Investigator agent | `agents/investigator/` |
