@@ -1,0 +1,15 @@
+{
+  "fixture_id": "javascript-missing-named-verifier",
+  "issue": "verifyWebhookSignature in src/webhooks.js accepts payloads whose X-Signature header is empty. Locate verifyWebhookSignature.",
+  "scope": "component",
+  "source_files": [
+    {
+      "path": "src/routes.js",
+      "content": "const express = require(\"express\");\nconst { verifyWebhookSignature } = require(\"./webhooks\");\n\nconst router = express.Router();\n\nrouter.post(\"/hooks\", express.raw({ type: \"*/*\" }), (req, res) => {\n  if (!verifyWebhookSignature(req.body, req.get(\"X-Signature\"))) return res.sendStatus(401);\n  res.sendStatus(204);\n});\n\nmodule.exports = router;\n"
+    },
+    {
+      "path": "src/token.js",
+      "content": "\"use strict\";\n\nconst crypto = require(\"crypto\");\n\n// Issue a session token.\nfunction generateToken() {\n  return crypto.randomBytes(16).toString(\"hex\");\n}\n\nmodule.exports = { generateToken };\n"
+    }
+  ]
+}

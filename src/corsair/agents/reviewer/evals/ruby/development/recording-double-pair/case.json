@@ -1,0 +1,20 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "accounts",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "A pair that replaces only the database dependency with a recording double",
+  "expected": "Both probes valid: the double replaces an allowed dependency and the PoV asserts the query text changed.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory"
+  ],
+  "provenance": {
+    "source": "derived",
+    "license": "n/a (synthetic)",
+    "notes": "control: control_prober development/recording-double reference draft; exploit: exploit_prober development/recording-double reference draft"
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "archive",
+    "path": "lib/backup.rb",
+    "lines": [
+      9,
+      10
+    ],
+    "max_span": 10
+  },
+  "exploit_markers": [
+    "; touch"
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "lib/backup.rb"
+  ],
+  "replay": {
+    "reads": [
+      "lib/backup.rb"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "archive",
+      "hypothesis": "If project 'site; touch pwned' reaches archive without the relevant check, the safe property fails: The runner receives several arguments (an argument vector, never one shell string), and no recorded argument contains '; touch pwned' outside a whole path element",
+      "control": {
+        "role": "control",
+        "test_file": "test/backup_control_test.rb",
+        "test_name": "test_passes_plain_project",
+        "target": "archive",
+        "seam": "Call the real Backup#archive with an injected runner",
+        "input_description": "project 'site'",
+        "property_to_assert": "Returns true and the runner records exactly one call naming site Observed by: Recorded runner argument lists from the real archive call, asserted with assert_equal",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "lib/backup.rb",
+            "start_line": 9,
+            "end_line": 10,
+            "quote": "  def archive(project)\n    @runner.call(\"tar czf backups/#{project}.tgz projects/#{project}\")"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "test/backup_exploit_test.rb",
+        "test_name": "test_keeps_hostile_project_out_of_shell",
+        "target": "archive",
+        "seam": "Call the real Backup#archive with an injected runner",
+        "input_description": "project 'site; touch pwned'",
+        "property_to_assert": "The runner receives several arguments (an argument vector, never one shell string), and no recorded argument contains '; touch pwned' outside a whole path element Observed by: Recorded runner argument lists: assert_operator args.length, :>, 1 and refute any single-string command containing 'touch pwned'",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "lib/backup.rb",
+            "start_line": 9,
+            "end_line": 10,
+            "quote": "  def archive(project)\n    @runner.call(\"tar czf backups/#{project}.tgz projects/#{project}\")"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "lib/backup.rb",
+          "start_line": 9,
+          "end_line": 10,
+          "quote": "  def archive(project)\n    @runner.call(\"tar czf backups/#{project}.tgz projects/#{project}\")"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

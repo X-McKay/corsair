@@ -1,0 +1,35 @@
+{
+  "row_id": "junit5-maven-temurin17",
+  "brief": {
+    "role": "control",
+    "test_file": "src/test/java/com/example/accounts/AccountsControlTest.java",
+    "test_name": "benignControl",
+    "target": "src/main/java/com/example/accounts/Accounts.java: Accounts.balance(database, account)",
+    "seam": "Call the real Accounts.balance with an injected Database implementation",
+    "input_description": "account 'alice'",
+    "property_to_assert": "Returns the rows the database double returns (25) and issues exactly one query",
+    "doubles": "RecordingDatabase.query records the SQL and parameters unchanged and returns fixed rows; it neither builds nor sanitizes SQL",
+    "citations": [
+      {
+        "path": "src/main/java/com/example/accounts/Accounts.java",
+        "start_line": 16,
+        "end_line": 18
+      },
+      {
+        "path": "src/test/java/com/example/accounts/AccountsTest.java",
+        "start_line": 1,
+        "end_line": 13
+      }
+    ]
+  },
+  "source_files": [
+    {
+      "path": "src/main/java/com/example/accounts/Accounts.java",
+      "content": "package com.example.accounts;\n\nimport java.util.Collections;\nimport java.util.List;\n\n/** Account balance lookups against an injected database connection. */\npublic final class Accounts {\n    /** The database connection the lookup runs on. */\n    public interface Database {\n        List<Integer> query(String sql, List<String> parameters);\n    }\n\n    private Accounts() {\n    }\n\n    public static List<Integer> balance(Database database, String account) {\n        return database.query(\"SELECT balance FROM accounts WHERE account = '\" + account + \"'\", Collections.emptyList());\n    }\n}\n"
+    },
+    {
+      "path": "src/test/java/com/example/accounts/AccountsTest.java",
+      "content": "package com.example.accounts;\n\nimport static org.junit.jupiter.api.Assertions.assertEquals;\n\nimport java.util.Collections;\nimport org.junit.jupiter.api.Test;\n\nclass AccountsTest {\n    @Test\n    void returnsRows() {\n        assertEquals(Collections.singletonList(25), Accounts.balance((sql, parameters) -> Collections.singletonList(25), \"alice\"));\n    }\n}\n"
+    }
+  ]
+}

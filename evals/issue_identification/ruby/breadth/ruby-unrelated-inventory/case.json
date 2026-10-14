@@ -1,0 +1,11 @@
+{
+  "language": "ruby",
+  "framework": "ruby",
+  "family": "zip-slip",
+  "kind": "abstention",
+  "probes": "The inventory holds only text helpers unrelated to the reported archive extraction.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)"
+  }
+}

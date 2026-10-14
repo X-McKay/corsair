@@ -1,0 +1,178 @@
+{
+  "source_files": [
+    {
+      "path": "Makefile",
+      "content": "install:\n\tpython3.12 -m pip install --require-hashes --only-binary :all: --no-compile -r requirements.txt\n\ntest:\n\tpytest -q\n"
+    },
+    {
+      "path": "requirements.txt",
+      "content": "pytest==9.0.3 --hash=sha256:d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4\n"
+    },
+    {
+      "path": "slugify/__init__.py",
+      "content": "import re\n\n\ndef slugify(text):\n    return re.sub(r\"[^a-z0-9]+\", \"-\", text.lower()).strip(\"-\")\n"
+    },
+    {
+      "path": "tests/test_slugify.py",
+      "content": "import pytest\n\nfrom slugify import slugify\n\n\n@pytest.mark.xfail(reason=\"CJK transliteration needs unidecode, which is not a dependency\")\ndef test_transliterates_cjk():\n    assert slugify(\"\\u5317\\u4eac\") == \"bei-jing\"\n\n\ndef test_collapses_separators():\n    assert slugify(\"a  --  b\") == \"a-b\"\n"
+    }
+  ],
+  "row_id": "pytest-cpython312",
+  "plan": {
+    "status": "planned",
+    "target": "slugify/__init__",
+    "citations": [
+      {
+        "path": "slugify/__init__.py",
+        "start_line": 1,
+        "end_line": 1,
+        "quote": "import re"
+      }
+    ]
+  },
+  "feedback": null,
+  "workspace_fixture": {
+    "observations": [
+      {
+        "argv": [
+          "python3.12",
+          "-m",
+          "pip",
+          "install",
+          "--require-hashes",
+          "--only-binary",
+          ":all:",
+          "--no-compile",
+          "-r",
+          "requirements.txt"
+        ],
+        "exit_code": 0,
+        "output": ""
+      },
+      {
+        "argv": [
+          "python3.12",
+          "-m",
+          "compileall",
+          "-q",
+          "slugify"
+        ],
+        "exit_code": 0,
+        "output": ""
+      },
+      {
+        "argv": [
+          "python3.12",
+          "-m",
+          "pytest",
+          "--collect-only",
+          "-q",
+          "-c",
+          "/dev/null",
+          "--rootdir",
+          "."
+        ],
+        "exit_code": 0,
+        "output": "tests/test_slugify.py::test_transliterates_cjk\ntests/test_slugify.py::test_collapses_separators\n\n2 tests collected in 0.02s\n"
+      },
+      {
+        "argv": [
+          "python3.12",
+          "-m",
+          "pytest",
+          "-q",
+          "-c",
+          "/dev/null",
+          "--rootdir",
+          ".",
+          "tests/test_slugify.py::test_transliterates_cjk"
+        ],
+        "exit_code": 0,
+        "output": "x                                                                        [100%]\n1 xfailed in 0.03s\n"
+      },
+      {
+        "argv": [
+          "python3.12",
+          "-m",
+          "pytest",
+          "-q",
+          "-c",
+          "/dev/null",
+          "--rootdir",
+          ".",
+          "tests/test_slugify.py::test_collapses_separators"
+        ],
+        "exit_code": 0,
+        "output": ".                                                                        [100%]\n1 passed in 0.02s\n"
+      },
+      {
+        "argv": [
+          "/usr/bin/env",
+          "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1",
+          "PYTHONDONTWRITEBYTECODE=1",
+          "PYTHONPATH=.:.corsair-deps",
+          "/usr/local/bin/python3",
+          "-m",
+          "pytest",
+          "-c",
+          "/dev/null",
+          "--rootdir",
+          ".",
+          "--noconftest",
+          "--import-mode=importlib",
+          "-p",
+          "no:cacheprovider",
+          "-v",
+          "tests/test_slugify.py::test_transliterates_cjk"
+        ],
+        "exit_code": 0,
+        "output": "============================= test session starts ==============================\nplatform linux -- Python 3.12.15, pytest-9.0.3, pluggy-1.6.0 -- /usr/local/bin/python3\nrootdir: /work\ncollecting ... collected 1 item\n\ntests/test_slugify.py::test_transliterates_cjk XFAIL [100%]\n\n=== 1 xfailed in 0.03s ===\n"
+      },
+      {
+        "argv": [
+          "/usr/bin/env",
+          "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1",
+          "PYTHONDONTWRITEBYTECODE=1",
+          "PYTHONPATH=.:.corsair-deps",
+          "/usr/local/bin/python3",
+          "-m",
+          "pytest",
+          "-c",
+          "/dev/null",
+          "--rootdir",
+          ".",
+          "--noconftest",
+          "--import-mode=importlib",
+          "-p",
+          "no:cacheprovider",
+          "-v",
+          "tests/test_slugify.py::test_collapses_separators"
+        ],
+        "exit_code": 0,
+        "output": "============================= test session starts ==============================\nplatform linux -- Python 3.12.15, pytest-9.0.3, pluggy-1.6.0 -- /usr/local/bin/python3\nrootdir: /work\ncollecting ... collected 1 item\n\ntests/test_slugify.py::test_collapses_separators PASSED [100%]\n\n=== 1 passed in 0.02s ===\n"
+      },
+      {
+        "argv": [
+          "python3.12",
+          "--version"
+        ],
+        "exit_code": 0,
+        "output": "Python 3.12.15\n"
+      },
+      {
+        "argv": [
+          "/usr/local/bin/python3",
+          "-m",
+          "pytest",
+          "--version"
+        ],
+        "exit_code": 0,
+        "output": "pytest 9.0.3\n"
+      }
+    ],
+    "written_file_run": {
+      "exit_code": 0,
+      "output": "============================= test session starts ==============================\nplatform linux -- Python 3.12.15, pytest-9.0.3, pluggy-1.6.0 -- /usr/local/bin/python3\nrootdir: /work\ncollecting ... collected 1 item\n\n{file}::{name} PASSED [100%]\n\n=== 1 passed in 0.01s ===\n"
+    }
+  }
+}

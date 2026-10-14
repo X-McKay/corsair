@@ -1,0 +1,74 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "apply_changes",
+    "path": "app/services/profile_updater.rb",
+    "lines": [
+      6,
+      8
+    ],
+    "max_span": 8
+  },
+  "exploit_markers": [],
+  "exploit_patterns": [
+    "(?i)\\badmin\\b"
+  ],
+  "required_reads": [
+    "app/services/profile_updater.rb"
+  ],
+  "replay": {
+    "reads": [
+      "app/services/profile_updater.rb"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "apply_changes",
+      "hypothesis": "If params {'name' => 'Ann', 'admin' => true} reaches apply_changes without the relevant check, the safe property fails: the user's admin flag stays false",
+      "control": {
+        "role": "control",
+        "test_file": "test/profile_updater_control_test.rb",
+        "test_name": "test_benign_control",
+        "target": "apply_changes",
+        "seam": "ProfileUpdater.new(user).apply_changes(params) with a Struct-backed user double",
+        "input_description": "params {'name' => 'Ann'}",
+        "property_to_assert": "the user's name becomes Ann and save is called",
+        "doubles": "a user double with name, admin and save",
+        "citations": [
+          {
+            "path": "app/services/profile_updater.rb",
+            "start_line": 6,
+            "end_line": 8,
+            "quote": "  def apply_changes(params)\n    params.each do |field, value|\n      @user.public_send(\"#{field}=\", value)"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "test/profile_updater_exploit_test.rb",
+        "test_name": "test_security_regression",
+        "target": "apply_changes",
+        "seam": "ProfileUpdater.new(user).apply_changes(params) with a Struct-backed user double",
+        "input_description": "params {'name' => 'Ann', 'admin' => true}",
+        "property_to_assert": "the user's admin flag stays false",
+        "doubles": "a user double with name, admin and save",
+        "citations": [
+          {
+            "path": "app/services/profile_updater.rb",
+            "start_line": 6,
+            "end_line": 8,
+            "quote": "  def apply_changes(params)\n    params.each do |field, value|\n      @user.public_send(\"#{field}=\", value)"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "app/services/profile_updater.rb",
+          "start_line": 6,
+          "end_line": 8,
+          "quote": "  def apply_changes(params)\n    params.each do |field, value|\n      @user.public_send(\"#{field}=\", value)"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

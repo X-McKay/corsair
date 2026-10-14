@@ -1,0 +1,43 @@
+{
+  "relevant": [
+    "7674"
+  ],
+  "dispositions": {
+    "7674": "not_exploitable"
+  },
+  "distractors": [
+    "7673"
+  ],
+  "prior_disposition": null,
+  "must_not_claim": [],
+  "injection_markers": [],
+  "script": [
+    {
+      "tool": "read_issue",
+      "args": {
+        "issue_id": "7673"
+      }
+    },
+    {
+      "final": {
+        "summary": "One comparable prior decision judged the code not exploitable for a reason specific to it. Another retrieved issue is a performance fix and is not a security precedent.",
+        "precedents": [
+          {
+            "issue_id": "7674",
+            "title": "redirect_to uses the return_to parameter in the archived service",
+            "state": "Closed",
+            "disposition": "not_exploitable",
+            "relation": "similarity",
+            "rationale": "Reviewers found the input constrained before use.",
+            "quote": "Not exploitable: return_to is replaced by a stored session value before the redirect.",
+            "similarity": 0.74
+          }
+        ],
+        "prior_disposition": null,
+        "caveats": [
+          "Issue 7673 matched on vocabulary only; it is a performance issue."
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "status": "unsupported_scope",
+  "target": {
+    "symbol": "matches",
+    "path": "src/main/java/com/example/auth/ApiKeyVerifier.java",
+    "lines": [
+      11,
+      12
+    ],
+    "max_span": 10
+  },
+  "required_reads": [
+    "src/main/java/com/example/auth/ApiKeyVerifier.java"
+  ],
+  "reason_patterns": [
+    "(?i)timing",
+    "(?i)wall[- ]?clock"
+  ],
+  "replay": {
+    "reads": [
+      "src/main/java/com/example/auth/ApiKeyVerifier.java"
+    ],
+    "plan": {
+      "status": "unsupported_scope",
+      "target": "",
+      "hypothesis": "",
+      "control": null,
+      "exploit": null,
+      "citations": [
+        {
+          "path": "src/main/java/com/example/auth/ApiKeyVerifier.java",
+          "start_line": 11,
+          "end_line": 12,
+          "quote": "    public boolean matches(String presented) {\n        return presented != null && expected.equals(presented);"
+        }
+      ],
+      "reason": "The concern is a timing side channel: a safe and an unsafe comparison return the same values, and a unit test at a seam offers no timing, instruction-count or constant-time observation, only native pass/fail outcomes"
+    }
+  }
+}

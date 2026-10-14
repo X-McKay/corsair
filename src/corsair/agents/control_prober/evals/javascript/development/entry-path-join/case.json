@@ -1,0 +1,21 @@
+{
+  "language": "javascript",
+  "framework": "jest",
+  "family": "archive-paths",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "The planned property is the entry path joined under the destination for an ordinary entry",
+  "expected": "A control draft asserting the joined path 'out/docs/a.txt' for the entry 'docs/a.txt'.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/test_authoring/javascript/breadth_pending/javascript-exception-plan (exception plan); control plan entry"
+  }
+}

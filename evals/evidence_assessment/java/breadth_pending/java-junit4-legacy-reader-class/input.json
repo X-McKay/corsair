@@ -1,0 +1,77 @@
+{
+  "scope": "component",
+  "plan": {
+    "control_test_id": "com.example.files.DocumentStoreTest#controlReadsDocumentInsideRoot",
+    "security_test_id": "com.example.files.DocumentStoreTest#exploitRejectsParentTraversal",
+    "expected_failure": {
+      "exception_type": "java.lang.AssertionError",
+      "path": "src/test/java/com/example/files/DocumentStoreTest.java",
+      "function": "exploitRejectsParentTraversal",
+      "assertion_lines": [
+        30
+      ]
+    },
+    "expected_safe_behavior": "java.lang.IllegalArgumentException",
+    "frozen_patch_sha256": "0cf2e9a3fe40febcc398d1c6bc8f5654f65dd3f2028743a546d074dbb3c74faf",
+    "observation_mode": "unit_test",
+    "test_plan_sha256": "200cc1e0ebaa3c23b09e47cff408d263301796b52382bcf97925ce0318ad3d62"
+  },
+  "revision_sources": {
+    "baseline": "ef069e5a2da473588b8fffe76f134c50b50e33971f05fe048cc70868b42d3e83"
+  },
+  "items": [
+    {
+      "item_id": "plan",
+      "kind": "plan",
+      "revision": null,
+      "run": null,
+      "sha256": "858445582405fde77da99d30569b8ef869c2cc912840b02fa219224a1f8166d0",
+      "content": "{\n  \"control_test_id\": \"com.example.files.DocumentStoreTest#controlReadsDocumentInsideRoot\",\n  \"security_test_id\": \"com.example.files.DocumentStoreTest#exploitRejectsParentTraversal\",\n  \"expected_failure\": {\n    \"exception_type\": \"java.lang.AssertionError\",\n    \"path\": \"src/test/java/com/example/files/DocumentStoreTest.java\",\n    \"function\": \"exploitRejectsParentTraversal\",\n    \"assertion_lines\": [\n      30\n    ]\n  },\n  \"expected_safe_behavior\": \"java.lang.IllegalArgumentException\",\n  \"frozen_patch_sha256\": \"0cf2e9a3fe40febcc398d1c6bc8f5654f65dd3f2028743a546d074dbb3c74faf\",\n  \"observation_mode\": \"unit_test\",\n  \"test_plan_sha256\": \"200cc1e0ebaa3c23b09e47cff408d263301796b52382bcf97925ce0318ad3d62\"\n}"
+    },
+    {
+      "item_id": "test-plan",
+      "kind": "plan",
+      "revision": null,
+      "run": null,
+      "sha256": "200cc1e0ebaa3c23b09e47cff408d263301796b52382bcf97925ce0318ad3d62",
+      "content": "Exactly two JUnit probes in DocumentStoreTest. Control: write note.txt under a temporary docs root and assert new DocumentStore(root).read(\"note.txt\") returns hello. Exploit: place secret.txt beside the root, call read(\"../secret.txt\") and assert IllegalArgumentException with message outside root. DocumentStore.read in src/main/java/com/example/files/DocumentStore.java owns the containment check. The filesystem is a temporary directory; DocumentStore itself is never replaced."
+    },
+    {
+      "item_id": "reported-condition",
+      "kind": "plan",
+      "revision": null,
+      "run": null,
+      "sha256": "55771cf78a71c8a9c984c338896d5f374c3ca076a78cfabb096ad2eb7fd86af8",
+      "content": "Document names from the download endpoint reach DocumentStore.read unchanged. A name such as ../secret.txt may resolve outside the configured document root and return another file's contents."
+    },
+    {
+      "item_id": "baseline-source-0",
+      "kind": "source",
+      "revision": "baseline",
+      "run": 0,
+      "sha256": "ad3b4114679ac8adb74a5c70add44166aff341fb700cd47bcf147f5828f34b90",
+      "path": "src/main/java/com/example/files/DocumentStore.java",
+      "source_sha256": "ef069e5a2da473588b8fffe76f134c50b50e33971f05fe048cc70868b42d3e83",
+      "content": "package com.example.files;\n\nimport java.io.IOException;\nimport java.nio.charset.StandardCharsets;\nimport java.nio.file.Files;\nimport java.nio.file.Path;\n\npublic final class DocumentStore {\n    private final Path root;\n\n    public DocumentStore(Path root) {\n        this.root = root.toAbsolutePath().normalize();\n    }\n\n    public String read(String name) throws IOException {\n        Path target = root.resolve(name).normalize();\n        if (!target.startsWith(root)) {\n            throw new IllegalArgumentException(\"outside root\");\n        }\n        return new String(Files.readAllBytes(target), StandardCharsets.UTF_8);\n    }\n}\n"
+    },
+    {
+      "item_id": "baseline-source-1",
+      "kind": "source",
+      "revision": "baseline",
+      "run": 0,
+      "sha256": "a38a79dec7019447b8e2c206ab2e8b9134cd007dca08a190728415ae4ee7418d",
+      "path": "src/main/java/com/example/files/LegacyDocumentReader.java",
+      "source_sha256": "ef069e5a2da473588b8fffe76f134c50b50e33971f05fe048cc70868b42d3e83",
+      "content": "package com.example.files;\n\nimport java.io.IOException;\nimport java.nio.charset.StandardCharsets;\nimport java.nio.file.Files;\nimport java.nio.file.Path;\n\npublic final class LegacyDocumentReader {\n    private LegacyDocumentReader() {\n    }\n\n    public static String read(Path root, String name) throws IOException {\n        if (name.contains(\"..\")) {\n            throw new IllegalArgumentException(\"outside root\");\n        }\n        return new String(Files.readAllBytes(root.resolve(name)), StandardCharsets.UTF_8);\n    }\n}\n"
+    },
+    {
+      "item_id": "patch-0",
+      "kind": "patch",
+      "revision": null,
+      "run": null,
+      "sha256": "dce3f729e9e98d04abc9585b13f58dbae455ed0679ad6c6be6c19215d69673e8",
+      "path": "src/test/java/com/example/files/DocumentStoreTest.java",
+      "content": "package com.example.files;\n\nimport static org.junit.Assert.assertEquals;\nimport static org.junit.Assert.assertThrows;\n\nimport java.io.File;\nimport java.nio.charset.StandardCharsets;\nimport java.nio.file.Files;\nimport java.nio.file.Path;\nimport org.junit.Rule;\nimport org.junit.Test;\nimport org.junit.rules.TemporaryFolder;\n\npublic class DocumentStoreTest {\n    @Rule\n    public TemporaryFolder tmp = new TemporaryFolder();\n\n    @Test\n    public void controlReadsDocumentInsideRoot() throws Exception {\n        Path root = tmp.newFolder(\"docs\").toPath();\n        Files.write(root.resolve(\"note.txt\"), \"hello\".getBytes(StandardCharsets.UTF_8));\n        assertEquals(\"hello\", LegacyDocumentReader.read(root, \"note.txt\"));\n    }\n\n    @Test\n    public void exploitRejectsParentTraversal() throws Exception {\n        Path root = tmp.newFolder(\"docs\").toPath();\n        File secret = tmp.newFile(\"secret.txt\");\n        Files.write(secret.toPath(), \"token\".getBytes(StandardCharsets.UTF_8));\n        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,\n                () -> LegacyDocumentReader.read(root, \"../secret.txt\"));\n        assertEquals(\"outside root\", error.getMessage());\n    }\n}\n"
+    }
+  ]
+}

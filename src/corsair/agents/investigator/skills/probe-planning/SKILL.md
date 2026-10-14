@@ -1,0 +1,50 @@
+---
+name: probe-planning
+description: How to choose a seam and write the control and exploit probe briefs.
+---
+# Planning two native probes
+
+**Target and seam.** The target is the production function, method or handler where the reported condition is
+decided. The seam is the narrowest public way a unit test can reach it: a direct call, a request through the
+framework's own test client, or a constructor plus method. Prefer a seam that keeps the production logic
+responsible for the property in the call path. Name the import or load path the test will use as it appears in
+the source.
+
+**Doubles.** Only dependencies may be doubled: databases, network clients, the filesystem, subprocesses, clocks.
+Say which ones and what the double must record or return. Never double the target or the check under test.
+
+**Control brief.** An ordinary, realistic input that a correct implementation handles successfully, and the
+ordinary result to assert (a return value, a written record, a response). It must stay true after a legitimate
+fix of the reported issue, so it must not assert anything about the security check itself.
+
+**Exploit brief.** The exploit probe is a proof-of-vulnerability (PoV) test. Give an adversarial input that would
+trigger the reported condition (Trace the payload through the exact code that builds the dangerous value (the string concatenation, format or template in the cited lines) and write out the final value the interpreter (shell, SQL engine, path resolver, template) would receive. It must be well-formed there and make the condition occur: no stray quote, comment or separator that turns it into a syntax error unless the code itself wraps the input in quotes. A payload that breaks the syntax proves nothing on affected code and turns a real issue into a false negative.), and the observable condition to assert as occurring: for example the injected
+command reached the subprocess double, the resolved path is outside the base directory, the query sent to the
+database double carries the input as structure, the response holds the unescaped markup. Phrase the property as
+what happens when the issue is real; the test passes when the code is vulnerable and fails when it is not. The
+condition must be one a correct implementation would not show, so the assertion can fail.
+
+Counterfactual check, required: write `safe_observation`, what the test would observe if the target were correct.
+A correct implementation usually does NOT reject the input: it passes it on as data (a separate argument, a bound
+parameter, an escaped string, a path checked against its base). So "the input reached the sink" and "the payload text
+appears" are true of correct code too and are never proof. The PoV must show the input crossing from data into
+structure or into an effect it should not have: the payload's own command ran (its output or a file it created), the
+command was run through a shell as one string carrying the metacharacters, the query's structure changed (extra
+rows, a different result), the resolved path lies outside the base, the markup arrived unescaped. The asserted
+property must be false in `safe_observation`.
+
+**Independence.** Write each brief as if the other did not exist: its own input, its own property, its own
+citations. Do not refer to "the other test" or reuse the other input.
+
+**Files and names.** Put each probe in its own new file under the given test directory, named so the framework
+discovers it, with a test name valid in that framework (letters, digits and underscores, starting with a
+letter or underscore).
+
+**Citations.** Cite the target's definition, the seam and the line where the condition is decided. Quote a
+short exact fragment of the cited lines; whitespace differences are tolerated, other differences are not.
+
+**Refusing.** Use target_not_found when searching the tree finds no code matching the finding. Scope is
+provability, not category: plan any finding both probes can prove inside the workspace, deterministically and with no
+outbound network, using local stand-ins where needed (a local server, a temporary file, an in-process double of a
+dependency). Use unsupported_scope, and say what is missing, only when the proof needs something the workspace cannot
+supply: a real remote endpoint, the host trust store, a system-wide cipher policy, or a specific library build.

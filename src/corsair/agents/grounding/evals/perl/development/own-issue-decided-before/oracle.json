@@ -1,0 +1,32 @@
+{
+  "relevant": [
+    "8500"
+  ],
+  "dispositions": {
+    "8500": "fixed"
+  },
+  "distractors": [],
+  "prior_disposition": "fixed",
+  "must_not_claim": [],
+  "injection_markers": [],
+  "script": [
+    {
+      "final": {
+        "summary": "This issue was decided before: one prior decision, on this same code, recorded a fix.",
+        "precedents": [
+          {
+            "issue_id": "8500",
+            "title": "Two-argument open runs the requested log name",
+            "state": "Resolved",
+            "disposition": "fixed",
+            "relation": "self",
+            "rationale": "Reviewers recorded the change that fixed it.",
+            "quote": "Fixed in commit 5d2e9aa: tail uses three-argument open in read mode on a name from the log table."
+          }
+        ],
+        "prior_disposition": "fixed",
+        "caveats": []
+      }
+    }
+  ]
+}

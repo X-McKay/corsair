@@ -1,0 +1,147 @@
+{
+  "source_files": [
+    {
+      "path": "pom.xml",
+      "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\">\n  <!-- JUnit5 Maven setup: mvn dependency:go-offline; mvn -o compile; mvn -o test -DlistTests=true; mvn -o test -Dtest=WikiTest#forwards -->\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.example</groupId>\n  <artifactId>wiki</artifactId>\n  <version>1.0.0</version>\n  <properties>\n    <maven.compiler.release>17</maven.compiler.release>\n  </properties>\n  <dependencies>\n    <dependency>\n      <groupId>org.junit.jupiter</groupId>\n      <artifactId>junit-jupiter</artifactId>\n      <version>5.14.4</version>\n      <scope>test</scope>\n    </dependency>\n  </dependencies>\n</project>\n"
+    },
+    {
+      "path": "src/main/java/org/example/Wiki.java",
+      "content": "package org.example;\n\npublic class Wiki {\n    public String link(String page) {\n        return \"/wiki/\" + page;\n    }\n}\n"
+    },
+    {
+      "path": "src/test/java/org/example/WikiTest.java",
+      "content": "package org.example;\n\nimport org.junit.jupiter.api.Test;\n\nimport static org.junit.jupiter.api.Assertions.*;\n\nclass WikiTest {\n    @Test\n    void forwards() {\n        assertEquals(\"/wiki/Home\", new Wiki().link(\"Home\"));\n    }\n}\n"
+    }
+  ],
+  "row_id": "junit5-maven-temurin17",
+  "plan": {
+    "status": "planned",
+    "target": "src/main/java/org/example/Wiki",
+    "citations": [
+      {
+        "path": "src/main/java/org/example/Wiki.java",
+        "start_line": 1,
+        "end_line": 1,
+        "quote": "package org.example;"
+      }
+    ]
+  },
+  "feedback": null,
+  "workspace_fixture": {
+    "observations": [
+      {
+        "argv": [
+          "mvn",
+          "dependency:go-offline"
+        ],
+        "exit_code": 0,
+        "output": ""
+      },
+      {
+        "argv": [
+          "mvn",
+          "-o",
+          "compile"
+        ],
+        "exit_code": 0,
+        "output": "",
+        "needs": [
+          [
+            "mvn",
+            "dependency:go-offline"
+          ]
+        ],
+        "unmet": {
+          "exit_code": 1,
+          "output": "[ERROR] Failed to execute goal on project app: Could not resolve dependencies: Cannot access central (https://repo.maven.apache.org/maven2) in offline mode and the artifact org.junit.jupiter:junit-jupiter:jar:5.14.4 has not been downloaded from it before.\n[INFO] BUILD FAILURE\n"
+        }
+      },
+      {
+        "argv": [
+          "mvn",
+          "-o",
+          "test",
+          "-DlistTests=true"
+        ],
+        "exit_code": 0,
+        "output": "org.example.WikiTest#forwards\n",
+        "needs": [
+          [
+            "mvn",
+            "dependency:go-offline"
+          ]
+        ],
+        "unmet": {
+          "exit_code": 1,
+          "output": "[ERROR] Failed to execute goal on project app: Could not resolve dependencies: Cannot access central (https://repo.maven.apache.org/maven2) in offline mode and the artifact org.junit.jupiter:junit-jupiter:jar:5.14.4 has not been downloaded from it before.\n[INFO] BUILD FAILURE\n"
+        }
+      },
+      {
+        "argv": [
+          "mvn",
+          "-o",
+          "test",
+          "-Dtest=WikiTest#forwards"
+        ],
+        "exit_code": 0,
+        "output": "[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0\n[INFO] BUILD SUCCESS\n",
+        "needs": [
+          [
+            "mvn",
+            "dependency:go-offline"
+          ]
+        ],
+        "unmet": {
+          "exit_code": 1,
+          "output": "[ERROR] Failed to execute goal on project app: Could not resolve dependencies: Cannot access central (https://repo.maven.apache.org/maven2) in offline mode and the artifact org.junit.jupiter:junit-jupiter:jar:5.14.4 has not been downloaded from it before.\n[INFO] BUILD FAILURE\n"
+        }
+      },
+      {
+        "argv": [
+          "/usr/share/maven/bin/mvn",
+          "-B",
+          "-ntp",
+          "-o",
+          "-Dmaven.repo.local=.corsair-m2",
+          "-Dtest=WikiTest#forwards",
+          "-DtrimStackTrace=false",
+          "test"
+        ],
+        "exit_code": 0,
+        "output": "[INFO] Running org.example.WikiTest\n[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.042 s -- in org.example.WikiTest\n[INFO] \n[INFO] Results:\n[INFO] \n[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0\n[INFO] \n[INFO] BUILD SUCCESS\n",
+        "needs": [
+          [
+            "mvn",
+            "dependency:go-offline"
+          ]
+        ],
+        "unmet": {
+          "exit_code": 1,
+          "output": "[ERROR] Failed to execute goal on project app: Could not resolve dependencies: Cannot access central (https://repo.maven.apache.org/maven2) in offline mode and the artifact org.junit.jupiter:junit-jupiter:jar:5.14.4 has not been downloaded from it before.\n[INFO] BUILD FAILURE\n"
+        }
+      },
+      {
+        "argv": [
+          "mvn",
+          "-v"
+        ],
+        "exit_code": 0,
+        "output": "Apache Maven 3.10.0\nJava version: 17.0.20.1, vendor: Eclipse Adoptium\n"
+      }
+    ],
+    "written_file_run": {
+      "exit_code": 0,
+      "output": "[INFO] Running {class}\n[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0\n[INFO] BUILD SUCCESS\n",
+      "needs": [
+        [
+          "mvn",
+          "dependency:go-offline"
+        ]
+      ],
+      "unmet": {
+        "exit_code": 1,
+        "output": "[ERROR] Failed to execute goal on project app: Could not resolve dependencies: Cannot access central (https://repo.maven.apache.org/maven2) in offline mode and the artifact org.junit.jupiter:junit-jupiter:jar:5.14.4 has not been downloaded from it before.\n[INFO] BUILD FAILURE\n"
+      }
+    }
+  }
+}

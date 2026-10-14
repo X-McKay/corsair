@@ -1,0 +1,20 @@
+{
+  "language": "java",
+  "framework": "junit5",
+  "family": "notes",
+  "kind": "positive",
+  "category": "adversarial",
+  "probes": "The same PoV against a tree whose target already confines the path: it will fail here, but it is still a valid experiment",
+  "expected": "Both probes valid; the reviewer does not reject the PoV because this code looks safe.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory"
+  ],
+  "provenance": {
+    "source": "derived",
+    "license": "n/a (synthetic)",
+    "notes": "control: control_prober development/guarded-path-confinement reference draft; exploit: exploit_prober development/guarded-path-confinement reference draft"
+  }
+}

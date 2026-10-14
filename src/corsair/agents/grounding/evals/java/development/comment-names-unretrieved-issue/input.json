@@ -1,0 +1,42 @@
+{
+  "finding": {
+    "title": "JPQL query concatenates the customer filter",
+    "description": "search builds a JPQL string by concatenating the filter request parameter.",
+    "file_path": "src/main/java/com/acme/billing/CustomerRepository.java",
+    "start_line": 112,
+    "symbol": "CustomerRepository.search",
+    "cwe": "CWE-89"
+  },
+  "context": {
+    "issue": {
+      "id": "5420",
+      "title": "JPQL query concatenates the customer filter",
+      "state": "Active",
+      "cwe": "CWE-89",
+      "description": "search builds a JPQL string by concatenating the filter request parameter.",
+      "repo_url": "https://dev.azure.com/acme/_git/billing-api",
+      "source_file": "src/main/java/com/acme/billing/CustomerRepository.java:112"
+    },
+    "related": [
+      {
+        "issue": {
+          "id": "5431",
+          "title": "JPQL query concatenates the customer filter in the mobile API",
+          "state": "Closed",
+          "cwe": "CWE-89",
+          "description": "search builds a JPQL string by concatenating the filter request parameter.",
+          "repo_url": "https://dev.azure.com/acme/_git/billing-api"
+        },
+        "relation": "similarity",
+        "comments": [
+          {
+            "author": "reviewer",
+            "created_at": "2026-03-03",
+            "text": "Fixed together with INC-5519; the patch and its review are on that ticket."
+          }
+        ],
+        "similarity": 0.84
+      }
+    ]
+  }
+}

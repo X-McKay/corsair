@@ -1,0 +1,118 @@
+{
+  "fixture_id": "ruby-collection-error-then-fix-v1",
+  "inputs": {
+    "plan": {
+      "status": "ready",
+      "scope": "component",
+      "security_expectation": {
+        "failure_type": "Minitest::Assertion",
+        "safe_behavior": "home_for_offsite_target"
+      },
+      "discovery_command": [
+        "ruby",
+        "-Ilib",
+        "-Itest",
+        "test/redirects_test.rb"
+      ],
+      "evidence_requirements": [
+        "Both control and exploit probe must execute with native outcomes",
+        "Review both real source calls, adversarial input and assertions before execution"
+      ],
+      "citations": [
+        {
+          "path": "lib/redirects.rb",
+          "start_line": 3,
+          "end_line": 6,
+          "quote": "  def self.after_login(target)\n    return '/' if target.nil? || target.empty?\n    target\n  end"
+        }
+      ],
+      "limitations": [
+        "Open redirect at this one call only; callers and deployment configuration are outside the observation"
+      ],
+      "control": {
+        "test_id": "test/redirects_security_test.rb::RedirectsSecurityTest#test_benign_control",
+        "test_path": "test/redirects_security_test.rb",
+        "fixture_setup": [
+          "No files; the call takes only the target string"
+        ],
+        "implementation_call": "Redirects.after_login(target)",
+        "input": "target '/account', a path on this site",
+        "required_behavior": "Returns the on-site path unchanged",
+        "observable_witness": "Native minitest assertion on returns the on-site path unchanged",
+        "observation": {
+          "kind": "return_value",
+          "property": "Returns the on-site path unchanged",
+          "seam": "Call the real Redirects.after_login through its public interface"
+        },
+        "source_references": [
+          {
+            "path": "lib/redirects.rb",
+            "start_line": 3,
+            "end_line": 6,
+            "quote": "  def self.after_login(target)\n    return '/' if target.nil? || target.empty?\n    target\n  end"
+          }
+        ]
+      },
+      "security": {
+        "test_id": "test/redirects_security_test.rb::RedirectsSecurityTest#test_security_rejects_offsite_target",
+        "test_path": "test/redirects_security_test.rb",
+        "fixture_setup": [
+          "No files; the call takes only the target string"
+        ],
+        "implementation_call": "Redirects.after_login(target)",
+        "input": "target '//evil.example/phish', a scheme-relative URL to another host",
+        "required_behavior": "Returns '/' instead of a target that leaves the site",
+        "observable_witness": "Native minitest assertion on returns '/' instead of a target that leaves the site",
+        "observation": {
+          "kind": "return_value",
+          "property": "Returns '/' instead of a target that leaves the site",
+          "seam": "Call the real Redirects.after_login through its public interface"
+        },
+        "source_references": [
+          {
+            "path": "lib/redirects.rb",
+            "start_line": 3,
+            "end_line": 6,
+            "quote": "  def self.after_login(target)\n    return '/' if target.nil? || target.empty?\n    target\n  end"
+          }
+        ]
+      }
+    },
+    "source_files": [
+      {
+        "path": "lib/redirects.rb",
+        "content": "# Where to send a user after sign-in.\nmodule Redirects\n  def self.after_login(target)\n    return '/' if target.nil? || target.empty?\n    target\n  end\nend\n"
+      },
+      {
+        "path": "test/redirects_test.rb",
+        "content": "require 'minitest/autorun'\nrequire 'redirects'\n\nclass RedirectsTest < Minitest::Test\n  def test_defaults_to_home\n    assert_equal '/', Redirects.after_login(nil)\n  end\nend\n"
+      }
+    ],
+    "environment": {
+      "language": "Ruby",
+      "runtime": "Ruby 3.1",
+      "framework": "minitest",
+      "discovery_command": [
+        "ruby",
+        "-Ilib",
+        "-Itest",
+        "test/redirects_test.rb"
+      ],
+      "approved_test_paths": [
+        "test/redirects_security_test.rb"
+      ],
+      "baseline_test": {
+        "test_id": "test/redirects_test.rb::RedirectsTest#test_defaults_to_home",
+        "path": "test/redirects_test.rb"
+      },
+      "scratch_location": "A per-test Dir.mktmpdir directory removed after the block",
+      "observation_facilities": [
+        "Native Minitest outcomes and assertion failure locations"
+      ],
+      "assertion_facts": [
+        "Minitest assertion failures, including assert_raises when the expected exception is not raised, report Minitest::Assertion. Match the planned native failure type."
+      ],
+      "witness_facilities": []
+    }
+  }
+}

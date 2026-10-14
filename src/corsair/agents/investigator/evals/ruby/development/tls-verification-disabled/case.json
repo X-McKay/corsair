@@ -1,0 +1,21 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "tls-verification",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "VERIFY_NONE is provable in the workspace: a local HTTPS server with a self-signed certificate shows the client connects anyway.",
+  "expected": "Planned against WebhookClient.deliver (lib/webhook_client.rb 8-13); the control posts to a local server whose test CA the client trusts, the exploit to a self-signed one.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "tree and finding converted from evals/test_planning/ruby/breadth/ruby-tls-verification-unsupported; earlier unsupported_scope; rewritten as planned under the scope rule decided by Al on 2026-10-14: in scope when both probes can prove it in the workspace with no outbound network"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "language": "java",
+  "framework": "junit4",
+  "family": "spring-security",
+  "kind": "negative",
+  "category": "capability",
+  "probes": "Stored-password comparison in PlaintextPasswordEncoder.isPasswordValid (CWE-522) reported against the variant where the upstream fix stops the input: the chain must not reproduce it.",
+  "expected": "The control passes and the proof-of-vulnerability (exploit) probe's assertion fails on this tree (the condition is not shown), so the label is LIKELY_NOT_EXPLOITABLE by R5.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "https://github.com/spring-projects/spring-security",
+    "license": "Apache-2.0",
+    "record": "CVE-2019-11272",
+    "fix_commit": "b2d4fec3617c497c5a8eb9c7e5270e0c7db293ee",
+    "verbatim": true,
+    "path": "benchmarks/corpus/permissive-reduced/java/spring-security/b"
+  }
+}

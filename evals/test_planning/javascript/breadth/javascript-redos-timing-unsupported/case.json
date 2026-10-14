@@ -1,0 +1,14 @@
+{
+  "language": "javascript",
+  "framework": "jest",
+  "family": "redos",
+  "kind": "abstention",
+  "probes": "ReDoS in a duration parser: the outcome is identical either way, so it needs a CPU-time observation the environment does not list.",
+  "provenance": {
+    "source": "https://github.com/vercel/ms",
+    "commit": "dc61e2fd6a70f234a3ee75a3243fb06062f5b2e9",
+    "path": "index.js",
+    "license": "MIT",
+    "notes": "Excerpt of tag 0.7.0 (constants and parse); the format helpers are omitted."
+  }
+}

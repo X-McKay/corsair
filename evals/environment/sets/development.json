@@ -1,0 +1,13 @@
+{
+  "held_out": false,
+  "cases": {
+    "python/ready": "67617fa8054136c4770494ce9ffc6afea2cf12646d2e89b8b435ab577cd7d25b",
+    "python/registry": "e8f8b762f511d65e26877c680b2397492581ec646c439a67e6bdf41c177fd770",
+    "python/tls": "0a67a8d9c1069611316b3cb31c44bd64422eeebd6773ce79f06e3826ab534b52",
+    "python/build": "a69c99f3fb91838f853935687b8c0f217444904d666d59a4ddd4b1b43a549baf",
+    "python/unknown-delivery": "ef7ee5b22b94f358cef5980e8852240d83640972564239569508f4935ef72a67",
+    "python/unsupported-toolchain": "b61d2834590d1fe17d6338e0edf11082bc978763e7853051d0ab801d25ae0fc8",
+    "python/command-budget": "40c8b00ce27a7bee6940c68eceb85508290cd826d4e69a9a24cb8de475c80c07",
+    "java/java-ready": "1461b65f31fb3c604ae503350e6ee603a3826c1aaefdfd4425ccb3eaee658c71"
+  }
+}

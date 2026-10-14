@@ -1,0 +1,236 @@
+{
+  "source_files": [
+    {
+      "path": ".travis.yml",
+      "content": "language: node_js\nnode_js:\n  - \"8\"\ninstall:\n  - npm ci --ignore-scripts\nscript:\n  - npm test\n"
+    },
+    {
+      "path": "index.js",
+      "content": "'use strict';\n\nfunction compare(a, b) {\n  return a.localeCompare(b, 'en', { numeric: true });\n}\n\nfunction caret(range, version) {\n  return version.split('.')[0] === range.replace('^', '').split('.')[0];\n}\n\nmodule.exports = { compare, caret };\n"
+    },
+    {
+      "path": "package.json",
+      "content": "{\n  \"name\": \"semver-range\",\n  \"version\": \"2.1.0\",\n  \"description\": \"semver-range utilities\",\n  \"main\": \"index.js\",\n  \"scripts\": {\n    \"test\": \"jest\"\n  },\n  \"devDependencies\": {\n    \"jest\": \"24.9.0\"\n  },\n  \"license\": \"MIT\"\n}\n"
+    },
+    {
+      "path": "test/caret.test.js",
+      "content": "'use strict';\n\nconst target = require('../index');\n\ntest('matches caret ranges', () => {\n  expect(target.caret('^1.2.0', '1.9.0')).toBe(true);\n});\n"
+    },
+    {
+      "path": "test/prerelease.test.js",
+      "content": "'use strict';\n\nconst target = require('../index');\n\ntest('orders prerelease tags', () => {\n  expect(target.compare('1.0.0-alpha', '1.0.0-beta')).toBeLessThan(0);\n});\n\ntest.skip('handles build metadata', () => {\n  expect(target.compare('1.0.0+b1', '1.0.0+b2')).toBe(0);\n});\n"
+    }
+  ],
+  "row_id": "jest29-node22",
+  "plan": {
+    "status": "planned",
+    "target": "index",
+    "citations": [
+      {
+        "path": "index.js",
+        "start_line": 1,
+        "end_line": 1,
+        "quote": "'use strict';"
+      }
+    ]
+  },
+  "feedback": null,
+  "workspace_fixture": {
+    "observations": [
+      {
+        "argv": [
+          "npm",
+          "ci",
+          "--ignore-scripts"
+        ],
+        "exit_code": 0,
+        "output": "added 523 packages in 9.81s\n"
+      },
+      {
+        "argv": [
+          "node",
+          "--check",
+          "index.js"
+        ],
+        "exit_code": 0,
+        "output": ""
+      },
+      {
+        "argv": [
+          "node",
+          "node_modules/jest/bin/jest.js",
+          "--ci",
+          "--listTests"
+        ],
+        "exit_code": 0,
+        "output": "/sandbox/work/test/prerelease.test.js\n/sandbox/work/test/caret.test.js\n",
+        "needs": [
+          [
+            "npm",
+            "ci",
+            "--ignore-scripts"
+          ]
+        ],
+        "unmet": {
+          "exit_code": 1,
+          "output": "node:internal/modules/cjs/loader:1228\n  throw err;\n  ^\n\nError: Cannot find module '/work/node_modules/jest/bin/jest.js'\n"
+        }
+      },
+      {
+        "argv": [
+          "node",
+          "node_modules/jest/bin/jest.js",
+          "--ci",
+          "--json",
+          "--runTestsByPath",
+          "test/prerelease.test.js"
+        ],
+        "exit_code": 0,
+        "output": "{\"numFailedTestSuites\":0,\"numFailedTests\":0,\"numPassedTestSuites\":1,\"numPassedTests\":1,\"numPendingTestSuites\":0,\"numPendingTests\":1,\"numRuntimeErrorTestSuites\":0,\"numTodoTests\":0,\"numTotalTestSuites\":1,\"numTotalTests\":2,\"openHandles\":[],\"startTime\":1791904230868,\"success\":true,\"testResults\":[{\"assertionResults\":[{\"ancestorTitles\":[],\"failureMessages\":[],\"fullName\":\"orders prerelease tags\",\"location\":null,\"status\":\"passed\",\"title\":\"orders prerelease tags\"},{\"ancestorTitles\":[],\"failureMessages\":[],\"fullName\":\"handles build metadata\",\"location\":null,\"status\":\"pending\",\"title\":\"handles build metadata\"}],\"endTime\":1791904231837,\"message\":\"\",\"name\":\"/sandbox/work/test/prerelease.test.js\",\"startTime\":1791904231277,\"status\":\"passed\",\"summary\":\"\"}],\"wasInterrupted\":false}",
+        "needs": [
+          [
+            "npm",
+            "ci",
+            "--ignore-scripts"
+          ]
+        ],
+        "unmet": {
+          "exit_code": 1,
+          "output": "node:internal/modules/cjs/loader:1228\n  throw err;\n  ^\n\nError: Cannot find module '/work/node_modules/jest/bin/jest.js'\n"
+        }
+      },
+      {
+        "argv": [
+          "node",
+          "node_modules/jest/bin/jest.js",
+          "--ci",
+          "--json",
+          "--runTestsByPath",
+          "test/caret.test.js"
+        ],
+        "exit_code": 0,
+        "output": "{\"numFailedTestSuites\":0,\"numFailedTests\":0,\"numPassedTestSuites\":1,\"numPassedTests\":1,\"numPendingTestSuites\":0,\"numPendingTests\":0,\"numRuntimeErrorTestSuites\":0,\"numTodoTests\":0,\"numTotalTestSuites\":1,\"numTotalTests\":1,\"openHandles\":[],\"startTime\":1791904230868,\"success\":true,\"testResults\":[{\"assertionResults\":[{\"ancestorTitles\":[],\"failureMessages\":[],\"fullName\":\"matches caret ranges\",\"location\":null,\"status\":\"passed\",\"title\":\"matches caret ranges\"}],\"endTime\":1791904231837,\"message\":\"\",\"name\":\"/sandbox/work/test/caret.test.js\",\"startTime\":1791904231277,\"status\":\"passed\",\"summary\":\"\"}],\"wasInterrupted\":false}",
+        "needs": [
+          [
+            "npm",
+            "ci",
+            "--ignore-scripts"
+          ]
+        ],
+        "unmet": {
+          "exit_code": 1,
+          "output": "node:internal/modules/cjs/loader:1228\n  throw err;\n  ^\n\nError: Cannot find module '/work/node_modules/jest/bin/jest.js'\n"
+        }
+      },
+      {
+        "argv": [
+          "/usr/local/bin/node",
+          "node_modules/jest/bin/jest.js",
+          "--ci",
+          "--runInBand",
+          "--verbose",
+          "--runTestsByPath",
+          "test/prerelease.test.js",
+          "-t",
+          "^orders prerelease tags$"
+        ],
+        "exit_code": 0,
+        "output": "PASS test/prerelease.test.js\n  ✓ orders prerelease tags (3 ms)\n  ○ skipped 1 test(s)\n\nTest Suites: 1 passed, 1 total\nTests:       1 skipped, 1 passed, 2 total\n",
+        "needs": [
+          [
+            "npm",
+            "ci",
+            "--ignore-scripts"
+          ]
+        ],
+        "unmet": {
+          "exit_code": 1,
+          "output": "node:internal/modules/cjs/loader:1228\n  throw err;\n  ^\n\nError: Cannot find module '/work/node_modules/jest/bin/jest.js'\n"
+        }
+      },
+      {
+        "argv": [
+          "/usr/local/bin/node",
+          "node_modules/jest/bin/jest.js",
+          "--ci",
+          "--runInBand",
+          "--verbose",
+          "--runTestsByPath",
+          "test/prerelease.test.js",
+          "-t",
+          "^handles build metadata$"
+        ],
+        "exit_code": 0,
+        "output": "Test Suites: 1 skipped, 0 of 1 total\nTests:       2 skipped, 2 total\n",
+        "needs": [
+          [
+            "npm",
+            "ci",
+            "--ignore-scripts"
+          ]
+        ],
+        "unmet": {
+          "exit_code": 1,
+          "output": "node:internal/modules/cjs/loader:1228\n  throw err;\n  ^\n\nError: Cannot find module '/work/node_modules/jest/bin/jest.js'\n"
+        }
+      },
+      {
+        "argv": [
+          "/usr/local/bin/node",
+          "node_modules/jest/bin/jest.js",
+          "--ci",
+          "--runInBand",
+          "--verbose",
+          "--runTestsByPath",
+          "test/caret.test.js",
+          "-t",
+          "^matches caret ranges$"
+        ],
+        "exit_code": 0,
+        "output": "PASS test/caret.test.js\n  ✓ matches caret ranges (3 ms)\n\nTest Suites: 1 passed, 1 total\nTests:       1 passed, 1 total\n",
+        "needs": [
+          [
+            "npm",
+            "ci",
+            "--ignore-scripts"
+          ]
+        ],
+        "unmet": {
+          "exit_code": 1,
+          "output": "node:internal/modules/cjs/loader:1228\n  throw err;\n  ^\n\nError: Cannot find module '/work/node_modules/jest/bin/jest.js'\n"
+        }
+      },
+      {
+        "argv": [
+          "node",
+          "--version"
+        ],
+        "exit_code": 0,
+        "output": "v22.23.3\n"
+      },
+      {
+        "argv": [
+          "npm",
+          "--version"
+        ],
+        "exit_code": 0,
+        "output": "10.9.9\n"
+      }
+    ],
+    "written_file_run": {
+      "exit_code": 0,
+      "output": "PASS {file}\n  ✓ {name} (1 ms)\n\nTest Suites: 1 passed, 1 total\nTests:       1 passed, 1 total\n",
+      "needs": [
+        [
+          "npm",
+          "ci",
+          "--ignore-scripts"
+        ]
+      ],
+      "unmet": {
+        "exit_code": 1,
+        "output": "node:internal/modules/cjs/loader:1228\n  throw err;\n  ^\n\nError: Cannot find module '/work/node_modules/jest/bin/jest.js'\n"
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "language": "ruby",
+  "framework": "ruby",
+  "family": "path-traversal",
+  "kind": "positive",
+  "probes": "Target is a module singleton method nested three modules deep, beside a store method in the same module.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)"
+  }
+}

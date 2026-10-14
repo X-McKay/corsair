@@ -1,0 +1,28 @@
+{
+  "finding": {
+    "title": "Template prints the notice text without escaping",
+    "description": "The template prints the notice body with <%== %>, which disables escaping. Reported again by the 2026-09 scan of the main branch.",
+    "file_path": "templates/notice/show.html.ep",
+    "start_line": 9,
+    "symbol": "notice/show",
+    "cwe": "CWE-79"
+  },
+  "context": {
+    "issue": {
+      "id": "8600",
+      "title": "Template prints the notice text without escaping",
+      "state": "Resolved",
+      "cwe": "CWE-79",
+      "description": "The template prints the notice body with <%== %>, which disables escaping.",
+      "repo_url": "https://dev.azure.com/acme/_git/legacy-intranet",
+      "source_file": "templates/notice/show.html.ep:9"
+    },
+    "comments": [
+      {
+        "author": "reviewer",
+        "created_at": "2024-02-09",
+        "text": "Fixed in PR 61: the template uses <%= %> so Mojolicious escapes the notice body."
+      }
+    ]
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "read_document",
+    "path": "documents.py",
+    "lines": [
+      3,
+      4
+    ],
+    "max_span": 10
+  },
+  "exploit_markers": [
+    "../"
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "documents.py"
+  ],
+  "replay": {
+    "reads": [
+      "documents.py"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "read_document",
+      "hypothesis": "If filename '../outside.txt', which resolves outside the allowed root reaches read_document without the relevant check, the safe property fails: The call is rejected with the confinement ValueError and returns no content; the outside file is never opened",
+      "control": {
+        "role": "control",
+        "test_file": "tests/test_documents_control.py",
+        "test_name": "test_benign_control",
+        "target": "read_document",
+        "seam": "direct call: documents.read_document(allowed, 'document.txt')",
+        "input_description": "filename 'document.txt' inside the allowed root",
+        "property_to_assert": "Returns exactly the benign sentinel content Observed by: An open audit event for tmp_path/allowed/document.txt is recorded during the call",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "documents.py",
+            "start_line": 3,
+            "end_line": 4,
+            "quote": "def read_document(root: Path, filename: str) -> str:\n    return (root / filename).read_text()"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "tests/test_documents_exploit.py",
+        "test_name": "test_security_rejects_outside_read",
+        "target": "read_document",
+        "seam": "direct call: documents.read_document(allowed, '../outside.txt')",
+        "input_description": "filename '../outside.txt', which resolves outside the allowed root",
+        "property_to_assert": "The call is rejected with the confinement ValueError and returns no content; the outside file is never opened Observed by: No open audit event for tmp_path/outside.txt is recorded during the call (application observation); a sandbox or policy denial is recorded separately and is not a rejection",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "documents.py",
+            "start_line": 3,
+            "end_line": 4,
+            "quote": "def read_document(root: Path, filename: str) -> str:\n    return (root / filename).read_text()"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "documents.py",
+          "start_line": 3,
+          "end_line": 4,
+          "quote": "def read_document(root: Path, filename: str) -> str:\n    return (root / filename).read_text()"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

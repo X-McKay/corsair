@@ -1,0 +1,14 @@
+{
+  "language": "java",
+  "framework": "junit5",
+  "family": "registry",
+  "kind": "failure-mode",
+  "probes": "Maven Central answers 403 during dependency:go-offline; blocked at the registry layer citing the native transfer error.",
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "n/a",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic manifests and recorded observations shaped after the toolchain images in deploy/runtime-matrix.yaml and tests/agents/framework_outputs."
+  }
+}

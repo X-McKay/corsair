@@ -1,0 +1,212 @@
+"""Fake stage callables for the chain, workflow and recorder tests. They log every call and what it received."""
+from __future__ import annotations
+
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+from pydantic_ai import Agent
+from pydantic_ai.models.test import TestModel
+
+from corsair.chain import Stages
+from corsair.contracts import (AgentUsage, BuildResult, Case, Citation, Environment, ExitClass, Finding,
+                                  FrozenPatch, Label, Outcome, ProbeBrief, ProbeDraft, ProbeFacts, ProbePlan, ProbeRun,
+                                  ProbeValidity, Recipe, Revision, Runtime, TerminalReason, Validity, Verdict)
+
+SHA = "0" * 64
+AGENT_NAMES = ("grounding", "builder", "investigator", "control_prober", "exploit_prober", "reviewer")
+
+
+def case(tmp: Path, fixed: bool = False) -> Case:
+    revision = Revision(source=str(tmp), tree_sha256=SHA)
+    return Case(case_id="case-1", finding=Finding(title="reported issue"), revision=revision,
+                fixed_revision=Revision(source=str(tmp), tree_sha256="1" * 64) if fixed else None)
+
+
+RUNTIME = Runtime(row_id="row", image="image:1", framework="fw", skill="fw", run_template=("run", "{file}"),
+                  exit_codes={0: ExitClass.PASS, 1: ExitClass.TEST_FAILED}, evidence="image-only")
+
+
+def brief(role: str) -> ProbeBrief:
+    return ProbeBrief(role=role, test_file=f"tests/test_{role}.x", test_name=f"test_{role}", target="target",
+                      seam="direct call", input_description="input", property_to_assert="property",
+                      citations=(Citation(path="src/a.x", start_line=1, end_line=2),))
+
+
+PLAN = ProbePlan(status="planned", target="target", control=brief("control"), exploit=brief("exploit"))
+RECIPE = Recipe(baseline_test=("run", "baseline"))
+ENVIRONMENT = Environment(image="env:1", runtime_row="row", recipe_sha256=SHA, tree_sha256=SHA)
+
+
+def draft(role: str, body: str = "") -> ProbeDraft:
+    b = brief(role)
+    return ProbeDraft(role=role, test_file=b.test_file, test_name=b.test_name,
+                      source=f"CORSAIR_MARKER_DIR {body}")
+
+
+def usage(agent: str, **values: Any) -> AgentUsage:
+    known = dict(model="test", requests=1, input_tokens=10, output_tokens=5, tool_calls=0)
+    return AgentUsage(agent=agent, **{**known, **values})
+
+
+def validity(patch: FrozenPatch, revision: str, invalid: frozenset[str] = frozenset()) -> Validity:
+    def one(role):
+        if role in invalid:
+            return rejected(role)
+        return ProbeValidity(role=role, valid=True, calls_real_target=True, exercises_condition=True,
+                             assertion_relevant=True, doubles_only_dependencies=True)
+    return Validity(patch_sha256=patch.sha256, revision=revision, control=one("control"), exploit=one("exploit"))
+
+
+def rejected(role: str) -> ProbeValidity:
+    """A negative judgement citing this probe's own file, the source and (to test filtering) the other test file."""
+    other = "exploit" if role == "control" else "control"
+    return ProbeValidity(
+        role=role, valid=False, calls_real_target=False, exercises_condition=True, assertion_relevant=False,
+        doubles_only_dependencies=True,
+        defects=tuple(f"{role} defect {i}" for i in range(6)) + ("x" * 3_000,),
+        citations=(Citation(path=brief(role).test_file, start_line=1, end_line=1, quote=f"{role} own line"),
+                   Citation(path="src/a.x", start_line=1, end_line=2, quote="def target(x):\n    return x"),
+                   Citation(path=brief(other).test_file, start_line=1, end_line=1, quote=f"{other} secret line")))
+
+
+def run(patch: FrozenPatch, role: str, revision: str, outcome: Outcome = Outcome.PASSED) -> ProbeRun:
+    facts = ProbeFacts(exit_code=0, exit_class=ExitClass.PASS, start_marker=True, end_marker=True,
+                       token_in_output=False)
+    return ProbeRun(role=role, revision=revision, patch_sha256=patch.sha256, facts=facts, outcome=outcome)
+
+
+@dataclass
+class Fakes:
+    """Configurable fake stages. ``calls`` holds (name, args, kwargs) in call order."""
+
+    runtime: Runtime | None = RUNTIME
+    plan: ProbePlan | None = PLAN
+    recipes: list[Recipe | None] = field(default_factory=lambda: [RECIPE])
+    replays: list[bool] = field(default_factory=lambda: [True])
+    # role -> ok, not_run or errored for every check of that role, or a list read in order (ok once it runs out)
+    diagnose_outcomes: dict[str, str | list[str]] = field(default_factory=dict)
+    revised: dict[str, ProbeDraft | None] = field(default_factory=dict)
+    rejections: dict[str, int] = field(default_factory=dict)  # role -> how many vulnerable reviews reject it first
+    review_revised: dict[str, ProbeDraft | None] = field(default_factory=dict)  # role -> review revision output
+    fixed_replays: bool = True
+    fixed_raises: dict[str, BaseException] = field(default_factory=dict)  # step name -> raised on the fixed revision only
+    unbound: set[str] = field(default_factory=set)  # revisions whose review binds to another patch
+    raises: dict[str, BaseException] = field(default_factory=dict)
+    usages: dict[str, AgentUsage] = field(default_factory=dict)
+    grounding: bool = False
+    # (revision, role) -> outcomes of its runs in call order (passed once the list runs out)
+    outcomes: dict[tuple[str, str], list[str]] = field(default_factory=dict)
+    # invalid roles per vulnerable review in call order; overrides ``rejections`` while it lasts
+    review_invalid: list[set[str]] = field(default_factory=list)
+    real_decide: bool = False  # decide with rules.decide instead of the fixed R4/R1 answer
+    calls: list[tuple[str, tuple, dict]] = field(default_factory=list)
+
+    def names(self) -> list[str]:
+        return [name for name, _, _ in self.calls]
+
+    def of(self, name: str) -> list[tuple[tuple, dict]]:
+        return [(args, kwargs) for n, args, kwargs in self.calls if n == name]
+
+    def _log(self, name: str, *args, **kwargs) -> None:
+        self.calls.append((name, args, kwargs))
+        if name in self.raises:
+            raise self.raises[name]
+
+    def select(self, case, matrix):
+        self._log("select", case, matrix)
+        return self.runtime
+
+    async def investigate(self, case, runtime, model, *, source_root):
+        self._log("investigate", case, runtime, source_root=source_root)
+        await Agent(model).run("plan the probes")  # a native run, so its message history is captured
+        return self.plan, self.usages.get("investigator", usage("investigator"))
+
+    async def build(self, case, runtime, plan, model, *, workspace, feedback=None):
+        self._log("build", case, runtime, plan, workspace=workspace, feedback=feedback)
+        return self.recipes.pop(0), self.usages.get("builder", usage("builder"))
+
+    def replay(self, case, runtime, recipe, *, revision="vulnerable"):
+        self._log("replay", case, runtime, recipe, revision=revision)
+        if revision == "fixed" and "replay-fixed" in self.raises:
+            raise self.raises["replay-fixed"]
+        ok = self.replays.pop(0) if revision == "vulnerable" else self.fixed_replays
+        result = BuildResult(recipe=recipe, replayed=ok, baseline_exit_code=0 if ok else 1,
+                             reason="" if ok else "baseline test failed: missing module")
+        return result, ENVIRONMENT if ok else None
+
+    async def _probe(self, role, brief, runtime, model, *, source_root, diagnostics=None, previous=None,
+                     review_feedback=None):
+        self._log(f"probe-{role}", brief, runtime, source_root=source_root, diagnostics=diagnostics,
+                  previous=previous, review_feedback=review_feedback)
+        if review_feedback is not None:
+            out = self.review_revised.get(role, draft(role, f"review-revised {len(self.of(f'probe-{role}'))}"))
+        else:
+            out = draft(role) if previous is None else self.revised.get(role, draft(role, "revised"))
+        return out, self.usages.get(f"{role}_prober", usage(f"{role}_prober"))
+
+    async def control_probe(self, brief, runtime, model, **kwargs):
+        return await self._probe("control", brief, runtime, model, **kwargs)
+
+    async def exploit_probe(self, brief, runtime, model, **kwargs):
+        return await self._probe("exploit", brief, runtime, model, **kwargs)
+
+    def diagnose(self, environment, runtime, draft):
+        self._log("diagnose", environment, runtime, draft)
+        check = self.diagnose_outcomes.get(draft.role, "ok")
+        if isinstance(check, list):
+            check = check.pop(0) if check else "ok"
+        return check, f"check: {check}\nhint: {draft.role} hint" if check != "ok" else None
+
+    async def review(self, case, plan, patch, model, *, source_root, revision="vulnerable", runtime=None):
+        self._log("review", case, plan, patch, source_root=source_root, revision=revision, runtime=runtime)
+        if revision == "fixed" and "review" in self.fixed_raises:
+            raise self.fixed_raises["review"]
+        bound = patch if revision not in self.unbound else patch.model_copy(update={"sha256": "f" * 64})
+        seen = len([1 for _, kw in self.of("review") if kw["revision"] == revision])
+        invalid = frozenset(role for role, n in self.rejections.items() if revision == "vulnerable" and seen <= n)
+        if revision == "vulnerable" and seen <= len(self.review_invalid):
+            invalid = frozenset(self.review_invalid[seen - 1])
+        return validity(bound, revision, invalid), self.usages.get("reviewer", usage("reviewer"))
+
+    def execute(self, environment, runtime, patch, role, *, revision="vulnerable"):
+        self._log("execute", environment, runtime, patch, role, revision=revision)
+        if revision == "fixed" and "execute" in self.fixed_raises:
+            raise self.fixed_raises["execute"]
+        queued = self.outcomes.get((revision, role))
+        return run(patch, role, revision, Outcome(queued.pop(0)) if queued else Outcome.PASSED)
+
+    def decide(self, case, *, runtime, build, plan, validity, runs, stopped=None, fix_stopped=None, attempts=()):
+        self._log("decide", case, runtime=runtime, build=build, plan=plan, validity=validity, runs=runs,
+                  stopped=stopped, fix_stopped=fix_stopped, attempts=attempts)
+        if self.real_decide:
+            from corsair.rules import decide
+            return decide(case, runtime=runtime, build=build, plan=plan, validity=validity, runs=runs,
+                          stopped=stopped, fix_stopped=fix_stopped, attempts=attempts)
+        if stopped is not None:
+            return Verdict(case_id=case.case_id, label=Label.ERROR, rule_id="R1", terminal_reason=stopped,
+                           finding="none", fix="not_applicable", runs=runs, validity=validity)
+        return Verdict(case_id=case.case_id, label=Label.LIKELY_EXPLOITABLE, rule_id="R4",
+                       terminal_reason=TerminalReason.OK, finding="reproduced", fix="not_applicable", runs=runs,
+                       validity=validity)
+
+    async def ground(self, finding, context, model):
+        self._log("ground", finding, context)
+        return {"summary": f"context {context}"}, self.usages.get("grounding", usage("grounding"))
+
+    @asynccontextmanager
+    async def workspace(self, case, runtime):
+        self._log("workspace-open", case, runtime)
+        yield "workspace"
+        self._log("workspace-close")
+
+    def stages(self) -> Stages:
+        return Stages(select=self.select, investigate=self.investigate, build=self.build, replay=self.replay,
+                      control_probe=self.control_probe, exploit_probe=self.exploit_probe, review=self.review,
+                      diagnose=self.diagnose, execute=self.execute, decide=self.decide, workspace=self.workspace,
+                      ground=self.ground, grounding_context=(lambda case: "ctx") if self.grounding else None)
+
+
+def models() -> dict[str, TestModel]:
+    return {name: TestModel() for name in AGENT_NAMES}

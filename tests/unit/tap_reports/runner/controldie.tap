@@ -1,9 +1,0 @@
-# Subtest: test_control
-    1..0
-    # No tests run!
-not ok 1 - No tests run for subtest "test_control"
-#   Failed test 'No tests run for subtest "test_control"'
-#   at t/controldie.t line 6.
-control died
-# Tests were run but no plan was declared and done_testing() was not seen.
-# Looks like your test exited with 255 just after 1.

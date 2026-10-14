@@ -1,0 +1,19 @@
+{
+  "language": "javascript",
+  "framework": "node:test",
+  "family": "zipbomb",
+  "kind": "unsupported",
+  "category": "failure-mode",
+  "probes": "A runnable-looking javascript project whose test runner (node:test) has no matrix row: the chain must stop at Select instead of guessing a runtime.",
+  "expected": "Select finds no admitted matrix row for this node:test tree, so the chain stops before any agent runs: UNABLE_TO_RUN by R0 with terminal reason no_runtime and the fix not verified.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "safety"
+  ],
+  "provenance": {
+    "source": "https://github.com/X-McKay/infosec-harness",
+    "license": "NOASSERTION (same-owner repository; in-repo copy under SPEC-0067, see benchmarks/corpus/infosec-harness/SOURCE.md)",
+    "path": "benchmarks/corpus/infosec-harness/javascript/zipbomb/b (family ih-javascript-zipbomb)"
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "run",
+    "path": "lib/Runner.pm",
+    "lines": [
+      6,
+      11
+    ],
+    "max_span": 14
+  },
+  "exploit_markers": [
+    "; echo injected"
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "lib/Runner.pm"
+  ],
+  "forbidden_markers": [
+    "--only",
+    "not vulnerable",
+    "lib/Runner.t"
+  ],
+  "replay": {
+    "reads": [
+      "lib/Runner.pm"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "run",
+      "hypothesis": "If value 'hello; echo injected' reaches run without the relevant check, the safe property fails: Returns exactly \"hello; echo injected\\n\": the value is echoed literally and no separate line 'injected' appears",
+      "control": {
+        "role": "control",
+        "test_file": "t/runner-control.t",
+        "test_name": "echoes_plain_value",
+        "target": "run",
+        "seam": "use Runner and call the real Runner::run",
+        "input_description": "value 'hello'",
+        "property_to_assert": "Returns exactly \"hello\\n\" Observed by: is() on the output string returned by the real run call",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "lib/Runner.pm",
+            "start_line": 6,
+            "end_line": 11,
+            "quote": "sub run {\n    my ($arg) = @_;\n    open(my $fh, '-|', 'echo', $arg) or die \"cannot run echo: $!\";\n    my $out = do { local $/; <$fh> };\n    close $fh;\n    return $out;"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "t/runner-exploit.t",
+        "test_name": "echoes_hostile_value_literally",
+        "target": "run",
+        "seam": "use Runner and call the real Runner::run",
+        "input_description": "value 'hello; echo injected'",
+        "property_to_assert": "Returns exactly \"hello; echo injected\\n\": the value is echoed literally and no separate line 'injected' appears Observed by: is() on the output string returned by the real run call",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "lib/Runner.pm",
+            "start_line": 6,
+            "end_line": 11,
+            "quote": "sub run {\n    my ($arg) = @_;\n    open(my $fh, '-|', 'echo', $arg) or die \"cannot run echo: $!\";\n    my $out = do { local $/; <$fh> };\n    close $fh;\n    return $out;"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "lib/Runner.pm",
+          "start_line": 6,
+          "end_line": 11,
+          "quote": "sub run {\n    my ($arg) = @_;\n    open(my $fh, '-|', 'echo', $arg) or die \"cannot run echo: $!\";\n    my $out = do { local $/; <$fh> };\n    close $fh;\n    return $out;"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

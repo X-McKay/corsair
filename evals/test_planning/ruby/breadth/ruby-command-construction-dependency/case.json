@@ -1,0 +1,12 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "command-injection",
+  "kind": "positive",
+  "probes": "Ruby shell command construction planned through an injected recording runner (dependency_call) without spawning a process.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic Backup class with an injectable runner."
+  }
+}

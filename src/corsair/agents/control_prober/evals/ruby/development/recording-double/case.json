@@ -1,0 +1,21 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "accounts",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "The brief allows a recording database double; the probe injects it into the real query function",
+  "expected": "A draft that injects a recording double (no mocking of the target), calls the real lookup and asserts on what reached the double.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/test_authoring/ruby/breadth/ruby-dependency-call-recording-double (dependency call recording double); control plan entry"
+  }
+}

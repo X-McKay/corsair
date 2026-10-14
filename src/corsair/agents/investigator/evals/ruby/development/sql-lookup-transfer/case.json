@@ -1,0 +1,21 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "sql-injection",
+  "kind": "transfer",
+  "category": "capability",
+  "probes": "The recording-database unit shape transferred to a duck-typed db double.",
+  "expected": "Planned against Orders.for_customer (lib/orders.rb 5-6); exploit name carries OR 1=1.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic sqlite3-style execute helper.; converted from evals/test_planning/ruby/breadth/ruby-transfer-sql-dependency"
+  }
+}

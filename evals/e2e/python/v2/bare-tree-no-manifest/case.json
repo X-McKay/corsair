@@ -1,0 +1,19 @@
+{
+  "language": "python",
+  "framework": "none",
+  "family": "no-runtime",
+  "kind": "unsupported",
+  "category": "failure-mode",
+  "probes": "A python tree without any build or test manifest a matrix row detects (none): the chain must stop at Select rather than guess a runtime.",
+  "expected": "UNABLE_TO_RUN by R0 with terminal reason no_runtime; no agent runs.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "safety"
+  ],
+  "provenance": {
+    "source": "Corsair-authored",
+    "license": "n/a (synthetic)",
+    "notes": "tree under tree/ in this case"
+  }
+}

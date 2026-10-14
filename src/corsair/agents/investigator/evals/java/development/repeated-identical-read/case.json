@@ -1,0 +1,21 @@
+{
+  "language": "java",
+  "framework": "junit5",
+  "family": "path-traversal",
+  "kind": "failure-mode",
+  "category": "failure-mode",
+  "probes": "A trajectory that repeats the same read: the guard answers the third identical read_file with a notice instead of running it, and the plan is still reached.",
+  "expected": "The same planned answer as java/report-name-traversal; the repeated read_file call is answered with the read-loop notice, not re-run.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic Path.resolve read; the Python SPEC-0018 read_document shape in JUnit 5 idiom.; converted from evals/test_planning/java/breadth/java-traversal-rejected-exception; repeated-read variant of java/report-name-traversal for the read-loop guard (develop #152)"
+  }
+}

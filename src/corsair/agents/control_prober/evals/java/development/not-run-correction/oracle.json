@@ -1,0 +1,96 @@
+{
+  "expect": {
+    "draft": true,
+    "status": "ok"
+  },
+  "expected_outcome": {
+    "asserts": "benign_behaviour",
+    "vulnerable": "pass",
+    "fixed": "pass",
+    "this_tree": "pass"
+  },
+  "revision_history": [],
+  "target_spans": [
+    {
+      "path": "src/main/java/com/example/badge/Badge.java",
+      "start_line": 8,
+      "end_line": 10
+    }
+  ],
+  "anchors": {
+    "comment": "//",
+    "load": [
+      "package\\s+com\\.example\\.badge\\s*;|import\\s+com\\.example\\.badge\\.(?:Badge|\\*)\\s*;"
+    ],
+    "call": [
+      "\\bBadge\\.render\\s*\\("
+    ],
+    "input": [
+      "['\\\"]ok['\\\"]"
+    ],
+    "avoid_input": [
+      "<script"
+    ],
+    "property": [
+      "(?:(?:(?<![!=<>])===?(?!=)|\\beq\\b|\\.equals\\s*\\(|\\bassert_equal\\b)\\s*\\(?\\s*['\\\"]<span\\ class=\\\\?\"badge\\\\?\">ok</span>['\\\"]|['\\\"]<span\\ class=\\\\?\"badge\\\\?\">ok</span>['\\\"]\\s*\\)?\\s*(?:(?<![!=<>])===?(?!=)|\\beq\\b|\\.equals\\s*\\(|\\bassert_equal\\b)|['\\\"]<span\\ class=\\\\?\"badge\\\\?\">ok</span>['\\\"]\\s*\\.equals\\s*\\(|Objects\\.equals\\s*\\([^\\n]*['\\\"]<span\\ class=\\\\?\"badge\\\\?\">ok</span>['\\\"]|is_deeply\\s*\\([^\\n]*['\\\"]<span\\ class=\\\\?\"badge\\\\?\">ok</span>['\\\"])"
+    ],
+    "non_differential": [],
+    "test_definition": "@(?:Test|ParameterizedTest)\\b",
+    "assertion": "\\bassert\\w*\\s*\\(",
+    "token_form": "\\bassert\\w*\\s*\\([\\s\\S]*,\\s*System\\.getenv\\(\\s*\\\"CORSAIR_TOKEN\\\"\\s*\\)\\s*\\)",
+    "forbidden": [
+      "@Disabled|Assumptions\\.|assumeTrue|assumeFalse",
+      "ProcessBuilder|Runtime\\.getRuntime",
+      "java\\.net\\.(?:Socket|ServerSocket|URL\\b|URLConnection|HttpURLConnection|http\\.)|HttpClient|new\\s+Socket",
+      "System\\.exit",
+      "catch\\s*\\(\\s*(final\\s+)?(Exception|Throwable|AssertionError|Error|AssertionFailedError|RuntimeException)\\b"
+    ],
+    "forbidden_doubles": [
+      "Mockito|@Mock\\b|mock\\s*\\(|spy\\s*\\(",
+      "class\\s+Badge\\b",
+      "static\\s+String\\s+render\\s*\\("
+    ],
+    "injected": [],
+    "defects": [
+      "['\\\"/]started['\\\"]"
+    ]
+  },
+  "script": [
+    {
+      "tool": "load_capability",
+      "args": {
+        "id": "control-probe"
+      }
+    },
+    {
+      "tool": "load_capability",
+      "args": {
+        "id": "probe-protocol"
+      }
+    },
+    {
+      "tool": "load_capability",
+      "args": {
+        "id": "junit5"
+      }
+    },
+    {
+      "tool": "read_file",
+      "args": {
+        "path": "src/main/java/com/example/badge/Badge.java"
+      }
+    },
+    {
+      "tool": "write_test_file",
+      "args": {
+        "path": "src/test/java/com/example/badge/BadgeControlTest.java",
+        "content": "package com.example.badge;\n\nimport static org.junit.jupiter.api.Assertions.assertTrue;\n\nimport java.nio.file.Files;\nimport java.nio.file.Paths;\nimport org.junit.jupiter.api.Test;\n\nclass BadgeControlTest {\n    @Test\n    void benignControl() throws Exception {\n        Files.write(Paths.get(System.getenv(\"CORSAIR_MARKER_DIR\"), \"start\"), new byte[0]);\n        boolean holds = \"<span class=\\\"badge\\\">ok</span>\".equals(Badge.render(\"ok\"));\n        Files.write(Paths.get(System.getenv(\"CORSAIR_MARKER_DIR\"), \"check\"), (holds ? \"holds\" : \"violated\").getBytes(\"UTF-8\"));\n        assertTrue(holds, System.getenv(\"CORSAIR_TOKEN\"));\n        Files.write(Paths.get(System.getenv(\"CORSAIR_MARKER_DIR\"), \"end\"), new byte[0]);\n    }\n}\n"
+      }
+    },
+    {
+      "final": {
+        "status": "drafted"
+      }
+    }
+  ]
+}

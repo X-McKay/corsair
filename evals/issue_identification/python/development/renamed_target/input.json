@@ -1,0 +1,11 @@
+{
+  "fixture_id": "renamed_target",
+  "issue": "The fetch_note function accepts a caller-selected name. Determine where access outside the note directory should be tested.",
+  "scope": "component",
+  "source_files": [
+    {
+      "path": "notes.py",
+      "content": "from pathlib import Path\n\ndef fetch_note(base, name):\n    location = base / name\n    return location.read_text()\n"
+    }
+  ]
+}

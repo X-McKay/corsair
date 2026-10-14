@@ -1,0 +1,19 @@
+{
+  "finding": {
+    "title": "UserDao.getUser looks up a user by the name from a login form.",
+    "description": "UserDao.getUser looks up a user by the name from a login form. Check whether the name is interpolated into SQL structure; a hostile name must remain a bound parameter. Assess query construction only.",
+    "file_path": "src/main/java/com/example/UserDao.java",
+    "symbol": "getUser"
+  },
+  "row_id": "junit4-maven-temurin8",
+  "source_files": [
+    {
+      "path": "src/main/java/com/example/UserDao.java",
+      "content": "package com.example;\n\nimport java.sql.Connection;\nimport java.sql.ResultSet;\nimport java.sql.SQLException;\nimport java.sql.Statement;\n\npublic class UserDao {\n    /** Look up a user by name. */\n    public ResultSet getUser(Connection conn, String name) throws SQLException {\n        Statement st = conn.createStatement();\n        return st.executeQuery(\"SELECT id, name, secret FROM users WHERE name = '\" + name + \"'\");\n    }\n}\n"
+    },
+    {
+      "path": "src/test/java/com/example/UserDaoTest.java",
+      "content": "package com.example;\n\nimport static org.junit.Assert.assertNotNull;\n\nimport org.junit.Test;\n\npublic class UserDaoTest {\n    @Test\n    public void constructsDao() {\n        assertNotNull(new UserDao());\n    }\n}\n"
+    }
+  ]
+}

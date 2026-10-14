@@ -1,0 +1,78 @@
+{
+  "expected_label": "INCONCLUSIVE",
+  "acceptable_labels": [
+    "INCONCLUSIVE"
+  ],
+  "forbidden_labels": [
+    "LIKELY_EXPLOITABLE",
+    "LIKELY_NOT_EXPLOITABLE"
+  ],
+  "expected_rule": "R6",
+  "expected_terminal_reason": "not_differential",
+  "expected_finding": "inconclusive",
+  "expected_fix": "not_verified",
+  "expected_runtime_row": "prove-perl526",
+  "truth": {
+    "source": "synthetic fix revision: the perl/cmdi-b exploitable tree plus one comment in the target file, so the reported condition still occurs on it"
+  },
+  "why": "The claimed fix changes no behaviour, so a PoV that demonstrates the condition passes on both revisions and R6 reports not_differential; a LIKELY label would mean the two identical behaviours were observed differently.",
+  "revision_tree_sha256": "eb81badb7564949772475e07f388d9976bd3870dd766376741cc61c41e875620",
+  "fixed_tree_sha256": "aa81e46f96dbc94a5e8421ada566e901094997019cbec20f10d070e284c18596",
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "lib/Runner.pm",
+          "start_line": 6,
+          "end_line": 6,
+          "quote": "sub run {"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "lib/Runner.pm",
+            "start_line": 6,
+            "end_line": 6,
+            "quote": "sub run {"
+          }
+        ]
+      },
+      "fixed": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "lib/Runner.pm",
+            "start_line": 6,
+            "end_line": 6,
+            "quote": "sub run {"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "passed"
+      },
+      "fixed": {
+        "control": "passed",
+        "exploit": "passed"
+      }
+    },
+    "build_fixed": true
+  }
+}

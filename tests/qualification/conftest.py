@@ -13,6 +13,9 @@ def kube(request):
     path = config.getoption("--kubeconfig")
     context = config.getoption("--context")
     evidence_arg = config.getoption("--evidence-dir")
+    if not path and not context:
+        # The offline suite (make test-v2) collects these gates; only the explicit make targets run them.
+        pytest.skip("Live kind qualification; run through its make target with --kubeconfig and --context")
     if not path or not evidence_arg or context != "kind-corsair":
         pytest.fail("Live qualification requires --kubeconfig, --context kind-corsair, --evidence-dir")
     kubeconfig = Path(path).resolve()
@@ -46,25 +49,3 @@ def network(kube, request):
     finally:
         fixture.cleanup()
 
-
-def pytest_collection_modifyitems(config, items):
-    """--toolchain names prepared images: keep exactly the toolchain gates whose images are all named."""
-    selected = config.getoption("--toolchain")
-    if not selected:
-        return
-    from tests.qualification.prepare_toolchains import BASES
-    unknown = sorted(set(selected) - set(BASES))
-    if unknown:
-        raise pytest.UsageError(f"Unknown toolchain image directories: {unknown}")
-    keep, drop = [], []
-    for item in items:
-        marker = item.get_closest_marker("toolchain")
-        if marker is not None and not (marker.args and set(marker.args) <= set(selected)):
-            drop.append(item)
-        else:
-            keep.append(item)
-    if drop and not any(item.get_closest_marker("toolchain") for item in keep):
-        raise pytest.UsageError(f"No toolchain gate covers exactly {sorted(set(selected))}; each gate needs all its images")
-    if drop:
-        config.hook.pytest_deselected(items=drop)
-        items[:] = keep

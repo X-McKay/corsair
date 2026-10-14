@@ -1,0 +1,14 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "registry",
+  "kind": "failure-mode",
+  "probes": "rubygems.org answers 403 while Bundler fetches specs; blocked at the registry layer quoting Bundler's error.",
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "n/a",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic manifests and recorded observations shaped after the toolchain images in deploy/runtime-matrix.yaml and tests/agents/framework_outputs."
+  }
+}

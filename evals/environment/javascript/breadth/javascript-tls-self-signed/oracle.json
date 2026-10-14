@@ -1,0 +1,33 @@
+{
+  "required_reads": [
+    ".travis.yml"
+  ],
+  "commands": [
+    [
+      "npm",
+      "ci",
+      "--ignore-scripts"
+    ]
+  ],
+  "observations": [
+    {
+      "exit": 1,
+      "stdout": "npm ERR! code SELF_SIGNED_CERT_IN_CHAIN\nnpm ERR! errno SELF_SIGNED_CERT_IN_CHAIN\nnpm ERR! request to https://registry.npmjs.org/jest failed, reason: self signed certificate in certificate chain\n"
+    }
+  ],
+  "draft": {
+    "status": "blocked",
+    "layer": "tls",
+    "evidence": "self signed certificate in certificate chain",
+    "run_ids": [
+      1
+    ],
+    "citations": []
+  },
+  "status": "blocked",
+  "layer": "tls",
+  "max_commands": 12,
+  "toolchain_id": "node-8.17.0-npm",
+  "requirement_patterns": [],
+  "checkout_paths": null
+}

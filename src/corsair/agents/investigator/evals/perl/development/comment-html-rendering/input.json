@@ -1,0 +1,19 @@
+{
+  "finding": {
+    "title": "Renderer::render turns visitor comments into HTML for the guestbook page.",
+    "description": "Renderer::render turns visitor comments into HTML for the guestbook page. A comment containing <script> may be emitted as a live element. Analyze this component only.",
+    "file_path": "lib/Renderer.pm",
+    "symbol": "render"
+  },
+  "row_id": "prove-perl526",
+  "source_files": [
+    {
+      "path": "lib/Renderer.pm",
+      "content": "package Renderer;\nuse strict;\nuse warnings;\nuse Exporter 'import';\nour @EXPORT_OK = qw(render);\n\n# Render a comment into HTML.\nsub render {\n    my ($text) = @_;\n    return \"<div class='comment'>\" . $text . \"</div>\";\n}\n\n1;\n"
+    },
+    {
+      "path": "t/renderer.t",
+      "content": "use strict;\nuse warnings;\nuse Test::More;\nuse Renderer qw(render);\n\nsubtest wraps_comment => sub {\n    is(render('hello'), \"<div class='comment'>hello</div>\", 'wrapped');\n};\n\ndone_testing;\n"
+    }
+  ]
+}

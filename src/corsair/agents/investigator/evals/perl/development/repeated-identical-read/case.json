@@ -1,0 +1,23 @@
+{
+  "language": "perl",
+  "framework": "test-more",
+  "family": "xss",
+  "kind": "failure-mode",
+  "category": "failure-mode",
+  "probes": "A trajectory that repeats the same read: the guard answers the third identical read_file with a notice instead of running it, and the plan is still reached.",
+  "expected": "The same planned answer as perl/comment-html-rendering; the repeated read_file call is answered with the read-loop notice, not re-run.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "https://github.com/X-McKay/infosec-harness",
+    "commit": "52aa2ac64f3d81139b609f18890ac52950d02933",
+    "path": "eval-corpus/perl/xss/b/lib/Renderer.pm",
+    "license": "NOASSERTION (same-owner repository; see benchmarks/corpus/infosec-harness/SOURCE.md)",
+    "notes": "Variant read from the local verbatim copy; the baseline test is synthetic.; converted from evals/test_planning/perl/breadth/perl-xss-return-value; repeated-read variant of perl/comment-html-rendering for the read-loop guard (develop #152)"
+  }
+}

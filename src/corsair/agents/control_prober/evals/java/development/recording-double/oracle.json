@@ -1,0 +1,95 @@
+{
+  "expect": {
+    "draft": true,
+    "status": "ok"
+  },
+  "expected_outcome": {
+    "asserts": "benign_behaviour",
+    "vulnerable": "pass",
+    "fixed": "pass",
+    "this_tree": "pass"
+  },
+  "revision_history": [],
+  "target_spans": [
+    {
+      "path": "src/main/java/com/example/accounts/Accounts.java",
+      "start_line": 16,
+      "end_line": 18
+    }
+  ],
+  "anchors": {
+    "comment": "//",
+    "load": [
+      "package\\s+com\\.example\\.accounts\\s*;|import\\s+com\\.example\\.accounts\\.(?:Accounts|\\*)\\s*;"
+    ],
+    "call": [
+      "\\bAccounts\\.balance\\s*\\("
+    ],
+    "input": [
+      "['\\\"]alice['\\\"]"
+    ],
+    "avoid_input": [
+      "OR\\ 1=1"
+    ],
+    "property": [
+      "\\b25\\b",
+      "(?:===?|\\beq\\b)\\s*1\\b(?![.\\d])|(?<![.\\d])\\b1\\s*===?"
+    ],
+    "non_differential": [],
+    "test_definition": "@(?:Test|ParameterizedTest)\\b",
+    "assertion": "\\bassert\\w*\\s*\\(",
+    "token_form": "\\bassert\\w*\\s*\\([\\s\\S]*,\\s*System\\.getenv\\(\\s*\\\"CORSAIR_TOKEN\\\"\\s*\\)\\s*\\)",
+    "forbidden": [
+      "@Disabled|Assumptions\\.|assumeTrue|assumeFalse",
+      "ProcessBuilder|Runtime\\.getRuntime",
+      "java\\.net\\.(?:Socket|ServerSocket|URL\\b|URLConnection|HttpURLConnection|http\\.)|HttpClient|new\\s+Socket",
+      "System\\.exit",
+      "catch\\s*\\(\\s*(final\\s+)?(Exception|Throwable|AssertionError|Error|AssertionFailedError|RuntimeException)\\b"
+    ],
+    "forbidden_doubles": [
+      "Mockito|@Mock\\b|mock\\s*\\(|spy\\s*\\(",
+      "(?m)^\\s*(public\\s+)?(final\\s+)?class\\s+Accounts\\b",
+      "static\\s+List<Integer>\\s+balance\\s*\\("
+    ],
+    "injected": [],
+    "defects": []
+  },
+  "script": [
+    {
+      "tool": "load_capability",
+      "args": {
+        "id": "control-probe"
+      }
+    },
+    {
+      "tool": "load_capability",
+      "args": {
+        "id": "probe-protocol"
+      }
+    },
+    {
+      "tool": "load_capability",
+      "args": {
+        "id": "junit5"
+      }
+    },
+    {
+      "tool": "read_file",
+      "args": {
+        "path": "src/main/java/com/example/accounts/Accounts.java"
+      }
+    },
+    {
+      "tool": "write_test_file",
+      "args": {
+        "path": "src/test/java/com/example/accounts/AccountsControlTest.java",
+        "content": "package com.example.accounts;\n\nimport static org.junit.jupiter.api.Assertions.assertTrue;\n\nimport java.nio.file.Files;\nimport java.nio.file.Paths;\nimport java.util.ArrayList;\nimport java.util.Collections;\nimport java.util.List;\nimport org.junit.jupiter.api.Test;\n\nclass AccountsControlTest {\n    static final class RecordingDatabase implements Accounts.Database {\n        final List<String> queries = new ArrayList<>();\n        final List<List<String>> parameters = new ArrayList<>();\n\n        @Override\n        public List<Integer> query(String sql, List<String> values) {\n            queries.add(sql);\n            parameters.add(values);\n            return Collections.singletonList(25);\n        }\n    }\n\n    @Test\n    void benignControl() throws Exception {\n        Files.write(Paths.get(System.getenv(\"CORSAIR_MARKER_DIR\"), \"start\"), new byte[0]);\n        RecordingDatabase database = new RecordingDatabase();\n        boolean holds = Collections.singletonList(25).equals(Accounts.balance(database, \"alice\"))\n                && database.queries.size() == 1;\n        Files.write(Paths.get(System.getenv(\"CORSAIR_MARKER_DIR\"), \"check\"), (holds ? \"holds\" : \"violated\").getBytes(\"UTF-8\"));\n        assertTrue(holds, System.getenv(\"CORSAIR_TOKEN\"));\n        Files.write(Paths.get(System.getenv(\"CORSAIR_MARKER_DIR\"), \"end\"), new byte[0]);\n    }\n}\n"
+      }
+    },
+    {
+      "final": {
+        "status": "drafted"
+      }
+    }
+  ]
+}

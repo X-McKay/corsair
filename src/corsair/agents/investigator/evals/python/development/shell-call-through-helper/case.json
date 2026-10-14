@@ -1,0 +1,21 @@
+{
+  "language": "python",
+  "framework": "pytest",
+  "family": "command-injection",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "A label passes through a neutral helper into a shell=True tar command.",
+  "expected": "Planned against create_archive (backup/archive.py 10-12); control label 'nightly', exploit label with '; touch'.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/issue_identification/python/breadth/python-cmdi-through-helper; v1 checked file/symbol selection only, the probe inputs and exploit markers are Corsair-authored for v2"
+  }
+}

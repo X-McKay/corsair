@@ -1,0 +1,18 @@
+{
+  "language": "javascript",
+  "framework": "express",
+  "family": "ssrf",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "The own issue was resolved years before a newer scan reported the same finding again.",
+  "expected": "prior_disposition is fixed with the old comment quoted; the brief does not claim the current code is fixed or that the finding can be ignored.",
+  "dimensions": [
+    "correctness",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Corsair-authored targeted grounding case; no v1 grounding suite exists"
+  }
+}

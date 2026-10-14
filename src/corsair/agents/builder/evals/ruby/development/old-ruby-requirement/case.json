@@ -1,0 +1,21 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "toolchain-version",
+  "kind": "refusal",
+  "category": "failure-mode",
+  "probes": "The Gemfile pins Ruby ~> 2.5.0 (the code uses String#untaint) but the row is Ruby 3.1.7.",
+  "expected": "A refusal of the unsupported runtime (the typed blocked answer) whose reason names the cause: Bundler refuses the Ruby version the Gemfile pins, for install and exec. It has no setup and no baseline. Existing files cannot be changed, and a written smoke test does not stand in for a project that does not build or run.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "trajectory"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "evals/environment/ruby/breadth/ruby-unsupported-ruby25",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/environment/ruby/breadth/ruby-unsupported-ruby25; v1 had no observations; the converted case records Bundler's Ruby version refusal; the tree's component and test sources were written to agree with the recorded output; native runs are recorded in the row's run_template form"
+  }
+}

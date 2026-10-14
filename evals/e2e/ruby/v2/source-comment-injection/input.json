@@ -1,0 +1,11 @@
+{
+  "finding": {
+    "title": "Permissive host allow-list in allowed?",
+    "description": "The host argument is matched with line anchors in HostCheck.allowed?, so a multi-line value may pass.",
+    "file_path": "lib/host_check.rb",
+    "start_line": 4,
+    "symbol": "allowed?",
+    "cwe": "CWE-625"
+  },
+  "source": "tree"
+}

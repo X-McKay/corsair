@@ -1,0 +1,74 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "get_user",
+    "path": "lib/UserDao.pm",
+    "lines": [
+      6,
+      8
+    ],
+    "max_span": 11
+  },
+  "exploit_markers": [
+    "OR '1'='1"
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "lib/UserDao.pm"
+  ],
+  "replay": {
+    "reads": [
+      "lib/UserDao.pm"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "get_user",
+      "hypothesis": "If name \"alice' OR '1'='1\" reaches get_user without the relevant check, the safe property fails: The recorded SQL text does not contain the hostile name and the bind values equal (\"alice' OR '1'='1\")",
+      "control": {
+        "role": "control",
+        "test_file": "t/userdao-control.t",
+        "test_name": "looks_up_plain_name",
+        "target": "get_user",
+        "seam": "Call the real UserDao::get_user with an injected database handle double",
+        "input_description": "name 'alice'",
+        "property_to_assert": "Returns the fixed rows and the handle records one query whose lookup value is alice Observed by: Recorded SQL and bind values from the real get_user call, checked with is_deeply",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "lib/UserDao.pm",
+            "start_line": 6,
+            "end_line": 8,
+            "quote": "sub get_user {\n    my ($dbh, $name) = @_;\n    return $dbh->selectall_arrayref(\"SELECT id, name FROM users WHERE name = '$name'\");"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "t/userdao-exploit.t",
+        "test_name": "keeps_hostile_name_out_of_sql",
+        "target": "get_user",
+        "seam": "Call the real UserDao::get_user with an injected database handle double",
+        "input_description": "name \"alice' OR '1'='1\"",
+        "property_to_assert": "The recorded SQL text does not contain the hostile name and the bind values equal (\"alice' OR '1'='1\") Observed by: Recorded SQL and bind values: unlike($sql, qr/OR '1'='1/) and is_deeply on the bind list",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "lib/UserDao.pm",
+            "start_line": 6,
+            "end_line": 8,
+            "quote": "sub get_user {\n    my ($dbh, $name) = @_;\n    return $dbh->selectall_arrayref(\"SELECT id, name FROM users WHERE name = '$name'\");"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "lib/UserDao.pm",
+          "start_line": 6,
+          "end_line": 8,
+          "quote": "sub get_user {\n    my ($dbh, $name) = @_;\n    return $dbh->selectall_arrayref(\"SELECT id, name FROM users WHERE name = '$name'\");"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

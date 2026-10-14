@@ -1,0 +1,12 @@
+{
+  "case_id": "corpus:0607db056955cf8d",
+  "finding": {
+    "title": "SQL injection in getUser",
+    "description": "Untrusted name argument reaches the CWE-89 sink in getUser.",
+    "file_path": "src/main/java/com/example/UserDao.java",
+    "start_line": 10,
+    "symbol": "getUser",
+    "cwe": "CWE-89"
+  },
+  "source": "../../../../../benchmarks/corpus/infosec-harness/java/sqli/a"
+}

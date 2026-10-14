@@ -1,0 +1,21 @@
+{
+  "language": "java",
+  "framework": "junit5",
+  "family": "ldap-injection",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "The LDAP filter is built by a private helper called on the search line.",
+  "expected": "Planned against DirectoryService.findUser (lines 21-24); exploit uid carries *)( filter metacharacters.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/issue_identification/java/breadth/java-ldap-filter-through-helper; v1 checked file/symbol selection only, the probe inputs and exploit markers are Corsair-authored for v2"
+  }
+}

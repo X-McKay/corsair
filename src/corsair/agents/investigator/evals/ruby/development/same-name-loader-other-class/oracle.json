@@ -1,0 +1,74 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "load_settings",
+    "path": "app/models/import.rb",
+    "lines": [
+      6,
+      7
+    ],
+    "max_span": 8
+  },
+  "exploit_markers": [
+    "!ruby/object"
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "app/models/import.rb"
+  ],
+  "replay": {
+    "reads": [
+      "app/models/import.rb"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "load_settings",
+      "hypothesis": "If raw document '--- !ruby/object:Gem::Installer {}' reaches load_settings without the relevant check, the safe property fails: loading raises Psych::DisallowedClass and builds no Gem::Installer",
+      "control": {
+        "role": "control",
+        "test_file": "test/import_control_test.rb",
+        "test_name": "test_benign_control",
+        "target": "load_settings",
+        "seam": "Import#load_settings(raw) on an instance whose save! is stubbed",
+        "input_description": "raw document 'theme: dark'",
+        "property_to_assert": "settings becomes {'theme' => 'dark'}",
+        "doubles": "save! is stubbed",
+        "citations": [
+          {
+            "path": "app/models/import.rb",
+            "start_line": 6,
+            "end_line": 7,
+            "quote": "  def load_settings(raw)\n    self.settings = YAML.load(raw)"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "test/import_exploit_test.rb",
+        "test_name": "test_security_regression",
+        "target": "load_settings",
+        "seam": "Import#load_settings(raw) on an instance whose save! is stubbed",
+        "input_description": "raw document '--- !ruby/object:Gem::Installer {}'",
+        "property_to_assert": "loading raises Psych::DisallowedClass and builds no Gem::Installer",
+        "doubles": "save! is stubbed",
+        "citations": [
+          {
+            "path": "app/models/import.rb",
+            "start_line": 6,
+            "end_line": 7,
+            "quote": "  def load_settings(raw)\n    self.settings = YAML.load(raw)"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "app/models/import.rb",
+          "start_line": 6,
+          "end_line": 7,
+          "quote": "  def load_settings(raw)\n    self.settings = YAML.load(raw)"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

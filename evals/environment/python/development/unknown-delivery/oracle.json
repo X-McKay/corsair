@@ -1,0 +1,48 @@
+{
+  "required_reads": [
+    ".github/workflows/ci.yml"
+  ],
+  "commands": [
+    [
+      "python3.12",
+      "-m",
+      "pip",
+      "install",
+      "--require-hashes",
+      "--only-binary",
+      ":all:",
+      "--no-compile",
+      "-r",
+      "requirements.txt"
+    ],
+    [
+      "python3.12",
+      "-m",
+      "compileall",
+      "documents.py"
+    ]
+  ],
+  "observations": [
+    {
+      "exit": 1,
+      "stdout": "native stream ended without exit status",
+      "unknown": true
+    },
+    {
+      "exit": 0,
+      "stdout": ""
+    }
+  ],
+  "draft": {
+    "status": "blocked",
+    "layer": "sandbox",
+    "evidence": "native stream ended without exit status",
+    "run_ids": [
+      1
+    ],
+    "citations": []
+  },
+  "status": "blocked",
+  "layer": "sandbox",
+  "max_commands": 12
+}

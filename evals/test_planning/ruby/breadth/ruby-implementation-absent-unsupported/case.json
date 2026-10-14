@@ -1,0 +1,12 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "open-redirect",
+  "kind": "abstention",
+  "probes": "The identified Ruby file is missing from the inventory (only its Minitest test is saved): the planner must abstain.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic; the implementation file is deliberately withheld from the inventory."
+  }
+}

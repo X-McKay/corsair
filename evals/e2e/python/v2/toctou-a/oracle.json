@@ -1,0 +1,71 @@
+{
+  "expected_label": "LIKELY_NOT_EXPLOITABLE",
+  "acceptable_labels": [
+    "LIKELY_NOT_EXPLOITABLE",
+    "UNABLE_TO_RUN"
+  ],
+  "forbidden_labels": [
+    "LIKELY_EXPLOITABLE"
+  ],
+  "expected_rule": null,
+  "expected_terminal_reason": null,
+  "expected_finding": null,
+  "expected_fix": "not_applicable",
+  "expected_runtime_row": "pytest-cpython312",
+  "truth": {
+    "source": "manifest",
+    "manifest": "benchmarks/corpus/infosec-harness/manifest.json",
+    "manifest_case": "toctou-fixed",
+    "manifest_truth": {
+      "expected_verdict": "likely_not_exploitable",
+      "reachability": "neutralized",
+      "sink_file": "app.py",
+      "sink_line": 6,
+      "source": "path parameter",
+      "target_callable": "read_config"
+    }
+  },
+  "why": "Manifest truth likely_not_exploitable (reachability neutralized). A race window is not reliably reachable from one native unit test, so an Investigator unsupported_scope refusal (UNABLE_TO_RUN by R0) is accepted too.",
+  "revision_tree_sha256": "380fde83c1717e59055527b5bb23b7d8cb0a90ee5a3ad1eaf65c0b3a83f086c5",
+  "fixed_tree_sha256": null,
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "app.py",
+          "start_line": 4,
+          "end_line": 4,
+          "quote": "def read_config(path: str) -> str:"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "app.py",
+            "start_line": 4,
+            "end_line": 4,
+            "quote": "def read_config(path: str) -> str:"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    }
+  }
+}

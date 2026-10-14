@@ -1,0 +1,20 @@
+{
+  "language": "common",
+  "framework": "pytest",
+  "family": "missing_source",
+  "kind": "refusal",
+  "category": "failure-mode",
+  "probes": "The revision tree is empty; there is nothing to locate.",
+  "expected": "status target_not_found with a reason, no probe briefs and no citations.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Corsair-authored; previously evals/issue_identification/cases.yaml; converted from evals/issue_identification/common/development/missing_source; v1 checked file/symbol selection only, the probe inputs and exploit markers are Corsair-authored for v2"
+  }
+}

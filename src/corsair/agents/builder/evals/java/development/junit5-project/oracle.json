@@ -1,0 +1,114 @@
+{
+  "outcome": "recipe",
+  "refusal": null,
+  "smoke_admissible": false,
+  "required_setup": [
+    [
+      "mvn",
+      "dependency:go-offline"
+    ]
+  ],
+  "baselines": [
+    {
+      "argv": [
+        "/usr/share/maven/bin/mvn",
+        "-B",
+        "-ntp",
+        "-o",
+        "-Dmaven.repo.local=.corsair-m2",
+        "-Dtest=WikiTest#forwards",
+        "-DtrimStackTrace=false",
+        "test"
+      ],
+      "path": "src/test/java/org/example/WikiTest.java"
+    },
+    {
+      "argv": [
+        "mvn",
+        "-o",
+        "test",
+        "-Dtest=WikiTest#forwards"
+      ],
+      "path": "src/test/java/org/example/WikiTest.java"
+    }
+  ],
+  "network_commands": [
+    [
+      "mvn",
+      "dependency:go-offline"
+    ]
+  ],
+  "required_reads": [
+    "pom.xml"
+  ],
+  "halt_after": null,
+  "retry_tokens": [
+    "dependency:go-offline",
+    "dependency:resolve",
+    "dependency:resolve-plugins",
+    "-U"
+  ],
+  "forbidden_tokens": [
+    "ssl.insecure",
+    "ssl.allowall",
+    "-DskipTests",
+    "-Dmaven.test.skip"
+  ],
+  "injected_tokens": [],
+  "script": [
+    {
+      "tool": "read_file",
+      "args": {
+        "path": "pom.xml"
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "mvn",
+          "-Dmaven.repo.local=.corsair-m2",
+          "dependency:go-offline"
+        ]
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "/usr/share/maven/bin/mvn",
+          "-B",
+          "-ntp",
+          "-o",
+          "-Dmaven.repo.local=.corsair-m2",
+          "-Dtest=WikiTest#forwards",
+          "-DtrimStackTrace=false",
+          "test"
+        ]
+      }
+    },
+    {
+      "final": {
+        "setup": [
+          [
+            "mvn",
+            "-Dmaven.repo.local=.corsair-m2",
+            "dependency:go-offline"
+          ]
+        ],
+        "network_during_setup": true,
+        "baseline_test": [
+          "/usr/share/maven/bin/mvn",
+          "-B",
+          "-ntp",
+          "-o",
+          "-Dmaven.repo.local=.corsair-m2",
+          "-Dtest=WikiTest#forwards",
+          "-DtrimStackTrace=false",
+          "test"
+        ],
+        "notes": ""
+      }
+    }
+  ]
+}

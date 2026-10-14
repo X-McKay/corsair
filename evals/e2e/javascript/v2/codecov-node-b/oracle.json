@@ -1,0 +1,87 @@
+{
+  "expected_label": "LIKELY_EXPLOITABLE",
+  "acceptable_labels": [
+    "LIKELY_EXPLOITABLE"
+  ],
+  "forbidden_labels": [
+    "LIKELY_NOT_EXPLOITABLE"
+  ],
+  "expected_rule": "R4",
+  "expected_terminal_reason": "ok",
+  "expected_finding": "reproduced",
+  "expected_fix": "verified",
+  "expected_runtime_row": "jest29-node22",
+  "truth": {
+    "source": "manifest",
+    "manifest": "benchmarks/corpus/permissive-reduced/manifest.json",
+    "manifest_case": "js-codecov-node-b",
+    "manifest_truth": {
+      "expected_verdict": "potentially_exploitable",
+      "reachability": "reachable",
+      "sink_file": "src/codecov.js",
+      "sink_line": 9,
+      "source": "root argument",
+      "target_callable": "listFiles"
+    }
+  },
+  "why": "Manifest truth potentially_exploitable (reachability reachable).",
+  "revision_tree_sha256": "b4551518fbbed8b30ea20b8b2601e728dabf4ea6452392687ff376f0153eab33",
+  "fixed_tree_sha256": "87fdf68ff32be9f18e6743ce144e5fdf1c0a287c3211e0dfce9bd45b1d6b3ba1",
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "src/codecov.js",
+          "start_line": 9,
+          "end_line": 9,
+          "quote": "  return execSync('find ' + root + ' ' + patterns).toString();"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "src/codecov.js",
+            "start_line": 9,
+            "end_line": 9,
+            "quote": "  return execSync('find ' + root + ' ' + patterns).toString();"
+          }
+        ]
+      },
+      "fixed": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "src/codecov.js",
+            "start_line": 10,
+            "end_line": 10,
+            "quote": "  return execFileSync('find', findArgs).toString();"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "passed"
+      },
+      "fixed": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    },
+    "build_fixed": true
+  }
+}

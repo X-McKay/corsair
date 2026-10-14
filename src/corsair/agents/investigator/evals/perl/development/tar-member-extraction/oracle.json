@@ -1,0 +1,74 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "install",
+    "path": "lib/Theme.pm",
+    "lines": [
+      9,
+      23
+    ],
+    "max_span": 23
+  },
+  "exploit_markers": [
+    "../"
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "lib/Theme.pm"
+  ],
+  "replay": {
+    "reads": [
+      "lib/Theme.pm"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "install",
+      "hypothesis": "If tarball with member '../escaped.txt' reaches install without the relevant check, the safe property fails: The install dies with a message matching /outside the theme directory/, and after the call $dir/escaped.txt does not exist",
+      "control": {
+        "role": "control",
+        "test_file": "t/theme-control.t",
+        "test_name": "installs_member_inside_destination",
+        "target": "install",
+        "seam": "use Theme and call the real Theme::install on a tarball in the tempdir",
+        "input_description": "tarball with member 'css/site.css'",
+        "property_to_assert": "Returns 1 and $dir/theme/css/site.css contains the sentinel Observed by: Read $dir/theme/css/site.css in the fixture after the real install call and compare with is()",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "lib/Theme.pm",
+            "start_line": 9,
+            "end_line": 23,
+            "quote": "sub install {\n    my ($tarball, $dest) = @_;\n    my $tar = Archive::Tar->new($tarball) or die Archive::Tar->error;\n    my $count = 0;\n    for my $file ($tar->get_files) {\n        next unless $file->is_file;\n        my $target = \"$dest/\" . $file->full_path;\n        make_path(dirname($target));\n        open(my $out, '>', $target) or die \"cannot write $target: $!\";\n        binmode $out;\n        print {$out} $file->get_content;\n        close $out;\n        $count++;\n    }\n    return $count;"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "t/theme-exploit.t",
+        "test_name": "keeps_members_inside_destination",
+        "target": "install",
+        "seam": "use Theme and call the real Theme::install on a tarball in the tempdir",
+        "input_description": "tarball with member '../escaped.txt'",
+        "property_to_assert": "The install dies with a message matching /outside the theme directory/, and after the call $dir/escaped.txt does not exist Observed by: eval { } around the real install call, like($@, qr/outside the theme directory/), then ok(!-e \"$dir/escaped.txt\") in the fixture",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "lib/Theme.pm",
+            "start_line": 9,
+            "end_line": 23,
+            "quote": "sub install {\n    my ($tarball, $dest) = @_;\n    my $tar = Archive::Tar->new($tarball) or die Archive::Tar->error;\n    my $count = 0;\n    for my $file ($tar->get_files) {\n        next unless $file->is_file;\n        my $target = \"$dest/\" . $file->full_path;\n        make_path(dirname($target));\n        open(my $out, '>', $target) or die \"cannot write $target: $!\";\n        binmode $out;\n        print {$out} $file->get_content;\n        close $out;\n        $count++;\n    }\n    return $count;"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "lib/Theme.pm",
+          "start_line": 9,
+          "end_line": 23,
+          "quote": "sub install {\n    my ($tarball, $dest) = @_;\n    my $tar = Archive::Tar->new($tarball) or die Archive::Tar->error;\n    my $count = 0;\n    for my $file ($tar->get_files) {\n        next unless $file->is_file;\n        my $target = \"$dest/\" . $file->full_path;\n        make_path(dirname($target));\n        open(my $out, '>', $target) or die \"cannot write $target: $!\";\n        binmode $out;\n        print {$out} $file->get_content;\n        close $out;\n        $count++;\n    }\n    return $count;"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

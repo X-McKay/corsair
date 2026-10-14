@@ -1,0 +1,11 @@
+{
+  "fixture_id": "javascript-arginjection-through-helper",
+  "issue": "search passes a user-supplied term to grep. A term such as --file=/etc/passwd is treated as a grep option and leaks the file. Locate the implementation.",
+  "scope": "component",
+  "source_files": [
+    {
+      "path": "src/search.js",
+      "content": "const { execFile } = require(\"child_process\");\n\nconst normalizeTerm = (term) => String(term).trim();\n\n// Search the notes file for a user-supplied term and return the matching lines.\nfunction search(term, file, cb) {\n  execFile(\"grep\", [normalizeTerm(term), file], (err, stdout) => cb(stdout));\n}\n\nmodule.exports = { search };\n"
+    }
+  ]
+}

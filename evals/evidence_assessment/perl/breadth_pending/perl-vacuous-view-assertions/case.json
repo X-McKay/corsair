@@ -1,0 +1,12 @@
+{
+  "language": "perl",
+  "framework": "test-more",
+  "family": "xss",
+  "kind": "negative",
+  "probes": "Both subtests call the real render_comment with the right inputs, but pass and ok(1) hold whatever it returns.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Written for this set; the property under review is in the frozen test patch, not the source."
+  }
+}

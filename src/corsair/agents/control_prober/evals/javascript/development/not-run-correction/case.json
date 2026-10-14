@@ -1,0 +1,21 @@
+{
+  "language": "javascript",
+  "framework": "jest",
+  "family": "badge",
+  "kind": "failure-mode",
+  "category": "capability",
+  "probes": "D3 mechanical correction: the previous draft (with the planned name) never wrote its start marker, so the body did not start",
+  "expected": "A revised draft with revision_of set and a working start marker, the defect gone and the brief's input and property kept.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/test_authoring/javascript/breadth_pending/javascript-reads-own-file-after-error (run did not start the planned test); control plan entry"
+  }
+}

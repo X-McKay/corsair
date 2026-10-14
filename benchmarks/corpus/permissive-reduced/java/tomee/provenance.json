@@ -1,0 +1,30 @@
+{
+  "family": "tomee",
+  "language": "java",
+  "cwe": "CWE-502",
+  "runtime_row": "junit4-maven-temurin8",
+  "upstream_repo": "https://github.com/apache/tomee",
+  "record": "CVE-2015-8581",
+  "pointer_source": "Vul4J VUL4J-37 (tuhh-softsec/vul4j@376411da dataset CSV; metadata only, no dataset code)",
+  "upstream_spdx": "Apache-2.0",
+  "spdx_verified": "ASF Apache-2.0 header in the kept file at fix commit 58cdbbef, 2026-10-14",
+  "parent_commit": "58cdbbef9c77ab2b44870f9d606593b49cde76d9~1",
+  "fix_commit": "58cdbbef9c77ab2b44870f9d606593b49cde76d9",
+  "verbatim": true,
+  "kept_files": [
+    {
+      "path": "src/main/java/org/apache/openejb/core/rmi/BlacklistClassResolver.java",
+      "upstream": "container/openejb-core/src/main/java/org/apache/openejb/core/rmi/BlacklistClassResolver.java",
+      "note": "byte-identical to upstream at parent and fix commits; variants differ only by the upstream one-line diff"
+    }
+  ],
+  "stand_ins": [],
+  "reduction_removed": [
+    "the rest of the TomEE tree; the fix commit's parallel change to openejb-client EjbObjectInputStream, the distribution default changes (Installer, arquillian Setup/TomEEConfiguration) and the upstream test were not carried"
+  ],
+  "added": [
+    "pom.xml (JUnit 4.13.2 test scope, plugin pins from the junit4-maven-temurin8 image closure)",
+    "empty src/test/java package directory (.gitkeep)"
+  ],
+  "pov_note": "Benign control and proof-of-vulnerability probes authored by the Corsair chain at run time; none authored here. Property observable in-process: whether check() throws SecurityException for a class name under a configured '*' entry."
+}

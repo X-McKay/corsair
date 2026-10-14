@@ -1,0 +1,22 @@
+{
+  "language": "perl",
+  "framework": "test-more",
+  "family": "baseline-failed",
+  "kind": "negative",
+  "category": "failure-mode",
+  "probes": "Setup succeeds but the project's only test file fails one assertion; prove runs whole files.",
+  "expected": "Either a blocked refusal whose reason names the failing native test, or a recipe whose baseline is a smoke test it wrote; never the failing native test (t/normalize.t).",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "evals/environment/perl/breadth/perl-baseline-test-fails",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/environment/perl/breadth/perl-baseline-test-fails; the tree's component and test sources were written to agree with the recorded output; native runs are recorded in the row's run_template form"
+  }
+}

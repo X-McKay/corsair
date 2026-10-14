@@ -1,0 +1,13 @@
+{
+  "finding": {
+    "title": "Session::Store::load_session thaws the session cookie with Storable, so a crafted cookie builds arbitrary objects.",
+    "description": "Session::Store::load_session thaws the session cookie with Storable, so a crafted cookie builds arbitrary objects. Locate load_session in lib/Session/Store.pm."
+  },
+  "row_id": "prove-perl526",
+  "source_files": [
+    {
+      "path": "lib/Session/Cookie.pm",
+      "content": "package Session::Cookie;\nuse strict;\nuse warnings;\n\nsub parse {\n    my ($header) = @_;\n    my %cookies = map { split /=/, $_, 2 } split /;\\s*/, ($header // '');\n    return \\%cookies;\n}\n\n1;\n"
+    }
+  ]
+}

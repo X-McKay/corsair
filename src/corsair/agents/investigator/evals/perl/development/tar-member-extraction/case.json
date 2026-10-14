@@ -1,0 +1,21 @@
+{
+  "language": "perl",
+  "framework": "test-more",
+  "family": "zip-slip",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "Archive::Tar extraction observed as fixture state in a tempdir.",
+  "expected": "Planned against Theme::install (lib/Theme.pm 9-23); exploit member ../escaped.txt.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic Theme module using core Archive::Tar.; converted from evals/test_planning/perl/breadth/perl-tar-extraction-fixture-state"
+  }
+}

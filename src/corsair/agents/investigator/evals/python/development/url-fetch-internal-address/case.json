@@ -1,0 +1,21 @@
+{
+  "language": "python",
+  "framework": "pytest",
+  "family": "native_dependency_observation",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "SSRF via urlopen: planned as a unit test that doubles the outbound call and asserts the internal address is refused before dispatch.",
+  "expected": "Planned against fetch_preview (previews.py 4-6); the control fetches https://example.com/preview, the exploit 169.254.169.254.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Corsair-authored; previously evals/test_planning/cases-unit-first-v2.yaml; converted from evals/test_planning/python/unit-first/native_dependency_observation"
+  }
+}

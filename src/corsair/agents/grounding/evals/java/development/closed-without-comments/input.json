@@ -1,0 +1,36 @@
+{
+  "finding": {
+    "title": "JPQL query concatenates the customer filter",
+    "description": "search builds a JPQL string by concatenating the filter request parameter.",
+    "file_path": "src/main/java/com/acme/billing/CustomerRepository.java",
+    "start_line": 112,
+    "symbol": "CustomerRepository.search",
+    "cwe": "CWE-89"
+  },
+  "context": {
+    "issue": {
+      "id": "5340",
+      "title": "JPQL query concatenates the customer filter",
+      "state": "Active",
+      "cwe": "CWE-89",
+      "description": "search builds a JPQL string by concatenating the filter request parameter.",
+      "repo_url": "https://dev.azure.com/acme/_git/billing-api",
+      "source_file": "src/main/java/com/acme/billing/CustomerRepository.java:112"
+    },
+    "related": [
+      {
+        "issue": {
+          "id": "5348",
+          "title": "JPQL query concatenates the customer filter in the v1 API",
+          "state": "Closed",
+          "cwe": "CWE-89",
+          "description": "search builds a JPQL string by concatenating the filter request parameter.",
+          "repo_url": "https://dev.azure.com/acme/_git/billing-api"
+        },
+        "relation": "similarity",
+        "comments": [],
+        "similarity": 0.86
+      }
+    ]
+  }
+}

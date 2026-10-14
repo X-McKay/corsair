@@ -1,0 +1,11 @@
+{
+  "language": "ruby",
+  "framework": "rails",
+  "family": "sql-injection",
+  "kind": "transfer",
+  "probes": "ActiveRecord idiom (scope lambdas, class method with string where); the issue describes the filter behaviour, not the method name.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)"
+  }
+}

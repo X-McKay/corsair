@@ -1,0 +1,98 @@
+{
+  "required_reads": [
+    "Makefile.PL",
+    ".github/workflows/ci.yml"
+  ],
+  "commands": [
+    [
+      "perl",
+      "Makefile.PL"
+    ],
+    [
+      "make"
+    ],
+    [
+      "prove",
+      "--dry",
+      "-l",
+      "t"
+    ],
+    [
+      "prove",
+      "--norc",
+      "-lv",
+      "t/corsair_smoke.t"
+    ]
+  ],
+  "observations": [
+    {
+      "exit": 0,
+      "stdout": "Checking if your kit is complete...\nLooks good\nGenerating a Unix-style Makefile\nWriting Makefile for Acme::Units\nWriting MYMETA.yml and MYMETA.json\n"
+    },
+    {
+      "exit": 0,
+      "stdout": ""
+    },
+    {
+      "exit": 0,
+      "stdout": "t/corsair_smoke.t\n"
+    },
+    {
+      "exit": 0,
+      "stdout": "t/corsair_smoke.t .. \n1..1\nok 1 - environment runs\nok\nAll tests successful.\nFiles=1, Tests=1,  0 wallclock secs ( 0.02 usr  0.00 sys +  0.04 cusr  0.00 csys =  0.06 CPU)\nResult: PASS\n"
+    }
+  ],
+  "draft": {
+    "status": "ready",
+    "toolchain_id": "perl-5.26-make",
+    "recipe": [
+      {
+        "phase": "build",
+        "command": [
+          "perl",
+          "Makefile.PL"
+        ],
+        "source": {
+          "path": ".github/workflows/ci.yml",
+          "start_line": 9,
+          "end_line": 9
+        }
+      }
+    ],
+    "build_command": [
+      "make"
+    ],
+    "discovery_command": [
+      "prove",
+      "--dry",
+      "-l",
+      "t"
+    ],
+    "framework": "tap-harness",
+    "baseline_test_id": "t/corsair_smoke.t",
+    "baseline_test_path": "t/corsair_smoke.t",
+    "baseline_test_command": [
+      "prove",
+      "--norc",
+      "-lv",
+      "t/corsair_smoke.t"
+    ],
+    "approved_test_paths": [
+      "t/corsair_control.t",
+      "t/corsair_security.t"
+    ]
+  },
+  "status": "ready",
+  "layer": null,
+  "max_commands": 12,
+  "toolchain_id": "perl-5.26-make",
+  "requirement_patterns": [],
+  "checkout_paths": [
+    ".github/workflows/ci.yml",
+    "Makefile.PL",
+    "MANIFEST",
+    "lib/Acme/Units.pm",
+    "README",
+    "t/corsair_smoke.t"
+  ]
+}

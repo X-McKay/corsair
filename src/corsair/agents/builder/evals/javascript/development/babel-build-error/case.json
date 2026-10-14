@@ -1,0 +1,21 @@
+{
+  "language": "javascript",
+  "framework": "jest",
+  "family": "build",
+  "kind": "failure-mode",
+  "category": "failure-mode",
+  "probes": "The declared Babel build fails on a syntax error in src/router.js; tests load the built lib/.",
+  "expected": "A blocked refusal whose reason names the cause: the declared build fails and the tests load its output. It has no setup and no baseline. Existing files cannot be changed, and a written smoke test does not stand in for a project that does not build or run.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "trajectory"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "evals/environment/javascript/breadth/javascript-babel-build-error",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/environment/javascript/breadth/javascript-babel-build-error; the test now loads the built lib/router, so skipping the failing build cannot pass; the tree's component and test sources were written to agree with the recorded output; native runs are recorded in the row's run_template form"
+  }
+}

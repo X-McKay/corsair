@@ -1,0 +1,21 @@
+{
+  "finding": {
+    "title": "Statement download resolves the requested file name",
+    "description": "download resolves the name request parameter against the statements directory without normalising it.",
+    "file_path": "src/main/java/com/acme/billing/StatementController.java",
+    "start_line": 64,
+    "symbol": "StatementController.download",
+    "cwe": "CWE-22"
+  },
+  "context": {
+    "issue": {
+      "id": "5360",
+      "title": "Statement download resolves the requested file name",
+      "state": "Active",
+      "cwe": "CWE-22",
+      "description": "download resolves the name request parameter against the statements directory without normalising it.",
+      "repo_url": "https://dev.azure.com/acme/_git/billing-api",
+      "source_file": "src/main/java/com/acme/billing/StatementController.java:64"
+    }
+  }
+}

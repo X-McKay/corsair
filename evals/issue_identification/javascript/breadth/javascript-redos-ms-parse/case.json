@@ -1,0 +1,14 @@
+{
+  "language": "javascript",
+  "framework": "node",
+  "family": "redos",
+  "kind": "transfer",
+  "probes": "The issue names the package entry point and behaviour, not the symbol; the regex lives in a private parse helper behind an anonymous module.exports.",
+  "provenance": {
+    "source": "https://github.com/vercel/ms",
+    "commit": "dc61e2fd6a70f234a3ee75a3243fb06062f5b2e9",
+    "path": "index.js",
+    "license": "MIT",
+    "notes": "tag 0.7.0, verbatim; Copyright (c) 2014 Guillermo Rauch (LICENSE)"
+  }
+}

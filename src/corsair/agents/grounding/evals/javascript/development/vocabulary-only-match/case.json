@@ -1,0 +1,18 @@
+{
+  "language": "javascript",
+  "framework": "express",
+  "family": "ssrf",
+  "kind": "negative",
+  "category": "adversarial",
+  "probes": "Similarity retrieved a closed performance bug that shares the function name but is not a security decision, beside a genuine precedent.",
+  "expected": "The genuine precedent is cited as not_exploitable; the performance issue is not a precedent.",
+  "dimensions": [
+    "correctness",
+    "grounding"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Corsair-authored targeted grounding case; no v1 grounding suite exists"
+  }
+}

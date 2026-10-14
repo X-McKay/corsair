@@ -1,0 +1,13 @@
+{
+  "case_id": "e2e-v2:ruby/pathtraversal-b",
+  "finding": {
+    "title": "Path traversal in read",
+    "description": "`name` reaches File.read in Attachments.read.",
+    "file_path": "lib/attachments.rb",
+    "start_line": 5,
+    "symbol": "read",
+    "cwe": "CWE-22"
+  },
+  "source": "tree",
+  "fixed_source": "../pathtraversal-a/tree"
+}

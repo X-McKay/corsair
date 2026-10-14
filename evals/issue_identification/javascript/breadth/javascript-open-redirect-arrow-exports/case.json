@@ -1,0 +1,11 @@
+{
+  "language": "javascript",
+  "framework": "express",
+  "family": "open-redirect",
+  "kind": "transfer",
+  "probes": "CommonJS exports.name = arrow-function idiom with several handlers in one module; the target has no function keyword.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)"
+  }
+}

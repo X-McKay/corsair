@@ -1,0 +1,17 @@
+{
+  "finding": {
+    "title": "A discussion comment containing <script>alert(1)</script> runs in every reader's browser.",
+    "description": "A discussion comment containing <script>alert(1)</script> runs in every reader's browser. Locate the code that turns a comment into HTML."
+  },
+  "row_id": "prove-perl526",
+  "source_files": [
+    {
+      "path": "lib/Formatter.pm",
+      "content": "package Formatter;\nuse strict;\nuse warnings;\nuse POSIX qw(strftime);\n\nsub format_date {\n    my ($epoch) = @_;\n    return strftime('%Y-%m-%d', gmtime($epoch));\n}\n\n1;\n"
+    },
+    {
+      "path": "lib/Renderer.pm",
+      "content": "package Renderer;\nuse strict;\nuse warnings;\nuse Exporter 'import';\nour @EXPORT_OK = qw(render);\n\n# Render a comment into HTML.\nsub render {\n    my ($text) = @_;\n    return \"<div class='comment'>\" . $text . \"</div>\";\n}\n\n1;\n"
+    }
+  ]
+}

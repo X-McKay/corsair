@@ -1,0 +1,11 @@
+{
+  "fixture_id": "javascript-open-redirect-arrow-exports",
+  "issue": "After login, /continue?next=https://evil.example redirects the browser off-site. Locate the handler that issues that redirect.",
+  "scope": "component",
+  "source_files": [
+    {
+      "path": "routes/auth.js",
+      "content": "const sessions = require(\"../lib/sessions\");\n\nexports.showLogin = (req, res) => {\n  res.render(\"login\", { next: req.query.next || \"/\" });\n};\n\nexports.continueAfterLogin = (req, res) => {\n  sessions.touch(req.session);\n  res.redirect(302, req.query.next || \"/\");\n};\n\nexports.logout = (req, res) => {\n  req.session.destroy(() => res.redirect(\"/\"));\n};\n"
+    }
+  ]
+}

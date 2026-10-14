@@ -1,0 +1,38 @@
+{
+  "family": "commons-io",
+  "language": "java",
+  "cwe": "CWE-20",
+  "runtime_row": "junit4-maven-temurin8",
+  "upstream_repo": "https://github.com/apache/commons-io",
+  "record": "CVE-2021-29425",
+  "pointer_source": "Vul4J VUL4J-14 (tuhh-softsec/vul4j dataset CSV; metadata only, no dataset code)",
+  "upstream_spdx": "Apache-2.0",
+  "spdx_verified": "ASF Apache-2.0 header in each kept file at fix commit 2736b6fe, 2026-10-14",
+  "parent_commit": "2736b6fe0b3fa22ec8e2b4184897ecadb021fc78~1",
+  "fix_commit": "2736b6fe0b3fa22ec8e2b4184897ecadb021fc78",
+  "verbatim": true,
+  "kept_files": [
+    {
+      "path": "src/main/java/org/apache/commons/io/FilenameUtils.java",
+      "upstream": "src/main/java/org/apache/commons/io/FilenameUtils.java",
+      "note": "byte-identical to upstream at the variant's commit"
+    },
+    {
+      "path": "src/main/java/org/apache/commons/io/IOCase.java",
+      "upstream": "src/main/java/org/apache/commons/io/IOCase.java",
+      "note": "byte-identical to upstream at the variant's commit"
+    }
+  ],
+  "stand_ins": [],
+  "reduction_removed": [
+    "the rest of commons-io and the upstream tests"
+  ],
+  "added": [
+    "pom.xml (JUnit 4.13.2 test scope, plugin pins from the junit4-maven-temurin8 image closure)",
+    "empty src/test/java package directory (.gitkeep)"
+  ],
+  "pov_note": "Benign control and proof-of-vulnerability probes authored by the Corsair chain at run time; none authored here. Property observable in-process: the string FilenameUtils.normalize returns for a given file name.",
+  "notes": [
+    "FilenameUtils.java carries an unrelated upstream message containing the word 'injection' (null-byte check); it is identical in both variants and left verbatim."
+  ]
+}

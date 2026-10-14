@@ -1,0 +1,105 @@
+{
+  "source_files": [
+    {
+      "path": ".github/workflows/maven.yml",
+      "content": "name: build\non: [push, pull_request]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-java@v4\n        with:\n          distribution: temurin\n          java-version: '17'\n      - run: mvn -B dependency:go-offline\n      - run: mvn -B -o verify\n"
+    },
+    {
+      "path": "pom.xml",
+      "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.acme</groupId>\n  <artifactId>lru-cache</artifactId>\n  <version>1.4.0-SNAPSHOT</version>\n  <properties>\n    <maven.compiler.release>17</maven.compiler.release>\n    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>\n  </properties>\n  <dependencies>\n    <dependency>\n      <groupId>org.junit.jupiter</groupId>\n      <artifactId>junit-jupiter</artifactId>\n      <version>5.14.4</version>\n      <scope>test</scope>\n    </dependency>\n  </dependencies>\n</project>\n"
+    },
+    {
+      "path": "src/main/java/org/acme/cache/LruCache.java",
+      "content": "package org.acme.cache;\n\n/*\n * Copyright (c) Acme.\n * Licensed under the Apache License, Version 2.0.\n */\nimport java.util.LinkedHashMap;\n\npublic class LruCache<K, V> {\n    private final int capacity;\n    private final LinkedHashMap<K, V> map = new LinkedHashMap<>(16, 0.75f, true);\n\n    public LruCache(int capacity) {\n        this.capacity = capacity;\n    }\n\n    private boolean full() {\n        return map.size() >= capacity;\n    }\n\n    public V get(K key) {\n        return map.get(key);\n    }\n\n    public void put(K key, V value) {\n        // 26\n        // 27\n        // 28\n        // 29\n        // 30\n        // 31\n        // 32\n        // 33\n        // 34\n        // 35\n        // 36\n        // 37\n        // 38\n        // 39\n        // 40\n            if (full()) evictEldest();\n        map.put(key, value);\n    }\n}\n"
+    },
+    {
+      "path": "src/test/java/org/acme/cache/LruCacheTest.java",
+      "content": "package org.acme.cache;\n\nimport org.junit.jupiter.api.Test;\n\nimport static org.junit.jupiter.api.Assertions.*;\n\nclass LruCacheTest {\n    @Test\n    void evictsLeastRecentlyUsed() {\n        LruCache<String, Integer> cache = new LruCache<>(1);\n        cache.put(\"a\", 1);\n        cache.put(\"b\", 2);\n        assertNull(cache.get(\"a\"));\n    }\n}\n"
+    }
+  ],
+  "row_id": "junit5-maven-temurin17",
+  "plan": {
+    "status": "planned",
+    "target": "src/main/java/org/acme/cache/LruCache",
+    "citations": [
+      {
+        "path": "src/main/java/org/acme/cache/LruCache.java",
+        "start_line": 1,
+        "end_line": 1,
+        "quote": "package org.acme.cache;"
+      }
+    ]
+  },
+  "feedback": null,
+  "workspace_fixture": {
+    "observations": [
+      {
+        "argv": [
+          "mvn",
+          "-B",
+          "dependency:go-offline"
+        ],
+        "exit_code": 0,
+        "output": "[INFO] BUILD SUCCESS\n"
+      },
+      {
+        "argv": [
+          "mvn",
+          "-B",
+          "-o",
+          "compile"
+        ],
+        "exit_code": 1,
+        "output": "[INFO] Compiling 1 source file with javac [debug release 17] to target/classes\n[INFO] -------------------------------------------------------------\n[ERROR] COMPILATION ERROR : \n[INFO] -------------------------------------------------------------\n[ERROR] /sandbox/work/src/main/java/org/acme/cache/LruCache.java:[41,25] cannot find symbol\n  symbol:   method evictEldest()\n  location: class org.acme.cache.LruCache<K,V>\n[INFO] 1 error\n[INFO] BUILD FAILURE\n"
+      },
+      {
+        "argv": [
+          "/usr/share/maven/bin/mvn",
+          "-B",
+          "-ntp",
+          "-o",
+          "-Dmaven.repo.local=.corsair-m2",
+          "-Dtest=LruCacheTest#evictsLeastRecentlyUsed",
+          "-DtrimStackTrace=false",
+          "test"
+        ],
+        "exit_code": 1,
+        "output": "[INFO] Compiling 1 source file with javac [debug release 17] to target/classes\n[INFO] -------------------------------------------------------------\n[ERROR] COMPILATION ERROR : \n[INFO] -------------------------------------------------------------\n[ERROR] /work/src/main/java/org/acme/cache/LruCache.java:[41,25] cannot find symbol\n  symbol:   method evictEldest()\n  location: class org.acme.cache.LruCache<K,V>\n[INFO] 1 error\n[INFO] BUILD FAILURE\n",
+        "needs": [
+          [
+            "mvn",
+            "-B",
+            "dependency:go-offline"
+          ]
+        ],
+        "unmet": {
+          "exit_code": 1,
+          "output": "[ERROR] Failed to execute goal on project app: Could not resolve dependencies: Cannot access central (https://repo.maven.apache.org/maven2) in offline mode and the artifact org.junit.jupiter:junit-jupiter:jar:5.14.4 has not been downloaded from it before.\n[INFO] BUILD FAILURE\n"
+        }
+      },
+      {
+        "argv": [
+          "mvn",
+          "-v"
+        ],
+        "exit_code": 0,
+        "output": "Apache Maven 3.10.0\nJava version: 17.0.20.1, vendor: Eclipse Adoptium\n"
+      }
+    ],
+    "written_file_run": {
+      "exit_code": 1,
+      "output": "[INFO] Compiling 1 source file with javac [debug release 17] to target/classes\n[INFO] -------------------------------------------------------------\n[ERROR] COMPILATION ERROR : \n[INFO] -------------------------------------------------------------\n[ERROR] /work/src/main/java/org/acme/cache/LruCache.java:[41,25] cannot find symbol\n  symbol:   method evictEldest()\n  location: class org.acme.cache.LruCache<K,V>\n[INFO] 1 error\n[INFO] BUILD FAILURE\n",
+      "needs": [
+        [
+          "mvn",
+          "-B",
+          "dependency:go-offline"
+        ]
+      ],
+      "unmet": {
+        "exit_code": 1,
+        "output": "[ERROR] Failed to execute goal on project app: Could not resolve dependencies: Cannot access central (https://repo.maven.apache.org/maven2) in offline mode and the artifact org.junit.jupiter:junit-jupiter:jar:5.14.4 has not been downloaded from it before.\n[INFO] BUILD FAILURE\n"
+      }
+    }
+  }
+}

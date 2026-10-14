@@ -1,15 +1,23 @@
 name: Development guards
 
+# The offline suite (`make test-v2`), no model and no cluster. Toolchain images build on demand only
+# (toolchain-images.yml). Gates and release policies return once end-to-end runs and agent baselines exist.
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [develop]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# A newer push to the same PR supersedes its running check; branch pushes always finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  # Keeps the existing check name, so anything that requires `offline-guards` still has a green to wait for.
   offline-guards:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -21,4 +29,4 @@ jobs:
         with:
           version: "0.12.23"
           python-version: "3.12"
-      - run: make test-config
+      - run: make test-v2

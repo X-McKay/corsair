@@ -1,0 +1,13 @@
+{
+  "finding": {
+    "title": "Exporting a backup named `nightly; touch /tmp/pwned` runs the extra command on the server.",
+    "description": "Exporting a backup named `nightly; touch /tmp/pwned` runs the extra command on the server. Check how create_archive builds and runs the tar invocation."
+  },
+  "row_id": "pytest-cpython312",
+  "source_files": [
+    {
+      "path": "backup/archive.py",
+      "content": "import subprocess\n\nARCHIVE_DIR = \"/var/backups\"\n\n\ndef _clean_label(label):\n    return label.strip().lower()\n\n\ndef create_archive(label, source_dir):\n    target = f\"{ARCHIVE_DIR}/{_clean_label(label)}.tar.gz\"\n    subprocess.run(f\"tar -czf {target} {source_dir}\", shell=True, check=True)\n    return target\n"
+    }
+  ]
+}

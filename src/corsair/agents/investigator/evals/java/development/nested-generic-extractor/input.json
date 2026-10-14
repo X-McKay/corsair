@@ -1,0 +1,13 @@
+{
+  "finding": {
+    "title": "Extracting an uploaded ZIP whose entry is named ../../etc/cron.d/job writes outside the destination directory.",
+    "description": "Extracting an uploaded ZIP whose entry is named ../../etc/cron.d/job writes outside the destination directory. Locate the entry extraction code in Archives."
+  },
+  "row_id": "junit5-maven-temurin17",
+  "source_files": [
+    {
+      "path": "src/main/java/com/example/io/Archives.java",
+      "content": "package com.example.io;\n\nimport java.io.IOException;\nimport java.io.InputStream;\nimport java.nio.file.Files;\nimport java.nio.file.Path;\nimport java.util.ArrayList;\nimport java.util.Collections;\nimport java.util.List;\nimport java.util.zip.ZipEntry;\nimport java.util.zip.ZipFile;\n\npublic final class Archives {\n    private Archives() {}\n\n    public static List<String> entryNames(ZipFile zip) {\n        List<String> names = new ArrayList<>();\n        for (ZipEntry entry : Collections.list(zip.entries())) {\n            names.add(entry.getName());\n        }\n        return names;\n    }\n\n    static final class Extractor<E extends ZipEntry> {\n        void extract(ZipFile zip, E entry, Path destination) throws IOException {\n            Path target = destination.resolve(entry.getName());\n            Files.createDirectories(target.getParent());\n            try (InputStream in = zip.getInputStream(entry)) {\n                Files.copy(in, target);\n            }\n        }\n    }\n}\n"
+    }
+  ]
+}

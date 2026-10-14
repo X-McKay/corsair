@@ -1,0 +1,74 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "fetch_preview",
+    "path": "lib/link_preview.rb",
+    "lines": [
+      8,
+      9
+    ],
+    "max_span": 8
+  },
+  "exploit_markers": [],
+  "exploit_patterns": [
+    "\\|\\s*touch"
+  ],
+  "required_reads": [
+    "lib/link_preview.rb"
+  ],
+  "replay": {
+    "reads": [
+      "lib/link_preview.rb"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "fetch_preview",
+      "hypothesis": "If url '|touch /tmp/pwned' reaches fetch_preview without the relevant check, the safe property fails: Kernel#open is never called with a string starting with a pipe",
+      "control": {
+        "role": "control",
+        "test_file": "test/link_preview_control_test.rb",
+        "test_name": "test_benign_control",
+        "target": "fetch_preview",
+        "seam": "LinkPreview.new.fetch_preview(url) with Kernel#open stubbed on the instance to record its argument",
+        "input_description": "url 'https://example.com/a'",
+        "property_to_assert": "open receives the URL and the first 500 bytes are returned",
+        "doubles": "the instance's open records its argument and returns a StringIO",
+        "citations": [
+          {
+            "path": "lib/link_preview.rb",
+            "start_line": 8,
+            "end_line": 9,
+            "quote": "  def fetch_preview(url)\n    body = open(strip_fragment(url)).read"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "test/link_preview_exploit_test.rb",
+        "test_name": "test_security_regression",
+        "target": "fetch_preview",
+        "seam": "LinkPreview.new.fetch_preview(url) with Kernel#open stubbed on the instance to record its argument",
+        "input_description": "url '|touch /tmp/pwned'",
+        "property_to_assert": "Kernel#open is never called with a string starting with a pipe",
+        "doubles": "the instance's open records its argument and returns a StringIO",
+        "citations": [
+          {
+            "path": "lib/link_preview.rb",
+            "start_line": 8,
+            "end_line": 9,
+            "quote": "  def fetch_preview(url)\n    body = open(strip_fragment(url)).read"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "lib/link_preview.rb",
+          "start_line": 8,
+          "end_line": 9,
+          "quote": "  def fetch_preview(url)\n    body = open(strip_fragment(url)).read"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

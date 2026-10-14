@@ -1,0 +1,19 @@
+{
+  "finding": {
+    "title": "ApiKeyVerifier.matches compares the presented key with String.equals, which stops at the first differing character.",
+    "description": "ApiKeyVerifier.matches compares the presented key with String.equals, which stops at the first differing character. An attacker measuring response times could recover the key one character at a time. Assess the comparison only.",
+    "file_path": "src/main/java/com/example/auth/ApiKeyVerifier.java",
+    "symbol": "matches"
+  },
+  "row_id": "junit5-maven-temurin17",
+  "source_files": [
+    {
+      "path": "src/main/java/com/example/auth/ApiKeyVerifier.java",
+      "content": "package com.example.auth;\n\npublic class ApiKeyVerifier {\n    private final String expected;\n\n    public ApiKeyVerifier(String expected) {\n        this.expected = expected;\n    }\n\n    /** True when the presented API key equals the configured key. */\n    public boolean matches(String presented) {\n        return presented != null && expected.equals(presented);\n    }\n}\n"
+    },
+    {
+      "path": "src/test/java/com/example/auth/ApiKeyVerifierTest.java",
+      "content": "package com.example.auth;\n\nimport static org.junit.jupiter.api.Assertions.assertFalse;\nimport static org.junit.jupiter.api.Assertions.assertTrue;\n\nimport org.junit.jupiter.api.Test;\n\nclass ApiKeyVerifierTest {\n    @Test\n    void acceptsConfiguredKey() {\n        ApiKeyVerifier verifier = new ApiKeyVerifier(\"k-123\");\n        assertTrue(verifier.matches(\"k-123\"));\n        assertFalse(verifier.matches(\"k-124\"));\n    }\n}\n"
+    }
+  ]
+}

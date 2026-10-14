@@ -1,0 +1,12 @@
+{
+  "case_id": "corpus:346cbf9a166cb3cd",
+  "finding": {
+    "title": "HTTP response splitting in redirect_headers",
+    "description": "`$location` reaches the Location header in redirect_headers.",
+    "file_path": "lib/Responder.pm",
+    "start_line": 6,
+    "symbol": "redirect_headers",
+    "cwe": "CWE-113"
+  },
+  "source": "../../../../../benchmarks/corpus/infosec-harness/perl/responsesplitting/b"
+}

@@ -1,0 +1,74 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "writeEntries",
+    "path": "lib/unpack.js",
+    "lines": [
+      6,
+      13
+    ],
+    "max_span": 16
+  },
+  "exploit_markers": [
+    "../"
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "lib/unpack.js"
+  ],
+  "replay": {
+    "reads": [
+      "lib/unpack.js"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "writeEntries",
+      "hypothesis": "If one entry named '../escaped.txt' reaches writeEntries without the relevant check, the safe property fails: The call throws an Error rejecting the member, and after the call dir/escaped.txt does not exist",
+      "control": {
+        "role": "control",
+        "test_file": "__tests__/unpack.control.test.js",
+        "test_name": "writes_member_inside_destination",
+        "target": "writeEntries",
+        "seam": "require('../lib/unpack') and call the real writeEntries",
+        "input_description": "one entry named 'site.css'",
+        "property_to_assert": "Returns 1 and dir/theme/site.css contains 'benign' Observed by: fs.readFileSync of dir/theme/site.css in the fixture after the real call",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "lib/unpack.js",
+            "start_line": 6,
+            "end_line": 13,
+            "quote": "function writeEntries(dest, entries) {\n  let written = 0;\n  entries.forEach((entry) => {\n    const target = path.join(dest, entry.name);\n    fs.writeFileSync(target, entry.data);\n    written += 1;\n  });\n  return written;"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "__tests__/unpack.exploit.test.js",
+        "test_name": "keeps_members_inside_destination",
+        "target": "writeEntries",
+        "seam": "require('../lib/unpack') and call the real writeEntries",
+        "input_description": "one entry named '../escaped.txt'",
+        "property_to_assert": "The call throws an Error rejecting the member, and after the call dir/escaped.txt does not exist Observed by: expect(() => writeEntries(...)).toThrow() then expect(fs.existsSync(path.join(dir, 'escaped.txt'))).toBe(false) in the fixture",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "lib/unpack.js",
+            "start_line": 6,
+            "end_line": 13,
+            "quote": "function writeEntries(dest, entries) {\n  let written = 0;\n  entries.forEach((entry) => {\n    const target = path.join(dest, entry.name);\n    fs.writeFileSync(target, entry.data);\n    written += 1;\n  });\n  return written;"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "lib/unpack.js",
+          "start_line": 6,
+          "end_line": 13,
+          "quote": "function writeEntries(dest, entries) {\n  let written = 0;\n  entries.forEach((entry) => {\n    const target = path.join(dest, entry.name);\n    fs.writeFileSync(target, entry.data);\n    written += 1;\n  });\n  return written;"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

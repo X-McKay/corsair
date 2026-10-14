@@ -1,0 +1,13 @@
+{
+  "case_id": "corpus:de1a26a865c2b0bf",
+  "finding": {
+    "title": "Entry path handling in ZipUtil.writeEntry",
+    "description": "ZipUtil.writeEntry writes one archive entry to a file under the destination directory, building the output path from the entry name stored in the archive.",
+    "file_path": "src/main/java/org/eclipse/rdf4j/common/io/ZipUtil.java",
+    "start_line": 93,
+    "symbol": "writeEntry",
+    "cwe": "CWE-22"
+  },
+  "source": "../../../../../benchmarks/corpus/permissive-reduced/java/rdf4j/b",
+  "fixed_source": "../../../../../benchmarks/corpus/permissive-reduced/java/rdf4j/a"
+}

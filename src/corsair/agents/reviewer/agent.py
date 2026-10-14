@@ -1,0 +1,46 @@
+"""Native factory for the outcome-blind Reviewer: ``agent.yaml`` plus read-only tools and its skills."""
+from __future__ import annotations
+
+from pathlib import Path
+
+from pydantic_ai import Agent, PromptedOutput
+from pydantic_ai.agent.spec import AgentSpec
+from pydantic_ai.capabilities import Instrumentation
+from pydantic_ai.durable_exec.temporal import TemporalDurability
+from pydantic_ai.models import Model
+from pydantic_ai.models.instrumented import InstrumentationSettings
+from pydantic_ai_harness import Skills
+
+from ..common.budget import tool_budget
+from ..common.repetition import read_loop_guard
+from ..common.prompted_output import prompted_output
+from ..probing.agent import PROTOCOL_SKILLS, framework_skills, skills_home
+from ..probing.source import source_tools
+from .review import ReviewDeps, finalize_review
+
+NAME = "reviewer"
+SPEC = AgentSpec.from_file(Path(__file__).with_name("agent.yaml"))
+SKILLS = "agents/reviewer/skills"
+
+
+def create_agent(model: Model, *, durability: TemporalDurability[ReviewDeps] | None = None,
+                 framework: str | None = None) -> Agent:
+    """One definition for direct and durable modes, offering the run's framework skill the way the Probers get it.
+
+    ``framework`` narrows the framework skills to the run's one (tolerating its absence); when None (a durable
+    worker built before any runtime is known) every present framework skill is offered and the prompt names the
+    one to load. The Reviewer judges marker placement by that skill's sanctioned pattern.
+    """
+    if not isinstance(model, Model):
+        raise TypeError("an explicit native Model instance is required")
+    return Agent.from_spec(SPEC, model=model, deps_type=ReviewDeps, output_type=PromptedOutput(finalize_review),
+                           capabilities=[
+                               source_tools(),
+                               Skills([SKILLS, PROTOCOL_SKILLS], workspace=skills_home()),
+                               *framework_skills(framework),
+                               tool_budget(),
+            read_loop_guard(),
+                               prompted_output(),
+                               Instrumentation(settings=InstrumentationSettings(include_content=False, version=5)),
+                               *([durability] if durability is not None else []),
+                           ])

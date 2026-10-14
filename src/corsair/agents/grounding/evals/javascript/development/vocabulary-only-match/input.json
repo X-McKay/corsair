@@ -1,0 +1,61 @@
+{
+  "finding": {
+    "title": "Image proxy fetches any URL from the query string",
+    "description": "proxyImage passes req.query.url straight to fetch and streams the response back.",
+    "file_path": "src/routes/imageProxy.js",
+    "start_line": 12,
+    "symbol": "proxyImage",
+    "cwe": "CWE-918"
+  },
+  "context": {
+    "issue": {
+      "id": "6560",
+      "title": "Image proxy fetches any URL from the query string",
+      "state": "Active",
+      "cwe": "CWE-918",
+      "description": "proxyImage passes req.query.url straight to fetch and streams the response back.",
+      "repo_url": "https://dev.azure.com/acme/_git/storefront-web",
+      "source_file": "src/routes/imageProxy.js:12"
+    },
+    "related": [
+      {
+        "issue": {
+          "id": "6573",
+          "title": "proxyImage is slow for large inputs",
+          "state": "Closed",
+          "cwe": null,
+          "description": "proxyImage takes minutes when the input is large.",
+          "repo_url": "https://dev.azure.com/acme/_git/storefront-web"
+        },
+        "relation": "similarity",
+        "comments": [
+          {
+            "author": "reviewer",
+            "created_at": "2026-05-30",
+            "text": "Fixed by adding pagination; no security impact."
+          }
+        ],
+        "similarity": 0.58
+      },
+      {
+        "issue": {
+          "id": "6574",
+          "title": "Image proxy fetches any URL from the query string in the archived service",
+          "state": "Closed",
+          "cwe": "CWE-918",
+          "description": "proxyImage passes req.query.url straight to fetch and streams the response back.",
+          "repo_url": "https://dev.azure.com/acme/_git/storefront-web"
+        },
+        "relation": "similarity",
+        "comments": [
+          {
+            "author": "reviewer",
+            "created_at": "2026-01-21",
+            "text": "Not exploitable: the proxy runs in a network namespace with egress limited to the public CDN."
+          }
+        ],
+        "similarity": 0.74
+      }
+    ]
+  }
+}

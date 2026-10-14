@@ -1,0 +1,43 @@
+{
+  "row_id": "jest29-node22",
+  "brief": {
+    "role": "control",
+    "test_file": "__tests__/redirects.control.test.js",
+    "test_name": "benign_control",
+    "target": "lib/redirects.js: redirects.afterLogin(target)",
+    "seam": "Call the real redirects.afterLogin through its public interface",
+    "input_description": "target '/account', a path on this site",
+    "property_to_assert": "Returns '/account' unchanged",
+    "doubles": "",
+    "citations": [
+      {
+        "path": "lib/redirects.js",
+        "start_line": 2,
+        "end_line": 7
+      },
+      {
+        "path": "test/redirects.test.js",
+        "start_line": 1,
+        "end_line": 5
+      }
+    ]
+  },
+  "source_files": [
+    {
+      "path": "lib/redirects.js",
+      "content": "// Where to send a user after sign-in.\nfunction afterLogin(target) {\n  if (!target) {\n    return '/';\n  }\n  return target;\n}\n\nmodule.exports = { afterLogin };\n"
+    },
+    {
+      "path": "test/redirects.test.js",
+      "content": "const redirects = require('../lib/redirects');\n\ntest('defaults to home', () => {\n  expect(redirects.afterLogin('')).toBe('/');\n});\n"
+    }
+  ],
+  "previous": {
+    "role": "control",
+    "test_file": "__tests__/redirects.control.test.js",
+    "test_name": "benign_control",
+    "source": "const assert = require('node:assert');\nconst fs = require('node:fs');\nconst path = require('node:path');\nconst redirects = require('../lib/redirects');\n\ntest('benign_control', () => {\n  fs.writeFileSync(path.join(process.env.CORSAIR_MARKER_DIR, 'start'), '');\n  const holds = redirects.afterLogin('/home') === '/account';\n  fs.writeFileSync(path.join(process.env.CORSAIR_MARKER_DIR, 'check'), holds ? 'holds' : 'violated');\n  assert.ok(holds, process.env.CORSAIR_TOKEN);\n  fs.writeFileSync(path.join(process.env.CORSAIR_MARKER_DIR, 'end'), '');\n});\n",
+    "revision_of": "bbac1427b1b75f200fb9a5c70b573108be9a4e8769d2cd10b353137156588edb"
+  },
+  "review_feedback": "Failed checks: exercises_condition\nDefects:\n- The test calls redirects.afterLogin with '/home' instead of the brief's input '/account', so it never exercises the condition the brief describes.\nCited lines:\n- __tests__/redirects.control.test.js:8-8\n      const holds = redirects.afterLogin('/home') === '/account';"
+}

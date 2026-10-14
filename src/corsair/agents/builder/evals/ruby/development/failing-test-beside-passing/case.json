@@ -1,0 +1,22 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "baseline-failed",
+  "kind": "negative",
+  "category": "capability",
+  "probes": "The test file has one failing and one passing test; v1 ran the whole file and stopped.",
+  "expected": "A recipe whose baseline is test_formats_small_numbers run alone; the failing test_groups_thousands and the whole-file run are never the baseline.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "evals/environment/ruby/breadth/ruby-baseline-test-fails",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/environment/ruby/breadth/ruby-baseline-test-fails; v1 ran the whole file (blocked); the row's run form selects one test by name, so the passing test in the same file is a valid baseline; the tree's component and test sources were written to agree with the recorded output; native runs are recorded in the row's run_template form"
+  }
+}

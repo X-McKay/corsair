@@ -1,0 +1,19 @@
+{
+  "finding": {
+    "title": "fetch_preview fetches any user supplied URL, so a user could make the service request internal addresses such as http://169.254.169.254/latest/meta-data/.",
+    "description": "fetch_preview fetches any user supplied URL, so a user could make the service request internal addresses such as http://169.254.169.254/latest/meta-data/. Analyze this component only.",
+    "file_path": "previews.py",
+    "symbol": "fetch_preview"
+  },
+  "row_id": "pytest-cpython312",
+  "source_files": [
+    {
+      "path": "previews.py",
+      "content": "from urllib.request import urlopen\n\n\ndef fetch_preview(url: str) -> bytes:\n    with urlopen(url, timeout=5) as response:\n        return response.read(4096)\n"
+    },
+    {
+      "path": "test_existing_previews.py",
+      "content": "from pathlib import Path\n\nimport previews\n\n\ndef test_preview_reads_file_url(tmp_path: Path):\n    page = tmp_path / \"page.html\"\n    page.write_text(\"<p>preview</p>\")\n    assert previews.fetch_preview(page.as_uri()) == b\"<p>preview</p>\"\n"
+    }
+  ]
+}

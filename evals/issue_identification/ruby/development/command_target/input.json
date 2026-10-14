@@ -1,0 +1,11 @@
+{
+  "fixture_id": "command_target",
+  "issue": "Check whether a caller-controlled pattern can execute shell commands through search_entries.",
+  "scope": "component",
+  "source_files": [
+    {
+      "path": "search.rb",
+      "content": "def search_entries(pattern)\n  system(\"grep #{pattern} records.txt\")\nend\n"
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "create_archive",
+    "path": "backup/archive.py",
+    "lines": [
+      10,
+      12
+    ],
+    "max_span": 8
+  },
+  "exploit_markers": [
+    "; touch"
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "backup/archive.py"
+  ],
+  "replay": {
+    "reads": [
+      "backup/archive.py"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "create_archive",
+      "hypothesis": "If label 'nightly; touch /tmp/pwned' and source directory 'data' reaches create_archive without the relevant check, the safe property fails: the recorded call is an argument list without shell=True, so the label cannot start a second command",
+      "control": {
+        "role": "control",
+        "test_file": "tests/test_archive_control.py",
+        "test_name": "test_benign_control",
+        "target": "create_archive",
+        "seam": "direct call of backup.archive.create_archive with subprocess.run replaced by a recording double",
+        "input_description": "label 'nightly' and source directory 'data'",
+        "property_to_assert": "subprocess.run is called once and the recorded command names nightly.tar.gz",
+        "doubles": "subprocess.run records its arguments and returns a completed process",
+        "citations": [
+          {
+            "path": "backup/archive.py",
+            "start_line": 10,
+            "end_line": 12,
+            "quote": "def create_archive(label, source_dir):\n    target = f\"{ARCHIVE_DIR}/{_clean_label(label)}.tar.gz\"\n    subprocess.run(f\"tar -czf {target} {source_dir}\", shell=True, check=True)"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "tests/test_archive_exploit.py",
+        "test_name": "test_security_regression",
+        "target": "create_archive",
+        "seam": "direct call of backup.archive.create_archive with subprocess.run replaced by a recording double",
+        "input_description": "label 'nightly; touch /tmp/pwned' and source directory 'data'",
+        "property_to_assert": "the recorded call is an argument list without shell=True, so the label cannot start a second command",
+        "doubles": "subprocess.run records its arguments and returns a completed process",
+        "citations": [
+          {
+            "path": "backup/archive.py",
+            "start_line": 10,
+            "end_line": 12,
+            "quote": "def create_archive(label, source_dir):\n    target = f\"{ARCHIVE_DIR}/{_clean_label(label)}.tar.gz\"\n    subprocess.run(f\"tar -czf {target} {source_dir}\", shell=True, check=True)"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "backup/archive.py",
+          "start_line": 10,
+          "end_line": 12,
+          "quote": "def create_archive(label, source_dir):\n    target = f\"{ARCHIVE_DIR}/{_clean_label(label)}.tar.gz\"\n    subprocess.run(f\"tar -czf {target} {source_dir}\", shell=True, check=True)"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

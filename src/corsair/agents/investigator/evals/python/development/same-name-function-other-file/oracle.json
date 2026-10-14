@@ -1,0 +1,74 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "fetch_note",
+    "path": "storage.py",
+    "lines": [
+      1,
+      2
+    ],
+    "max_span": 8
+  },
+  "exploit_markers": [
+    "../"
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "storage.py"
+  ],
+  "replay": {
+    "reads": [
+      "storage.py"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "fetch_note",
+      "hypothesis": "If note name '../outside.txt' while outside.txt exists beside the note directory reaches fetch_note without the relevant check, the safe property fails: the call is rejected and never returns the content of outside.txt",
+      "control": {
+        "role": "control",
+        "test_file": "tests/test_storage_control.py",
+        "test_name": "test_benign_control",
+        "target": "fetch_note",
+        "seam": "direct call of storage.fetch_note with a pytest tmp_path note directory",
+        "input_description": "note name 'today.txt' inside the note directory",
+        "property_to_assert": "returns exactly the content of today.txt",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "storage.py",
+            "start_line": 1,
+            "end_line": 2,
+            "quote": "def fetch_note(base, name):\n    return (base / name).read_text()"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "tests/test_storage_exploit.py",
+        "test_name": "test_security_regression",
+        "target": "fetch_note",
+        "seam": "direct call of storage.fetch_note with a pytest tmp_path note directory",
+        "input_description": "note name '../outside.txt' while outside.txt exists beside the note directory",
+        "property_to_assert": "the call is rejected and never returns the content of outside.txt",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "storage.py",
+            "start_line": 1,
+            "end_line": 2,
+            "quote": "def fetch_note(base, name):\n    return (base / name).read_text()"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "storage.py",
+          "start_line": 1,
+          "end_line": 2,
+          "quote": "def fetch_note(base, name):\n    return (base / name).read_text()"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

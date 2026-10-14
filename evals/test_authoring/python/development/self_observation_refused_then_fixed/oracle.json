@@ -1,0 +1,25 @@
+{
+  "script": [
+    {
+      "write": "self_observing"
+    },
+    {
+      "write": "reference"
+    },
+    {
+      "run": true
+    }
+  ],
+  "runner_runs": [
+    {
+      "status": "static"
+    }
+  ],
+  "status": "patch",
+  "runs": 1,
+  "security_assertion_lines": [
+    64,
+    65,
+    66
+  ]
+}

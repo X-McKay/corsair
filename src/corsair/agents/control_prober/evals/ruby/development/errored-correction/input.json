@@ -1,0 +1,42 @@
+{
+  "row_id": "minitest-ruby31",
+  "brief": {
+    "role": "control",
+    "test_file": "test/download_headers_control_test.rb",
+    "test_name": "test_benign_control",
+    "target": "lib/download_headers.rb: DownloadHeaders.disposition(filename)",
+    "seam": "Call the real DownloadHeaders.disposition through its public interface",
+    "input_description": "filename 'report.txt'",
+    "property_to_assert": "Returns exactly 'attachment; filename=\"report.txt\"'",
+    "doubles": "",
+    "citations": [
+      {
+        "path": "lib/download_headers.rb",
+        "start_line": 3,
+        "end_line": 5
+      },
+      {
+        "path": "test/download_headers_test.rb",
+        "start_line": 1,
+        "end_line": 8
+      }
+    ]
+  },
+  "source_files": [
+    {
+      "path": "lib/download_headers.rb",
+      "content": "# Response headers for file downloads.\nmodule DownloadHeaders\n  def self.disposition(filename)\n    \"attachment; filename=\\\"#{filename}\\\"\"\n  end\nend\n"
+    },
+    {
+      "path": "test/download_headers_test.rb",
+      "content": "require 'minitest/autorun'\nrequire 'download_headers'\n\nclass DownloadHeadersTest < Minitest::Test\n  def test_names_attachment\n    assert_match(/attachment/, DownloadHeaders.disposition('a.txt'))\n  end\nend\n"
+    }
+  ],
+  "previous": {
+    "role": "control",
+    "test_file": "test/download_headers_control_test.rb",
+    "test_name": "test_benign_control",
+    "source": "require 'minitest/autorun'\nrequire 'download_headers'\n\nclass DownloadHeadersControlTest < Minitest::Test\n  def test_benign_control\n    File.write(File.join(ENV.fetch('CORSAIR_MARKER_DIR'), 'start'), '')\n    holds = DownloadHeaders.dispositon('report.txt') == 'attachment; filename=\"report.txt\"'\n    File.write(File.join(ENV.fetch('CORSAIR_MARKER_DIR'), 'check'), holds ? 'holds' : 'violated')\n    assert holds, ENV.fetch('CORSAIR_TOKEN')\n    File.write(File.join(ENV.fetch('CORSAIR_MARKER_DIR'), 'end'), '')\n  end\nend\n"
+  },
+  "diagnostics": "check: errored\nhint: raised before the check marker\n--- syntax check (exit 0) ---\nSyntax OK\n"
+}

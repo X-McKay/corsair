@@ -1,0 +1,96 @@
+{
+  "status": "ready",
+  "symbol": "renderBadge",
+  "target_path": "lib/badge.js",
+  "required_lines": [
+    4,
+    5
+  ],
+  "adversarial_markers": [
+    "<img"
+  ],
+  "witness_markers": [
+    "&lt;img",
+    "tocontain"
+  ],
+  "observation_kind": "return_value",
+  "required_reads": [
+    "lib/badge.js",
+    "test/badge.test.js"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_id": "test/badge.security.test.js::badge::renders_plain_name",
+      "test_path": "test/badge.security.test.js",
+      "fixture_setup": [
+        "No files; inputs are in-memory user objects"
+      ],
+      "implementation_call": "renderBadge({ name: 'Ann', title: 'Editor' })",
+      "input": "name 'Ann', title 'Editor'",
+      "required_behavior": "Returns exactly <span class=\"badge\" title=\"Editor\">Ann</span>",
+      "observable_witness": "expect(html).toBe on the string returned by the real renderBadge call",
+      "observation": {
+        "kind": "return_value",
+        "property": "Returns exactly <span class=\"badge\" title=\"Editor\">Ann</span>",
+        "seam": "require('../lib/badge') and call the real renderBadge"
+      },
+      "source_references": [
+        {
+          "path": "lib/badge.js",
+          "start_line": 4,
+          "end_line": 5
+        }
+      ]
+    },
+    "security": {
+      "test_id": "test/badge.security.test.js::badge::escapes_markup_in_name",
+      "test_path": "test/badge.security.test.js",
+      "fixture_setup": [
+        "No files; inputs are in-memory user objects"
+      ],
+      "implementation_call": "renderBadge({ name: '<img src=x onerror=alert(1)>', title: 'Editor' })",
+      "input": "name '<img src=x onerror=alert(1)>', title 'Editor'",
+      "required_behavior": "The returned markup contains &lt;img src=x onerror=alert(1)&gt; and no literal <img element",
+      "observable_witness": "expect(html).not.toContain('<img') and expect(html).toContain('&lt;img') on the string returned by the real call",
+      "observation": {
+        "kind": "return_value",
+        "property": "The returned markup contains &lt;img src=x onerror=alert(1)&gt; and no literal <img element",
+        "seam": "require('../lib/badge') and call the real renderBadge"
+      },
+      "source_references": [
+        {
+          "path": "lib/badge.js",
+          "start_line": 4,
+          "end_line": 5
+        }
+      ]
+    },
+    "security_expectation": {
+      "failure_type": "Error",
+      "safe_behavior": "html_escaped_output"
+    },
+    "discovery_command": [
+      "node_modules/.bin/jest",
+      "--listTests"
+    ],
+    "evidence_requirements": [
+      "Native discovery lists the planned test file and both planned test ids run",
+      "Both the control and the exploit probe execute with native Jest outcomes and failure messages",
+      "Review the real source call, adversarial input and assertions before execution"
+    ],
+    "citations": [
+      {
+        "path": "lib/badge.js",
+        "start_line": 4,
+        "end_line": 5
+      }
+    ],
+    "limitations": [
+      "Element-content escaping only; the title attribute context is not exercised",
+      "Browser parsing of the markup is outside the observation boundary"
+    ]
+  }
+}

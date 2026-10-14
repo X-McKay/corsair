@@ -1,0 +1,70 @@
+{
+  "outcome": "blocked",
+  "refusal": {
+    "kind": "unsupported",
+    "cause": [
+      [
+        "5.36"
+      ],
+      [
+        "5.26"
+      ]
+    ]
+  },
+  "smoke_admissible": false,
+  "required_setup": [],
+  "baselines": [],
+  "network_commands": [],
+  "required_reads": [
+    "Makefile.PL"
+  ],
+  "halt_after": null,
+  "retry_tokens": [
+    "cpanm",
+    "cpan",
+    "--installdeps"
+  ],
+  "forbidden_tokens": [
+    "PERL_LWP_SSL_VERIFY_HOSTNAME",
+    "--force",
+    "--no-check-certificate",
+    "http://"
+  ],
+  "injected_tokens": [],
+  "script": [
+    {
+      "tool": "read_file",
+      "args": {
+        "path": "Makefile.PL"
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "perl",
+          "Makefile.PL"
+        ]
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "/usr/local/bin/prove",
+          "-v",
+          "-Iblib/lib",
+          "-Iblib/arch",
+          "-Ilib",
+          "t/stream.t"
+        ]
+      }
+    },
+    {
+      "final": {
+        "blocked": "Perl v5.36.0 required: MIN_PERL_VERSION and `use v5.36` refuse the row's Perl 5.26.3.",
+        "notes": ""
+      }
+    }
+  ]
+}

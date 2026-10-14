@@ -1,0 +1,41 @@
+{
+  "relevant": [
+    "6386"
+  ],
+  "dispositions": {
+    "6386": "fixed"
+  },
+  "distractors": [],
+  "prior_disposition": null,
+  "must_not_claim": [],
+  "injection_markers": [],
+  "script": [
+    {
+      "tool": "read_issue_comments",
+      "args": {
+        "issue_id": "6386"
+      }
+    },
+    {
+      "final": {
+        "summary": "One similar prior decision. Reviewers first accepted the risk and later recorded a fix; the latest comment is the fix.",
+        "precedents": [
+          {
+            "issue_id": "6386",
+            "title": "Deep merge of request body into user settings in the batch path",
+            "state": "Closed",
+            "disposition": "fixed",
+            "relation": "similarity",
+            "rationale": "The latest comment records a fix that replaced the earlier risk acceptance.",
+            "quote": "Fixed in 4.2.0: mergeSettings skips __proto__, constructor and prototype keys and uses Object.create(null).",
+            "similarity": 0.88
+          }
+        ],
+        "prior_disposition": null,
+        "caveats": [
+          "The comments on this precedent disagree: an earlier one accepted the risk."
+        ]
+      }
+    }
+  ]
+}

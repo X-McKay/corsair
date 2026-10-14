@@ -1,0 +1,22 @@
+{
+  "status": "unsupported",
+  "required_reads": [
+    "lib/webhook_client.rb"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "unsupported",
+    "scope": "component",
+    "missing_capability": "Whether the client refuses an untrusted certificate is a TLS handshake property: it needs a TLS peer presenting an untrusted certificate and a network connection observation, and the environment lists neither",
+    "limitations": [
+      "No test specification is produced; asserting the verify_mode attribute on a stub would test configuration text, not that a connection with an untrusted certificate is refused"
+    ],
+    "citations": [
+      {
+        "path": "lib/webhook_client.rb",
+        "start_line": 8,
+        "end_line": 13
+      }
+    ]
+  }
+}

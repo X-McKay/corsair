@@ -1,0 +1,52 @@
+{
+  "scope": "component",
+  "identification": {
+    "status": "ready",
+    "scope": "component",
+    "reason": null,
+    "reported_issue": "ReturnTo.after_sign_in_path accepts any value starting with a slash, so //evil.example may redirect users off-site after sign-in. Analyze this component only.",
+    "target": {
+      "symbol": "after_sign_in_path",
+      "source": {
+        "path": "lib/return_to.rb",
+        "start_line": 5,
+        "end_line": 6,
+        "quote": "  def self.after_sign_in_path(param)\n    param.to_s.start_with?('/') ? param : '/'"
+      }
+    }
+  },
+  "source_files": [
+    {
+      "path": "test/return_to_test.rb",
+      "content": "# frozen_string_literal: true\n\nrequire 'minitest/autorun'\nrequire 'return_to'\n\nclass ReturnToTest < Minitest::Test\n  def test_keeps_local_path\n    assert_equal '/dashboard', ReturnTo.after_sign_in_path('/dashboard')\n  end\nend\n"
+    }
+  ],
+  "environment": {
+    "language": "Ruby",
+    "runtime": "Ruby 3.1",
+    "framework": "minitest",
+    "discovery_command": [
+      "bundle",
+      "exec",
+      "rake",
+      "test",
+      "TESTOPTS=--verbose"
+    ],
+    "approved_test_paths": [
+      "test/return_to_security_test.rb"
+    ],
+    "baseline_test": {
+      "test_id": "test/return_to_test.rb::ReturnToTest#test_keeps_local_path",
+      "path": "test/return_to_test.rb"
+    },
+    "scratch_location": "Per-test in-memory recording dependency only",
+    "observation_facilities": [
+      "Native Minitest results per test with failure class and location",
+      "Minitest assert_raises for a specific exception class and Dir.mktmpdir per-test directories"
+    ],
+    "assertion_facts": [
+      "Minitest assertion failures, including assert_raises when the expected exception is not raised, report Minitest::Assertion. Match the planned native failure type."
+    ],
+    "witness_facilities": []
+  }
+}

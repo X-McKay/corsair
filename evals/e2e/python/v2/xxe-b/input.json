@@ -1,0 +1,13 @@
+{
+  "case_id": "corpus:e426705b11ea4a57",
+  "finding": {
+    "title": "XML external entity expansion in parse_note",
+    "description": "`document` reaches a SAX parser in parse_note.",
+    "file_path": "app.py",
+    "start_line": 21,
+    "symbol": "parse_note",
+    "cwe": "CWE-611"
+  },
+  "source": "../../../../../benchmarks/corpus/infosec-harness/python/xxe/b",
+  "fixed_source": "../../../../../benchmarks/corpus/infosec-harness/python/xxe/a"
+}

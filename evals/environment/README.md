@@ -7,7 +7,7 @@ Unrecorded commands receive a synthetic exit 126 refusal, recorded separately in
 attempt receipt as `unrecorded_commands`; this is not an observed operator-policy denial.
 Even equivalent command spellings are unrecorded unless they match exactly. Live scores
 therefore measure adherence to curated argv, not general setup judgement. Unknown delivery halts the production tool ledger.
-Command and setup-correction budgets remain operator owned. Attempt receipts now record `setup_corrections` separately from output-schema corrections and preserve an unresolved correction run ID. The eight frozen cases do not exercise the new invocation corrections; production FunctionModel trajectories in tests/agents/test_environment.py cover their admission/refusal, and live recovery frequency and side effects remain unmeasured. Eight frozen development cases cover Python,
+Command and setup-correction budgets remain operator owned. Attempt receipts now record `setup_corrections` separately from output-schema corrections and preserve an unresolved correction run ID. The eight frozen cases do not exercise the new invocation corrections; production FunctionModel trajectories in tests/agents/test_environment.py cover their admission/refusal, and live recovery frequency and side effects remain unmeasured. Eight frozen development cases (`python/development/`, `java/development/`, `sets/development.json`) cover Python,
 Java/Maven, registry/TLS/build failure, unsupported runtime, unknown delivery with attempted
 follow-up, and budget exhaustion. README injection is untrusted source.
 
@@ -29,11 +29,34 @@ Unsupported-runtime truth has bounded evaluator-only wording anchors for require
 versions. An inverted claim fails even with correct source quotations. This is a curated semantic
 regression, not validation of arbitrary natural-language requirements.
 
+## Breadth set
 
-Versioned correction: `development-v2` uses `cases-v2.json` and `manifest-v2.json`.
-Select it explicitly with `python -m evals.environment.evaluate --cases development-v2`
-(or the environment suite's `SET=development-v2`). The original `development` set,
-`cases.json`, manifest and historical receipts remain unchanged. V2 declares the
+`make eval AGENT=environment SET=breadth` (`--cases breadth`) runs 50 synthetic cases in the per-case layout
+(`<language>/breadth/<id>/{input,oracle,case}.json`, manifest `sets/breadth.json`, identity `evals.cases.set_digest`): Python 4,
+Java 12, JavaScript 12, Ruby 11 and Perl 11, which with the development set gives at least ten per language. Each
+oracle is the development `FrozenCase` model without `name`; the replay, checks and receipts are unchanged. Toolchain
+ids and runtimes follow `deploy/runtime-matrix.yaml` (image digests are placeholders) and every framework the
+finalizer admits appears: pytest on CPython 3.12 and 3.7, junit5/junit4 on Temurin 17/8, jest on Node 8.17.0,
+minitest on Ruby 3.1.7 and tap-harness on Perl 5.26.3.
+
+Per language the cases cover a ready project test, registry and TLS failures, a build failure, a discovery failure
+(pytest collection error, JUnit engine discovery error, Jest config validation error), a failing baseline test
+(blocked; the layer is not checked because the skill names no layer for it), a skipped/xfailed first baseline
+candidate followed by a passing one, an unsupported runtime with wording anchors (JDK 21, Node 18, Ruby 2.5,
+Perl 5.36), prompt injection in a README, POM comment or CI file, unknown delivery, command-budget exhaustion and
+the operator smoke-test baseline with an uncapped checkout listing. Ruby and Perl have no discovery-failure case:
+their discovery is a file listing (`ruby -e Dir.glob`, `prove --dry`) with no realistic failure separate from the
+build. The Java discovery command keeps the development set's `mvn -o test -DlistTests=true` convention, which
+prints `Class#method` ids; it is a synthetic stand-in, not a captured Maven listing.
+
+The observations are hand-written in the shape of `tests/agents/framework_outputs` and real tool messages, not
+captured runs, so the set measures trajectory and contract adherence across languages, not setup judgement or
+admission on real repositories. `tests/configuration/test_breadth_environment.py` checks counts and that wrong
+status, wrong layer, versionless unsupported wording and a skipped first candidate fail the checks.
+
+Versioned correction: the `development-v2` set (`python/development-v2/`, `java/development-v2/`,
+`sets/development-v2.json`). Select it with `make eval AGENT=environment SET=development-v2`. The original
+`development` set and historical receipts remain unchanged. V2 declares the
 recorded locked pip, build, collection, baseline-test and offline Maven command
 arguments in the agent-visible repository source. It preserves the eight case
 statuses, failure layers and command budgets; unknown delivery still requires the

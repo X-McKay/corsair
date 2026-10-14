@@ -1,0 +1,34 @@
+{
+  "family": "cocoapods-git",
+  "language": "ruby",
+  "cwe": "CWE-88",
+  "runtime_row": "minitest-ruby31",
+  "upstream_repo": "https://github.com/CocoaPods/cocoapods-downloader",
+  "record": "CVE-2022-24440",
+  "pointer_source": "GitHub Advisory Database / candidate survey (metadata only)",
+  "upstream_spdx": "MIT",
+  "spdx_verified": "cocoapods-downloader.gemspec s.license = 'MIT' at commit 35340f4, 2026-10-14",
+  "parent_commit": "eed7e8f6c42c2e2f582f5c6c34bf44dcf0a08120",
+  "fix_commit": "35340f4b238bf395c9b21a56866d1c415f4468ce",
+  "verbatim": false,
+  "kept_files": [
+    {
+      "path": "lib/cocoapods-downloader/git.rb",
+      "upstream": "lib/cocoapods-downloader/git.rb",
+      "note": "Pod::Downloader::Git.preprocess_options, commit_from_ls_remote and the input guard (validate_input plus its call site and the private_class_method list) are upstream-verbatim; the guard and its call are exactly what the fix commit added, and the ls-remote argument-list construction is the code it guards"
+    }
+  ],
+  "stand_ins": [
+    {
+      "replaces": "Git.execute_command, the inherited method that spawns the git process",
+      "with": "a recorder that stores the argument list it is given and runs nothing",
+      "note": "captures the argv so the property is observable in-process; it decides nothing about the argument content"
+    }
+  ],
+  "reduction_removed": [
+    "all other Pod::Downloader::Git methods and download state unrelated to preprocess_options",
+    "the real process execution and output handling inside execute_command",
+    "the raise message string in the input guard is neutral; the guard condition is upstream-verbatim"
+  ],
+  "pov_note": "Benign control and proof-of-vulnerability probes authored by the Corsair chain at run time; none authored here. Property observable in-process via the recorded argument list: a download option that looks like a command flag reaches the runner as an argument on one variant and is rejected before any argument list is built on the other. No outbound network and no git binary."
+}

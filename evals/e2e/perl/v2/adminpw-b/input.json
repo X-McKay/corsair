@@ -1,0 +1,13 @@
+{
+  "case_id": "corpus:06619b83cad4da8f",
+  "finding": {
+    "title": "Hard-coded credentials in authenticate",
+    "description": "authenticate decides whether a username and password are accepted, including for the admin account.",
+    "file_path": "lib/Auth.pm",
+    "start_line": 10,
+    "symbol": "authenticate",
+    "cwe": "CWE-798"
+  },
+  "source": "../../../../../benchmarks/corpus/infosec-harness/perl/adminpw/b",
+  "fixed_source": "../../../../../benchmarks/corpus/infosec-harness/perl/adminpw/a"
+}

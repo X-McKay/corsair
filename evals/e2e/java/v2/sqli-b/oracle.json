@@ -1,0 +1,87 @@
+{
+  "expected_label": "LIKELY_EXPLOITABLE",
+  "acceptable_labels": [
+    "LIKELY_EXPLOITABLE"
+  ],
+  "forbidden_labels": [
+    "LIKELY_NOT_EXPLOITABLE"
+  ],
+  "expected_rule": "R4",
+  "expected_terminal_reason": "ok",
+  "expected_finding": "reproduced",
+  "expected_fix": "verified",
+  "expected_runtime_row": "junit5-maven-temurin17",
+  "truth": {
+    "source": "manifest",
+    "manifest": "benchmarks/corpus/infosec-harness/manifest.json",
+    "manifest_case": "java-sqli-vulnerable",
+    "manifest_truth": {
+      "expected_verdict": "potentially_exploitable",
+      "reachability": "reachable",
+      "sink_file": "src/main/java/com/example/UserDao.java",
+      "sink_line": 12,
+      "source": "name argument",
+      "target_callable": "getUser"
+    }
+  },
+  "why": "Manifest truth potentially_exploitable (reachability reachable).",
+  "revision_tree_sha256": "6695b57642e13db389f8ec93ab5612b0b52696b2d3e96e10f3d1f799e31d67de",
+  "fixed_tree_sha256": "ae84d7ff25091b9c1dd5b2b2fb4f6f03ec659cbdf1785595ea697bc3a55da4ae",
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "src/main/java/com/example/UserDao.java",
+          "start_line": 10,
+          "end_line": 10,
+          "quote": "    public ResultSet getUser(Connection conn, String name) throws SQLException {"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "src/main/java/com/example/UserDao.java",
+            "start_line": 10,
+            "end_line": 10,
+            "quote": "    public ResultSet getUser(Connection conn, String name) throws SQLException {"
+          }
+        ]
+      },
+      "fixed": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "src/main/java/com/example/UserDao.java",
+            "start_line": 10,
+            "end_line": 10,
+            "quote": "    public ResultSet getUser(Connection conn, String name) throws SQLException {"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "passed"
+      },
+      "fixed": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    },
+    "build_fixed": true
+  }
+}

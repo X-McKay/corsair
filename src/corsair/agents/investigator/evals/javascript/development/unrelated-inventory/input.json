@@ -1,0 +1,13 @@
+{
+  "finding": {
+    "title": "The image proxy's fetchRemoteImage follows a user-supplied URL to http://169.254.169.254/ and returns cloud metadata.",
+    "description": "The image proxy's fetchRemoteImage follows a user-supplied URL to http://169.254.169.254/ and returns cloud metadata. Locate the proxy fetch implementation."
+  },
+  "row_id": "jest29-node22",
+  "source_files": [
+    {
+      "path": "src/token.js",
+      "content": "\"use strict\";\n\n// Issue a session token.\nfunction generateToken() {\n  let token = \"\";\n  for (let i = 0; i < 16; i++) {\n    // 0..15 -> one hex digit, 16 digits total.\n    token += Math.floor(Math.random() * 16).toString(16);\n  }\n  return token;\n}\n\nmodule.exports = { generateToken };\n"
+    }
+  ]
+}

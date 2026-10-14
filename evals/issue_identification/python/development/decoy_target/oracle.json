@@ -1,0 +1,10 @@
+{
+  "status": "ready",
+  "symbol": "fetch_note",
+  "path": "storage.py",
+  "required_lines": [
+    1,
+    2
+  ],
+  "max_span": 8
+}

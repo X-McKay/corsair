@@ -1,0 +1,10 @@
+{
+  "status": "ready",
+  "symbol": "countLines",
+  "path": "src/cmd.js",
+  "required_lines": [
+    4,
+    5
+  ],
+  "max_span": 8
+}

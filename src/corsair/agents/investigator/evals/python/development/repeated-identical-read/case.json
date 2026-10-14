@@ -1,0 +1,21 @@
+{
+  "language": "python",
+  "framework": "pytest",
+  "family": "path_traversal_unguarded",
+  "kind": "failure-mode",
+  "category": "failure-mode",
+  "probes": "A trajectory that repeats the same read: the guard answers the third identical read_file with a notice instead of running it, and the plan is still reached.",
+  "expected": "The same planned answer as python/read-document-traversal; the repeated read_file call is answered with the read-loop notice, not re-run.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Corsair-authored; previously evals/test_planning/cases.yaml; converted from evals/test_planning/python/development/path_traversal_unguarded; repeated-read variant of python/read-document-traversal for the read-loop guard (develop #152)"
+  }
+}

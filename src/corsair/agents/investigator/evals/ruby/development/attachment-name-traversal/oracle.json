@@ -1,0 +1,74 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "fetch_attachment",
+    "path": "lib/attachments.rb",
+    "lines": [
+      5,
+      6
+    ],
+    "max_span": 10
+  },
+  "exploit_markers": [
+    "../"
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "lib/attachments.rb"
+  ],
+  "replay": {
+    "reads": [
+      "lib/attachments.rb"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "fetch_attachment",
+      "hypothesis": "If name '../outside.txt', which resolves outside the attachment root reaches fetch_attachment without the relevant check, the safe property fails: The call raises ArgumentError and never returns the outside sentinel",
+      "control": {
+        "role": "control",
+        "test_file": "test/attachments_control_test.rb",
+        "test_name": "test_reads_file_inside_root",
+        "target": "fetch_attachment",
+        "seam": "require 'attachments' and call the real Attachments.fetch_attachment",
+        "input_description": "name 'a.txt' inside the attachment root",
+        "property_to_assert": "Returns exactly the benign sentinel content Observed by: assert_equal on the String returned by the real fetch_attachment call",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "lib/attachments.rb",
+            "start_line": 5,
+            "end_line": 6,
+            "quote": "  def self.fetch_attachment(root, name)\n    File.read(File.join(root, name))"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "test/attachments_exploit_test.rb",
+        "test_name": "test_rejects_name_outside_root",
+        "target": "fetch_attachment",
+        "seam": "require 'attachments' and call the real Attachments.fetch_attachment",
+        "input_description": "name '../outside.txt', which resolves outside the attachment root",
+        "property_to_assert": "The call raises ArgumentError and never returns the outside sentinel Observed by: assert_raises(ArgumentError) around the real fetch_attachment call; a returned outside sentinel fails with Minitest::Assertion",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "lib/attachments.rb",
+            "start_line": 5,
+            "end_line": 6,
+            "quote": "  def self.fetch_attachment(root, name)\n    File.read(File.join(root, name))"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "lib/attachments.rb",
+          "start_line": 5,
+          "end_line": 6,
+          "quote": "  def self.fetch_attachment(root, name)\n    File.read(File.join(root, name))"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

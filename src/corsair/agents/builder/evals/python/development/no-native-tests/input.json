@@ -1,0 +1,91 @@
+{
+  "source_files": [
+    {
+      "path": "README.md",
+      "content": "# tinyconf\n\nDevelopment setup:\n\n    python3.12 -m pip install --require-hashes --only-binary :all: --no-compile -r requirements-dev.txt\n"
+    },
+    {
+      "path": "pyproject.toml",
+      "content": "[project]\nname = \"tinyconf\"\nversion = \"0.3.0\"\nrequires-python = \">=3.10\"\n\n[project.optional-dependencies]\ntest = [\"pytest==9.0.3\"]\n"
+    },
+    {
+      "path": "requirements-dev.txt",
+      "content": "pytest==9.0.3 --hash=sha256:e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5\n"
+    },
+    {
+      "path": "tinyconf/__init__.py",
+      "content": "from .loader import load\n"
+    },
+    {
+      "path": "tinyconf/loader.py",
+      "content": "def load(text):\n    return dict(line.split(\"=\", 1) for line in text.splitlines() if line)\n"
+    }
+  ],
+  "row_id": "pytest-cpython312",
+  "plan": {
+    "status": "planned",
+    "target": "tinyconf/loader",
+    "citations": [
+      {
+        "path": "tinyconf/loader.py",
+        "start_line": 1,
+        "end_line": 1,
+        "quote": "def load(text):"
+      }
+    ]
+  },
+  "feedback": null,
+  "workspace_fixture": {
+    "observations": [
+      {
+        "argv": [
+          "python3.12",
+          "-m",
+          "pip",
+          "install",
+          "--require-hashes",
+          "--only-binary",
+          ":all:",
+          "--no-compile",
+          "-r",
+          "requirements-dev.txt"
+        ],
+        "exit_code": 0,
+        "output": ""
+      },
+      {
+        "argv": [
+          "python3.12",
+          "-m",
+          "compileall",
+          "-q",
+          "tinyconf"
+        ],
+        "exit_code": 0,
+        "output": ""
+      },
+      {
+        "argv": [
+          "python3.12",
+          "--version"
+        ],
+        "exit_code": 0,
+        "output": "Python 3.12.15\n"
+      },
+      {
+        "argv": [
+          "/usr/local/bin/python3",
+          "-m",
+          "pytest",
+          "--version"
+        ],
+        "exit_code": 0,
+        "output": "pytest 9.0.3\n"
+      }
+    ],
+    "written_file_run": {
+      "exit_code": 0,
+      "output": "============================= test session starts ==============================\nplatform linux -- Python 3.12.15, pytest-9.0.3, pluggy-1.6.0 -- /usr/local/bin/python3\nrootdir: /work\ncollecting ... collected 1 item\n\n{file}::{name} PASSED [100%]\n\n=== 1 passed in 0.01s ===\n"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "zip-slip",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "Gem::Package::TarReader extraction observed as fixture state.",
+  "expected": "Planned against ThemeInstaller.install (lib/theme_installer.rb 8-16); exploit member ../escaped.txt.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic installer; the zip-slip shape of rubyzip's 1.2.2 fix realised with the stdlib tar reader.; converted from evals/test_planning/ruby/breadth/ruby-tar-extraction-fixture-state"
+  }
+}

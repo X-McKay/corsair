@@ -1,0 +1,74 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "loadTitle",
+    "path": "src/main/java/com/example/XmlLoader.java",
+    "lines": [
+      13,
+      20
+    ],
+    "max_span": 16
+  },
+  "exploit_markers": [
+    "<!ENTITY"
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "src/main/java/com/example/XmlLoader.java"
+  ],
+  "replay": {
+    "reads": [
+      "src/main/java/com/example/XmlLoader.java"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "loadTitle",
+      "hypothesis": "If xml with <!DOCTYPE title [<!ENTITY x SYSTEM \"file:...secret.txt\">]> and <title>&x;</title> reaches loadTitle without the relevant check, the safe property fails: The call throws org.xml.sax.SAXParseException for the DOCTYPE and never returns the secret sentinel",
+      "control": {
+        "role": "control",
+        "test_file": "src/test/java/com/example/XmlLoaderControlTest.java",
+        "test_name": "loadsPlainTitle",
+        "target": "loadTitle",
+        "seam": "Call the real XmlLoader.loadTitle with an in-memory document",
+        "input_description": "xml '<title>Quarterly</title>' with no DOCTYPE",
+        "property_to_assert": "Returns exactly 'Quarterly' Observed by: assertEquals on the String returned by the real loadTitle call",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "src/main/java/com/example/XmlLoader.java",
+            "start_line": 13,
+            "end_line": 20,
+            "quote": "    public String loadTitle(String xml) throws Exception {\n        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();\n        factory.setFeature(DISALLOW_DOCTYPE, true);\n        factory.setXIncludeAware(false);\n        factory.setExpandEntityReferences(false);\n        DocumentBuilder builder = factory.newDocumentBuilder();\n        Document document = builder.parse(new ByteArrayInputStream(xml.getBytes(\"UTF-8\")));\n        return document.getDocumentElement().getTextContent();"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "src/test/java/com/example/XmlLoaderExploitTest.java",
+        "test_name": "rejectsExternalEntity",
+        "target": "loadTitle",
+        "seam": "Call the real XmlLoader.loadTitle with an in-memory document",
+        "input_description": "xml with <!DOCTYPE title [<!ENTITY x SYSTEM \"file:...secret.txt\">]> and <title>&x;</title>",
+        "property_to_assert": "The call throws org.xml.sax.SAXParseException for the DOCTYPE and never returns the secret sentinel Observed by: assertThrows(SAXParseException.class, ...) around the real loadTitle call; a returned title containing the sentinel fails the test",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "src/main/java/com/example/XmlLoader.java",
+            "start_line": 13,
+            "end_line": 20,
+            "quote": "    public String loadTitle(String xml) throws Exception {\n        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();\n        factory.setFeature(DISALLOW_DOCTYPE, true);\n        factory.setXIncludeAware(false);\n        factory.setExpandEntityReferences(false);\n        DocumentBuilder builder = factory.newDocumentBuilder();\n        Document document = builder.parse(new ByteArrayInputStream(xml.getBytes(\"UTF-8\")));\n        return document.getDocumentElement().getTextContent();"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "src/main/java/com/example/XmlLoader.java",
+          "start_line": 13,
+          "end_line": 20,
+          "quote": "    public String loadTitle(String xml) throws Exception {\n        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();\n        factory.setFeature(DISALLOW_DOCTYPE, true);\n        factory.setXIncludeAware(false);\n        factory.setExpandEntityReferences(false);\n        DocumentBuilder builder = factory.newDocumentBuilder();\n        Document document = builder.parse(new ByteArrayInputStream(xml.getBytes(\"UTF-8\")));\n        return document.getDocumentElement().getTextContent();"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

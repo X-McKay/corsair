@@ -1,0 +1,13 @@
+{
+  "finding": {
+    "title": "Hard-coded credential in service configuration",
+    "cwe": "CWE-798",
+    "description": "A password literal is assigned to the database client configuration."
+  },
+  "context": {
+    "degraded": [
+      "issue lookup failed: TimeoutError: graph node lookup timed out after 30 s",
+      "similarity search failed: TimeoutError: graph search timed out after 30 s"
+    ]
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "finding": {
+    "title": "DBI do interpolates the department filter",
+    "description": "search interpolates the dept parameter into the SQL passed to $dbh->do.",
+    "file_path": "lib/Intranet/Directory.pm",
+    "start_line": 52,
+    "symbol": "Intranet::Directory::search",
+    "cwe": "CWE-89"
+  },
+  "context": {
+    "issue": {
+      "id": "8720",
+      "title": "DBI do interpolates the department filter",
+      "state": "Active",
+      "cwe": "CWE-89",
+      "description": "search interpolates the dept parameter into the SQL passed to $dbh->do.",
+      "repo_url": "https://dev.azure.com/acme/_git/legacy-intranet",
+      "source_file": "lib/Intranet/Directory.pm:52"
+    },
+    "related": [
+      {
+        "issue": {
+          "id": "8731",
+          "title": "DBI do interpolates the department filter in the mobile API",
+          "state": "Closed",
+          "cwe": "CWE-89",
+          "description": "search interpolates the dept parameter into the SQL passed to $dbh->do.",
+          "repo_url": "https://dev.azure.com/acme/_git/legacy-intranet"
+        },
+        "relation": "similarity",
+        "comments": [
+          {
+            "author": "reviewer",
+            "created_at": "2026-03-03",
+            "text": "Fixed together with INC-8819; the patch and its review are on that ticket."
+          }
+        ],
+        "similarity": 0.84
+      }
+    ]
+  }
+}

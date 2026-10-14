@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import shutil
 import subprocess
 import time
 from datetime import datetime, timezone
@@ -19,9 +20,8 @@ TOOLS = ROOT / ".tools" / LOCK["platform"]
 CLUSTER = "corsair"
 STATE = ROOT / ".state/kind"
 KUBECONFIG = STATE / "kubeconfig"
-# Backing filesystem for all sandbox workspaces: two 8Gi workspaces plus headroom (SPEC-0036).
-WORKSPACE_IMAGE_SIZE = "18G"
-ENV =os.environ.copy()
+OPENSHELL_STATE = ROOT / ".state/openshell"
+ENV = os.environ.copy()
 for key in ("DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_TLS", "DOCKER_TLS_VERIFY", "DOCKER_CERT_PATH"):
     ENV.pop(key, None)
 ENV["KIND_EXPERIMENTAL_PROVIDER"] = "docker"
@@ -45,7 +45,7 @@ def download(spec, destination, executable=False):
 def main():
     os.umask(0o077)
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("tools", "up", "down", "workspace-storage"))
+    parser.add_argument("action", choices=("tools", "up", "down"))
     args = parser.parse_args()
     if (platform.system(), platform.machine()) != ("Linux", "x86_64"):
         parser.error("Only Linux amd64 is selected for this first qualification tuple")
@@ -92,6 +92,8 @@ def main():
     if args.action == "down":
         if not owner_path.exists():
             parser.error("No local ownership receipt; refusing to delete a possibly unrelated cluster")
+        if (OPENSHELL_STATE / "port-forward.json").exists():
+            parser.error("A recorded gateway port-forward may still run; run make openshell-forward-stop first")
         owner = json.loads(owner_path.read_text())
         found = run(docker + ["inspect", "--format", "{{.Id}}", container], check=False)
         if found.returncode == 0 and found.stdout.strip() != owner["container_id"]:
@@ -102,34 +104,13 @@ def main():
         remaining = run(docker + ["inspect", container], check=False)
         if remaining.returncode == 0 or "no such" not in remaining.stderr.lower():
             raise RuntimeError("Cluster deletion not confirmed")
-        (evidence / "cleanup.json").write_text(json.dumps({"cluster": CLUSTER, "container_id": owner["container_id"], "confirmed": True}))
+        # The gateway, its namespace and its client identity lived only in this node.
+        gateway_state = OPENSHELL_STATE.exists()
+        if gateway_state:
+            shutil.rmtree(OPENSHELL_STATE)
+        (evidence / "cleanup.json").write_text(json.dumps({"cluster": CLUSTER, "container_id": owner["container_id"], "confirmed": True, "openshell_state_removed": gateway_state}))
         owner_path.unlink()
         KUBECONFIG.unlink(missing_ok=True)
-        return
-    if args.action == "workspace-storage":
-        # SPEC-0036: a preallocated XFS image with project quota inside the owned node, then the quota class.
-        if not owner_path.exists():
-            parser.error("No local ownership receipt; refusing to modify a possibly unrelated cluster")
-        found = run(docker + ["inspect", "--format", "{{.Id}}", container])
-        if found.stdout.strip() != json.loads(owner_path.read_text())["container_id"]:
-            parser.error("Cluster container identity changed; refusing to modify its replacement")
-        image, mount = "/var/corsair-workspaces.img", "/var/corsair-workspaces"
-        if run(docker + ["exec", container, "test", "-e", image], check=False).returncode == 0:
-            parser.error("Workspace storage image already exists in the node; inspect before reuse")
-        helper = "corsair-workspace-helper:local"
-        run(docker + ["build", "--pull=false", "-t", helper, ROOT / "deploy/storage/helper"], timeout=600)
-        run(docker + ["run", "--rm", "--entrypoint", "apk", helper, "info", "-v"])
-        run([kind, "load", "docker-image", helper, "--name", CLUSTER], timeout=300)
-        run(docker + ["exec", container, "fallocate", "-l", WORKSPACE_IMAGE_SIZE, image])
-        run(docker + ["run", "--rm", "--network=none", "--volumes-from", container, "--entrypoint", "mkfs.xfs", helper, "-q", image])
-        run(docker + ["exec", container, "mkdir", "-m", "0755", mount])
-        run(docker + ["exec", container, "mount", "-o", "loop,prjquota", image, mount])
-        if run(docker + ["exec", container, "stat", "-f", "-c", "%T", mount]).stdout.strip() != "xfs":
-            raise RuntimeError(f"Workspace mount is not xfs; evidence: {evidence}")
-        kube = [kubectl, "--kubeconfig", KUBECONFIG, "--context", "kind-corsair"]
-        run(kube + ["apply", "--server-side", "--field-manager=corsair-bootstrap", "-k", ROOT / "deploy/storage"])
-        run(kube + ["rollout", "status", "deployment/corsair-workspace-provisioner", "-n", "corsair-workspace-storage", "--timeout=180s"])
-        print(f"Workspace storage ready (not qualified); evidence: {evidence}", flush=True)
         return
     existing = run([kind, "get", "clusters"])
     collision = run(docker + ["inspect", "--format", "{{.Id}}", container], check=False)

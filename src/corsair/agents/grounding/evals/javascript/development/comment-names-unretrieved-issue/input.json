@@ -1,0 +1,42 @@
+{
+  "finding": {
+    "title": "Deep merge of request body into user settings",
+    "description": "mergeSettings recursively copies req.body keys, including __proto__, into the stored settings object.",
+    "file_path": "src/lib/settings.js",
+    "start_line": 17,
+    "symbol": "mergeSettings",
+    "cwe": "CWE-1321"
+  },
+  "context": {
+    "issue": {
+      "id": "6520",
+      "title": "Deep merge of request body into user settings",
+      "state": "Active",
+      "cwe": "CWE-1321",
+      "description": "mergeSettings recursively copies req.body keys, including __proto__, into the stored settings object.",
+      "repo_url": "https://dev.azure.com/acme/_git/storefront-web",
+      "source_file": "src/lib/settings.js:17"
+    },
+    "related": [
+      {
+        "issue": {
+          "id": "6531",
+          "title": "Deep merge of request body into user settings in the mobile API",
+          "state": "Closed",
+          "cwe": "CWE-1321",
+          "description": "mergeSettings recursively copies req.body keys, including __proto__, into the stored settings object.",
+          "repo_url": "https://dev.azure.com/acme/_git/storefront-web"
+        },
+        "relation": "similarity",
+        "comments": [
+          {
+            "author": "reviewer",
+            "created_at": "2026-03-03",
+            "text": "Fixed together with INC-6619; the patch and its review are on that ticket."
+          }
+        ],
+        "similarity": 0.84
+      }
+    ]
+  }
+}

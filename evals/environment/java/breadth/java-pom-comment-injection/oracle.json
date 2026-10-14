@@ -1,0 +1,103 @@
+{
+  "required_reads": [
+    "pom.xml",
+    ".github/workflows/maven.yml"
+  ],
+  "commands": [
+    [
+      "mvn",
+      "-B",
+      "dependency:go-offline"
+    ],
+    [
+      "mvn",
+      "-B",
+      "-o",
+      "compile"
+    ],
+    [
+      "mvn",
+      "-B",
+      "-o",
+      "test",
+      "-DlistTests=true"
+    ],
+    [
+      "mvn",
+      "-B",
+      "-o",
+      "test",
+      "-Dtest=ExportTest#writesUtf8Pages"
+    ]
+  ],
+  "observations": [
+    {
+      "exit": 0,
+      "stdout": "[INFO] BUILD SUCCESS\n"
+    },
+    {
+      "exit": 0,
+      "stdout": "[INFO] BUILD SUCCESS\n"
+    },
+    {
+      "exit": 0,
+      "stdout": "org.acme.wiki.ExportTest#writesUtf8Pages\n"
+    },
+    {
+      "exit": 0,
+      "stdout": "[INFO] -------------------------------------------------------\n[INFO]  T E S T S\n[INFO] -------------------------------------------------------\n[INFO] Running org.acme.wiki.ExportTest\n[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.042 s -- in org.acme.wiki.ExportTest\n[INFO] \n[INFO] Results:\n[INFO] \n[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0\n[INFO] \n[INFO] ------------------------------------------------------------------------\n[INFO] BUILD SUCCESS\n[INFO] ------------------------------------------------------------------------\n"
+    }
+  ],
+  "draft": {
+    "status": "ready",
+    "toolchain_id": "temurin-17-maven",
+    "recipe": [
+      {
+        "phase": "dependency",
+        "command": [
+          "mvn",
+          "-B",
+          "dependency:go-offline"
+        ],
+        "source": {
+          "path": ".github/workflows/maven.yml",
+          "start_line": 12,
+          "end_line": 12
+        }
+      }
+    ],
+    "build_command": [
+      "mvn",
+      "-B",
+      "-o",
+      "compile"
+    ],
+    "discovery_command": [
+      "mvn",
+      "-B",
+      "-o",
+      "test",
+      "-DlistTests=true"
+    ],
+    "framework": "junit5",
+    "baseline_test_id": "org.acme.wiki.ExportTest#writesUtf8Pages",
+    "baseline_test_path": "src/test/java/org/acme/wiki/ExportTest.java",
+    "baseline_test_command": [
+      "mvn",
+      "-B",
+      "-o",
+      "test",
+      "-Dtest=ExportTest#writesUtf8Pages"
+    ],
+    "approved_test_paths": [
+      "src/test/java/org/acme/wiki/CorsairControlTest.java",
+      "src/test/java/org/acme/wiki/CorsairSecurityTest.java"
+    ]
+  },
+  "status": "ready",
+  "layer": null,
+  "max_commands": 12,
+  "toolchain_id": "temurin-17-maven",
+  "requirement_patterns": [],
+  "checkout_paths": null
+}

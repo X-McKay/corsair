@@ -1,0 +1,12 @@
+{
+  "language": "java",
+  "framework": "junit5",
+  "family": "xss",
+  "kind": "positive",
+  "probes": "Java HTML rendering planned as a return-value assertion on escaped markup with no file fixture.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic StringBuilder renderer."
+  }
+}

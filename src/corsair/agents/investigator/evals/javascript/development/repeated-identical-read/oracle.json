@@ -1,0 +1,76 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "readUpload",
+    "path": "lib/uploads.js",
+    "lines": [
+      6,
+      8
+    ],
+    "max_span": 11
+  },
+  "exploit_markers": [
+    "../"
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "lib/uploads.js"
+  ],
+  "replay": {
+    "reads": [
+      "lib/uploads.js",
+      "lib/uploads.js",
+      "lib/uploads.js"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "readUpload",
+      "hypothesis": "If name '../outside.txt', which resolves outside the upload directory reaches readUpload without the relevant check, the safe property fails: The call throws an Error whose message names the rejected attachment path, and the outside sentinel is never returned; ENOENT cannot occur because the outside file exists",
+      "control": {
+        "role": "control",
+        "test_file": "__tests__/uploads.control.test.js",
+        "test_name": "reads_file_inside_directory",
+        "target": "readUpload",
+        "seam": "require('../lib/uploads') and call the real readUpload",
+        "input_description": "name 'a.txt' inside the upload directory",
+        "property_to_assert": "Returns exactly the benign sentinel content Observed by: expect(...).toBe on the string returned by the real readUpload call",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "lib/uploads.js",
+            "start_line": 6,
+            "end_line": 8,
+            "quote": "function readUpload(uploadDir, name) {\n  const file = path.join(uploadDir, name);\n  return fs.readFileSync(file, 'utf8');"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "__tests__/uploads.exploit.test.js",
+        "test_name": "rejects_name_outside_directory",
+        "target": "readUpload",
+        "seam": "require('../lib/uploads') and call the real readUpload",
+        "input_description": "name '../outside.txt', which resolves outside the upload directory",
+        "property_to_assert": "The call throws an Error whose message names the rejected attachment path, and the outside sentinel is never returned; ENOENT cannot occur because the outside file exists Observed by: expect(() => readUpload(...)).toThrow(/outside/) around the real call; a returned outside sentinel fails the test",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "lib/uploads.js",
+            "start_line": 6,
+            "end_line": 8,
+            "quote": "function readUpload(uploadDir, name) {\n  const file = path.join(uploadDir, name);\n  return fs.readFileSync(file, 'utf8');"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "lib/uploads.js",
+          "start_line": 6,
+          "end_line": 8,
+          "quote": "function readUpload(uploadDir, name) {\n  const file = path.join(uploadDir, name);\n  return fs.readFileSync(file, 'utf8');"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

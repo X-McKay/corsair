@@ -1,0 +1,12 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "open-redirect",
+  "kind": "failure-mode",
+  "probes": "A first write that does not load gives a collection error; the author rewrites and the second run admits the patch",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Written for this set; the source shape follows common open redirect reports"
+  }
+}

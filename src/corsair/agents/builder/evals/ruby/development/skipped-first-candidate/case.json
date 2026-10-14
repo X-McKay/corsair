@@ -1,0 +1,22 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "baseline-not-passed",
+  "kind": "negative",
+  "category": "capability",
+  "probes": "One candidate test calls skip and exits 0; the other tests pass.",
+  "expected": "A recipe whose baseline is a passing test; test_handles_dst_transition (skipped) and the whole dst_test.rb run are never the baseline.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "evals/environment/ruby/breadth/ruby-skipped-baseline-rechosen",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/environment/ruby/breadth/ruby-skipped-baseline-rechosen; the tree's component and test sources were written to agree with the recorded output; native runs are recorded in the row's run_template form"
+  }
+}

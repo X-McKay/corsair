@@ -1,0 +1,12 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "sql-injection",
+  "kind": "positive",
+  "probes": "A dependency_call plan: an injected recording database double observes the real query construction",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Written for this set; the source shape follows common sql injection reports"
+  }
+}

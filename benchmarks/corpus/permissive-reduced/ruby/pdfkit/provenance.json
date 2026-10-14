@@ -1,0 +1,38 @@
+{
+  "family": "pdfkit",
+  "language": "ruby",
+  "cwe": "CWE-78",
+  "runtime_row": "minitest-ruby31",
+  "upstream_repo": "https://github.com/pdfkit/pdfkit",
+  "record": "CVE-2022-25765",
+  "pointer_source": "GitHub Advisory Database / candidate survey (metadata only)",
+  "upstream_spdx": "MIT",
+  "spdx_verified": "pdfkit.gemspec s.license = 'MIT' at commit 79ec0c08, 2026-10-14",
+  "parent_commit": "ceca488e1a801a9f965f04175b51aa50392744da",
+  "fix_commit": "79ec0c08b0d1eb09b034f83f56f25a8d1362cea5",
+  "verbatim": false,
+  "kept_files": [
+    {
+      "path": "lib/pdfkit/pdfkit.rb",
+      "upstream": "lib/pdfkit/pdfkit.rb",
+      "note": "PDFKit#command is upstream-verbatim in both variants: the assembly of the process invocation from the executable, options and source is exactly the code the fix commit rewrote (a single joined string on one variant, an argument array on the other)"
+    }
+  ],
+  "stand_ins": [
+    {
+      "replaces": "PDFKit#to_pdf, which passes the invocation to IO.popen to spawn wkhtmltopdf",
+      "with": "a recorder that stores the invocation command builds and runs nothing",
+      "note": "captures what would reach the process so the property is observable in-process; it decides nothing about how the invocation is assembled"
+    },
+    {
+      "replaces": "the configuration, renderer, source and per-OS escaping collaborators",
+      "with": "minimal objects returning the executable path, an empty option list, the source value and a real shell escape of the options",
+      "note": "supply the inputs command assembles; they perform the real escaping/value passing but decide nothing about how the invocation is assembled"
+    }
+  ],
+  "reduction_removed": [
+    "HTML preprocessing, stylesheet handling and the IO.popen read loop in to_pdf unrelated to how the invocation is assembled",
+    "a documentation comment in the upstream method, removed identically from both variants; it is not part of the invocation assembly"
+  ],
+  "pov_note": "Benign control and proof-of-vulnerability probes authored by the Corsair chain at run time; none authored here. Property observable in-process via the recorded invocation: a source value containing shell metacharacters is interpolated into a single command string the shell would interpret on one variant and confined to a single argument element on the other. No outbound network and no process spawn."
+}

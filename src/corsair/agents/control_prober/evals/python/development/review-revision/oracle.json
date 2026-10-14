@@ -1,0 +1,97 @@
+{
+  "expect": {
+    "draft": true,
+    "status": "ok"
+  },
+  "expected_outcome": {
+    "asserts": "benign_behaviour",
+    "vulnerable": "pass",
+    "fixed": "pass",
+    "this_tree": "pass"
+  },
+  "revision_history": [
+    "mechanical"
+  ],
+  "target_spans": [
+    {
+      "path": "documents.py",
+      "start_line": 3,
+      "end_line": 4
+    }
+  ],
+  "anchors": {
+    "comment": "#",
+    "load": [
+      "(?m)^\\s*(import\\s+documents\\b|from\\s+documents\\s+import\\b)"
+    ],
+    "call": [
+      "\\bread_document\\s*\\("
+    ],
+    "input": [
+      "document\\.txt"
+    ],
+    "avoid_input": [
+      "\\.\\./outside\\.txt"
+    ],
+    "property": [
+      "(?:(?:(?<![!=<>])===?(?!=)|\\beq\\b|\\.equals\\s*\\(|\\bassert_equal\\b)\\s*\\(?\\s*['\\\"]quarterly\\ report['\\\"]|['\\\"]quarterly\\ report['\\\"]\\s*\\)?\\s*(?:(?<![!=<>])===?(?!=)|\\beq\\b|\\.equals\\s*\\(|\\bassert_equal\\b)|['\\\"]quarterly\\ report['\\\"]\\s*\\.equals\\s*\\(|Objects\\.equals\\s*\\([^\\n]*['\\\"]quarterly\\ report['\\\"]|is_deeply\\s*\\([^\\n]*['\\\"]quarterly\\ report['\\\"])"
+    ],
+    "non_differential": [],
+    "test_definition": "(?m)^\\s*(async\\s+)?def\\s+test_\\w+",
+    "assertion": "(?m)^\\s*assert\\b|pytest\\.raises",
+    "token_form": "(?m)^\\s*assert\\b[\\s\\S]*,\\s*\\(?\\s*os\\.environ(?:\\[\\s*['\\\"]CORSAIR_TOKEN['\\\"]\\s*\\]|\\.get\\(\\s*['\\\"]CORSAIR_TOKEN['\\\"]\\s*\\))",
+    "forbidden": [
+      "pytest\\.(skip|xfail|importorskip)|mark\\.(skip|skipif|xfail)",
+      "\\bsubprocess\\b|os\\.system|os\\.popen",
+      "(?m)^\\s*(?:import|from)\\s+(?:requests|socket|http\\.client|urllib\\.request)\\b|urlopen\\s*\\(",
+      "sys\\.exit|os\\._exit",
+      "except\\s*:|except\\s+\\(?\\s*(BaseException|Exception|AssertionError)\\b"
+    ],
+    "forbidden_doubles": [
+      "monkeypatch\\.(?:setattr|delattr|setitem|delitem)|unittest\\.mock|\\bmock\\.patch|\\bpatch\\s*\\(|MagicMock",
+      "(?m)^\\s*def\\s+read_document\\s*\\("
+    ],
+    "injected": [],
+    "defects": [
+      "['\\\"]other\\.txt['\\\"]"
+    ]
+  },
+  "script": [
+    {
+      "tool": "load_capability",
+      "args": {
+        "id": "control-probe"
+      }
+    },
+    {
+      "tool": "load_capability",
+      "args": {
+        "id": "probe-protocol"
+      }
+    },
+    {
+      "tool": "load_capability",
+      "args": {
+        "id": "pytest"
+      }
+    },
+    {
+      "tool": "read_file",
+      "args": {
+        "path": "documents.py"
+      }
+    },
+    {
+      "tool": "write_test_file",
+      "args": {
+        "path": "tests/test_documents_control.py",
+        "content": "import os\nfrom pathlib import Path\n\nimport documents\n\n\ndef test_benign_control(tmp_path):\n    Path(os.environ[\"CORSAIR_MARKER_DIR\"], \"start\").write_text(\"\")\n    allowed = tmp_path / \"allowed\"\n    allowed.mkdir()\n    (allowed / \"document.txt\").write_text(\"quarterly report\")\n    outside = tmp_path / \"outside.txt\"\n    outside.write_text(\"outside secret\")\n    holds = documents.read_document(allowed, \"document.txt\") == \"quarterly report\"\n    Path(os.environ[\"CORSAIR_MARKER_DIR\"], \"check\").write_text(\"holds\" if holds else \"violated\")\n    assert holds, os.environ[\"CORSAIR_TOKEN\"]\n    Path(os.environ[\"CORSAIR_MARKER_DIR\"], \"end\").write_text(\"\")\n"
+      }
+    },
+    {
+      "final": {
+        "status": "drafted"
+      }
+    }
+  ]
+}

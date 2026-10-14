@@ -1,0 +1,98 @@
+{
+  "status": "ready",
+  "symbol": "feed_titles",
+  "target_path": "feeds.py",
+  "required_lines": [
+    25,
+    31
+  ],
+  "adversarial_markers": [
+    "<!ENTITY",
+    "file://",
+    "file:",
+    "SYSTEM"
+  ],
+  "witness_markers": [
+    "open",
+    "urllib.request"
+  ],
+  "required_reads": [
+    "feeds.py",
+    "test_feeds_existing.py"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_path": "test_feeds_security.py",
+      "test_id": "test_feeds_security.py::test_benign_feed_titles",
+      "fixture_setup": [
+        "Install an audit hook that records 'open' and 'urllib.Request' events raised during the call"
+      ],
+      "implementation_call": "feeds.feed_titles(b'<rss><channel><title>Daily</title><item><title>Second</title></item></channel></rss>')",
+      "input": "an RSS document with two title elements and no entity declarations",
+      "required_behavior": "Returns exactly ['Daily', 'Second']",
+      "observable_witness": "No urllib.Request audit event is recorded during the call",
+      "source_references": [
+        {
+          "path": "feeds.py",
+          "start_line": 25,
+          "end_line": 31
+        }
+      ]
+    },
+    "security": {
+      "test_path": "test_feeds_security.py",
+      "test_id": "test_feeds_security.py::test_security_external_entity_not_resolved",
+      "fixture_setup": [
+        "Install an audit hook that records 'open' and 'urllib.Request' events raised during the call",
+        "Create tmp_path/secret.txt holding the sentinel SENTINEL-7",
+        "Build the document with (tmp_path / 'secret.txt').as_uri() as the entity system identifier"
+      ],
+      "implementation_call": "feeds.feed_titles(document)",
+      "input": "an RSS document whose DOCTYPE declares <!ENTITY leak SYSTEM \"file://<tmp_path>/secret.txt\"> and whose title contains &leak;",
+      "required_behavior": "The external entity is never resolved: tmp_path/secret.txt is not read and no returned title contains SENTINEL-7",
+      "observable_witness": "No open audit event for tmp_path/secret.txt and no urllib.Request audit event for its file URL are recorded during the call, and the returned titles do not contain the sentinel; a sandbox denial is recorded separately and is not a rejection",
+      "source_references": [
+        {
+          "path": "feeds.py",
+          "start_line": 25,
+          "end_line": 31
+        }
+      ]
+    },
+    "security_expectation": {
+      "failure_type": "AssertionError",
+      "safe_behavior": "external_entity_not_resolved"
+    },
+    "discovery_command": [
+      "python",
+      "-m",
+      "pytest",
+      "--collect-only",
+      "-q"
+    ],
+    "evidence_requirements": [
+      "Native discovery finds exactly the two planned test ids",
+      "Open and urllib.Request audit events captured per test",
+      "Native JUnit outcome per test"
+    ],
+    "citations": [
+      {
+        "path": "feeds.py",
+        "start_line": 25,
+        "end_line": 31
+      },
+      {
+        "path": "test_feeds_existing.py",
+        "start_line": 1,
+        "end_line": 6
+      }
+    ],
+    "limitations": [
+      "Component scope only: the plan does not show how fetched feeds reach feed_titles",
+      "The plan covers a file URL entity; network URL entities are not observed by these tests"
+    ]
+  }
+}

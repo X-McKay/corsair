@@ -1,0 +1,22 @@
+{
+  "language": "javascript",
+  "framework": "jest",
+  "family": "baseline-not-passed",
+  "kind": "negative",
+  "category": "capability",
+  "probes": "One candidate test is test.skip and exits 0 as skipped; other tests pass.",
+  "expected": "A recipe whose baseline is a passing test (orders prerelease tags or matches caret ranges); the skipped 'handles build metadata' is never the baseline.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "evals/environment/javascript/breadth/javascript-skipped-baseline-rechosen",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/environment/javascript/breadth/javascript-skipped-baseline-rechosen; the tree's component and test sources were written to agree with the recorded output; native runs are recorded in the row's run_template form"
+  }
+}

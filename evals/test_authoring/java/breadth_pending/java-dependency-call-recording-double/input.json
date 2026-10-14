@@ -1,0 +1,120 @@
+{
+  "fixture_id": "java-dependency-call-recording-double-v1",
+  "inputs": {
+    "plan": {
+      "status": "ready",
+      "scope": "component",
+      "security_expectation": {
+        "failure_type": "org.opentest4j.AssertionFailedError",
+        "safe_behavior": "bound_parameter"
+      },
+      "discovery_command": [
+        "mvn",
+        "-q",
+        "-DskipTests",
+        "test-compile"
+      ],
+      "evidence_requirements": [
+        "Both control and exploit probe must execute with native outcomes",
+        "Review both real source calls, adversarial input and assertions before execution"
+      ],
+      "citations": [
+        {
+          "path": "src/main/java/com/example/accounts/Accounts.java",
+          "start_line": 16,
+          "end_line": 18,
+          "quote": "    public static List<Integer> balance(Database database, String account) {\n        return database.query(\"SELECT balance FROM accounts WHERE account = '\" + account + \"'\", Collections.emptyList());\n    }"
+        }
+      ],
+      "limitations": [
+        "Sql injection at this one call only; callers and deployment configuration are outside the observation"
+      ],
+      "control": {
+        "test_id": "com.example.accounts.AccountsSecurityTest#benignControl",
+        "test_path": "src/test/java/com/example/accounts/AccountsSecurityTest.java",
+        "fixture_setup": [
+          "Create an in-memory recording Database returning [25] and recording each query with its parameters"
+        ],
+        "implementation_call": "Accounts.balance(database, account)",
+        "input": "account \"alice\"",
+        "required_behavior": "Returns the database rows and issues exactly one query",
+        "observable_witness": "Native junit5 assertion on returns the database rows and issues exactly one query",
+        "observation": {
+          "kind": "dependency_call",
+          "property": "Returns the database rows and issues exactly one query",
+          "seam": "Call the real Accounts.balance with an injected Database implementation",
+          "controlled_dependency": "RecordingDatabase.query records the SQL and parameters unchanged and returns fixed rows; it neither builds nor sanitizes SQL"
+        },
+        "source_references": [
+          {
+            "path": "src/main/java/com/example/accounts/Accounts.java",
+            "start_line": 16,
+            "end_line": 18,
+            "quote": "    public static List<Integer> balance(Database database, String account) {\n        return database.query(\"SELECT balance FROM accounts WHERE account = '\" + account + \"'\", Collections.emptyList());\n    }"
+          }
+        ]
+      },
+      "security": {
+        "test_id": "com.example.accounts.AccountsSecurityTest#securityBindsAccount",
+        "test_path": "src/test/java/com/example/accounts/AccountsSecurityTest.java",
+        "fixture_setup": [
+          "Create an in-memory recording Database returning [25] and recording each query with its parameters"
+        ],
+        "implementation_call": "Accounts.balance(database, account)",
+        "input": "account \"alice' OR 1=1 --\"",
+        "required_behavior": "The hostile account is passed as a bound parameter and never appears in the SQL text",
+        "observable_witness": "Native junit5 assertion on the hostile account is passed as a bound parameter and never appears in the SQL text",
+        "observation": {
+          "kind": "dependency_call",
+          "property": "The hostile account is passed as a bound parameter and never appears in the SQL text",
+          "seam": "Call the real Accounts.balance with an injected Database implementation",
+          "controlled_dependency": "RecordingDatabase.query records the SQL and parameters unchanged and returns fixed rows; it neither builds nor sanitizes SQL"
+        },
+        "source_references": [
+          {
+            "path": "src/main/java/com/example/accounts/Accounts.java",
+            "start_line": 16,
+            "end_line": 18,
+            "quote": "    public static List<Integer> balance(Database database, String account) {\n        return database.query(\"SELECT balance FROM accounts WHERE account = '\" + account + \"'\", Collections.emptyList());\n    }"
+          }
+        ]
+      }
+    },
+    "source_files": [
+      {
+        "path": "src/main/java/com/example/accounts/Accounts.java",
+        "content": "package com.example.accounts;\n\nimport java.util.Collections;\nimport java.util.List;\n\n/** Account balance lookups against an injected database connection. */\npublic final class Accounts {\n    /** The database connection the lookup runs on. */\n    public interface Database {\n        List<Integer> query(String sql, List<String> parameters);\n    }\n\n    private Accounts() {\n    }\n\n    public static List<Integer> balance(Database database, String account) {\n        return database.query(\"SELECT balance FROM accounts WHERE account = '\" + account + \"'\", Collections.emptyList());\n    }\n}\n"
+      },
+      {
+        "path": "src/test/java/com/example/accounts/AccountsTest.java",
+        "content": "package com.example.accounts;\n\nimport static org.junit.jupiter.api.Assertions.assertEquals;\n\nimport java.util.Collections;\nimport org.junit.jupiter.api.Test;\n\nclass AccountsTest {\n    @Test\n    void returnsRows() {\n        assertEquals(Collections.singletonList(25), Accounts.balance((sql, parameters) -> Collections.singletonList(25), \"alice\"));\n    }\n}\n"
+      }
+    ],
+    "environment": {
+      "language": "Java",
+      "runtime": "JDK 17",
+      "framework": "junit5",
+      "discovery_command": [
+        "mvn",
+        "-q",
+        "-DskipTests",
+        "test-compile"
+      ],
+      "approved_test_paths": [
+        "src/test/java/com/example/accounts/AccountsSecurityTest.java"
+      ],
+      "baseline_test": {
+        "test_id": "com.example.accounts.AccountsTest#returnsRows",
+        "path": "src/test/java/com/example/accounts/AccountsTest.java"
+      },
+      "scratch_location": "A per-test JUnit @TempDir directory",
+      "observation_facilities": [
+        "Native Surefire report: outcome, failure type and failing line per test method"
+      ],
+      "assertion_facts": [
+        "JUnit 5 assertion failures, including assertThrows when nothing is thrown, report org.opentest4j.AssertionFailedError. Match the planned native failure type."
+      ],
+      "witness_facilities": []
+    }
+  }
+}

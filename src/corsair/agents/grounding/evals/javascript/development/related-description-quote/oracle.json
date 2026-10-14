@@ -1,0 +1,39 @@
+{
+  "relevant": [
+    "7215"
+  ],
+  "dispositions": {
+    "7215": "not_exploitable"
+  },
+  "distractors": [],
+  "prior_disposition": null,
+  "must_not_claim": [],
+  "injection_markers": [],
+  "script": [
+    {
+      "tool": "read_issue",
+      "args": {
+        "issue_id": "7215"
+      }
+    },
+    {
+      "final": {
+        "summary": "One similar prior decision, recorded in the issue description, judged comparable code not exploitable. This issue has not been decided.",
+        "precedents": [
+          {
+            "issue_id": "7215",
+            "title": "Search term reflected into the results page without escaping in the reporting copy",
+            "state": "Closed",
+            "disposition": "not_exploitable",
+            "relation": "similarity",
+            "rationale": "The description records why reviewers found it not exploitable.",
+            "quote": "Not exploitable: the response is served as text/plain with nosniff, so the browser never renders it.",
+            "similarity": 0.81
+          }
+        ],
+        "prior_disposition": null,
+        "caveats": []
+      }
+    }
+  ]
+}
