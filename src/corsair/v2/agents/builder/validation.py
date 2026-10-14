@@ -47,6 +47,8 @@ def written_files(messages: Sequence[ModelMessage]) -> tuple[RecipeFile, ...]:
 
 
 def check_recipe(recipe: Recipe, messages: Sequence[ModelMessage]) -> Recipe:
+    if recipe.blocked:  # a reasoned refusal carries no commands to check
+        return recipe.model_copy(update={"setup": (), "baseline_test": (), "files": ()})
     codes = last_exit_codes(messages)
     problems = [f"{list(argv)} {'was never run here' if argv not in codes else f'last exited {codes[argv]}'}"
                 for argv in (*recipe.setup, recipe.baseline_test) if codes.get(argv, -1) != 0]

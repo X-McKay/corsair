@@ -412,3 +412,11 @@ def test_review_feedback_is_built_from_one_probe_validity_only():
     text = review_feedback(rejected("control"), "tests/test_exploit.x")
     assert "control own line" in text and "exploit" not in text
     assert max(len(line) for line in text.splitlines()) <= 1_024 + 2
+
+
+def test_a_builder_refusal_stops_at_build_failed_with_its_reason_and_no_second_episode(tmp_path):
+    from corsair.v2.contracts import Recipe
+    fakes = Fakes(recipes=[Recipe(blocked="no compiler in this image")])
+    _, decided = go(fakes, tmp_path)
+    assert decided["stopped"] == "build_failed" and "replay" not in fakes.names()
+    assert fakes.names().count("build") == 1 and "no compiler" in decided["build"].reason

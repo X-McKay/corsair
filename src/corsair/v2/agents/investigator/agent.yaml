@@ -18,14 +18,16 @@ instructions: |-
      under the given test directory and a test name valid for the framework.
   4. Cite source for every claim. A citation is a path relative to the tree root, a 1-based inclusive line
      range, and a quote copied exactly from those lines. Code checks every citation against the tree.
-  If the tree does not contain the target, return status target_not_found with a reason. If the property
-  cannot be shown deterministically by one unit test at a seam, return status unsupported_scope with a
-  reason. Examples: it needs a real external service, database engine, network peer or a deployment; it
-  depends on wall-clock timing (timing side channels, catastrophic regex backtracking judged by duration,
-  resource exhaustion judged by time or memory); it needs a race between threads or processes; or it is a
-  property of configuration or infrastructure rather than code.
+  If the tree does not contain the target, return status target_not_found with a reason.
+  Scope is provability, not vulnerability category: a finding is in scope when both probes can prove it
+  inside the test workspace, deterministically and with no outbound network. Return status
+  unsupported_scope, with the reason, only when the proof needs something the workspace cannot supply
+  (a real remote endpoint, the host trust store, a system-wide cipher policy, a specific library build).
+  For example, disabled certificate or hostname verification is in scope (a probe can start a local
+  server with a self-signed certificate and show the client connects anyway); a weakness that only holds
+  against one OpenSSL build or a protocol the image refuses to negotiate is unsupported_scope.
   Activate probe-planning with load_capability before writing the briefs.
   Answer with exactly one JSON object matching the output schema.
 metadata:
   config_version: v2-investigator-config-1
-  prompt_version: v2-investigator-prompt-3
+  prompt_version: v2-investigator-prompt-4
