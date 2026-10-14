@@ -8,11 +8,9 @@ File operations use PydanticAI's shell fallback, so commands and files always se
 """
 from __future__ import annotations
 
-import hashlib
 import io
 import json
 import posixpath
-import re
 import subprocess
 import tarfile
 import uuid
@@ -20,7 +18,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import DEVNULL, PIPE
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import anyio
 import anyio.abc
@@ -29,10 +27,11 @@ from pydantic_ai.workspaces import (CommandResult, SupportsCommands, WorkspaceBa
                                     WorkspaceUnavailableError)
 from pydantic_ai.workspaces.protocol import validate_timeout
 
-LABEL = "corsair.v2"
-RUN_LABEL = "corsair.v2.run"
-STAGE_LABEL = "corsair.v2.stage"
-ROLE_LABEL = "corsair.v2.role"
+from .port import LABEL, RUN_LABEL, Exec, SandboxExists, SandboxSpec, labels, sandbox_name
+
+if TYPE_CHECKING:
+    from ..contracts import Environment, Recipe
+
 PROVIDER = "docker"
 HARDENED = ("--cap-drop=ALL", "--security-opt=no-new-privileges")
 CONTROL_TIMEOUT_S = 120.0
@@ -43,12 +42,6 @@ DRAIN_GRACE_S = 5.0
 # Records the command's pid (a session leader under docker exec) so a timeout or cancellation can kill its whole
 # process group inside the container; killing the docker client alone leaves the process running.
 _WRAPPER = 'echo $$ > "$1" 2>/dev/null; shift; exec "$@"'
-
-
-def labels(run_id: str, stage: str, role: str | None = None, **extra: str) -> dict[str, str]:
-    """The identity labels of one container: the run, the stage and, where there is one, the role."""
-    found = {RUN_LABEL: run_id, STAGE_LABEL: stage} | ({ROLE_LABEL: role} if role else {})
-    return found | {f"{LABEL}.{key}": value for key, value in extra.items()}
 
 
 @dataclass(frozen=True)
@@ -75,11 +68,7 @@ class DockerConfig:
     @property
     def name(self) -> str:
         """Deterministic: the same labels always name the same container, so a retried create finds it."""
-        all_labels = {LABEL: "1", **self.labels}
-        digest = hashlib.sha256(json.dumps(all_labels, sort_keys=True).encode()).hexdigest()[:12]
-        parts = [self.labels.get(key, "") for key in (RUN_LABEL, STAGE_LABEL, ROLE_LABEL)]
-        slug = re.sub(r"[^a-z0-9_.-]+", "-", "-".join(part for part in parts if part).lower()).strip("-.")[:48]
-        return f"corsair-v2-{slug + '-' if slug else ''}{digest}"
+        return sandbox_name(self.labels)
 
 
 # --- synchronous helpers ----------------------------------------------------------------------------------------
@@ -142,8 +131,8 @@ def container_labels(name: str) -> dict[str, str] | None:
     return (json.loads(result.stdout) or {}) if result.returncode == 0 else None
 
 
-class ContainerExists(WorkspaceError):
-    """A container already holds this identity: an earlier, uncertain attempt that trusted code must not reuse."""
+ContainerExists = SandboxExists
+"""A container already holds this identity (the port's ``SandboxExists``)."""
 
 
 def create(config: DockerConfig, *, adopt: bool = True) -> str:
@@ -239,17 +228,6 @@ def copy_out(name: str, paths: Sequence[str]) -> dict[str, bytes | None]:
                     data = extracted.read() if extracted else None
         found[path] = data
     return found
-
-
-@dataclass(frozen=True)
-class Exec:
-    """One command's observed result. ``exit_code`` is None when it timed out or the container failed."""
-
-    exit_code: int | None
-    stdout: bytes
-    stderr: bytes
-    timed_out: bool = False
-    container_failed: bool = False
 
 
 def exec_once(name: str, argv: Sequence[str], *, workdir: str, env: Mapping[str, str] | None = None,
@@ -423,3 +401,87 @@ class DockerWorkspace(WorkspaceBackend, SupportsCommands):
     async def destroy(self) -> bool:
         """Remove the container. Returns whether its absence was confirmed (False is ``cleanup_unconfirmed``)."""
         return await anyio.to_thread.run_sync(remove, self.name)
+
+
+# --- the trusted Sandboxes port ---------------------------------------------------------------------------------
+
+ENV_LOG_LABEL = f"{LABEL}.env.log"
+ENV_KEY_LABEL = f"{LABEL}.env.key"
+
+
+class DockerSandboxes:
+    """The ``Sandboxes`` port over the helpers above. An environment is a committed image labelled with its key and
+    build-log digest; ``build`` network is the default bridge, removed before the baseline."""
+
+    provider = PROVIDER
+
+    def __init__(self) -> None:
+        self._owners: dict[str, tuple[int, int]] = {}  # uid, gid read once per created container
+
+    @staticmethod
+    def _config(spec: SandboxSpec) -> DockerConfig:
+        return DockerConfig(image=spec.image, labels=spec.labels, workdir=spec.workdir,
+                            network="bridge" if spec.network == "build" else "none")
+
+    def create(self, spec: SandboxSpec) -> str:
+        name = create(self._config(spec), adopt=False)
+        self._owners[name] = uid, gid = owner(name)
+        make_workdir(name, spec.workdir, uid, gid)
+        return name
+
+    def copy_tree_in(self, name: str, source: Path, destination: str) -> None:
+        uid, gid = self._owners.get(name) or owner(name)
+        copy_tree_in(name, source, destination, uid, gid)
+
+    def write_file(self, name: str, path: str, data: bytes) -> None:
+        write_file(name, path, data)
+
+    def copy_out(self, name: str, paths: Sequence[str]) -> dict[str, bytes | None]:
+        return copy_out(name, paths)
+
+    def exec_once(self, name: str, argv: Sequence[str], *, workdir: str, env: Mapping[str, str] | None = None,
+                  timeout: float | None = None) -> Exec:
+        return exec_once(name, argv, workdir=workdir, env=env, timeout=timeout)
+
+    def drop_network(self, name: str) -> None:
+        detached = docker("network", "disconnect", "--force", "bridge", name)
+        if detached.returncode != 0:
+            raise WorkspaceError(detached.stderr.decode(errors="replace"))
+
+    def image_id(self, name: str) -> str | None:
+        return image_id(name, container=True)
+
+    def resolve_image(self, reference: str) -> str | None:
+        return image_id(reference)
+
+    def remove(self, name: str) -> bool:
+        self._owners.pop(name, None)
+        return remove(name)
+
+    def labelled(self, run_id: str | None = None) -> list[str]:
+        filters = ["--filter", f"label={LABEL}=1"] + (["--filter", f"label={RUN_LABEL}={run_id}"] if run_id else [])
+        listed = docker("ps", "--all", "--no-trunc", *filters, "--format", "{{.Names}}")
+        if listed.returncode != 0:
+            raise RuntimeError(f"cannot list containers: {listed.stderr.decode(errors='replace')[-2000:]}")
+        return sorted(listed.stdout.decode().split())
+
+    def find_environment(self, tag: str, key: str) -> str | None:
+        cached = docker("image", "inspect", "--format", "{{json .Config.Labels}}", tag)
+        if cached.returncode != 0:
+            return None
+        found = json.loads(cached.stdout) or {}
+        return found.get(ENV_LOG_LABEL, "") if found.get(ENV_KEY_LABEL) == key else None
+
+    def seal_environment(self, name: str, tag: str, key: str, log_sha256: str, *, recipe: Recipe,
+                         tree_source: Path, base_image: str) -> None:
+        committed = docker("commit", "--change", f"LABEL {ENV_KEY_LABEL}={key} {ENV_LOG_LABEL}={log_sha256}", name,
+                           tag, timeout=1800)
+        if committed.returncode != 0:
+            raise WorkspaceError(f"docker commit failed: {committed.stderr.decode(errors='replace')[-1000:]}")
+
+    def open_environment(self, environment: Environment, sandbox_labels: Mapping[str, str]) -> str:
+        return create(DockerConfig(image=environment.image, workdir=environment.workdir, network="none",
+                                   labels=sandbox_labels), adopt=False)
+
+    def agent_workspace(self, image: str, sandbox_labels: Mapping[str, str]) -> DockerWorkspace:
+        return DockerWorkspace(DockerConfig(image=image, labels=sandbox_labels, network="bridge"))

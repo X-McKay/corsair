@@ -8,6 +8,8 @@ dependencies = [
     "pydantic-ai-harness[skills]==0.55.0",
     "temporalio==1.34.0",
     "PyYAML==6.0.3",
+    # Native OpenShell SDK for the OpenShell sandbox backend (the version v1 qualified; release wheel, hashed in uv.lock).
+    "openshell @ https://github.com/NVIDIA/OpenShell/releases/download/v0.1.3/openshell-0.1.3-py3-none-any.whl",
 ]
 
 [project.scripts]
@@ -35,3 +37,9 @@ namespace = true
 testpaths = ["tests"]
 pythonpath = ["src", "."]
 addopts = "--strict-markers"
+markers = [
+    "platform: live kind and CNI qualification; requires explicit kubeconfig (make qualify-network)",
+    "admission: live storage and native OpenShell kernel admission; requires installed prerequisites (make qualify-admission)",
+    "gateway: live gateway TLS and generated identity qualification; uninstalls the gateway afterwards (make qualify-gateway)",
+    "openshell: live v2 OpenShell sandbox backend against .state/openshell/config.json (make qualify-openshell-v2)",
+]

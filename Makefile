@@ -3,6 +3,10 @@ export UV_CACHE_DIR ?= $(CURDIR)/.cache/uv
 # pytest otherwise infers its root from argument paths, so an evidence dir inside another checkout (for example
 # the main repository's .runs from a worktree) would load that checkout's config and code.
 PYTEST_ROOT := -c $(CURDIR)/pyproject.toml --rootdir=$(CURDIR)
+# A new evidence directory under this checkout's own .runs for each live qualification target.
+ifndef CORSAIR_QUAL_RUN
+CORSAIR_QUAL_RUN := .runs/qualify-$(shell date -u +%Y%m%dT%H%M%S)
+endif
 
 # The offline suite is CPU-bound; pytest-xdist spreads it over the cores. `TEST_WORKERS=0 make test-v2` runs it
 # serially. No model, no cluster; Docker-backed tests skip when Docker is unavailable.
@@ -41,3 +45,71 @@ maven-hashes:
 	  && mv deploy/qualification/toolchains/$$dir/m2.sha256.new deploy/qualification/toolchains/$$dir/m2.sha256 \
 	  || { rm -f deploy/qualification/toolchains/$$dir/m2.sha256.new; exit 1; }; \
 	done
+
+# Fresh kind + OpenShell cluster for the v2 OpenShell backend (docs/runbooks/openshell-v2.md). Every target runs
+# against the one owned `corsair` cluster in .state/kind; evidence lands under this checkout's own .runs.
+.PHONY: tools kind-up kind-down qualify-network admission-artifacts admission-install qualify-admission \
+	openshell-install qualify-gateway openshell-images-load openshell-config openshell-forward-stop qualify-openshell-v2
+QUAL_ARGS = --kubeconfig .state/kind/kubeconfig --context kind-corsair --evidence-dir "$(CORSAIR_QUAL_RUN)" \
+	--junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
+
+# Checksum-verified kind and kubectl into .tools/linux-amd64 (admission-artifacts adds helm and the OpenShell CLI).
+tools:
+	uv run --locked python deploy/kind/bootstrap.py tools
+
+kind-up:
+	uv run --locked python deploy/kind/bootstrap.py up
+
+kind-down:
+	uv run --locked python deploy/kind/bootstrap.py down
+
+qualify-network:
+	test ! -e "$(CORSAIR_QUAL_RUN)"
+	mkdir -p "$(CORSAIR_QUAL_RUN)"
+	uv run --locked python -m pytest $(PYTEST_ROOT) tests/qualification -m platform $(QUAL_ARGS)
+
+# Explicit preparation and installation. Neither target installs a gateway.
+admission-artifacts:
+	uv run --locked python -m deploy.openshell.artifacts
+
+admission-install:
+	uv run --locked python -m tests.qualification.install_admission
+
+qualify-admission:
+	test ! -e "$(CORSAIR_QUAL_RUN)"
+	mkdir -p "$(CORSAIR_QUAL_RUN)"
+	uv run --locked python -m pytest $(PYTEST_ROOT) tests/qualification -m admission $(QUAL_ARGS)
+
+# Gateway work requires successful admission from this exact owned node (CORSAIR_ADMISSION_RUN, under .runs).
+openshell-install:
+	test -n "$(CORSAIR_ADMISSION_RUN)"
+	uv run --locked python -m tests.qualification.install_gateway --admission-evidence "$(CORSAIR_ADMISSION_RUN)"
+
+# Optional bounded gateway TLS/caller-auth/identity/access-isolation controls. It UNINSTALLS the gateway and removes
+# .state/openshell afterwards, so run openshell-install again before the steps below.
+qualify-gateway:
+	test ! -e "$(CORSAIR_QUAL_RUN)"
+	mkdir -p "$(CORSAIR_QUAL_RUN)"
+	uv run --locked python -m pytest $(PYTEST_ROOT) tests/qualification -m gateway --tb=short $(QUAL_ARGS)
+
+# Load each locally built deploy/v2/runtime-matrix.yaml image into the node; writes .state/openshell/images.json.
+openshell-images-load:
+	uv run --locked python -m tools.openshell_images load
+
+# Private client mTLS, a loopback port-forward and .state/openshell/config.json for the v2 backend.
+# OPENSHELL_PORT picks the local port (default: a free one).
+openshell-config:
+	uv run --locked python -m tools.openshell_images config $(if $(OPENSHELL_PORT),--port "$(OPENSHELL_PORT)")
+
+openshell-forward-stop:
+	uv run --locked python -m tools.openshell_images stop
+
+# The v2 OpenShell backend's live tests (marker `openshell` in tests/v2) against the installed gateway.
+qualify-openshell-v2:
+	test -f .state/openshell/config.json
+	test ! -e "$(CORSAIR_QUAL_RUN)"
+	mkdir -p "$(CORSAIR_QUAL_RUN)"
+	CORSAIR_WORKSPACE=openshell CORSAIR_OPENSHELL_CONFIG="$(CURDIR)/.state/openshell/config.json" \
+	CORSAIR_EVIDENCE_DIR="$(abspath $(CORSAIR_QUAL_RUN))" \
+	uv run --locked python -m pytest $(PYTEST_ROOT) tests/v2 -m openshell --tb=short \
+		--evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"

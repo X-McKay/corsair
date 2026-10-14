@@ -1,0 +1,20 @@
+# Operator-owned OpenShell policy for v2 sandboxes with no network: probes, baselines and every replayed
+# environment after setup. Agents and project files never edit it; the backend refuses a document outside this
+# shape (src/corsair/v2/workspace/openshell.py, check_policy).
+#
+# NOT YET TRUSTED: this document follows the format v1 qualified (docs/qualification/openshell-policy.md, removed
+# from develop; `git show 9c3bc62:policies/openshell/identity.yaml`), but these exact paths have not passed the live
+# policy gate. Until they do, nothing run under it is live evidence. Open live questions: whether Landlock accepts
+# /work before the backend creates it, whether /opt and /lib64 are enough for every runtime-matrix image, and which
+# user the gateway's process defaults run commands as.
+#
+# Writable: the probe workdir (/work, the default) and /tmp ($CORSAIR_MARKER_DIR and the staging area for copies
+# live there). Everything else the toolchains need is read-only. No provider or network grants.
+version: 1
+filesystem_policy:
+  include_workdir: true
+  read_only: [/bin, /usr, /lib, /lib64, /opt, /proc, /dev/urandom, /etc, /var/log]
+  read_write: [/work, /tmp, /dev/null]
+landlock:
+  compatibility: hard_requirement
+network_policies: {}

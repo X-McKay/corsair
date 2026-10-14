@@ -1,0 +1,55 @@
+# Operator-owned OpenShell policy for v2 recipe setup that installs declared dependencies (SandboxSpec network
+# "build") and for the Builder agent's workspace. Identical to none.yaml except network_policies: GET-only egress on
+# 443 to the union of the runtime matrix's build_network_hosts (deploy/v2/runtime-matrix.yaml), as SPEC-0026 set
+# out. The backend replaces it with none.yaml before anything is tested.
+#
+# NOT YET TRUSTED: v1 qualified this grant format (exact host, port 443, protocol rest, enforcement enforce, GET
+# rules, named binaries) but not these hosts, these binaries or TLS interception for each registry client. The
+# binaries are the interpreters that open the connections in the matrix images (pip runs under python, mvn under
+# the JDK, npm under node, gem/bundle under ruby, cpanm under perl); the live policy gate must confirm each path and
+# that a POST and an unlisted host are denied before this document is trusted.
+version: 1
+filesystem_policy:
+  include_workdir: true
+  read_only: [/bin, /usr, /lib, /lib64, /opt, /proc, /dev/urandom, /etc, /var/log]
+  read_write: [/work, /tmp, /dev/null]
+landlock:
+  compatibility: hard_requirement
+network_policies:
+  corsair-build-python:
+    name: corsair-build-python
+    binaries: [{path: /usr/local/bin/python3.12}, {path: /usr/local/bin/python3.7}]
+    endpoints:
+      - {host: pypi.org, port: 443, protocol: rest, enforcement: enforce, rules: [{allow: {method: GET, path: /**}}]}
+      - {host: files.pythonhosted.org, port: 443, protocol: rest, enforcement: enforce,
+         rules: [{allow: {method: GET, path: /**}}]}
+  corsair-build-java:
+    name: corsair-build-java
+    binaries: [{path: /opt/java/openjdk/bin/java}]
+    endpoints:
+      - {host: repo.maven.apache.org, port: 443, protocol: rest, enforcement: enforce,
+         rules: [{allow: {method: GET, path: /**}}]}
+      - {host: repo1.maven.org, port: 443, protocol: rest, enforcement: enforce,
+         rules: [{allow: {method: GET, path: /**}}]}
+  corsair-build-javascript:
+    name: corsair-build-javascript
+    binaries: [{path: /usr/local/bin/node}]
+    endpoints:
+      - {host: registry.npmjs.org, port: 443, protocol: rest, enforcement: enforce,
+         rules: [{allow: {method: GET, path: /**}}]}
+  corsair-build-ruby:
+    name: corsair-build-ruby
+    binaries: [{path: /usr/local/bin/ruby}]
+    endpoints:
+      - {host: rubygems.org, port: 443, protocol: rest, enforcement: enforce, rules: [{allow: {method: GET, path: /**}}]}
+      - {host: index.rubygems.org, port: 443, protocol: rest, enforcement: enforce,
+         rules: [{allow: {method: GET, path: /**}}]}
+  corsair-build-perl:
+    name: corsair-build-perl
+    binaries: [{path: /usr/local/bin/perl}]
+    endpoints:
+      - {host: cpan.metacpan.org, port: 443, protocol: rest, enforcement: enforce,
+         rules: [{allow: {method: GET, path: /**}}]}
+      - {host: www.cpan.org, port: 443, protocol: rest, enforcement: enforce, rules: [{allow: {method: GET, path: /**}}]}
+      - {host: fastapi.metacpan.org, port: 443, protocol: rest, enforcement: enforce,
+         rules: [{allow: {method: GET, path: /**}}]}

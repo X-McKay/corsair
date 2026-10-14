@@ -1,0 +1,11 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ingress-allow-selected-probe
+spec:
+  podSelector: {matchLabels: {app: corsair-qualification, role: echo}}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {matchLabels: {app: corsair-qualification, role: allowed}}
+      ports: [{protocol: TCP, port: 5678}]
