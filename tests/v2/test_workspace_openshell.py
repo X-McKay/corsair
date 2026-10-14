@@ -704,6 +704,27 @@ async def test_a_command_with_an_argument_over_the_gateway_limit_runs_as_a_stage
     assert short.exit_code == 0 and gateway.execs[-1].command == ["printf", "%s", "x" * 100]
 
 
+def test_the_wrapper_returns_at_exit_though_a_background_child_holds_its_output(tmp_path):
+    pidfile = str(tmp_path / "pid")
+    release = tmp_path / "release"
+    child = 'while [ ! -f "$1" ]; do sleep 0.1; done'
+    shown = subprocess.run(["sh", "-c", backend._WRAPPER, "sh", pidfile, "sh", "-c",
+                            f"({child}) & printf done; printf warn >&2; exit 3", "sh", str(release)],
+                           capture_output=True, timeout=20)
+    release.write_text("go")
+    assert (shown.returncode, shown.stdout, shown.stderr) == (3, b"done", b"warn")
+    assert list(tmp_path.iterdir()) == [release]
+
+
+def test_the_gateways_undelivered_output_is_never_a_program_exit(sandboxes, gateway):
+    name = sandboxes.create(spec())
+    gateway.handler = lambda call: Outcome(74, b"done", stderr=backend._UNDELIVERED + b"\n")
+    seen = sandboxes.exec_once(name, ["python", "-m", "pytest"], workdir=WORKDIR)
+    assert seen.exit_code is None and seen.container_failed and seen.stdout == b"done"
+    gateway.handler = lambda call: Outcome(74, b"", stderr=b"own")
+    assert sandboxes.exec_once(name, ["python", "-m", "pytest"], workdir=WORKDIR).exit_code == 74
+
+
 def test_the_staged_script_runs_exactly_the_argv_and_removes_itself(sandboxes, gateway, tmp_path):
     name = sandboxes.create(spec())
     sandboxes._deliverable(native_name(name), ["printf", "%s", LONG])

@@ -102,11 +102,19 @@ _LABEL_VALUE = re.compile(r"^(?:[A-Za-z0-9](?:[A-Za-z0-9._-]{0,61}[A-Za-z0-9])?)
 _HOST = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$")
 _LABEL_KEY = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,61}[A-Za-z0-9])?$")
 
-# Records the command's pid so a timeout or cancellation can kill its process group inside the sandbox.
-_WRAPPER = 'echo $$ > "$1" 2>/dev/null; shift; exec "$@"'
-# Exits 0 only when the recorded process is confirmed gone after the kill (``kill -0`` fails within ~2s).
-_KILL = ('pid=$(cat "$1" 2>/dev/null) || exit 3; { kill -9 "-$pid" || kill -9 "$pid"; } 2>/dev/null; rm -f "$1"; '
-         'i=0; while kill -0 "$pid" 2>/dev/null; do i=$((i+1)); [ "$i" -gt 20 ] && exit 4; sleep 0.1; done')
+# Records the wrapper's pid so a timeout or cancellation can kill its process group inside the sandbox, and runs
+# the command with its output in files: the gateway answers exit 74 (``exec output could not be delivered intact``,
+# RIG0 live run) when a background child still holds the exec's pipes after the command exits. The command's own
+# exit status and everything it wrote before exiting are returned; a background child's later output is not.
+_WRAPPER = ('p="$1"; shift; "$@" > "$p.out" 2> "$p.err" < /dev/null & c=$!; echo "$$ $c" > "$p" 2>/dev/null; '
+            'wait "$c"; s=$?; cat "$p.out"; cat "$p.err" >&2; rm -f "$p" "$p.out" "$p.err"; exit "$s"')
+_UNDELIVERED = b"openshell: exec output could not be delivered intact"
+"""The gateway's stderr with exit 74 when it could not collect a command's output intact (pipes held open)."""
+# Kills the wrapper's process group (or, failing that, the command and the wrapper); exits 0 only when both are
+# confirmed gone (``kill -0`` fails within ~2s).
+_KILL = ('read w c < "$1" 2>/dev/null || exit 3; { kill -9 "-$w" || kill -9 "$c" "$w"; } 2>/dev/null; rm -f "$1"; '
+         'i=0; while kill -0 "$c" 2>/dev/null || kill -0 "$w" 2>/dev/null; do '
+         'i=$((i+1)); [ "$i" -gt 20 ] && exit 4; sleep 0.1; done')
 _READ = f'if [ -f "$1" ] && [ ! -L "$1" ]; then exec cat -- "$1"; else exit {MISSING_EXIT}; fi'
 
 
@@ -644,6 +652,8 @@ class OpenShellSandboxes:
             return Exec(None, stdout, stderr + f"\n[{_detail(ran.error)}]\n".encode(), container_failed=True)
         if self._gateway_timed_out(ran, limit):
             return Exec(None, stdout, stderr, timed_out=True)
+        if ran.exit_code == STDIN_OVERFLOW_EXIT and _UNDELIVERED in stderr:  # The gateway's, not the program's.
+            return Exec(None, stdout, stderr, container_failed=True)
         if ran.exit_code != 0:
             try:
                 self._ready_ref(name)
