@@ -27,6 +27,9 @@ import re
 import subprocess
 import sys
 
+from evals import agent_summary
+from evals.cases import AGENTS as V2_AGENTS, AGENTS_PACKAGE, agent_root, set_names
+
 REPOSITORY = Path(__file__).resolve().parents[1]
 RESULTS = REPOSITORY / ".runs" / "evals"
 # Top-level suite identity; the chain nests per-stage prompt/config/skill under "versions" and names its live stages.
@@ -55,7 +58,16 @@ LANGUAGE_MODULES: frozenset[str] = frozenset()
 
 
 def narrows_by_language(suite: Suite, set_name: str) -> bool:
-    return suite.set_modules.get(set_name, suite.module) in LANGUAGE_MODULES
+    module = suite.set_modules.get(set_name, suite.module)
+    return module in LANGUAGE_MODULES or module.startswith(AGENTS_PACKAGE + ".")
+
+
+def v2_suite(agent: str) -> Suite | None:
+    """A v2 agent's suite: its evals/evaluate.py over the sets in its own evals/sets/ (evals/cases.py agent_root)."""
+    root = agent_root(agent)
+    if not (root / "evaluate.py").exists():
+        return None
+    return Suite(f"{AGENTS_PACKAGE}.{agent}.evals.evaluate", {name: ("--set", name) for name in set_names(root)})
 
 
 # Agents without an isolated eval set yet, and where the gap is planned.
@@ -237,16 +249,79 @@ def run(agent: str, set_name: str, provider_config: Path | None, repeat: int | N
     return exit_code
 
 
+def _v2_reference(agent_dir: Path, base_set: str, mode: str, run_id: str) -> tuple[str | None, dict | None]:
+    """The promoted baseline for the base set and mode, else the latest earlier run of it; a language-narrowed run
+    compares against that reference's language rollup, so no per-language baseline exists."""
+    pointer = agent_dir / f"baseline-{base_set}-{mode}.json"
+    if pointer.exists():
+        baseline = json.loads(pointer.read_text())["run"]
+        return baseline, json.loads((agent_dir / baseline / "summary.json").read_text()) | {"reference_kind": "baseline"}
+    index = agent_dir / "index.jsonl"
+    earlier = [json.loads(line) for line in index.read_text().splitlines()] if index.exists() else []
+    # whole-set runs only: a language-narrowed run's overall rollup covers one language, not the set
+    earlier = [row for row in earlier if row["set"] == base_set and row["mode"] == mode and row["run"] != run_id
+               and not row.get("language") and (agent_dir / row["run"] / "summary.json").exists()]
+    if not earlier:
+        return None, None
+    previous = earlier[-1]["run"]
+    return previous, json.loads((agent_dir / previous / "summary.json").read_text()) | {"reference_kind": "previous run"}
+
+
+def run_v2(agent: str, suite: Suite, set_name: str, provider_config: Path | None, repeat: int | None, note: str,
+           results: Path = RESULTS, language: str | None = None) -> int:
+    """One v2 agent eval: the runner's attempts become summary.json, comparison.md and policy.json."""
+    mode = "live" if provider_config else "scripted"
+    agent_dir = results / agent
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    label = f"{set_name}.{language}" if language else set_name
+    run_id = f"{stamp}-{label}-{mode}"
+    run_dir = agent_dir / run_id
+    run_dir.mkdir(parents=True, exist_ok=False)
+    argv = [sys.executable, "-m", suite.module, "--evidence", str(run_dir / "evidence"), *suite.sets[set_name]]
+    argv += ["--language", language] if language else []
+    argv += ["--provider-config", str(provider_config.resolve())] if provider_config else []
+    argv += ["--repeat", str(repeat)] if repeat is not None else []
+    env = os.environ | {"PYTHONPATH": os.pathsep.join(filter(None, ["src", ".", os.environ.get("PYTHONPATH")]))}
+    command = {"agent": agent, "set": set_name, "language": language, "mode": mode, "argv": argv[1:], "note": note,
+               "git_commit": _git("rev-parse", "HEAD"), "git_dirty": bool(_git("status", "--porcelain")),
+               "started": datetime.now(timezone.utc).isoformat()}
+    (run_dir / "command.json").write_text(json.dumps(command, indent=2))
+    exit_code = subprocess.run(argv, cwd=REPOSITORY, env=env, check=False).returncode
+    command |= {"ended": datetime.now(timezone.utc).isoformat(), "exit_code": exit_code}
+    (run_dir / "command.json").write_text(json.dumps(command, indent=2))
+    summary = agent_summary.summarize(run_dir / "evidence", agent=agent, set_name=set_name, language=language,
+                                      mode=mode, run=run_id, command=command)
+    (run_dir / "summary.json").write_text(json.dumps(summary, indent=2))
+    policy = agent_summary.apply_policy(summary, agent_root(agent) / "release-policy.yaml")
+    (run_dir / "policy.json").write_text(json.dumps(policy, indent=2))
+    reference_id, reference = _v2_reference(agent_dir, set_name, mode, run_id)
+    (run_dir / "comparison.md").write_text(agent_summary.compare(summary, reference, reference_id)
+                                           + f"\nRelease policy (deferred, does not set the exit code): {policy['status']}\n")
+    overall = (summary.get("rollups") or {}).get("all") or {}
+    with (agent_dir / "index.jsonl").open("a") as index:
+        index.write(json.dumps({"run": run_id, "set": set_name, "language": language, "mode": mode,
+                                "exit_code": exit_code, "git_commit": command["git_commit"],
+                                "git_dirty": command["git_dirty"],
+                                "prompt_version": summary["identity"].get("prompt_version"),
+                                "clean_attempts": overall.get("clean_attempts"), "attempts": overall.get("attempts"),
+                                "policy": policy["status"], "note": note}) + "\n")
+    print(f"\n{run_dir.relative_to(REPOSITORY) if run_dir.is_relative_to(REPOSITORY) else run_dir}")
+    print((run_dir / "comparison.md").read_text())
+    return exit_code
+
+
 def promote(agent: str, run_id: str, results: Path = RESULTS) -> None:
     """A baseline is a measurement chosen by a person, never selected automatically."""
     record = json.loads((results / agent / run_id / "summary.json").read_text())
+    if record.get("schema") == agent_summary.SCHEMA and record.get("language"):
+        raise SystemExit("a language-narrowed run is not a baseline; promote a run of the whole set")
     pointer = results / agent / f"baseline-{record['set']}-{record['mode']}.json"
     pointer.write_text(json.dumps({"run": run_id, "promoted": datetime.now(timezone.utc).isoformat()}, indent=2))
     print(f"{pointer}: {run_id}")
 
 
 def main(argv: list[str] | None = None) -> int:
-    agents = sorted(SUITES) + sorted(MISSING)
+    agents = sorted(SUITES) + sorted(V2_AGENTS) + sorted(MISSING)
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("agent", choices=agents)
     parser.add_argument("--set", dest="set_name", help="Case set; defaults to the suite's first set")
@@ -264,12 +339,19 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("RUN must be a run id from index.jsonl")
         promote(args.agent, args.promote, args.results)
         return 0
-    suite = SUITES[args.agent]
+    suite = SUITES.get(args.agent) or v2_suite(args.agent)
+    if suite is None:
+        parser.error(f"{args.agent} has no evals/evaluate.py yet under {AGENTS_PACKAGE}")
+    if not suite.sets:
+        parser.error(f"{args.agent} has no frozen set under its evals/sets/")
     set_name = args.set_name or next(iter(suite.sets))
     if set_name not in suite.sets:
         parser.error(f"{args.agent} sets: {', '.join(suite.sets)}")
     if args.language and not narrows_by_language(suite, set_name):
         parser.error(f"{args.agent} set {set_name} is not split by language")
+    if args.agent in V2_AGENTS:
+        return run_v2(args.agent, suite, set_name, args.provider_config, args.repeat, args.note, args.results,
+                      args.language)
     return run(args.agent, set_name, args.provider_config, args.repeat, args.note, args.results, args.language)
 
 

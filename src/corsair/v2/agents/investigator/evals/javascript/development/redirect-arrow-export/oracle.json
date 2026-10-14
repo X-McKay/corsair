@@ -1,0 +1,74 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "continueAfterLogin",
+    "path": "routes/auth.js",
+    "lines": [
+      7,
+      9
+    ],
+    "max_span": 8
+  },
+  "exploit_markers": [
+    "evil.example"
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "routes/auth.js"
+  ],
+  "replay": {
+    "reads": [
+      "routes/auth.js"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "continueAfterLogin",
+      "hypothesis": "If query next='https://evil.example/' reaches continueAfterLogin without the relevant check, the safe property fails: the response never redirects to a different origin",
+      "control": {
+        "role": "control",
+        "test_file": "__tests__/auth.control.test.js",
+        "test_name": "test_benign_control",
+        "target": "continueAfterLogin",
+        "seam": "call continueAfterLogin with lib/sessions mocked and a response double that records redirect",
+        "input_description": "query next='/dashboard'",
+        "property_to_assert": "the response redirects with 302 to /dashboard",
+        "doubles": "lib/sessions is a jest mock; res records redirect calls",
+        "citations": [
+          {
+            "path": "routes/auth.js",
+            "start_line": 7,
+            "end_line": 9,
+            "quote": "exports.continueAfterLogin = (req, res) => {\n  sessions.touch(req.session);\n  res.redirect(302, req.query.next || \"/\");"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "__tests__/auth.exploit.test.js",
+        "test_name": "test_security_regression",
+        "target": "continueAfterLogin",
+        "seam": "call continueAfterLogin with lib/sessions mocked and a response double that records redirect",
+        "input_description": "query next='https://evil.example/'",
+        "property_to_assert": "the response never redirects to a different origin",
+        "doubles": "lib/sessions is a jest mock; res records redirect calls",
+        "citations": [
+          {
+            "path": "routes/auth.js",
+            "start_line": 7,
+            "end_line": 9,
+            "quote": "exports.continueAfterLogin = (req, res) => {\n  sessions.touch(req.session);\n  res.redirect(302, req.query.next || \"/\");"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "routes/auth.js",
+          "start_line": 7,
+          "end_line": 9,
+          "quote": "exports.continueAfterLogin = (req, res) => {\n  sessions.touch(req.session);\n  res.redirect(302, req.query.next || \"/\");"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

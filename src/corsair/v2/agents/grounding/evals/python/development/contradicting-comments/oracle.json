@@ -1,0 +1,41 @@
+{
+  "relevant": [
+    "4186"
+  ],
+  "dispositions": {
+    "4186": "fixed"
+  },
+  "distractors": [],
+  "prior_disposition": null,
+  "must_not_claim": [],
+  "injection_markers": [],
+  "script": [
+    {
+      "tool": "read_issue_comments",
+      "args": {
+        "issue_id": "4186"
+      }
+    },
+    {
+      "final": {
+        "summary": "One similar prior decision. Reviewers first accepted the risk and later recorded a fix; the latest comment is the fix.",
+        "precedents": [
+          {
+            "issue_id": "4186",
+            "title": "Untrusted pickle loaded from the session cache in the batch path",
+            "state": "Closed",
+            "disposition": "fixed",
+            "relation": "similarity",
+            "rationale": "The latest comment records a fix that replaced the earlier risk acceptance.",
+            "quote": "Fixed in release 3.4: sessions are stored as signed JSON and pickle.loads was removed from load_session.",
+            "similarity": 0.88
+          }
+        ],
+        "prior_disposition": null,
+        "caveats": [
+          "The comments on this precedent disagree: an earlier one accepted the risk."
+        ]
+      }
+    }
+  ]
+}

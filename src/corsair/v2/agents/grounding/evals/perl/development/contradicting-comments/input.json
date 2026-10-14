@@ -1,0 +1,47 @@
+{
+  "finding": {
+    "title": "DBI do interpolates the department filter",
+    "description": "search interpolates the dept parameter into the SQL passed to $dbh->do.",
+    "file_path": "lib/Intranet/Directory.pm",
+    "start_line": 52,
+    "symbol": "Intranet::Directory::search",
+    "cwe": "CWE-89"
+  },
+  "context": {
+    "issue": {
+      "id": "8580",
+      "title": "DBI do interpolates the department filter",
+      "state": "Active",
+      "cwe": "CWE-89",
+      "description": "search interpolates the dept parameter into the SQL passed to $dbh->do.",
+      "repo_url": "https://dev.azure.com/acme/_git/legacy-intranet",
+      "source_file": "lib/Intranet/Directory.pm:52"
+    },
+    "related": [
+      {
+        "issue": {
+          "id": "8586",
+          "title": "DBI do interpolates the department filter in the batch path",
+          "state": "Closed",
+          "cwe": "CWE-89",
+          "description": "search interpolates the dept parameter into the SQL passed to $dbh->do.",
+          "repo_url": "https://dev.azure.com/acme/_git/legacy-intranet"
+        },
+        "relation": "similarity",
+        "comments": [
+          {
+            "author": "lead",
+            "created_at": "2026-06-30",
+            "text": "Fixed in 1.14: search uses a prepared statement with a placeholder for dept."
+          },
+          {
+            "author": "owner",
+            "created_at": "2025-12-01",
+            "text": "Risk accepted by the directory owner: the database user is read-only on a replica."
+          }
+        ],
+        "similarity": 0.88
+      }
+    ]
+  }
+}

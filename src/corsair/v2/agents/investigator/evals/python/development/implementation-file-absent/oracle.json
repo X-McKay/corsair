@@ -1,0 +1,24 @@
+{
+  "status": "target_not_found",
+  "required_reads": [],
+  "must_search": true,
+  "replay": {
+    "reads": [],
+    "plan": {
+      "status": "target_not_found",
+      "target": "",
+      "hypothesis": "",
+      "control": null,
+      "exploit": null,
+      "citations": [
+        {
+          "path": "test_existing.py",
+          "start_line": 1,
+          "end_line": 8,
+          "quote": "from pathlib import Path\n\nimport documents\n\n\ndef test_reads_existing_document(tmp_path: Path):\n    (tmp_path / \"note.txt\").write_text(\"hello\")\n    assert documents.read_document(tmp_path, \"note.txt\") == \"hello\""
+        }
+      ],
+      "reason": "The tree does not contain documents.py, which the finding names; only test_existing.py is present, so read_document cannot be located or cited."
+    }
+  }
+}

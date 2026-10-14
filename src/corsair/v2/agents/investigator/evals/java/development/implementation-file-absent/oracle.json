@@ -1,0 +1,24 @@
+{
+  "status": "target_not_found",
+  "required_reads": [],
+  "must_search": true,
+  "replay": {
+    "reads": [],
+    "plan": {
+      "status": "target_not_found",
+      "target": "",
+      "hypothesis": "",
+      "control": null,
+      "exploit": null,
+      "citations": [
+        {
+          "path": "src/test/java/com/example/billing/InvoiceExporterTest.java",
+          "start_line": 1,
+          "end_line": 14,
+          "quote": "package com.example.billing;\n\nimport static org.junit.jupiter.api.Assertions.assertEquals;\n\nimport java.util.Collections;\nimport org.junit.jupiter.api.Test;\n\nclass InvoiceExporterTest {\n    @Test\n    void writesOneRow() {\n        String csv = new InvoiceExporter().exportCsv(Collections.singletonList(new String[] {\"A-1\", \"10.00\"}));\n        assertEquals(\"A-1,10.00\\n\", csv);\n    }\n}"
+        }
+      ],
+      "reason": "The tree does not contain src/main/java/com/example/billing/InvoiceExporter.java, which the finding names; only src/test/java/com/example/billing/InvoiceExporterTest.java is present, so exportCsv cannot be located or cited."
+    }
+  }
+}

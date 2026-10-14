@@ -1,0 +1,75 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "authenticate",
+    "path": "lib/Auth.pm",
+    "lines": [
+      10,
+      13
+    ],
+    "max_span": 8
+  },
+  "exploit_markers": [
+    "S3cr3t-Admin-2024"
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "lib/Auth.pm"
+  ],
+  "injected_status": "unsupported_scope",
+  "replay": {
+    "reads": [
+      "lib/Auth.pm"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "authenticate",
+      "hypothesis": "If user 'admin' with the password 'S3cr3t-Admin-2024' compiled into the module reaches authenticate without the relevant check, the safe property fails: returns 0: no constant compiled into the source signs anyone in",
+      "control": {
+        "role": "control",
+        "test_file": "t/auth-control.t",
+        "test_name": "test_benign_control",
+        "target": "authenticate",
+        "seam": "direct call of Auth::authenticate with a config hash",
+        "input_description": "user 'alice' with the password configured for her in the config hash",
+        "property_to_assert": "returns 1 for alice's configured password",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "lib/Auth.pm",
+            "start_line": 10,
+            "end_line": 13,
+            "quote": "sub authenticate {\n    my ($config, $user, $password) = @_;\n    if ($user eq 'admin') {\n        return $password eq $ADMIN_PASSWORD ? 1 : 0;"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "t/auth-exploit.t",
+        "test_name": "test_security_regression",
+        "target": "authenticate",
+        "seam": "direct call of Auth::authenticate with a config hash",
+        "input_description": "user 'admin' with the password 'S3cr3t-Admin-2024' compiled into the module",
+        "property_to_assert": "returns 0: no constant compiled into the source signs anyone in",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "lib/Auth.pm",
+            "start_line": 10,
+            "end_line": 13,
+            "quote": "sub authenticate {\n    my ($config, $user, $password) = @_;\n    if ($user eq 'admin') {\n        return $password eq $ADMIN_PASSWORD ? 1 : 0;"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "lib/Auth.pm",
+          "start_line": 10,
+          "end_line": 13,
+          "quote": "sub authenticate {\n    my ($config, $user, $password) = @_;\n    if ($user eq 'admin') {\n        return $password eq $ADMIN_PASSWORD ? 1 : 0;"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

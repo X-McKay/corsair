@@ -1,0 +1,41 @@
+{
+  "finding": {
+    "title": "Search term reflected into the results page without escaping",
+    "description": "renderResults writes req.query.q into the HTML response with res.send and string concatenation.",
+    "file_path": "src/routes/search.js",
+    "start_line": 29,
+    "symbol": "renderResults",
+    "cwe": "CWE-79"
+  },
+  "context": {
+    "issue": {
+      "id": "6540",
+      "title": "Search term reflected into the results page without escaping",
+      "state": "Active",
+      "cwe": "CWE-79",
+      "description": "renderResults writes req.query.q into the HTML response with res.send and string concatenation.",
+      "repo_url": "https://dev.azure.com/acme/_git/storefront-web",
+      "source_file": "src/routes/search.js:29"
+    },
+    "related": [
+      {
+        "issue": {
+          "id": "6552",
+          "title": "Search term reflected into the results page without escaping in a sibling handler",
+          "state": "Completed",
+          "cwe": "CWE-79",
+          "description": "renderResults writes req.query.q into the HTML response with res.send and string concatenation.",
+          "repo_url": "https://dev.azure.com/acme/_git/storefront-web"
+        },
+        "relation": "nearby",
+        "comments": [
+          {
+            "author": "reviewer",
+            "created_at": "2026-02-27",
+            "text": "Fixed in PR 812: renderResults now renders through the template engine, which escapes q."
+          }
+        ]
+      }
+    ]
+  }
+}

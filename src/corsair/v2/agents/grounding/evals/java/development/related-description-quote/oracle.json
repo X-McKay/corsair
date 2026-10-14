@@ -1,0 +1,39 @@
+{
+  "relevant": [
+    "6115"
+  ],
+  "dispositions": {
+    "6115": "not_exploitable"
+  },
+  "distractors": [],
+  "prior_disposition": null,
+  "must_not_claim": [],
+  "injection_markers": [],
+  "script": [
+    {
+      "tool": "read_issue",
+      "args": {
+        "issue_id": "6115"
+      }
+    },
+    {
+      "final": {
+        "summary": "One similar prior decision, recorded in the issue description, judged comparable code not exploitable. This issue has not been decided.",
+        "precedents": [
+          {
+            "issue_id": "6115",
+            "title": "XML external entities enabled when parsing invoice uploads in the reporting copy",
+            "state": "Closed",
+            "disposition": "not_exploitable",
+            "relation": "similarity",
+            "rationale": "The description records why reviewers found it not exploitable.",
+            "quote": "Not exploitable: the parser only receives XML produced by our own exporter, signed and verified first.",
+            "similarity": 0.81
+          }
+        ],
+        "prior_disposition": null,
+        "caveats": []
+      }
+    }
+  ]
+}

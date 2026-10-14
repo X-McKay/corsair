@@ -1,0 +1,77 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "lookup_account",
+    "path": "queries.py",
+    "lines": [
+      4,
+      5
+    ],
+    "max_span": 10
+  },
+  "exploit_markers": [
+    "OR 1=1"
+  ],
+  "exploit_patterns": [
+    "(?i)'\\s+OR\\s+([0-9]+)\\s*=\\s*\\1(?=\\s|--|['\"]?$)",
+    "(?i)'\\s+OR\\s+'([a-z0-9_]+)'\\s*=\\s*'\\1'?(?=\\s|--|[\"']?$)"
+  ],
+  "required_reads": [
+    "queries.py"
+  ],
+  "replay": {
+    "reads": [
+      "queries.py"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "lookup_account",
+      "hypothesis": "If account \"alice' OR 1=1 --\" reaches lookup_account without the relevant check, the safe property fails: Hostile input remains a bound parameter and never enters SQL structure",
+      "control": {
+        "role": "control",
+        "test_file": "tests/test_queries_control.py",
+        "test_name": "test_benign_control",
+        "target": "lookup_account",
+        "seam": "Call the real imported lookup_account with an injected database dependency",
+        "input_description": "account 'alice'",
+        "property_to_assert": "Benign lookup returns rows and records the expected query with its account argument Observed by: Recorded query and parameter arguments from the real lookup_account call",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "queries.py",
+            "start_line": 4,
+            "end_line": 5,
+            "quote": "def lookup_account(database, account):\n    return database.execute(\"SELECT balance FROM accounts WHERE account = '\" + account + \"'\", ())"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "tests/test_queries_exploit.py",
+        "test_name": "test_security_preserves_query_structure",
+        "target": "lookup_account",
+        "seam": "Call the real imported lookup_account with an injected database dependency",
+        "input_description": "account \"alice' OR 1=1 --\"",
+        "property_to_assert": "Hostile input remains a bound parameter and never enters SQL structure Observed by: Recorded query and parameter arguments from the real lookup_account call",
+        "doubles": "",
+        "citations": [
+          {
+            "path": "queries.py",
+            "start_line": 4,
+            "end_line": 5,
+            "quote": "def lookup_account(database, account):\n    return database.execute(\"SELECT balance FROM accounts WHERE account = '\" + account + \"'\", ())"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "queries.py",
+          "start_line": 4,
+          "end_line": 5,
+          "quote": "def lookup_account(database, account):\n    return database.execute(\"SELECT balance FROM accounts WHERE account = '\" + account + \"'\", ())"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

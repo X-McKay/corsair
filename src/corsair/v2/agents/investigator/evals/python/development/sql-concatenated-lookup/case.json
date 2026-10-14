@@ -1,0 +1,21 @@
+{
+  "language": "python",
+  "framework": "pytest",
+  "family": "sql_dependency_unsafe",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "An account name concatenated into SQL, observed through a recording database double.",
+  "expected": "Planned against lookup_account (queries.py 4-5); the exploit input is a quote-and-OR tautology, the control a plain account name.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Corsair-authored; previously evals/test_planning/cases-unit.yaml; converted from evals/test_planning/python/unit/sql_dependency_unsafe (exploit patterns also from evals/test_planning/python/unit-v2/sql_dependency_unsafe)"
+  }
+}

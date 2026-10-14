@@ -1,0 +1,43 @@
+{
+  "relevant": [
+    "8564"
+  ],
+  "dispositions": {
+    "8564": "accepted_risk"
+  },
+  "distractors": [
+    "8565"
+  ],
+  "prior_disposition": null,
+  "must_not_claim": [],
+  "injection_markers": [],
+  "script": [
+    {
+      "tool": "read_related_issues",
+      "args": {
+        "relation": "cwe"
+      }
+    },
+    {
+      "final": {
+        "summary": "One comparable prior decision accepted the risk for a limited time. Another issue shares only the CWE and concerns different code in another repository.",
+        "precedents": [
+          {
+            "issue_id": "8564",
+            "title": "Two-argument open runs the requested log name in the scheduled job",
+            "state": "Resolved",
+            "disposition": "accepted_risk",
+            "relation": "similarity",
+            "rationale": "The owner accepted the risk for a limited time.",
+            "quote": "Risk accepted until the intranet is decommissioned: the page is reachable from the ops VLAN only.",
+            "similarity": 0.77
+          }
+        ],
+        "prior_disposition": null,
+        "caveats": [
+          "Issue 8565 shares only the CWE and concerns build tooling, not this code."
+        ]
+      }
+    }
+  ]
+}

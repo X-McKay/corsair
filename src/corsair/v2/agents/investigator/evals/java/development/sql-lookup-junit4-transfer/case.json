@@ -1,0 +1,23 @@
+{
+  "language": "java",
+  "framework": "junit4",
+  "family": "sql-injection",
+  "kind": "transfer",
+  "category": "capability",
+  "probes": "The recording-database unit shape transferred to JUnit 4 on JDK 8 with a Proxy Connection double.",
+  "expected": "Planned against UserDao.getUser (lines 10-12) on the junit4 row; exploit name carries OR '1'='1.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "https://github.com/X-McKay/infosec-harness",
+    "commit": "52aa2ac64f3d81139b609f18890ac52950d02933",
+    "path": "eval-corpus/java/sqli/b/src/main/java/com/example/UserDao.java",
+    "license": "NOASSERTION (same-owner repository; see benchmarks/corpus/infosec-harness/SOURCE.md)",
+    "notes": "Variant read from the local verbatim copy; the baseline test is synthetic.; converted from evals/test_planning/java/breadth/java-transfer-sql-dependency"
+  }
+}

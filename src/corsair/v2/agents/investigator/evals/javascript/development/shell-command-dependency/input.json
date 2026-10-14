@@ -1,0 +1,19 @@
+{
+  "finding": {
+    "title": "countLines receives a file name chosen by the user in the reports page.",
+    "description": "countLines receives a file name chosen by the user in the reports page. A name such as notes.txt; touch pwned may be executed by a shell. Assess command construction only.",
+    "file_path": "src/cmd.js",
+    "symbol": "countLines"
+  },
+  "row_id": "jest29-node22",
+  "source_files": [
+    {
+      "path": "src/cmd.js",
+      "content": "const { exec } = require(\"child_process\");\n\n// Count lines in a file.\nfunction countLines(path, cb) {\n  exec(\"wc -l \" + path, (err, stdout) => cb(stdout));\n}\n\nmodule.exports = { countLines };\n"
+    },
+    {
+      "path": "__tests__/cmd.test.js",
+      "content": "'use strict';\nconst fs = require('fs');\nconst os = require('os');\nconst path = require('path');\nconst { countLines } = require('../src/cmd');\n\ntest('counts_lines', (done) => {\n  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'cmd-')), 'a.txt');\n  fs.writeFileSync(file, 'one\\ntwo\\n');\n  countLines(file, (stdout) => {\n    expect(stdout.trim().startsWith('2')).toBe(true);\n    done();\n  });\n});\n"
+    }
+  ]
+}

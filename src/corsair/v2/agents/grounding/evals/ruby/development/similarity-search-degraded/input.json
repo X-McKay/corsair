@@ -1,0 +1,44 @@
+{
+  "finding": {
+    "title": "YAML.load on imported profile data",
+    "description": "ProfileImport#call passes the uploaded file body to YAML.load.",
+    "file_path": "app/services/profile_import.rb",
+    "start_line": 41,
+    "symbol": "ProfileImport#call",
+    "cwe": "CWE-502"
+  },
+  "context": {
+    "issue": {
+      "id": "7580",
+      "title": "YAML.load on imported profile data",
+      "state": "Active",
+      "cwe": "CWE-502",
+      "description": "ProfileImport#call passes the uploaded file body to YAML.load.",
+      "repo_url": "https://dev.azure.com/acme/_git/member-portal",
+      "source_file": "app/services/profile_import.rb:41"
+    },
+    "related": [
+      {
+        "issue": {
+          "id": "7589",
+          "title": "YAML.load on imported profile data in the legacy module",
+          "state": "Done",
+          "cwe": "CWE-502",
+          "description": "ProfileImport#call passes the uploaded file body to YAML.load.",
+          "repo_url": "https://dev.azure.com/acme/_git/member-portal"
+        },
+        "relation": "cwe",
+        "comments": [
+          {
+            "author": "reviewer",
+            "created_at": "2026-01-15",
+            "text": "Fixed in commit c07be11: ProfileImport uses YAML.safe_load with permitted_classes set to an empty list."
+          }
+        ]
+      }
+    ],
+    "degraded": [
+      "similarity search failed: TimeoutError: graph search timed out after 30 s"
+    ]
+  }
+}

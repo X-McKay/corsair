@@ -1,0 +1,74 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "handleProfile",
+    "path": "src/server.js",
+    "lines": [
+      4,
+      8
+    ],
+    "max_span": 8
+  },
+  "exploit_markers": [
+    "attacker.example"
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "src/server.js"
+  ],
+  "replay": {
+    "reads": [
+      "src/server.js"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "handleProfile",
+      "hypothesis": "If a request with Origin https://attacker.example and a session cookie reaches handleProfile without the relevant check, the safe property fails: the response never pairs Access-Control-Allow-Origin naming that origin with Access-Control-Allow-Credentials true",
+      "control": {
+        "role": "control",
+        "test_file": "__tests__/server.control.test.js",
+        "test_name": "test_benign_control",
+        "target": "handleProfile",
+        "seam": "call handleProfile with a request object and a response double that records headers",
+        "input_description": "a request with no Origin header and a session cookie",
+        "property_to_assert": "no Access-Control-Allow-Origin header is set and the profile JSON is returned",
+        "doubles": "res records setHeader and end calls",
+        "citations": [
+          {
+            "path": "src/server.js",
+            "start_line": 4,
+            "end_line": 8,
+            "quote": "function handleProfile(req, res) {\n  const origin = req.headers.origin;\n  if (origin) {\n    res.setHeader(\"Access-Control-Allow-Origin\", origin);\n    res.setHeader(\"Access-Control-Allow-Credentials\", \"true\");"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "__tests__/server.exploit.test.js",
+        "test_name": "test_security_regression",
+        "target": "handleProfile",
+        "seam": "call handleProfile with a request object and a response double that records headers",
+        "input_description": "a request with Origin https://attacker.example and a session cookie",
+        "property_to_assert": "the response never pairs Access-Control-Allow-Origin naming that origin with Access-Control-Allow-Credentials true",
+        "doubles": "res records setHeader and end calls",
+        "citations": [
+          {
+            "path": "src/server.js",
+            "start_line": 4,
+            "end_line": 8,
+            "quote": "function handleProfile(req, res) {\n  const origin = req.headers.origin;\n  if (origin) {\n    res.setHeader(\"Access-Control-Allow-Origin\", origin);\n    res.setHeader(\"Access-Control-Allow-Credentials\", \"true\");"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "src/server.js",
+          "start_line": 4,
+          "end_line": 8,
+          "quote": "function handleProfile(req, res) {\n  const origin = req.headers.origin;\n  if (origin) {\n    res.setHeader(\"Access-Control-Allow-Origin\", origin);\n    res.setHeader(\"Access-Control-Allow-Credentials\", \"true\");"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

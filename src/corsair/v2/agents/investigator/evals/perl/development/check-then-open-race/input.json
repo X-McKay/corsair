@@ -1,0 +1,19 @@
+{
+  "finding": {
+    "title": "Spool::write_job checks for a symbolic link and then opens the path.",
+    "description": "Spool::write_job checks for a symbolic link and then opens the path. Another local user may swap in a symlink between the check and the open, redirecting the write. Analyze this component only.",
+    "file_path": "lib/Spool.pm",
+    "symbol": "write_job"
+  },
+  "row_id": "prove-perl526",
+  "source_files": [
+    {
+      "path": "lib/Spool.pm",
+      "content": "package Spool;\nuse strict;\nuse warnings;\n\n# Write a job file into the shared spool directory, refusing symbolic links.\nsub write_job {\n    my ($dir, $name, $data) = @_;\n    my $path = \"$dir/$name\";\n    die \"refusing symlink $path\\n\" if -l $path;\n    open(my $fh, '>', $path) or die \"cannot write $path: $!\";\n    print {$fh} $data;\n    close $fh;\n    return 1;\n}\n\n1;\n"
+    },
+    {
+      "path": "t/spool.t",
+      "content": "use strict;\nuse warnings;\nuse File::Temp qw(tempdir);\nuse Test::More;\nuse Spool;\n\nsubtest refuses_existing_symlink => sub {\n    my $dir = tempdir(CLEANUP => 1);\n    symlink(\"$dir/target\", \"$dir/job\") or die $!;\n    ok(!eval { Spool::write_job($dir, 'job', 'x') }, 'symlink refused');\n};\n\ndone_testing;\n"
+    }
+  ]
+}

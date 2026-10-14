@@ -1,0 +1,42 @@
+{
+  "finding": {
+    "title": "Image proxy fetches any URL from the query string",
+    "description": "proxyImage passes req.query.url straight to fetch and streams the response back.",
+    "file_path": "src/routes/imageProxy.js",
+    "start_line": 12,
+    "symbol": "proxyImage",
+    "cwe": "CWE-918"
+  },
+  "context": {
+    "issue": {
+      "id": "6340",
+      "title": "Image proxy fetches any URL from the query string",
+      "state": "Active",
+      "cwe": "CWE-918",
+      "description": "proxyImage passes req.query.url straight to fetch and streams the response back.",
+      "repo_url": "https://dev.azure.com/acme/_git/storefront-web",
+      "source_file": "src/routes/imageProxy.js:12"
+    },
+    "related": [
+      {
+        "issue": {
+          "id": "6343",
+          "title": "Image proxy fetches any URL from the query string in the admin variant",
+          "state": "Closed",
+          "cwe": "CWE-918",
+          "description": "proxyImage passes req.query.url straight to fetch and streams the response back.",
+          "repo_url": "https://dev.azure.com/acme/_git/storefront-web"
+        },
+        "relation": "similarity",
+        "comments": [
+          {
+            "author": "reviewer",
+            "created_at": "2026-03-20",
+            "text": "Not exploitable: the proxy runs in a network namespace with egress limited to the public CDN."
+          }
+        ],
+        "similarity": 0.82
+      }
+    ]
+  }
+}

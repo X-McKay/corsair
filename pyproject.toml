@@ -21,6 +21,7 @@ build-backend = "uv_build"
 dev = [
     "pytest==9.0.3",
     "pytest-xdist==3.8.0",
+    "pydantic-evals==2.55.0",  # native eval runner for the per-agent evals (evals/agent_eval.py)
 ]
 
 [tool.uv]

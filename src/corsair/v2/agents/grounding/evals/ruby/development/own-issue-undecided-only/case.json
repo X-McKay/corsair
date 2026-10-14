@@ -1,0 +1,19 @@
+{
+  "language": "ruby",
+  "framework": "rails",
+  "family": "open-redirect",
+  "kind": "negative",
+  "category": "capability",
+  "probes": "Retrieval found the finding's own open issue and nothing decided.",
+  "expected": "A brief with no precedents and no prior_disposition that says nothing was decided.",
+  "dimensions": [
+    "contract",
+    "correctness",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Corsair-authored targeted grounding case; no v1 grounding suite exists"
+  }
+}

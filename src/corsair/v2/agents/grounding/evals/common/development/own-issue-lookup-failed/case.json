@@ -1,0 +1,18 @@
+{
+  "language": "common",
+  "framework": "none",
+  "family": "hard-coded-credential",
+  "kind": "failure-mode",
+  "category": "failure-mode",
+  "probes": "The finding's own issue could not be looked up but a similar decided issue was retrieved.",
+  "expected": "The similar issue is cited as fixed, prior_disposition stays empty and the failed lookup is a caveat.",
+  "dimensions": [
+    "grounding",
+    "correctness"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Corsair-authored targeted grounding case; no v1 grounding suite exists"
+  }
+}

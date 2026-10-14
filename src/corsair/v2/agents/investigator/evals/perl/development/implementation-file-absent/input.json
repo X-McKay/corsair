@@ -1,0 +1,15 @@
+{
+  "finding": {
+    "title": "Auth::is_admin compares the password with a value written in the source, so anyone reading the code can sign in as administrator.",
+    "description": "Auth::is_admin compares the password with a value written in the source, so anyone reading the code can sign in as administrator. Analyze this component only.",
+    "file_path": "lib/Auth.pm",
+    "symbol": "is_admin"
+  },
+  "row_id": "prove-perl526",
+  "source_files": [
+    {
+      "path": "t/auth.t",
+      "content": "use strict;\nuse warnings;\nuse Test::More;\nuse Auth;\n\nsubtest rejects_wrong_password => sub {\n    ok(!Auth::is_admin('guess'), 'wrong password rejected');\n};\n\ndone_testing;\n"
+    }
+  ]
+}

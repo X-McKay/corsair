@@ -1,0 +1,21 @@
+{
+  "language": "perl",
+  "framework": "test-more",
+  "family": "command-injection",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "A shell command string observed through an injected recording code reference.",
+  "expected": "Planned against Notify::send_notice (lib/Notify.pm 6-8); exploit recipient carries '; touch'.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic Notify module with an injected runner.; converted from evals/test_planning/perl/breadth/perl-command-construction-dependency"
+  }
+}

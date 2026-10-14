@@ -1,0 +1,18 @@
+{
+  "language": "java",
+  "framework": "spring-boot",
+  "family": "path-traversal",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "A similar issue was resolved by an owner's time-limited exception rather than a code change.",
+  "expected": "The precedent is reported as accepted_risk, not fixed, with the owner's comment quoted.",
+  "dimensions": [
+    "correctness",
+    "grounding"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Corsair-authored targeted grounding case; no v1 grounding suite exists"
+  }
+}

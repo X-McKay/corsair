@@ -1,0 +1,19 @@
+{
+  "finding": {
+    "title": "The API passes the user supplied ?ttl= value to parse.",
+    "description": "The API passes the user supplied ?ttl= value to parse. A long crafted string of digits followed by an unexpected character may make the regular expression backtrack for seconds and block the event loop. Analyze this component only.",
+    "file_path": "lib/ms.js",
+    "symbol": "parse"
+  },
+  "row_id": "jest29-node22",
+  "source_files": [
+    {
+      "path": "lib/ms.js",
+      "content": "// Excerpt of ms 0.7.0 index.js. Copyright (c) 2014 Guillermo Rauch <rauchg@gmail.com>, MIT License.\n\n/**\n * Helpers.\n */\n\nvar s = 1000;\nvar m = s * 60;\nvar h = m * 60;\nvar d = h * 24;\nvar y = d * 365.25;\n\nfunction parse(str) {\n  var match = /^((?:\\d+)?\\.?\\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|years?|yrs?|y)?$/i.exec(str);\n  if (!match) return;\n  var n = parseFloat(match[1]);\n  var type = (match[2] || 'ms').toLowerCase();\n  switch (type) {\n    case 'years':\n    case 'year':\n    case 'yrs':\n    case 'yr':\n    case 'y':\n      return n * y;\n    case 'days':\n    case 'day':\n    case 'd':\n      return n * d;\n    case 'hours':\n    case 'hour':\n    case 'hrs':\n    case 'hr':\n    case 'h':\n      return n * h;\n    case 'minutes':\n    case 'minute':\n    case 'mins':\n    case 'min':\n    case 'm':\n      return n * m;\n    case 'seconds':\n    case 'second':\n    case 'secs':\n    case 'sec':\n    case 's':\n      return n * s;\n    case 'milliseconds':\n    case 'millisecond':\n    case 'msecs':\n    case 'msec':\n    case 'ms':\n      return n;\n  }\n}\n\nmodule.exports = parse;\n"
+    },
+    {
+      "path": "test/ms.test.js",
+      "content": "'use strict';\nconst parse = require('../lib/ms');\n\ntest('parses_hours', () => {\n  expect(parse('2h')).toBe(7200000);\n});\n"
+    }
+  ]
+}

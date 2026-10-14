@@ -1,0 +1,21 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "unsafe-deserialization",
+  "kind": "positive",
+  "category": "adversarial",
+  "probes": "Two load_settings methods; only Import's handles the uploaded document.",
+  "expected": "Planned against Import#load_settings (app/models/import.rb 6-7), not Defaults.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/issue_identification/ruby/breadth/ruby-yaml-load-same-name-decoy; v1 checked file/symbol selection only, the probe inputs and exploit markers are Corsair-authored for v2"
+  }
+}

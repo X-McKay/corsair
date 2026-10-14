@@ -1,0 +1,21 @@
+{
+  "language": "javascript",
+  "framework": "jest",
+  "family": "sql-injection",
+  "kind": "transfer",
+  "category": "capability",
+  "probes": "The recording-database unit shape transferred to a callback-style db double.",
+  "expected": "Planned against findAccount (lib/accounts.js 4-5); exploit name carries OR 1=1.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic mysql-style callback query helper.; converted from evals/test_planning/javascript/breadth/javascript-transfer-sql-dependency"
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "with_status",
+    "path": "app/models/order.rb",
+    "lines": [
+      6,
+      7
+    ],
+    "max_span": 8
+  },
+  "exploit_markers": [
+    "OR '1'='1"
+  ],
+  "exploit_patterns": [],
+  "required_reads": [
+    "app/models/order.rb"
+  ],
+  "replay": {
+    "reads": [
+      "app/models/order.rb"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "with_status",
+      "hypothesis": "If status \"paid' OR '1'='1\" reaches with_status without the relevant check, the safe property fails: where receives the status only as a bound value, never inside the SQL string",
+      "control": {
+        "role": "control",
+        "test_file": "test/order_control_test.rb",
+        "test_name": "test_benign_control",
+        "target": "with_status",
+        "seam": "Order.with_status(status) with Order.where stubbed to record its arguments",
+        "input_description": "status 'paid'",
+        "property_to_assert": "where receives a condition selecting paid",
+        "doubles": "Order.where records its arguments",
+        "citations": [
+          {
+            "path": "app/models/order.rb",
+            "start_line": 6,
+            "end_line": 7,
+            "quote": "  def self.with_status(status)\n    where(\"status = '#{status}'\")"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "test/order_exploit_test.rb",
+        "test_name": "test_security_regression",
+        "target": "with_status",
+        "seam": "Order.with_status(status) with Order.where stubbed to record its arguments",
+        "input_description": "status \"paid' OR '1'='1\"",
+        "property_to_assert": "where receives the status only as a bound value, never inside the SQL string",
+        "doubles": "Order.where records its arguments",
+        "citations": [
+          {
+            "path": "app/models/order.rb",
+            "start_line": 6,
+            "end_line": 7,
+            "quote": "  def self.with_status(status)\n    where(\"status = '#{status}'\")"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "app/models/order.rb",
+          "start_line": 6,
+          "end_line": 7,
+          "quote": "  def self.with_status(status)\n    where(\"status = '#{status}'\")"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

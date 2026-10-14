@@ -1,0 +1,13 @@
+{
+  "finding": {
+    "title": "Locate the login token verification implementation for a report of accepting unsigned tokens.",
+    "description": "Locate the login token verification implementation for a report of accepting unsigned tokens."
+  },
+  "row_id": "pytest-cpython312",
+  "source_files": [
+    {
+      "path": "formatting.py",
+      "content": "def title(text):\n    return text.strip()\n"
+    }
+  ]
+}

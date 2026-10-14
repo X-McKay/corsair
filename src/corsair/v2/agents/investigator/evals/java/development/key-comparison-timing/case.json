@@ -1,0 +1,21 @@
+{
+  "language": "java",
+  "framework": "junit5",
+  "family": "timing-side-channel",
+  "kind": "refusal",
+  "category": "failure-mode",
+  "probes": "A timing side channel in String.equals: safe and unsafe comparisons return the same values, so no unit assertion separates them.",
+  "expected": "status unsupported_scope with a reason citing ApiKeyVerifier.java 11-12, no probe briefs.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic String.equals key comparison.; converted from evals/test_planning/java/breadth/java-timing-unsupported"
+  }
+}

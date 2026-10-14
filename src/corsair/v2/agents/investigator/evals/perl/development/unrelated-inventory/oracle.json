@@ -1,0 +1,17 @@
+{
+  "status": "target_not_found",
+  "required_reads": [],
+  "must_search": true,
+  "replay": {
+    "reads": [],
+    "plan": {
+      "status": "target_not_found",
+      "target": "",
+      "hypothesis": "",
+      "control": null,
+      "exploit": null,
+      "citations": [],
+      "reason": "No file in the tree implements what the finding describes, so no target can be located."
+    }
+  }
+}

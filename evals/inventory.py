@@ -13,13 +13,17 @@ import argparse
 from collections import Counter
 import json
 
-from evals.cases import LANGUAGES, load_set, set_names
+from evals.cases import AGENTS, LANGUAGES, agent_root, load_set, set_names
 
-# make eval AGENT= name -> eval package; e2e is the chain's case data (AGENT=chain)
+# make eval AGENT= name -> eval root: a v1 suite under evals/, or a v2 agent's own evals/ directory (evals/cases.py
+# agent_root); e2e is the chain's case data (AGENT=chain)
 SUITES = {"environment": "environment", "identification": "issue_identification", "planning": "test_planning",
-          "authoring": "test_authoring", "assessment": "evidence_assessment", "e2e": "e2e"}
+          "authoring": "test_authoring", "assessment": "evidence_assessment", "e2e": "e2e",
+          **{agent: agent_root(agent) for agent in AGENTS}}
 RETIRED = {("planning", "heldout"), ("planning", "heldout2"), ("assessment", "unit-v1")}
-PENDING = {("authoring", "breadth_pending"), ("assessment", "breadth_pending")}
+# a v2 agent set named `pending` waits on production behaviour and is outside every baseline
+PENDING = {("authoring", "breadth_pending"), ("assessment", "breadth_pending"),
+           *((agent, "pending") for agent in AGENTS)}
 # Issue requests run through `corsair run --issue-json`, not scored by `make eval`.
 REQUESTS = {("e2e", "corpus"), ("e2e", "corpus_negative")}
 
@@ -58,6 +62,25 @@ def markdown(found: dict[tuple[str, str], Counter]) -> str:
     return "\n".join(lines)
 
 
+def dimensions(found: dict[tuple[str, str], Counter]) -> str:
+    """Dimension x language case counts for the v2 agents, from case.json ``dimensions``."""
+    lines = []
+    for agent in AGENTS:
+        table: dict[str, Counter] = {}
+        for name in set_names(SUITES[agent]):
+            if (agent, name) in RETIRED | PENDING | REQUESTS:
+                continue
+            for case in load_set(SUITES[agent], name):
+                for dimension in case.case.get("dimensions", ()):
+                    table.setdefault(dimension, Counter())[case.language] += 1
+        if table:
+            lines += ["", f"{agent} dimensions:", "", "| Dimension | " + " | ".join(LANGUAGES) + " |",
+                      "|---" * (len(LANGUAGES) + 1) + "|"]
+            lines += [f"| {dimension} | " + " | ".join(str(counter[language]) for language in LANGUAGES) + " |"
+                      for dimension, counter in sorted(table.items())]
+    return "\n".join(lines)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--json", action="store_true")
@@ -67,6 +90,7 @@ def main() -> None:
         print(json.dumps({f"{agent}/{name}": dict(counter) for (agent, name), counter in found.items()}, indent=2))
     else:
         print(markdown(found))
+        print(dimensions(found))
 
 
 if __name__ == "__main__":

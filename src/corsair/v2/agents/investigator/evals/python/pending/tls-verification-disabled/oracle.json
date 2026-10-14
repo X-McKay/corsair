@@ -1,0 +1,36 @@
+{
+  "status": "unsupported_scope",
+  "target": {
+    "symbol": "deliver",
+    "path": "webhook.py",
+    "lines": [
+      4,
+      5
+    ],
+    "max_span": 10
+  },
+  "required_reads": [
+    "webhook.py"
+  ],
+  "replay": {
+    "reads": [
+      "webhook.py"
+    ],
+    "plan": {
+      "status": "unsupported_scope",
+      "target": "",
+      "hypothesis": "",
+      "control": null,
+      "exploit": null,
+      "citations": [
+        {
+          "path": "webhook.py",
+          "start_line": 4,
+          "end_line": 5,
+          "quote": "def deliver(url, body):\n    return requests.post(url, json=body, timeout=5, verify=False)"
+        }
+      ],
+      "reason": "Whether the client refuses an untrusted certificate is a TLS handshake property: it needs a TLS peer presenting an untrusted certificate, which a unit test at a seam cannot give; asserting the verify argument on a double would test configuration text only."
+    }
+  }
+}

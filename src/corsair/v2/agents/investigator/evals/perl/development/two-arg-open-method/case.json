@@ -1,0 +1,21 @@
+{
+  "language": "perl",
+  "framework": "test-more",
+  "family": "command-injection",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "A method-style sub in a nested package uses two-argument open, beside a list method.",
+  "expected": "Planned against Acme::Files::Reader::read_file (lib/Acme/Files/Reader.pm 16-18); exploit name '| id'.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/issue_identification/perl/breadth/perl-two-arg-open-nested-package; v1 checked file/symbol selection only, the probe inputs and exploit markers are Corsair-authored for v2"
+  }
+}

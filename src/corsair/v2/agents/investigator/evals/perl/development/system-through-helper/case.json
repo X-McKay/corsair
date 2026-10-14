@@ -1,0 +1,21 @@
+{
+  "language": "perl",
+  "framework": "test-more",
+  "family": "command-injection",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "The file name passes through a private trim helper inside a system() string.",
+  "expected": "Planned against Thumbnail::make_thumbnail (lib/Thumbnail.pm 11-13); exploit name carries '; touch'.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/issue_identification/perl/breadth/perl-system-through-helper; v1 checked file/symbol selection only, the probe inputs and exploit markers are Corsair-authored for v2"
+  }
+}
