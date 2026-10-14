@@ -578,6 +578,18 @@ def test_seal_keeps_replay_timeouts_and_resolves_the_environment_tag(sandboxes, 
     assert timeouts[tuple(RECIPE.setup[0])] == 77 and timeouts[tuple(RECIPE.baseline_test)] == 33
 
 
+def test_every_replayed_step_on_open_shares_one_budget(sandboxes, gateway, tmp_path, monkeypatch):
+    environment, tree = _environment(tmp_path, RECIPE)
+    sandboxes.seal_environment("b", environment.image, "k", "", recipe=RECIPE, tree_source=tree, base_image=IMAGE)
+    monkeypatch.setattr("corsair.v2.build.REPLAY_BUDGET_S", 100.0)
+    sandboxes.open_environment(environment, labels("run-1", "execute", "control"))
+    timeouts = {tuple(call.command): call.timeout_seconds for call in gateway.execs}
+    assert 0 < timeouts[tuple(RECIPE.setup[0])] <= 100 and 0 < timeouts[tuple(RECIPE.baseline_test)] <= 100
+    monkeypatch.setattr("corsair.v2.build.REPLAY_BUDGET_S", 0.0)
+    with pytest.raises(WorkspaceError, match="setup step 1: replay budget of 0s exhausted"):
+        sandboxes.open_environment(environment, labels("run-1", "execute", "exploit"))
+
+
 @pytest.mark.parametrize("change", ["edited", "removed"])
 def test_find_environment_forgets_a_tree_that_can_no_longer_be_opened(sandboxes, tmp_path, change):
     environment, tree = _environment(tmp_path, RECIPE)
@@ -650,6 +662,12 @@ async def test_workspace_maps_deadline_transport_and_the_default_limit(sandboxes
     with pytest.raises(WorkspaceTimeoutError) as timed:
         await workspace.run(["slow"], timeout=5)
     assert timed.value.stdout == "so far" and "kill -9" in gateway.execs[-1].command[2]
+    assert "was killed" in str(timed.value)
+    gateway.handler = lambda call: (Outcome(None, error=FakeRpcError(grpc.StatusCode.DEADLINE_EXCEEDED))
+                                    if call.command[-1] == "slow" else Outcome(4) if "kill -9" in call.command[2]
+                                    else Outcome())
+    with pytest.raises(WorkspaceTimeoutError, match="termination is unconfirmed"):
+        await workspace.run(["slow"], timeout=5)
     gateway.handler = lambda call: (Outcome(None, error=FakeRpcError(grpc.StatusCode.UNAVAILABLE))
                                     if call.command[-1] == "flaky" else Outcome())
     with pytest.raises(WorkspaceError, match="delivery uncertain") as failed:

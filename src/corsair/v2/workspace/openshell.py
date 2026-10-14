@@ -101,7 +101,9 @@ _LABEL_KEY = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,61}[A-Za-z0-9])?$")
 
 # Records the command's pid so a timeout or cancellation can kill its process group inside the sandbox.
 _WRAPPER = 'echo $$ > "$1" 2>/dev/null; shift; exec "$@"'
-_KILL = 'pid=$(cat "$1" 2>/dev/null) && { kill -9 "-$pid" || kill -9 "$pid"; } 2>/dev/null; rm -f "$1"'
+# Exits 0 only when the recorded process is confirmed gone after the kill (``kill -0`` fails within ~2s).
+_KILL = ('pid=$(cat "$1" 2>/dev/null) || exit 3; { kill -9 "-$pid" || kill -9 "$pid"; } 2>/dev/null; rm -f "$1"; '
+         'i=0; while kill -0 "$pid" 2>/dev/null; do i=$((i+1)); [ "$i" -gt 20 ] && exit 4; sleep 0.1; done')
 _READ = f'if [ -f "$1" ] && [ ! -L "$1" ]; then exec cat -- "$1"; else exit {MISSING_EXIT}; fi'
 
 
@@ -754,6 +756,7 @@ class OpenShellSandboxes:
             "baseline_timeout": BASELINE_TIMEOUT_S if baseline_timeout is None else baseline_timeout})
 
     def open_environment(self, environment: Environment, sandbox_labels: Mapping[str, str]) -> str:
+        from ..build import REPLAY_BUDGET_S
         from ..contracts import Recipe
         from ..intake import tree_sha256
 
@@ -772,11 +775,16 @@ class OpenShellSandboxes:
         spec = SandboxSpec(image=manifest["base_image"], labels=sandbox_labels, workdir=environment.workdir,
                            network="build" if recipe.network_during_setup else "none")
         step = "create"
+        deadline = time.monotonic() + REPLAY_BUDGET_S
         name, sandbox_id = self._create_native(spec)  # SandboxExists propagates: never remove another attempt's.
         log: list[bytes] = []
 
         def run(argv: Sequence[str], timeout: float) -> None:
-            result = self.exec_once(name, argv, workdir=environment.workdir, timeout=timeout)
+            # Every step shares one budget, so the whole replay fits the activity bound sized for it.
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise WorkspaceError(f"replay budget of {REPLAY_BUDGET_S:g}s exhausted")
+            result = self.exec_once(name, argv, workdir=environment.workdir, timeout=min(timeout, remaining))
             status = ("timed out" if result.timed_out else "sandbox failed" if result.container_failed
                       else f"exit {result.exit_code}")
             log.append(f"$ {shlex.join(argv)}\n".encode() + result.stdout + result.stderr
@@ -822,6 +830,10 @@ class OpenShellSandboxes:
 
 
 # --- the native WorkspaceBackend ----------------------------------------------------------------------------------
+
+
+def _killed(confirmed: bool) -> str:
+    return " and was killed" if confirmed else "; a kill was attempted but termination is unconfirmed"
 
 
 class OpenShellWorkspace(WorkspaceBackend, SupportsCommands):
@@ -926,9 +938,9 @@ class OpenShellWorkspace(WorkspaceBackend, SupportsCommands):
                 await anyio.to_thread.run_sync(dispatch, abandon_on_cancel=True)
         except BaseException as error:
             with anyio.CancelScope(shield=True):
-                await self._kill(name, pidfile)
+                killed = await self._kill(name, pidfile)
             if isinstance(error, TimeoutError):
-                raise WorkspaceTimeoutError(f"command timed out after {limit:g}s and was killed",
+                raise WorkspaceTimeoutError(f"command timed out after {limit:g}s{_killed(killed)}",
                                             stdout=text(ran.stdout), stderr=text(ran.stderr)) from error
             raise
         if ran.overflowed:
@@ -937,27 +949,29 @@ class OpenShellWorkspace(WorkspaceBackend, SupportsCommands):
                                             stdout=text(ran.stdout), stderr=text(ran.stderr))
         if ran.error is not None:
             if _code(ran.error) == grpc.StatusCode.DEADLINE_EXCEEDED:
-                await self._kill(name, pidfile)
-                raise WorkspaceTimeoutError(f"command passed its {limit:g}s deadline and was killed",
+                killed = await self._kill(name, pidfile)
+                raise WorkspaceTimeoutError(f"command passed its {limit:g}s deadline{_killed(killed)}",
                                             stdout=text(ran.stdout), stderr=text(ran.stderr)) from ran.error
             if await anyio.to_thread.run_sync(self._gone):
                 raise WorkspaceUnavailableError(f"sandbox {name} is gone") from ran.error
             raise WorkspaceError(f"command delivery uncertain: {_detail(ran.error)}") from ran.error
         if self.sandboxes._gateway_timed_out(ran, limit):
-            await self._kill(name, pidfile)
-            raise WorkspaceTimeoutError(f"command timed out after {limit:g}s", stdout=text(ran.stdout),
+            killed = await self._kill(name, pidfile)
+            raise WorkspaceTimeoutError(f"command timed out after {limit:g}s{_killed(killed)}", stdout=text(ran.stdout),
                                         stderr=text(ran.stderr))
         assert ran.exit_code is not None
         if ran.exit_code != 0 and await anyio.to_thread.run_sync(self._gone):
             raise WorkspaceUnavailableError(f"sandbox {name} is gone")
         return CommandResult(exit_code=ran.exit_code, stdout=text(ran.stdout), stderr=text(ran.stderr))
 
-    async def _kill(self, name: str, pidfile: str) -> None:
-        """Best effort: kill the command's process group in the sandbox. Not proof that it stopped."""
+    async def _kill(self, name: str, pidfile: str) -> bool:
+        """Kill the command's process group in the sandbox; True only when the sandbox confirmed it is gone."""
         with anyio.move_on_after(30):
-            await anyio.to_thread.run_sync(
+            ran = await anyio.to_thread.run_sync(
                 lambda: self.sandboxes._stream(name, ["sh", "-c", _KILL, "sh", pidfile], workdir="/", timeout=30),
                 abandon_on_cancel=True)
+            return ran.error is None and ran.exit_code == 0
+        return False
 
     # --- owner operations, outside the protocol ---
 

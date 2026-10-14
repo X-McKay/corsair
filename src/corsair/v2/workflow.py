@@ -44,7 +44,7 @@ from temporalio.exceptions import ActivityError
 with workflow.unsafe.imports_passed_through():
     from pydantic_ai.models import Model
 
-    from .build import BASELINE_TIMEOUT_S, SETUP_TIMEOUT_S
+    from .build import REPLAY_BUDGET_S
     from .chain import Budget, Diagnosis, LocalOps, Progress, Replayed, Stages, StepResult, compose
     from .contracts import (BuildResult, Case, Environment, FrozenPatch, ProbeBrief, ProbeDraft, ProbePlan, ProbeRun,
                             Recipe, Runtime, TerminalReason, Validity, Verdict)
@@ -57,8 +57,9 @@ CONTROL_QUEUE = "corsair-v2-control"
 AGENT_TIMEOUT = timedelta(hours=1)
 BUILD_TIMEOUT = timedelta(hours=2)
 CONTAINER_TIMEOUT = timedelta(hours=1)
-REPLAY_ON_OPEN = timedelta(seconds=SETUP_TIMEOUT_S + BASELINE_TIMEOUT_S)
-"""What an OpenShell probe sandbox adds before the probe: it replays the recipe's setup and baseline on open."""
+REPLAY_ON_OPEN = timedelta(seconds=REPLAY_BUDGET_S)
+"""What an OpenShell probe sandbox adds before the probe: it replays the recipe on open, within the whole replay
+budget however many setup steps the recipe has."""
 CONTROL_TIMEOUT = timedelta(minutes=2)
 
 MODEL_RETRY = RetryPolicy(maximum_attempts=3, initial_interval=timedelta(seconds=5))

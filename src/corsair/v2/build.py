@@ -22,6 +22,9 @@ from .workspace.port import Exec, Sandboxes, SandboxExists, SandboxSpec, labels
 
 SETUP_TIMEOUT_S = 1800.0
 BASELINE_TIMEOUT_S = 600.0
+REPLAY_BUDGET_S = 3600.0
+"""The most one replay of a sealed recipe (copy, every setup step, baseline) may take when a backend replays it again
+to open an environment; equal to the replay activity's own bound, which the sealed replay already completed within."""
 ENV_REPOSITORY = "corsair-v2-env"
 
 

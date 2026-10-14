@@ -118,6 +118,6 @@ def test_sandbox_timeouts_follow_the_backend():
     assert workflow.container_timeout("openshell", "replay") == workflow.CONTAINER_TIMEOUT
     for step in ("diagnose", "execute"):
         assert workflow.container_timeout("openshell", step) == workflow.CONTAINER_TIMEOUT + workflow.REPLAY_ON_OPEN
-    assert workflow.REPLAY_ON_OPEN.total_seconds() == 2400
+    assert workflow.REPLAY_ON_OPEN.total_seconds() == 3600
     assert workflow.RunRequest.model_fields["workspace"].default == "docker"
     assert workflow.execute.__name__ == "execute" and workflow.diagnose.__name__ == "diagnose"
