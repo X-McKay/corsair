@@ -183,6 +183,10 @@ class FakeGateway:
         outcome = self.handler(call)
 
         def events():
+            for index, arg in enumerate(command):  # The live gateway's per-argument cap.
+                if len(arg.encode()) > 32768:
+                    raise FakeRpcError(grpc.StatusCode.INVALID_ARGUMENT,
+                                       f"command argument {index} exceeds 32768 byte limit")
             for start in range(0, len(outcome.stdout), 4096):
                 yield ExecChunk(stream="stdout", data=outcome.stdout[start:start + 4096])
             if outcome.stderr:

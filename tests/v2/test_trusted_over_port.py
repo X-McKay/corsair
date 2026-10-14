@@ -19,6 +19,7 @@ class Recording:
     """A host double: records every call, answers from ``exits`` (argv[0] -> exit code) and fixed marker output."""
 
     provider = "recording"
+    workdir = "/work"
 
     def __init__(self, *, exits=None, exists=False, sealed=None, markers=b"start\nend\n---\nholds"):
         self.calls: list[tuple] = []
@@ -67,8 +68,10 @@ class Recording:
     def find_environment(self, tag, key):
         return self.sealed
 
-    def seal_environment(self, name, tag, key, log_sha256, *, recipe, tree_source, base_image):
+    def seal_environment(self, name, tag, key, log_sha256, *, recipe, tree_source, base_image, setup_timeout=None,
+                         baseline_timeout=None):
         self._note("seal", tag, base_image)
+        self.sealed_timeouts = (setup_timeout, baseline_timeout)
 
     def open_environment(self, environment, sandbox_labels):
         self._note("open_environment", environment.image)
@@ -108,6 +111,21 @@ def test_replay_drops_network_before_the_baseline_then_seals_and_removes(tmp_pat
     assert built.replayed and built.cleanup_confirmed and environment is not None
     assert kinds(fake) == ["create", "copy_tree_in", "exec", "drop_network", "exec", "seal", "remove"]
     assert fake.calls[0][2] == "build" and fake.calls[5] == ("seal", environment.image, RUNTIME.image)
+
+
+def test_replay_works_in_the_backends_workdir_and_seals_its_timeouts(tmp_path):
+    fake = Recording()
+    fake.workdir = "/sandbox"
+    recipe = Recipe(setup=(("pip", "install", "-e", "."),), baseline_test=BASELINE)
+    built, environment = replay(make_case(tmp_path / "tree"), RUNTIME, recipe, artifacts=tmp_path / "a",
+                                backend=fake, setup_timeout=12, baseline_timeout=34)
+    assert built.replayed and environment is not None and environment.workdir == "/sandbox"
+    assert fake.calls[0][3] == "/sandbox" and fake.calls[1] == ("copy_tree_in", "/sandbox")
+    assert all(call[2] == "/sandbox" for call in fake.calls if call[0] == "exec")
+    assert fake.sealed_timeouts == (12, 34)
+    _, named = replay(make_case(tmp_path / "tree2"), RUNTIME, recipe, artifacts=tmp_path / "a", backend=Recording(),
+                      workdir="/elsewhere")
+    assert named is not None and named.workdir == "/elsewhere"
 
 
 def test_a_failed_baseline_is_never_sealed(tmp_path):

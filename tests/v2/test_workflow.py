@@ -112,6 +112,17 @@ def test_workflow_runs_the_same_review_loop_as_direct_mode(tmp_path):
     assert len(feedback) == 1 and "exploit defect 0" in feedback[0]
 
 
+def test_sandbox_timeouts_follow_the_backend():
+    assert workflow.container_timeout("docker", "execute") == workflow.CONTAINER_TIMEOUT
+    assert workflow.container_timeout("docker", "diagnose") == workflow.CONTAINER_TIMEOUT
+    assert workflow.container_timeout("openshell", "replay") == workflow.CONTAINER_TIMEOUT
+    for step in ("diagnose", "execute"):
+        assert workflow.container_timeout("openshell", step) == workflow.CONTAINER_TIMEOUT + workflow.REPLAY_ON_OPEN
+    assert workflow.REPLAY_ON_OPEN.total_seconds() == 3600
+    assert workflow.RunRequest.model_fields["workspace"].default == "docker"
+    assert workflow.execute.__name__ == "execute" and workflow.diagnose.__name__ == "diagnose"
+
+
 def test_workflow_runs_the_same_second_attempt_as_direct_mode(tmp_path):
     def setup():  # attempt 1's PoV fails, attempt 2's is rejected once, revised and then passes (R4 on attempt 2)
         return Fakes(outcomes={("vulnerable", "exploit"): ["assertion_failed", "passed"],

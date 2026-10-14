@@ -22,6 +22,9 @@ from .workspace.port import Exec, Sandboxes, SandboxExists, SandboxSpec, labels
 
 SETUP_TIMEOUT_S = 1800.0
 BASELINE_TIMEOUT_S = 600.0
+REPLAY_BUDGET_S = 3600.0
+"""The most one replay of a sealed recipe (copy, every setup step, baseline) may take when a backend replays it again
+to open an environment; equal to the replay activity's own bound, which the sealed replay already completed within."""
 ENV_REPOSITORY = "corsair-v2-env"
 
 
@@ -51,7 +54,7 @@ def _failure(result: Exec, what: str) -> str:
 
 
 def replay(case: Case, runtime: Runtime, recipe: Recipe, *, revision: str = "vulnerable", run_id: str | None = None,
-           artifacts: Path | str | None = None, workdir: str = "/work", setup_timeout: float = SETUP_TIMEOUT_S,
+           artifacts: Path | str | None = None, workdir: str | None = None, setup_timeout: float = SETUP_TIMEOUT_S,
            baseline_timeout: float = BASELINE_TIMEOUT_S, backend: Sandboxes | None = None
            ) -> tuple[BuildResult, Environment | None]:
     if revision not in ("vulnerable", "fixed"):
@@ -67,10 +70,10 @@ def replay(case: Case, runtime: Runtime, recipe: Recipe, *, revision: str = "vul
     digest = recipe_sha256(recipe)
     key = environment_key(runtime, digest, tree.tree_sha256)
     tag = f"{ENV_REPOSITORY}:{key[:32]}"
+    backend = backend or configured()
+    workdir = workdir or backend.workdir  # The backend's own workdir unless the caller names one.
     environment = Environment(image=tag, workdir=workdir, runtime_row=runtime.row_id, recipe_sha256=digest,
                               tree_sha256=tree.tree_sha256)
-
-    backend = backend or configured()
     cached = backend.find_environment(tag, key)
     if cached is not None:
         log = store.ref(cached) if cached else None
@@ -111,7 +114,8 @@ def replay(case: Case, runtime: Runtime, recipe: Recipe, *, revision: str = "vul
         if not reason:
             try:
                 backend.seal_environment(name, tag, key, log_ref.sha256, recipe=recipe, tree_source=Path(tree.source),
-                                         base_image=runtime.image)
+                                         base_image=runtime.image, setup_timeout=setup_timeout,
+                                         baseline_timeout=baseline_timeout)
             except Exception as error:
                 reason = str(error)
     except Exception as error:  # A create, copy or control-plane failure is recorded as the build's reason.

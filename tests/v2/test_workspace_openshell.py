@@ -6,28 +6,34 @@ import hashlib
 import io
 import json
 import os
+import posixpath
+import subprocess
 import tarfile
 import uuid
 from pathlib import Path
 
+import anyio
 import grpc
 import pytest
 import yaml
 from openshell import DeletionOutcome
 from openshell._proto import openshell_pb2
 from pydantic_ai.workspaces import (
+    Workspace,
     WorkspaceError,
     WorkspaceOutputLimitError,
     WorkspaceRef,
     WorkspaceTimeoutError,
     WorkspaceUnavailableError,
 )
+from pydantic_ai.workspaces import conformance
 from pydantic_ai.workspaces.conformance import WorkspaceBackendSuite
 
 from corsair.v2.contracts import Environment, Recipe, RecipeFile
 from corsair.v2.intake import tree_sha256
 from corsair.v2.workspace import SandboxExists, SandboxSpec, labels
 from corsair.v2.workspace import openshell as backend
+from corsair.v2.workspace.openshell import WORKDIR
 from corsair.v2.workspace.openshell import (
     OpenShellConfig,
     OpenShellSandboxes,
@@ -78,7 +84,7 @@ def sandboxes(tmp_path, gateway) -> OpenShellSandboxes:
 
 
 def spec(network="none", **extra) -> SandboxSpec:
-    return SandboxSpec(image=IMAGE, labels=labels("run-1", "execute", "control", case="org/repo:CVE#1", **extra),
+    return SandboxSpec(image=IMAGE, labels=labels("run-1", "execute", "control", case="org/repo:CVE#1", **extra), workdir=WORKDIR,
                        network=network)
 
 
@@ -117,7 +123,7 @@ def test_an_image_must_map_to_a_digest_pinned_ref(tmp_path, ref):
 
 
 @pytest.mark.parametrize("weaken", ["audit", "wildcard", "port", "landlock", "field", "fs", "post", "protocol",
-                                    "rule", "endpoint", "no_rules"])
+                                    "rule", "endpoint", "no_rules", "workdir"])
 def test_weakened_policies_are_refused(tmp_path, weaken):
     document = documents()["build"]
     endpoint = document["network_policies"]["corsair-build-python"]["endpoints"][0]
@@ -141,6 +147,8 @@ def test_weakened_policies_are_refused(tmp_path, weaken):
         document["network_policies"]["corsair-build-python"]["endpoints"].append("pypi.org")
     elif weaken == "no_rules":
         endpoint["rules"] = []
+    elif weaken == "workdir":
+        document["filesystem_policy"]["include_workdir"] = False
     else:
         document["filesystem_policy"]["read_write"].append("/etc")
     (tmp_path / "build.yaml").write_text(yaml.safe_dump(document))
@@ -169,7 +177,8 @@ def test_policy_documents_match_the_runtime_matrix():
     assert none["network_policies"] == {} and {key: value for key, value in build.items()
                                                if key != "network_policies"} == {
         key: value for key, value in none.items() if key != "network_policies"}
-    assert {"/work", "/tmp"} <= set(none["filesystem_policy"]["read_write"])
+    assert none["filesystem_policy"]["include_workdir"] is True and "/tmp" in none["filesystem_policy"]["read_write"]
+    assert "/work" not in none["filesystem_policy"]["read_write"]
 
 
 # --- names and labels ------------------------------------------------------------------------------------------------
@@ -178,8 +187,12 @@ def test_policy_documents_match_the_runtime_matrix():
 def test_names_and_labels_are_valid_deterministic_and_distinct():
     port_name = spec().name
     name = native_name(port_name)
-    assert name == native_name(port_name) == native_name(name) and len(name) <= 63
+    assert name == native_name(port_name) == native_name(name) and len(name) <= 19
     assert name.replace("-", "").isalnum() and name[0].isalpha() and name.islower()
+    for long_name in (port_name, "corsair-v2-" + "x" * 80, "Upper_and.dots", "a" * 20, "9starts-with-a-digit"):
+        short = native_name(long_name)
+        assert len(short) <= backend.NAME_LIMIT == 19 and native_name(short) == short and short.startswith("cv2-")
+    assert native_name("cv2-0123456789abc") == "cv2-0123456789abc" and native_name("short") == "short"
     assert native_name(SandboxSpec(image=IMAGE, labels=labels("run-2", "execute", "control")).name) != name
     for raw in ("org/repo:CVE-1#2", "x" * 100, "-leading", "::"):
         value = label_value(raw)
@@ -201,13 +214,14 @@ def test_create_pins_the_image_labels_policy_and_workdir(sandboxes, gateway):
     assert list(box.spec.policy.filesystem.read_write) == documents()["none"]["filesystem_policy"]["read_write"]
     assert box.spec.policy.landlock.compatibility == "hard_requirement" and not box.spec.policy.network_policies
     assert not box.spec.providers and not box.spec.environment
-    assert box.labels == native_labels(wanted.labels) and box.labels["corsair.v2"] == "1"
+    assert box.labels == native_labels(wanted.labels, wanted.name) and box.labels["corsair.v2"] == "1"
+    assert box.labels[backend.NAME_LABEL] == label_value(wanted.name) and len(box.name) <= 19
     assert box.labels["corsair.v2.case"] == label_value("org/repo:CVE#1")
     assert box.revisions == [documents()["none"]]
     order = [call[0] if call[0] != "cli" else call[1][:2] for call in gateway.calls]
     assert order.index("create") < order.index("wait_ready") < order.index(("policy", "set"))
     mkdir = gateway.execs[-1]
-    assert mkdir.command[-1] == "/work" and "mkdir -p" in mkdir.command[2] and mkdir.no_login_shell
+    assert mkdir.command[-1] == "/sandbox" and "mkdir -p" in mkdir.command[2] and mkdir.no_login_shell
 
 
 def test_build_network_gets_the_build_policy(sandboxes, gateway):
@@ -217,14 +231,21 @@ def test_build_network_gets_the_build_policy(sandboxes, gateway):
 
 def test_an_unmapped_image_fails_before_any_create(sandboxes, gateway):
     with pytest.raises(WorkspaceError, match="no digest-pinned mapping"):
-        sandboxes.create(SandboxSpec(image="corsair-unknown:1", labels=labels("r", "s")))
+        sandboxes.create(SandboxSpec(image="corsair-unknown:1", labels=labels("r", "s"), workdir=WORKDIR))
     assert gateway.calls == []
 
 
-def test_a_workdir_outside_the_policy_is_refused(sandboxes, gateway):
+@pytest.mark.parametrize("workdir", ["/srv", "/work"])
+def test_a_workdir_outside_the_policy_is_refused(sandboxes, gateway, workdir):
+    # The toolchain images run as uid 10001 with no /work; only the native workdir and /tmp are writable.
     with pytest.raises(WorkspaceError, match="not writable"):
-        sandboxes.create(SandboxSpec(image=IMAGE, labels=labels("r", "s"), workdir="/srv"))
-    assert gateway.calls == []
+        sandboxes.create(SandboxSpec(image=IMAGE, labels=labels("r", "s"), workdir=workdir))
+    assert gateway.calls == [] and sandboxes.workdir == WORKDIR == "/sandbox"
+
+
+def test_tmp_is_a_writable_workdir_too(sandboxes, gateway):
+    sandboxes.create(SandboxSpec(image=IMAGE, labels=labels("r", "s"), workdir="/tmp/work"))
+    assert gateway.execs[-1].command[-1] == "/tmp/work"
 
 
 def test_an_existing_identity_raises_sandbox_exists_and_is_left_alone(sandboxes, gateway):
@@ -265,14 +286,20 @@ def test_the_cli_hash_is_cached_by_path_mtime_and_size(sandboxes, gateway, tmp_p
         sandboxes.drop_network(spec().name)
 
 
-def test_from_config_shares_one_instance_per_config_path(tmp_path):
+def test_from_config_shares_one_instance_per_config_path_until_it_is_rewritten(tmp_path):
     path = write_config(tmp_path)
-    first = OpenShellSandboxes.from_config(path)
+    made = [OpenShellSandboxes.from_config(path)]
     try:
-        assert OpenShellSandboxes.from_config(tmp_path / "." / path.name) is first
+        assert OpenShellSandboxes.from_config(tmp_path / "." / path.name) is made[0]
+        info = path.stat()
+        os.utime(path, ns=(info.st_atime_ns, info.st_mtime_ns + 1_000_000))
+        made.append(OpenShellSandboxes.from_config(path))
+        assert made[1] is not made[0]
     finally:
-        backend._INSTANCES.pop(path.resolve(), None)
-        first.client.close()
+        for key in [key for key in backend._INSTANCES if key[0] == path.resolve()]:
+            backend._INSTANCES.pop(key)
+        for instance in made:
+            instance.client.close()
 
 
 def test_the_cli_is_checked_against_its_pin_before_every_call(sandboxes, gateway, tmp_path):
@@ -295,21 +322,21 @@ def made(sandboxes, gateway) -> str:
 
 def test_exec_once_reports_the_exit_and_runs_once(sandboxes, gateway, made):
     gateway.handler = lambda call: Outcome(3, b"out", b"err")
-    result = sandboxes.exec_once(made, ["false"], workdir="/work", env={"A": "1"}, timeout=10)
+    result = sandboxes.exec_once(made, ["false"], workdir="/sandbox", env={"A": "1"}, timeout=10)
     assert (result.exit_code, result.stdout, result.stderr, result.timed_out) == (3, b"out", b"err", False)
     assert len(gateway.execs) == 1 and gateway.execs[0].env == {"A": "1"} and gateway.execs[0].timeout_seconds == 10
 
 
 def test_gateway_exit_124_is_a_timeout_only_once_the_timeout_elapsed(sandboxes, gateway, made):
     gateway.handler = lambda call: Outcome(124, b"partial", elapsed=10)
-    timed = sandboxes.exec_once(made, ["sleep", "60"], workdir="/work", timeout=10)
+    timed = sandboxes.exec_once(made, ["sleep", "60"], workdir="/sandbox", timeout=10)
     assert timed.timed_out and timed.exit_code is None and timed.stdout == b"partial"
     gateway.handler = lambda call: Outcome(124, elapsed=0.1)
-    assert sandboxes.exec_once(made, ["sh", "-c", "exit 124"], workdir="/work", timeout=10).exit_code == 124
+    assert sandboxes.exec_once(made, ["sh", "-c", "exit 124"], workdir="/sandbox", timeout=10).exit_code == 124
 
 
 def test_exec_without_a_timeout_is_still_bounded(sandboxes, gateway, made):
-    sandboxes.exec_once(made, ["true"], workdir="/work")
+    sandboxes.exec_once(made, ["true"], workdir="/sandbox")
     assert gateway.execs[0].timeout_seconds == backend.EXEC_DEFAULT_TIMEOUT_S
 
 
@@ -320,7 +347,7 @@ def test_exec_failure_after_dispatch_is_a_fact_never_a_retry(sandboxes, gateway,
         "gone": lambda call: Outcome(137, gone=True),
         "deadline": lambda call: Outcome(None, error=FakeRpcError(grpc.StatusCode.DEADLINE_EXCEEDED)),
     }[fault]
-    result = sandboxes.exec_once(made, ["run"], workdir="/work", timeout=5)
+    result = sandboxes.exec_once(made, ["run"], workdir="/sandbox", timeout=5)
     assert result.exit_code is None and len(gateway.execs) == 1
     assert (result.timed_out, result.container_failed) == ((True, False) if fault == "deadline" else (False, True))
 
@@ -334,14 +361,14 @@ def test_exec_refuses_before_dispatch_when_the_sandbox_is_not_ours_and_ready(san
         gateway.sandboxes[name].phase = ERROR
     else:
         gateway.replace(name)
-    result = sandboxes.exec_once(made, ["run"], workdir="/work", timeout=5)
+    result = sandboxes.exec_once(made, ["run"], workdir="/sandbox", timeout=5)
     assert result.container_failed and gateway.execs == []
 
 
 def test_exec_output_is_bounded(sandboxes, gateway, made, monkeypatch):
     monkeypatch.setattr(backend, "MAX_OUTPUT_BYTES", 10_000)
     gateway.handler = lambda call: Outcome(0, b"y" * 50_000)
-    result = sandboxes.exec_once(made, ["yes"], workdir="/work", timeout=5)
+    result = sandboxes.exec_once(made, ["yes"], workdir="/sandbox", timeout=5)
     assert result.exit_code == 0 and len(result.stdout) == 10_000 and b"truncated" in result.stderr
 
 
@@ -362,7 +389,7 @@ def test_copy_tree_in_sends_symlinks_as_links_in_bounded_chunks(sandboxes, gatew
     secret.write_text("host only")
     (tree / "link").symlink_to(secret)
     (tree / "linkdir").symlink_to(tmp_path)
-    sandboxes.copy_tree_in(made, tree, "/work")
+    sandboxes.copy_tree_in(made, tree, "/sandbox")
     chunks = [call.stdin for call in gateway.execs if call.command[2] == 'cat > "$1"']
     assert len(chunks) > 1 and all(len(chunk) <= 1024 for chunk in chunks)
     members = _members(chunks)
@@ -370,7 +397,7 @@ def test_copy_tree_in_sends_symlinks_as_links_in_bounded_chunks(sandboxes, gatew
     assert members["link"].issym() and members["link"].linkname == str(secret)
     assert members["linkdir"].issym() and b"host only" not in b"".join(chunks)
     extract = gateway.execs[-1].command
-    assert "tar -x" in extract[2] and "--no-same-owner" in extract[2] and extract[-1] == "/work"
+    assert "tar -x" in extract[2] and "--no-same-owner" in extract[2] and extract[-1] == "/sandbox"
 
 
 def test_copy_tree_in_refuses_an_oversized_tree_before_reading_it(sandboxes, made, tmp_path, monkeypatch):
@@ -383,7 +410,7 @@ def test_copy_tree_in_refuses_an_oversized_tree_before_reading_it(sandboxes, mad
     real_open = Path.open
     monkeypatch.setattr(Path, "open", lambda self, *a, **k: opened.append(self) or real_open(self, *a, **k))
     with pytest.raises(WorkspaceError, match="transfer bound"):
-        sandboxes.copy_tree_in(made, tree, "/work")
+        sandboxes.copy_tree_in(made, tree, "/sandbox")
     assert tree / "b.bin" not in opened
 
 
@@ -392,18 +419,18 @@ def test_copy_tree_in_refuses_special_files(sandboxes, made, tmp_path):
     tree.mkdir()
     os.mkfifo(tree / "pipe")
     with pytest.raises(WorkspaceError, match="not a file"):
-        sandboxes.copy_tree_in(made, tree, "/work")
+        sandboxes.copy_tree_in(made, tree, "/sandbox")
 
 
 def test_write_file_and_copy_out(sandboxes, gateway, made):
-    sandboxes.write_file(made, "/work/tests/test_x.py", b"print(1)\n")
-    assert gateway.execs[-1].stdin == b"print(1)\n" and gateway.execs[-1].command[-1] == "/work/tests/test_x.py"
-    gateway.handler = lambda call: (Outcome(0, b"data") if call.command[-1] == "/work/a"
+    sandboxes.write_file(made, "/sandbox/tests/test_x.py", b"print(1)\n")
+    assert gateway.execs[-1].stdin == b"print(1)\n" and gateway.execs[-1].command[-1] == "/sandbox/tests/test_x.py"
+    gateway.handler = lambda call: (Outcome(0, b"data") if call.command[-1] == "/sandbox/a"
                                     else Outcome(backend.MISSING_EXIT))
-    assert sandboxes.copy_out(made, ["/work/a", "/work/missing"]) == {"/work/a": b"data", "/work/missing": None}
+    assert sandboxes.copy_out(made, ["/sandbox/a", "/sandbox/missing"]) == {"/sandbox/a": b"data", "/sandbox/missing": None}
     gateway.handler = lambda call: Outcome(None, error=FakeRpcError(grpc.StatusCode.UNAVAILABLE))
     with pytest.raises(WorkspaceError):
-        sandboxes.copy_out(made, ["/work/a"])
+        sandboxes.copy_out(made, ["/sandbox/a"])
 
 
 # --- network, provenance, removal and listing ------------------------------------------------------------------------
@@ -458,8 +485,8 @@ def test_remove_returns_false_on_anything_uncertain(sandboxes, gateway, made, fa
 
 
 def test_labelled_filters_by_sanitized_run(sandboxes, gateway):
-    first = sandboxes.create(SandboxSpec(image=IMAGE, labels=labels("case:1#a", "build")))
-    sandboxes.create(SandboxSpec(image=IMAGE, labels=labels("run-2", "build")))
+    first = sandboxes.create(SandboxSpec(image=IMAGE, labels=labels("case:1#a", "build"), workdir=WORKDIR))
+    sandboxes.create(SandboxSpec(image=IMAGE, labels=labels("run-2", "build"), workdir=WORKDIR))
     assert sandboxes.labelled("case:1#a") == [native_name(first)]
     assert len(sandboxes.labelled()) == 2
     assert gateway.calls[-1] == ("list_all", "corsair.v2=1")
@@ -473,7 +500,7 @@ def _environment(tmp_path: Path, recipe: Recipe) -> tuple[Environment, Path]:
     tree.mkdir(exist_ok=True)
     (tree / "app.py").write_text("x = 1\n")
     digest = hashlib.sha256(json.dumps(recipe.model_dump(mode="json"), sort_keys=True).encode()).hexdigest()
-    return Environment(image="corsair-v2-env:abc", runtime_row="pytest-cpython312", recipe_sha256=digest,
+    return Environment(image="corsair-v2-env:abc", workdir=WORKDIR, runtime_row="pytest-cpython312", recipe_sha256=digest,
                        tree_sha256=tree_sha256(tree)), tree
 
 
@@ -502,9 +529,9 @@ def test_seal_find_and_open_replay_the_recipe_in_order(sandboxes, gateway, tmp_p
     assert baseline.timeout_seconds == 600
     written = [call.command[-1] for call in gateway.execs if 'cat > "$1"' in call.command[2:3]
                or "mkdir -p \"$(dirname" in call.command[2]]
-    assert "/work/tests/test_smoke.py" in written
+    assert "/sandbox/tests/test_smoke.py" in written
     index = {key: commands.index(next(c for c in commands if match(c))) for key, match in {
-        "extract": lambda c: "tar -x" in c[2], "file": lambda c: c[-1] == "/work/tests/test_smoke.py",
+        "extract": lambda c: "tar -x" in c[2], "file": lambda c: c[-1] == "/sandbox/tests/test_smoke.py",
         "setup": lambda c: c[0] == "pip"}.items()}
     assert index["extract"] < index["file"] < index["setup"]
     sets = gateway.policy_sets()
@@ -545,6 +572,42 @@ def test_a_failed_baseline_on_open_names_it_and_keeps_the_log(sandboxes, gateway
     assert gateway.sandboxes == {}
 
 
+def test_seal_keeps_replay_timeouts_and_resolves_the_environment_tag(sandboxes, gateway, tmp_path):
+    environment, tree = _environment(tmp_path, RECIPE)
+    assert sandboxes.resolve_image(environment.image) is None
+    sandboxes.seal_environment("b", environment.image, "k", "", recipe=RECIPE, tree_source=tree, base_image=IMAGE,
+                               setup_timeout=77, baseline_timeout=33)
+    assert sandboxes.resolve_image(environment.image) == DIGEST_REF
+    sandboxes.open_environment(environment, labels("run-1", "execute", "control"))
+    timeouts = {tuple(call.command): call.timeout_seconds for call in gateway.execs}
+    assert timeouts[tuple(RECIPE.setup[0])] == 77 and timeouts[tuple(RECIPE.baseline_test)] == 33
+
+
+def test_every_replayed_step_on_open_shares_one_budget(sandboxes, gateway, tmp_path, monkeypatch):
+    environment, tree = _environment(tmp_path, RECIPE)
+    sandboxes.seal_environment("b", environment.image, "k", "", recipe=RECIPE, tree_source=tree, base_image=IMAGE)
+    monkeypatch.setattr("corsair.v2.build.REPLAY_BUDGET_S", 100.0)
+    sandboxes.open_environment(environment, labels("run-1", "execute", "control"))
+    timeouts = {tuple(call.command): call.timeout_seconds for call in gateway.execs}
+    assert 0 < timeouts[tuple(RECIPE.setup[0])] <= 100 and 0 < timeouts[tuple(RECIPE.baseline_test)] <= 100
+    monkeypatch.setattr("corsair.v2.build.REPLAY_BUDGET_S", 0.0)
+    with pytest.raises(WorkspaceError, match="setup step 1: replay budget of 0s exhausted"):
+        sandboxes.open_environment(environment, labels("run-1", "execute", "exploit"))
+
+
+@pytest.mark.parametrize("change", ["edited", "removed"])
+def test_find_environment_forgets_a_tree_that_can_no_longer_be_opened(sandboxes, tmp_path, change):
+    environment, tree = _environment(tmp_path, RECIPE)
+    sandboxes.seal_environment("b", environment.image, "k", "log", recipe=RECIPE, tree_source=tree, base_image=IMAGE)
+    assert sandboxes.find_environment(environment.image, "k") == "log"
+    if change == "edited":
+        (tree / "app.py").write_text("x = 3\n")
+    else:
+        (tree / "app.py").unlink()
+        tree.rmdir()
+    assert sandboxes.find_environment(environment.image, "k") is None
+
+
 def test_open_refuses_a_base_image_that_resolves_differently(sandboxes, gateway, tmp_path):
     environment, tree = _environment(tmp_path, RECIPE)
     sandboxes.seal_environment("b", environment.image, "k", "", recipe=RECIPE, tree_source=tree, base_image=IMAGE)
@@ -559,7 +622,7 @@ def test_open_refuses_a_changed_tree_or_a_held_identity(sandboxes, gateway, tmp_
     environment, tree = _environment(tmp_path, RECIPE)
     sandboxes.seal_environment("b", environment.image, "k", "", recipe=RECIPE, tree_source=tree, base_image=IMAGE)
     wanted = labels("run-1", "execute", "control")
-    sandboxes.create(SandboxSpec(image=IMAGE, labels=wanted))
+    sandboxes.create(SandboxSpec(image=IMAGE, labels=wanted, workdir=WORKDIR))
     with pytest.raises(SandboxExists):
         sandboxes.open_environment(environment, wanted)
     assert native_name(SandboxSpec(image=IMAGE, labels=wanted).name) in gateway.sandboxes
@@ -574,7 +637,7 @@ def test_open_refuses_a_changed_tree_or_a_held_identity(sandboxes, gateway, tmp_
 def test_building_the_workspace_does_no_io(sandboxes, gateway):
     workspace = sandboxes.agent_workspace(IMAGE, labels("run-1", "build", "builder"))
     assert isinstance(workspace, OpenShellWorkspace) and workspace.ref is None and gateway.calls == []
-    assert workspace.spec.network == "build"
+    assert workspace.spec.network == "build" and workspace.spec.workdir == WORKDIR
     with pytest.raises(ValueError):
         OpenShellWorkspace(sandboxes, spec(), ref=WorkspaceRef(provider="docker", id="x"))
 
@@ -583,7 +646,7 @@ def test_building_the_workspace_does_no_io(sandboxes, gateway):
 async def test_workspace_creates_lazily_and_runs_commands(sandboxes, gateway):
     workspace = sandboxes.agent_workspace(IMAGE, labels("run-1", "build", "builder"))
     gateway.handler = lambda call: Outcome(0, b"hi\n") if call.command[-1] == "hi" else Outcome()
-    assert await workspace.working_dir() == "/work"
+    assert await workspace.working_dir() == "/sandbox"
     assert workspace.ref == WorkspaceRef(provider="openshell", id=native_name(workspace.spec.name))
     result = await workspace.run(["echo", "hi"], env={"K": "v"})
     assert result.exit_code == 0 and result.stdout == "hi\n"
@@ -593,6 +656,84 @@ async def test_workspace_creates_lazily_and_runs_commands(sandboxes, gateway):
     with pytest.raises(TypeError):
         await workspace.run(["echo"], shell=True)
     assert gateway.sandboxes[workspace.name].revisions == [documents()["build"]]
+
+
+@pytest.mark.anyio
+async def test_workspace_maps_deadline_transport_and_the_default_limit(sandboxes, gateway):
+    workspace = sandboxes.agent_workspace(IMAGE, labels("run-1", "build", "builder"))
+    await workspace.working_dir()
+    gateway.handler = lambda call: (Outcome(None, b"so far", error=FakeRpcError(grpc.StatusCode.DEADLINE_EXCEEDED))
+                                    if call.command[-1] == "slow" else Outcome())
+    with pytest.raises(WorkspaceTimeoutError) as timed:
+        await workspace.run(["slow"], timeout=5)
+    assert timed.value.stdout == "so far" and "kill -9" in gateway.execs[-1].command[2]
+    assert "was killed" in str(timed.value)
+    gateway.handler = lambda call: (Outcome(None, error=FakeRpcError(grpc.StatusCode.DEADLINE_EXCEEDED))
+                                    if call.command[-1] == "slow" else Outcome(4) if "kill -9" in call.command[2]
+                                    else Outcome())
+    with pytest.raises(WorkspaceTimeoutError, match="termination is unconfirmed"):
+        await workspace.run(["slow"], timeout=5)
+    gateway.handler = lambda call: (Outcome(None, error=FakeRpcError(grpc.StatusCode.UNAVAILABLE))
+                                    if call.command[-1] == "flaky" else Outcome())
+    with pytest.raises(WorkspaceError, match="delivery uncertain") as failed:
+        await workspace.run(["flaky"])
+    assert not isinstance(failed.value, (WorkspaceTimeoutError, WorkspaceUnavailableError))
+    gateway.handler = lambda call: (Outcome(124, elapsed=backend.EXEC_DEFAULT_TIMEOUT_S)
+                                    if call.command[-1] == "forever" else Outcome())
+    with pytest.raises(WorkspaceTimeoutError):
+        await workspace.run(["forever"])
+    gateway.handler = lambda call: Outcome(124, elapsed=1) if call.command[-1] == "own124" else Outcome()
+    assert (await workspace.run(["own124"])).exit_code == 124
+
+
+LONG = "x" * 40_000 + "'\"$(not run)\n\\"
+
+
+@pytest.mark.anyio
+async def test_a_command_with_an_argument_over_the_gateway_limit_runs_as_a_staged_script(sandboxes, gateway):
+    workspace = sandboxes.agent_workspace(IMAGE, labels("run-1", "build", "builder"))
+    await workspace.working_dir()
+    assert (await workspace.run(["printf", "%s", LONG])).exit_code == 0
+    ran = gateway.execs[-1].command
+    assert all(len(arg) <= backend.ARG_LIMIT for arg in ran) and ran[-2] == "sh" and ran[-1].endswith("/000000")
+    staged = next(call.stdin for call in reversed(gateway.execs) if call.stdin)
+    assert staged.startswith(b'rm -rf -- "${0%/*}"\n') and LONG.encode() not in ran
+    seen = sandboxes.exec_once(workspace.name, ["printf", "%s", LONG], workdir=WORKDIR)
+    assert seen.exit_code == 0 and gateway.execs[-1].command[0] == "sh"
+    short = sandboxes.exec_once(workspace.name, ["printf", "%s", "x" * 100], workdir=WORKDIR)
+    assert short.exit_code == 0 and gateway.execs[-1].command == ["printf", "%s", "x" * 100]
+
+
+def test_the_wrapper_returns_at_exit_though_a_background_child_holds_its_output(tmp_path):
+    pidfile = str(tmp_path / "pid")
+    release = tmp_path / "release"
+    child = 'while [ ! -f "$1" ]; do sleep 0.1; done'
+    shown = subprocess.run(["sh", "-c", backend._WRAPPER, "sh", pidfile, "sh", "-c",
+                            f"({child}) & printf done; printf warn >&2; exit 3", "sh", str(release)],
+                           capture_output=True, timeout=20)
+    release.write_text("go")
+    assert (shown.returncode, shown.stdout, shown.stderr) == (3, b"done", b"warn")
+    assert list(tmp_path.iterdir()) == [release]
+
+
+def test_the_gateways_undelivered_output_is_never_a_program_exit(sandboxes, gateway):
+    name = sandboxes.create(spec())
+    gateway.handler = lambda call: Outcome(74, b"done", stderr=backend._UNDELIVERED + b"\n")
+    seen = sandboxes.exec_once(name, ["python", "-m", "pytest"], workdir=WORKDIR)
+    assert seen.exit_code is None and seen.container_failed and seen.stdout == b"done"
+    gateway.handler = lambda call: Outcome(74, b"", stderr=b"own")
+    assert sandboxes.exec_once(name, ["python", "-m", "pytest"], workdir=WORKDIR).exit_code == 74
+
+
+def test_the_staged_script_runs_exactly_the_argv_and_removes_itself(sandboxes, gateway, tmp_path):
+    name = sandboxes.create(spec())
+    sandboxes._deliverable(native_name(name), ["printf", "%s", LONG])
+    staged = next(call.stdin for call in reversed(gateway.execs) if call.stdin)
+    script = tmp_path / "stage" / "000000"
+    script.parent.mkdir()
+    script.write_bytes(staged)
+    shown = subprocess.run(["sh", str(script)], capture_output=True, check=True)
+    assert shown.stdout == LONG.encode() and not script.parent.exists()
 
 
 @pytest.mark.anyio
@@ -642,7 +783,8 @@ def _live() -> OpenShellSandboxes:
 
 def _live_spec() -> SandboxSpec:
     image = next(iter(OpenShellConfig.from_json(Path(LIVE_CONFIG or "")).images))
-    return SandboxSpec(image=image, labels=labels(f"test-{uuid.uuid4().hex[:10]}", "conformance"), network="build")
+    return SandboxSpec(image=image, labels=labels(f"test-{uuid.uuid4().hex[:10]}", "conformance"), network="build",
+                       workdir=WORKDIR)
 
 
 @pytest.mark.openshell
@@ -679,6 +821,27 @@ class TestOpenShellWorkspaceConformance(WorkspaceBackendSuite):
             assert confirmed
 
         return destroy
+
+    async def test_background_child_does_not_hold_up_completed_command(
+            self, backend, has_real_posix_shell, can_detect_exit_with_inherited_output_pipes):
+        """The suite's own test with its values in the failure: a live run failed it with a bare assertion. Same
+        command, hang guard, assertions and release; nothing is relaxed."""
+        if not has_real_posix_shell or not can_detect_exit_with_inherited_output_pipes:
+            pytest.skip("backend cannot observe the direct command exit independently of inherited output pipes")
+        workspace = Workspace(backend)
+        async with conformance._scratch_dir(workspace) as root:
+            release, finished = posixpath.join(root, "release"), posixpath.join(root, "finished")
+            command = 'while [ ! -f "$1" ]; do sleep 0.1; done; printf finished > "$2"'
+            try:
+                with anyio.fail_after(60):
+                    result = await backend.run(["sh", "-c", f"({command}) & printf done", "sh", release, finished])
+                assert (result.exit_code, result.stdout) == (0, "done"), result
+                assert not await workspace.exists(finished)
+            finally:
+                with anyio.move_on_after(30, shield=True):
+                    await workspace.write_bytes(release, b"go")
+                    while not await workspace.exists(finished):
+                        await anyio.sleep(0.1)
 
 
 

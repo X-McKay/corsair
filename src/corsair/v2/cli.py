@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -85,7 +86,8 @@ async def _run(args) -> int:
                     serving = asyncio.ensure_future(workflow.serve(client, workspace_slots=args.workspace_slots))
                     try:
                         verdict = await workflow.run_workflow(
-                            client, workflow.RunRequest(case=case, run_dir=str(record.run_dir.resolve())),
+                            client, workflow.RunRequest(case=case, run_dir=str(record.run_dir.resolve()),
+                                                 workspace=os.environ.get("CORSAIR_WORKSPACE") or "docker"),
                             workflow_id=f"corsair-v2-{record.run_id}")
                     finally:
                         serving.cancel()

@@ -57,7 +57,9 @@ def _openshell() -> Backend:
     from corsair.v2.workspace.openshell import OpenShellSandboxes
 
     live = OpenShellSandboxes.from_config(Path(OPENSHELL_CONFIG))
-    image = os.environ.get("CORSAIR_OPENSHELL_IMAGE") or next(iter(live.config.images))
+    # The python image, so the network tests have an HTTPS client; else the operator's choice, else the first.
+    image = (next((tag for tag in live.config.images if tag.startswith("corsair-python:")), None)
+             or os.environ.get("CORSAIR_OPENSHELL_IMAGE") or next(iter(live.config.images)))
 
     def forget(tag: str) -> None:
         (live.config.state_dir / "environments" / f"{hashlib.sha256(tag.encode()).hexdigest()[:32]}.json").unlink(
@@ -81,11 +83,12 @@ def run_id(port) -> Iterator[str]:
 
 
 def _spec(port: Backend, run: str, stage: str = "test", network: str = "none", **extra: str) -> SandboxSpec:
-    return SandboxSpec(image=port.image, labels=labels(run, stage, **extra), network=network)
+    return SandboxSpec(image=port.image, labels=labels(run, stage, **extra), network=network,
+                       workdir=port.sandboxes.workdir)
 
 
 def _sh(port: Backend, name: str, script: str, timeout: float = 60):
-    return port.sandboxes.exec_once(name, ["sh", "-c", script], workdir="/work", timeout=timeout)
+    return port.sandboxes.exec_once(name, ["sh", "-c", script], workdir=port.sandboxes.workdir, timeout=timeout)
 
 
 def test_create_never_adopts(port, run_id):
@@ -96,9 +99,10 @@ def test_create_never_adopts(port, run_id):
         port.sandboxes.create(spec)
 
 
-def test_workdir_exists_and_belongs_to_the_command_user(port, run_id):
+def test_workdir_exists_and_the_command_user_owns_what_it_writes(port, run_id):
     name = port.sandboxes.create(_spec(port, run_id))
-    result = _sh(port, name, 'test -d /work && test -w /work && echo "$(stat -c %u /work) $(id -u)"')
+    result = _sh(port, name, 'test "$PWD" = "$1" && test -w . && mkdir made && echo "$(stat -c %u made) $(id -u)"'
+                             .replace("$1", port.sandboxes.workdir))
     assert result.exit_code == 0, result.stderr
     owner, user = result.stdout.split()
     assert owner == user
@@ -112,7 +116,7 @@ def test_copy_tree_in_keeps_symlinks_as_links(port, run_id, tmp_path):
     secret.write_text("host secret")
     (tree / "link").symlink_to(secret)
     name = port.sandboxes.create(_spec(port, run_id))
-    port.sandboxes.copy_tree_in(name, tree, "/work")
+    port.sandboxes.copy_tree_in(name, tree, port.sandboxes.workdir)
     result = _sh(port, name, 'cat pkg/mod.py; readlink link; test -e link && echo followed || echo dangling; '
                              'touch pkg/new && echo writable')
     assert result.exit_code == 0, result.stderr
@@ -121,31 +125,43 @@ def test_copy_tree_in_keeps_symlinks_as_links(port, run_id, tmp_path):
 
 def test_write_file_and_copy_out(port, run_id):
     name = port.sandboxes.create(_spec(port, run_id))
-    port.sandboxes.write_file(name, "/work/deep/nested/file.txt", b"payload\x00\xff")
+    root = port.sandboxes.workdir
+    port.sandboxes.write_file(name, f"{root}/deep/nested/file.txt", b"payload\x00\xff")
     assert _sh(port, name, "ln -s deep/nested/file.txt link && mkdir dir").exit_code == 0
-    found = port.sandboxes.copy_out(name, ["/work/deep/nested/file.txt", "/work/missing", "/work/link",
-                                           "/work/dir"])
-    assert found == {"/work/deep/nested/file.txt": b"payload\x00\xff", "/work/missing": None, "/work/link": None,
-                     "/work/dir": None}
+    paths = [f"{root}/{path}" for path in ("deep/nested/file.txt", "missing", "link", "dir")]
+    assert port.sandboxes.copy_out(name, paths) == dict(zip(paths, [b"payload\x00\xff", None, None, None]))
 
 
 def test_exec_once_reports_exit_output_and_timeout(port, run_id):
     name = port.sandboxes.create(_spec(port, run_id))
-    result = port.sandboxes.exec_once(name, ["sh", "-c", 'echo "$V"; echo err >&2; exit 3'], workdir="/work",
+    result = port.sandboxes.exec_once(name, ["sh", "-c", 'echo "$V"; echo err >&2; exit 3'], workdir=port.sandboxes.workdir,
                                       env={"V": "value"}, timeout=60)
     assert (result.exit_code, result.stdout, result.stderr) == (3, b"value\n", b"err\n")
     assert not (result.timed_out or result.container_failed)
-    slow = port.sandboxes.exec_once(name, ["sleep", "60"], workdir="/work", timeout=3)
+    slow = port.sandboxes.exec_once(name, ["sleep", "60"], workdir=port.sandboxes.workdir, timeout=3)
     assert slow.timed_out and slow.exit_code is None
 
 
-def test_drop_network_leaves_a_working_offline_sandbox(port, run_id):
+# One allowed HTTPS GET to a build host, through the sandbox's own tooling: prints the status, or the error.
+_GET = ("import sys, urllib.request\n"
+        "try:\n"
+        "    print(urllib.request.urlopen('https://pypi.org/simple/pip/', timeout=20).status)\n"
+        "except Exception as error:\n"
+        "    print('failed', type(error).__name__, error)\n")
+
+
+def test_drop_network_removes_build_egress(port, run_id):
     name = port.sandboxes.create(_spec(port, run_id, network="build"))
+    if _sh(port, name, "command -v python3").exit_code != 0:
+        pytest.skip(f"{port.image} has no python3 to make the HTTPS request")
+    before = port.sandboxes.exec_once(name, ["python3", "-c", _GET], workdir=port.sandboxes.workdir, timeout=60)
+    if before.stdout.strip() != b"200":
+        if port.sandboxes.provider == "docker":
+            pytest.skip(f"this host's Docker bridge does not reach pypi.org: {before.stdout!r}")
+        pytest.fail(f"the build policy did not allow GET https://pypi.org: {before.stdout!r} {before.stderr!r}")
     port.sandboxes.drop_network(name)
-    probe = ("command -v python3 >/dev/null || exit 0; python3 -c 'import socket; "
-             "socket.create_connection((\"pypi.org\", 443), timeout=5)' 2>/dev/null && echo reached || echo denied")
-    result = _sh(port, name, probe)
-    assert result.exit_code == 0 and b"reached" not in result.stdout
+    after = port.sandboxes.exec_once(name, ["python3", "-c", _GET], workdir=port.sandboxes.workdir, timeout=60)
+    assert after.exit_code == 0 and after.stdout.startswith(b"failed"), after.stdout
 
 
 def test_remove_is_confirmed_and_the_sandbox_is_then_gone(port, run_id):
@@ -155,7 +171,7 @@ def test_remove_is_confirmed_and_the_sandbox_is_then_gone(port, run_id):
     confirmed = port.sandboxes.remove(name)
     record_cleanup(port.sandboxes.provider, name, confirmed)
     assert confirmed is True
-    assert port.sandboxes.exec_once(name, ["true"], workdir="/work", timeout=30).container_failed
+    assert port.sandboxes.exec_once(name, ["true"], workdir=port.sandboxes.workdir, timeout=30).container_failed
     assert port.sandboxes.remove(name) is True
 
 
@@ -189,14 +205,15 @@ def test_seal_find_and_open_environment_round_trip(port, run_id, tmp_path):
                     baseline_test=("sh", "-c", "test -f built.txt"))
     digest = hashlib.sha256(json.dumps(recipe.model_dump(mode="json"), sort_keys=True).encode()).hexdigest()
     tag = f"corsair-v2-env-port-test:{uuid.uuid4().hex[:16]}"
-    environment = Environment(image=tag, runtime_row="port-test", recipe_sha256=digest,
+    environment = Environment(image=tag, workdir=port.sandboxes.workdir, runtime_row="port-test",
+                              recipe_sha256=digest,
                               tree_sha256=tree_sha256(tree))
     try:
         assert port.sandboxes.find_environment(tag, "key") is None
         built = port.sandboxes.create(_spec(port, run_id, "build"))
-        port.sandboxes.copy_tree_in(built, tree, "/work")
-        port.sandboxes.write_file(built, "/work/added.txt", b"from recipe\n")
-        assert port.sandboxes.exec_once(built, recipe.setup[0], workdir="/work", timeout=60).exit_code == 0
+        port.sandboxes.copy_tree_in(built, tree, port.sandboxes.workdir)
+        port.sandboxes.write_file(built, f"{port.sandboxes.workdir}/added.txt", b"from recipe\n")
+        assert port.sandboxes.exec_once(built, recipe.setup[0], workdir=port.sandboxes.workdir, timeout=60).exit_code == 0
         port.sandboxes.seal_environment(built, tag, "key", "c" * 64, recipe=recipe, tree_source=tree,
                                         base_image=port.image)
         assert remove_confirmed(port.sandboxes, [built]) == []
@@ -205,7 +222,8 @@ def test_seal_find_and_open_environment_round_trip(port, run_id, tmp_path):
         wanted = labels(run_id, "execute", "control")
         opened = port.sandboxes.open_environment(environment, wanted)
         assert opened == SandboxSpec(image=port.image, labels=wanted).name
-        result = port.sandboxes.exec_once(opened, ["cat", "built.txt"], workdir="/work", timeout=60)
+        assert port.sandboxes.resolve_image(tag) is not None
+        result = port.sandboxes.exec_once(opened, ["cat", "built.txt"], workdir=port.sandboxes.workdir, timeout=60)
         assert result.exit_code == 0 and result.stdout == b"source\nfrom recipe\n"
         with pytest.raises(SandboxExists):
             port.sandboxes.open_environment(environment, wanted)
