@@ -4,7 +4,7 @@ kind: spec
 title: Corsair v2 architecture
 status: accepted
 updated: 2026-10-14
-related: [PLAN-0097, SPEC-0078, SPEC-0079, SPEC-0080, SPEC-0081]
+related: [PLAN-0097]
 ---
 
 # Corsair v2 architecture
@@ -65,7 +65,7 @@ Investigate runs before Build (A1). The Investigator plans on read-only source w
 
 ### Agents
 
-Each agent is self-contained under `src/corsair/v2/agents/<name>/`, holding `agent.yaml` (a native `AgentSpec`), `agent.py`, `tools.py`, `skills/`, `evals/` (its cases and promoted baseline) and a placeholder `release-policy.yaml`. The release policy stays empty and nothing enforces it until the gates resume. This is the package shape [SPEC-0080](SPEC-0080-native-agent-manifests.md) and [SPEC-0081](SPEC-0081-native-harness-capabilities.md) adopted. Guidance lives in native Harness Skills.
+Each agent is self-contained under `src/corsair/v2/agents/<name>/`, holding `agent.yaml` (a native `AgentSpec`), `agent.py`, `tools.py`, `skills/`, `evals/` (its cases and promoted baseline) and a placeholder `release-policy.yaml`. The release policy stays empty and nothing enforces it until the gates resume. This is the package shape the v1 manifest and Harness specs (SPEC-0080, SPEC-0081) adopted; those records remain on main. Guidance lives in native Harness Skills.
 
 | Agent | Job | Tools | Done when |
 | --- | --- | --- | --- |
