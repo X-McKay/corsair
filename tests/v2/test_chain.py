@@ -6,7 +6,7 @@ from pydantic_ai.exceptions import ModelHTTPError, UsageLimitExceeded
 
 from chain_fakes import PLAN, RECIPE, Fakes, case, draft, models
 from corsair.v2.chain import Budget, draft_digest, freeze, run_case
-from corsair.v2.contracts import FrozenPatch, Outcome, ProbePlan, ProbeRun
+from corsair.v2.contracts import FrozenPatch, ProbePlan, ProbeRun
 from corsair.v2.record import RunRecorder
 
 
@@ -108,14 +108,14 @@ def test_one_budget_across_corrections(tmp_path):
     assert decided["stopped"] == "budget_exhausted" and len(fakes.of("build")) == 1
 
 
-@pytest.mark.parametrize("outcome", [Outcome.NOT_RUN, Outcome.ERRORED])
-def test_d3_gives_a_failed_author_one_revision_with_its_own_diagnostics(tmp_path, outcome):
+@pytest.mark.parametrize("outcome", ["not_run", "errored"])
+def test_d3_gives_a_failed_author_one_revision_with_its_check_result(tmp_path, outcome):
     fakes = Fakes(diagnose_outcomes={"control": outcome})
     _, decided = go(fakes, tmp_path)
     controls, exploits = fakes.of("probe-control"), fakes.of("probe-exploit")
     assert len(controls) == 2 and len(exploits) == 1
     assert controls[0][1]["diagnostics"] is None
-    assert controls[1][1]["diagnostics"] == "control output: ImportError"
+    assert controls[1][1]["diagnostics"] == f"check: {outcome}\nhint: control hint"
     assert controls[1][1]["previous"] == draft("control")
     assert len(fakes.of("diagnose")) == 2  # the revision is not diagnosed again
     reviewed: FrozenPatch = fakes.of("review")[0][0][2]
@@ -123,17 +123,23 @@ def test_d3_gives_a_failed_author_one_revision_with_its_own_diagnostics(tmp_path
     assert reviewed.control.revision_of == draft_digest(draft("control"))
     assert reviewed == freeze(reviewed.control, draft("exploit"))
     assert all(a[2].sha256 == reviewed.sha256 for a, _ in fakes.of("execute"))
+    # The check run precedes review, and review precedes the counted execution.
+    names = fakes.names()
+    assert names.index("probe-control", names.index("diagnose")) < names.index("review") < names.index("execute")
 
 
-@pytest.mark.parametrize("outcome", [Outcome.PASSED, Outcome.ASSERTION_FAILED, Outcome.ANOMALOUS])
-def test_d3_completed_runs_get_no_revision(tmp_path, outcome):
-    fakes = Fakes(diagnose_outcomes={"control": outcome, "exploit": outcome})
+def test_d3_ok_gets_no_revision_and_the_frozen_patch_is_reviewed_and_executed(tmp_path):
+    fakes = Fakes(diagnose_outcomes={"control": "ok", "exploit": "ok"})
     go(fakes, tmp_path)
     assert len(fakes.of("probe-control")) == 1 and len(fakes.of("probe-exploit")) == 1
+    patch = freeze(draft("control"), draft("exploit"))
+    assert [a[2] for a, _ in fakes.of("diagnose")] == [patch, patch]
+    assert fakes.of("review")[0][0][2] == patch
+    assert all(a[2] == patch for a, _ in fakes.of("execute"))
 
 
 def test_d3_both_authors_revise_once_and_a_failed_revision_keeps_the_original(tmp_path):
-    fakes = Fakes(diagnose_outcomes={"control": Outcome.ERRORED, "exploit": Outcome.NOT_RUN},
+    fakes = Fakes(diagnose_outcomes={"control": "errored", "exploit": "not_run"},
                   revised={"control": None})
     go(fakes, tmp_path)
     assert len(fakes.of("probe-control")) == 2 and len(fakes.of("probe-exploit")) == 2
@@ -166,7 +172,7 @@ def _contains_run(value) -> bool:
 
 
 def test_reviewer_and_probers_never_see_runs_or_each_other(tmp_path):
-    fakes = Fakes(diagnose_outcomes={"exploit": Outcome.ERRORED})
+    fakes = Fakes(diagnose_outcomes={"exploit": "errored"})
     go(fakes, tmp_path, fixed=True)
     for name in ("review", "probe-control", "probe-exploit"):
         for args, kwargs in fakes.of(name):
@@ -196,3 +202,36 @@ def test_missing_model_is_an_explicit_error(tmp_path):
         asyncio.run(run_case(case(tmp_path), stages=Fakes().stages(),
                              models={k: v for k, v in models().items() if k != "reviewer"},
                              matrix_path=tmp_path, record=record))
+
+
+@pytest.mark.parametrize("setup, reason", [
+    (dict(fixed_raises={"review": ModelHTTPError(500, "m")}), "provider_error"),
+    (dict(fixed_raises={"execute": OSError("daemon")}), "infra_error"),
+    (dict(raises={"replay-fixed": OSError("daemon")}), "infra_error"),
+    (dict(fixed_replays=False), "build_failed"),
+])
+def test_fixed_revision_failures_never_stop_the_run(tmp_path, setup, reason):
+    fakes = Fakes(**setup)
+    _, decided = go(fakes, tmp_path, fixed=True)
+    assert decided["stopped"] is None and decided["fix_stopped"] == reason
+    assert [(r.role, r.revision) for r in decided["runs"]][:2] == [("control", "vulnerable"),
+                                                                   ("exploit", "vulnerable")]
+
+
+def test_budget_exhausted_at_the_fixed_review_still_executes_the_vulnerable_revision(tmp_path):
+    # Calls: investigate, build, two probes, the vulnerable review; the fixed review is over budget.
+    fakes = Fakes()
+    _, decided = go(fakes, tmp_path, fixed=True, budget=Budget(max_agent_calls=5))
+    assert decided["stopped"] is None and decided["fix_stopped"] == "budget_exhausted"
+    assert [(r.role, r.revision) for r in decided["runs"]] == [("control", "vulnerable"), ("exploit", "vulnerable")]
+
+
+def test_unreviewed_bytes_are_never_executed(tmp_path):
+    fakes = Fakes(unbound={"vulnerable"})
+    _, decided = go(fakes, tmp_path, fixed=True)
+    assert fakes.of("execute") == [] and decided["runs"] == ()
+    assert [v.revision for v in decided["validity"]] == ["fixed"]
+    fakes = Fakes(unbound={"fixed"})
+    _, decided = go(fakes, tmp_path / "f", fixed=True)
+    assert [kw["revision"] for _, kw in fakes.of("execute")] == ["vulnerable", "vulnerable"]
+    assert decided["stopped"] is None and decided["fix_stopped"] is None

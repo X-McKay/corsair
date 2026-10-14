@@ -20,8 +20,10 @@ lives; it does not restate the design.
 | 8 | Decide | code | `outcome.py`, `rules.py` |
 
 Investigate runs before Build (amendment A1). After the drafts freeze, trusted code runs both probes once on the
-vulnerable revision; an author whose probe is `not_run` or `errored` gets its own diagnostics back for one revision
-(D3). Authors have no test-running tool.
+vulnerable revision as a mechanical check only (D3): it keeps `ok`, `not_run` or `errored` and discards the outcome.
+A `not_run` or `errored` author gets back only that class, a fixed hint and the row's optional syntax-check output,
+never the run's output, and revises once. The Reviewer then reviews the final frozen bytes, and Execute runs only
+reviewed bytes. Authors have no test-running tool.
 
 `contracts.py` holds every type that crosses a stage boundary. `chain.py` composes the stages as plain async
 functions (direct mode, used by evals and `corsair-v2 run`); `workflow.py` runs the same functions in one Temporal
@@ -35,7 +37,9 @@ workflow per case on three task queues: `model` (one slot), `workspace` and `con
 - Exactly two probes per investigated revision: a benign control and a security regression. Native
   parametrisation inside one test is allowed (D9).
 - The label comes from the rule table over recorded facts (D4). No model runs after execution.
-- A probe's outcome comes from the exit-code map, the start and end marker files and the per-run token (D8).
+- A probe's outcome comes from the exit-code map, the `start`, `check` and `end` marker files and the per-run token
+  (D8, `outcome.py`). Both probes carry the token and the check marker.
+- ERROR is scoped to the vulnerable revision; a failure on the fixed revision only leaves the fix `not_verified`.
 - Oracles and labels are evaluator-only and never reach an agent input.
 - Probes and commands run exactly once; an uncertain outcome is `infra`, never retried.
 - Workers never reach the network except for inference; Build may use the network during setup only.

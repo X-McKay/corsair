@@ -71,8 +71,11 @@ class Fakes:
     plan: ProbePlan | None = PLAN
     recipes: list[Recipe | None] = field(default_factory=lambda: [RECIPE])
     replays: list[bool] = field(default_factory=lambda: [True])
-    diagnose_outcomes: dict[str, Outcome] = field(default_factory=dict)
+    diagnose_outcomes: dict[str, str] = field(default_factory=dict)  # role -> ok, not_run or errored
     revised: dict[str, ProbeDraft | None] = field(default_factory=dict)
+    fixed_replays: bool = True
+    fixed_raises: dict[str, BaseException] = field(default_factory=dict)  # step name -> raised on the fixed revision only
+    unbound: set[str] = field(default_factory=set)  # revisions whose review binds to another patch
     raises: dict[str, BaseException] = field(default_factory=dict)
     usages: dict[str, AgentUsage] = field(default_factory=dict)
     grounding: bool = False
@@ -104,7 +107,9 @@ class Fakes:
 
     def replay(self, case, runtime, recipe, *, revision="vulnerable"):
         self._log("replay", case, runtime, recipe, revision=revision)
-        ok = self.replays.pop(0) if revision == "vulnerable" else True
+        if revision == "fixed" and "replay-fixed" in self.raises:
+            raise self.raises["replay-fixed"]
+        ok = self.replays.pop(0) if revision == "vulnerable" else self.fixed_replays
         result = BuildResult(recipe=recipe, replayed=ok, baseline_exit_code=0 if ok else 1,
                              reason="" if ok else "baseline test failed: missing module")
         return result, ENVIRONMENT if ok else None
@@ -123,20 +128,25 @@ class Fakes:
 
     def diagnose(self, environment, runtime, patch, role):
         self._log("diagnose", environment, runtime, patch, role)
-        outcome = self.diagnose_outcomes.get(role, Outcome.PASSED)
-        return outcome, f"{role} output: ImportError" if outcome in (Outcome.NOT_RUN, Outcome.ERRORED) else None
+        check = self.diagnose_outcomes.get(role, "ok")
+        return check, f"check: {check}\nhint: {role} hint" if check != "ok" else None
 
     async def review(self, case, plan, patch, model, *, source_root, revision="vulnerable"):
         self._log("review", case, plan, patch, source_root=source_root, revision=revision)
-        return validity(patch, revision), self.usages.get("reviewer", usage("reviewer"))
+        if revision == "fixed" and "review" in self.fixed_raises:
+            raise self.fixed_raises["review"]
+        bound = patch if revision not in self.unbound else patch.model_copy(update={"sha256": "f" * 64})
+        return validity(bound, revision), self.usages.get("reviewer", usage("reviewer"))
 
     def execute(self, environment, runtime, patch, role, *, revision="vulnerable"):
         self._log("execute", environment, runtime, patch, role, revision=revision)
+        if revision == "fixed" and "execute" in self.fixed_raises:
+            raise self.fixed_raises["execute"]
         return run(patch, role, revision)
 
-    def decide(self, case, *, runtime, build, plan, validity, runs, stopped=None):
+    def decide(self, case, *, runtime, build, plan, validity, runs, stopped=None, fix_stopped=None):
         self._log("decide", case, runtime=runtime, build=build, plan=plan, validity=validity, runs=runs,
-                  stopped=stopped)
+                  stopped=stopped, fix_stopped=fix_stopped)
         if stopped is not None:
             return Verdict(case_id=case.case_id, label=Label.ERROR, rule_id="R1", terminal_reason=stopped,
                            finding="none", fix="not_applicable", runs=runs, validity=validity)

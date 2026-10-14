@@ -92,6 +92,9 @@ class Runtime(Frozen):
     exit_codes: dict[int, ExitClass] = Field(min_length=1, description="Exit code to class; unlisted is unknown")
     test_dir: str = Field(default="", max_length=256, description="Where probe files go, relative to the root")
     evidence: Literal["image-only", "live", "canary-only"]
+    syntax_check: tuple[str, ...] | None = Field(
+        default=None, description="argv template (same placeholders) that checks the probe file without running "
+                                  "application code; its output may go back to the author (D3). None: no check")
 
 
 # --- 3. Build (Builder agent, then trusted replay) --------------------------------------------------------------
@@ -176,10 +179,11 @@ class ProbeDraft(Frozen):
     @field_validator("source")
     @classmethod
     def _markers(cls, value: str) -> str:
-        # D8 marker protocol: the test writes the files ``start`` (first statement) and ``end`` (last, after its
-        # assertions) inside the directory named by the CORSAIR_MARKER_DIR environment variable.
+        # D8 marker protocol: the test writes the files ``start`` (first statement), ``check`` (``safe`` or
+        # ``unsafe``, immediately before its main assertion) and ``end`` (last, after its assertions) inside the
+        # directory named by the CORSAIR_MARKER_DIR environment variable.
         if "CORSAIR_MARKER_DIR" not in value:
-            raise ValueError("a probe must write the start and end marker files under $CORSAIR_MARKER_DIR")
+            raise ValueError("a probe must write the start, check and end marker files under $CORSAIR_MARKER_DIR")
         return value
 
 
@@ -224,6 +228,10 @@ class Outcome(StrEnum):
     ANOMALOUS = "anomalous"
 
 
+CheckResult = Literal["ok", "not_run", "errored"]
+"""The D3 mechanical check after freezing: any outcome other than not_run or errored is ``ok`` and discarded."""
+
+
 class ProbeFacts(Frozen):
     """What trusted code observed for one run of one probe. ``Outcome`` is a pure function of these."""
 
@@ -233,6 +241,9 @@ class ProbeFacts(Frozen):
     start_marker: bool
     end_marker: bool
     token_in_output: bool
+    check_marker: Literal["safe", "unsafe"] | None = Field(
+        default=None, description="Content of the check file the test writes before its main assertion; None when "
+                                  "absent or not exactly safe/unsafe after stripping whitespace")
 
 
 class ProbeRun(Frozen):
@@ -265,6 +276,7 @@ class TerminalReason(StrEnum):
     UNSUPPORTED_SCOPE = "unsupported_scope"
     PROBE_NOT_RUN = "probe_not_run"
     PROBE_ERRORED = "probe_errored"
+    PROBE_ANOMALOUS = "probe_anomalous"
     TEST_INVALID = "test_invalid"
     CONTROL_FAILED = "control_failed"
     NO_VALID_OBSERVATION = "no_valid_observation"
@@ -291,6 +303,8 @@ class Verdict(Frozen):
     terminal_reason: TerminalReason
     finding: Literal["reproduced", "not_reproduced", "inconclusive", "none"]
     fix: Literal["verified", "not_verified", "not_applicable"]
+    fix_reason: TerminalReason | None = Field(
+        default=None, description="ok when verified, None when not applicable, else why the fix is not verified")
     runs: tuple[ProbeRun, ...] = ()
     validity: tuple[Validity, ...] = ()
     facts_origin: dict[str, Origin] = Field(default_factory=dict)

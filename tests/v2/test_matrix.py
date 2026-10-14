@@ -24,8 +24,10 @@ def test_matrix_loads_with_unique_rows_and_known_placeholders():
     rows = matrix.load()
     assert len({row.id for row in rows}) == len(rows) >= 6
     for row in rows:
-        fields = {f for part in row.run_template for _, f, _, _ in string.Formatter().parse(part) if f is not None}
-        assert fields <= PLACEHOLDERS, row.id
+        for template in (row.run_template, row.syntax_check or ()):
+            fields = {f for part in template for _, f, _, _ in string.Formatter().parse(part) if f is not None}
+            assert fields <= PLACEHOLDERS, row.id
+        assert row.runtime().syntax_check == row.syntax_check, row.id
         assert row.exit_codes.get(0) is not None, row.id
         canary = SKILLS / row.skill / "canary"
         assert (SKILLS / row.skill / "SKILL.md").is_file(), row.id
@@ -112,3 +114,6 @@ def test_pytest_canary_pair_on_its_image():
     assert {kind: c["outcome"] for kind, c in evidence["canaries"].items()} == {"pass": "passed",
                                                                                  "fail": "assertion_failed"}
     assert evidence["admitted"] and all(c["cleanup_confirmed"] for c in evidence["canaries"].values())
+    assert all(c["facts"]["check_marker"] == {"pass": "safe", "fail": "unsafe"}[kind]
+               for kind, c in evidence["canaries"].items())
+    assert all(c["syntax_check"]["holds"] for c in evidence["canaries"].values())

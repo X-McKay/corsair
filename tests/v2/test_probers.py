@@ -13,7 +13,8 @@ from corsair.v2.agents.probing.agent import framework_skills
 from corsair.v2.agents.probing.draft import protocol_defects
 from corsair.v2.contracts import Citation, ExitClass, ProbeBrief, ProbeDraft, Runtime
 
-CONTROL_SOURCE = "def test_ordinary():\n    open(env['CORSAIR_MARKER_DIR'] + '/start')\n    assert target('a') == 'a'\n"
+CONTROL_SOURCE = ("def test_ordinary():\n    open(env['CORSAIR_MARKER_DIR'] + '/start')\n"
+                  "    assert target('a') == 'a', env['CORSAIR_TOKEN']\n")
 pytestmark = pytest.mark.anyio
 
 
@@ -89,13 +90,13 @@ async def test_write_test_file_refuses_any_other_path(tree):
     assert not (tree.parent / "escape.src").exists()
 
 
-async def test_control_with_token_and_exploit_without_token_are_refused(tree):
+async def test_either_role_without_the_token_is_refused(tree):
     seen = []
-    control_with_token = CONTROL_SOURCE + "    print(env['CORSAIR_TOKEN'])\n"
-    model = scripted([("write_test_file", {"path": "tests/test_ordinary.src", "content": control_with_token})],
+    control_without_token = CONTROL_SOURCE.replace(", env['CORSAIR_TOKEN']", "")
+    model = scripted([("write_test_file", {"path": "tests/test_ordinary.src", "content": control_without_token})],
                      seen=seen)
     draft, _ = await control_prober.probe(brief("control"), RUNTIME, model, source_root=tree)
-    assert draft is None and "must not reference CORSAIR_TOKEN" in tool_returns(seen, "write_test_file")[0]
+    assert draft is None and "never reads CORSAIR_TOKEN" in tool_returns(seen, "write_test_file")[0]
 
     seen.clear()
     no_token = EXPLOIT_SOURCE.replace(", env['CORSAIR_TOKEN']", "")
