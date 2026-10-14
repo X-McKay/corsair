@@ -85,8 +85,12 @@ def test_repository_markdown_links_resolve():
             assert not local or (path.parent / local).exists(), f"Broken link: {path} -> {target}"
 
 
-def test_development_ci_has_only_read_permissions_and_pinned_actions():
-    config = yaml.safe_load((ROOT / ".github/workflows/development.yml").read_text())
+WORKFLOWS = ("development.yml", "offline-v1.yml", "toolchain-images.yml")
+
+
+@pytest.mark.parametrize("name", WORKFLOWS)
+def test_ci_has_only_read_permissions_and_pinned_actions(name):
+    config = yaml.safe_load((ROOT / ".github/workflows" / name).read_text())
     assert config["permissions"] == {"contents": "read"}
     for job in config["jobs"].values():
         for step in job["steps"]:
@@ -96,19 +100,20 @@ def test_development_ci_has_only_read_permissions_and_pinned_actions():
                 assert step["with"]["persist-credentials"] is False
 
 
-def test_development_ci_shards_run_the_whole_offline_suite():
-    """Every shard k/n of 1..n runs `make test-config`, v2 runs `make test-v2`, and `offline-guards` fails unless all pass."""
-    jobs = yaml.safe_load((ROOT / ".github/workflows/development.yml").read_text())["jobs"]
-    shards = jobs["offline-shard"]
+def test_pr_path_runs_only_the_v2_suite_and_v1_shards_cover_the_whole_suite():
+    """Until end-to-end runs exist the PR check `offline-guards` runs `make test-v2`; every v1 shard k/n of 1..n runs
+    `make test-config`, off the PR path."""
+    pr = yaml.safe_load((ROOT / ".github/workflows/development.yml").read_text())["jobs"]
+    assert list(pr) == ["offline-guards"]
+    assert [step["run"] for step in pr["offline-guards"]["steps"] if "run" in step] == ["make test-v2"]
+    v1 = yaml.safe_load((ROOT / ".github/workflows/offline-v1.yml").read_text())
+    assert "pull_request" not in v1[True]  # PyYAML reads the bare `on` key as True
+    shards = v1["jobs"]["offline-shard"]
     count = len(shards["strategy"]["matrix"]["shard"])
     assert shards["strategy"]["matrix"]["shard"] == list(range(1, count + 1))
     runs = [step for step in shards["steps"] if "run" in step]
     assert [step["run"] for step in runs] == ["make test-config"]
     assert runs[0]["env"]["TEST_SHARD"] == "${{ matrix.shard }}/" + str(count)
-    assert [step["run"] for step in jobs["v2-offline"]["steps"] if "run" in step] == ["make test-v2"]
-    guard = jobs["offline-guards"]
-    assert guard["needs"] == ["offline-shard", "v2-offline"] and guard["if"] == "always()"
-    assert guard["steps"][0]["env"]["RESULTS"] == " ".join("${{ needs.%s.result }}" % name for name in guard["needs"])
 
 
 def test_test_shards_partition_the_collection():
