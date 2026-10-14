@@ -99,9 +99,9 @@ def test_create_never_adopts(port, run_id):
         port.sandboxes.create(spec)
 
 
-def test_workdir_exists_and_belongs_to_the_command_user(port, run_id):
+def test_workdir_exists_and_the_command_user_owns_what_it_writes(port, run_id):
     name = port.sandboxes.create(_spec(port, run_id))
-    result = _sh(port, name, 'test "$PWD" = "$1" && test -w . && echo "$(stat -c %u .) $(id -u)"'
+    result = _sh(port, name, 'test "$PWD" = "$1" && test -w . && mkdir made && echo "$(stat -c %u made) $(id -u)"'
                              .replace("$1", port.sandboxes.workdir))
     assert result.exit_code == 0, result.stderr
     owner, user = result.stdout.split()

@@ -6,22 +6,27 @@ import hashlib
 import io
 import json
 import os
+import posixpath
+import subprocess
 import tarfile
 import uuid
 from pathlib import Path
 
+import anyio
 import grpc
 import pytest
 import yaml
 from openshell import DeletionOutcome
 from openshell._proto import openshell_pb2
 from pydantic_ai.workspaces import (
+    Workspace,
     WorkspaceError,
     WorkspaceOutputLimitError,
     WorkspaceRef,
     WorkspaceTimeoutError,
     WorkspaceUnavailableError,
 )
+from pydantic_ai.workspaces import conformance
 from pydantic_ai.workspaces.conformance import WorkspaceBackendSuite
 
 from corsair.v2.contracts import Environment, Recipe, RecipeFile
@@ -681,6 +686,35 @@ async def test_workspace_maps_deadline_transport_and_the_default_limit(sandboxes
     assert (await workspace.run(["own124"])).exit_code == 124
 
 
+LONG = "x" * 40_000 + "'\"$(not run)\n\\"
+
+
+@pytest.mark.anyio
+async def test_a_command_with_an_argument_over_the_gateway_limit_runs_as_a_staged_script(sandboxes, gateway):
+    workspace = sandboxes.agent_workspace(IMAGE, labels("run-1", "build", "builder"))
+    await workspace.working_dir()
+    assert (await workspace.run(["printf", "%s", LONG])).exit_code == 0
+    ran = gateway.execs[-1].command
+    assert all(len(arg) <= backend.ARG_LIMIT for arg in ran) and ran[-2] == "sh" and ran[-1].endswith("/000000")
+    staged = next(call.stdin for call in reversed(gateway.execs) if call.stdin)
+    assert staged.startswith(b'rm -rf -- "${0%/*}"\n') and LONG.encode() not in ran
+    seen = sandboxes.exec_once(workspace.name, ["printf", "%s", LONG], workdir=WORKDIR)
+    assert seen.exit_code == 0 and gateway.execs[-1].command[0] == "sh"
+    short = sandboxes.exec_once(workspace.name, ["printf", "%s", "x" * 100], workdir=WORKDIR)
+    assert short.exit_code == 0 and gateway.execs[-1].command == ["printf", "%s", "x" * 100]
+
+
+def test_the_staged_script_runs_exactly_the_argv_and_removes_itself(sandboxes, gateway, tmp_path):
+    name = sandboxes.create(spec())
+    sandboxes._deliverable(native_name(name), ["printf", "%s", LONG])
+    staged = next(call.stdin for call in reversed(gateway.execs) if call.stdin)
+    script = tmp_path / "stage" / "000000"
+    script.parent.mkdir()
+    script.write_bytes(staged)
+    shown = subprocess.run(["sh", str(script)], capture_output=True, check=True)
+    assert shown.stdout == LONG.encode() and not script.parent.exists()
+
+
 @pytest.mark.anyio
 async def test_workspace_maps_timeout_overflow_and_loss(sandboxes, gateway, monkeypatch):
     workspace = sandboxes.agent_workspace(IMAGE, labels("run-1", "build", "builder"))
@@ -766,6 +800,27 @@ class TestOpenShellWorkspaceConformance(WorkspaceBackendSuite):
             assert confirmed
 
         return destroy
+
+    async def test_background_child_does_not_hold_up_completed_command(
+            self, backend, has_real_posix_shell, can_detect_exit_with_inherited_output_pipes):
+        """The suite's own test with its values in the failure: a live run failed it with a bare assertion. Same
+        command, hang guard, assertions and release; nothing is relaxed."""
+        if not has_real_posix_shell or not can_detect_exit_with_inherited_output_pipes:
+            pytest.skip("backend cannot observe the direct command exit independently of inherited output pipes")
+        workspace = Workspace(backend)
+        async with conformance._scratch_dir(workspace) as root:
+            release, finished = posixpath.join(root, "release"), posixpath.join(root, "finished")
+            command = 'while [ ! -f "$1" ]; do sleep 0.1; done; printf finished > "$2"'
+            try:
+                with anyio.fail_after(60):
+                    result = await backend.run(["sh", "-c", f"({command}) & printf done", "sh", release, finished])
+                assert (result.exit_code, result.stdout) == (0, "done"), result
+                assert not await workspace.exists(finished)
+            finally:
+                with anyio.move_on_after(30, shield=True):
+                    await workspace.write_bytes(release, b"go")
+                    while not await workspace.exists(finished):
+                        await anyio.sleep(0.1)
 
 
 

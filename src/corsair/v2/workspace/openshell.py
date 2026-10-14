@@ -79,6 +79,9 @@ STDIN_CHUNK_BYTES = 1024 * 1024
 """One exec's stdin. gRPC's default message cap is 4 MiB and the gateway's own stdin buffer is unqualified
 (exit 74 is its overflow), so larger payloads are staged in chunks."""
 MAX_TRANSFER_BYTES = 512 * 1024 * 1024
+ARG_LIMIT = 32768
+"""The gateway refuses a command argument over 32 KiB (``command argument 7 exceeds 32768 byte limit``, RIG0 live
+run); a command with a longer argument is staged as a script instead (``_deliverable``)."""
 RESOURCES = {"limits": {"cpu": "2", "memory": "4Gi"}}
 """Mirrors the Docker backend's 2 CPUs / 4 GiB, in the nested shape the v1 recovery gate used."""
 WORKDIR = "/sandbox"
@@ -612,12 +615,22 @@ class OpenShellSandboxes:
             found[path] = bytes(ran.stdout) if ran.exit_code == 0 else None
         return found
 
+    def _deliverable(self, name: str, argv: Sequence[str]) -> list[str]:
+        """``argv`` itself when every argument fits the gateway's limit; otherwise a staged script that removes
+        itself and then execs exactly ``argv`` (``shlex`` quoting round-trips any argument), run by ``sh``."""
+        if all(len(arg.encode()) <= ARG_LIMIT for arg in argv):
+            return list(argv)
+        script = f'rm -rf -- "${{0%/*}}"\nexec {shlex.join(argv)}\n'.encode()
+        staging = self._push(name, script, what="stage a command with a long argument")
+        return ["sh", f"{staging}/000000"]
+
     def exec_once(self, name: str, argv: Sequence[str], *, workdir: str, env: Mapping[str, str] | None = None,
                   timeout: float | None = None) -> Exec:
         name = native_name(name)
         limit = EXEC_DEFAULT_TIMEOUT_S if timeout is None else timeout
         try:
             self._ready_ref(name)
+            argv = self._deliverable(name, argv)
         except Exception as error:  # Not dispatched: the sandbox is gone, not Ready, replaced or unreachable.
             return Exec(None, b"", f"[sandbox unavailable before dispatch: {_detail(error)}]".encode(),
                         container_failed=True)
@@ -921,6 +934,7 @@ class OpenShellWorkspace(WorkspaceBackend, SupportsCommands):
         else:
             argv = list(command)
         name = await self._ensure()
+        argv = await anyio.to_thread.run_sync(self.sandboxes._deliverable, name, argv)
         pidfile = f"/tmp/.corsair-exec-{uuid.uuid4().hex}"
         limit = EXEC_DEFAULT_TIMEOUT_S if timeout is None else timeout
         ran = _Ran(None, bytearray(), bytearray())
@@ -959,7 +973,9 @@ class OpenShellWorkspace(WorkspaceBackend, SupportsCommands):
             killed = await self._kill(name, pidfile)
             raise WorkspaceTimeoutError(f"command timed out after {limit:g}s{_killed(killed)}", stdout=text(ran.stdout),
                                         stderr=text(ran.stderr))
-        assert ran.exit_code is not None
+        if ran.exit_code is None:
+            raise WorkspaceError("command delivery uncertain: the gateway ended the exec stream without an exit "
+                                 "status")
         if ran.exit_code != 0 and await anyio.to_thread.run_sync(self._gone):
             raise WorkspaceUnavailableError(f"sandbox {name} is gone")
         return CommandResult(exit_code=ran.exit_code, stdout=text(ran.stdout), stderr=text(ran.stderr))

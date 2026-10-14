@@ -98,8 +98,9 @@ class Sandboxes(Protocol):
     (Docker ``/work``; OpenShell its native workdir ``/sandbox``). Replay records it in the Environment."""
 
     def create(self, spec: SandboxSpec) -> str:
-        """Create and start the sandbox named ``spec.name`` with ``spec.workdir`` existing and owned by the user
-        commands run as. Raises ``SandboxExists`` when that name is already held."""
+        """Create and start the sandbox named ``spec.name`` with ``spec.workdir`` existing and writable by the user
+        commands run as (Docker makes that user its owner; OpenShell's ``/sandbox`` is root-owned and writable under
+        ``include_workdir``). Raises ``SandboxExists`` when that name is already held."""
         ...
 
     def copy_tree_in(self, name: str, source: Path, destination: str) -> None:
