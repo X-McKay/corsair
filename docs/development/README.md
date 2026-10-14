@@ -48,7 +48,7 @@ An issue can stay open while its dependent plan is blocked. A template, render, 
 
 ## Maintain the unit-test approach
 
-[SPEC-0082](specs/SPEC-0082-corsair-v2-architecture.md) defines the probe protocol: exactly two native tests, a benign control and a security safety regression, written by the Control Prober and Exploit Prober through the real application seam, frozen, reviewed outcome-blind, then run once by trusted code. The outcome comes from the exit-code map, the marker files and the token, never from parsing reports. Framework knowledge lives only in matrix rows and framework skills; the chain never branches on language, CWE or case.
+[SPEC-0082](specs/SPEC-0082-corsair-v2-architecture.md) defines the probe protocol: exactly two native tests, a benign control and a proof-of-vulnerability (PoV) test that passes when it demonstrates the reported condition, written by the Control Prober and Exploit Prober through the real application seam, frozen, reviewed outcome-blind, then run once by trusted code. The outcome comes from the exit-code map, the marker files and the token, never from parsing reports. Framework knowledge lives only in matrix rows and framework skills; the chain never branches on language, CWE or case.
 
 ## Isolated agent evaluation
 
