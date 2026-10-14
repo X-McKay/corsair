@@ -18,7 +18,7 @@ ordinary result to assert (a return value, a written record, a response). It mus
 fix of the reported issue, so it must not assert anything about the security check itself.
 
 **Exploit brief.** The exploit probe is a proof-of-vulnerability (PoV) test. Give an adversarial input that would
-trigger the reported condition, and the observable condition to assert as occurring: for example the injected
+trigger the reported condition (Trace the payload through the exact code that builds the dangerous value (the string concatenation, format or template in the cited lines) and write out the final value the interpreter (shell, SQL engine, path resolver, template) would receive. It must be well-formed there and make the condition occur: no stray quote, comment or separator that turns it into a syntax error unless the code itself wraps the input in quotes. A payload that breaks the syntax proves nothing on affected code and turns a real issue into a false negative.), and the observable condition to assert as occurring: for example the injected
 command reached the subprocess double, the resolved path is outside the base directory, the query sent to the
 database double carries the input as structure, the response holds the unescaped markup. Phrase the property as
 what happens when the issue is real; the test passes when the code is vulnerable and fails when it is not. The
