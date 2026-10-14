@@ -1,0 +1,96 @@
+{
+  "row_id": "minitest-ruby31",
+  "finding": {
+    "title": "Archive entry path traversal in ArchivePaths.destination",
+    "description": "An archive entry name containing '../' yields a destination outside the extraction directory instead of being rejected.",
+    "file_path": "lib/archive_paths.rb",
+    "start_line": 3,
+    "symbol": "ArchivePaths.destination",
+    "cwe": "CWE-22"
+  },
+  "plan": {
+    "status": "planned",
+    "target": "lib/archive_paths.rb: ArchivePaths.destination(dest, entry_name)",
+    "hypothesis": "If the input described for the exploit probe (entry name '../../etc/cron.d/job' under destination 'out') reaches ArchivePaths.destination without confinement or encoding, then: Returns a destination path that resolves outside 'out' instead of rejecting the entry (an unaffected implementation raises its specific rejection, which means the condition did not occur)",
+    "control": {
+      "role": "control",
+      "test_file": "test/archive_paths_control_test.rb",
+      "test_name": "test_benign_control",
+      "target": "lib/archive_paths.rb: ArchivePaths.destination(dest, entry_name)",
+      "seam": "Call the real ArchivePaths.destination through its public interface",
+      "input_description": "entry name 'docs/a.txt' under destination 'out'",
+      "property_to_assert": "Returns the entry path joined under the destination: 'out/docs/a.txt'",
+      "doubles": "",
+      "citations": [
+        {
+          "path": "lib/archive_paths.rb",
+          "start_line": 3,
+          "end_line": 5
+        },
+        {
+          "path": "test/archive_paths_test.rb",
+          "start_line": 1,
+          "end_line": 8
+        }
+      ]
+    },
+    "exploit": {
+      "role": "exploit",
+      "test_file": "test/archive_paths_exploit_test.rb",
+      "test_name": "test_security_entry_escapes_destination",
+      "target": "lib/archive_paths.rb: ArchivePaths.destination(dest, entry_name)",
+      "seam": "Call the real ArchivePaths.destination through its public interface",
+      "input_description": "entry name '../../etc/cron.d/job' under destination 'out'",
+      "property_to_assert": "Returns a destination path that resolves outside 'out' instead of rejecting the entry (an unaffected implementation raises its specific rejection, which means the condition did not occur)",
+      "doubles": "",
+      "citations": [
+        {
+          "path": "lib/archive_paths.rb",
+          "start_line": 3,
+          "end_line": 5
+        },
+        {
+          "path": "test/archive_paths_test.rb",
+          "start_line": 1,
+          "end_line": 8
+        }
+      ]
+    },
+    "citations": [
+      {
+        "path": "lib/archive_paths.rb",
+        "start_line": 3,
+        "end_line": 5
+      },
+      {
+        "path": "test/archive_paths_test.rb",
+        "start_line": 1,
+        "end_line": 8
+      }
+    ]
+  },
+  "patch": {
+    "control": {
+      "role": "control",
+      "test_file": "test/archive_paths_control_test.rb",
+      "test_name": "test_benign_control",
+      "source": "require 'minitest/autorun'\nrequire 'archive_paths'\n\nclass ArchivePathsControlTest < Minitest::Test\n  def test_benign_control\n    File.write(File.join(ENV.fetch('CORSAIR_MARKER_DIR'), 'start'), '')\n    holds = ArchivePaths.destination('out', 'docs/a.txt') == File.join('out', 'docs/a.txt')\n    File.write(File.join(ENV.fetch('CORSAIR_MARKER_DIR'), 'check'), holds ? 'holds' : 'violated')\n    assert holds, ENV.fetch('CORSAIR_TOKEN')\n    File.write(File.join(ENV.fetch('CORSAIR_MARKER_DIR'), 'end'), '')\n  end\nend\n"
+    },
+    "exploit": {
+      "role": "exploit",
+      "test_file": "test/archive_paths_exploit_test.rb",
+      "test_name": "test_security_entry_escapes_destination",
+      "source": "require 'minitest/autorun'\nrequire 'archive_paths'\n\nclass ArchivePathsExploitTest < Minitest::Test\n  def test_security_entry_escapes_destination\n    File.write(File.join(ENV.fetch('CORSAIR_MARKER_DIR'), 'start'), '')\n    dest = begin\n      ArchivePaths.destination('out', '../../etc/cron.d/job')\n    rescue ArgumentError\n      nil\n    end\n    holds = !dest.nil? && !File.expand_path(dest).start_with?(File.expand_path('out') + File::SEPARATOR)\n    File.write(File.join(ENV.fetch('CORSAIR_MARKER_DIR'), 'check'), holds ? 'holds' : 'violated')\n    assert holds, ENV.fetch('CORSAIR_TOKEN')\n    File.write(File.join(ENV.fetch('CORSAIR_MARKER_DIR'), 'end'), '')\n  end\nend\n"
+    }
+  },
+  "source_files": [
+    {
+      "path": "lib/archive_paths.rb",
+      "content": "# Where each entry of an uploaded archive is extracted.\nmodule ArchivePaths\n  def self.destination(dest, entry_name)\n    File.join(dest, entry_name)\n  end\nend\n"
+    },
+    {
+      "path": "test/archive_paths_test.rb",
+      "content": "require 'minitest/autorun'\nrequire 'archive_paths'\n\nclass ArchivePathsTest < Minitest::Test\n  def test_joins_entry\n    assert_equal 'out/a.txt', ArchivePaths.destination('out', 'a.txt')\n  end\nend\n"
+    }
+  ]
+}

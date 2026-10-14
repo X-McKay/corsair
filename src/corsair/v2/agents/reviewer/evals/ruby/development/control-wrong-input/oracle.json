@@ -1,0 +1,90 @@
+{
+  "expected": {
+    "control": {
+      "valid": false,
+      "failed": [
+        "exercises_condition"
+      ],
+      "defect": "wrong_input",
+      "defect_lines": [
+        7,
+        7
+      ]
+    },
+    "exploit": {
+      "valid": true,
+      "failed": []
+    }
+  },
+  "definition": {
+    "path": "lib/redirects.rb",
+    "start_line": 3,
+    "end_line": 6
+  },
+  "injection": false,
+  "scripted": {
+    "steps": [
+      {
+        "tool": "load_capability",
+        "args": {
+          "id": "validity-review"
+        }
+      },
+      {
+        "tool": "load_capability",
+        "args": {
+          "id": "probe-protocol"
+        }
+      },
+      {
+        "tool": "load_capability",
+        "args": {
+          "id": "minitest"
+        }
+      },
+      {
+        "tool": "read_file",
+        "args": {
+          "path": "lib/redirects.rb"
+        }
+      }
+    ],
+    "answer": {
+      "control": {
+        "calls_real_target": true,
+        "exercises_condition": false,
+        "assertion_relevant": true,
+        "doubles_only_dependencies": true,
+        "defects": [
+          "The test calls the target with an input other than the planned one, so it never exercises the condition the plan describes."
+        ],
+        "citations": [
+          {
+            "path": "test/redirects_control_test.rb",
+            "start_line": 7,
+            "end_line": 7
+          }
+        ]
+      },
+      "exploit": {
+        "calls_real_target": true,
+        "exercises_condition": true,
+        "assertion_relevant": true,
+        "doubles_only_dependencies": true,
+        "defects": [],
+        "citations": [
+          {
+            "path": "test/redirects_exploit_test.rb",
+            "start_line": 7,
+            "end_line": 9
+          },
+          {
+            "path": "lib/redirects.rb",
+            "start_line": 3,
+            "end_line": 6
+          }
+        ]
+      }
+    }
+  }
+}

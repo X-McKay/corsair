@@ -1,0 +1,20 @@
+{
+  "language": "java",
+  "framework": "junit5",
+  "family": "badge",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "A pair for an HTML rendering finding; the PoV asserts the raw element appears",
+  "expected": "Both probes valid.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory"
+  ],
+  "provenance": {
+    "source": "derived",
+    "license": "n/a (synthetic)",
+    "notes": "control: control_prober development/not-run-correction reference draft; exploit: exploit_prober development/not-run-correction reference draft"
+  }
+}

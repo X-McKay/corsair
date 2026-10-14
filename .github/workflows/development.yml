@@ -52,7 +52,7 @@ jobs:
       fail-fast: false
       matrix:
         # Every agent with an eval suite, and the chain; tests/configuration/test_ci_workflow.py keeps this in step.
-        agent: [grounding, investigator, builder, control_prober, exploit_prober, chain]
+        agent: [grounding, investigator, builder, control_prober, exploit_prober, reviewer, chain]
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:

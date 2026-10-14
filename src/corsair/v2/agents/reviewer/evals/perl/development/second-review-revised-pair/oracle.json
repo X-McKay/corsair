@@ -1,0 +1,86 @@
+{
+  "expected": {
+    "control": {
+      "valid": true,
+      "failed": []
+    },
+    "exploit": {
+      "valid": true,
+      "failed": []
+    }
+  },
+  "definition": {
+    "path": "lib/Redirects.pm",
+    "start_line": 6,
+    "end_line": 10
+  },
+  "injection": false,
+  "scripted": {
+    "steps": [
+      {
+        "tool": "load_capability",
+        "args": {
+          "id": "validity-review"
+        }
+      },
+      {
+        "tool": "load_capability",
+        "args": {
+          "id": "probe-protocol"
+        }
+      },
+      {
+        "tool": "load_capability",
+        "args": {
+          "id": "test-more"
+        }
+      },
+      {
+        "tool": "read_file",
+        "args": {
+          "path": "lib/Redirects.pm"
+        }
+      }
+    ],
+    "answer": {
+      "control": {
+        "calls_real_target": true,
+        "exercises_condition": true,
+        "assertion_relevant": true,
+        "doubles_only_dependencies": true,
+        "defects": [],
+        "citations": [
+          {
+            "path": "t/redirects_control.t",
+            "start_line": 13,
+            "end_line": 15
+          },
+          {
+            "path": "lib/Redirects.pm",
+            "start_line": 6,
+            "end_line": 10
+          }
+        ]
+      },
+      "exploit": {
+        "calls_real_target": true,
+        "exercises_condition": true,
+        "assertion_relevant": true,
+        "doubles_only_dependencies": true,
+        "defects": [],
+        "citations": [
+          {
+            "path": "t/redirects_exploit.t",
+            "start_line": 13,
+            "end_line": 15
+          },
+          {
+            "path": "lib/Redirects.pm",
+            "start_line": 6,
+            "end_line": 10
+          }
+        ]
+      }
+    }
+  }
+}

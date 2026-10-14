@@ -1,0 +1,21 @@
+{
+  "language": "python",
+  "framework": "pytest",
+  "family": "documents",
+  "kind": "negative",
+  "category": "capability",
+  "probes": "The control carries the exploit's adversarial input",
+  "expected": "Control invalid with exercises_condition false; exploit valid.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "derived",
+    "license": "n/a (synthetic)",
+    "notes": "control: control_prober development/path-confinement reference draft, degraded (adversarial input); exploit: exploit_prober development/path-confinement reference draft"
+  }
+}

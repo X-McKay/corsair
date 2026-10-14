@@ -1,0 +1,21 @@
+{
+  "language": "javascript",
+  "framework": "jest",
+  "family": "redirects",
+  "kind": "negative",
+  "category": "regression",
+  "probes": "The first-review control draft that called the target with a different file than planned",
+  "expected": "Control invalid with exercises_condition false; exploit valid.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "derived",
+    "license": "n/a (synthetic)",
+    "notes": "control: control_prober development/review-revision accepted previous draft; exploit: exploit_prober development/review-revision reference draft"
+  }
+}

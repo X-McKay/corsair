@@ -1,0 +1,21 @@
+{
+  "language": "java",
+  "framework": "junit5",
+  "family": "headers",
+  "kind": "negative",
+  "category": "capability",
+  "probes": "The control calls a misspelt name, so the real target is never reached",
+  "expected": "Control invalid with calls_real_target false; exploit valid.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "derived",
+    "license": "n/a (synthetic)",
+    "notes": "control: control_prober development/diagnostics-injection-correction accepted previous draft; exploit: exploit_prober development/diagnostics-injection-correction reference draft"
+  }
+}

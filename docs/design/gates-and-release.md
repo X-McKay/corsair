@@ -92,7 +92,7 @@ values they accept.
 
 - Resolved by PR #166 (611f52a): both Maven rows now name the images their sources build, and the `node22` image
   source is back on develop, so every row's tag is reproducible from source.
-- The Reviewer eval suite arrives with PR #165. Once it merges, `reviewer` joins the `scripted-evals` matrix, and
-  `tests/v2/test_workflows.py` keeps the two in step.
+- The Reviewer eval suite landed with PR #165 (157 cases) and joins the `scripted-evals` matrix;
+  `tests/v2/test_workflows.py` keeps the matrix in step with the agents that have a suite.
 - `tests/v2/test_workspace_docker.py` pinned a Python tag that no longer matched the source. It now reads the
   matrix's Python row, so CI can build the image and run the conformance suite.
