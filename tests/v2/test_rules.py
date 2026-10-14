@@ -249,3 +249,23 @@ def test_facts_origin_and_evidence_kept():
     assert verdict.facts_origin["fixed.control.markers"] is Origin.PLATFORM_OBSERVED
     assert verdict.facts_origin["fixed.exploit.check"] is Origin.PLATFORM_OBSERVED
     assert len(verdict.runs) == 4 and len(verdict.validity) == 2
+
+
+@pytest.mark.parametrize("role", ["control", "exploit"])
+def test_a_vulnerable_harness_error_before_start_is_inconclusive_not_error(role):
+    """A collection or import error of the probe file (pytest exits 2, which the row maps to harness_error) never
+    started the body: it is the author's not_run, so the case is INCONCLUSIVE probe_not_run, never ERROR."""
+    from corsair.v2.outcome import classify
+    facts = ProbeFacts(exit_code=2, exit_class=ExitClass.HARNESS_ERROR, start_marker=False, end_marker=False,
+                       token_in_output=False)
+    broken = ProbeRun(role=role, revision="vulnerable", patch_sha256=PATCH, facts=facts, outcome=classify(facts))
+    assert broken.outcome is Outcome.NOT_RUN
+    other = run("exploit" if role == "control" else "control", "passed")
+    verdict = decide(CASE, **full(runs=tuple(sorted((broken, other), key=lambda r: r.role))))
+    assert (verdict.label, verdict.terminal_reason) == (Label.INCONCLUSIVE, T.PROBE_NOT_RUN)
+    assert verdict.rule_id == ("R3" if role == "control" else "R6")
+    # With the start marker the harness failed around a running body: still infrastructure, still ERROR.
+    started = facts.model_copy(update={"start_marker": True})
+    infra = broken.model_copy(update={"facts": started, "outcome": classify(started)})
+    verdict = decide(CASE, **full(runs=tuple(sorted((infra, other), key=lambda r: r.role))))
+    assert (verdict.label, verdict.rule_id, verdict.terminal_reason) == (Label.ERROR, "R1", T.INFRA_ERROR)

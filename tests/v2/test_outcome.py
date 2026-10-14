@@ -17,9 +17,13 @@ TABLE = [
     ((None, None, True, True, False, False, None), O.INFRA),  # timeout
     ((None, None, False, True, True, False, "holds"), O.INFRA),  # container failed, no exit code
     ((0, E.PASS, True, True, True, False, "holds"), O.INFRA),  # a timeout is never trusted, whatever else was seen
-    ((2, E.HARNESS_ERROR, False, True, False, False, None), O.INFRA),
-    ((2, E.HARNESS_ERROR, False, False, False, False, None), O.INFRA),  # infra outranks a missing start
+    ((2, E.HARNESS_ERROR, False, True, False, False, None), O.INFRA),  # the harness failed around a started body
     ((137, E.HARNESS_ERROR, False, True, True, True, "violated"), O.INFRA),  # a signal the row maps to harness_error
+    ((None, None, False, False, False, False, None), O.INFRA),  # container failed before anything started
+    ((2, E.HARNESS_ERROR, True, False, False, False, None), O.INFRA),  # a timeout stays infra without start
+    # harness_error without start: the body never started (a collection, import or compile error)
+    ((2, E.HARNESS_ERROR, False, False, False, False, None), O.NOT_RUN),
+    ((2, E.HARNESS_ERROR, False, False, True, True, "violated"), O.NOT_RUN),
     # not_run
     ((5, E.NO_TESTS, False, True, True, False, "holds"), O.NOT_RUN),
     ((5, E.NO_TESTS, False, False, False, False, None), O.NOT_RUN),
@@ -65,11 +69,11 @@ def test_every_combination_obeys_the_table(row):
     exit_code, cls, timed_out, start, end, token, check = row
     outcome = classify(facts(*row))
     effective = cls or E.UNKNOWN
-    infra = exit_code is None or timed_out or effective is E.HARNESS_ERROR
+    infra = exit_code is None or timed_out or (effective is E.HARNESS_ERROR and start)
     assert (outcome is O.INFRA) == infra
     if not infra:
-        assert (outcome is O.NOT_RUN) == (effective is E.NO_TESTS or not start)
-    ran = not infra and effective is not E.NO_TESTS and start
+        assert (outcome is O.NOT_RUN) == (effective in (E.NO_TESTS, E.HARNESS_ERROR) or not start)
+    ran = not infra and effective not in (E.NO_TESTS, E.HARNESS_ERROR) and start
     # Only the exact rows give their outcome; everything else that ran is anomalous.
     assert (outcome is O.PASSED) == (ran and effective is E.PASS and end and not token and check == "holds")
     assert (outcome is O.ASSERTION_FAILED) == (ran and effective is E.TEST_FAILED and not end and token
