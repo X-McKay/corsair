@@ -2,7 +2,9 @@
 
 ``summarize`` reads the runner's ``attempts.jsonl`` and ``configuration.json`` and rolls attempts up overall, by
 language and by case kind: per dimension passed/total, clean attempts, and efficiency (mean, p50, p90, total) over
-observed samples only. A metric no attempt reported has ``observed: 0`` and null statistics, never zero.
+observed samples only. A metric no attempt reported has ``observed: 0`` and null statistics, never zero; ``total``
+is null when any attempt left it unreported (a sum with an unknown in it is unknown). Metric and parameter names
+follow the run record (``corsair-v2-run/1``, ``src/corsair/v2/RUN_RECORD.md``).
 
 ``apply_policy`` reads the agent's ``evals/release-policy.yaml`` and reports pass, fail or unknown per entry. While
 gates are deferred it never changes the run's exit code. An entry whose threshold is null is ``not_set``; an entry
@@ -18,7 +20,7 @@ from typing import Any
 import yaml
 
 SCHEMA = "corsair-eval-summary/v1"
-METRICS = ("latency_s", "requests", "tool_calls", "input_tokens", "output_tokens")
+METRICS = ("wall_s", "requests", "tool_calls", "input_tokens", "output_tokens", "tokens", "retries")
 # Chain dispositions (contracts.Label). Decisive = one of the two exploitability labels; abstentions are reported as
 # their own rates by terminal reason so they are never hidden inside accuracy.
 DECISIVE = ("LIKELY_EXPLOITABLE", "LIKELY_NOT_EXPLOITABLE")
@@ -35,7 +37,20 @@ def _stats(values: list[float | None]) -> dict:
     if not seen:
         return {"observed": 0, "mean": None, "p50": None, "p90": None, "total": None}
     return {"observed": len(seen), "mean": round(mean(seen), 3), "p50": round(median(seen), 3),
-            "p90": round(_p90(seen), 3), "total": round(sum(seen), 3)}
+            "p90": round(_p90(seen), 3), "total": round(sum(seen), 3) if len(seen) == len(values) else None}
+
+
+def _parameters(rows: list[dict]) -> dict:
+    """Per parameter, the distinct values the attempts ran with (null kept: unknown), so runs compare by setting."""
+    names = sorted({name for row in rows for name in row.get("parameters") or {}})
+    return {name: sorted({json.dumps((row.get("parameters") or {}).get(name)) for row in rows}) for name in names}
+
+
+def _statuses(rows: list[dict]) -> dict:
+    counts: dict[str, int] = {}
+    for row in rows:
+        counts[str(row.get("status"))] = counts.get(str(row.get("status")), 0) + 1
+    return dict(sorted(counts.items()))
 
 
 def dispositions(rows: list[dict]) -> dict | None:
@@ -79,6 +94,8 @@ def rollup(rows: list[dict]) -> dict:
                 "accepted_within_limit": {"passed": sum(row["accepted_within_limit"] is True for row in rows),
                                           "total": sum(row.get("accepted_within_limit") is not None for row in rows)}}
                if any(row.get("revisions") is not None for row in rows) else {}),
+            "statuses": _statuses(rows), "parameters": {k: [json.loads(v) for v in vs]
+                                                        for k, vs in _parameters(rows).items()},
             **{metric: _stats([row.get(metric) for row in rows]) for metric in METRICS}}
 
 

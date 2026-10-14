@@ -9,7 +9,9 @@ must mean the same for every agent:
   ``FunctionModel`` with real requests blocked, live mode uses ``corsair.v2.models`` for that agent's profile;
 - every assertion is tagged with exactly one dimension (``AgentEval.dimensions``) so the summary can roll accuracy up
   per eval type, language and case kind;
-- efficiency comes from the stage's ``AgentUsage``: a value the provider did not report stays null, never zero.
+- efficiency and parameters come from the stage's ``AgentUsage`` under the run-record names (``corsair-v2-run/1``,
+  ``src/corsair/v2/RUN_RECORD.md``): a value the provider did not report stays null, never zero, and a sum with a
+  null in it is null.
 
 Evidence written under ``--evidence``: ``configuration.json`` (identity), ``attempts.jsonl`` (one row per attempt,
 the input of ``evals/run.py``'s summary.json) and ``receipts/<n>.json`` (output, usage, messages per attempt).
@@ -37,7 +39,11 @@ from corsair.v2.contracts import AgentUsage
 from evals.cases import DIMENSIONS, LANGUAGES, EvalCase, agent_root, load_set, set_digest
 
 SCHEMA = "corsair-agent-attempts/v1"
-USAGE_FIELDS = ("requests", "tool_calls", "input_tokens", "output_tokens")
+# run-record names (RUN_RECORD.md usage.json): counts and cost per attempt, then the parameters the agent ran with
+USAGE_FIELDS = ("requests", "tool_calls", "input_tokens", "output_tokens", "retries", "wall_s")
+PARAMETER_FIELDS = ("model", "provider_host", "temperature", "max_tokens", "thinking", "thinking_budget",
+                    "request_limit", "tool_calls_limit", "max_output_retries", "max_tool_retries", "prompt_version",
+                    "config_version", "spec_sha256")
 # Attempt.facts keys copied into the attempt row when an agent reports them (D3 corrections: at most two revisions
 # per probe author, three reviews in total).
 ROW_FACTS = ("revisions", "accepted_within_limit")
@@ -115,11 +121,14 @@ def _model_name(model: Any) -> Any:
 
 
 def provider_identity(provider_config: Path, agents: tuple[str, ...]) -> dict[str, dict[str, str]]:
-    """Per agent: the operator profile it resolved to (name, endpoint, served model). No credential is read."""
+    """Per agent: the operator profile it resolved to, with the run record's names (``model``, ``provider_host``: the
+    endpoint host only, no scheme, credentials, path or query). No credential is read."""
+    from urllib.parse import urlsplit
+
     from corsair.v2.models import load_provider_config
     config = load_provider_config(provider_config)
-    return {agent: {"profile": config.agents[agent], "base_url": config.profile(agent).base_url,
-                    "model_name": config.profile(agent).model_name} for agent in agents}
+    return {agent: {"profile": config.agents[agent], "provider_host": urlsplit(config.profile(agent).base_url).hostname,
+                    "model": config.profile(agent).model_name} for agent in agents}
 
 
 async def evaluate(spec: AgentEval, evidence: Path, set_name: str, *, language: str | None = None,
@@ -161,7 +170,7 @@ async def evaluate(spec: AgentEval, evidence: Path, set_name: str, *, language: 
                            "messages": TypeAdapter(list[ModelMessage]).dump_python(list(messages), mode="json")}
                 (evidence / "receipts" / f"{number:04d}.json").write_text(json.dumps(receipt, indent=2))
                 set_eval_attribute("receipt", f"{number:04d}")
-                for name in USAGE_FIELDS + ("wall_s", "status"):
+                for name in USAGE_FIELDS + PARAMETER_FIELDS + ("status",):
                     value = getattr(usage, name, None) if usage is not None else None
                     set_eval_attribute(name, value)
                 for name in ROW_FACTS + LABEL_FACTS:
@@ -196,12 +205,14 @@ def _row(spec: AgentEval, case: EvalCase, values: dict[str, bool], attributes: M
         if name in values and dimension in declared:
             dimensions[dimension] = dimensions.get(dimension, True) and values[name]
     metrics = {name: attributes.get(name) for name in USAGE_FIELDS}
+    tokens = (metrics["input_tokens"], metrics["output_tokens"])
+    metrics["tokens"] = None if None in tokens else sum(tokens)  # a sum with an unknown in it is unknown
     return {"case": case.key, "language": case.language, "kind": case.case.get("kind"),
             "receipt": attributes.get("receipt"), "status": attributes.get("status"),
             "passed": bool(values) and failure is None and all(values.values()),
             "assertions": values, "dimensions": dimensions,
             "failed_assertions": sorted(name for name, value in values.items() if not value),
-            "failure": failure, "latency_s": attributes.get("wall_s"), **metrics,
+            "failure": failure, **metrics, "parameters": {name: attributes.get(name) for name in PARAMETER_FIELDS},
             **{name: attributes.get(name) for name in ROW_FACTS},
             **{name: attributes[name] for name in LABEL_FACTS if attributes.get(name) is not None}}
 

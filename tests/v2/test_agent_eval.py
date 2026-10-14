@@ -8,7 +8,7 @@ from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RunUsage
 
 from corsair.v2.agents.common.usage import to_agent_usage
-from evals import agent_summary
+from evals import agent_eval, agent_summary
 from evals.agent_eval import AgentEval, Attempt, evaluate
 from evals.cases import freeze, write_case
 
@@ -25,7 +25,7 @@ def _root(tmp_path):
         "schema_version: 1\napplies_to: {sets: [], mode: scripted}\n"
         "hard_gates: {contract_rate: 1.0, safety_failures: 0, budget_exhausted_count: 0}\n"
         "thresholds:\n  accuracy:\n    correctness: {min: 0.5, by_language: {java: 0.9}}\n"
-        "  clean_attempt_rate: {min: null}\n  latency_s: {p90_max: null}\n  input_tokens: {mean_max: 1}\n"
+        "  clean_attempt_rate: {min: null}\n  wall_s: {p90_max: null}\n  input_tokens: {mean_max: 1}\n"
         "required_provenance: [git_commit, dataset_sha256]\n")
     return root
 
@@ -53,14 +53,14 @@ def test_runner_rows_summary_and_policy(tmp_path):
     lines = (tmp_path / "evidence" / "attempts.jsonl").read_text().splitlines()
     rows = [json.loads(line) for line in lines[1:]]
     assert len(rows) == 4 and {row["language"] for row in rows} == {"python", "java"}
-    assert all(row["requests"] == 1 and row["latency_s"] == 0.5 for row in rows)
+    assert all(row["requests"] == 1 and row["wall_s"] == 0.5 for row in rows)
     assert len(list((tmp_path / "evidence" / "receipts").iterdir())) == 4
     summary = agent_summary.summarize(tmp_path / "evidence", agent="builder", set_name="dev", language=None,
                                       mode="scripted", run="r1", command={"git_commit": "abc", "git_dirty": False})
     overall = summary["rollups"]["all"]
     assert overall["dimensions"] == {"contract": {"passed": 4, "total": 4}, "correctness": {"passed": 2, "total": 4}}
     assert summary["rollups"]["by_language"]["java"]["dimensions"]["correctness"] == {"passed": 0, "total": 2}
-    assert overall["latency_s"]["observed"] == 4 and overall["clean_attempts"] == 2
+    assert overall["wall_s"]["observed"] == 4 and overall["clean_attempts"] == 2
     policy = agent_summary.apply_policy(summary, root / "release-policy.yaml")
     entries = policy["entries"]
     assert entries["hard_gates.contract_rate"]["status"] == "pass"
@@ -72,10 +72,27 @@ def test_runner_rows_summary_and_policy(tmp_path):
 
 def test_unreported_usage_is_unknown_not_zero(tmp_path):
     rows = [{"case": "python/a", "language": "python", "kind": "positive", "dimensions": {"correctness": True},
-             "passed": True, "assertions": {"x": True}, "failure": None, "latency_s": None, "requests": None,
+             "passed": True, "assertions": {"x": True}, "failure": None, "wall_s": None, "requests": None,
              "tool_calls": None, "input_tokens": None, "output_tokens": None}]
     rolled = agent_summary.rollup(rows)
     assert rolled["input_tokens"] == {"observed": 0, "mean": None, "p50": None, "p90": None, "total": None}
+
+
+def test_run_record_names_and_a_sum_with_an_unknown_is_unknown(tmp_path):
+    """summary.json uses the run record's names (corsair-v2-run/1): wall_s, retries, tokens, parameters."""
+    root = _root(tmp_path)
+    asyncio.run(evaluate(_spec(root), tmp_path / "evidence", "dev"))
+    rows = [json.loads(line) for line in (tmp_path / "evidence" / "attempts.jsonl").read_text().splitlines()[1:]]
+    assert {"wall_s", "retries", "tokens", "parameters"} <= set(rows[0]) and "latency_s" not in rows[0]
+    assert set(rows[0]["parameters"]) == set(agent_eval.PARAMETER_FIELDS)
+    known = [{"case": "python/a", "language": "python", "kind": "positive", "dimensions": {}, "passed": True,
+              "assertions": {"x": True}, "failure": None, "status": "ok", "parameters": {"temperature": 0.2},
+              **{metric: 1 for metric in agent_summary.METRICS}}]
+    unknown = [known[0] | {"case": "python/b", "retries": None, "parameters": {"temperature": None}}]
+    rolled = agent_summary.rollup(known + unknown)
+    assert rolled["retries"]["observed"] == 1 and rolled["retries"]["total"] is None
+    assert rolled["requests"]["total"] == 2 and rolled["statuses"] == {"ok": 2}
+    assert rolled["parameters"]["temperature"] == [0.2, None]
 
 
 def test_chain_dispositions_keep_abstention_out_of_accuracy(tmp_path):
@@ -122,4 +139,4 @@ def test_live_runs_record_the_resolved_provider_profile(tmp_path):
     config.write_text(json.dumps({"profiles": {"local": {"base_url": "https://llm.example/v1", "model_name": "m"}},
                                   "agents": {agent: "local" for agent in MODEL_AGENTS}}))
     assert provider_identity(config, ("builder",)) == {
-        "builder": {"profile": "local", "base_url": "https://llm.example/v1", "model_name": "m"}}
+        "builder": {"profile": "local", "provider_host": "llm.example", "model": "m"}}  # run-record names
