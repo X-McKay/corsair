@@ -19,7 +19,7 @@ from pydantic_ai.usage import UsageLimits
 from pydantic_ai.workspaces import LocalWorkspaceBackend
 from pydantic_ai_harness import Skills
 
-from corsair.v2.contracts import AgentUsage, Case, ProbePlan, Runtime
+from corsair.v2.contracts import AgentUsage, Case, Finding, ProbePlan, Runtime
 
 from ..common.budget import tool_budget
 from ..common.repetition import read_loop_guard
@@ -41,6 +41,7 @@ LIMITS = UsageLimits(request_limit=40, tool_calls_limit=30)
 class InvestigatorDeps:
     source_root: Path
     test_dir: str
+    finding: Finding | None = None
 
 
 def create_agent(model: Model, *, durability: TemporalDurability | None = None,
@@ -61,7 +62,7 @@ def create_agent(model: Model, *, durability: TemporalDurability | None = None,
 
     @agent.output_validator
     def resolve_citations(ctx: RunContext[InvestigatorDeps], plan: ProbePlan) -> ProbePlan:
-        return check_plan(plan, ctx.deps.source_root, ctx.deps.test_dir)
+        return check_plan(plan, ctx.deps.source_root, ctx.deps.test_dir, ctx.deps.finding)
 
     return agent
 
@@ -80,7 +81,7 @@ async def investigate(case: Case, runtime: Runtime, model: Model, *, source_root
                       ) -> tuple[ProbePlan, AgentUsage]:
     """Stage entry. A run without a valid plan returns status unresolved (not a refusal) with the usage status as reason."""
     agent = create_agent(model)
-    deps = InvestigatorDeps(source_root=Path(source_root), test_dir=runtime.test_dir)
+    deps = InvestigatorDeps(source_root=Path(source_root), test_dir=runtime.test_dir, finding=case.finding)
     plan, usage = await run_recorded(agent, "investigator", render_prompt(case, runtime), model=model, deps=deps,
                                      usage_limits=LIMITS, workspace=source_workspace(Path(source_root)))
     if plan is None:
