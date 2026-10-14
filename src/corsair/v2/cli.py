@@ -50,7 +50,7 @@ def _intake(args):
 
     if args.issue_json is not None:
         return intake.from_issue_json(args.issue_json)
-    return intake.from_manifest(args.manifest, args.case)
+    return intake.load_corpus_case(args.manifest, args.case)
 
 
 async def _run(args) -> int:
