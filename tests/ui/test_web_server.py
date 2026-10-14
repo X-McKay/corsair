@@ -152,7 +152,7 @@ def test_reference_follows_the_runner_order(root):
     evidence = Evidence(root)
     reference = evidence.evaluation('reviewer', later)['reference']
     assert (reference['run'], reference['kind']) == (EVAL_RUN, 'previous run')
-    (agent / f'baseline-development-scripted.json').write_text(json.dumps({'run': EVAL_RUN}))
+    (agent / 'baseline-development-scripted.json').write_text(json.dumps({'run': EVAL_RUN}))
     assert evidence.evaluation('reviewer', later)['reference']['kind'] == 'baseline'
     assert evidence.baselines()['baselines'] == [{'agent': 'reviewer', 'set': 'development', 'mode': 'scripted',
                                                    'source': 'promoted', 'run': EVAL_RUN}]

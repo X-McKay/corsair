@@ -123,10 +123,9 @@ def newest(names, limit: int = MAX_ENTRIES) -> tuple[list[str], bool]:
 
 def entries(root: Path, parts: tuple[str, ...]) -> tuple[list[str], bool]:
     """Directory names (no symlinks) in ``parts``, newest name first, and whether the limit cut it short."""
-    with directory(root, parts) as fd:
-        with os.scandir(fd) as found:
-            return newest(entry.name for entry in found
-                          if NAME.fullmatch(entry.name) and entry.is_dir(follow_symlinks=False))
+    with directory(root, parts) as fd, os.scandir(fd) as found:
+        return newest(entry.name for entry in found
+                      if NAME.fullmatch(entry.name) and entry.is_dir(follow_symlinks=False))
 
 
 def is_dir(root: Path, parts: tuple[str, ...]) -> bool:
@@ -725,11 +724,10 @@ class Evidence:
 
 
 def entries_files(root: Path, parts: tuple[str, ...], suffix: str) -> list[str]:
-    with directory(root, parts) as fd:
-        with os.scandir(fd) as found:
-            names, _ = newest(entry.name for entry in found
-                              if entry.name.endswith(suffix) and NAME.fullmatch(entry.name)
-                              and entry.is_file(follow_symlinks=False))
+    with directory(root, parts) as fd, os.scandir(fd) as found:
+        names, _ = newest(entry.name for entry in found
+                          if entry.name.endswith(suffix) and NAME.fullmatch(entry.name)
+                          and entry.is_file(follow_symlinks=False))
     return sorted(names)
 
 
