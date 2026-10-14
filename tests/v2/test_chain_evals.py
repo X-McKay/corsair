@@ -76,3 +76,11 @@ def test_live_mode_refuses_without_docker(tmp_path, monkeypatch):
     case = next(iter(CASES.values()))
     with pytest.raises(RuntimeError, match="needs Docker"):
         asyncio.run(chain.run(case, {}, tmp_path))
+
+
+def test_a_wrong_fix_result_fails_outcome_fields(tmp_path):
+    case = next(case for case in CASES.values() if case.oracle.get("expected_fix") == "verified")
+    attempt, results = _attempt(case, tmp_path)
+    assert results["outcome_fields"]
+    attempt = dataclasses.replace(attempt, output=attempt.output.model_copy(update={"fix": "not_verified"}))
+    assert chain.check(case, attempt)["outcome_fields"] is False

@@ -58,9 +58,10 @@ REPOSITORY = EVALS.parent
 MATRIX = REPOSITORY / "deploy" / "v2" / "runtime-matrix.yaml"
 AGENTS = ("investigator", "builder", "control_prober", "exploit_prober", "reviewer")
 ROLES = ("control", "exploit")
-DIMENSIONS = {"label": "correctness", "terminal_reason": "correctness", "contract": "contract",
+DIMENSIONS = {"label": "correctness", "terminal_reason": "correctness", "outcome_fields": "correctness",
+              "contract": "contract",
               "grounding": "grounding", "trajectory": "trajectory", "safety": "safety"}
-OPTIONAL = frozenset({"terminal_reason", "grounding"})
+OPTIONAL = frozenset({"terminal_reason", "outcome_fields", "grounding"})
 RULE_LABEL = {rule.id: rule.label for rule in RULES}
 USAGE_FIELDS = ("requests", "tool_calls", "input_tokens", "output_tokens")
 # Oracle fields whose values legitimately reach stages: pinned digests, the Select row, the chain's own enum values
@@ -439,6 +440,12 @@ def check(case: EvalCase, attempt: Attempt) -> dict[str, bool]:
                         and verdict.label.value not in oracle.get("forbidden_labels", ()))
     if oracle.get("expected_terminal_reason") is not None:
         results["terminal_reason"] = verdict.terminal_reason.value == oracle["expected_terminal_reason"]
+    # rule, finding and fix as the oracle names them (a case that accepts alternative labels names none)
+    expected = {"rule_id": oracle.get("expected_rule"), "finding": oracle.get("expected_finding"),
+                "fix": oracle.get("expected_fix")}
+    expected = {name: value for name, value in expected.items() if value is not None}
+    if expected:
+        results["outcome_fields"] = all(getattr(verdict, name) == value for name, value in expected.items())
     try:
         Verdict.model_validate(verdict.model_dump(mode="json"))
         results["contract"] = (verdict.case_id == facts["case_id"]
