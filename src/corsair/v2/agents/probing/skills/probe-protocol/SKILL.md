@@ -28,8 +28,8 @@ The environment variable `CORSAIR_MARKER_DIR` names a directory that exists when
   matter).
 - Write them inside the test body itself, not in a fixture, setup or teardown hook, helper class or module-level
   code, and not inside a loop or exception handler. Use the language's standard library. Where the framework skill
-  shows a sanctioned form (for example a guarded `end` in a framework that keeps running after a failed
-  assertion), follow it exactly.
+  shows a sanctioned form (for example a small marker-writing helper, or a guarded `end` in a framework that keeps
+  running after a failed assertion), follow it exactly; that form overrides the general rule above.
 - Nothing that can fail goes before `start`. Nothing goes after `end`.
 
 So `start` without `check` means the body began but raised before reaching its assertion; `check` = `violated`

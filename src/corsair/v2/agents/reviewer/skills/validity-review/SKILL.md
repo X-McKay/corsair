@@ -38,14 +38,14 @@ assertion lines in the test file, and the target's definition in the source.
 ## Protocol defects (probe-protocol skill)
 
 Marker placement follows the pattern in the framework skill for the test's framework (the one the prompt names):
-a form that skill prescribes, such as a guarded `end` marker followed by the framework's closing call, is correct
-and never a defect.
+a form that skill prescribes, such as a small marker-writing helper or a guarded `end` marker followed by the
+framework's closing call, is correct and never a defect.
 
 Name these as defects, and set the most affected check false (usually assertion_relevant):
 
 - the `start` marker is not the first statement of the test body, or the `end` marker is not the last
-  statement after every assertion; markers written in a fixture, hook, helper or exception handler, or in any
-  guard the framework skill does not prescribe;
+  statement after every assertion; markers written in a fixture, hook, helper or exception handler, or inside a
+  guard, in a way the framework skill does not prescribe;
 - the `check` marker is not computed from the asserted condition: hard-coded `holds` or `violated`, computed from a
   different expression or an earlier value than the one asserted, written somewhere other than immediately
   before the main assertion, or missing;
