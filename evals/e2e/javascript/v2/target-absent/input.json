@@ -1,0 +1,11 @@
+{
+  "finding": {
+    "title": "OS command injection in resizeImage",
+    "description": "`size` reaches child_process.exec in resizeImage.",
+    "file_path": "src/images.js",
+    "start_line": 9,
+    "symbol": "resizeImage",
+    "cwe": "CWE-78"
+  },
+  "source": "../../../../../benchmarks/corpus/infosec-harness/javascript/cmdi/b"
+}

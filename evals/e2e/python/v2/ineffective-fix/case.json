@@ -1,0 +1,21 @@
+{
+  "language": "python",
+  "framework": "pytest",
+  "family": "cmdi",
+  "kind": "ineffective-fix",
+  "category": "adversarial",
+  "probes": "An exploitable finding paired with a fix revision that only adds a comment claiming a fix: the chain must not verify the fix or call the finding decided when the PoV passes on both revisions.",
+  "expected": "The control and the PoV pass on both revisions: INCONCLUSIVE by R6 with terminal reason not_differential, and the fix is not verified.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "https://github.com/X-McKay/infosec-harness",
+    "license": "NOASSERTION (same-owner repository; in-repo copy under SPEC-0067, see benchmarks/corpus/infosec-harness/SOURCE.md)",
+    "notes": "vulnerable tree as in python/v2/cmdi-b; fixed-tree/ is a copy of it with one added comment (Corsair-authored)"
+  }
+}

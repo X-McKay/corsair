@@ -1,0 +1,79 @@
+{
+  "expected_label": "LIKELY_EXPLOITABLE",
+  "acceptable_labels": [
+    "LIKELY_EXPLOITABLE"
+  ],
+  "forbidden_labels": [
+    "LIKELY_NOT_EXPLOITABLE"
+  ],
+  "expected_rule": "R4",
+  "expected_terminal_reason": "ok",
+  "expected_finding": "reproduced",
+  "expected_fix": "verified",
+  "expected_runtime_row": "minitest-ruby31",
+  "truth": {
+    "source": "synthetic",
+    "variant": "unsafe",
+    "paired_with": "ruby/cmdi-b"
+  },
+  "why": "The tainted argument reaches the sink unguarded.",
+  "revision_tree_sha256": "052c6e44c336c159f54f2df32e88588f3c12246a553811cf9ecf4ad7d38004ee",
+  "fixed_tree_sha256": "5f748a8294f09605c5081b08c9803d59cee6656922d451cca035bd6ec208fad1",
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "lib/archive.rb",
+          "start_line": 3,
+          "end_line": 3,
+          "quote": "  def self.list_entries(path)"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "lib/archive.rb",
+            "start_line": 3,
+            "end_line": 3,
+            "quote": "  def self.list_entries(path)"
+          }
+        ]
+      },
+      "fixed": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "lib/archive.rb",
+            "start_line": 3,
+            "end_line": 3,
+            "quote": "module Archive"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "passed"
+      },
+      "fixed": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    },
+    "build_fixed": true
+  }
+}

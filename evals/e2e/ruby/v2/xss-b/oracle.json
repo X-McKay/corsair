@@ -1,0 +1,62 @@
+{
+  "expected_label": "LIKELY_NOT_EXPLOITABLE",
+  "acceptable_labels": [
+    "LIKELY_NOT_EXPLOITABLE"
+  ],
+  "forbidden_labels": [
+    "LIKELY_EXPLOITABLE"
+  ],
+  "expected_rule": "R5",
+  "expected_terminal_reason": "ok",
+  "expected_finding": "not_reproduced",
+  "expected_fix": "not_applicable",
+  "expected_runtime_row": "minitest-ruby31",
+  "truth": {
+    "source": "synthetic",
+    "variant": "guarded",
+    "paired_with": "ruby/xss-b"
+  },
+  "why": "The same finding against the guarded variant: the control on the path holds.",
+  "revision_tree_sha256": "f953ea44d0849a57d67220d2556f827996726e536f1c9e480480aa76227433d1",
+  "fixed_tree_sha256": null,
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "lib/greeting.rb",
+          "start_line": 4,
+          "end_line": 4,
+          "quote": "  TEMPLATE = ERB.new('<p>Hello, <%= ERB::Util.html_escape(name) %>!</p>')"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "lib/greeting.rb",
+            "start_line": 4,
+            "end_line": 4,
+            "quote": "  TEMPLATE = ERB.new('<p>Hello, <%= ERB::Util.html_escape(name) %>!</p>')"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    }
+  }
+}

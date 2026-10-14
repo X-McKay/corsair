@@ -1,0 +1,12 @@
+{
+  "case_id": "corpus:4f64efe5f3999b10",
+  "finding": {
+    "title": "Path traversal in read_doc",
+    "description": "`name` reaches open() in read_doc.",
+    "file_path": "app.py",
+    "start_line": 6,
+    "symbol": "read_doc",
+    "cwe": "CWE-22"
+  },
+  "source": "../../../../../benchmarks/corpus/infosec-harness/python/pathtraversal/b"
+}

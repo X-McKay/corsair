@@ -1,0 +1,11 @@
+{
+  "finding": {
+    "title": "OS command injection in compress",
+    "description": "Untrusted directory argument reaches Runtime.exec through sh -c in compress.",
+    "file_path": "src/main/java/com/example/Archiver.java",
+    "start_line": 5,
+    "symbol": "compress",
+    "cwe": "CWE-78"
+  },
+  "source": "tree"
+}

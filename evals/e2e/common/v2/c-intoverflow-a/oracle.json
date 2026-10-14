@@ -1,0 +1,31 @@
+{
+  "expected_label": "UNABLE_TO_RUN",
+  "acceptable_labels": [
+    "UNABLE_TO_RUN"
+  ],
+  "forbidden_labels": [
+    "LIKELY_EXPLOITABLE",
+    "LIKELY_NOT_EXPLOITABLE"
+  ],
+  "expected_rule": "R0",
+  "expected_terminal_reason": "no_runtime",
+  "expected_finding": "none",
+  "expected_fix": "not_verified",
+  "expected_runtime_row": null,
+  "truth": {
+    "source": "manifest",
+    "manifest": "benchmarks/corpus/infosec-harness/manifest.json",
+    "manifest_case": "c-intoverflow-vulnerable",
+    "manifest_truth": {
+      "expected_verdict": "potentially_exploitable",
+      "reachability": "reachable",
+      "sink_file": "dup.c",
+      "sink_line": 7,
+      "source": "n parameter",
+      "target_callable": "dup_n"
+    }
+  },
+  "why": "C is not a supported language: no matrix row detects a Makefile tree, so Select stops the chain (R0). The manifest truth is kept for when a C row exists.",
+  "revision_tree_sha256": "85f1ebad9ed4725a035b254e22c7072da46dde9c93ec3ceaba2d8ae33711320d",
+  "fixed_tree_sha256": "29145b7311cb97faf41b5fea73a4047c53982d09e047189f8cd71c95f198ad12"
+}

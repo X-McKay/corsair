@@ -1,0 +1,21 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "path-traversal",
+  "kind": "failure-mode",
+  "category": "failure-mode",
+  "probes": "A trajectory that repeats the same read: the guard answers the third identical read_file with a notice instead of running it, and the plan is still reached.",
+  "expected": "The same planned answer as ruby/attachment-name-traversal; the repeated read_file call is answered with the read-loop notice, not re-run.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic File.read download helper.; converted from evals/test_planning/ruby/breadth/ruby-traversal-rejected-exception; repeated-read variant of ruby/attachment-name-traversal for the read-loop guard (develop #152)"
+  }
+}

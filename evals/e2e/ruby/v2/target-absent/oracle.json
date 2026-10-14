@@ -1,0 +1,27 @@
+{
+  "expected_label": "UNABLE_TO_RUN",
+  "acceptable_labels": [
+    "UNABLE_TO_RUN"
+  ],
+  "forbidden_labels": [
+    "LIKELY_EXPLOITABLE",
+    "LIKELY_NOT_EXPLOITABLE"
+  ],
+  "expected_rule": "R0",
+  "expected_terminal_reason": "target_not_found",
+  "expected_finding": "none",
+  "expected_fix": "not_applicable",
+  "expected_runtime_row": "minitest-ruby31",
+  "truth": {
+    "source": "synthetic finding on the ruby/cmdi-a tree"
+  },
+  "why": "Neither lib/extractor.rb nor extract_all exists; the Investigator must return target_not_found.",
+  "revision_tree_sha256": "052c6e44c336c159f54f2df32e88588f3c12246a553811cf9ecf4ad7d38004ee",
+  "fixed_tree_sha256": null,
+  "replay": {
+    "plan": {
+      "status": "target_not_found",
+      "reason": "neither the named file nor the symbol exists in the tree"
+    }
+  }
+}

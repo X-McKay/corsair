@@ -1,0 +1,19 @@
+{
+  "finding": {
+    "title": "readUpload is called with the attachment name from the download query string.",
+    "description": "readUpload is called with the attachment name from the download query string. A name such as ../outside.txt may read files outside the upload directory. Analyze this component only.",
+    "file_path": "lib/uploads.js",
+    "symbol": "readUpload"
+  },
+  "row_id": "jest29-node22",
+  "source_files": [
+    {
+      "path": "lib/uploads.js",
+      "content": "'use strict';\nconst fs = require('fs');\nconst path = require('path');\n\n// Read a previously uploaded attachment for download.\nfunction readUpload(uploadDir, name) {\n  const file = path.join(uploadDir, name);\n  return fs.readFileSync(file, 'utf8');\n}\n\nmodule.exports = { readUpload };\n"
+    },
+    {
+      "path": "test/uploads.test.js",
+      "content": "'use strict';\nconst fs = require('fs');\nconst os = require('os');\nconst path = require('path');\nconst { readUpload } = require('../lib/uploads');\n\ntest('reads_an_uploaded_file', () => {\n  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'uploads-'));\n  fs.writeFileSync(path.join(dir, 'a.txt'), 'hello');\n  expect(readUpload(dir, 'a.txt')).toBe('hello');\n});\n"
+    }
+  ]
+}

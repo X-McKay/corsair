@@ -1,0 +1,13 @@
+{
+  "case_id": "corpus:9571ee1cbce4e51c",
+  "finding": {
+    "title": "Cross-site scripting in renderComment",
+    "description": "Untrusted text argument reaches the CWE-79 sink in renderComment.",
+    "file_path": "src/render.ts",
+    "start_line": 2,
+    "symbol": "renderComment",
+    "cwe": "CWE-79"
+  },
+  "source": "../../../../../benchmarks/corpus/infosec-harness/javascript/xssesm/a",
+  "fixed_source": "../../../../../benchmarks/corpus/infosec-harness/javascript/xssesm/b"
+}

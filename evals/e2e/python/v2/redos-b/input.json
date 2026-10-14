@@ -1,0 +1,13 @@
+{
+  "case_id": "corpus:1b4d2b242cdce660",
+  "finding": {
+    "title": "Inefficient regular expression in is_valid_email",
+    "description": "`value` is matched against an email-validation regex in is_valid_email.",
+    "file_path": "app.py",
+    "start_line": 6,
+    "symbol": "is_valid_email",
+    "cwe": "CWE-1333"
+  },
+  "source": "../../../../../benchmarks/corpus/infosec-harness/python/redos/b",
+  "fixed_source": "../../../../../benchmarks/corpus/infosec-harness/python/redos/a"
+}

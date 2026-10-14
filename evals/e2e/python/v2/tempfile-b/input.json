@@ -1,0 +1,13 @@
+{
+  "case_id": "corpus:d8e5795a2cae09a0",
+  "finding": {
+    "title": "Temporary file creation in export_report",
+    "description": "export_report creates its export file in the shared temp directory.",
+    "file_path": "app.py",
+    "start_line": 5,
+    "symbol": "export_report",
+    "cwe": "CWE-377"
+  },
+  "source": "../../../../../benchmarks/corpus/infosec-harness/python/tempfile/b",
+  "fixed_source": "../../../../../benchmarks/corpus/infosec-harness/python/tempfile/a"
+}

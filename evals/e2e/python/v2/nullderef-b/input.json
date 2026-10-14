@@ -1,0 +1,12 @@
+{
+  "case_id": "corpus:73496e8be02e8095",
+  "finding": {
+    "title": "None dereference in user_city",
+    "description": "`payload`'s 'address' field is read in user_city.",
+    "file_path": "app.py",
+    "start_line": 4,
+    "symbol": "user_city",
+    "cwe": "CWE-476"
+  },
+  "source": "../../../../../benchmarks/corpus/infosec-harness/python/nullderef/b"
+}

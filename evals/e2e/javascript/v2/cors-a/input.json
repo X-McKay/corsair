@@ -1,0 +1,12 @@
+{
+  "case_id": "corpus:d4c2a63866468d8d",
+  "finding": {
+    "title": "Permissive CORS policy in handleProfile",
+    "description": "The request Origin reaches Access-Control-Allow-Origin with credentials in handleProfile.",
+    "file_path": "src/server.js",
+    "start_line": 7,
+    "symbol": "handleProfile",
+    "cwe": "CWE-942"
+  },
+  "source": "../../../../../benchmarks/corpus/infosec-harness/javascript/cors/a"
+}

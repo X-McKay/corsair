@@ -1,0 +1,12 @@
+{
+  "case_id": "corpus:5e6017027437e595",
+  "finding": {
+    "title": "SQL execution in healthcheck",
+    "description": "healthcheck runs a query; a scanner flagged the execute sink.",
+    "file_path": "app.py",
+    "start_line": 15,
+    "symbol": "healthcheck",
+    "cwe": "CWE-89"
+  },
+  "source": "../../../../../benchmarks/corpus/infosec-harness/python/healthcheck/a"
+}

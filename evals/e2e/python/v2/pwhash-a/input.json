@@ -1,0 +1,13 @@
+{
+  "case_id": "corpus:e93fd143be395280",
+  "finding": {
+    "title": "Risky password hashing in hash_password",
+    "description": "hash_password produces the stored representation of a user's password.",
+    "file_path": "app.py",
+    "start_line": 6,
+    "symbol": "hash_password",
+    "cwe": "CWE-327"
+  },
+  "source": "../../../../../benchmarks/corpus/infosec-harness/python/pwhash/a",
+  "fixed_source": "../../../../../benchmarks/corpus/infosec-harness/python/pwhash/b"
+}

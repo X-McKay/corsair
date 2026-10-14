@@ -1,0 +1,12 @@
+{
+  "case_id": "corpus:a62daaadb0494701",
+  "finding": {
+    "title": "Mass assignment in update_profile",
+    "description": "Request body keys reach setattr on the user in update_profile.",
+    "file_path": "app.py",
+    "start_line": 18,
+    "symbol": "update_profile",
+    "cwe": "CWE-915"
+  },
+  "source": "../../../../../benchmarks/corpus/infosec-harness/python/massassignment/a"
+}

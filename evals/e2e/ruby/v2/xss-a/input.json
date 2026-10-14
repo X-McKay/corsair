@@ -1,0 +1,13 @@
+{
+  "case_id": "e2e-v2:ruby/xss-a",
+  "finding": {
+    "title": "Cross-site scripting in render",
+    "description": "Untrusted name argument reaches the ERB template output in Greeting.render.",
+    "file_path": "lib/greeting.rb",
+    "start_line": 4,
+    "symbol": "render",
+    "cwe": "CWE-79"
+  },
+  "source": "tree",
+  "fixed_source": "../xss-b/tree"
+}
