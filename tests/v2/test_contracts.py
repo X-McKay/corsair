@@ -13,8 +13,9 @@ def test_safe_paths_refuse_absolute_and_climbing():
 
 def test_probe_draft_requires_both_markers():
     with pytest.raises(ValidationError):
-        ProbeDraft(role="control", test_file="t/test_x.py", test_name="test_x", source="CORSAIR_START only")
-    ProbeDraft(role="control", test_file="t/test_x.py", test_name="test_x", source="CORSAIR_START ... CORSAIR_END")
+        ProbeDraft(role="control", test_file="t/test_x.py", test_name="test_x", source="writes no markers")
+    ProbeDraft(role="control", test_file="t/test_x.py", test_name="test_x",
+               source="open(os.environ['CORSAIR_MARKER_DIR'] + '/start', 'w')")
 
 
 def test_finding_cwe_shape():

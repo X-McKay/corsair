@@ -122,6 +122,7 @@ class BuildResult(Frozen):
     baseline_exit_code: int | None = None
     log: ArtifactRef | None = None
     reason: str = Field(default="", max_length=2_000)
+    cleanup_confirmed: bool | None = Field(default=None, description="False is cleanup_unconfirmed; None unknown")
 
 
 class Environment(Frozen):
@@ -185,8 +186,10 @@ class ProbeDraft(Frozen):
     @field_validator("source")
     @classmethod
     def _markers(cls, value: str) -> str:
-        if "CORSAIR_START" not in value or "CORSAIR_END" not in value:
-            raise ValueError("a probe must write the CORSAIR_START and CORSAIR_END markers")
+        # D8 marker protocol: the test writes the files ``start`` (first statement) and ``end`` (last, after its
+        # assertions) inside the directory named by the CORSAIR_MARKER_DIR environment variable.
+        if "CORSAIR_MARKER_DIR" not in value:
+            raise ValueError("a probe must write the start and end marker files under $CORSAIR_MARKER_DIR")
         return value
 
 
@@ -250,6 +253,7 @@ class ProbeRun(Frozen):
     outcome: Outcome
     output: ArtifactRef | None = None
     duration_s: float | None = Field(default=None, ge=0)
+    cleanup_confirmed: bool | None = Field(default=None, description="False is cleanup_unconfirmed; None unknown")
 
 
 # --- 8. Decide (code) -------------------------------------------------------------------------------------------
