@@ -324,6 +324,25 @@ class Origin(StrEnum):
     DECLARED = "declared"
 
 
+class Attempt(Frozen):
+    """One exploit attempt's pair (SPEC-0082 D18): a case runs at most two, the second only before R5.
+
+    Attempt 2 reuses attempt 1's control byte for byte with a new, independently written PoV, frozen into its own
+    pair. Decide binds each attempt's reviews and runs by ``patch_sha256``; attempt 2's vulnerable control result is
+    attempt 1's run, and counts only when ``control_sha256`` is the same in both attempts.
+    """
+
+    number: Literal[1, 2]
+    patch_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$",
+                                     description="The attempt's final frozen pair; None when no pair was frozen")
+    control_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$",
+                                       description="Digest of the control draft in that pair")
+    review_rounds: int = Field(default=0, ge=0, description="Vulnerable-revision reviews in this attempt")
+    revisions: dict[Literal["control", "exploit"], int] = Field(default_factory=dict)
+    mechanical_fixes: dict[Literal["control", "exploit"], int] = Field(default_factory=dict)
+    first_review_valid: dict[Literal["control", "exploit"], bool] = Field(default_factory=dict)
+
+
 class Verdict(Frozen):
     contract: Literal["corsair-v2/1"] = CONTRACT_VERSION
     case_id: str
@@ -345,6 +364,13 @@ class Verdict(Frozen):
     first_review_valid: dict[Literal["control", "exploit"], bool] = Field(
         default_factory=dict, description="Each probe's validity at the first review; absent when that review did not bind "
                                   "or complete")
+    attempts: tuple[Attempt, ...] = Field(
+        default=(), description="The exploit attempts in order (D18); the fields above describe attempt 1")
+    attempt: Literal[1, 2] | None = Field(
+        default=None, description="The attempt whose pair the rule decided on; None when no pair was decided on")
+    sensitivity: Literal["unverified"] | None = Field(
+        default=None, description="On every R5 (D18): how often a failed PoV pair misses a real vulnerability is not "
+                                  "yet measured. Never changes the label")
 
 
 # --- Telemetry, recorded per agent call -------------------------------------------------------------------------

@@ -110,3 +110,25 @@ def test_workflow_runs_the_same_review_loop_as_direct_mode(tmp_path):
     assert fakes.names() == direct.names()
     feedback = [kw["review_feedback"] for _, kw in fakes.of("probe-exploit") if kw["review_feedback"]]
     assert len(feedback) == 1 and "exploit defect 0" in feedback[0]
+
+
+def test_workflow_runs_the_same_second_attempt_as_direct_mode(tmp_path):
+    def setup():  # attempt 1's PoV fails, attempt 2's is rejected once, revised and then passes (R4 on attempt 2)
+        return Fakes(outcomes={("vulnerable", "exploit"): ["assertion_failed", "passed"],
+                               ("fixed", "exploit"): ["assertion_failed", "assertion_failed"]},
+                     review_invalid=[set(), {"exploit"}], real_decide=True)
+    fakes = setup()
+    verdict, run_dir = asyncio.run(_run(tmp_path, fakes, "durable-a2", fixed=True))
+    direct = setup()
+    record = RunRecorder.create(tmp_path, "direct-a2")
+    expected = asyncio.run(run_case(case(tmp_path, True), stages=direct.stages(), models=models(),
+                                    matrix_path=tmp_path / "matrix.yaml", record=record))
+    assert verdict == expected
+    assert (verdict.rule_id, verdict.attempt, verdict.fix) == ("R4", 2, "verified")
+    assert [a.review_rounds for a in verdict.attempts] == [1, 2]
+    assert _steps(run_dir) == _steps(record.run_dir)
+    assert {"probe-exploit.a2", "review.a2.1", "probe.exploit.r1.a2", "review.a2.2", "execute-exploit-vulnerable.a2",
+            "execute-exploit-fixed.a2"} <= set(_steps(run_dir))
+    assert fakes.names() == direct.names()
+    summary = json.loads((run_dir / "summary.json").read_text())
+    assert [a["exploit_outcome"] for a in summary["attempts"]] == ["assertion_failed", "passed"]

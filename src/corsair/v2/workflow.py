@@ -43,8 +43,8 @@ with workflow.unsafe.imports_passed_through():
     from pydantic_ai.models import Model
 
     from .chain import Budget, Diagnosis, LocalOps, Progress, Replayed, Stages, StepResult, compose
-    from .contracts import (BuildResult, Case, Environment, FrozenPatch, ProbeBrief, ProbeDraft, ProbePlan, ProbeRun,
-                            Recipe, Runtime, TerminalReason, Validity, Verdict)
+    from .contracts import (Attempt, BuildResult, Case, Environment, FrozenPatch, ProbeBrief, ProbeDraft, ProbePlan,
+                            ProbeRun, Recipe, Runtime, TerminalReason, Validity, Verdict)
     from .record import RunRecorder
 
 MODEL_QUEUE = "corsair-v2-model"
@@ -174,8 +174,9 @@ async def execute(run_dir: str, step: str, environment: Environment, runtime: Ru
 @activity.defn(name="corsair.v2.decide")
 async def decide(run_dir: str, step: str, case: Case, runtime: Runtime | None, build: BuildResult | None,
                  plan: ProbePlan | None, validity: tuple[Validity, ...], runs: tuple[ProbeRun, ...],
-                 stopped: str | None, fix_stopped: str | None = None) -> Verdict:
-    return await _ops(run_dir).decide(step, case, runtime, build, plan, validity, runs, stopped, fix_stopped)
+                 stopped: str | None, fix_stopped: str | None = None, attempts: tuple[Attempt, ...] = ()) -> Verdict:
+    return await _ops(run_dir).decide(step, case, runtime, build, plan, validity, runs, stopped, fix_stopped,
+                                      attempts)
 
 
 MODEL_ACTIVITIES = (ground, investigate, build, probe, review)
@@ -239,10 +240,10 @@ class ActivityOps:
         return self._container(execute, step, environment, runtime, patch, role, revision)
 
     async def decide(self, step, case, runtime, build_result, plan, validity, runs, stopped,
-                     fix_stopped=None) -> Verdict:
+                     fix_stopped=None, attempts=()) -> Verdict:
         return await workflow.execute_activity(
             decide, args=[self.run_dir, step, case, runtime, build_result, plan, validity, runs, stopped,
-                          fix_stopped],
+                          fix_stopped, attempts],
             task_queue=CONTROL_QUEUE, start_to_close_timeout=CONTROL_TIMEOUT, retry_policy=READ_RETRY)
 
 

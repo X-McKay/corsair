@@ -96,8 +96,10 @@ Every attempt builds the `Case` with `intake.from_issue_json` and runs `corsair.
   null no recipe), `build_fixed`, `check` (D3 result per role, a string or a list in call order), `review` (per
   revision one round or a list of rounds: validity per role, citations) and `outcomes` (the raw probe outcome per
   revision and role, the one place outcomes live; the recorded facts must classify as that outcome under
-  `outcome.classify`). These are reference trajectories authored from each oracle's own expected path, not
-  observations of live runs; a stage whose observation is missing raises, which the chain records as `infra_error`.
+  `outcome.classify`). A second exploit attempt (D18, before any R5) answers from an optional `attempt2` block with
+  the same `check`, `review` and `outcomes` keys; without one it repeats attempt 1's last exploit check, last review
+  per revision and recorded outcomes. These are reference trajectories authored from each oracle's own expected
+  path, not observations of live runs; a stage whose observation is missing raises, which the chain records as `infra_error`.
 - **Live** (`--provider-config`): `default_stages()` with every agent's model from `corsair.v2.models`; it needs
   Docker and a reachable endpoint and exits 2 with the reason when Docker does not answer.
 
