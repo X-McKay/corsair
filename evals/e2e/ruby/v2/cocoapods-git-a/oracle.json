@@ -1,0 +1,87 @@
+{
+  "expected_label": "LIKELY_EXPLOITABLE",
+  "acceptable_labels": [
+    "LIKELY_EXPLOITABLE"
+  ],
+  "forbidden_labels": [
+    "LIKELY_NOT_EXPLOITABLE"
+  ],
+  "expected_rule": "R4",
+  "expected_terminal_reason": "ok",
+  "expected_finding": "reproduced",
+  "expected_fix": "verified",
+  "expected_runtime_row": "minitest-ruby31",
+  "truth": {
+    "source": "manifest",
+    "manifest": "benchmarks/corpus/permissive-reduced/manifest.json",
+    "manifest_case": "ruby-cocoapods-git-a",
+    "manifest_truth": {
+      "expected_verdict": "potentially_exploitable",
+      "reachability": "reachable",
+      "sink_file": "lib/cocoapods-downloader/git.rb",
+      "sink_line": 16,
+      "source": "git option",
+      "target_callable": "preprocess_options"
+    }
+  },
+  "why": "Manifest truth potentially_exploitable (reachability reachable).",
+  "revision_tree_sha256": "873307c2dde8c6b601d08ccae6afe4083dc3b64076c35546636822c8c2cb7576",
+  "fixed_tree_sha256": "2a3d1ab2a0fca0158ebcb381fd5547a33ee7d206011148ef03da037ed14c6325",
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "lib/cocoapods-downloader/git.rb",
+          "start_line": 16,
+          "end_line": 16,
+          "quote": "        output = Git.execute_command('git', command)"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "lib/cocoapods-downloader/git.rb",
+            "start_line": 16,
+            "end_line": 16,
+            "quote": "        output = Git.execute_command('git', command)"
+          }
+        ]
+      },
+      "fixed": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "lib/cocoapods-downloader/git.rb",
+            "start_line": 17,
+            "end_line": 17,
+            "quote": "        output = Git.execute_command('git', command)"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "passed"
+      },
+      "fixed": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    },
+    "build_fixed": true
+  }
+}

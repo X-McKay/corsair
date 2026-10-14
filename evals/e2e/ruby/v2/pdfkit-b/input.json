@@ -1,0 +1,13 @@
+{
+  "case_id": "corpus:b514ef7e705eeb40",
+  "finding": {
+    "title": "Process invocation construction in PDFKit#command",
+    "description": "PDFKit#command builds the invocation for the wkhtmltopdf process from the configured executable, options and source.",
+    "file_path": "lib/pdfkit/pdfkit.rb",
+    "start_line": 59,
+    "symbol": "command",
+    "cwe": "CWE-78"
+  },
+  "source": "../../../../../benchmarks/corpus/permissive-reduced/ruby/pdfkit/b",
+  "fixed_source": "../../../../../benchmarks/corpus/permissive-reduced/ruby/pdfkit/a"
+}

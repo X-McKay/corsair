@@ -1,0 +1,24 @@
+{
+  "language": "javascript",
+  "framework": "jest",
+  "family": "codecov-node",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "Command injection in coverage file discovery (CWE-78) on the variant where untrusted input reaches the sink: the whole chain must reproduce it through listFiles.",
+  "expected": "The control and the proof-of-vulnerability (exploit) probe pass on this tree, so the label is LIKELY_EXPLOITABLE by R4; on the paired fixed tree the control passes and the PoV's assertion fails, so the fix is verified.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "https://github.com/codecov/codecov-node",
+    "license": "MIT",
+    "record": "CVE-2020-15123",
+    "fix_commit": "c0711c6566",
+    "verbatim": false,
+    "path": "benchmarks/corpus/permissive-reduced/javascript/codecov-node/b"
+  }
+}

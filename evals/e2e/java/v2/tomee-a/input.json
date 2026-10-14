@@ -1,0 +1,13 @@
+{
+  "case_id": "corpus:2d1ef9441332cfc8",
+  "finding": {
+    "title": "Class-name filter in BlacklistClassResolver.check",
+    "description": "BlacklistClassResolver.check decides whether a class name read from a serialized stream may be loaded, by matching the name against the configured blacklist and whitelist entries (tomee.serialization.class.blacklist / whitelist).",
+    "file_path": "src/main/java/org/apache/openejb/core/rmi/BlacklistClassResolver.java",
+    "start_line": 59,
+    "symbol": "check",
+    "cwe": "CWE-502"
+  },
+  "source": "../../../../../benchmarks/corpus/permissive-reduced/java/tomee/a",
+  "fixed_source": "../../../../../benchmarks/corpus/permissive-reduced/java/tomee/b"
+}

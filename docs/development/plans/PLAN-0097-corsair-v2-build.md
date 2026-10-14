@@ -81,6 +81,8 @@ After phase 5, on Al's call:
 
 Each step records its actual commands and results here, including failed attempts. A failure is never replaced by its later successful rerun.
 
+2026-10-14, D18 (branch `claude/v2-d18`): the chain runs a second, blind exploit attempt before R5, reusing attempt 1's control bytes in a new pair with its own digest, exploit-only D3 check and review loop; `rules.decide` reads `attempts` and decides on the last attempt; R5 needs two `assertion_failed` PoVs and carries `sensitivity: unverified`. Scripted only (fake stages and the scripted e2e replay); no live model or Docker run. `uv run --locked python -m pytest -q -n auto tests`: 1722 passed, 55 skipped.
+
 ## Decisions and next action
 
 Decisions are recorded in SPEC-0082. Defaults this plan uses until Al decides otherwise:

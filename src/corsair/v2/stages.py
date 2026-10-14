@@ -10,8 +10,8 @@ from typing import Protocol
 
 from pydantic_ai.models import Model
 
-from .contracts import (AgentUsage, BuildResult, Case, CheckResult, Environment, FrozenPatch, ProbeBrief, ProbeDraft,
-                        ProbePlan, ProbeRun, Recipe, Runtime, Validity, Verdict)
+from .contracts import (AgentUsage, Attempt, BuildResult, Case, CheckResult, Environment, FrozenPatch, ProbeBrief,
+                        ProbeDraft, ProbePlan, ProbeRun, Recipe, Runtime, Validity, Verdict)
 
 
 class Select(Protocol):
@@ -83,8 +83,9 @@ class Diagnose(Protocol):
 
 class Decide(Protocol):
     """``stopped`` is why the chain stopped (it concerns the vulnerable revision); ``fix_stopped`` is why the
-    fixed-revision steps stopped, which only makes the fix ``not_verified``."""
+    fixed-revision steps stopped, which only makes the fix ``not_verified``. ``attempts`` names each exploit
+    attempt's pair (D18); the table decides on the last one."""
 
     def __call__(self, case: Case, *, runtime: Runtime | None, build: BuildResult | None, plan: ProbePlan | None,
                  validity: tuple[Validity, ...], runs: tuple[ProbeRun, ...], stopped: str | None = None,
-                 fix_stopped: str | None = None) -> Verdict: ...
+                 fix_stopped: str | None = None, attempts: tuple[Attempt, ...] = ()) -> Verdict: ...

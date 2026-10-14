@@ -1,0 +1,87 @@
+{
+  "expected_label": "LIKELY_EXPLOITABLE",
+  "acceptable_labels": [
+    "LIKELY_EXPLOITABLE"
+  ],
+  "forbidden_labels": [
+    "LIKELY_NOT_EXPLOITABLE"
+  ],
+  "expected_rule": "R4",
+  "expected_terminal_reason": "ok",
+  "expected_finding": "reproduced",
+  "expected_fix": "verified",
+  "expected_runtime_row": "minitest-ruby31",
+  "truth": {
+    "source": "manifest",
+    "manifest": "benchmarks/corpus/permissive-reduced/manifest.json",
+    "manifest_case": "ruby-secure-headers-b",
+    "manifest_truth": {
+      "expected_verdict": "potentially_exploitable",
+      "reachability": "reachable",
+      "sink_file": "lib/secure_headers/headers/content_security_policy.rb",
+      "sink_line": 9,
+      "source": "source value",
+      "target_callable": "build_source_list_directive"
+    }
+  },
+  "why": "Manifest truth potentially_exploitable (reachability reachable).",
+  "revision_tree_sha256": "e829c911ca7ae5fdf8131e195536eed786a0158763773ee7e1ea7be920e72245",
+  "fixed_tree_sha256": "ea0374b57e54104802c880126d4facf0c365b13263a564bdc68b031fe7bdad12",
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "lib/secure_headers/headers/content_security_policy.rb",
+          "start_line": 9,
+          "end_line": 9,
+          "quote": "      escaped_source_list = minified_source_list.gsub(\";\", \" \")"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "lib/secure_headers/headers/content_security_policy.rb",
+            "start_line": 9,
+            "end_line": 9,
+            "quote": "      escaped_source_list = minified_source_list.gsub(\";\", \" \")"
+          }
+        ]
+      },
+      "fixed": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "lib/secure_headers/headers/content_security_policy.rb",
+            "start_line": 9,
+            "end_line": 9,
+            "quote": "      escaped_source_list = minified_source_list.gsub(/[\\n;]/, \" \")"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "passed"
+      },
+      "fixed": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    },
+    "build_fixed": true
+  }
+}

@@ -11,7 +11,7 @@ from pathlib import Path
 
 from pydantic_ai import ModelRetry
 
-from corsair.v2.contracts import Citation, ProbeBrief, ProbePlan
+from corsair.v2.contracts import Citation, Finding, ProbeBrief, ProbePlan
 
 _SPACE = re.compile(r"\s+")
 
@@ -75,8 +75,52 @@ def plan_problems(plan: ProbePlan, root: Path, test_dir: str) -> list[str]:
     return problems
 
 
-def check_plan(plan: ProbePlan, root: Path, test_dir: str) -> ProbePlan:
-    problems = plan_problems(plan, root, test_dir)
+MAX_SCAN_BYTES = 2_000_000
+"""Per-file cap when looking for the finding's symbol in the tree."""
+
+
+def _mentions(root: Path, text: str) -> bool:
+    """Whether any regular file under ``root`` (outside .git) contains ``text``."""
+    for path in root.rglob("*"):
+        if ".git" in path.relative_to(root).parts or not path.is_file() or path.is_symlink():
+            continue
+        try:
+            if path.stat().st_size <= MAX_SCAN_BYTES and text in path.read_text(errors="ignore"):
+                return True
+        except OSError:
+            continue
+    return False
+
+
+def finding_problems(plan: ProbePlan, root: Path, finding: Finding | None) -> list[str]:
+    """A plan must be about the code the finding names, never a different weakness found nearby.
+
+    Mechanical and language-neutral: the finding's own symbol and file, as text, against the plan's target and
+    citations. Nothing here judges whether the code is vulnerable.
+    """
+    if finding is None or plan.status != "planned":
+        return []
+    briefs = [brief for brief in (plan.control, plan.exploit) if brief is not None]
+    citations = [*plan.citations, *(citation for brief in briefs for citation in brief.citations)]
+    named = finding.symbol.strip() if finding.symbol else ""
+    reported = finding.file_path
+    file_exists = reported is not None and (root / reported).is_file()
+    if named and not _mentions(root, named) and not file_exists:
+        return [f"the finding names {named!r}" + (f" in {reported!r}" if reported else "") + ", and neither "
+                "appears in the tree: a plan about other code is a different finding. Return status "
+                "target_not_found with that reason."]
+    problems = []
+    if named and _mentions(root, named) and named not in plan.target and not any(
+            named in citation.quote for citation in citations):
+        problems.append(f"the finding names {named!r}; the plan's target or a citation must be that code, "
+                        "not a different function")
+    if file_exists and not any(citation.path == reported for citation in citations):
+        problems.append(f"the finding reports {reported!r}; cite the reported code in that file")
+    return problems
+
+
+def check_plan(plan: ProbePlan, root: Path, test_dir: str, finding: Finding | None = None) -> ProbePlan:
+    problems = plan_problems(plan, root, test_dir) + finding_problems(plan, root, finding)
     if problems:
         raise ModelRetry("The plan was refused:\n- " + "\n- ".join(problems))
     return plan

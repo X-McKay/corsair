@@ -10,8 +10,8 @@ Every file carries the versioned run-record schema ``corsair-v2-run/1`` (``SCHEM
 - ``agents/<step>.messages.json``: the native PydanticAI message history of an agent call, when captured.
 - ``usage.json``: one ``AgentUsage`` per agent call (with its step), in order; ``timings.json``: per-stage wall time.
 - ``grounding.json``: the advisory grounding brief, when Ground ran. Nothing downstream reads it.
-- ``verdict.json`` and ``summary.json`` (outcome, per-author review results, per-agent aggregates and totals;
-  unknown values are null).
+- ``verdict.json`` and ``summary.json`` (outcome, per-author review results, per-attempt results, per-agent
+  aggregates and totals; unknown values are null).
 
 State lives in the files, not in the object, so a Temporal activity on any worker sharing the filesystem can reopen
 the run directory and append to it. Steps run one at a time per run, so read-modify-write appends do not race.
@@ -32,7 +32,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from .contracts import AgentUsage, Case, Environment, Revision, Runtime, Verdict
+from .contracts import AgentUsage, Case, Environment, ProbeRun, Revision, Runtime, Verdict
 
 SCHEMA = "corsair-v2-run/1"
 DEFAULT_ROOT = Path(".runs/v2/runs")
@@ -110,6 +110,7 @@ class RunRecorder:
             self._write("run.json", {
                 "schema": SCHEMA, "run_id": self.run_id, "case_id": case.case_id, "mode": mode,
                 "hostname": socket.gethostname(), "started_at": _now(), "finished_at": None,
+                "state": "recorded", "stopped_at": None, "last_started_step": None,
                 "git_commit": commit, "git_dirty": dirty,
                 "provider_config_sha256": _file_sha256(provider_config),
                 "matrix_sha256": _file_sha256(matrix),
@@ -118,6 +119,16 @@ class RunRecorder:
                 "environments": {},
             })
         self._write("case.json", case)
+
+    def started(self, step: str) -> None:
+        """Persist the last observed dispatch; this alone does not prove a process is still running."""
+        if not _STEP.match(step):
+            raise ValueError(f"invalid step name: {step!r}")
+        self._update("run.json", last_started_step=step)
+
+    def cancelled(self) -> None:
+        """Record direct-call cancellation without inventing a Verdict, finish time, or final usage."""
+        self._update("run.json", state="cancelled", stopped_at=_now())
 
     def runtime(self, runtime: Runtime, image_id: str | None) -> None:
         """The selected matrix row, its image reference and the local image id it resolved to (None: unknown)."""
@@ -154,7 +165,7 @@ class RunRecorder:
     def finish(self, verdict: Verdict) -> dict[str, Any]:
         self._write("verdict.json", verdict)
         finished = _now()
-        self._update("run.json", finished_at=finished)
+        self._update("run.json", finished_at=finished, state="completed")
         run = self._read("run.json", {})
         rows = self._read("usage.json", [])
         usage = self.usage()
@@ -169,8 +180,10 @@ class RunRecorder:
             "terminal_reason": verdict.terminal_reason.value,
             "finding": verdict.finding,
             "fix": verdict.fix,
+            "sensitivity": verdict.sensitivity,
             "outcome": _outcome(verdict),
             "review": _review(verdict),
+            "attempts": _attempts(verdict),
             "models": sorted({u.model for u in usage if u.model is not None}),
             "agents": _agents(rows),
             "totals": {
@@ -228,10 +241,33 @@ def _git_state(root: Path = CODE_ROOT) -> tuple[str | None, bool | None]:
     return head.stdout.strip() or None, (bool(status.stdout.strip()) if status.returncode == 0 else None)
 
 
+def _decided_runs(verdict: Verdict) -> tuple[ProbeRun, ...]:
+    """The runs of the pair the rule decided on: after a second attempt (D18) its own runs and attempt 1's
+    vulnerable control run, which it reuses; otherwise every run."""
+    if len(verdict.attempts) < 2:
+        return verdict.runs
+    first, second = verdict.attempts[0].patch_sha256, verdict.attempts[1].patch_sha256
+    return tuple(run for run in verdict.runs if run.patch_sha256 == second or (
+        run.patch_sha256 == first and (run.revision, run.role) == ("vulnerable", "control")))
+
+
+def _attempts(verdict: Verdict) -> list[dict[str, Any]]:
+    """Per exploit attempt (D18): its pair, its vulnerable PoV outcome and its review loop. Unknown stays None."""
+    out = []
+    for attempt in verdict.attempts:
+        pov = next((run.outcome.value for run in verdict.runs if attempt.patch_sha256 is not None and (
+            run.patch_sha256, run.revision, run.role) == (attempt.patch_sha256, "vulnerable", "exploit")), None)
+        out.append({"number": attempt.number, "patch_sha256": attempt.patch_sha256, "exploit_outcome": pov,
+                    "review_rounds": attempt.review_rounds, "first_review_valid": dict(attempt.first_review_valid),
+                    "revisions": dict(attempt.revisions), "mechanical_fixes": dict(attempt.mechanical_fixes),
+                    "decided": verdict.attempt == attempt.number})
+    return out
+
+
 def _outcome(verdict: Verdict) -> dict[str, Any]:
-    """The decision and the per-probe evidence it read, by revision then role."""
+    """The decision and the per-probe evidence it read (the deciding pair's runs), by revision then role."""
     probes: dict[str, dict[str, Any]] = {}
-    for run in verdict.runs:
+    for run in _decided_runs(verdict):
         probes.setdefault(run.revision, {})[run.role] = {
             "outcome": run.outcome.value, "facts": run.facts.model_dump(mode="json"),
             "duration_s": run.duration_s, "patch_sha256": run.patch_sha256, "image_digest": run.image_digest,

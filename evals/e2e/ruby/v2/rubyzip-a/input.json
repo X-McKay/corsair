@@ -1,0 +1,12 @@
+{
+  "case_id": "corpus:222d899041390059",
+  "finding": {
+    "title": "Path traversal via archive entry name in Zip::Entry#extract",
+    "description": "Zip::Entry#extract joins the entry name onto the destination directory and writes the file; an entry name containing parent-directory segments is carried into the join.",
+    "file_path": "lib/zip/entry.rb",
+    "start_line": 28,
+    "symbol": "extract",
+    "cwe": "CWE-22"
+  },
+  "source": "../../../../../benchmarks/corpus/permissive-reduced/ruby/rubyzip/a"
+}

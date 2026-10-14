@@ -1,0 +1,33 @@
+{
+  "family": "ruby-git-fetch",
+  "language": "ruby",
+  "cwe": "CWE-88",
+  "runtime_row": "minitest-ruby31",
+  "upstream_repo": "https://github.com/ruby-git/ruby-git",
+  "record": "CVE-2022-25648",
+  "pointer_source": "Ruby Advisory Database / candidate survey (metadata only)",
+  "upstream_spdx": "MIT",
+  "spdx_verified": "git.gemspec s.license = 'MIT' at commit 291ca0946, 2026-10-14",
+  "parent_commit": "291ca0946bec7164b90ad5c572ac147f512c7159~1",
+  "fix_commit": "291ca0946bec7164b90ad5c572ac147f512c7159",
+  "verbatim": false,
+  "kept_files": [
+    {
+      "path": "lib/git/lib.rb",
+      "upstream": "lib/git/lib.rb",
+      "note": "Git::Lib#fetch is upstream-verbatim: the argument-list construction, including the order of the remote relative to the option flags and the inserted '--' separator, is exactly the code the fix commit changed"
+    }
+  ],
+  "stand_ins": [
+    {
+      "replaces": "Git::Lib#command, which spawns the git process",
+      "with": "a recorder that stores the argument list it is given and runs nothing",
+      "note": "captures the argv so the property is observable in-process; it decides nothing about the argument order"
+    }
+  ],
+  "reduction_removed": [
+    "all Git::Lib methods and state unrelated to fetch",
+    "the real process execution, logging and output handling inside command"
+  ],
+  "pov_note": "Benign control and proof-of-vulnerability probes authored by the Corsair chain at run time; none authored here. Property observable in-process via the recorded argument list: a remote value that looks like an option reaches the runner as an option (no separator before it) on one variant and as a positional argument after a separator on the other. No outbound network and no git binary."
+}

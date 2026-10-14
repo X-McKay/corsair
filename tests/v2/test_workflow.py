@@ -23,8 +23,8 @@ async def _environment():
         pytest.skip(f"Temporal test server unavailable: {exc}")
 
 
-async def _run(tmp_path, fakes, run_id, *, fixed=False, replace=()):
-    workflow.configure(fakes.stages(), models(), tmp_path / "matrix.yaml")
+async def _run(tmp_path, fakes, run_id, *, fixed=False, replace=(), progress=None):
+    workflow.configure(fakes.stages(), models(), tmp_path / "matrix.yaml", progress)
     run_dir = tmp_path / run_id
     async with await _environment() as env, AsyncExitStack() as stack:
         built = workflow.workers(env.client, workspace_slots=2,
@@ -121,3 +121,70 @@ def test_sandbox_timeouts_follow_the_backend():
     assert workflow.REPLAY_ON_OPEN.total_seconds() == 3600
     assert workflow.RunRequest.model_fields["workspace"].default == "docker"
     assert workflow.execute.__name__ == "execute" and workflow.diagnose.__name__ == "diagnose"
+
+
+def test_workflow_runs_the_same_second_attempt_as_direct_mode(tmp_path):
+    def setup():  # attempt 1's PoV fails, attempt 2's is rejected once, revised and then passes (R4 on attempt 2)
+        return Fakes(outcomes={("vulnerable", "exploit"): ["assertion_failed", "passed"],
+                               ("fixed", "exploit"): ["assertion_failed", "assertion_failed"]},
+                     review_invalid=[set(), {"exploit"}], real_decide=True)
+    fakes = setup()
+    verdict, run_dir = asyncio.run(_run(tmp_path, fakes, "durable-a2", fixed=True))
+    direct = setup()
+    record = RunRecorder.create(tmp_path, "direct-a2")
+    expected = asyncio.run(run_case(case(tmp_path, True), stages=direct.stages(), models=models(),
+                                    matrix_path=tmp_path / "matrix.yaml", record=record))
+    assert verdict == expected
+    assert (verdict.rule_id, verdict.attempt, verdict.fix) == ("R4", 2, "verified")
+    assert [a.review_rounds for a in verdict.attempts] == [1, 2]
+    assert _steps(run_dir) == _steps(record.run_dir)
+    assert {"probe-exploit.a2", "review.a2.1", "probe.exploit.r1.a2", "review.a2.2", "execute-exploit-vulnerable.a2",
+            "execute-exploit-fixed.a2"} <= set(_steps(run_dir))
+    assert fakes.names() == direct.names()
+    summary = json.loads((run_dir / "summary.json").read_text())
+    assert [a["exploit_outcome"] for a in summary["attempts"]] == ["assertion_failed", "passed"]
+
+
+@pytest.mark.parametrize("execution", ["activity", "worker"])
+def test_progress_records_only_the_requested_run_not_client_or_worker_default(tmp_path, monkeypatch, execution):
+    from temporalio.testing import ActivityEnvironment
+    from corsair.v2.presentation import StageReporter
+
+    client_record = RunRecorder.create(tmp_path / "client", "untouched")
+    client_record.begin(case(tmp_path), mode="temporal")
+    before = {p.relative_to(client_record.run_dir): p.read_bytes()
+              for p in client_record.run_dir.rglob("*") if p.is_file()}
+    worker_home = tmp_path / "worker-home"
+    worker_home.mkdir()
+    monkeypatch.chdir(worker_home)
+    monkeypatch.setattr(workflow, "_CONFIG", None)  # restore the caller's configuration after this test
+    observed = []
+    started = RunRecorder.started
+
+    def observe(recorder, step):
+        observed.append((recorder.run_dir, step))
+        started(recorder, step)
+
+    monkeypatch.setattr(RunRecorder, "started", observe)
+    requested = [tmp_path / "request-a", tmp_path / "request-b"]
+
+    async def run(progress):
+        for path in requested:
+            if execution == "worker":
+                await _run(tmp_path, Fakes(), path.name, progress=progress)
+            else:
+                workflow.configure(Fakes().stages(), models(), tmp_path / "matrix.yaml", progress)
+                env = ActivityEnvironment()
+                await env.run(workflow.begin_run, str(path), case(tmp_path))
+                selected = await env.run(workflow.select, str(path), "select", case(tmp_path))
+                await env.run(workflow.investigate, str(path), "investigate", case(tmp_path), selected.output)
+
+    with StageReporter(color="never", animate=False) as progress:
+        asyncio.run(run(progress))
+    assert {path for path, _ in observed} == set(requested)
+    assert all({"select", "investigate"} <= {step for run, step in observed if run == path} for path in requested)
+    assert all(json.loads((path / "run.json").read_text())["last_started_step"] for path in requested)
+    after = {p.relative_to(client_record.run_dir): p.read_bytes()
+             for p in client_record.run_dir.rglob("*") if p.is_file()}
+    assert after == before
+    assert list(worker_home.iterdir()) == []  # no implicit .runs, client receipt or alternate run root

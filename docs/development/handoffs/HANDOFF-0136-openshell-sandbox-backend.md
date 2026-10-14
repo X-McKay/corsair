@@ -43,7 +43,7 @@ Open facts only the live run settles:
 - **Environments:** OpenShell replays the sealed recipe and reruns the baseline in each probe sandbox.
 - **Docker:** stays the default and unchanged.
 
-Next: the coordinator hands this branch the RIG0 cluster, then the runbook sequence runs in `/home/al/git/corsair/.worktrees/claude/validate-openshell-v2-rl9wud`, ending with `make qualify-openshell-v2` and one decisive case on each backend.
+Update 2026-10-14 15:40Z: conformance qualified on RIG0 at 11fa46f0 after three live rounds (sandbox names over 19 characters, the root-owned `/sandbox`, the gateway's 32 KiB argument cap, and exit 74 when a background child holds the exec's pipes; all fixed in #171, see PLAN-0100). `qualify-openshell-v2`: 47 passed, 1 skipped; Docker 52 passed, 11 skipped; all cleanup confirmed. Evidence: `.runs/openshell-v2-20261014T145942Z/` in that worktree (archive it to `/home/al/git/corsair/.runs` before deleting the worktree). Next: one decisive case on each backend once the coordinator gives a model slot; the cluster stays up for it (`make openshell-forward-stop` then `make kind-down` in the worktree to release it).
 
 ## Continuation prompt
 

@@ -32,6 +32,15 @@ is INCONCLUSIVE `test_invalid` (R2). Each review (`review.<n>`) and revision (`p
 recorded step; the Verdict and `summary.json` carry review rounds and per-author revision counts. Authors have no
 test-running tool.
 
+Before LIKELY_NOT_EXPLOITABLE the chain runs one more exploit attempt (SPEC-0082 D18): when attempt 1's executed
+pair has a passing control and an `assertion_failed` PoV, a fresh Exploit Prober call writes a new PoV from the same
+brief (no previous draft, review or outcome). Attempt 1's control, byte for byte, freezes with it into a pair with
+its own digest, which gets the exploit-only D3 check, a fresh review loop in which only the PoV may revise (a
+rejected control ends it as R2), one vulnerable run of the new PoV and, on a decisive pass, the fixed-revision run.
+Its steps carry an `a2` marker (`probe-exploit.a2`, `review.a2.<n>`, `execute-exploit-vulnerable.a2`). Decide reads
+`attempts` and decides on the last attempt: R5 needs both PoVs `assertion_failed` after positive reviews and always
+carries `sensitivity: unverified`; a single failed PoV is R6 `no_valid_observation`.
+
 `contracts.py` holds every type that crosses a stage boundary. `chain.py` composes the stages as plain async
 functions (direct mode, used by evals and `corsair-v2 run`); `workflow.py` runs the same functions in one Temporal
 workflow per case on three task queues: `model` (one slot), `workspace` and `control`. Every run writes the
