@@ -210,7 +210,8 @@ def test_the_install_may_add_the_row_dependency_location_and_nothing_else():
     good = _good(case)
     located = good.setup[0]
     assert ".corsair-deps" in located
-    declared = builder_eval.without_location(located, frozenset({".corsair-deps"}))
+    locations = builder_eval.location_options(builder_eval._runtime("pytest-cpython312").run_template)
+    declared = builder_eval.without_location(located, locations)
     assert declared == tuple(case.oracle["required_setup"][0])
     for setup in (located, declared):
         recipe = good.model_copy(update={"setup": (setup,)})
@@ -301,3 +302,17 @@ def test_each_assertion_family_rejects_a_wrong_answer():
         agent="builder", status="output_invalid", error="x"), facts={
         "commands": [], "reads": unknown.oracle["required_reads"], "written": [], "infra_error": None,
         "unrecorded_commands": [], "run_template": []}))
+
+
+def test_only_the_row_location_option_is_normalized_away():
+    """Codex #158: another option naming the dependency directory is not the declared command."""
+    case = CASES["python/pytest-project"]
+    good = _good(case)
+    located = good.setup[0]
+    at = located.index("--target")
+    for other in ("--cache-dir", "--index-url"):
+        changed = located[:at] + (other,) + located[at + 1:]
+        checks = builder_eval.check(case, _recipe_attempt(case, good.model_copy(update={"setup": (changed,)})))
+        assert checks["setup_declared"] is False, other
+    joined = located[:at] + ("--target=.corsair-deps",) + located[at + 2:]
+    assert all(builder_eval.check(case, _recipe_attempt(case, good.model_copy(update={"setup": (joined,)}))).values())

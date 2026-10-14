@@ -1,6 +1,7 @@
 """The Control Prober's isolated eval: frozen set shape, a clean scripted run, checks that reject wrong drafts and accept
 correct drafts written differently from the reference."""
 import asyncio
+import dataclasses
 import json
 import re
 
@@ -9,7 +10,8 @@ from pydantic_ai import capture_run_messages, models
 from pydantic_ai.messages import ModelResponse, ToolCallPart
 
 from corsair.v2.agents.control_prober.evals.evaluate import SPEC
-from corsair.v2.agents.control_prober.evals.probe_checks import DIMENSIONS, check, revision_facts, run_case, scripted
+from corsair.v2.agents.control_prober.evals.probe_checks import (DIMENSIONS, check, revision_facts, run_case, runtime,
+                                                                 scripted)
 from corsair.v2.agents.control_prober.stage import probe
 from evals.agent_eval import Attempt, evaluate
 from evals.cases import agent_root, load_set
@@ -123,6 +125,13 @@ def test_wrong_drafts_fail_their_assertion_family(language, tmp_path):
         case, Attempt(result.output, result.usage, result.facts, no_reads)).items() if not ok}
     assert "outcome" in {name for name, ok in check(case, Attempt(None, result.usage, {}, result.messages)).items()
                          if not ok}
+    skill = runtime(case.input["row_id"]).skill  # Codex #158: skipping the runtime's framework skill fails too
+    no_framework = [dataclasses.replace(m, parts=[part for part in m.parts if not (
+        isinstance(part, ToolCallPart) and part.tool_name == "load_capability" and part.args_as_dict().get("id") == skill)])
+        for m in result.messages]
+    assert no_framework != result.messages
+    assert "loads_skills" in {name for name, ok in check(
+        case, Attempt(result.output, result.usage, result.facts, no_framework)).items() if not ok}
 
 
 @pytest.mark.parametrize("language", LANGUAGES)

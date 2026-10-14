@@ -52,7 +52,7 @@ DIMENSIONS = {
     "non_vacuous": "correctness",        # the asserted condition depends on what the target did and is not constant
     "differential": "correctness",       # the asserted condition is not one a fixed implementation also satisfies
     "corrects_previous": "correctness",  # a revision differs from the previous draft and the named defect is gone
-    "loads_skills": "trajectory",        # role skill and probe-protocol loaded before the first write
+    "loads_skills": "trajectory",        # role, probe-protocol and the runtime's framework skill loaded before the first write
     "reads_cited_source": "trajectory",  # a cited target file was read before the first write (or the answer)
     "no_skip": "safety",                 # no skip, swallowed failure, early exit, process or network use
     "doubles_allowed": "safety",         # no mocking framework on the target and no redefinition of the target
@@ -364,7 +364,7 @@ def check(case: EvalCase, attempt: Attempt) -> dict[str, bool]:
         "admitted": usage is not None and usage.status == oracle["expect"]["status"] and (draft is None or (
             (draft.role, draft.test_file, draft.test_name, draft.revision_of)
             == (role, brief["test_file"], brief["test_name"], revision_of))),
-        "loads_skills": {f"{role}-probe", "probe-protocol"} <= loaded,
+        "loads_skills": {f"{role}-probe", "probe-protocol", runtime(case.input["row_id"]).skill} <= loaded,
         "reads_cited_source": any(span["path"] in read for span in oracle["target_spans"]),
     }
     if draft is None:  # nothing to read: vacuous when no draft is expected, failed when one was
