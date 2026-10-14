@@ -52,14 +52,17 @@ async def run_recorded(agent: Agent[Any, Any], name: AgentName, prompt: str, *, 
     ``model`` only labels the usage: the agent already holds its model from its factory, which is what a durable
     run resolves, so it is never swapped here.
     """
-    usage, started, status, output = RunUsage(), time.monotonic(), "ok", None
+    usage, started, status, output, error = RunUsage(), time.monotonic(), "ok", None, None
     try:
         result = await agent.run(prompt, deps=deps, usage=usage, usage_limits=usage_limits, **run_kwargs)
         output = result.output
-    except UsageLimitExceeded:
-        status = "budget_exhausted"
-    except ModelAPIError:
-        status = "provider_error"
-    except UnexpectedModelBehavior:
-        status = "output_invalid"
-    return output, to_agent_usage(name, usage, model=model, wall_s=time.monotonic() - started, status=status)
+    except UsageLimitExceeded as exc:
+        status, error = "budget_exhausted", exc
+    except ModelAPIError as exc:
+        status, error = "provider_error", exc
+    except UnexpectedModelBehavior as exc:
+        status, error = "output_invalid", exc
+    recorded = to_agent_usage(name, usage, model=model, wall_s=time.monotonic() - started, status=status)
+    if error is not None:  # keep the upstream detail so a failure stays attributable
+        recorded = recorded.model_copy(update={"error": f"{type(error).__name__}: {error}"[:2_000]})
+    return output, recorded

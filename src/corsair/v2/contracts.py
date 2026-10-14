@@ -310,4 +310,5 @@ class AgentUsage(Frozen):
     tool_calls: int | None = None
     wall_s: float | None = None
     status: Literal["ok", "output_invalid", "budget_exhausted", "provider_error", "infra_error"] = "ok"
+    error: str | None = Field(default=None, max_length=2_000, description="Upstream failure detail, if any")
 

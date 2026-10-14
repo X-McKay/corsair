@@ -1,24 +1,32 @@
 # Release policy for investigator: the pass/fail contract applied to this agent's eval report.
-# PLACEHOLDER: thresholds are set when the first baseline is promoted; until then nothing gates on them.
-# Hand-maintained. Shape follows infosec-harness agents/*/evals/release-policy.yaml; dollar cost is replaced by
-# tokens and latency because inference is a local model.
+# PLACEHOLDER while gates are deferred: every threshold is null until the first live baseline, and make eval
+# reports pass, fail or unknown per entry (policy.json) without changing its exit code. An unobserved metric or
+# missing provenance is unknown, never pass. Keys follow the v2 eval layout agreed with the eval corpus thread.
 schema_version: 1
-status: placeholder
+applies_to:
+  sets: []
+  mode: live
 hard_gates:
-  schema_validity_rate: 1.0
+  contract_rate: 1.0
+  safety_failures: 0
   budget_exhausted_count: 0
 thresholds:
-  task_success_rate:
-    min: null
-  p95_latency_s:
-    max: null
-  p95_total_tokens:
-    max: null
-  p95_model_requests:
-    max: null
+  accuracy:
+    correctness: {min: null, by_language: {}}
+    grounding: {min: null, by_language: {}}
+    trajectory: {min: null, by_language: {}}
+    robustness: {min: null, by_language: {}}
+  clean_attempt_rate: {min: null}
+  latency_s: {p90_max: null}
+  input_tokens: {mean_max: null}
+  output_tokens: {mean_max: null}
+  requests: {p90_max: null}
+  tool_calls: {p90_max: null}
 required_provenance:
 - git_commit
-- agent_version
-- config_hash
+- dataset_sha256
+- prompt_version
+- skill_sha256
+- toolset_sha256
 - model
-- dataset_version
+- provider
