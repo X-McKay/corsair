@@ -268,14 +268,15 @@ def _agents(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
 
 
 def _review(verdict: Verdict) -> dict[str, Any]:
-    """Per-author review results for evals: first-time pass, revisions used and recovery (invalid at the first
-    review, valid on the final one). Unknown stays None."""
+    """Per-author review results for evals: first-time pass, revisions used, D3 corrections and recovery (invalid at
+    the first review, valid on the final one). Unknown stays None."""
     final = next((v for v in verdict.validity if v.revision == "vulnerable"), None)
     authors = {}
     for role in ("control", "exploit"):
         first = verdict.first_review_valid.get(role)
         last = None if final is None else getattr(final, role).valid
         authors[role] = {"first_review_valid": first, "revisions_used": verdict.revisions.get(role, 0),
+                          "mechanical_fixes": verdict.mechanical_fixes.get(role, 0),
                          "final_valid": last,
                          "recovered": None if first is None else (first is False and last is True)}
     return {"rounds": verdict.review_rounds, "authors": authors}

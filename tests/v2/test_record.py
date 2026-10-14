@@ -51,7 +51,8 @@ def test_run_directory_holds_every_stage_usage_messages_and_verdict(tmp_path):
     assert (summary["label"], summary["rule_id"], summary["terminal_reason"]) == ("LIKELY_EXPLOITABLE", "R4", "ok")
     assert summary["totals"]["agent_calls"] == 6
     assert summary["review"] == {"rounds": 1, "authors": {
-        role: {"first_review_valid": True, "revisions_used": 0, "final_valid": True, "recovered": False}
+        role: {"first_review_valid": True, "revisions_used": 0, "mechanical_fixes": 0, "final_valid": True,
+               "recovered": False}
         for role in ("control", "exploit")}}
     assert summary["totals"]["requests"] == 6 and summary["totals"]["tokens"] == 90
     assert summary["totals"]["tool_calls"] == 0 and summary["totals"]["wall_s"] is not None

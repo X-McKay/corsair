@@ -83,7 +83,7 @@ Authors cannot run tests (D3). After both drafts are frozen, trusted code makes 
 | Classifier outcome | Mechanical class | Next action |
 | --- | --- | --- |
 | passed, assertion_failed, anomalous | ok | Nothing is returned to the author; continue to review |
-| not_run, errored | not_run or errored | No runtime output is returned. The author gets the mechanical class, a fixed hint chosen from the exit class and the markers (not discovered, harness error, body did not start, raised before the check marker), and the full output of the row's syntax check if that check failed. One revision (A2), frozen again |
+| not_run, errored | not_run or errored | No runtime output is returned. The author gets the mechanical class, a fixed hint chosen from the exit class and the markers (not discovered, harness error, body did not start, raised before the check marker), and the full output of the row's syntax check if that check failed. The author corrects its draft (A2), and each correction is checked again, up to three corrections per author per draft version (`chain.MAX_MECHANICAL_FIXES`), stopping at the first `ok`; then frozen again |
 | infra | infra | The attempt stops with `infra_error` (R1, ERROR) |
 
 `anomalous` maps to `ok` because returning it would hint at the outcome. Application code can run before the test body, from a fixture, a setup hook, a module import or a class initializer. Any line of runtime output, even one that names the author's own file, can therefore carry an observation of the target. So runtime output is never returned.
@@ -136,11 +136,13 @@ For each run, trusted code sets four environment variables: `CORSAIR_MARKER_STAR
 - Each probe runs alone, using the matrix row's run-one-test template filled with only the planned file and test name.
 - The container runtime gives the exit code, signal or timeout. The row's exit-code map sorts the code into `pass`, `test_failed`, `no_tests`, `harness_error` or `unknown`.
 
-Rows are evaluated top to bottom, and the first match wins. Infrastructure exits come first, so a harness error before the start marker stays attributable as `infra`.
+Rows are evaluated top to bottom, and the first match wins. Infrastructure exits come first. A harness error is split by the start marker: without it the test body never started, which is what a collection, import or compile failure of the probe file looks like (pytest exits 2 for these), so it is the author's `not_run` rather than the platform's `infra`; with it the harness failed around a body that ran, so it stays `infra`. A timeout, signal or missing exit code is `infra` whatever the markers say.
 
 | Exit class | start | check | end | token | Outcome |
 | --- | --- | --- | --- | --- | --- |
-| harness_error, timeout, signal | any | any | any | any | infra |
+| timeout, signal, no exit code | any | any | any | any | infra |
+| harness_error | yes | any | any | any | infra |
+| harness_error | no | any | any | any | not_run |
 | no_tests, or no start marker | any | any | any | any | not_run |
 | pass | yes | holds | yes | no | passed |
 | test_failed | yes | violated | no | yes | assertion_failed |
@@ -314,6 +316,10 @@ The proposal's decisions and their status:
 | D9 | Exactly two tests; native parametrisation inside a test is allowed | Accepted with the build kickoff |
 | D12 | The exploit probe is a proof-of-vulnerability test that passes when it demonstrates the reported condition (PoV polarity) | Decided by Al, 2026-10-14 09:17Z |
 | D13 | Reviewer feedback loop: three reviews in total, at most two review revisions per author | Decided by Al, 2026-10-14 09:09Z |
+| D14 | Scope is provability, not category: a finding is in scope when both probes can prove it inside the workspace, deterministically and with no outbound network, using local stand-ins (a local server, a temporary file, an in-process double). The Investigator returns `unsupported_scope`, with the missing piece named, only when proof needs something the workspace cannot supply (a real remote endpoint, the host trust store, a system-wide policy, a specific library build). No vulnerability-category list exists anywhere | Decided by Al, 2026-10-14 09:33Z; implemented in #154 |
+| D15 | Counterfactual assertion: the brief states `safe_observation`, what the test would see on a correct implementation, and the PoV assertion must be false there. Payload text echoed back in output, an argument list or a log is never proof | Implemented in #155 |
+| D16 | Proof shows structure or effect: input merely reaching a dependency is never proof, because correct code usually passes input on as data rather than rejecting it. The PoV must show the input crossing from data into structure or into an effect it should not have | Implemented in #156 |
+| D17 | The Reviewer stays outcome-blind: it judges whether each test is a valid experiment, never whether the code looks vulnerable. It must not call a PoV vacuous because the target looks safe, reject a control for not exercising the vulnerability, or steer an author toward what this code does | Implemented in #157 |
 
 "Accepted with the build kickoff" means Al started the build on this proposal without objecting to that decision. Any of them can be reopened.
 

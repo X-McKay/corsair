@@ -26,7 +26,8 @@ thresholds:
   accuracy:
     correctness: {min: null, by_language: {}}
   clean_attempt_rate: {min: null}
-  latency_s: {p90_max: null}
+  wall_s: {p90_max: null}
+  retries: {p90_max: null}
   input_tokens: {mean_max: null}
   output_tokens: {mean_max: null}
   requests: {p90_max: null}

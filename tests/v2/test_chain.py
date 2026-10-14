@@ -114,15 +114,15 @@ def test_one_budget_across_corrections(tmp_path):
 
 
 @pytest.mark.parametrize("outcome", ["not_run", "errored"])
-def test_d3_gives_a_failed_author_one_revision_with_its_check_result(tmp_path, outcome):
-    fakes = Fakes(diagnose_outcomes={"control": outcome})
+def test_d3_gives_a_failed_author_a_correction_with_its_check_result(tmp_path, outcome):
+    fakes = Fakes(diagnose_outcomes={"control": [outcome]})
     _, decided = go(fakes, tmp_path)
     controls, exploits = fakes.of("probe-control"), fakes.of("probe-exploit")
     assert len(controls) == 2 and len(exploits) == 1
     assert controls[0][1]["diagnostics"] is None
     assert controls[1][1]["diagnostics"] == f"check: {outcome}\nhint: control hint"
     assert controls[1][1]["previous"] == draft("control")
-    assert len(fakes.of("diagnose")) == 2  # the revision is not diagnosed again
+    assert len(fakes.of("diagnose")) == 3  # the correction is checked again, and reads ok
     reviewed: FrozenPatch = fakes.of("review")[0][0][2]
     assert "revised" in reviewed.control.source
     assert reviewed.control.revision_of == draft_digest(draft("control"))
@@ -143,8 +143,8 @@ def test_d3_ok_gets_no_revision_and_the_frozen_patch_is_reviewed_and_executed(tm
     assert all(a[2] == patch for a, _ in fakes.of("execute"))
 
 
-def test_d3_both_authors_revise_once_and_a_failed_revision_keeps_the_original(tmp_path):
-    fakes = Fakes(diagnose_outcomes={"control": "errored", "exploit": "not_run"},
+def test_d3_both_authors_correct_and_a_failed_correction_keeps_the_original(tmp_path):
+    fakes = Fakes(diagnose_outcomes={"control": "errored", "exploit": ["not_run"]},
                   revised={"control": None})
     go(fakes, tmp_path)
     assert len(fakes.of("probe-control")) == 2 and len(fakes.of("probe-exploit")) == 2
@@ -320,7 +320,8 @@ def test_real_rules_read_a_still_invalid_pair_as_test_invalid(tmp_path):
                                                                                      "test_invalid")
     summary = json.loads((tmp_path / "runs" / "run" / "summary.json").read_text())
     assert summary["review"]["authors"]["control"] == {"first_review_valid": False, "revisions_used": 2,
-                                                       "final_valid": False, "recovered": False}
+                                                       "mechanical_fixes": 0, "final_valid": False,
+                                                       "recovered": False}
     fakes = Fakes(rejections={"control": 1})
     fakes.decide = lambda case, **kw: (fakes._log("decide", case, **kw), decide(case, **kw))[1]
     verdict, _ = go(fakes, tmp_path / "b")
@@ -388,15 +389,17 @@ def test_a_provider_error_in_a_review_revision_stops_the_run(tmp_path):
 
 
 def test_the_mechanical_check_reruns_on_a_review_revision_with_its_own_correction(tmp_path):
-    fakes = Fakes(rejections={"exploit": 1}, diagnose_outcomes={"exploit": "errored"})
-    go(fakes, tmp_path)
+    fakes = Fakes(rejections={"exploit": 1}, diagnose_outcomes={"exploit": ["ok", "errored"]})
+    verdict, _ = go(fakes, tmp_path)
     steps = _steps(tmp_path)
     assert steps[steps.index("review.1"):steps.index("review.2") + 1] == [
-        "review.1", "probe.exploit.r1", "diagnose.exploit.r1", "probe.exploit.r1.revision", "review.2"]
+        "review.1", "probe.exploit.r1", "diagnose.exploit.r1", "probe.exploit.r1.revision",
+        "diagnose.exploit.r1.1", "review.2"]
+    assert verdict.mechanical_fixes == {"exploit": 1}
     corrected = fakes.of("probe-exploit")[-1][1]
     assert corrected["review_feedback"] is None and "check: errored" in corrected["diagnostics"]
     assert "review-revised" in corrected["previous"].source
-    assert len(fakes.of("diagnose")) == 3  # both first drafts, then only the revised exploit
+    assert len(fakes.of("diagnose")) == 4  # both first drafts, then only the revised exploit and its correction
 
 
 def test_an_incomplete_review_gives_no_feedback(tmp_path):
@@ -420,3 +423,60 @@ def test_a_builder_refusal_stops_at_build_failed_with_its_reason_and_no_second_e
     _, decided = go(fakes, tmp_path)
     assert decided["stopped"] == "build_failed" and "replay" not in fakes.names()
     assert fakes.names().count("build") == 1 and "no compiler" in decided["build"].reason
+
+
+@pytest.mark.parametrize("failures", [1, 2, 3])
+def test_d3_corrects_until_the_check_reads_ok(tmp_path, failures):
+    from corsair.v2.chain import MAX_MECHANICAL_FIXES
+    # The first draft and the first failures - 1 corrections fail; correction number ``failures`` reads ok.
+    fakes = Fakes(diagnose_outcomes={"control": ["errored"] * failures})
+    verdict, _ = go(fakes, tmp_path)
+    controls = fakes.of("probe-control")
+    assert len(controls) == 1 + failures <= 1 + MAX_MECHANICAL_FIXES
+    assert all("check: errored" in kw["diagnostics"] for _, kw in controls[1:])
+    assert all(kw["previous"] is not None for _, kw in controls[1:])
+    assert len(fakes.of("diagnose")) == 2 + failures  # both first drafts, then every correction
+    corrections = ["probe-control-revision"] + [f"probe-control-revision.{k}" for k in range(2, failures + 1)]
+    checks = [f"diagnose-control.{k}" for k in range(1, failures + 1)]
+    steps = _steps(tmp_path)
+    assert [s for s in steps if s.startswith("probe-control-revision")] == corrections
+    assert [s for s in steps if s.startswith("diagnose-control.")] == checks
+    assert verdict.mechanical_fixes == {"control": failures}
+    summary = json.loads((tmp_path / "runs" / "run" / "summary.json").read_text())
+    assert summary["review"]["authors"]["control"]["mechanical_fixes"] == failures
+    assert summary["review"]["authors"]["exploit"]["mechanical_fixes"] == 0
+    assert fakes.names()[-1] == "decide" and len(fakes.of("execute")) == 2
+
+
+def test_d3_stops_after_the_last_correction_and_reviews_the_last_draft(tmp_path):
+    from corsair.v2.chain import MAX_MECHANICAL_FIXES
+    fakes = Fakes(diagnose_outcomes={"exploit": "not_run"})  # every check of the exploit fails
+    verdict, _ = go(fakes, tmp_path)
+    assert len(fakes.of("probe-exploit")) == 1 + MAX_MECHANICAL_FIXES
+    assert len(fakes.of("diagnose")) == 2 + MAX_MECHANICAL_FIXES
+    assert verdict.mechanical_fixes == {"exploit": MAX_MECHANICAL_FIXES}
+    reviewed = fakes.of("review")[0][0][2]
+    assert reviewed.exploit == fakes.of("diagnose")[-1][0][2]  # the last checked correction goes on as is
+
+
+def test_d3_budget_exhaustion_mid_corrections_stops_the_run(tmp_path):
+    # Calls: investigate, build, two probes (= 4), then corrections 1 and 2 (= 6); the third is over budget.
+    fakes = Fakes(diagnose_outcomes={"control": "errored"})
+    verdict, decided = go(fakes, tmp_path, budget=Budget(max_agent_calls=6))
+    assert decided["stopped"] == "budget_exhausted"
+    assert len(fakes.of("probe-control")) == 3 and fakes.of("review") == []
+    assert verdict.mechanical_fixes == {"control": 2}
+
+
+def test_d3_corrections_after_a_review_revision_are_bounded_per_draft_version(tmp_path):
+    from corsair.v2.chain import MAX_MECHANICAL_FIXES
+    # The first draft fails twice then reads ok; the review revision fails every check.
+    outcomes = ["errored", "errored", "ok"] + ["not_run"] * 4
+    fakes = Fakes(rejections={"exploit": 1}, diagnose_outcomes={"exploit": outcomes})
+    verdict, _ = go(fakes, tmp_path)
+    steps = _steps(tmp_path)
+    assert [s for s in steps if s.startswith("probe.exploit.r1.revision")] == [
+        "probe.exploit.r1.revision", "probe.exploit.r1.revision.2", "probe.exploit.r1.revision.3"]
+    assert [s for s in steps if s.startswith("diagnose.exploit.r1")] == [
+        "diagnose.exploit.r1", "diagnose.exploit.r1.1", "diagnose.exploit.r1.2", "diagnose.exploit.r1.3"]
+    assert verdict.mechanical_fixes == {"exploit": 2 + MAX_MECHANICAL_FIXES}

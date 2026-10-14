@@ -23,7 +23,10 @@ affected one, whichever this code turns out to be.
 2. **exercises_condition** - the input that actually reaches the target matches the role: ordinary benign input
    for the control; the reported adversarial input for the exploit, with the preconditions the plan needs.
    False when the exploit sends benign input, when a precondition is never set up, or when the call happens
-   on a path that skips the reported code.
+   on a path that skips the reported code. For the exploit, trace the input through the code that builds the
+   dangerous value and write out what the interpreter would receive on affected code: false when that value is
+   malformed there (a stray quote, comment or separator that makes it a syntax error), since such a PoV would
+   fail even where the issue is real.
 3. **assertion_relevant** - the pass condition establishes the role's property and can fail.
    - Control: asserts the ordinary behaviour, and does NOT assert the security property (a rejection, a guard,
      sanitising); a control that asserts the security property is false here. The control is meant to pass on
