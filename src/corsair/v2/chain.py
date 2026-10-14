@@ -308,6 +308,11 @@ class LocalOps:
         result = await self._agent(step, "grounding", {"finding": case.finding}, call)
         if result.output is not None:
             self.record.grounding(result.output)
+        elif context is not None:
+            # No brief: say why, so a failed retrieval never reads as "no precedent".
+            degraded = list(getattr(context, "degraded", ()) or ())
+            self.record.grounding({"brief": None, "empty_context": bool(getattr(context, "empty", False)),
+                                   "degraded": degraded, "status": result.failure.value if result.failure else "ok"})
         # Advisory only: the brief never leaves this step.
         return StepResult(usage=result.usage, failure=result.failure, detail=result.detail)
 
@@ -474,6 +479,8 @@ class _Composition:
         self.plan = plan
         if plan is not None and plan.status == "unsupported_scope":
             raise _Stop(TerminalReason.UNSUPPORTED_SCOPE)
+        if plan is not None and plan.status == "target_not_found":
+            raise _Stop(TerminalReason.TARGET_NOT_FOUND)
         if plan is None or plan.status != "planned" or plan.control is None or plan.exploit is None:
             raise _Stop(TerminalReason.PLAN_UNRESOLVED)
 

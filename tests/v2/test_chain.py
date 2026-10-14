@@ -1,3 +1,4 @@
+import json
 """Chain routing with fake stages: order, early stops, A2/D3 correction bounds and review blindness."""
 import asyncio
 import json
@@ -44,7 +45,8 @@ def test_fixed_revision_is_reviewed_replayed_and_executed(tmp_path):
 @pytest.mark.parametrize("setup, reason, last", [
     (dict(runtime=None), "no_runtime", "select"),
     (dict(plan=None), "plan_unresolved", "investigate"),
-    (dict(plan=ProbePlan(status="target_not_found", reason="x")), "plan_unresolved", "investigate"),
+    (dict(plan=ProbePlan(status="target_not_found", reason="x")), "target_not_found", "investigate"),
+    (dict(plan=ProbePlan(status="unresolved", reason="x")), "plan_unresolved", "investigate"),
     (dict(plan=ProbePlan(status="unsupported_scope", reason="x")), "unsupported_scope", "investigate"),
     (dict(plan=PLAN.model_copy(update={"exploit": None})), "plan_unresolved", "investigate"),
     (dict(raises={"investigate": ModelHTTPError(503, "m")}), "provider_error", "investigate"),
@@ -195,6 +197,9 @@ def test_grounding_runs_first_only_when_configured_and_is_never_passed_on(tmp_pa
     fakes = Fakes(grounding=True, raises={"ground": ModelHTTPError(500, "m")})
     _, decided = go(fakes, tmp_path / "h")
     assert decided["stopped"] is None
+    # ...and it still says why there is no brief, so a failure never reads as "no precedent".
+    recorded = json.loads((tmp_path / "h" / "runs" / "run" / "grounding.json").read_text())
+    assert recorded["brief"] is None and recorded["status"] == "provider_error"
 
 
 def test_missing_model_is_an_explicit_error(tmp_path):

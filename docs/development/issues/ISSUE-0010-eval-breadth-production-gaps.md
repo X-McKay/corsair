@@ -4,7 +4,7 @@ kind: issue
 title: Production gaps exposed by the per-language eval breadth sets
 status: open
 updated: 2026-10-14
-related: [PLAN-0098, SPEC-0078]
+related: [PLAN-0098]
 ---
 
 # Production gaps exposed by the per-language eval breadth sets

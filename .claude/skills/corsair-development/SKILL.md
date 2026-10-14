@@ -18,7 +18,7 @@ Resolve paths from the repository root. Read `AGENTS.md`, `docs/development/READ
 
 1. Make the smallest independently reviewable change. Keep the current plan's ordered steps, decisions and validation notes up to date.
 2. Exercise the component alone first. Use native test/override facilities for contracts and real qualification for external boundaries. Do not hide an unavailable live prerequisite with a mock or fallback.
-3. For agent changes, select relevant evaluation dimensions from `docs/evaluation-and-acceptance.md`. Use saved inputs, frozen cases and native instrumentation; record modes, repeat counts, usage/trace coverage and regression evidence.
+3. For agent changes, select relevant evaluation dimensions from `docs/development/specs/SPEC-0082-corsair-v2-architecture.md` (its eval layout and baselines). Use saved inputs, frozen cases and native instrumentation; record modes, repeat counts, usage/trace coverage and regression evidence.
 4. When blocked, retain the command/native error and evidence reference, open/update the repository issue, and mark the plan blocked. Continue useful authorized work that does not depend on the missing gate. Do not add undocumented environment patches or weaken acceptance.
 
 ## Investigation changes

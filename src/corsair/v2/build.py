@@ -58,6 +58,10 @@ def replay(case: Case, runtime: Runtime, recipe: Recipe, *, revision: str = "vul
     tree = case.revision if revision == "vulnerable" else case.fixed_revision
     if tree is None:
         return BuildResult(recipe=recipe, replayed=False, reason="the case has no fixed revision"), None
+    clobbered = [added.path for added in recipe.files if (Path(tree.source) / added.path).exists()]
+    if clobbered:  # a recipe may add files, never replace the revision's own
+        return BuildResult(recipe=recipe, replayed=False,
+                           reason=f"recipe would overwrite files of the revision: {', '.join(clobbered)}"), None
     store = ArtifactStore(artifacts)
     digest = recipe_sha256(recipe)
     key = environment_key(runtime, digest, tree.tree_sha256)

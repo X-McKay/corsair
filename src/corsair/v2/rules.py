@@ -77,13 +77,15 @@ class Rule:
 
 
 def _r0(f: Facts) -> TerminalReason | None:
-    if f.stopped in (R.NO_RUNTIME, R.BUILD_FAILED, R.UNSUPPORTED_SCOPE, R.PLAN_UNRESOLVED):
+    if f.stopped in (R.NO_RUNTIME, R.BUILD_FAILED, R.UNSUPPORTED_SCOPE, R.TARGET_NOT_FOUND, R.PLAN_UNRESOLVED):
         return f.stopped
     if f.runtime is None:
         return R.NO_RUNTIME
     if f.plan is not None and f.plan.status == "unsupported_scope":
         return R.UNSUPPORTED_SCOPE
     if f.plan is not None and f.plan.status == "target_not_found":
+        return R.TARGET_NOT_FOUND
+    if f.plan is not None and f.plan.status == "unresolved":
         return R.PLAN_UNRESOLVED
     if f.build is not None and not f.build.replayed:
         return R.BUILD_FAILED
@@ -144,7 +146,7 @@ def _r6(f: Facts) -> TerminalReason | None:
 
 
 RULES: tuple[Rule, ...] = (
-    Rule("R0", "Stopped before evidence: no matrix row, build failed, plan unsupported_scope or target_not_found",
+    Rule("R0", "Stopped before evidence: no matrix row, build failed, plan unsupported_scope, target_not_found or unresolved",
          Label.UNABLE_TO_RUN, "none", _r0),
     Rule("R1", "Provider or infrastructure failure affecting the vulnerable revision, including an infra run on it",
          Label.ERROR, "none", _r1),

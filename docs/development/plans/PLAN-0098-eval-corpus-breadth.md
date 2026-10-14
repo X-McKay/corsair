@@ -4,7 +4,7 @@ kind: plan
 title: Ten eval cases per agent per language, one directory per case
 status: in_progress
 updated: 2026-10-14
-related: [SPEC-0023, SPEC-0035, SPEC-0067, SPEC-0078, ISSUE-0010]
+related: [PLAN-0097, ISSUE-0010]
 ---
 
 # Ten eval cases per agent per language, one directory per case

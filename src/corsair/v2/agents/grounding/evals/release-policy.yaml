@@ -1,7 +1,7 @@
 # Release policy for grounding: the pass/fail contract applied to this agent's eval report.
 # PLACEHOLDER while gates are deferred: every threshold is null until the first live baseline, and make eval
 # reports pass, fail or unknown per entry (policy.json) without changing its exit code. An unobserved metric or
-# missing provenance is unknown, never pass. Keys follow the v2 eval layout agreed with the eval corpus thread.
+# missing provenance is unknown, never pass. Grounding has no skill, so skill_sha256 is not required. Keys follow the v2 eval layout agreed with the eval corpus thread.
 schema_version: 1
 applies_to:
   sets: []
@@ -26,7 +26,6 @@ required_provenance:
 - git_commit
 - dataset_sha256
 - prompt_version
-- skill_sha256
 - toolset_sha256
 - model
 - provider

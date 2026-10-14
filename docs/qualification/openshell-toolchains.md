@@ -1,6 +1,6 @@
 # Native OpenShell toolchain qualification
 
-Status: bounded native 1E qualified on 2026-10-11 on two independently created clusters, with confirmed original-ID cleanup. Scope is native 1E only on the selected Linux amd64 tuple. Preparation and offline guards are not OpenShell runtime qualification. See [SPEC-0007](../development/specs/SPEC-0007-openshell-toolchains.md), [PLAN-0008](../development/plans/PLAN-0008-openshell-toolchains.md) and the [runbook](../runbooks/openshell-toolchains.md).
+Status: bounded native 1E qualified on 2026-10-11 on two independently created clusters, with confirmed original-ID cleanup. Scope is native 1E only on the selected Linux amd64 tuple. Preparation and offline guards are not OpenShell runtime qualification. See SPEC-0007, PLAN-0008 and the toolchain runbook; those v1 records remain on main (removed from develop in the v2 clean-up). This report stays on develop because the toolchain images and both runtime matrices cite it.
 
 ## Selected artifacts and authority
 
@@ -89,7 +89,7 @@ This is bounded native 1E on one Linux amd64 host and two independently created 
 
 ## SPEC-0045: JDK 8 image and per-image gates (2026-10-13)
 
-[SPEC-0045](../development/specs/SPEC-0045-jdk8-toolchain-and-junit4.md) adds the `java8` image, puts the pinned JUnit Platform console launcher 1.14.4 (SHA-256 7c6968cbcaf4301c729f202b23b7d736c5d88be625fc7d27ad5d746146a8bc28, Java 8 class files) and maven-dependency-plugin 3.8.1 in both Java images, and splits the gate into one test per image under one module-scoped gateway. Run on RIG0 in the worktree `.worktrees/claude-toolchain-jdk8-junit4-x5k2l4`, on a fresh cluster that worktree created (kind node container dd6cd613…, Kubernetes 1.35.8, Calico ready). Commands, every attempt and the corrections are in [PLAN-0049](../development/plans/PLAN-0049-jdk8-toolchain-and-junit4.md).
+SPEC-0045 adds the `java8` image, puts the pinned JUnit Platform console launcher 1.14.4 (SHA-256 7c6968cbcaf4301c729f202b23b7d736c5d88be625fc7d27ad5d746146a8bc28, Java 8 class files) and maven-dependency-plugin 3.8.1 in both Java images, and splits the gate into one test per image under one module-scoped gateway. Run on RIG0 in the worktree `.worktrees/claude-toolchain-jdk8-junit4-x5k2l4`, on a fresh cluster that worktree created (kind node container dd6cd613…, Kubernetes 1.35.8, Calico ready). Commands, every attempt and the corrections are in PLAN-0049.
 
 | Artifact | Immutable selection |
 | --- | --- |
@@ -113,7 +113,7 @@ Not established: JUnit 4 before 4.12 (no Vintage discovery), any JUnit 4 or 5 ve
 
 ## SPEC-0046: CPython 3.7 image, real case and witness v2 probe (2026-10-13)
 
-[SPEC-0046](../development/specs/SPEC-0046-cpython37-toolchain.md) adds the `python37` image and pytest 6 to 7 support in the runner, parser and probe. Run on RIG0 in the worktree `.worktrees/claude/toolchain-python37-drklks`, on a fresh cluster that worktree created after `make kind-down` in the JDK 8 worktree. Commands, every attempt and the corrections are in [PLAN-0050](../development/plans/PLAN-0050-cpython37-toolchain.md). Evidence is under the worktree's `.runs/` and archived to `/home/al/git/corsair/.runs/py37-toolchain-20261013/` on RIG0.
+SPEC-0046 adds the `python37` image and pytest 6 to 7 support in the runner, parser and probe. Run on RIG0 in the worktree `.worktrees/claude/toolchain-python37-drklks`, on a fresh cluster that worktree created after `make kind-down` in the JDK 8 worktree. Commands, every attempt and the corrections are in PLAN-0050. Evidence is under the worktree's `.runs/` and archived to `/home/al/git/corsair/.runs/py37-toolchain-20261013/` on RIG0.
 
 | Artifact | Immutable selection |
 | --- | --- |

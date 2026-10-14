@@ -75,11 +75,11 @@ def render_prompt(case: Case, runtime: Runtime) -> str:
 
 async def investigate(case: Case, runtime: Runtime, model: Model, *, source_root: Path
                       ) -> tuple[ProbePlan, AgentUsage]:
-    """Stage entry. A run without a valid plan returns status target_not_found with the usage status as reason."""
+    """Stage entry. A run without a valid plan returns status unresolved (not a refusal) with the usage status as reason."""
     agent = create_agent(model)
     deps = InvestigatorDeps(source_root=Path(source_root), test_dir=runtime.test_dir)
     plan, usage = await run_recorded(agent, "investigator", render_prompt(case, runtime), model=model, deps=deps,
                                      usage_limits=LIMITS, workspace=source_workspace(Path(source_root)))
     if plan is None:
-        plan = ProbePlan(status="target_not_found", reason=f"investigator produced no valid plan ({usage.status})")
+        plan = ProbePlan(status="unresolved", reason=f"investigator produced no valid plan ({usage.status})")
     return plan, usage
