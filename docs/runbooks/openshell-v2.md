@@ -57,6 +57,12 @@ uv run --locked corsair-v2 run --case <case> --provider-config <provider.json> -
 
 On OpenShell an Environment is not an image: replay seals a manifest under `state_dir`, and each probe's fresh sandbox replays that recipe on the runtime image before the probe file is written. Only the runtime-matrix images need loading. A `cmdi` case already decisive on Docker is the natural first choice.
 
+**Known differences from Docker.** These are expected, not defects to fix by weakening anything:
+
+- Environments replay per probe. Docker commits the replayed sandbox to an image; OpenShell cannot snapshot, so each probe's sandbox reruns the recipe's setup and then its baseline test (offline, under `none`) before the probe file is written. The sealed manifest pins the base image's digest ref, the recipe digest and the tree digest, and opening refuses if any of them changed. A non-hermetic setup (an unpinned dependency, a registry change) can therefore produce a different environment than the one Build validated; that shows up as a failed baseline or an infra failure for that probe, never as a silent pass. Each open's replay log is kept at `state_dir/environments/opens/<sandbox>.log`, and a failure names its sha256.
+- The filesystem policy allows writes only to `/work`, `/tmp` and `/dev/null`. A recipe that writes to `$HOME` (unless `HOME` is under `/tmp` or `/work`, as in the toolchain images that set `HOME=/tmp`) or into system site-packages fails on OpenShell where it passes on Docker. That stays so until the live policy gate decides otherwise (for example by putting `HOME` under `/work`).
+- `image_id` (the run record's `image_digest`) on OpenShell is the runtime image's digest ref (`docker.io/library/<repo>@sha256:...`) the probe sandbox was created from, not an environment image: there is none.
+
 ## Backend config
 
 `.state/openshell/config.json` (mode 0600). Every path in it is absolute.
@@ -120,7 +126,7 @@ Evidence goes to the worktree's own `.runs/`:
 | `toolchain-images` | `.runs/toolchains-image/<id>/`; build receipts in `.cache/toolchains/<dir>/build.json` |
 | `openshell-images-load` | `.runs/openshell-images/<id>/`: `images.json`, `load.json` (node UID, digests, tags missing locally) |
 | `openshell-config` | `.runs/openshell-config/<id>/`: `config.json` (paths only), `native-status.json`, `port-forward.json`, `scope.json`, credential-withheld export receipts |
-| `qualify-openshell-v2` | `$CORSAIR_QUAL_RUN/`, written by the backend's tests |
+| `qualify-openshell-v2` | `$CORSAIR_QUAL_RUN/`: `junit.xml` (pytest) and `cleanup.jsonl` (one line per sandbox the live tests removed: backend, name, whether its absence was confirmed; a test fails on any unconfirmed line) |
 
 Private state lives in `.state/`. It is ignored by Git and is never evidence:
 
