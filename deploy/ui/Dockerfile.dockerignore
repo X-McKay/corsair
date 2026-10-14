@@ -5,6 +5,8 @@
 !src/
 !src/corsair/
 !src/corsair/**
+!evals/e2e/baselines
+!evals/e2e/baselines/**
 !ui/
 !ui/NOTICE.md
 !ui/package.json

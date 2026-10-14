@@ -181,7 +181,7 @@ def ratio(value) -> dict | None:
 
 def stats(value) -> dict:
     value = obj(value)
-    return {'observed': count(value.get('observed')) or 0,
+    return {'observed': count(value.get('observed')),
             **{key: number(value.get(key)) for key in ('mean', 'p50', 'p90', 'total')}}
 
 

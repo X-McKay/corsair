@@ -21,6 +21,8 @@ COPY --from=dependencies /app/.venv /app/.venv
 COPY --from=frontend /build/ui/dist /app/ui/dist
 # The server, the runtime-matrix contract and the committed per-agent baselines beside each agent's cases.
 COPY src/corsair /app/src/corsair
+# The committed chain baselines, which live with the chain's cases rather than in the package.
+COPY evals/e2e/baselines /app/evals/e2e/baselines
 COPY ui/NOTICE.md /app/ui/NOTICE.md
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONPATH=/app/src \

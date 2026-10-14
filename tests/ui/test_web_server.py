@@ -26,7 +26,8 @@ def rollup(attempts=2, clean=1):
             'parameters': {'model': ['scripted'], 'api_key': ['SECRET'] * 0},
             'wall_s': {'observed': attempts, 'mean': 0.5, 'p50': 0.5, 'p90': 0.9, 'total': 1.0},
             'tokens': {'observed': 0, 'mean': None, 'p50': None, 'p90': None, 'total': None},
-            'input_tokens': {'observed': 2, 'mean': 0, 'p50': 0, 'p90': 0, 'total': 0}}
+            'input_tokens': {'observed': 2, 'mean': 0, 'p50': 0, 'p90': 0, 'total': 0},
+            'retries': {'mean': None, 'p50': None, 'p90': None, 'total': None}}
 
 
 def eval_summary(agent='reviewer', run=EVAL_RUN, attempts=2, clean=1):
@@ -129,6 +130,8 @@ def test_eval_listing_and_detail_are_safe_projections(root):
         # a measured zero stays zero and an unobserved metric stays unknown
         assert listed['overall']['metrics']['input_tokens']['total'] == 0
         assert listed['overall']['metrics']['tokens']['mean'] is None
+        assert listed['overall']['metrics']['tokens']['observed'] == 0
+        assert listed['overall']['metrics']['retries']['observed'] is None
         detail = get(server, f'/api/evaluations/reviewer/{EVAL_RUN}')
         assert detail['attempts'][0]['failed'] is True and detail['attempts'][0]['failure_kind'] == 'evaluator'
         assert 'failure' not in detail['attempts'][0]

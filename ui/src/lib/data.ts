@@ -32,7 +32,7 @@ export interface Ratio {
   total: number;
 }
 export interface Stats {
-  observed: number;
+  observed: number | null;
   mean: number | null;
   p50: number | null;
   p90: number | null;

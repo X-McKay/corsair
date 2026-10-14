@@ -290,13 +290,13 @@ export function Detail({
           {
             label: "Wall time p50 / p90",
             value: `${duration(o?.metrics.wall_s?.p50)} / ${duration(o?.metrics.wall_s?.p90)}`,
-            note: `${o?.metrics.wall_s?.observed ?? 0}/${integer(o?.attempts)} observed`,
+            note: `${integer(o?.metrics.wall_s?.observed)}/${integer(o?.attempts)} observed`,
             icon: <Clock3 size={18} />,
           },
           {
             label: "Mean tokens",
             value: number(o?.metrics.tokens?.mean, 0),
-            note: `${o?.metrics.tokens?.observed ?? 0}/${integer(o?.attempts)} observed`,
+            note: `${integer(o?.metrics.tokens?.observed)}/${integer(o?.attempts)} observed`,
             icon: <Coins size={18} />,
           },
         ]}

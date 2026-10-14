@@ -98,7 +98,9 @@ def check(image: str, data: Path, runtime_matrix: Path) -> None:
             assert request('/api/workflows')[1]['status'] == 'not_configured'
             docker('exec', cid, 'python', '-c',
                    "from pathlib import Path; import os; assert os.getuid()==10001; "
-                   "assert not any(Path(p).exists() for p in ('/app/.runs','/app/.state','/app/ui/e2e'))")
+                   "assert not any(Path(p).exists() for p in ('/app/.runs','/app/.state','/app/ui/e2e')); "
+                   "assert Path('/app/evals/e2e/baselines/README.md').is_file(); "
+                   "assert not Path('/app/evals/e2e/v2').exists()")
             print('Mounted data check passed.' if mounted else 'Missing data correctly fails readiness with HTTP 503.')
         finally:
             docker('stop', '--time', '5', cid)
