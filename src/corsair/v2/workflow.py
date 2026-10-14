@@ -268,7 +268,8 @@ class InvestigationWorkflow:
     async def run(self, request: RunRequest) -> Verdict:
         bookend = {"task_queue": CONTROL_QUEUE, "start_to_close_timeout": CONTROL_TIMEOUT, "retry_policy": READ_RETRY}
         await workflow.execute_activity(begin_run, args=[request.run_dir, request.case], **bookend)
-        verdict = await compose(request.case, ActivityOps(request.run_dir, request.grounding, request.workspace), request.budget)
+        ops = ActivityOps(request.run_dir, request.grounding, request.workspace)
+        verdict = await compose(request.case, ops, request.budget)
         await workflow.execute_activity(finish_run, args=[request.run_dir, verdict], **bookend)
         return verdict
 
