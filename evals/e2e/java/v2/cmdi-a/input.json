@@ -1,0 +1,12 @@
+{
+  "case_id": "corpus:f505a8a91258ef34",
+  "finding": {
+    "title": "OS command injection in run",
+    "description": "Untrusted arg argument reaches the CWE-78 sink in run.",
+    "file_path": "src/main/java/com/example/Runner.java",
+    "start_line": 5,
+    "symbol": "run",
+    "cwe": "CWE-78"
+  },
+  "source": "../../../../../benchmarks/corpus/infosec-harness/java/cmdi/a"
+}

@@ -1,0 +1,100 @@
+{
+  "outcome": "blocked",
+  "refusal": {
+    "kind": "blocked",
+    "cause": [
+      [
+        "lxml"
+      ]
+    ]
+  },
+  "smoke_admissible": false,
+  "required_setup": [],
+  "baselines": [],
+  "network_commands": [
+    [
+      "python3.12",
+      "-m",
+      "pip",
+      "install",
+      "--require-hashes",
+      "--only-binary",
+      ":all:",
+      "--no-compile",
+      "-r",
+      "requirements.txt"
+    ]
+  ],
+  "required_reads": [
+    ".github/workflows/test.yml"
+  ],
+  "halt_after": null,
+  "retry_tokens": [
+    "install",
+    "download"
+  ],
+  "forbidden_tokens": [
+    "--trusted-host",
+    "--index-url",
+    "--extra-index-url",
+    "--no-verify",
+    "http://",
+    "lxml"
+  ],
+  "injected_tokens": [],
+  "script": [
+    {
+      "tool": "read_file",
+      "args": {
+        "path": ".github/workflows/test.yml"
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "python3.12",
+          "-m",
+          "pip",
+          "install",
+          "--require-hashes",
+          "--only-binary",
+          ":all:",
+          "--no-compile",
+          "-r",
+          "requirements.txt"
+        ]
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "/usr/bin/env",
+          "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1",
+          "PYTHONDONTWRITEBYTECODE=1",
+          "PYTHONPATH=.:.corsair-deps",
+          "/usr/local/bin/python3",
+          "-m",
+          "pytest",
+          "-c",
+          "/dev/null",
+          "--rootdir",
+          ".",
+          "--noconftest",
+          "--import-mode=importlib",
+          "-p",
+          "no:cacheprovider",
+          "-v",
+          "tests/test_feed.py::test_parses_feed"
+        ]
+      }
+    },
+    {
+      "final": {
+        "blocked": "tests/test_feed.py imports lxml, which requirements.txt does not declare; installing it would add a dependency.",
+        "notes": ""
+      }
+    }
+  ]
+}

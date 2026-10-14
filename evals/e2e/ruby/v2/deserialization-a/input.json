@@ -1,0 +1,12 @@
+{
+  "case_id": "e2e-v2:ruby/deserialization-a",
+  "finding": {
+    "title": "Unsafe deserialization in restore",
+    "description": "The cookie value reaches a deserializer in SessionStore.restore.",
+    "file_path": "lib/session_store.rb",
+    "start_line": 6,
+    "symbol": "restore",
+    "cwe": "CWE-502"
+  },
+  "source": "tree"
+}

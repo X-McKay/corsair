@@ -1,0 +1,12 @@
+{
+  "case_id": "corpus:8fef501a431062b6",
+  "finding": {
+    "title": "Argument injection in search",
+    "description": "`term` reaches the grep argument vector in search.",
+    "file_path": "src/search.js",
+    "start_line": 4,
+    "symbol": "search",
+    "cwe": "CWE-77"
+  },
+  "source": "../../../../../benchmarks/corpus/infosec-harness/javascript/arginjection/b"
+}

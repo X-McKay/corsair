@@ -1,0 +1,23 @@
+{
+  "language": "python",
+  "framework": "pytest",
+  "family": "smoke-baseline",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "The project has no tests; the Builder writes one trivial smoke test and runs it in the row's form.",
+  "expected": "A recipe with one written test file (any name, no CORSAIR_ variable) run in the row's form as baseline; setup may be empty because the image provides the declared pytest.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "evals/environment/python/breadth/python-operator-smoke-baseline",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/environment/python/breadth/python-operator-smoke-baseline; v1 placed an operator smoke file in the checkout; in v2 the Builder writes it, so the listing and run that showed it are dropped; the README declares the recorded pip argv verbatim; the tree's component and test sources were written to agree with the recorded output; native runs are recorded in the row's run_template form"
+  }
+}

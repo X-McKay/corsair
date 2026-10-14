@@ -12,6 +12,12 @@
   "required_reads": [
     "lib/ms.js"
   ],
+  "reason_patterns": [
+    "(?i)wall[- ]?clock",
+    "(?i)\\btim(e|ing)\\b",
+    "(?i)duration",
+    "(?i)cpu[- ]time"
+  ],
   "replay": {
     "reads": [
       "lib/ms.js"

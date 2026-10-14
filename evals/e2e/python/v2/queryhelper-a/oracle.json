@@ -1,0 +1,78 @@
+{
+  "expected_label": "LIKELY_NOT_EXPLOITABLE",
+  "acceptable_labels": [
+    "LIKELY_NOT_EXPLOITABLE",
+    "UNABLE_TO_RUN"
+  ],
+  "forbidden_labels": [],
+  "expected_rule": null,
+  "expected_terminal_reason": null,
+  "expected_finding": null,
+  "expected_fix": "not_applicable",
+  "expected_runtime_row": "pytest-cpython312",
+  "truth": {
+    "source": "manifest and v1 oracle",
+    "manifest": "benchmarks/corpus/infosec-harness/manifest.json",
+    "manifest_case": "testonly",
+    "manifest_truth": {
+      "expected_verdict": "likely_not_exploitable",
+      "reachability": "unknown",
+      "sink_file": "tests/test_helpers.py",
+      "sink_line": 6,
+      "source": "name parameter",
+      "target_callable": "build_query",
+      "early_exit": "test_or_vendored"
+    },
+    "v1": {
+      "path": "evals/e2e/python/corpus/ih-python-queryhelper/oracle.json",
+      "gate": {
+        "execution": "completed",
+        "finding": "not_reproduced",
+        "fix": "not_applicable"
+      }
+    }
+  },
+  "why": "Manifest truth likely_not_exploitable with early_exit test_or_vendored; v2's rule table has no test-or-vendored exit yet, so an unsupported_scope refusal is accepted and no label is forbidden until that exit exists.",
+  "revision_tree_sha256": "fe1f9f46643972078be5b58aab6dab769d6df389409104b39acb4290d01a7652",
+  "fixed_tree_sha256": null,
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "tests/test_helpers.py",
+          "start_line": 4,
+          "end_line": 4,
+          "quote": "def build_query(name):"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "tests/test_helpers.py",
+            "start_line": 4,
+            "end_line": 4,
+            "quote": "def build_query(name):"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    }
+  }
+}

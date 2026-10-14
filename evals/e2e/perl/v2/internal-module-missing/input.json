@@ -1,0 +1,11 @@
+{
+  "finding": {
+    "title": "SQL injection in total",
+    "description": "Untrusted account argument reaches a query string in total.",
+    "file_path": "lib/Report.pm",
+    "start_line": 8,
+    "symbol": "total",
+    "cwe": "CWE-89"
+  },
+  "source": "tree"
+}

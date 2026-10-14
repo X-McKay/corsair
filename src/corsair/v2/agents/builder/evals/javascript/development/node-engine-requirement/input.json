@@ -1,0 +1,108 @@
+{
+  "source_files": [
+    {
+      "path": ".npmrc",
+      "content": "engine-strict=true\n"
+    },
+    {
+      "path": ".travis.yml",
+      "content": "language: node_js\nnode_js:\n  - \"24\"\ninstall:\n  - npm ci --ignore-scripts\nscript:\n  - npm test\n"
+    },
+    {
+      "path": "index.js",
+      "content": "'use strict';\n\nconst cache = new Map();\n\nmodule.exports = async function cached(key, load) {\n  if (!cache.has(key)) cache.set(key, await load());\n  return cache.get(key);\n};\n"
+    },
+    {
+      "path": "package.json",
+      "content": "{\n  \"name\": \"fetch-cache\",\n  \"version\": \"2.1.0\",\n  \"description\": \"fetch-cache utilities\",\n  \"main\": \"index.js\",\n  \"scripts\": {\n    \"test\": \"jest\"\n  },\n  \"devDependencies\": {\n    \"jest\": \"24.9.0\"\n  },\n  \"license\": \"MIT\",\n  \"engines\": {\n    \"node\": \">=24\"\n  }\n}\n"
+    },
+    {
+      "path": "test/cache.test.js",
+      "content": "'use strict';\n\nconst target = require('../index');\n\ntest('caches results', () => {\n  return target('k', async () => 1).then((v) => expect(v).toBe(1));\n});\n"
+    }
+  ],
+  "row_id": "jest29-node22",
+  "plan": {
+    "status": "planned",
+    "target": "index",
+    "citations": [
+      {
+        "path": "index.js",
+        "start_line": 1,
+        "end_line": 1,
+        "quote": "'use strict';"
+      }
+    ]
+  },
+  "feedback": null,
+  "workspace_fixture": {
+    "observations": [
+      {
+        "argv": [
+          "npm",
+          "ci",
+          "--ignore-scripts"
+        ],
+        "exit_code": 1,
+        "output": "npm error code EBADENGINE\nnpm error engine Unsupported engine\nnpm error engine Not compatible with your version of node/npm: fetch-cache@2.1.0\nnpm error notsup Required: {\"node\":\">=24\"}\nnpm error notsup Actual:   {\"npm\":\"10.9.9\",\"node\":\"v22.23.3\"}\n"
+      },
+      {
+        "argv": [
+          "/usr/local/bin/node",
+          "node_modules/jest/bin/jest.js",
+          "--ci",
+          "--runInBand",
+          "--verbose",
+          "--runTestsByPath",
+          "test/cache.test.js",
+          "-t",
+          "^caches results$"
+        ],
+        "exit_code": 0,
+        "output": "PASS test/cache.test.js\n  ✓ caches results (3 ms)\n\nTest Suites: 1 passed, 1 total\nTests:       1 passed, 1 total\n",
+        "needs": [
+          [
+            "npm",
+            "ci",
+            "--ignore-scripts"
+          ]
+        ],
+        "unmet": {
+          "exit_code": 1,
+          "output": "node:internal/modules/cjs/loader:1228\n  throw err;\n  ^\n\nError: Cannot find module '/work/node_modules/jest/bin/jest.js'\n"
+        }
+      },
+      {
+        "argv": [
+          "node",
+          "--version"
+        ],
+        "exit_code": 0,
+        "output": "v22.23.3\n"
+      },
+      {
+        "argv": [
+          "npm",
+          "--version"
+        ],
+        "exit_code": 0,
+        "output": "10.9.9\n"
+      }
+    ],
+    "written_file_run": {
+      "exit_code": 0,
+      "output": "PASS {file}\n  ✓ {name} (1 ms)\n\nTest Suites: 1 passed, 1 total\nTests:       1 passed, 1 total\n",
+      "needs": [
+        [
+          "npm",
+          "ci",
+          "--ignore-scripts"
+        ]
+      ],
+      "unmet": {
+        "exit_code": 1,
+        "output": "node:internal/modules/cjs/loader:1228\n  throw err;\n  ^\n\nError: Cannot find module '/work/node_modules/jest/bin/jest.js'\n"
+      }
+    }
+  }
+}

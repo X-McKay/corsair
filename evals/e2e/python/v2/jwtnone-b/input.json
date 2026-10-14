@@ -1,0 +1,12 @@
+{
+  "case_id": "corpus:88da59ae36a51325",
+  "finding": {
+    "title": "Improper signature verification in verify_token",
+    "description": "verify_token reads the token header and returns the claims of a token it accepts.",
+    "file_path": "app.py",
+    "start_line": 29,
+    "symbol": "verify_token",
+    "cwe": "CWE-347"
+  },
+  "source": "../../../../../benchmarks/corpus/infosec-harness/python/jwtnone/b"
+}

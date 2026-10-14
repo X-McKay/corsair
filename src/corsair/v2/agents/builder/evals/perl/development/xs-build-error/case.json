@@ -1,0 +1,21 @@
+{
+  "language": "perl",
+  "framework": "test-more",
+  "family": "build",
+  "kind": "failure-mode",
+  "category": "failure-mode",
+  "probes": "make fails compiling the XS module; the Perl module loads the compiled object.",
+  "expected": "A blocked refusal whose reason names the cause: the XS module does not build and lib/Digest/XXH.pm loads it. It has no setup and no baseline. Existing files cannot be changed, and a written smoke test does not stand in for a project that does not build or run.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "trajectory"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "evals/environment/perl/breadth/perl-xs-build-error",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/environment/perl/breadth/perl-xs-build-error; lib/Digest/XXH.pm loads the compiled object with XSLoader, so skipping make cannot pass; the tree's component and test sources were written to agree with the recorded output; native runs are recorded in the row's run_template form"
+  }
+}

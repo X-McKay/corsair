@@ -1,0 +1,42 @@
+{
+  "row_id": "prove-perl526",
+  "brief": {
+    "role": "control",
+    "test_file": "t/download_headers_control.t",
+    "test_name": "benign_control",
+    "target": "lib/DownloadHeaders.pm: DownloadHeaders::disposition($filename)",
+    "seam": "Call the real DownloadHeaders::disposition through its public interface",
+    "input_description": "filename 'report.txt'",
+    "property_to_assert": "Returns exactly 'attachment; filename=\"report.txt\"'",
+    "doubles": "",
+    "citations": [
+      {
+        "path": "lib/DownloadHeaders.pm",
+        "start_line": 6,
+        "end_line": 9
+      },
+      {
+        "path": "t/download_headers.t",
+        "start_line": 1,
+        "end_line": 8
+      }
+    ]
+  },
+  "source_files": [
+    {
+      "path": "lib/DownloadHeaders.pm",
+      "content": "package DownloadHeaders;\n# Response headers for file downloads.\nuse strict;\nuse warnings;\n\nsub disposition {\n    my ($filename) = @_;\n    return qq{attachment; filename=\"$filename\"};\n}\n\n1;\n"
+    },
+    {
+      "path": "t/download_headers.t",
+      "content": "use strict;\nuse warnings;\nuse Test::More;\nuse DownloadHeaders;\n\nlike(DownloadHeaders::disposition('a.txt'), qr/^attachment/, 'names an attachment');\n\ndone_testing();\n"
+    }
+  ],
+  "previous": {
+    "role": "control",
+    "test_file": "t/download_headers_control.t",
+    "test_name": "benign_control",
+    "source": "use strict;\nuse warnings;\nuse Test::More;\nuse DownloadHeaders;\n\nsub corsair_marker {\n    open(my $fh, '>', \"$ENV{CORSAIR_MARKER_DIR}/$_[0]\") or die \"marker $_[0]: $!\";\n    print $fh $_[1] if defined $_[1];\n    close($fh);\n}\n\ncorsair_marker('start');\nmy $holds = DownloadHeaders::dispositon('report.txt') eq 'attachment; filename=\"report.txt\"';\ncorsair_marker('check', $holds ? 'holds' : 'violated');\nok($holds, 'benign_control') or diag($ENV{CORSAIR_TOKEN});\ncorsair_marker('end') if Test::More->builder->is_passing;\ndone_testing();\n"
+  },
+  "diagnostics": "check: errored\nhint: raised before the check marker"
+}

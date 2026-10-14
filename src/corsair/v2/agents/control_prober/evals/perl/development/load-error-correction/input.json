@@ -1,0 +1,42 @@
+{
+  "row_id": "prove-perl526",
+  "brief": {
+    "role": "control",
+    "test_file": "t/redirects_control.t",
+    "test_name": "benign_control",
+    "target": "lib/Redirects.pm: Redirects::after_login($target)",
+    "seam": "Call the real Redirects::after_login through its public interface",
+    "input_description": "target '/account', a path on this site",
+    "property_to_assert": "Returns '/account' unchanged",
+    "doubles": "",
+    "citations": [
+      {
+        "path": "lib/Redirects.pm",
+        "start_line": 6,
+        "end_line": 10
+      },
+      {
+        "path": "t/redirects.t",
+        "start_line": 1,
+        "end_line": 8
+      }
+    ]
+  },
+  "source_files": [
+    {
+      "path": "lib/Redirects.pm",
+      "content": "package Redirects;\n# Where to send a user after sign-in.\nuse strict;\nuse warnings;\n\nsub after_login {\n    my ($target) = @_;\n    return '/' unless defined $target && length $target;\n    return $target;\n}\n\n1;\n"
+    },
+    {
+      "path": "t/redirects.t",
+      "content": "use strict;\nuse warnings;\nuse Test::More;\nuse Redirects;\n\nis(Redirects::after_login(undef), '/', 'defaults to home');\n\ndone_testing();\n"
+    }
+  ],
+  "previous": {
+    "role": "control",
+    "test_file": "t/redirects_control.t",
+    "test_name": "benign_control",
+    "source": "use strict;\nuse warnings;\nuse Test::More;\nuse Redirect;\n\nsub corsair_marker {\n    open(my $fh, '>', \"$ENV{CORSAIR_MARKER_DIR}/$_[0]\") or die \"marker $_[0]: $!\";\n    print $fh $_[1] if defined $_[1];\n    close($fh);\n}\n\ncorsair_marker('start');\nmy $holds = Redirects::after_login('/account') eq '/account';\ncorsair_marker('check', $holds ? 'holds' : 'violated');\nok($holds, 'benign_control') or diag($ENV{CORSAIR_TOKEN});\ncorsair_marker('end') if Test::More->builder->is_passing;\ndone_testing();\n"
+  },
+  "diagnostics": "check: not_run\nhint: body did not start"
+}

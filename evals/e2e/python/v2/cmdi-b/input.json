@@ -1,0 +1,13 @@
+{
+  "case_id": "corpus:58027cef63eac7a2",
+  "finding": {
+    "title": "OS command injection in count_lines",
+    "description": "`path` reaches subprocess.run in count_lines.",
+    "file_path": "app.py",
+    "start_line": 4,
+    "symbol": "count_lines",
+    "cwe": "CWE-78"
+  },
+  "source": "../../../../../benchmarks/corpus/infosec-harness/python/cmdi/b",
+  "fixed_source": "../../../../../benchmarks/corpus/infosec-harness/python/cmdi/a"
+}

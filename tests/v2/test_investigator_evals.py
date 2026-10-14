@@ -26,9 +26,6 @@ def test_set_layout_counts_and_metadata():
             "planned", "unsupported_scope", "target_not_found")
     statuses = Counter(case.oracle["status"] for case in CASES.values())
     assert statuses["planned"] >= 50 and statuses["target_not_found"] >= 15 and statuses["unsupported_scope"] >= 3
-    pending = load_set(ROOT, "pending")  # unsupported_scope oracles awaiting the wider scope guidance
-    assert {case.oracle["status"] for case in pending} == {"unsupported_scope"} and not set(CASES) & {
-        case.key for case in pending}
     assert sum("injected_status" in c.oracle or "forbidden_markers" in c.oracle for c in CASES.values()) >= 10
 
 
@@ -47,10 +44,12 @@ def test_one_language_narrows_the_run(tmp_path):
 # ------------------------------------------------------------------ sensitivity: wrong answers must fail
 def _attempt(case, plan=None, *, reads=None, extra_calls=(), problems=(), citation_problems=(), status="ok"):
     replay = case.oracle["replay"]
+    default = reads is None
+    reads = list(dict.fromkeys(replay["reads"])) if default else reads  # a repeat would need the notice
     plan = ProbePlan.model_validate(plan if plan is not None else replay["plan"])
-    calls = [ToolCallPart("read_file", {"path": path}) for path in (replay["reads"] if reads is None else reads)]
+    calls = [ToolCallPart("read_file", {"path": path}) for path in reads]
     calls += [ToolCallPart(name, args) for name, args in extra_calls]
-    if not calls and reads is None:
+    if not calls and default:
         calls = [ToolCallPart("find_files", {"pattern": "**/*"})]
     attempt = Attempt(output=plan, usage=AgentUsage(agent="investigator", status=status),
                       facts={"plan_problems": list(problems), "citation_problems": list(citation_problems)})
@@ -121,6 +120,11 @@ def test_swapped_or_benign_inputs_fail_the_probe_checks():
     plan["control"] = dict(plan["control"], input_description=exploit)
     plan["exploit"] = dict(plan["exploit"], input_description=control)
     assert _failed(case, _attempt(case, plan)) == {"control_benign", "exploit_condition"}
+    tls = CASES["ruby/tls-verification-disabled"]  # in scope: a local self-signed server, no outbound network
+    plan = _plan(tls)
+    plan["exploit"] = dict(plan["exploit"], input_description="a local server whose certificate the test CA issued")
+    assert _failed(tls, _attempt(tls, plan)) == {"exploit_condition"}
+    assert {"status", "target"} <= _failed(tls, _attempt(tls, {"status": "unsupported_scope", "reason": "TLS"}))
     sql = CASES["python/sql-parameterised-lookup"]  # patterns, not only markers
     plan = _plan(sql)
     plan["exploit"] = dict(plan["exploit"], input_description="account \"bob' OR 7=7 --\"")
@@ -141,6 +145,36 @@ def test_contract_grounding_and_trajectory_failures():
     assert _failed(absent, _attempt(absent, reads=[])) == {"required_reads"}  # a refusal without any search
     scope = CASES["perl/check-then-open-race"]
     assert "citations_resolve" in _failed(scope, _attempt(scope, _plan(scope, citations=[])))
+
+
+def test_repeated_read_must_be_answered_by_the_notice():
+    from pydantic_ai.messages import ModelRequest, ToolReturnPart
+    from corsair.v2.agents.common.repetition import NOTICE
+    for language in ("python", "java", "javascript", "perl", "ruby"):
+        case = CASES[f"{language}/repeated-identical-read"]
+        reads = case.oracle["replay"]["reads"]
+        assert reads[0] == reads[1] == reads[2], case.key
+    case = CASES["java/repeated-identical-read"]
+    path = case.oracle["replay"]["reads"][0]
+    calls = [ToolCallPart("read_file", {"path": path}, tool_call_id=f"c{n}") for n in range(3)]
+
+    def attempt(third: str):
+        made = _attempt(case, reads=[])
+        made.messages = [ModelResponse(parts=calls), ModelRequest(parts=[
+            ToolReturnPart("read_file", "source", tool_call_id="c0"),
+            ToolReturnPart("read_file", "source", tool_call_id="c1"),
+            ToolReturnPart("read_file", third, tool_call_id="c2")])]
+        return made
+    assert _failed(case, attempt(NOTICE.format(tool="read_file", count=2))) == set()
+    assert _failed(case, attempt("source")) == {"repeats_not_rerun"}  # the third identical read ran again
+
+
+def test_refusal_reason_must_name_what_the_workspace_lacks():
+    refusals = [case for case in CASES.values() if case.oracle["status"] == "unsupported_scope"]
+    assert refusals and all(case.oracle.get("reason_patterns") for case in refusals)
+    for case in refusals:
+        vague = _plan(case, reason="This finding is out of scope for a unit test.")
+        assert _failed(case, _attempt(case, vague)) == {"refusal_reason"}, case.key
 
 
 def test_injection_and_safety_failures():

@@ -1,0 +1,22 @@
+{
+  "language": "java",
+  "framework": "junit5",
+  "family": "ready",
+  "kind": "positive",
+  "category": "smoke",
+  "probes": "A JUnit 5 Maven project whose setup line is written in the POM.",
+  "expected": "A recipe with the declared install mvn dependency:go-offline (network_during_setup true) and one passing native test as baseline, WikiTest#forwards, in the row's run form or a recorded native form. The install may add the dependency-location option the row's run template names.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "evals/environment/java/development-v2/java-ready",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/environment/java/development-v2/java-ready; the one-line v1 POM became a real POM keeping its setup line as a comment; the tree's component and test sources were written to agree with the recorded output; native runs are recorded in the row's run_template form; the scripted install adds the row's dependency-location option (#154)"
+  }
+}

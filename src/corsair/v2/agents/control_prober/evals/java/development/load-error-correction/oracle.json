@@ -1,0 +1,96 @@
+{
+  "expect": {
+    "draft": true,
+    "status": "ok"
+  },
+  "expected_outcome": {
+    "asserts": "benign_behaviour",
+    "vulnerable": "pass",
+    "fixed": "pass",
+    "this_tree": "pass"
+  },
+  "revision_history": [],
+  "target_spans": [
+    {
+      "path": "src/main/java/com/example/redirects/Redirects.java",
+      "start_line": 8,
+      "end_line": 13
+    }
+  ],
+  "anchors": {
+    "comment": "//",
+    "load": [
+      "package\\s+com\\.example\\.redirects\\s*;|import\\s+com\\.example\\.redirects\\.(?:Redirects|\\*)\\s*;"
+    ],
+    "call": [
+      "\\bRedirects\\.afterLogin\\s*\\("
+    ],
+    "input": [
+      "['\\\"]/account['\\\"]"
+    ],
+    "avoid_input": [
+      "//evil"
+    ],
+    "property": [
+      "(?:(?:(?<![!=<>])===?(?!=)|\\beq\\b|\\.equals\\s*\\(|\\bassert_equal\\b)\\s*\\(?\\s*['\\\"]/account['\\\"]|['\\\"]/account['\\\"]\\s*\\)?\\s*(?:(?<![!=<>])===?(?!=)|\\beq\\b|\\.equals\\s*\\(|\\bassert_equal\\b)|['\\\"]/account['\\\"]\\s*\\.equals\\s*\\(|Objects\\.equals\\s*\\([^\\n]*['\\\"]/account['\\\"]|is_deeply\\s*\\([^\\n]*['\\\"]/account['\\\"])"
+    ],
+    "non_differential": [],
+    "test_definition": "@(?:Test|ParameterizedTest)\\b",
+    "assertion": "\\bassert\\w*\\s*\\(",
+    "token_form": "\\bassert\\w*\\s*\\([\\s\\S]*,\\s*System\\.getenv\\(\\s*\\\"CORSAIR_TOKEN\\\"\\s*\\)\\s*\\)",
+    "forbidden": [
+      "@Disabled|Assumptions\\.|assumeTrue|assumeFalse",
+      "ProcessBuilder|Runtime\\.getRuntime",
+      "java\\.net\\.(?:Socket|ServerSocket|URL\\b|URLConnection|HttpURLConnection|http\\.)|HttpClient|new\\s+Socket",
+      "System\\.exit",
+      "catch\\s*\\(\\s*(final\\s+)?(Exception|Throwable|AssertionError|Error|AssertionFailedError|RuntimeException)\\b"
+    ],
+    "forbidden_doubles": [
+      "Mockito|@Mock\\b|mock\\s*\\(|spy\\s*\\(",
+      "class\\s+Redirects\\b",
+      "static\\s+String\\s+afterLogin\\s*\\("
+    ],
+    "injected": [],
+    "defects": [
+      "package\\s+com\\.example\\.redirect\\s*;"
+    ]
+  },
+  "script": [
+    {
+      "tool": "load_capability",
+      "args": {
+        "id": "control-probe"
+      }
+    },
+    {
+      "tool": "load_capability",
+      "args": {
+        "id": "probe-protocol"
+      }
+    },
+    {
+      "tool": "load_capability",
+      "args": {
+        "id": "junit5"
+      }
+    },
+    {
+      "tool": "read_file",
+      "args": {
+        "path": "src/main/java/com/example/redirects/Redirects.java"
+      }
+    },
+    {
+      "tool": "write_test_file",
+      "args": {
+        "path": "src/test/java/com/example/redirects/RedirectsControlTest.java",
+        "content": "package com.example.redirects;\n\nimport static org.junit.jupiter.api.Assertions.assertTrue;\n\nimport java.nio.file.Files;\nimport java.nio.file.Paths;\nimport org.junit.jupiter.api.Test;\n\nclass RedirectsControlTest {\n    @Test\n    void benignControl() throws Exception {\n        Files.write(Paths.get(System.getenv(\"CORSAIR_MARKER_DIR\"), \"start\"), new byte[0]);\n        boolean holds = \"/account\".equals(Redirects.afterLogin(\"/account\"));\n        Files.write(Paths.get(System.getenv(\"CORSAIR_MARKER_DIR\"), \"check\"), (holds ? \"holds\" : \"violated\").getBytes(\"UTF-8\"));\n        assertTrue(holds, System.getenv(\"CORSAIR_TOKEN\"));\n        Files.write(Paths.get(System.getenv(\"CORSAIR_MARKER_DIR\"), \"end\"), new byte[0]);\n    }\n}\n"
+      }
+    },
+    {
+      "final": {
+        "status": "drafted"
+      }
+    }
+  ]
+}

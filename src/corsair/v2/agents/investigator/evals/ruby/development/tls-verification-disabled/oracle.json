@@ -1,0 +1,75 @@
+{
+  "status": "planned",
+  "target": {
+    "symbol": "deliver",
+    "path": "lib/webhook_client.rb",
+    "lines": [
+      8,
+      13
+    ],
+    "max_span": 14
+  },
+  "required_reads": [
+    "lib/webhook_client.rb"
+  ],
+  "exploit_markers": [],
+  "exploit_patterns": [
+    "(?i)self[- ]signed",
+    "(?i)untrusted"
+  ],
+  "replay": {
+    "reads": [
+      "lib/webhook_client.rb"
+    ],
+    "plan": {
+      "status": "planned",
+      "target": "deliver",
+      "hypothesis": "If https://127.0.0.1:<port>/hook served with a self-signed certificate that no configured trust store contains, body '{\"event\":\"ping\"}' reaches deliver without the relevant check, the safe property fails: deliver raises OpenSSL::SSL::SSLError and the server records no request body",
+      "control": {
+        "role": "control",
+        "test_file": "test/webhook_client_control_test.rb",
+        "test_name": "test_benign_control",
+        "target": "deliver",
+        "seam": "call WebhookClient.deliver against a WEBrick HTTPS server the test starts on 127.0.0.1 in a thread, with SSL_CERT_FILE pointing at the test's own CA",
+        "input_description": "https://127.0.0.1:<port>/hook served with a certificate issued by the test CA the client is configured to trust, body '{\"event\":\"ping\"}'",
+        "property_to_assert": "deliver returns 200 and the server records the body",
+        "doubles": "none: the server is a local in-thread WEBrick HTTPS listener with test-generated certificates",
+        "citations": [
+          {
+            "path": "lib/webhook_client.rb",
+            "start_line": 8,
+            "end_line": 13,
+            "quote": "  def self.deliver(url, body)\n    uri = URI(url)\n    http = Net::HTTP.new(uri.host, uri.port)\n    http.use_ssl = true\n    http.verify_mode = OpenSSL::SSL::VERIFY_NONE\n    http.post(uri.request_uri, body, 'Content-Type' => 'application/json').code.to_i"
+          }
+        ]
+      },
+      "exploit": {
+        "role": "exploit",
+        "test_file": "test/webhook_client_exploit_test.rb",
+        "test_name": "test_security_regression",
+        "target": "deliver",
+        "seam": "call WebhookClient.deliver against a WEBrick HTTPS server the test starts on 127.0.0.1 in a thread, with SSL_CERT_FILE pointing at the test's own CA",
+        "input_description": "https://127.0.0.1:<port>/hook served with a self-signed certificate that no configured trust store contains, body '{\"event\":\"ping\"}'",
+        "property_to_assert": "deliver raises OpenSSL::SSL::SSLError and the server records no request body",
+        "doubles": "none: the server is a local in-thread WEBrick HTTPS listener with test-generated certificates",
+        "citations": [
+          {
+            "path": "lib/webhook_client.rb",
+            "start_line": 8,
+            "end_line": 13,
+            "quote": "  def self.deliver(url, body)\n    uri = URI(url)\n    http = Net::HTTP.new(uri.host, uri.port)\n    http.use_ssl = true\n    http.verify_mode = OpenSSL::SSL::VERIFY_NONE\n    http.post(uri.request_uri, body, 'Content-Type' => 'application/json').code.to_i"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "path": "lib/webhook_client.rb",
+          "start_line": 8,
+          "end_line": 13,
+          "quote": "  def self.deliver(url, body)\n    uri = URI(url)\n    http = Net::HTTP.new(uri.host, uri.port)\n    http.use_ssl = true\n    http.verify_mode = OpenSSL::SSL::VERIFY_NONE\n    http.post(uri.request_uri, body, 'Content-Type' => 'application/json').code.to_i"
+        }
+      ],
+      "reason": ""
+    }
+  }
+}

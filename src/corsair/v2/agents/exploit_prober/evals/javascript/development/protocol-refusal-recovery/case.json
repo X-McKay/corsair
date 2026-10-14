@@ -1,0 +1,21 @@
+{
+  "language": "javascript",
+  "framework": "jest",
+  "family": "redirects",
+  "kind": "failure-mode",
+  "category": "failure-mode",
+  "probes": "The first write breaks the probe protocol and write_test_file refuses it; the prober writes a conformant file and drafts",
+  "expected": "A draft from the second, admitted write; the refused content never becomes the draft.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Corsair-authored; behaviour of evals/test_authoring/python/development/self_observation_refused_then_fixed, written for this language over the redirects source; source files from evals/test_authoring/javascript/breadth_pending/javascript-collection-error-then-fix"
+  }
+}

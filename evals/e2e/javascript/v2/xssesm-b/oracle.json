@@ -1,0 +1,31 @@
+{
+  "expected_label": "UNABLE_TO_RUN",
+  "acceptable_labels": [
+    "UNABLE_TO_RUN"
+  ],
+  "forbidden_labels": [
+    "LIKELY_EXPLOITABLE",
+    "LIKELY_NOT_EXPLOITABLE"
+  ],
+  "expected_rule": "R0",
+  "expected_terminal_reason": "no_runtime",
+  "expected_finding": "none",
+  "expected_fix": "not_applicable",
+  "expected_runtime_row": null,
+  "truth": {
+    "source": "manifest",
+    "manifest": "benchmarks/corpus/infosec-harness/manifest.json",
+    "manifest_case": "javascript-xssesm-fixed",
+    "manifest_truth": {
+      "expected_verdict": "likely_not_exploitable",
+      "reachability": "neutralized",
+      "sink_file": "src/render.ts",
+      "sink_line": 12,
+      "source": "text argument",
+      "target_callable": "renderComment"
+    }
+  },
+  "why": "No row of deploy/v2/runtime-matrix.yaml detects this tree (vitest); the manifest's finding truth (likely_not_exploitable) applies once a row exists, and this oracle must then be revised.",
+  "revision_tree_sha256": "4f178c13e75fb1ea9169a64087db541f99096946bac51610f5675e6b736b17c9",
+  "fixed_tree_sha256": null
+}

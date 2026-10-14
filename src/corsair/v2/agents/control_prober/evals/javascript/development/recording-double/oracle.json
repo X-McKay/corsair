@@ -1,0 +1,95 @@
+{
+  "expect": {
+    "draft": true,
+    "status": "ok"
+  },
+  "expected_outcome": {
+    "asserts": "benign_behaviour",
+    "vulnerable": "pass",
+    "fixed": "pass",
+    "this_tree": "pass"
+  },
+  "revision_history": [],
+  "target_spans": [
+    {
+      "path": "lib/accounts.js",
+      "start_line": 2,
+      "end_line": 4
+    }
+  ],
+  "anchors": {
+    "comment": "//",
+    "load": [
+      "require\\s*\\(\\s*['\\\"](\\.\\./)+lib/accounts(\\.js)?['\\\"]\\s*\\)"
+    ],
+    "call": [
+      "\\bbalance\\s*\\("
+    ],
+    "input": [
+      "['\\\"]alice['\\\"]"
+    ],
+    "avoid_input": [
+      "OR\\ 1=1"
+    ],
+    "property": [
+      "\\b25\\b",
+      "(?:===?|\\beq\\b)\\s*1\\b(?![.\\d])|(?<![.\\d])\\b1\\s*===?"
+    ],
+    "non_differential": [],
+    "test_definition": "(?m)^\\s*(?:test|it)(?:\\.only)?(?:\\.each\\s*\\(.*?\\)\\s*)?\\(\\s*['\\\"`]",
+    "assertion": "\\bassert(\\.\\w+)?\\s*\\(|\\bexpect\\s*\\(",
+    "token_form": "\\bassert(?:\\.\\w+)?\\s*\\([\\s\\S]*,\\s*process\\.env(?:\\.CORSAIR_TOKEN|\\[\\s*['\\\"]CORSAIR_TOKEN['\\\"]\\s*\\])\\s*,?\\s*\\)",
+    "forbidden": [
+      "\\b(test|it|describe)\\.(skip|todo)\\b|\\bxit\\b|\\bxtest\\b|\\bxdescribe\\b",
+      "child_process",
+      "require\\(\\s*['\\\"](node:)?(http|https|net)['\\\"]|\\bfetch\\s*\\(",
+      "process\\.exit",
+      "\\.failing\\b",
+      "catch\\s*(?:\\([^)]*\\))?\\s*\\{(?![^{}]*\\b(?:throw|instanceof)\\b)[^{}]*\\}"
+    ],
+    "forbidden_doubles": [
+      "jest\\.(mock|spyOn|doMock|replaceProperty)\\s*\\(",
+      "function\\s+balance\\s*\\("
+    ],
+    "injected": [],
+    "defects": []
+  },
+  "script": [
+    {
+      "tool": "load_capability",
+      "args": {
+        "id": "control-probe"
+      }
+    },
+    {
+      "tool": "load_capability",
+      "args": {
+        "id": "probe-protocol"
+      }
+    },
+    {
+      "tool": "load_capability",
+      "args": {
+        "id": "jest"
+      }
+    },
+    {
+      "tool": "read_file",
+      "args": {
+        "path": "lib/accounts.js"
+      }
+    },
+    {
+      "tool": "write_test_file",
+      "args": {
+        "path": "__tests__/accounts.control.test.js",
+        "content": "const assert = require('node:assert');\nconst fs = require('node:fs');\nconst path = require('node:path');\nconst accounts = require('../lib/accounts');\n\nfunction recordingDatabase(rows) {\n  const calls = [];\n  return { calls, query: (sql, params) => { calls.push([sql, params]); return rows; } };\n}\n\ntest('benign_control', () => {\n  fs.writeFileSync(path.join(process.env.CORSAIR_MARKER_DIR, 'start'), '');\n  const database = recordingDatabase([[25]]);\n  const rows = accounts.balance(database, 'alice');\n  const holds = JSON.stringify(rows) === JSON.stringify([[25]]) && database.calls.length === 1;\n  fs.writeFileSync(path.join(process.env.CORSAIR_MARKER_DIR, 'check'), holds ? 'holds' : 'violated');\n  assert.ok(holds, process.env.CORSAIR_TOKEN);\n  fs.writeFileSync(path.join(process.env.CORSAIR_MARKER_DIR, 'end'), '');\n});\n"
+      }
+    },
+    {
+      "final": {
+        "status": "drafted"
+      }
+    }
+  ]
+}

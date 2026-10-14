@@ -1,0 +1,79 @@
+{
+  "expected_label": "LIKELY_EXPLOITABLE",
+  "acceptable_labels": [
+    "LIKELY_EXPLOITABLE"
+  ],
+  "forbidden_labels": [
+    "LIKELY_NOT_EXPLOITABLE"
+  ],
+  "expected_rule": "R4",
+  "expected_terminal_reason": "ok",
+  "expected_finding": "reproduced",
+  "expected_fix": "verified",
+  "expected_runtime_row": "minitest-ruby31",
+  "truth": {
+    "source": "synthetic",
+    "variant": "unsafe",
+    "paired_with": "ruby/pathtraversal-a"
+  },
+  "why": "The tainted argument reaches the sink unguarded.",
+  "revision_tree_sha256": "6dce2fa6e8cf11abedb01671fae81fc35c3e6915a85eff3470af0183f245362f",
+  "fixed_tree_sha256": "cee80cc405d723d9b7583ead2104bd5dd5edf484fa7b5e8d44621312419c6cc0",
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "lib/attachments.rb",
+          "start_line": 5,
+          "end_line": 5,
+          "quote": "  def self.read(name)"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "lib/attachments.rb",
+            "start_line": 5,
+            "end_line": 5,
+            "quote": "  def self.read(name)"
+          }
+        ]
+      },
+      "fixed": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "lib/attachments.rb",
+            "start_line": 5,
+            "end_line": 5,
+            "quote": "  def self.read(name)"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "passed"
+      },
+      "fixed": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    },
+    "build_fixed": true
+  }
+}

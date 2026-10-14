@@ -1,0 +1,13 @@
+{
+  "case_id": "corpus:f5368bda1332dfa0",
+  "finding": {
+    "title": "Information exposure through an error message in ReportHandler.do_GET",
+    "description": "A failed report lookup reaches the error response written by ReportHandler.do_GET.",
+    "file_path": "app.py",
+    "start_line": 18,
+    "symbol": "ReportHandler.do_GET",
+    "cwe": "CWE-209"
+  },
+  "source": "../../../../../benchmarks/corpus/infosec-harness/python/errorexposure/a",
+  "fixed_source": "../../../../../benchmarks/corpus/infosec-harness/python/errorexposure/b"
+}

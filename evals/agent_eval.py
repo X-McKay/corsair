@@ -41,6 +41,8 @@ USAGE_FIELDS = ("requests", "tool_calls", "input_tokens", "output_tokens")
 # Attempt.facts keys copied into the attempt row when an agent reports them (D3 corrections: at most two revisions
 # per probe author, three reviews in total).
 ROW_FACTS = ("revisions", "accepted_within_limit")
+# Chain dispositions (evals/agent_summary.py dispositions): copied into the row only when the attempt reports them.
+LABEL_FACTS = ("label", "expected_label", "terminal_reason")
 
 
 @dataclass
@@ -67,6 +69,11 @@ class AgentEval:
     identity: Mapping[str, Any] = field(default_factory=dict)
     # the eval root; None means the agent's own package evals/ (evals.cases.agent_root)
     root: Path | None = None
+    # assertions ``check`` may leave out when they do not apply to an attempt (e.g. no citation to resolve)
+    optional: frozenset[str] = frozenset()
+    # live mode: build these agents' models and hand ``run`` the mapping (a composition, e.g. the chain); empty means
+    # this one agent's model
+    live_agents: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         unknown = set(self.dimensions.values()) - set(DIMENSIONS)
@@ -86,17 +93,25 @@ class _Checks(Evaluator):
 
     def evaluate(self, ctx: EvaluatorContext) -> dict[str, bool]:
         values = dict(self.spec.check(ctx.metadata, ctx.output))
-        if set(values) != set(self.spec.dimensions):
+        declared = set(self.spec.dimensions)
+        if not declared - set(self.spec.optional) <= set(values) <= declared:
             raise ValueError(f"{self.spec.agent}: checks returned {sorted(values)}, declared "
                              f"{sorted(self.spec.dimensions)}")
         return values
 
 
 @asynccontextmanager
-async def _live_model(agent: str, provider_config: Path):
+async def _live_model(spec: AgentEval, provider_config: Path):
     from corsair.v2.models import agent_models, load_provider_config
-    async with agent_models(load_provider_config(provider_config), (agent,)) as built:
-        yield built[agent]
+    agents = spec.live_agents or (spec.agent,)
+    async with agent_models(load_provider_config(provider_config), agents) as built:
+        yield dict(built) if spec.live_agents else built[spec.agent]
+
+
+def _model_name(model: Any) -> Any:
+    if isinstance(model, Mapping):
+        return {name: getattr(item, "model_name", None) for name, item in model.items()}
+    return getattr(model, "model_name", None)
 
 
 def provider_identity(provider_config: Path, agents: tuple[str, ...]) -> dict[str, dict[str, str]]:
@@ -117,7 +132,7 @@ async def evaluate(spec: AgentEval, evidence: Path, set_name: str, *, language: 
     scripted = model is None
     configuration = {"agent": spec.agent, "mode": "scripted" if scripted else "live", "dataset": set_name,
                      "language": language, "dataset_sha256": set_digest(root, set_name), "repeat": repeat,
-                     "model": "scripted-oracle-replay" if scripted else getattr(model, "model_name", None),
+                     "model": "scripted-oracle-replay" if scripted else _model_name(model),
                      # live runs record the resolved provider profile(s); release policies require it
                      "provider": None if scripted else dict(provider or {}) or None,
                      "dimensions": dict(spec.dimensions), **spec.identity}
@@ -149,7 +164,7 @@ async def evaluate(spec: AgentEval, evidence: Path, set_name: str, *, language: 
                 for name in USAGE_FIELDS + ("wall_s", "status"):
                     value = getattr(usage, name, None) if usage is not None else None
                     set_eval_attribute(name, value)
-                for name in ROW_FACTS:
+                for name in ROW_FACTS + LABEL_FACTS:
                     set_eval_attribute(name, attempt.facts.get(name) if attempt is not None else None)
 
     dataset = Dataset(name=f"{spec.agent}-{set_name}", cases=[Case(name=case.key, inputs=case.key, metadata=case)
@@ -187,7 +202,8 @@ def _row(spec: AgentEval, case: EvalCase, values: dict[str, bool], attributes: M
             "assertions": values, "dimensions": dimensions,
             "failed_assertions": sorted(name for name, value in values.items() if not value),
             "failure": failure, "latency_s": attributes.get("wall_s"), **metrics,
-            **{name: attributes.get(name) for name in ROW_FACTS}}
+            **{name: attributes.get(name) for name in ROW_FACTS},
+            **{name: attributes[name] for name in LABEL_FACTS if attributes.get(name) is not None}}
 
 
 def main(spec: AgentEval, argv: list[str] | None = None) -> int:
@@ -204,8 +220,8 @@ def main(spec: AgentEval, argv: list[str] | None = None) -> int:
     async def go() -> bool:
         if args.provider_config is None:
             return await evaluate(spec, args.evidence, args.set_name, language=args.language, repeat=args.repeat)
-        provider = provider_identity(args.provider_config, (spec.agent,))
-        async with _live_model(spec.agent, args.provider_config) as model:
+        provider = provider_identity(args.provider_config, spec.live_agents or (spec.agent,))
+        async with _live_model(spec, args.provider_config) as model:
             return await evaluate(spec, args.evidence, args.set_name, language=args.language, repeat=args.repeat,
                                   model=model, provider=provider)
     return 0 if asyncio.run(go()) else 1

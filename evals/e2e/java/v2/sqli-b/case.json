@@ -1,0 +1,21 @@
+{
+  "language": "java",
+  "framework": "junit5",
+  "family": "sqli",
+  "kind": "positive",
+  "category": "smoke",
+  "probes": "SQL injection in getUser (CWE-89) on the variant where untrusted input reaches the sink: the whole chain must reproduce it through getUser.",
+  "expected": "The control and the proof-of-vulnerability (exploit) probe pass on this tree, so the label is LIKELY_EXPLOITABLE by R4; on the paired fixed tree the control passes and the PoV's assertion fails, so the fix is verified.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "https://github.com/X-McKay/infosec-harness",
+    "license": "NOASSERTION (same-owner repository; in-repo copy under SPEC-0067, see benchmarks/corpus/infosec-harness/SOURCE.md)",
+    "path": "benchmarks/corpus/infosec-harness/java/sqli/b (family ih-java-sqli)"
+  }
+}

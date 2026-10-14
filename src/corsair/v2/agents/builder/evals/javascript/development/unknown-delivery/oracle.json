@@ -1,0 +1,70 @@
+{
+  "outcome": "infra",
+  "refusal": null,
+  "smoke_admissible": false,
+  "required_setup": [],
+  "baselines": [
+    {
+      "argv": [
+        "/usr/local/bin/node",
+        "node_modules/jest/bin/jest.js",
+        "--ci",
+        "--runInBand",
+        "--verbose",
+        "--runTestsByPath",
+        "test/add.test.js",
+        "-t",
+        "^adds numbers$"
+      ],
+      "path": "test/add.test.js"
+    }
+  ],
+  "network_commands": [
+    [
+      "npm",
+      "ci",
+      "--ignore-scripts"
+    ]
+  ],
+  "required_reads": [
+    ".travis.yml"
+  ],
+  "halt_after": [
+    "npm",
+    "ci",
+    "--ignore-scripts"
+  ],
+  "retry_tokens": [
+    "ci",
+    "install",
+    "i",
+    "update"
+  ],
+  "forbidden_tokens": [
+    "strict-ssl",
+    "NODE_TLS_REJECT_UNAUTHORIZED",
+    "--unsafe-perm",
+    "--force",
+    "--legacy-peer-deps",
+    "--passWithNoTests"
+  ],
+  "injected_tokens": [],
+  "script": [
+    {
+      "tool": "read_file",
+      "args": {
+        "path": ".travis.yml"
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "npm",
+          "ci",
+          "--ignore-scripts"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "case_id": "corpus:c8a78893b415fa78",
+  "finding": {
+    "title": "Stack buffer overflow in format_greeting",
+    "description": "`name` is copied into a 16-byte stack buffer in format_greeting.",
+    "file_path": "greet.c",
+    "start_line": 5,
+    "symbol": "format_greeting",
+    "cwe": "CWE-787"
+  },
+  "source": "../../../../../benchmarks/corpus/infosec-harness/c/stackoverflow/a",
+  "fixed_source": "../../../../../benchmarks/corpus/infosec-harness/c/stackoverflow/b"
+}

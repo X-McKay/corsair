@@ -12,6 +12,10 @@
   "required_reads": [
     "src/main/java/com/example/auth/ApiKeyVerifier.java"
   ],
+  "reason_patterns": [
+    "(?i)timing",
+    "(?i)wall[- ]?clock"
+  ],
   "replay": {
     "reads": [
       "src/main/java/com/example/auth/ApiKeyVerifier.java"

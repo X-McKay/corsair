@@ -28,7 +28,12 @@ import subprocess
 import sys
 
 from evals import agent_summary
-from evals.cases import AGENTS as V2_AGENTS, AGENTS_PACKAGE, agent_root, set_names
+from evals.cases import AGENTS, AGENTS_PACKAGE, CHAIN, agent_root, set_names
+
+# v2 agents plus the whole chain, which is scored by the same runner over evals/e2e/ (evals/e2e/evaluate.py)
+V2_AGENTS = (*AGENTS, CHAIN)
+CHAIN_MODULE = "evals.e2e.evaluate"
+CHAIN_SETS = ("v2",)  # the e2e sets the chain scorer reads; the older e2e sets keep their own runners
 
 REPOSITORY = Path(__file__).resolve().parents[1]
 RESULTS = REPOSITORY / ".runs" / "evals"
@@ -54,7 +59,7 @@ SUITES: dict[str, Suite] = {}
 
 # Scorers whose CLI narrows a per-case set to one language (`--language`, evals/cases.py); every other set refuses
 # EVAL_LANGUAGE before anything runs. v2 agents add theirs as they register.
-LANGUAGE_MODULES: frozenset[str] = frozenset()
+LANGUAGE_MODULES: frozenset[str] = frozenset({CHAIN_MODULE})
 
 
 def narrows_by_language(suite: Suite, set_name: str) -> bool:
@@ -67,6 +72,8 @@ def v2_suite(agent: str) -> Suite | None:
     root = agent_root(agent)
     if not (root / "evaluate.py").exists():
         return None
+    if agent == CHAIN:
+        return Suite(CHAIN_MODULE, {name: ("--set", name) for name in CHAIN_SETS if name in set_names(root)})
     return Suite(f"{AGENTS_PACKAGE}.{agent}.evals.evaluate", {name: ("--set", name) for name in set_names(root)})
 
 

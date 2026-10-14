@@ -36,6 +36,8 @@ EVALS = Path(__file__).resolve().parent
 # one place that names the package; it changes once if the v2 tree moves.
 AGENTS_PACKAGE = "corsair.v2.agents"
 AGENTS = ("grounding", "builder", "investigator", "control_prober", "exploit_prober", "reviewer")
+# The whole chain is scored like an agent (`make eval AGENT=chain`) over the end-to-end cases in evals/e2e/.
+CHAIN = "chain"
 # A v2 case's case.json `category`: what kind of evidence the case gives (infosec-harness style).
 CATEGORIES = ("smoke", "capability", "regression", "adversarial", "failure-mode")
 # Eval types a v2 case may name in case.json `dimensions` (efficiency is measured on every attempt, never pass/fail).
@@ -60,7 +62,10 @@ class EvalCase:
 
 
 def agent_root(agent: str) -> Path:
-    """A v2 agent's eval root, resolved through its package; an agent without an evals/ directory is refused."""
+    """A v2 agent's eval root, resolved through its package; an agent without an evals/ directory is refused.
+    The chain's root is evals/e2e/."""
+    if agent == CHAIN:
+        return EVALS / "e2e"
     if agent not in AGENTS:
         raise ValueError(f"unknown v2 agent {agent!r}")
     # Search locations in import order: a namespace package can span several (an editable install plus a

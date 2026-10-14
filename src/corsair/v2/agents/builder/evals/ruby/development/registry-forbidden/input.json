@@ -1,0 +1,111 @@
+{
+  "source_files": [
+    {
+      "path": ".github/workflows/test.yml",
+      "content": "name: test\non: [push]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: ruby/setup-ruby@v1\n        with:\n          ruby-version: '3.1'\n      - run: bundle install\n      - run: bundle exec rake test\n"
+    },
+    {
+      "path": "Gemfile",
+      "content": "source \"https://rubygems.org\"\n\ngem \"rake\", \"13.0.6\"\ngem \"minitest\", \"5.15.0\"\n"
+    },
+    {
+      "path": "Gemfile.lock",
+      "content": "GEM\n  remote: https://rubygems.org/\n  specs:\n    minitest (5.15.0)\n    rake (13.0.6)\n\nPLATFORMS\n  x86_64-linux\n\nDEPENDENCIES\n  minitest (= 5.15.0)\n  rake (= 13.0.6)\n\nBUNDLED WITH\n   2.3.27\n"
+    },
+    {
+      "path": "Rakefile",
+      "content": "require \"rake/testtask\"\n\nRake::TestTask.new(:test) do |t|\n  t.libs << \"test\"\n  t.pattern = \"test/**/*_test.rb\"\nend\n"
+    },
+    {
+      "path": "lib/roman.rb",
+      "content": "module Roman\n  def self.call(n)\n    %w[I II III IV V][n - 1]\n  end\nend\n"
+    },
+    {
+      "path": "test/roman_test.rb",
+      "content": "require 'minitest/autorun'\nrequire_relative '../lib/roman'\n\nclass RomanTest < Minitest::Test\n  def test_converts_four\n    assert_equal 'IV', Roman.call(4)\n  end\nend\n"
+    }
+  ],
+  "row_id": "minitest-ruby31",
+  "plan": {
+    "status": "planned",
+    "target": "lib/roman",
+    "citations": [
+      {
+        "path": "lib/roman.rb",
+        "start_line": 1,
+        "end_line": 1,
+        "quote": "module Roman"
+      }
+    ]
+  },
+  "feedback": null,
+  "workspace_fixture": {
+    "observations": [
+      {
+        "argv": [
+          "bundle",
+          "install"
+        ],
+        "exit_code": 17,
+        "output": "Fetching source index from https://rubygems.org/\n\nRetrying fetcher due to error (2/4): Bundler::HTTPError Could not fetch specs from https://rubygems.org/ due to underlying error <bad response Forbidden 403 (https://rubygems.org/specs.4.8.gz)>\n"
+      },
+      {
+        "argv": [
+          "/usr/bin/env",
+          "BUNDLE_FROZEN=true",
+          "/usr/local/bin/bundle",
+          "exec",
+          "/usr/local/bin/ruby",
+          "-Itest",
+          "-Ilib",
+          "test/roman_test.rb",
+          "-v",
+          "-n",
+          "test_converts_four"
+        ],
+        "exit_code": 0,
+        "output": "Run options: -v -n test_converts_four --seed 31337\n\n# Running:\n\nRomanTest#test_converts_four = 0.00 s = .\n\nFinished in 0.001203s, 831.2552 runs/s, 831.2552 assertions/s.\n\n1 runs, 1 assertions, 0 failures, 0 errors, 0 skips\n",
+        "needs": [
+          [
+            "bundle",
+            "install"
+          ]
+        ],
+        "unmet": {
+          "exit_code": 7,
+          "output": "Could not find gem 'minitest (= 5.15.0)' in locally installed gems.\nRun `bundle install` to install missing gems.\n"
+        }
+      },
+      {
+        "argv": [
+          "ruby",
+          "--version"
+        ],
+        "exit_code": 0,
+        "output": "ruby 3.1.7p261 (2025-03-26 revision 0a3704f218) [x86_64-linux]\n"
+      },
+      {
+        "argv": [
+          "bundle",
+          "--version"
+        ],
+        "exit_code": 0,
+        "output": "Bundler version 2.3.27\n"
+      }
+    ],
+    "written_file_run": {
+      "exit_code": 0,
+      "output": "Run options: -v -n {name} --seed 31337\n\n# Running:\n\n= 0.00 s = .\n\n1 runs, 1 assertions, 0 failures, 0 errors, 0 skips\n",
+      "needs": [
+        [
+          "bundle",
+          "install"
+        ]
+      ],
+      "unmet": {
+        "exit_code": 7,
+        "output": "Could not find gem 'minitest (= 5.15.0)' in locally installed gems.\nRun `bundle install` to install missing gems.\n"
+      }
+    }
+  }
+}

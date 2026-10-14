@@ -1,0 +1,11 @@
+{
+  "finding": {
+    "title": "SQL injection in total",
+    "description": "Untrusted account argument reaches a query string in total.",
+    "file_path": "src/main/java/com/example/ReportDao.java",
+    "start_line": 14,
+    "symbol": "total",
+    "cwe": "CWE-89"
+  },
+  "source": "tree"
+}

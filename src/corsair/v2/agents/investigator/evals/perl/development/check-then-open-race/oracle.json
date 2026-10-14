@@ -12,6 +12,11 @@
   "required_reads": [
     "lib/Spool.pm"
   ],
+  "reason_patterns": [
+    "(?i)\\brace\\b",
+    "(?i)concurren",
+    "(?i)interleav"
+  ],
   "replay": {
     "reads": [
       "lib/Spool.pm"

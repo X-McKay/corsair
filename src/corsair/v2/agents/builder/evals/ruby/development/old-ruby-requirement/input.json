@@ -1,0 +1,91 @@
+{
+  "source_files": [
+    {
+      "path": ".github/workflows/test.yml",
+      "content": "name: test\non: [push]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: ruby/setup-ruby@v1\n        with:\n          ruby-version: '3.1'\n      - run: bundle install\n      - run: bundle exec rake test\n"
+    },
+    {
+      "path": "Gemfile",
+      "content": "source \"https://rubygems.org\"\nruby \"~> 2.5.0\"\ngem \"rake\", \"13.0.6\"\ngem \"minitest\", \"5.15.0\"\n"
+    },
+    {
+      "path": "Gemfile.lock",
+      "content": "GEM\n  remote: https://rubygems.org/\n  specs:\n    minitest (5.15.0)\n    rake (13.0.6)\n\nPLATFORMS\n  x86_64-linux\n\nDEPENDENCIES\n  minitest (= 5.15.0)\n  rake (= 13.0.6)\n\nBUNDLED WITH\n   2.3.27\n\nRUBY VERSION\n   ruby 2.5.9p229\n"
+    },
+    {
+      "path": "Rakefile",
+      "content": "require \"rake/testtask\"\n\nRake::TestTask.new(:test) do |t|\n  t.libs << \"test\"\n  t.pattern = \"test/**/*_test.rb\"\nend\n"
+    },
+    {
+      "path": "lib/roman_legacy.rb",
+      "content": "module RomanLegacy\n  def self.call(n)\n    n.to_s.untaint\n  end\nend\n"
+    },
+    {
+      "path": "test/roman_legacy_test.rb",
+      "content": "require 'minitest/autorun'\nrequire_relative '../lib/roman_legacy'\n\nclass RomanLegacyTest < Minitest::Test\n  def test_call\n    assert_equal '1', RomanLegacy.call(1)\n  end\nend\n"
+    }
+  ],
+  "row_id": "minitest-ruby31",
+  "plan": {
+    "status": "planned",
+    "target": "lib/roman_legacy",
+    "citations": [
+      {
+        "path": "lib/roman_legacy.rb",
+        "start_line": 1,
+        "end_line": 1,
+        "quote": "module RomanLegacy"
+      }
+    ]
+  },
+  "feedback": null,
+  "workspace_fixture": {
+    "observations": [
+      {
+        "argv": [
+          "bundle",
+          "install"
+        ],
+        "exit_code": 18,
+        "output": "Your Ruby version is 3.1.7, but your Gemfile specified ~> 2.5.0\n"
+      },
+      {
+        "argv": [
+          "/usr/bin/env",
+          "BUNDLE_FROZEN=true",
+          "/usr/local/bin/bundle",
+          "exec",
+          "/usr/local/bin/ruby",
+          "-Itest",
+          "-Ilib",
+          "test/roman_legacy_test.rb",
+          "-v",
+          "-n",
+          "test_call"
+        ],
+        "exit_code": 18,
+        "output": "Your Ruby version is 3.1.7, but your Gemfile specified ~> 2.5.0\n"
+      },
+      {
+        "argv": [
+          "ruby",
+          "--version"
+        ],
+        "exit_code": 0,
+        "output": "ruby 3.1.7p261 (2025-03-26 revision 0a3704f218) [x86_64-linux]\n"
+      },
+      {
+        "argv": [
+          "bundle",
+          "--version"
+        ],
+        "exit_code": 0,
+        "output": "Bundler version 2.3.27\n"
+      }
+    ],
+    "written_file_run": {
+      "exit_code": 18,
+      "output": "Your Ruby version is 3.1.7, but your Gemfile specified ~> 2.5.0\n"
+    }
+  }
+}

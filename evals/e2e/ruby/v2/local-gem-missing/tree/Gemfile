@@ -1,0 +1,4 @@
+source "https://rubygems.org"
+
+gem "minitest", "5.15.0"
+gem "ledger_store", path: "vendor/ledger_store"

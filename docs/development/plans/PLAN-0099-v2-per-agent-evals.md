@@ -25,10 +25,11 @@ coordinator), and Docker for the chain.
   inside each package, placeholder `release-policy.yaml` per agent and for the chain.
 - [x] Grounding set (85) and investigator set (83 + 2 pending), drafted and independently validated; fixes applied
   (PR #151).
-- [ ] Builder (57), control_prober (60), exploit_prober (61), reviewer (76) and chain (`evals/e2e` set `v2`) sets:
-  validation fixes, chain scorer (scripted with recorded stage outcomes; live via `chain.run_case`), second PR.
-- [ ] Invert exploit-probe oracles to the proof-of-vulnerability polarity (SPEC-0082 D12) once the production skills
-  and rules change; add `not_differential` cases to the chain set.
+- [x] Builder (57), control_prober (65), exploit_prober (70) and chain (`evals/e2e` set `v2`, 100) sets with
+  validation fixes; chain scorer (scripted with recorded stage outcomes through the real rules; live via
+  `chain.run_case`, refuses without Docker); oracles in proof-of-vulnerability polarity (SPEC-0082 D12) with
+  `not_differential` cases; investigator scope cases under the provability rule (91).
+- [ ] Reviewer set: stopped by a safety check while inverting exploit drafts; waits on the owner (HANDOFF-0135).
 - [ ] Live baseline per agent and language, scheduled through the coordinator; promote, then propose thresholds.
 
 ## Validation and progress
@@ -36,7 +37,9 @@ coordinator), and Docker for the chain.
 - `pytest tests` on a clean checkout of the PR #151 head: 1008 passed, 53 skipped.
 - Scripted `evals.run grounding --set development`: 85/85 clean; `evals.run investigator --set development`: 83/83
   clean; each with `--language` narrowing also clean.
-- Independent validation (accept/fix/reject): grounding 42/32/0, investigator 73/12/0, builder 16/41/0, chain 66/22/7.
+- Independent validation (accept/fix/reject): grounding 42/32/0, investigator 73/12/0, builder 16/41/0, chain 66/22/7,
+  control_prober 26/34/0, exploit_prober 25/36/0, reviewer 23/50/3 (not shipped).
+- Second batch: scripted builder 57/57, control_prober 65/65, exploit_prober 70/70, chain 100/100, investigator 91/91.
 - Scripted runs prove plumbing and oracle consistency only. No live run has been made.
 
 ## Decisions and next action
@@ -45,4 +48,4 @@ coordinator), and Docker for the chain.
 - Language-free behaviours replicated in five wordings measure consistency, not coverage (grounding README).
 - Cases that wait on production behaviour sit in a `pending` set, outside every baseline.
 - Production gaps found while drafting are relayed to the build owner, not worked around in scorers.
-- Next: land the second PR, then schedule the first live baseline.
+- Next: schedule the first live baseline per agent through the coordinator (HANDOFF-0135).

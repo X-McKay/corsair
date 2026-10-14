@@ -1,0 +1,77 @@
+{
+  "source_files": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "content": "name: ci\non: [push]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    container: perl:5.26\n    steps:\n      - uses: actions/checkout@v4\n      - run: perl Makefile.PL\n      - run: make\n      - run: prove -lv t\n"
+    },
+    {
+      "path": "MANIFEST",
+      "content": "Makefile.PL\nMANIFEST\nREADME\nlib/Acme/Units.pm\n"
+    },
+    {
+      "path": "Makefile.PL",
+      "content": "use strict;\nuse warnings;\nuse ExtUtils::MakeMaker;\n\nWriteMakefile(\n    NAME             => 'Acme::Units',\n    VERSION_FROM     => 'lib/Acme/Units.pm',\n    MIN_PERL_VERSION => '5.008001',\n    PREREQ_PM        => {  },\n    TEST_REQUIRES    => { 'Test::More' => '0.88' },\n);\n"
+    },
+    {
+      "path": "README",
+      "content": "Acme::Units\n"
+    },
+    {
+      "path": "lib/Acme/Units.pm",
+      "content": "package Acme::Units;\nuse strict;\nuse warnings;\n\nour $VERSION = '0.01';\n\nsub km {\n    my ($class, $m) = @_;\n    return $m / 1000;\n}\n\n1;\n"
+    }
+  ],
+  "row_id": "prove-perl526",
+  "plan": {
+    "status": "planned",
+    "target": "lib/Acme/Units",
+    "citations": [
+      {
+        "path": "lib/Acme/Units.pm",
+        "start_line": 1,
+        "end_line": 1,
+        "quote": "package Acme::Units;"
+      }
+    ]
+  },
+  "feedback": null,
+  "workspace_fixture": {
+    "observations": [
+      {
+        "argv": [
+          "perl",
+          "Makefile.PL"
+        ],
+        "exit_code": 0,
+        "output": "Checking if your kit is complete...\nLooks good\nGenerating a Unix-style Makefile\nWriting Makefile for Acme::Units\nWriting MYMETA.yml and MYMETA.json\n"
+      },
+      {
+        "argv": [
+          "make"
+        ],
+        "exit_code": 0,
+        "output": ""
+      },
+      {
+        "argv": [
+          "perl",
+          "-v"
+        ],
+        "exit_code": 0,
+        "output": "This is perl 5, version 26, subversion 3 (v5.26.3) built for x86_64-linux-gnu\n"
+      },
+      {
+        "argv": [
+          "prove",
+          "--version"
+        ],
+        "exit_code": 0,
+        "output": "TAP::Harness v3.38 and Perl v5.26.3\n"
+      }
+    ],
+    "written_file_run": {
+      "exit_code": 0,
+      "output": "{file} .. \n1..1\nok 1\nok\nAll tests successful.\nResult: PASS\n"
+    }
+  }
+}

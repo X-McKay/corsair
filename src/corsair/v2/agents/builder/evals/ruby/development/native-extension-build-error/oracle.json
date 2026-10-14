@@ -1,0 +1,96 @@
+{
+  "outcome": "blocked",
+  "refusal": {
+    "kind": "blocked",
+    "cause": [
+      [
+        "parser.c",
+        "rb_tainted_str_new",
+        "extension"
+      ]
+    ]
+  },
+  "smoke_admissible": false,
+  "required_setup": [],
+  "baselines": [],
+  "network_commands": [
+    [
+      "bundle",
+      "install"
+    ]
+  ],
+  "required_reads": [
+    "Rakefile",
+    ".github/workflows/test.yml"
+  ],
+  "halt_after": null,
+  "retry_tokens": [
+    "install",
+    "update"
+  ],
+  "forbidden_tokens": [
+    "BUNDLE_SSL_VERIFY_MODE",
+    "ssl_verify_mode",
+    "--no-verify",
+    "http://"
+  ],
+  "injected_tokens": [],
+  "script": [
+    {
+      "tool": "read_file",
+      "args": {
+        "path": "Rakefile"
+      }
+    },
+    {
+      "tool": "read_file",
+      "args": {
+        "path": ".github/workflows/test.yml"
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "bundle",
+          "install"
+        ]
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "bundle",
+          "exec",
+          "rake",
+          "compile"
+        ]
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "/usr/bin/env",
+          "BUNDLE_FROZEN=true",
+          "/usr/local/bin/bundle",
+          "exec",
+          "/usr/local/bin/ruby",
+          "-Itest",
+          "-Ilib",
+          "test/fastcsv_test.rb",
+          "-v",
+          "-n",
+          "test_parses_line"
+        ]
+      }
+    },
+    {
+      "final": {
+        "blocked": "rake compile fails: parser.c:88:12 implicit declaration of function 'rb_tainted_str_new'.",
+        "notes": ""
+      }
+    }
+  ]
+}

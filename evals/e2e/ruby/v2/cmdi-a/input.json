@@ -1,0 +1,13 @@
+{
+  "case_id": "e2e-v2:ruby/cmdi-a",
+  "finding": {
+    "title": "OS command injection in list_entries",
+    "description": "`path` reaches a backtick shell command in list_entries.",
+    "file_path": "lib/archive.rb",
+    "start_line": 3,
+    "symbol": "list_entries",
+    "cwe": "CWE-78"
+  },
+  "source": "tree",
+  "fixed_source": "../cmdi-b/tree"
+}
