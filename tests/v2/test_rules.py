@@ -67,6 +67,8 @@ CASES = [
     ("plan unsupported", full(plan=UNSUPPORTED, build=None, validity=(), runs=()),
      ("R0", Label.UNABLE_TO_RUN, T.UNSUPPORTED_SCOPE, "none")),
     ("plan target not found", full(plan=NOT_FOUND, build=None, validity=(), runs=()),
+     ("R0", Label.UNABLE_TO_RUN, T.TARGET_NOT_FOUND, "none")),
+    ("plan unresolved", full(plan=ProbePlan(status="unresolved"), build=None, validity=(), runs=()),
      ("R0", Label.UNABLE_TO_RUN, T.PLAN_UNRESOLVED, "none")),
     ("stopped plan_unresolved", full(stopped="plan_unresolved", validity=(), runs=()),
      ("R0", Label.UNABLE_TO_RUN, T.PLAN_UNRESOLVED, "none")),

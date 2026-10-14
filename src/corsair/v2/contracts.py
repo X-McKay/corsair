@@ -165,7 +165,8 @@ class ProbeBrief(Frozen):
 
 
 class ProbePlan(Frozen):
-    status: Literal["planned", "unsupported_scope", "target_not_found"]
+    status: Literal["planned", "unsupported_scope", "target_not_found", "unresolved"]
+    """``unresolved``: the Investigator produced no valid plan (output or budget failure), not a refusal."""
     target: str = Field(default="", max_length=512)
     hypothesis: str = Field(default="", max_length=4_000, description="Conditional: if X reaches Y without Z then ...")
     control: ProbeBrief | None = None
@@ -281,6 +282,7 @@ class TerminalReason(StrEnum):
     NO_RUNTIME = "no_runtime"
     BUILD_FAILED = "build_failed"
     PLAN_UNRESOLVED = "plan_unresolved"
+    TARGET_NOT_FOUND = "target_not_found"
     UNSUPPORTED_SCOPE = "unsupported_scope"
     PROBE_NOT_RUN = "probe_not_run"
     PROBE_ERRORED = "probe_errored"

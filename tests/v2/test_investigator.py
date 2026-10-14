@@ -101,7 +101,7 @@ def test_wrong_quote_is_refused_with_the_reason_then_corrected(tree):
 def test_a_second_invalid_plan_ends_without_a_plan(tree):
     bad = dict(TARGET, end_line=99)
     result, usage = run(Script([plan(citations=[bad]), plan(citations=[bad])]), tree)
-    assert result.status == "target_not_found" and "output_invalid" in result.reason
+    assert result.status == "unresolved" and "output_invalid" in result.reason
     assert usage.status == "output_invalid" and usage.requests == 2
 
 

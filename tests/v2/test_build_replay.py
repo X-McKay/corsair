@@ -107,3 +107,15 @@ def test_network_only_during_setup(tmp_path, cleanup_images):
     result, environment = replay(case, RUNTIME, online, artifacts=tmp_path / "artifacts")
     assert environment is not None, result.reason
     cleanup_images.append(environment.image)
+
+
+def test_a_recipe_never_overwrites_the_revisions_own_files(tmp_path):
+    from corsair.v2.contracts import Case, Finding, Recipe, RecipeFile, Revision, Runtime
+    from corsair.v2.build import replay
+    (tmp_path / "app.py").write_text("x = 1\n")
+    case = Case(case_id="c", finding=Finding(title="t"), revision=Revision(source=str(tmp_path), tree_sha256="0" * 64))
+    runtime = Runtime(row_id="r", image="unused", framework="f", skill="s", run_template=("true",),
+                      exit_codes={0: "pass"}, evidence="image-only")
+    recipe = Recipe(files=(RecipeFile(path="app.py", content="x = 2\n"),), baseline_test=("true",))
+    result, environment = replay(case, runtime, recipe)
+    assert environment is None and not result.replayed and "app.py" in result.reason
