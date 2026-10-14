@@ -25,7 +25,7 @@ never pass it to an agent.
 
 from dataclasses import dataclass
 from hashlib import sha256
-from importlib.resources import files
+import importlib.util
 import json
 from pathlib import Path
 import re
@@ -63,10 +63,14 @@ def agent_root(agent: str) -> Path:
     """A v2 agent's eval root, resolved through its package; an agent without an evals/ directory is refused."""
     if agent not in AGENTS:
         raise ValueError(f"unknown v2 agent {agent!r}")
-    root = Path(str(files(f"{AGENTS_PACKAGE}.{agent}") / "evals"))
-    if not root.is_dir():
-        raise ValueError(f"{agent} has no evals/ directory under {AGENTS_PACKAGE}")
-    return root
+    # Search locations in import order: a namespace package can span several (an editable install plus a
+    # checkout on PYTHONPATH), and the first one wins exactly as it does for imports.
+    spec = importlib.util.find_spec(f"{AGENTS_PACKAGE}.{agent}")
+    for location in (spec.submodule_search_locations or ()) if spec else ():
+        root = Path(location) / "evals"
+        if root.is_dir():
+            return root
+    raise ValueError(f"{agent} has no evals/ directory under {AGENTS_PACKAGE}")
 
 
 def eval_root(suite: str | Path) -> Path:
