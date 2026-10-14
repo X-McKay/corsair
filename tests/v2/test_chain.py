@@ -1,6 +1,5 @@
 """Chain routing with fake stages: order, early stops, A2/D3 correction bounds and review blindness."""
 import asyncio
-import json
 
 import pytest
 from pydantic_ai.exceptions import ModelHTTPError, UsageLimitExceeded
