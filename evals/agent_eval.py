@@ -205,10 +205,11 @@ async def evaluate(spec: AgentEval, evidence: Path, set_name: str, *, language: 
         key = item.source_case_name or item.name
         values = {name: bool(result.value) for name, result in item.assertions.items()}
         rows.append(_row(spec, by_key[key], values, item.attributes, failure=(
-            "; ".join(f"{f.name}: {f.error_message}" for f in item.evaluator_failures) or None)))
+            "; ".join(f"{f.name}: {f.error_message}" for f in item.evaluator_failures) or None),
+            failure_kind="evaluator" if item.evaluator_failures else None))
     for failure in report.failures:
         key = failure.source_case_name or failure.name
-        rows.append(_row(spec, by_key[key], {}, {}, failure=failure.error_message[:2_000]))
+        rows.append(_row(spec, by_key[key], {}, {}, failure=failure.error_message[:2_000], failure_kind="task"))
     with (evidence / "attempts.jsonl").open("w") as out:
         out.write(json.dumps({"schema": SCHEMA, "agent": spec.agent, "set": set_name, "language": language}) + "\n")
         for row in rows:
@@ -217,7 +218,7 @@ async def evaluate(spec: AgentEval, evidence: Path, set_name: str, *, language: 
 
 
 def _row(spec: AgentEval, case: EvalCase, values: dict[str, bool], attributes: Mapping[str, Any], *,
-         failure: str | None) -> dict:
+         failure: str | None, failure_kind: str | None = None) -> dict:
     # A dimension counts only where the case declares it measures it, so an assertion that passes trivially on a case
     # it does not apply to (no injection, no target) cannot inflate that dimension's rate. Pass/fail still uses all.
     declared = set(case.case.get("dimensions") or DIMENSIONS)
@@ -233,7 +234,8 @@ def _row(spec: AgentEval, case: EvalCase, values: dict[str, bool], attributes: M
             "passed": bool(values) and failure is None and all(values.values()),
             "assertions": values, "dimensions": dimensions,
             "failed_assertions": sorted(name for name, value in values.items() if not value),
-            "failure": failure, **metrics, "parameters": attributes.get("parameters") or {},
+            "failure": failure, "failure_kind": failure_kind, **metrics,
+            "parameters": attributes.get("parameters") or {},
             **{name: attributes.get(name) for name in ROW_FACTS},
             **{name: attributes[name] for name in LABEL_FACTS if attributes.get(name) is not None}}
 

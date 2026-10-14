@@ -87,9 +87,19 @@ def rollup(rows: list[dict]) -> dict:
             entry = dimensions.setdefault(name, {"passed": 0, "total": 0})
             entry["passed"] += int(value)
             entry["total"] += 1
+    # New receipts distinguish task failure from evaluator failure. Older rows cannot prove which failed:
+    # retain their legacy task_failures count below, but do not manufacture completion coverage for them.
+    task_failures = sum(row.get("failure_kind") == "task" for row in rows)
+    evaluator_failures = sum(row.get("failure_kind") == "evaluator" for row in rows)
+    unknown_failures = sum(row.get("failure") is not None and row.get("failure_kind") is None for row in rows)
+    completed = len(rows) - task_failures if not unknown_failures else None
     return {"cases": len({row["case"] for row in rows}), "attempts": len(rows),
             "clean_attempts": sum(row["passed"] for row in rows),
-            "task_failures": sum(row["failure"] is not None and not row["assertions"] for row in rows),
+            "task_failures": task_failures + sum(row["failure"] is not None and not row["assertions"]
+                                                  and row.get("failure_kind") is None for row in rows),
+            "completion": {"attempted": len(rows), "completed": completed, "task_failures": task_failures,
+                           "evaluator_failures": evaluator_failures, "unknown_failures": unknown_failures,
+                           "rate": completed / len(rows) if completed is not None and rows else None},
             "dimensions": dict(sorted(dimensions.items())),
             **({"dispositions": found} if (found := dispositions(rows)) is not None else {}),
             **({"revisions": _stats([row.get("revisions") for row in rows]),
@@ -147,7 +157,18 @@ def apply_policy(summary: dict, policy_path: Path) -> dict:
     applies = policy.get("applies_to") or {}
     sets = applies.get("sets") or []
     in_scope = (not sets or summary["set"] in sets) and applies.get("mode", summary["mode"]) == summary["mode"]
+    if not in_scope:
+        return {"policy": str(policy_path), "schema_version": policy.get("schema_version"), "in_scope": False,
+                "deferred": True, "status": "not_applicable", "missing_provenance": [], "entries": {}}
     hard = policy.get("hard_gates") or {}
+    if "completion_rate" in hard:
+        entries["hard_gates.completion_rate"] = _judge((overall.get("completion") or {}).get("rate"),
+                                                      hard["completion_rate"], "min")
+    if "evaluator_failures" in hard:
+        completion = overall.get("completion") or {}
+        entries["hard_gates.evaluator_failures"] = _judge(
+            completion.get("evaluator_failures") if completion.get("unknown_failures") == 0 else None,
+            hard["evaluator_failures"], "max")
     if "contract_rate" in hard:
         entries["hard_gates.contract_rate"] = _judge(_rate((overall.get("dimensions") or {}).get("contract")),
                                                      hard["contract_rate"], "min")
@@ -206,6 +227,12 @@ def compare(current: dict, reference: dict | None, reference_id: str | None) -> 
         return "\n".join(lines + ["Attempts missing: results and telemetry are unknown.", ""])
     now = current["rollups"]["all"]
     lines += [f"Clean attempts: {now['clean_attempts']}/{now['attempts']} (task failures {now['task_failures']})", ""]
+    completion = now.get("completion")
+    if completion is not None:
+        lines += [f"Task completion: {completion['completed']}/{completion['attempted']}; "
+                  f"evaluator failures: {completion['evaluator_failures']}; "
+                  f"unattributed failures: {completion['unknown_failures']}. "
+                  "Dimension rates are conditional on evaluated attempts.", ""]
     if reference is None or reference.get("rollups") is None:
         return "\n".join(lines + ["No earlier run with this set and mode; nothing to compare.", ""])
     language = current.get("language")
