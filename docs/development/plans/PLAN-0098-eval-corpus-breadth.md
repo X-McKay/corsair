@@ -24,6 +24,7 @@ One case is one frozen directory with its own agent input and evaluator-only ora
 - [x] Move end-to-end data (fixture chain cases, Jest cohort, the corpus issue requests and the two negative requests) to `evals/e2e/<language>/<set>/`.
 - [x] Guards: every set loads and matches its manifest, no unlisted case directory, held-out case ids never cited under `docs/development/` (`tests/configuration/test_evaluation_layout.py`).
 - [x] Run every scripted set and the offline suite; record results.
+- [x] Merge develop (`58c2d9b`), move its new single-file sets into the layout, renumber records (PLAN-0098, HANDOFF-0133, ISSUE-0010).
 - [ ] Owner review of the draft PR; live runs of the new sets on RIG0 when the owner chooses.
 
 ## Inventory
@@ -42,19 +43,19 @@ After (`python -m evals.inventory`):
 
 | Agent | Python | Java | JavaScript | Ruby | Perl | common |
 | --- | --- | --- | --- | --- | --- | --- |
-| environment | 11 | 13 | 12 | 11 | 11 | 0 |
+| environment | 18 | 14 | 12 | 11 | 11 | 0 |
 | identification | 10 | 10 | 10 | 11 | 10 | 1 |
-| planning | 14 | 10 | 10 | 10 | 10 | 0 |
+| planning | 22 | 10 | 10 | 10 | 10 | 0 |
 | authoring | 12 | **0** (10 pending) | **0** (10 pending) | 10 | **0** (10 pending) | 0 |
-| assessment | 32 | 11 | 11 | 11 | 11 | 0 |
+| assessment | 32 | **0** (11 pending) | 2 (11 pending) | 1 (11 pending) | **0** (11 pending) | 0 |
 | e2e (chain) | 5 | 0 | 2 | 0 | 0 | 0 |
 
-Python planning's 14 are development 6, the held-out set still in use 6, unit 2; the two retired held-out sets (6 each) are not counted.
+Counts are after merging develop `58c2d9b`, whose new single-file sets moved into the same layout: environment `development-v2` (8), planning `unit-v2` (2) and `unit-first` (6), assessment `unit` (now the structured validity v2 cases; the original seven stay frozen as `unit-v1`, which the suite refuses) and `unit-transfer` (3). Python planning's 22 are development 6, the held-out set still in use 6, unit 2, unit-v2 2, unit-first 6; the two retired held-out sets (6 each) are not counted.
 
 Shortfalls:
 
 - Authoring Java, JavaScript and Perl: the ten behaviours per language are written (`breadth_pending`) but `TestAuthoringInput` admits pytest and Minitest test ids only, and Java/Perl also lack an assertion reader (PR #128 carries the Perl one; the per-framework reader registry is a lane 4 follow-up). They count once those land and the set is re-frozen as `breadth`.
-- Assessment Java, JavaScript, Ruby and Perl cover the pre-execution validity review only. Post-execution gate-evidence cases need real base runs from each language's runner, as the Python cases have; none were captured.
+- Assessment Java, JavaScript, Ruby and Perl: the 44 validity cases were written against the boolean review protocol; develop's structured validity review (`unit-validity-v2-structured-classification`) needs a reviewed `scripted_review` per case, so they sit in `breadth_pending` ([ISSUE-0010](../issues/ISSUE-0010-eval-breadth-production-gaps.md) item 7). They cover the pre-execution validity review only. Post-execution gate-evidence cases need real base runs from each language's runner, as the Python cases have; none were captured.
 - End-to-end cases are not part of the per-agent target; they are listed for the inventory.
 
 ## Provenance

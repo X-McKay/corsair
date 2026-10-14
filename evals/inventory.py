@@ -18,7 +18,7 @@ from evals.cases import LANGUAGES, load_set, set_names
 # make eval AGENT= name -> eval package; e2e is the chain's case data (AGENT=chain)
 SUITES = {"environment": "environment", "identification": "issue_identification", "planning": "test_planning",
           "authoring": "test_authoring", "assessment": "evidence_assessment", "e2e": "e2e"}
-RETIRED = {("planning", "heldout"), ("planning", "heldout2")}
+RETIRED = {("planning", "heldout"), ("planning", "heldout2"), ("assessment", "unit-v1")}
 PENDING = {("authoring", "breadth_pending"), ("assessment", "breadth_pending")}
 # Issue requests run through `corsair run --issue-json`, not scored by `make eval`.
 REQUESTS = {("e2e", "corpus"), ("e2e", "corpus_negative")}

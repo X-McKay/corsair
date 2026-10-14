@@ -19,12 +19,13 @@ Writing ten cases per agent per language (PLAN-0098) exposed places where produc
 4. **Post-execution assessment has no non-Python material.** Gate-evidence cases are typed transformations of real runner output; only pytest base runs exist (`evals/evidence_assessment/base/`). Java, JavaScript, Ruby and Perl assessment cases therefore cover the pre-execution validity review only.
 5. **Self-observation admission reads Python only.** The authoring stage's self-observation check parses Python and admits other files unread, so `stage_admitted` is omitted from non-Python authoring checks.
 6. **Environment discovery ids for Maven are unverified.** Java environment oracles assume Surefire reports `pkg.Class#method`; no captured Surefire output confirms the form for both JUnit 4 and 5.
+7. **Assessment breadth cases predate the structured validity review.** Develop replaced the boolean validity review with a structured per-probe review; its scripted replay needs a reviewed `scripted_review` for each case. The 44 non-Python validity cases have expected flags only, so they moved to `evidence_assessment/sets/breadth_pending.json` (flag sensitivity is still tested offline). Expected: each case gains a reviewed structured review, most likely as source material for the v2 Reviewer agent's sets.
 
 Eval-side limits found at the same time, not production defects: the environment checks raise `KeyError` when a ready output names a field the oracle lacks (the run still fails, but as an evaluator failure); identification has no `unsupported` oracle; Ruby and Perl environment sets have no discovery-failure case; older-runtime ready cases exist for Java and Python only; several identification and planning oracles are judgement calls that need review after the first live run; planning discovery commands in the new cases are illustrative and were never executed.
 
 ## Reproduction and evidence
 
-Branch `claude/eval-corpus-breadth-88ptmq` on main `df5c661`:
+Branch `claude/eval-corpus-breadth-88ptmq` (main `df5c661`, then develop `58c2d9b` merged in):
 
 ```sh
 make eval AGENT=authoring SET=breadth_pending   # 0/30, every case refused as input; pending.json names the reason
@@ -37,4 +38,4 @@ Items 1 and 2 were confirmed by running the pending set; items 3 to 6 by reading
 
 ## Resolution criteria and next action
 
-Resolved per item when the production change lands on main and the matching eval cases pass in scripted mode: for 1 and 2, `breadth_pending` re-frozen as part of `breadth` and passing; for 4, captured base runs from each runner and gate-evidence cases built from them. Next action: lane 4's reader registry after #128, then the authoring id grammar.
+Resolved per item when the production change lands on main and the matching eval cases pass in scripted mode: for 1 and 2, `breadth_pending` re-frozen as part of `breadth` and passing; for 4, captured base runs from each runner and gate-evidence cases built from them. For 7, the structured reviews are written and the set re-frozen as `breadth`. Next action: superseded in part by the v2 agents; carry items 1, 4 and 7 into the v2 Builder/Prober/Reviewer eval sets.
