@@ -124,6 +124,20 @@ class BuildResult(Frozen):
     reason: str = Field(default="", max_length=2_000)
 
 
+class Environment(Frozen):
+    """A replayed, ready-to-test environment: an image with the revision and its dependencies installed.
+
+    Trusted code builds it from the Recipe in a fresh container (never the one an agent typed into) and keys it by
+    (runtime row, recipe, revision tree), which is the exact-environment cache level of amendment A3.
+    """
+
+    image: str = Field(min_length=1, max_length=512, description="Local image tag holding the prepared tree")
+    workdir: str = Field(default="/work", pattern=r"^/[A-Za-z0-9._/-]*$")
+    runtime_row: str
+    recipe_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    tree_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
 # --- 4. Investigate (Investigator agent) ------------------------------------------------------------------------
 
 
