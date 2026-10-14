@@ -302,8 +302,12 @@ def run_v2(agent: str, suite: Suite, set_name: str, provider_config: Path | None
     policy = agent_summary.apply_policy(summary, agent_root(agent) / "release-policy.yaml")
     (run_dir / "policy.json").write_text(json.dumps(policy, indent=2))
     reference_id, reference = _v2_reference(agent_dir, set_name, mode, run_id)
+    enforced = not policy.get("deferred", True) and policy.get("in_scope")
+    if enforced and policy["status"] != "pass" and exit_code == 0:
+        exit_code = 1
     (run_dir / "comparison.md").write_text(agent_summary.compare(summary, reference, reference_id)
-                                           + f"\nRelease policy (deferred, does not set the exit code): {policy['status']}\n")
+                                           + (f"\nRelease policy (enforced): {policy['status']}\n" if enforced else
+                                              f"\nRelease policy (deferred, does not set the exit code): {policy['status']}\n"))
     overall = (summary.get("rollups") or {}).get("all") or {}
     with (agent_dir / "index.jsonl").open("a") as index:
         index.write(json.dumps({"run": run_id, "set": set_name, "language": language, "mode": mode,

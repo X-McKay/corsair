@@ -6,6 +6,9 @@
 # LIKELY_EXPLOITABLE or LIKELY_NOT_EXPLOITABLE, so the decisive rate and abstention rates are tracked beside accuracy
 # (summary.json rollups.<scope>.dispositions, by language), never folded into it.
 schema_version: 1
+# false while gates are deferred; true makes an in-scope `make eval` run fail unless the policy passes, and
+# tools/release_check.py requires every threshold set (docs/design/gates-and-release.md).
+enforced: false
 applies_to:
   sets: []
   mode: live

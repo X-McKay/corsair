@@ -3,6 +3,9 @@
 # reports pass, fail or unknown per entry (policy.json) without changing its exit code. An unobserved metric or
 # missing provenance is unknown, never pass. Keys follow the v2 eval layout agreed with the eval corpus thread.
 schema_version: 1
+# false while gates are deferred; true makes an in-scope `make eval` run fail unless the policy passes, and
+# tools/release_check.py requires every threshold set (docs/design/gates-and-release.md).
+enforced: false
 applies_to:
   sets: []
   mode: live

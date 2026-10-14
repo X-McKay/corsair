@@ -5,7 +5,8 @@ language and by case kind: per dimension passed/total, clean attempts, and effic
 observed samples only. A metric no attempt reported has ``observed: 0`` and null statistics, never zero.
 
 ``apply_policy`` reads the agent's ``evals/release-policy.yaml`` and reports pass, fail or unknown per entry. While
-gates are deferred it never changes the run's exit code. An entry whose threshold is null is ``not_set``; an entry
+gates are deferred (the policy's ``enforced`` is not true) it never changes the run's exit code; an enforced policy
+fails an in-scope run whose status is not ``pass`` (evals/run.py). An entry whose threshold is null is ``not_set``; an entry
 whose metric was not observed, or a run missing required provenance, is ``unknown``, never ``pass``.
 """
 from __future__ import annotations
@@ -176,7 +177,8 @@ def apply_policy(summary: dict, policy_path: Path) -> dict:
     status = ("fail" if "fail" in statuses else "unknown" if "unknown" in statuses or missing
               else "pass" if statuses == {"pass"} else "not_set")
     return {"policy": str(policy_path), "schema_version": policy.get("schema_version"), "in_scope": in_scope,
-            "deferred": True, "status": status, "missing_provenance": missing, "entries": entries}
+            "deferred": policy.get("enforced") is not True, "status": status, "missing_provenance": missing,
+            "entries": entries}
 
 
 def compare(current: dict, reference: dict | None, reference_id: str | None) -> str:

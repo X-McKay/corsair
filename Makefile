@@ -1,4 +1,4 @@
-.PHONY: test test-v2 eval eval-baseline canary toolchain-images maven-hashes
+.PHONY: test test-v2 eval eval-baseline baseline-commit release-check gate-status canary toolchain-images maven-hashes
 export UV_CACHE_DIR ?= $(CURDIR)/.cache/uv
 # pytest otherwise infers its root from argument paths, so an evidence dir inside another checkout (for example
 # the main repository's .runs from a worktree) would load that checkout's config and code.
@@ -21,6 +21,18 @@ eval:
 
 eval-baseline:
 	uv run --locked python -m evals.run "$(AGENT)" --promote "$(RUN)"
+
+# Release check (tools/release_check.py, docs/design/gates-and-release.md), offline and deterministic: commit a promoted
+# live run as the agent's baseline, check every agent and the chain against its committed baseline and release policy,
+# and report whether the gate for turning gates back on holds.
+baseline-commit:
+	uv run --locked python tools/release_check.py commit "$(AGENT)" "$(RUN)"
+
+release-check:
+	uv run --locked python tools/release_check.py check $(foreach agent,$(AGENT),--agent $(agent))
+
+gate-status:
+	uv run --locked python tools/release_check.py gate
 
 # Classify each runtime-matrix row's known-passing and known-failing canary on its image (evidence under .runs/canary/).
 canary:

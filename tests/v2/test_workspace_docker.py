@@ -5,10 +5,13 @@ import pytest
 from pydantic_ai.workspaces import Workspace, WorkspaceRef, WorkspaceUnavailableError
 from pydantic_ai.workspaces.conformance import WorkspaceBackendSuite
 
+from corsair.v2 import matrix
 from corsair.v2.workspace import DockerConfig, DockerWorkspace, labels
 from corsair.v2.workspace.docker import docker, docker_available, remove, run_args
 
-IMAGE = "corsair-python:ebf057997574de59"
+# Any image with a shell will do; the matrix's Python row is rebuilt from its source under the same tag
+# (`make toolchain-images TOOLCHAINS=python`), so CI can build it and run this suite.
+IMAGE = next(row.image for row in matrix.load() if row.id == "pytest-cpython312")
 
 
 def _image_present() -> bool:
