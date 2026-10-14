@@ -17,6 +17,7 @@ import logfire
 from pydantic import BaseModel, ConfigDict
 from pydantic_ai import models
 from pydantic_ai.messages import ModelResponse, ToolCallPart, ToolReturnPart
+from evals.native_skills import load_skills
 from pydantic_ai.models.function import FunctionModel
 from pydantic_evals import Case, Dataset
 from pydantic_evals.evaluators import Evaluator
@@ -184,7 +185,10 @@ def scripted_final_model(inputs, oracle):
     """Read each actual frozen item and cite native receipts, never a witness-only oracle."""
     items = tuple(item.item_id for item in inputs.items)
     async def respond(messages, info):
-        done = sum(isinstance(part, ToolReturnPart) for message in messages for part in message.parts)
+        activation = load_skills(messages, info, ['assess-evidence'])
+        if activation is not None:
+            return activation
+        done = sum(isinstance(part, ToolReturnPart) and part.tool_name == "read_evidence" for message in messages for part in message.parts)
         if done < len(items):
             return ModelResponse(parts=[ToolCallPart('read_evidence', {'item_id':items[done]})])
         def citation(item_id):

@@ -16,6 +16,7 @@ from openai import APIConnectionError
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from pydantic_ai import capture_run_messages, models
 from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart, ToolReturnPart
+from evals.native_skills import load_skills
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RunUsage, UsageLimits
 from pydantic_evals import Dataset, set_eval_attribute
@@ -151,6 +152,9 @@ def dataset(name: str = "development") -> Dataset[TestPlanningInput, PlanOutput,
 def scripted_model(oracle: PlanOracle) -> FunctionModel:
     """Oracle injection is confined to the scripted plumbing model, never live task inputs."""
     async def respond(messages, info):
+        activation = load_skills(messages, info, ['plan-two-tests'])
+        if activation is not None:
+            return activation
         returned = {SourceRead.model_validate(part.content).path for message in messages for part in message.parts
                     if isinstance(part, ToolReturnPart) and part.tool_name == READ_SOURCE_TOOL}
         pending = [path for path in oracle.required_reads if path not in returned]
@@ -168,8 +172,8 @@ def read_paths(messages: list[ModelMessage]) -> list[str]:
 class EvaluationBudget(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     repeat: int = Field(default=2, ge=1, le=3, strict=True)
-    request_limit: int = Field(default=5, ge=1, le=8, strict=True)
-    tool_calls_limit: int = Field(default=4, ge=0, le=6, strict=True)
+    request_limit: int = Field(default=6, ge=1, le=8, strict=True)
+    tool_calls_limit: int = Field(default=5, ge=0, le=6, strict=True)
     # Room for one full 32768-token response (~235 s on the local server) beside the rest of the attempt.
     total_tokens_limit: int = Field(default=96000, ge=1, le=192000, strict=True)
     task_seconds: int = Field(default=600, ge=1, le=1200, strict=True)
@@ -227,7 +231,7 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, case
         usage, messages, result, failure = RunUsage(), [], None, None
         started = perf_counter()
         selected = fixture_models[inputs.input_digest] if scripted else model
-        known_tools = frozenset({READ_SOURCE_TOOL}) | output_tool_names(selected)
+        known_tools = frozenset({READ_SOURCE_TOOL, "load_capability"}) | output_tool_names(selected)
         agent = create_test_planning_agent(selected, output_retries=budget.output_retries)
         try:
             with capture_run_messages() as messages, models.override_allow_model_requests(not scripted):

@@ -1,4 +1,4 @@
-"""The shared native-probe procedure, read once by both independent authors."""
+"""Shared packaged native-probe skill bytes and provenance for both independent authors."""
 from hashlib import sha256
 from pathlib import Path
 COMMON_SKILL_ID = 'native-probe-boundary'

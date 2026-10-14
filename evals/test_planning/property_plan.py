@@ -17,6 +17,7 @@ from pydantic import Field, TypeAdapter
 from pydantic_ai import Agent, ModelRetry, RunContext, capture_run_messages, models
 from pydantic_ai.capabilities import Instrumentation
 from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart, ToolReturnPart
+from evals.native_skills import load_skills
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.models.instrumented import InstrumentationSettings
 from pydantic_ai.usage import RunUsage, UsageLimits
@@ -174,6 +175,9 @@ def reference_property(inputs, oracle):
 
 def scripted_model(inputs, oracle):
     async def respond(messages, info):
+        activation = load_skills(messages, info, ['plan-two-tests'])
+        if activation is not None:
+            return activation
         returned = {SourceRead.model_validate(part.content).path for message in messages for part in message.parts
                     if isinstance(part, ToolReturnPart) and part.tool_name == READ_SOURCE_TOOL}
         pending = [path for path in oracle.required_reads if path not in returned]

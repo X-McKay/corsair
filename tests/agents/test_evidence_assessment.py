@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from pydantic_ai import models
 from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.messages import ModelResponse, RetryPromptPart, ToolCallPart
+from tests.agents.native_skills import activate_skill
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import UsageLimits
 
@@ -93,11 +94,14 @@ def scripted(output, reads=READS, seen=None, retries=None):
     outputs = output if isinstance(output, list) else [output]
 
     async def respond(messages, info):
+        activation = activate_skill(messages, info, 'assess-evidence', SKILL_TEXT)
+        if activation is not None:
+            return activation
         if seen is not None:
             seen.append(info)
-        assert SKILL_TEXT.strip() in info.instructions
-        assert [tool.name for tool in info.function_tools] == ['read_evidence']
-        step = sum(1 for message in messages if message.kind == 'request') - 1
+        assert {tool.name for tool in info.function_tools} <= {'load_capability', 'read_evidence'}
+        assert 'load_capability' in {tool.name for tool in info.function_tools}
+        step = sum(1 for message in messages if message.kind == 'request') - 1 - sum(1 for message in messages if any(isinstance(part, ToolCallPart) and part.tool_name == 'load_capability' for part in message.parts))
         if step < len(reads):
             return ModelResponse(parts=[ToolCallPart('read_evidence',
                 reads[step] if isinstance(reads[step], dict) else {'item_id': reads[step]})])

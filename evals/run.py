@@ -31,7 +31,7 @@ REPOSITORY = Path(__file__).resolve().parents[1]
 RESULTS = REPOSITORY / ".runs" / "evals"
 # Top-level suite identity; the chain nests per-stage prompt/config/skill under "versions" and names its live stages.
 # toolset_sha256 digests the offered tool definitions (SPEC-0052); suites that do not report it leave it absent.
-IDENTITY = ("factory_source_sha256", "shared_helper_source_sha256", "spec_sha256", "capability_selection_sha256", "budget_policy_sha256", "effective_budget_sha256", "prompt_version", "config_version", "skill_sha256", "toolset_sha256", "versions", "live_stages", "composition", "model",
+IDENTITY = ("harness_version", "pydantic_ai_version", "factory_source_sha256", "shared_helper_source_sha256", "spec_sha256", "capability_selection_sha256", "budget_policy_sha256", "effective_budget_sha256", "prompt_version", "config_version", "skill_sha256", "toolset_sha256", "versions", "live_stages", "composition", "model",
             "evaluator_version", "dataset", "dataset_sha256", "mode", "runner", "execution", "budget")
 
 

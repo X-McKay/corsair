@@ -201,6 +201,10 @@ def _scripted_challenge(inputs, metadata):
     output = {'reviews': [{'revision': 'baseline', **probes, 'challenge': observation,
         'defects': [] if valid else [observation], 'unsupported': [], 'decision': 'supported' if valid else 'invalid'}]}
     async def respond(messages, info):
+        from evals.native_skills import load_skills
+        activation = load_skills(messages, info, ['assess-evidence'])
+        if activation is not None:
+            return activation
         reads = [p.content for m in messages for p in m.parts if isinstance(p, ToolReturnPart)
                  and p.tool_name == READ_EVIDENCE_TOOL]
         for item in inputs.items:

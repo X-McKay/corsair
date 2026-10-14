@@ -1,3 +1,7 @@
+---
+name: native-probe-boundary
+description: Preserve source linkage, dependency boundaries, native identity and assertion relevance while drafting a probe.
+---
 Use the existing native test framework and actual application seam. Preserve the
 production logic responsible for the property. Substituted dependencies may supply responses and record
 interactions only within the admitted dependency boundary. Prepare required state and observe relevant

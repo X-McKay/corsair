@@ -10,6 +10,7 @@ from uuid import uuid4
 from pydantic import TypeAdapter
 from pydantic_ai import capture_run_messages, models
 from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart
+from evals.native_skills import load_skills
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RunUsage, UsageLimits
 from pydantic_evals import Case, Dataset, set_eval_attribute
@@ -30,6 +31,9 @@ def scripted_model(case, inputs, role):
     step = 0
     def respond(messages, info):
         nonlocal step
+        activation = load_skills(messages, info, ['control-probe' if role == 'control' else 'exploit-probe', 'native-probe-boundary'])
+        if activation is not None:
+            return activation
         step += 1
         if step == 1:
             return ModelResponse(parts=[ToolCallPart('read_source', {'path':s.path}) for s in inputs.source_files])
@@ -85,7 +89,7 @@ async def evaluate(role, evidence, *, model=None, provider=None, repeat=1, budge
         selected=model if model is not None else scripted_model(fixture_cases[inputs.input_digest],inputs,role)
         agent=factory(selected,output_retries=budget.output_retries)
         usage=RunUsage(); messages=[]; result=None; failure=None; started=perf_counter()
-        known_tools=frozenset({'read_source','write_test_file'})|output_tool_names(selected)
+        known_tools=frozenset({'read_source','write_test_file','load_capability'})|output_tool_names(selected)
         try:
             with capture_run_messages() as messages, models.override_allow_model_requests(model is not None):
                 result=await asyncio.wait_for(agent.run(package.prompt_for(inputs),deps=SpecialistDependencies(inputs),

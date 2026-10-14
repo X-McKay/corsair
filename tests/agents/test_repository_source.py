@@ -6,6 +6,7 @@ import pytest
 from pydantic_ai import models
 from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.messages import ModelResponse, ToolCallPart, ToolReturnPart
+from tests.agents.native_skills import activate_skill
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import UsageLimits
 
@@ -186,9 +187,11 @@ def scripted(steps, final, seen=None):
     seen = seen if seen is not None else []
 
     async def respond(messages, info):
-        assert "sole task" in info.instructions and SKILL_TEXT.strip() in info.instructions
-        returns = [p for p in messages[-1].parts if isinstance(p, ToolReturnPart)]
-        seen.append(({t.name for t in info.function_tools}, returns))
+        activation = activate_skill(messages, info, 'identify-issue-repository', SKILL_TEXT)
+        if activation is not None:
+            return activation
+        returns = [p for p in messages[-1].parts if isinstance(p, ToolReturnPart) and p.tool_name != "load_capability"]
+        seen.append(({t.name for t in info.function_tools if t.name != "load_capability"}, returns))
         step = len(seen) - 1
         if step < len(steps):
             name, args = steps[step]

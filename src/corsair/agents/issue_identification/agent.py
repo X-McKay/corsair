@@ -7,7 +7,9 @@ activity payload yet.
 from pathlib import Path
 
 from pydantic_ai import Agent
-from pydantic_ai.capabilities import Capability, Instrumentation
+from pydantic_ai.capabilities import Instrumentation
+from pydantic_ai_harness import Skills
+from pydantic_ai.capabilities import LocalWorkspace
 from pydantic_ai.durable_exec.temporal import TemporalDurability
 from pydantic_ai.models import Model
 from pydantic_ai.models.instrumented import InstrumentationSettings
@@ -47,8 +49,10 @@ def create_issue_identification_agent(
     return Agent.from_spec(
         _SPEC, model=model, deps_type=FixtureDependencies, output_type=finalize_identification,
         retries={'tools': TOOL_RETRIES, 'output': output_retries},
+        toolsets=[identification_tools()],
         capabilities=[
-            Capability(id=SKILL_ID, instructions=SKILL_TEXT, toolsets=[identification_tools()]),
+            LocalWorkspace(Path(__file__).parent, read_only=True),
+            Skills('skills', include={SKILL_ID}),
             tool_budget(), prompted_output(),
             Instrumentation(settings=InstrumentationSettings(include_content=False, version=5)),
                 *([durability] if durability is not None else []),
@@ -65,8 +69,10 @@ def create_repository_identification_agent(
     return Agent.from_spec(
         _REPOSITORY_SPEC, model=model, deps_type=RepositoryDependencies,
         output_type=finalize_repository_identification, retries={'tools': TOOL_RETRIES, 'output': output_retries},
+        toolsets=[repository_tools()],
         capabilities=[
-            Capability(id=REPOSITORY_SKILL_ID, instructions=REPOSITORY_SKILL_TEXT, toolsets=[repository_tools()]),
+            LocalWorkspace(Path(__file__).parent, read_only=True),
+            Skills('skills', include={REPOSITORY_SKILL_ID}),
             tool_budget(), prompted_output(),
             Instrumentation(settings=InstrumentationSettings(include_content=False, version=5)),
         ],

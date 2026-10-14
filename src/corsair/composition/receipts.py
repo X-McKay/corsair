@@ -66,8 +66,8 @@ _MANIFESTS = {
     "exploit_authoring": exploit_authoring.MANIFEST_IDENTITY,
     "assessment": assessment.MANIFEST_IDENTITY,
 }
-VERSION_FIELDS += ("spec_sha256", "factory_source_sha256", "shared_helper_source_sha256")
-VERSIONS = {stage: version + tuple(_MANIFESTS[stage][key] for key in VERSION_FIELDS[-3:])
+VERSION_FIELDS += ("spec_sha256", "factory_source_sha256", "shared_helper_source_sha256", "harness_version", "pydantic_ai_version")
+VERSIONS = {stage: version + tuple(_MANIFESTS[stage][key] for key in VERSION_FIELDS[-5:])
             for stage, version in VERSIONS.items()}
 
 
@@ -158,7 +158,14 @@ def result_record(run: DirectRun) -> dict:
 
 
 def attempt_record(attempt) -> dict:
-    return {"stage": attempt.stage, "elapsed_seconds": attempt.elapsed_seconds,
+    from pydantic_ai.messages import ToolCallPart, ToolReturnPart
+    parts = [part for message in attempt.messages for part in message.parts]
+    completed = {part.tool_call_id for part in parts if isinstance(part, ToolReturnPart)
+                 and part.tool_name == "load_capability"}
+    loaded = sorted({part.args_as_dict()["id"] for part in parts if isinstance(part, ToolCallPart)
+                     and part.tool_name == "load_capability" and part.tool_call_id in completed})
+    return {"loaded_capability_ids": None if getattr(attempt, "messages_omitted", False) else loaded,
+"stage": attempt.stage, "elapsed_seconds": attempt.elapsed_seconds,
             "failure": None if attempt.failure is None else {"type": type(attempt.failure).__name__,
                                                              "detail": str(attempt.failure)[:4096]},
             "output": _dump(attempt.output) if hasattr(attempt.output, "model_dump_json") else None,

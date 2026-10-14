@@ -13,6 +13,7 @@ import pytest
 import yaml
 from pydantic_ai.messages import ModelResponse, ToolCallPart, ToolReturnPart
 from pydantic_ai.models.function import FunctionModel
+from evals.native_skills import load_skills
 
 from corsair.adapters.pytest_runner import PytestRunnerConfig
 from corsair.investigation.frameworks import harness
@@ -99,10 +100,13 @@ def reviewed_runners(store, root: Path, case: str = "exploitable"):
     return runner
 
 
-def _reads_then(paths, output):
+def _reads_then(paths, output, *, skills=()):
     """Read each path once from line 1, then call the output tool with ``output(info)``."""
     async def respond(messages, info):
-        done = sum(isinstance(part, ToolReturnPart) for message in messages for part in message.parts)
+        activation = load_skills(messages, info, skills)
+        if activation is not None:
+            return activation
+        done = sum(isinstance(part, ToolReturnPart) and part.tool_name == "read_source" for message in messages for part in message.parts)
         if done < len(paths):
             return ModelResponse(parts=[ToolCallPart("read_source", {"path": paths[done], "start_line": 1},
                                                      tool_call_id=f"read-{done}")])
@@ -123,7 +127,7 @@ def scripted_identification(case: str = "exploitable") -> FunctionModel:
     end = target_end(case)
     return _reads_then(["documents.py"], lambda info: {
         "status": "ready", "scope": "component", "reason": None,
-        "target": {"symbol": "read_document", "source": {"path": "documents.py", "start_line": 3, "end_line": end}}})
+        "target": {"symbol": "read_document", "source": {"path": "documents.py", "start_line": 3, "end_line": end}}}, skills=("identify-issue",))
 
 
 def historical_reference_plan(discovery: tuple[str, ...] = DISCOVER, case: str = "exploitable") -> dict:
@@ -188,7 +192,10 @@ def _scripted_probe(role, case="exploitable"):
              ToolCallPart("read_source", {"path": "test_existing.py"}),
              ToolCallPart("write_test_file", {"path": path, "content": content})]
     async def respond(messages, info):
-        done = sum(isinstance(part, ToolReturnPart) for message in messages for part in message.parts)
+        activation = load_skills(messages, info, ("control-probe" if role == "control" else "exploit-probe", "native-probe-boundary"))
+        if activation is not None:
+            return activation
+        done = sum(isinstance(part, ToolReturnPart) and part.tool_name in {"read_source", "write_test_file"} for message in messages for part in message.parts)
         if done < len(steps):
             step = steps[done]
             return ModelResponse(parts=[ToolCallPart(step.tool_name, step.args, tool_call_id=f"{role}-{done}")])
@@ -208,7 +215,7 @@ def scripted_exploit_authoring(case="exploitable"):
 
 def scripted_planning(discovery: tuple[str, ...] = DISCOVER, case: str = "exploitable") -> FunctionModel:
     """The reference plan for the environment whose discovery command is ``discovery``."""
-    return _reads_then(["documents.py", "test_existing.py"], lambda info: {"plan": reference_plan(discovery, case)})
+    return _reads_then(["documents.py", "test_existing.py"], lambda info: {"plan": reference_plan(discovery, case)}, skills=("plan-two-tests",))
 
 
 # Assertion lines of test_security_rejects_outside_read in the reviewed bytes, as the authoring dataset records.
@@ -241,6 +248,9 @@ def scripted_assessment(execution="completed", finding="inconclusive", fix="not_
     """Reads every inventory item once and proposes the given triple, citing each revision's witness item when
     one is listed (the assessor's grounding rule), else its first item, at line 1."""
     async def respond(messages, info):
+        activation = load_skills(messages, info, ("assess-evidence",))
+        if activation is not None:
+            return activation
         prompt = next(part.content for message in messages for part in message.parts if part.part_kind == "user-prompt")
         items = [match.groupdict() for match in INVENTORY.finditer(prompt)]
         reads = [part.content for message in messages for part in message.parts

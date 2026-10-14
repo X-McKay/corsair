@@ -104,6 +104,7 @@ def message_counts(messages: list[ModelMessage], known_tools: frozenset[str]) ->
     """Counts from native messages, including failed attempts that never reach a span."""
     parts = [part for message in messages for part in message.parts]
     return {"output_corrections": sum(isinstance(part, RetryPromptPart) for part in parts),
+            "capability_load_calls": sum(isinstance(part, ToolCallPart) and part.tool_name == "load_capability" for part in parts),
             "unknown_tool_attempts": sum(isinstance(part, ToolCallPart) and part.tool_name not in known_tools
                                          for part in parts)}
 

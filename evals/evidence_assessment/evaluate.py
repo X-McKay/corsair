@@ -23,6 +23,7 @@ from openai import APIConnectionError
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from pydantic_ai import capture_run_messages, models
 from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart, ToolReturnPart
+from evals.native_skills import load_skills
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RunUsage
 from pydantic_evals import Case, Dataset, set_eval_attribute
@@ -176,7 +177,10 @@ def scripted_model(inputs: AssessmentInput, oracle: AssessmentOracle, proposal: 
         return {"item_id": item_id, "start_line": 1, "end_line": 1}
 
     async def respond(messages, info):
-        done = sum(isinstance(part, ToolReturnPart) for message in messages for part in message.parts)
+        activation = load_skills(messages, info, ['assess-evidence'])
+        if activation is not None:
+            return activation
+        done = sum(isinstance(part, ToolReturnPart) and part.tool_name == READ_EVIDENCE_TOOL for message in messages for part in message.parts)
         if done < len(oracle.required_reads):
             return ModelResponse(parts=[ToolCallPart(READ_EVIDENCE_TOOL, {"item_id": oracle.required_reads[done]},
                                                      tool_call_id=f"evidence-{done}")])
@@ -288,7 +292,7 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, split: Split | L
         usage, messages, result, failure = RunUsage(), [], None, None
         started = perf_counter()
         selected = fixture_models[input_key(inputs)] if offline else model
-        known_tools = frozenset({READ_EVIDENCE_TOOL}) | output_tool_names(selected)
+        known_tools = frozenset({READ_EVIDENCE_TOOL, "load_capability"}) | output_tool_names(selected)
         agent = create_evidence_assessment_agent(selected, output_retries=budget.output_retries)
         limits = budget.limits(inputs)
         try:

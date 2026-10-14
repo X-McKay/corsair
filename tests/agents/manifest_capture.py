@@ -51,11 +51,20 @@ def normalize(value):
     return value
 
 
-def capture(role, *, output_retries=2):
+def capture(role, *, output_retries=2, activate=False):
     factory,prompt,deps_type=factory_parts(role)
     inputs=inputs_for(role); seen={}
+    activation_ids = {'control_authoring':['control-probe','native-probe-boundary'],
+        'exploit_authoring':['exploit-probe','native-probe-boundary'],
+        'planning':['plan-two-tests'],'assessment':['assess-evidence']}[role]
     def respond(messages,info):
-        seen['native_offer']=normalize(asdict(info))
+        offer=normalize(asdict(info))
+        seen.setdefault('initial_offer',offer)
+        seen['native_offer']=offer
+        seen['loaded_instructions']=[part.content['instructions'] for message in messages for part in message.parts if part.__class__.__name__=='LoadCapabilityReturnPart' and isinstance(part.content,dict)]
+        if activate and activation_ids:
+            from pydantic_ai.messages import ModelResponse,ToolCallPart
+            return ModelResponse(parts=[ToolCallPart('load_capability', {'id':activation_ids.pop(0)})])
         raise CaptureComplete()
     agent=factory(FunctionModel(respond),output_retries=output_retries)
     seen['input_schema']=inputs.model_json_schema()
@@ -74,7 +83,7 @@ def capture(role, *, output_retries=2):
     return seen
 
 
-def capture_root(role):
+def capture_root(role, *, activate=False):
     """Root's pre-migration first native offer, persisted without endpoint or tool execution."""
     from pydantic_ai.tools import ToolDefinition
     if role=='environment':
@@ -98,7 +107,14 @@ def capture_root(role):
         factory=create_repository_identification_agent;deps=RepositoryDependencies(inputs(),tree())
     else:raise ValueError(role)
     seen={}
+    activation_ids={'environment':['prepare-environment'],'identification':['identify-issue'],
+        'repository_identification':['identify-issue-repository']}[role]
     def respond(messages,info):
+        seen.setdefault('initial_offer',normalize(asdict(info)))
+        seen['loaded_instructions']=[part.content['instructions'] for message in messages for part in message.parts if part.__class__.__name__=='LoadCapabilityReturnPart' and isinstance(part.content,dict)]
+        if activate and activation_ids:
+            from pydantic_ai.messages import ModelResponse,ToolCallPart
+            return ModelResponse(parts=[ToolCallPart('load_capability', {'id':activation_ids.pop(0)})])
         seen.update(instructions=info.instructions,
             function_tools=TypeAdapter(list[ToolDefinition]).dump_python(info.function_tools,mode='json'),
             output_tools=TypeAdapter(list[ToolDefinition]).dump_python(info.output_tools,mode='json'),

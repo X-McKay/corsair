@@ -20,6 +20,7 @@ from pydantic_ai.messages import (
     ToolCallPart,
     ToolReturnPart,
 )
+from evals.native_skills import load_skills
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RunUsage, UsageLimits
 from pydantic_evals import Case, Dataset, set_eval_attribute
@@ -136,6 +137,9 @@ def scripted(case):
 
     async def respond(messages, info):
         nonlocal position
+        activation = load_skills(messages, info, ['prepare-environment'])
+        if activation is not None:
+            return activation
         if position < len(calls):
             name, args = calls[position]
             position += 1
@@ -349,6 +353,7 @@ async def evaluate(evidence, budget, model=None, provider=None, *, cases="develo
                 messages,
                 frozenset(
                     {
+                        "load_capability",
                         "read_source",
                         "list_toolchains",
                         "run_setup_command",

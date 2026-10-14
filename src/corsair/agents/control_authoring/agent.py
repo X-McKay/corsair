@@ -2,7 +2,9 @@
 from pathlib import Path
 from pydantic_ai import Agent
 from ..agent_identity import factory_identity
-from pydantic_ai.capabilities import Capability, Instrumentation
+from pydantic_ai.capabilities import Instrumentation
+from pydantic_ai_harness import Skills
+from pydantic_ai.capabilities import LocalWorkspace
 from pydantic_ai.models import Model
 from pydantic_ai.durable_exec.temporal import TemporalDurability
 from pydantic_ai.models.instrumented import InstrumentationSettings
@@ -25,9 +27,11 @@ def create_control_agent(model, *, output_retries=1, durability: TemporalDurabil
         raise TypeError('an explicit native Model instance is required')
     agent = Agent.from_spec(_SPEC, model=model, deps_type=SpecialistDependencies,
         output_type=finalize_draft, retries={'tools': 0, 'output': output_retries},
+        toolsets=[specialist_tools()],
         capabilities=[
-            Capability(id=CONTROL_SKILL_ID, instructions=CONTROL_SKILL_TEXT, toolsets=[specialist_tools()]),
-            Capability(id=COMMON_SKILL_ID, instructions=COMMON_SKILL_TEXT),
+            LocalWorkspace(Path(__file__).parent, read_only=True),
+            Skills('skills', include={CONTROL_SKILL_ID}),
+            Skills('../probe_authoring/skills', include={COMMON_SKILL_ID}),
             tool_budget(),
             prompted_output(),
             Instrumentation(settings=InstrumentationSettings(include_content=False, version=5)),

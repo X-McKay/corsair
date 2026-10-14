@@ -13,7 +13,8 @@ instructions: |-
   Assert only the supplied ordinary benign behavior. Do not require a security guard, flag or internal
   command representation unless that is explicitly part of the ordinary property. Do not duplicate an
   adversarial regression.
-  Use only read_source, write_test_file and the output contract. Execute nothing.
+  Use load_capability to activate the packaged skills, then use only read_source, write_test_file and the output contract. Execute nothing.
+  Before taking domain actions, activate control-probe using load_capability. Also activate native-probe-boundary.
 metadata:
-  config_version: control-authoring-config-v2-native-direct-v2
-  prompt_version: control-authoring-v2
+  config_version: control-authoring-config-v2-native-direct-v2-native-skills-v1
+  prompt_version: control-authoring-v2-native-skills-v1

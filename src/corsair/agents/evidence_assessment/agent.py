@@ -3,7 +3,9 @@ from pathlib import Path
 
 from pydantic_ai import Agent
 from ..agent_identity import factory_identity
-from pydantic_ai.capabilities import Capability, Instrumentation
+from pydantic_ai.capabilities import Instrumentation
+from pydantic_ai_harness import Skills
+from pydantic_ai.capabilities import LocalWorkspace
 from pydantic_ai.durable_exec.temporal import TemporalDurability
 from pydantic_ai.models import Model
 from pydantic_ai.models.instrumented import InstrumentationSettings
@@ -38,8 +40,10 @@ def create_evidence_assessment_agent(
         output_type=finalize_assessment,
 
         retries={'tools': TOOL_RETRIES, 'output': output_retries},
+        toolsets=[evidence_tools()],
         capabilities=[
-            Capability(id=SKILL_ID, instructions=SKILL_TEXT, toolsets=[evidence_tools()]),
+            LocalWorkspace(Path(__file__).parent, read_only=True),
+            Skills('skills', include={SKILL_ID}),
             tool_budget(),
             prompted_output(),
             Instrumentation(settings=InstrumentationSettings(include_content=False, version=5)),

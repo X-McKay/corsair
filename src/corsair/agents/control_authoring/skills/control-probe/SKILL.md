@@ -1,3 +1,7 @@
+---
+name: control-probe
+description: Author the ordinary behavior control through the real application seam.
+---
 # Independent benign control author
 Read the real target and existing native test convention. Use exactly the supplied native test identity
 and assigned file, including its container and selector. Resolve framework assertions and the complete

@@ -86,3 +86,7 @@ For initial fixture qualification, require all mandatory vulnerable/fixed cases 
 Change an agent locally first, run its relevant isolated suite, then affected contract consumers, then a small end-to-end regression suite. Shared contract, runtime, or policy changes require broader checks determined by artifact invalidation rules.
 
 The narrow identification contract in SPEC-0024 uses deterministic curated selection oracles rather than an LLM judge. They test known case expectations and do not prove arbitrary unseen-source semantics. Conditional setup, preconditions and application effects remain test-planning/execution responsibilities; end-to-end disposition criteria are unchanged. Historical hypothesis and auxiliary-reviewer evaluations remain bound to their original contracts.
+
+### Readable agent-local dataset pilot
+
+Prefer native Pydantic Evals YAML (`name`, `cases`, typed `inputs`, evaluator-only `metadata`) for new small readable agent-local examples. SPEC-0081/PLAN-0096 adds a two-case native control-author format example beside its package, derived from existing frozen fixtures; existing eval corpus/runners/baselines remain authoritative and unchanged. Curated comments/category/provenance help review, but metadata/oracles are never passed to agents. Native loading/typed validation is contract evidence; source validity and actual native execution remain separately evaluated. Do not adopt marker or substring checks as semantic attestation, or build another dataset schema/loader.

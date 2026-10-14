@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from pydantic_ai import models
 from pydantic_ai.exceptions import ToolFailed, UnexpectedModelBehavior
 from pydantic_ai.messages import ModelResponse, ToolCallPart
+from tests.agents.native_skills import activate_skill
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import UsageLimits
 
@@ -42,9 +43,11 @@ def run(agent, inputs, **kwargs):
 def responding(draft, *, read=True, read_path="documents.py"):
     calls=[]
     async def respond(messages, info):
+        activation = activate_skill(messages, info, 'identify-issue', SKILL_TEXT)
+        if activation is not None:
+            return activation
         calls.append(len(messages))
-        assert "sole task" in info.instructions and SKILL_TEXT.strip() in info.instructions
-        assert [t.name for t in info.function_tools]==["read_source"]
+        assert {t.name for t in info.function_tools} == {"load_capability", "read_source"}
         if read and len(calls)==1:
             return ModelResponse(parts=[ToolCallPart("read_source", {"path":read_path,"start_line":1})])
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name,draft)])
@@ -162,13 +165,18 @@ def test_native_provider_wire_carries_narrow_schema_skill_and_only_reader():
     async def respond(request):
         body=json.loads(request.content); bodies.append(body)
         system=body['messages'][0]['content']
-        assert SKILL_TEXT.strip() in system
+        assert SKILL_TEXT.split('---', 2)[2].strip() not in system
+        assert 'identify-issue' in system
         assert '"reported_property"' not in system and '"reported_issue"' not in system and '"target"' in system
         assert '"hypothesis"' not in system and '"preconditions"' not in system and '"quote"' not in system
-        assert [t['function']['name'] for t in body['tools']]==['read_source']
+        assert {t['function']['name'] for t in body['tools']} == {'read_source', 'load_capability'}
         assert 'response_format' not in body
         assert body['max_completion_tokens']==8192 and body['parallel_tool_calls'] is False
         if len(bodies)==1:
+            message={'role':'assistant','content':None,'tool_calls':[{'id':'skill1','type':'function','function':{'name':'load_capability','arguments':json.dumps({'id':'identify-issue'})}}]}
+            finish='tool_calls'
+        elif len(bodies)==2:
+            assert any(m.get('role') == 'tool' and '# Skill: identify-issue' in str(m.get('content')) for m in body['messages'])
             message={'role':'assistant','content':None,'tool_calls':[{'id':'read1','type':'function','function':{
                 'name':'read_source','arguments':json.dumps({'path':'documents.py','start_line':1})}}]}
             finish='tool_calls'
@@ -183,9 +191,9 @@ def test_native_provider_wire_carries_narrow_schema_skill_and_only_reader():
             with models.override_allow_model_requests(True):
                 result=await create_issue_identification_agent(model).run(identification_prompt(c.inputs),deps=FixtureDependencies(c.inputs))
             assert all(selection_checks(c.inputs,result.output,c.metadata).values())
-            assert result.usage.requests==2
+            assert result.usage.requests==3
     asyncio.run(exercise())
-    assert client.is_closed and len(bodies)==2
+    assert client.is_closed and len(bodies)==3
 
 
 @pytest.mark.parametrize('line_count,start,expected_end', [(2,1,2),(100,1,80),(100,81,100)])
@@ -198,7 +206,7 @@ def test_window_reader_preserves_hard_bound_and_computes_actual_end(line_count,s
     calls=[]
     async def respond(messages,info):
         calls.append(1)
-        assert set(info.function_tools[0].parameters_json_schema['properties'])=={'path','start_line'}
+        assert set(next(t for t in info.function_tools if t.name == 'read_source').parameters_json_schema['properties'])=={'path','start_line'}
         if len(calls)==1:
             return ModelResponse(parts=[ToolCallPart('read_source',{'path':'saved.txt','start_line':start})])
         part=next(p for p in messages[-1].parts if isinstance(p,ToolReturnPart))

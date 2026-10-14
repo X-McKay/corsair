@@ -100,7 +100,7 @@ def test_v10_native_sdk_admits_distinct_recipe_and_terminal_execution_once():
             agent=create_environment_agent(FunctionModel(respond),output_retries=0)
             return (await agent.run(environment_prompt(inputs),deps=deps)).output
     result=asyncio.run(run())
-    assert PROMPT_VERSION=='environment-v10-distinct-recipe-and-terminal-commands'
+    assert PROMPT_VERSION=='environment-v10-distinct-recipe-and-terminal-commands-native-skills-v1'
     assert result.status=='ready' and len(result.recipe)==1
     assert tuple(record.command for record in result.receipts)==tuple(tuple(c) for c in case['commands'])
     assert len(result.receipts)==4 and result.build_command not in [s.command for s in result.recipe]

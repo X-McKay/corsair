@@ -10,6 +10,7 @@ from uuid import uuid4
 from pydantic import TypeAdapter
 from pydantic_ai import capture_run_messages, models
 from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart, ToolReturnPart
+from evals.native_skills import load_skills
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RunUsage
 from pydantic_evals import Case, Dataset, set_eval_attribute
@@ -83,6 +84,9 @@ class ValidityScore(Evaluator):
 
 def scripted_model(inputs, expected):
     async def respond(messages, info):
+        activation = load_skills(messages, info, ['assess-evidence'])
+        if activation is not None:
+            return activation
         reads = [p.content for m in messages for p in m.parts if isinstance(p, ToolReturnPart)
                  and p.tool_name == 'read_evidence']
         for item in inputs.items:

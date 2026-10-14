@@ -17,6 +17,7 @@ from openai import APIConnectionError
 from pydantic import TypeAdapter
 from pydantic_ai import capture_run_messages, models
 from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart
+from evals.native_skills import load_skills
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RunUsage, UsageLimits
 from pydantic_evals import Case, Dataset, set_eval_attribute
@@ -106,6 +107,9 @@ def author_script(inputs, content, assertion_lines):
     step=0
     def respond(messages, info):
         nonlocal step
+        activation=load_skills(messages, info, ['control-probe' if type(inputs).__name__ == 'ControlInput' else 'exploit-probe', 'native-probe-boundary'])
+        if activation is not None:
+            return activation
         step += 1
         if step == 1:
             return ModelResponse(parts=[ToolCallPart('read_source',{'path':s.path}) for s in inputs.source_files])
@@ -213,7 +217,7 @@ async def evaluate(agent, evidence, *, model=None, provider=None, repeat=1):
     if model is not None:stage.corpus.evaluators.append(ProviderUsageCoverage())
     async def task(inputs):
         selected=model if model is not None else stage.scripted[inputs.model_dump_json()]
-        known=stage.tool_names|output_tool_names(selected)
+        known=stage.tool_names|{"load_capability"}|output_tool_names(selected)
         usage=RunUsage();messages=[];result=None;failure=None;started=perf_counter()
         limits=budget.limits(inputs).usage_limits() if agent=='validity' else UsageLimits(request_limit=budget.request_limit,
             tool_calls_limit=budget.tool_calls_limit,total_tokens_limit=budget.total_tokens_limit)

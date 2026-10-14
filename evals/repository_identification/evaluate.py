@@ -22,6 +22,7 @@ from openai import APIConnectionError
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from pydantic_ai import capture_run_messages, models
 from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart, ToolReturnPart
+from evals.native_skills import load_skills
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RunUsage, UsageLimits
 from pydantic_evals import Dataset, set_eval_attribute
@@ -129,7 +130,10 @@ def call_bytes(messages: list[ModelMessage]) -> list[dict]:
 
 def probe_model(steps: list[tuple[str, dict]], final: dict) -> FunctionModel:
     async def respond(messages, info):
-        step = sum(isinstance(m, ModelResponse) for m in messages)
+        activation = load_skills(messages, info, ['identify-issue-repository'])
+        if activation is not None:
+            return activation
+        step = sum(isinstance(m, ModelResponse) and any(isinstance(p, ToolCallPart) and p.tool_name != "load_capability" for p in m.parts) for m in messages)
         if step < len(steps) and {t.name for t in info.function_tools} >= {steps[step][0]}:
             return ModelResponse(parts=[ToolCallPart(*steps[step])])
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, final)])
@@ -201,7 +205,7 @@ async def live(evidence: Path, tree: SourceTree, model, budget: LiveBudget, limi
         attempt = evidence / f"attempt-{uuid4()}.json"
         usage, messages, result, failure = RunUsage(), [], None, None
         started = perf_counter()
-        known = REPOSITORY_TOOLS | output_tool_names(model)
+        known = REPOSITORY_TOOLS | {"load_capability"} | output_tool_names(model)
         deps = RepositoryDependencies(inputs, tree, limits)
         agent = create_repository_identification_agent(model, output_retries=budget.output_retries)
         try:

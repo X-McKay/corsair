@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from pydantic_ai import models
 from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.messages import ModelResponse, ToolCallPart
+from tests.agents.native_skills import activate_skill
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import UsageLimits
 
@@ -42,9 +43,12 @@ def run(agent, inputs, **kwargs):
 def responding(plan, *, reads=("documents.py", "test_existing.py"), offered=None):
     calls, offered = [], [] if offered is None else offered
     async def respond(messages, info):
+        activation = activate_skill(messages, info, 'plan-two-tests', SKILL_TEXT)
+        if activation is not None:
+            return activation
         calls.append(1)
-        assert "Plan exactly one benign control" in info.instructions and SKILL_TEXT.strip() in info.instructions
-        offered.append([t.name for t in info.function_tools])
+        assert 'Plan exactly one benign control' in info.instructions
+        offered.append([t.name for t in info.function_tools if t.name != "load_capability"])
         if len(calls) <= len(reads):
             return ModelResponse(parts=[ToolCallPart("read_source", {"path": reads[len(calls) - 1]})])
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {"plan": plan})])
@@ -281,14 +285,18 @@ def test_native_provider_wire_carries_skill_schema_and_only_reader():
     async def respond(request):
         body = json.loads(request.content); bodies.append(body)
         system = body["messages"][0]["content"]
-        assert SKILL_TEXT.strip() in system and '"missing_capability"' in system and '"observable_witness"' in system
+        assert SKILL_TEXT.split('---',2)[2].strip() not in system and '"missing_capability"' in system and '"observable_witness"' in system
         assert '"quote"' not in system and '"verdict"' not in system
         reads = ("documents.py", "test_existing.py")
         offered = [t["function"]["name"] for t in body.get("tools", ())]
-        assert offered == ["read_source"] if len(bodies) <= len(reads) else "read_source" not in offered
-        if len(bodies) <= len(reads):
+        assert set(offered) == {"load_capability", "read_source"} if len(bodies) <= len(reads) + 1 else "read_source" not in offered
+        if len(bodies) == 1:
+            message = {'role':'assistant','content':None,'tool_calls':[{'id':'skill1','type':'function','function':{'name':'load_capability','arguments':json.dumps({'id':'plan-two-tests'})}}]}
+            finish = 'tool_calls'
+        elif len(bodies) <= len(reads) + 1:
+            assert any(m.get('role') == 'tool' and '# Skill: plan-two-tests' in str(m.get('content')) for m in body['messages'])
             message = {"role": "assistant", "content": None, "tool_calls": [{"id": f"read{len(bodies)}", "type": "function",
-                "function": {"name": "read_source", "arguments": json.dumps({"path": reads[len(bodies) - 1]})}}]}
+                "function": {"name": "read_source", "arguments": json.dumps({"path": reads[len(bodies) - 2]})}}]}
             finish = "tool_calls"
         else:
             message = {"role": "assistant", "content": json.dumps({"plan": reference()})}; finish = "stop"
@@ -303,7 +311,7 @@ def test_native_provider_wire_carries_skill_schema_and_only_reader():
                 result = await create_test_planning_agent(model).run(planning_prompt(c.inputs), deps=PlanningDependencies(c.inputs))
             assert all(plan_checks(c.inputs, result.output, c.metadata).values())
     asyncio.run(exercise())
-    assert client.is_closed and len(bodies) == 3
+    assert client.is_closed and len(bodies) == 4
 
 
 def test_scratch_check_rejects_fixtures_outside_the_scratch_location():

@@ -15,6 +15,7 @@ from openai import APIConnectionError
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from pydantic_ai import capture_run_messages, models
 from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart, ToolReturnPart
+from evals.native_skills import load_skills
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RunUsage, UsageLimits
 from pydantic_evals import Case, Dataset, set_eval_attribute
@@ -80,11 +81,14 @@ def dataset() -> Dataset[IssueAnalysisInput, IssueIdentification, SelectionOracl
 def scripted_model(inputs: IssueAnalysisInput, oracle: SelectionOracle) -> FunctionModel:
     """Oracle injection is confined to the scripted plumbing model, never live task inputs."""
     async def respond(messages, info):
+        activation = load_skills(messages, info, ['identify-issue'])
+        if activation is not None:
+            return activation
         if oracle.status != "ready":
             draft = {"status": oracle.status, "scope": inputs.scope, "target": None, "reason": "The supplied inventory does not establish the requested target."}
         else:
             start, end = min(oracle.required_lines), max(oracle.required_lines)
-            if not any(isinstance(p, ToolReturnPart) for m in messages for p in m.parts):
+            if not any(isinstance(p, ToolReturnPart) and p.tool_name == "read_source" for m in messages for p in m.parts):
                 return ModelResponse(parts=[ToolCallPart("read_source", {"path": oracle.path, "start_line": start})])
             draft = {"status": "ready", "scope": inputs.scope, "target": {"symbol": oracle.symbol, "source": {"path": oracle.path, "start_line": start, "end_line": end}},
                      "reason": None}
@@ -95,8 +99,8 @@ def scripted_model(inputs: IssueAnalysisInput, oracle: SelectionOracle) -> Funct
 class EvaluationBudget(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     repeat: int = Field(default=2, ge=1, le=3, strict=True)
-    request_limit: int = Field(default=4, ge=1, le=6, strict=True)
-    tool_calls_limit: int = Field(default=3, ge=0, le=4, strict=True)
+    request_limit: int = Field(default=5, ge=1, le=6, strict=True)
+    tool_calls_limit: int = Field(default=4, ge=0, le=4, strict=True)
     total_tokens_limit: int = Field(default=32000, ge=1, le=64000, strict=True)
     task_seconds: int = Field(default=180, ge=1, le=300, strict=True)
     output_retries: int = Field(default=1, ge=0, le=1, strict=True)
@@ -140,7 +144,7 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, corp
         usage, messages, result, failure = RunUsage(), [], None, None
         started = perf_counter()
         selected = fixture_models[inputs.input_digest] if scripted else model
-        known_tools = frozenset({"read_source"}) | output_tool_names(selected)
+        known_tools = frozenset({"read_source", "load_capability"}) | output_tool_names(selected)
         agent = create_issue_identification_agent(selected, output_retries=budget.output_retries)
         try:
             with capture_run_messages() as messages, models.override_allow_model_requests(not scripted):
