@@ -75,6 +75,7 @@ CASES = [
     ("infra error", full(stopped="infra_error"), ("R1", Label.ERROR, T.INFRA_ERROR, "none")),
     ("cleanup unconfirmed", full(stopped="cleanup_unconfirmed"), ("R1", Label.ERROR, T.CLEANUP_UNCONFIRMED, "none")),
     ("infra run", full(runs=runs(exploit="infra")), ("R1", Label.ERROR, T.INFRA_ERROR, "none")),
+    ("infra control run", full(runs=runs(control="infra")), ("R1", Label.ERROR, T.INFRA_ERROR, "none")),
     ("budget exhausted", full(stopped="budget_exhausted", validity=(), runs=()),
      ("R7", Label.INCONCLUSIVE, T.BUDGET_EXHAUSTED, "inconclusive")),
     ("review missing", full(validity=()), ("R2", Label.INCONCLUSIVE, T.TEST_INVALID, "inconclusive")),
@@ -89,7 +90,7 @@ CASES = [
     ("control assertion failed", full(runs=runs(control="assertion_failed")),
      ("R3", Label.INCONCLUSIVE, T.CONTROL_FAILED, "inconclusive")),
     ("control anomalous", full(runs=runs(control="anomalous")),
-     ("R3", Label.INCONCLUSIVE, T.CONTROL_FAILED, "inconclusive")),
+     ("R3", Label.INCONCLUSIVE, T.PROBE_ANOMALOUS, "inconclusive")),
     ("control not run", full(runs=runs(control="not_run")),
      ("R3", Label.INCONCLUSIVE, T.PROBE_NOT_RUN, "inconclusive")),
     ("control errored", full(runs=runs(control="errored")),
@@ -100,7 +101,7 @@ CASES = [
     ("not reproduced", full(runs=runs(exploit="passed")),
      ("R5", Label.LIKELY_NOT_EXPLOITABLE, T.OK, "not_reproduced")),
     ("exploit anomalous", full(runs=runs(exploit="anomalous")),
-     ("R6", Label.INCONCLUSIVE, T.NO_VALID_OBSERVATION, "inconclusive")),
+     ("R6", Label.INCONCLUSIVE, T.PROBE_ANOMALOUS, "inconclusive")),
     ("exploit not run", full(runs=runs(exploit="not_run")),
      ("R6", Label.INCONCLUSIVE, T.PROBE_NOT_RUN, "inconclusive")),
     ("exploit errored", full(runs=runs(exploit="errored")),
@@ -115,6 +116,10 @@ CASES = [
     ("R0 outranks R1", full(runtime=None, stopped="provider_error"),
      ("R0", Label.UNABLE_TO_RUN, T.NO_RUNTIME, "none")),
     ("R1 outranks a decisive run", full(stopped="infra_error"), ("R1", Label.ERROR, T.INFRA_ERROR, "none")),
+    ("fix stop never reaches the label", full(fix_stopped="infra_error"),
+     ("R4", Label.LIKELY_EXPLOITABLE, T.OK, "reproduced")),
+    ("fixed infra run never reaches the label", full(runs=runs() + runs(control="infra", revision="fixed")),
+     ("R4", Label.LIKELY_EXPLOITABLE, T.OK, "reproduced")),
 ]
 
 
@@ -122,7 +127,7 @@ CASES = [
 def test_rule_table(kwargs, expected):
     verdict = decide(CASE, **kwargs)
     assert (verdict.rule_id, verdict.label, verdict.terminal_reason, verdict.finding) == expected
-    assert verdict.fix == "not_applicable"
+    assert (verdict.fix, verdict.fix_reason) == ("not_applicable", None)
     assert verdict.case_id == "case-1"
 
 
@@ -140,23 +145,59 @@ def fixed(**changes):
     return kwargs
 
 
-@pytest.mark.parametrize(("kwargs", "fix"), [
-    (fixed(), "verified"),
-    (fixed(validity=(review(),)), "not_verified"),
-    (fixed(validity=(review(), review("fixed", exploit=False))), "not_verified"),
-    (fixed(validity=(review(), review("fixed", patch=OTHER))), "not_verified"),
-    (fixed(runs=runs() + runs(exploit="assertion_failed", revision="fixed")), "not_verified"),
-    (fixed(runs=runs() + runs(control="errored", exploit="passed", revision="fixed")), "not_verified"),
-    (fixed(runs=runs() + runs(exploit="passed", revision="fixed", patch=OTHER)), "not_verified"),
-    (fixed(runs=runs(exploit="passed") + runs(exploit="passed", revision="fixed")), "not_verified"),  # R5, not R4
-], ids=["verified", "no fixed review", "fixed review negative", "fixed review other patch", "still fails on fix",
-        "fixed control errored", "fixed runs other patch", "not reproduced first"])
-def test_fix_verification(kwargs, fix):
-    assert decide(FIXED_CASE, **kwargs).fix == fix
+FIX_CASES = [
+    ("verified", fixed(), "verified", T.OK),
+    ("no fixed review", fixed(validity=(review(),)), "not_verified", T.TEST_INVALID),
+    ("fixed review negative", fixed(validity=(review(), review("fixed", exploit=False))), "not_verified",
+     T.TEST_INVALID),
+    ("fixed review other patch", fixed(validity=(review(), review("fixed", patch=OTHER))), "not_verified",
+     T.TEST_INVALID),
+    ("still fails on fix", fixed(runs=runs() + runs(exploit="assertion_failed", revision="fixed")), "not_verified",
+     T.NO_VALID_OBSERVATION),
+    ("fixed control errored", fixed(runs=runs() + runs(control="errored", exploit="passed", revision="fixed")),
+     "not_verified", T.PROBE_ERRORED),
+    ("fixed control assertion failed", fixed(runs=runs() + runs(control="assertion_failed", exploit="passed",
+                                                                revision="fixed")), "not_verified", T.CONTROL_FAILED),
+    ("fixed exploit anomalous", fixed(runs=runs() + runs(exploit="anomalous", revision="fixed")), "not_verified",
+     T.PROBE_ANOMALOUS),
+    ("not_run outranks errored and anomalous", fixed(runs=runs() + runs(control="anomalous", exploit="not_run",
+                                                                         revision="fixed")),
+     "not_verified", T.PROBE_NOT_RUN),
+    ("errored outranks anomalous", fixed(runs=runs() + runs(control="anomalous", exploit="errored",
+                                                             revision="fixed")), "not_verified", T.PROBE_ERRORED),
+    ("fixed runs missing", fixed(runs=runs()), "not_verified", T.PROBE_NOT_RUN),
+    ("fixed runs other patch", fixed(runs=runs() + runs(exploit="passed", revision="fixed", patch=OTHER)),
+     "not_verified", T.PROBE_NOT_RUN),
+    ("fixed infra run", fixed(runs=runs() + runs(control="infra", revision="fixed")), "not_verified",
+     T.INFRA_ERROR),
+    ("fixed revision stopped", fixed(runs=runs(), fix_stopped="provider_error"), "not_verified",
+     T.PROVIDER_ERROR),
+    ("fixed replay failed", fixed(runs=runs(), fix_stopped="build_failed"), "not_verified", T.BUILD_FAILED),
+    ("not reproduced first", fixed(runs=runs(exploit="passed") + runs(exploit="passed", revision="fixed")),
+     "not_verified", T.NO_VALID_OBSERVATION),
+    ("vulnerable exploit errored", fixed(runs=runs(exploit="errored") + runs(exploit="passed", revision="fixed")),
+     "not_verified", T.PROBE_ERRORED),
+]
+
+
+@pytest.mark.parametrize(("kwargs", "fix", "reason"), [c[1:] for c in FIX_CASES], ids=[c[0] for c in FIX_CASES])
+def test_fix_verification(kwargs, fix, reason):
+    verdict = decide(FIXED_CASE, **kwargs)
+    assert (verdict.fix, verdict.fix_reason) == (fix, reason)
 
 
 def test_fix_not_applicable_without_fixed_revision():
-    assert decide(CASE, **fixed()).fix == "not_applicable"
+    verdict = decide(CASE, **fixed())
+    assert (verdict.fix, verdict.fix_reason) == ("not_applicable", None)
+
+
+def test_infra_on_the_fixed_revision_keeps_a_reproduced_finding():
+    verdict = decide(FIXED_CASE, **fixed(runs=runs() + runs(exploit="infra", revision="fixed")))
+    assert (verdict.rule_id, verdict.label, verdict.finding) == ("R4", Label.LIKELY_EXPLOITABLE, "reproduced")
+    assert (verdict.fix, verdict.fix_reason) == ("not_verified", T.INFRA_ERROR)
+    verdict = decide(FIXED_CASE, **fixed(runs=runs(), fix_stopped="infra_error"))
+    assert (verdict.label, verdict.fix, verdict.fix_reason) == (Label.LIKELY_EXPLOITABLE, "not_verified",
+                                                                T.INFRA_ERROR)
 
 
 def test_duplicate_runs_and_reviews_are_refused():
@@ -166,6 +207,8 @@ def test_duplicate_runs_and_reviews_are_refused():
         decide(CASE, **full(validity=(review(), review())))
     with pytest.raises(ValueError):
         decide(CASE, **full(stopped="not_a_reason"))
+    with pytest.raises(ValueError):
+        decide(CASE, **full(fix_stopped="not_a_reason"))
 
 
 def test_facts_origin_and_evidence_kept():
@@ -175,4 +218,5 @@ def test_facts_origin_and_evidence_kept():
     assert verdict.facts_origin["vulnerable.validity"] is Origin.MODEL_REVIEWED
     assert verdict.facts_origin["vulnerable.exploit.exit_class"] is Origin.NATIVE_TEST_REPORTED
     assert verdict.facts_origin["fixed.control.markers"] is Origin.PLATFORM_OBSERVED
+    assert verdict.facts_origin["fixed.exploit.check"] is Origin.PLATFORM_OBSERVED
     assert len(verdict.runs) == 4 and len(verdict.validity) == 2

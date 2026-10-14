@@ -2,11 +2,13 @@
 
 A row is admitted (``evidence: image-only``) only when its known-passing canary classifies as ``passed`` and its
 known-failing canary as ``assertion_failed``, through the row's own run template and exit-code map (redesign
-section 13, D8). This tool records that fact; it never edits the matrix, which stays operator-owned.
+section 13, D8), and, when the row declares a ``syntax_check``, that check accepts both canaries and rejects a
+broken copy (the canary with one line of non-code appended). This tool records that fact; it never edits the
+matrix, which stays operator-owned.
 
 Each canary runs in a fresh ``docker run --network none`` container labelled ``corsair.v2=1`` and removed after,
-with the probe protocol's environment: ``CORSAIR_MARKER_DIR`` (a mounted directory the test writes ``start`` and
-``end`` into) and ``CORSAIR_TOKEN`` (a fresh random string per run). The canary tree is the skill's
+with the probe protocol's environment: ``CORSAIR_MARKER_DIR`` (a mounted directory the test writes ``start``,
+``check`` and ``end`` into) and ``CORSAIR_TOKEN`` (a fresh random string per run). The canary tree is the skill's
 ``canary/project`` (optional) plus ``canary/pass`` or ``canary/fail``, whose one file is the test; the test is
 always named ``test_canary``. A row's ``canary_setup`` argv, if any, runs first in its own offline container.
 
@@ -32,7 +34,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from corsair.v2 import matrix  # noqa: E402
 from corsair.v2.contracts import ProbeFacts  # noqa: E402
-from corsair.v2.outcome import classify, exit_class  # noqa: E402
+from corsair.v2.outcome import classify, exit_class, read_check  # noqa: E402
 
 SKILLS = ROOT / "src/corsair/v2/skills/frameworks"
 EVIDENCE = ROOT / ".runs/canary"
@@ -41,6 +43,7 @@ MARKERS = "/corsair/markers"
 TEST_NAME = "test_canary"
 EXPECTED = {"pass": "passed", "fail": "assertion_failed"}
 TAIL = 6_000
+BROKEN_LINE = "\n%%% corsair syntax check ((( \n"
 
 
 def docker_base(name: str) -> list[str]:
@@ -96,6 +99,8 @@ def run_canary(row: matrix.Row, kind: str, scratch: Path, timeout: int) -> dict:
             record["outcome"] = None
             record["detail"] = "canary setup failed; the test did not run"
             return record
+    if row.syntax_check:
+        record["syntax_check"] = syntax_check(row, tree, file, scratch / kind, timeout)
     argv = matrix.fill(row.run_template, test_file=file, test_name=TEST_NAME)
     token = secrets.token_hex(16)
     name = f"corsair-v2-canary-{uuid.uuid4().hex[:12]}"
@@ -105,10 +110,30 @@ def run_canary(row: matrix.Row, kind: str, scratch: Path, timeout: int) -> dict:
     output = result["stdout"] + result["stderr"]
     facts = ProbeFacts(exit_code=result["exit_code"], exit_class=exit_class(result["exit_code"], row.exit_codes),
                        timed_out=result["timed_out"], start_marker=(markers / "start").is_file(),
-                       end_marker=(markers / "end").is_file(), token_in_output=token in output)
+                       end_marker=(markers / "end").is_file(), token_in_output=token in output,
+                       check_marker=read_check((markers / "check").read_bytes()) if (markers / "check").is_file()
+                       else None)
     record.update({"argv": list(argv), "facts": facts.model_dump(mode="json"), "outcome": classify(facts).value,
                    "cleanup_confirmed": result["cleanup_confirmed"],
                    "stdout_tail": result["stdout"][-TAIL:], "stderr_tail": result["stderr"][-TAIL:]})
+    return record
+
+
+def syntax_check(row: matrix.Row, tree: Path, file: str, scratch: Path, timeout: int) -> dict:
+    """Run the row's syntax check on the canary as written, then on a copy with one line of non-code appended."""
+    argv = matrix.fill(row.syntax_check, test_file=file, test_name=TEST_NAME)
+    record: dict = {"argv": list(argv)}
+    broken = scratch / "broken"
+    shutil.copytree(tree, broken)
+    with open(broken / file, "a") as handle:
+        handle.write(BROKEN_LINE)
+    for label, root in (("valid", tree), ("broken", broken)):
+        name = f"corsair-v2-canary-syntax-{uuid.uuid4().hex[:12]}"
+        done = run_container(docker_base(name) + ["-v", f"{root}:{WORKDIR}", row.image, *argv], name, timeout)
+        record[label] = {"exit_code": done["exit_code"], "timed_out": done["timed_out"],
+                         "cleanup_confirmed": done["cleanup_confirmed"],
+                         "output_tail": (done["stdout"] + done["stderr"])[-TAIL:]}
+    record["holds"] = record["valid"]["exit_code"] == 0 and record["broken"]["exit_code"] not in (0, None)
     return record
 
 
@@ -130,7 +155,9 @@ def check_row(row: matrix.Row, timeout: int) -> dict:
     with tempfile.TemporaryDirectory(prefix=f"{row.id}-", dir=EVIDENCE) as scratch:
         for kind in ("pass", "fail"):
             evidence["canaries"][kind] = run_canary(row, kind, Path(scratch), timeout)
-    evidence["admitted"] = all(evidence["canaries"][kind]["outcome"] == EXPECTED[kind] for kind in EXPECTED)
+    evidence["admitted"] = all(evidence["canaries"][kind]["outcome"] == EXPECTED[kind]
+                               and evidence["canaries"][kind].get("syntax_check", {"holds": True})["holds"]
+                               for kind in EXPECTED)
     return evidence
 
 
@@ -149,6 +176,10 @@ def main() -> int:
         evidence = check_row(row, args.timeout)
         (EVIDENCE / f"{row.id}.json").write_text(json.dumps(evidence, indent=2) + "\n")
         outcomes = {kind: record.get("outcome") for kind, record in evidence["canaries"].items()}
+        syntax = {kind: record["syntax_check"]["holds"] for kind, record in evidence["canaries"].items()
+                  if "syntax_check" in record}
+        if syntax:
+            outcomes["syntax_check_holds"] = syntax
         print(f"{row.id}: {'admitted' if evidence['admitted'] else 'NOT admitted'} {outcomes}"
               f"{'' if evidence['admitted'] else ' ' + evidence.get('detail', '')}")
         failed += not evidence["admitted"]

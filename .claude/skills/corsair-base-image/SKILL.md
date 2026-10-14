@@ -5,7 +5,7 @@ description: Use when adding, registering or bumping a Corsair sandbox toolchain
 
 # Corsair base image
 
-Resolve paths from the repository root. Use this with `corsair-development` (records, validation) and `corsair-review` (final review); it adds the image-specific steps only and grants no extra authority. Read [SPEC-0007](../../../docs/development/specs/SPEC-0007-openshell-toolchains.md), the [toolchain qualification report](../../../docs/qualification/openshell-toolchains.md) and SPEC-0042 (runtime selection) before starting.
+Resolve paths from the repository root. Use this with `corsair-development` (records, validation) and `corsair-review` (final review); it adds the image-specific steps only and grants no extra authority. Read SPEC-0007 (on main), the [toolchain qualification report](../../../docs/qualification/openshell-toolchains.md) and SPEC-0042 (runtime selection) before starting.
 
 The runtime matrix, its guard test and the requirements report are on main (#48). Prerequisites not yet on main when this skill was written: per-image preparation and the `JAVA` gate table (#51); `TOOLCHAINS`/`--toolchain`, `PYTHONS` and the pytest version fixtures (#55). Work on a base that has them, stacking on those branches until they merge; never copy their files.
 

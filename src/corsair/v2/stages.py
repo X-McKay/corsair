@@ -10,7 +10,7 @@ from typing import Protocol
 
 from pydantic_ai.models import Model
 
-from .contracts import (AgentUsage, BuildResult, Case, Environment, FrozenPatch, Outcome, ProbeBrief, ProbeDraft,
+from .contracts import (AgentUsage, BuildResult, Case, CheckResult, Environment, FrozenPatch, ProbeBrief, ProbeDraft,
                         ProbePlan, ProbeRun, Recipe, Runtime, Validity, Verdict)
 
 
@@ -63,16 +63,21 @@ class Execute(Protocol):
 
 
 class Diagnose(Protocol):
-    """Trusted D3 pre-check: runs one frozen probe once on the vulnerable revision, before review.
+    """Trusted D3 mechanical check: runs one frozen probe once on the vulnerable revision, before review.
 
-    Returns the outcome and, only for ``not_run`` or ``errored``, that author's own diagnostics (the run output).
-    A completed run returns no diagnostics, so the author can fix mechanics but never steer toward an outcome.
+    Returns ``ok`` (any outcome other than not_run or errored; the outcome itself is discarded) with no feedback, or
+    ``not_run`` / ``errored`` with a fixed hint and the row's optional syntax-check output, never the run's own
+    output. Nothing from this run counts as evidence; only reviewed bytes are executed later.
     """
 
     def __call__(self, environment: Environment, runtime: Runtime, draft: ProbeDraft
-                 ) -> tuple[Outcome, str | None]: ...
+                 ) -> tuple[CheckResult, str | None]: ...
 
 
 class Decide(Protocol):
+    """``stopped`` is why the chain stopped (it concerns the vulnerable revision); ``fix_stopped`` is why the
+    fixed-revision steps stopped, which only makes the fix ``not_verified``."""
+
     def __call__(self, case: Case, *, runtime: Runtime | None, build: BuildResult | None, plan: ProbePlan | None,
-                 validity: tuple[Validity, ...], runs: tuple[ProbeRun, ...], stopped: str | None = None) -> Verdict: ...
+                 validity: tuple[Validity, ...], runs: tuple[ProbeRun, ...], stopped: str | None = None,
+                 fix_stopped: str | None = None) -> Verdict: ...

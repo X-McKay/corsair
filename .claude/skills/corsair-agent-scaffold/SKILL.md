@@ -1,11 +1,11 @@
 ---
 name: corsair-agent-scaffold
-description: Use when creating a new Corsair agent, adding a model-facing tool to an agent, or moving an existing agent package to the standard layout. Follows docs/agent-packages.md, trusted native AgentSpec manifests and operator policy; there is no generator.
+description: Use when creating a new Corsair agent, adding a model-facing tool to an agent, or moving an existing agent package to the standard layout. Follows the agent package shape in SPEC-0082, trusted native AgentSpec manifests and operator policy; there is no generator.
 ---
 
 # Corsair agent scaffold
 
-Read [the agent package convention](../../../docs/agent-packages.md) first; it is authoritative and this skill does not repeat it. Use `corsair-development` for records and `corsair-review` before finishing. This skill grants no tools, approves no graph integration and certifies nothing.
+Read the Agents section of [SPEC-0082](../../../docs/development/specs/SPEC-0082-corsair-v2-architecture.md#agents) first; it is authoritative and this skill does not repeat it. Use `corsair-development` for records and `corsair-review` before finishing. This skill grants no tools, approves no graph integration and certifies nothing.
 
 For investigation agents and tools, preserve the shared unit-test-first contract across languages/frameworks/CWEs: exactly two native tests through existing real application seams; controlled dependencies retain the real logic owning the security property; source/condition/assertion validity is distinct from execution admission. Optional witnesses provide bounded supporting evidence. Do not add mandatory language-specific recorders or let missing database/filesystem telemetry alone reject a valid unit test. Evaluate both a sound seam-based test and invalid substitute/irrelevant assertions.
 

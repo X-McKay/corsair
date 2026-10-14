@@ -10,7 +10,7 @@ These instructions apply throughout this repository. Follow the user's current s
 4. Review using the [review skill](.claude/skills/corsair-review/SKILL.md). Run checks appropriate to the changed boundary; report failed or unrun checks explicitly.
 5. Before ending substantial work, use the [handoff skill](.claude/skills/corsair-handoff/SKILL.md), update `CURRENT.md`, and leave a self-contained result for the user.
 
-The [development guide](docs/development/README.md) defines locations, templates, status meanings and validation. Existing architecture, investigation, recovery and evaluation documents remain authoritative; work records reference them rather than copying them.
+The [development guide](docs/development/README.md) defines locations, templates, status meanings and validation. The v2 architecture in [SPEC-0082](docs/development/specs/SPEC-0082-corsair-v2-architecture.md) is authoritative; work records reference it rather than copying it.
 
 ## Development principles
 

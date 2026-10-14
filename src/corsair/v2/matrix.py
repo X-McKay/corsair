@@ -49,12 +49,15 @@ class Row(BaseModel):
     evidence: Literal["canary-only", "image-only", "live"]
     build_network_hosts: tuple[str, ...] = ()
     canary_setup: tuple[str, ...] = Field(default=(), description="argv run before each canary, offline; canary only")
+    syntax_check: tuple[str, ...] | None = Field(
+        default=None, min_length=1, description="argv template checking a probe file without running application "
+                                                "code (D3 feedback); omitted where the check could run code")
     note: str = Field(default="", max_length=2_000)
 
     def runtime(self) -> Runtime:
         return Runtime(row_id=self.id, image=self.image, framework=self.framework, skill=self.skill,
                        run_template=self.run_template, exit_codes=self.exit_codes, test_dir=self.test_dir,
-                       evidence=self.evidence)
+                       evidence=self.evidence, syntax_check=self.syntax_check)
 
 
 class Matrix(BaseModel):

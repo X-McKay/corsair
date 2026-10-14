@@ -2,9 +2,21 @@
 
 Order: Ground (optional, advisory) -> Select -> Investigate -> Build (Builder episode in a disposable workspace,
 then trusted replay in a fresh container; one more episode with the replay failure's tail if that fails, A2) ->
-Probe (control and exploit, each from its own brief only) -> freeze -> D3 diagnose (each draft runs once; a
-``not_run`` or ``errored`` author gets its own diagnostics for one revision, then the patch is re-frozen) ->
-Review (outcome-blind, per revision) -> Execute (each probe once per revision) -> Decide (rule table).
+Probe (control and exploit, each from its own brief only) -> freeze -> D3 check -> Review (outcome-blind, per
+revision, of the final frozen bytes) -> Execute (only reviewed bytes, each probe once per revision) -> Decide.
+
+The D3 check run is mechanical only and never evidence. Each frozen draft runs once on the vulnerable revision and
+the run keeps one of three results, each with a defined next step:
+
+- ``ok`` (any outcome other than not_run or errored; the outcome is discarded): the draft goes to review as is.
+- ``not_run`` or ``errored``: that author alone gets the class, a fixed hint and the row's syntax-check output
+  (never the run's output) and revises once (A2). The revision is not checked again; a failed revision keeps the original draft. Both drafts are then
+  re-frozen, and only that final patch is reviewed and executed. Execute's own run of it is what Decide reads.
+
+A container failure of the check step itself stops the run as ``infra_error``, like any vulnerable-revision step.
+Failures on the fixed revision (its review, replay or execution) never stop the run: they are passed to Decide as
+``fix_stopped``, which only makes the fix ``not_verified``. A revision whose review did not bind to the final patch
+is not executed.
 
 The composition is split in two so direct and durable mode run the same logic:
 
@@ -38,7 +50,7 @@ from typing import Any, Generic, TypeVar
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_ai.models import Model
 
-from .contracts import (AgentUsage, BuildResult, Case, Environment, FrozenPatch, Outcome, ProbeBrief, ProbeDraft,
+from .contracts import (AgentUsage, BuildResult, Case, CheckResult, Environment, FrozenPatch, ProbeBrief, ProbeDraft,
                         ProbePlan, ProbeRun, Recipe, Runtime, TerminalReason, Validity, Verdict)
 from .record import RunRecorder
 from .stages import BuildAgent, Decide, Diagnose, Execute, Investigate, Probe, Replay, Review, Select
@@ -75,8 +87,10 @@ class Replayed(BaseModel):
 
 
 class Diagnosis(BaseModel):
+    """The D3 check result; ``diagnostics`` (the author's own file lines) only for not_run or errored."""
+
     model_config = ConfigDict(frozen=True)
-    outcome: Outcome
+    check: CheckResult
     diagnostics: str | None = None
 
 
@@ -311,9 +325,8 @@ class LocalOps:
                        role: str) -> StepResult[Diagnosis]:
         def call() -> Diagnosis:
             draft = patch.control if role == "control" else patch.exploit
-            outcome, diagnostics = self.stages.diagnose(environment, runtime, draft)
-            keep = outcome in (Outcome.NOT_RUN, Outcome.ERRORED)
-            return Diagnosis(outcome=outcome, diagnostics=diagnostics if keep else None)
+            check, diagnostics = self.stages.diagnose(environment, runtime, draft)
+            return Diagnosis(check=check, diagnostics=diagnostics if check != "ok" else None)
 
         return await self._code(step, {"environment": environment, "patch_sha256": patch.sha256, "role": role}, call)
 
@@ -337,12 +350,13 @@ class LocalOps:
 
     async def decide(self, step: str, case: Case, runtime: Runtime | None, build: BuildResult | None,
                      plan: ProbePlan | None, validity: tuple[Validity, ...], runs: tuple[ProbeRun, ...],
-                     stopped: str | None) -> Verdict:
+                     stopped: str | None, fix_stopped: str | None = None) -> Verdict:
         started = perf_counter()
         verdict = self.stages.decide(case, runtime=runtime, build=build, plan=plan, validity=validity, runs=runs,
-                                     stopped=stopped)
+                                     stopped=stopped, fix_stopped=fix_stopped)
         self.record.stage(step, inputs={"case_id": case.case_id, "runtime": runtime, "build": build, "plan": plan,
-                                        "validity": validity, "runs": runs, "stopped": stopped},
+                                        "validity": validity, "runs": runs, "stopped": stopped,
+                                        "fix_stopped": fix_stopped},
                           output=verdict, wall_s=round(perf_counter() - started, 3))
         self._report(step, f"{verdict.label.value} {verdict.rule_id} {verdict.terminal_reason.value}")
         return verdict
@@ -366,6 +380,7 @@ class _Composition:
         self.plan: ProbePlan | None = None
         self.validity: list[Validity] = []
         self.runs: list[ProbeRun] = []
+        self.fix_stopped: TerminalReason | None = None
 
     async def agent(self, start: Callable[[], Awaitable[StepResult]], *, stop_on_failure: bool = True
                     ) -> StepResult:
@@ -396,7 +411,8 @@ class _Composition:
         except _Stop as stop:
             stopped = stop.reason
         return await self.ops.decide("decide", self.case, self.runtime, self.build, self.plan, tuple(self.validity),
-                                     tuple(self.runs), stopped.value if stopped else None)
+                                     tuple(self.runs), stopped.value if stopped else None,
+                                     self.fix_stopped.value if self.fix_stopped else None)
 
     async def steps(self) -> None:
         case, ops = self.case, self.ops
@@ -419,17 +435,35 @@ class _Composition:
         environment = await self.prepare(runtime, plan)
         patch = await self.author(runtime, plan, environment)
 
-        for revision in ("vulnerable", "fixed") if case.fixed_revision is not None else ("vulnerable",):
-            validity = (await self.agent(lambda: ops.review(f"review-{revision}", case, plan, patch, revision))).output
-            if validity is not None:
-                self.validity.append(validity)
+        # Review the final frozen bytes before any execution that counts.
+        reviewed = {"vulnerable": await self.review(plan, patch, "vulnerable")}
+        if case.fixed_revision is not None:
+            try:
+                reviewed["fixed"] = await self.review(plan, patch, "fixed")
+            except _Stop as stop:  # a fixed-revision failure only leaves the fix not verified
+                self.fix_stopped = stop.reason
+        if not reviewed["vulnerable"]:
+            return  # nothing reviewed is executed; Decide reads the missing review (R2)
 
         await self.execute(environment, runtime, patch, "vulnerable")
-        if case.fixed_revision is not None and self.build is not None and self.build.recipe is not None:
-            # A fixed revision that does not replay leaves no fixed runs, so the fix stays not verified.
-            fixed = await ops.replay("replay-fixed", case, runtime, self.build.recipe, "fixed")
-            if fixed.failure is None and fixed.output.environment is not None and fixed.output.build.replayed:
-                await self.execute(fixed.output.environment, runtime, patch, "fixed")
+        if reviewed.get("fixed") and self.build is not None and self.build.recipe is not None:
+            try:
+                fixed = (await self.code(ops.replay("replay-fixed", case, runtime, self.build.recipe, "fixed"))
+                         ).output
+                if not fixed.build.replayed or fixed.environment is None:
+                    raise _Stop(TerminalReason.BUILD_FAILED)
+                await self.execute(fixed.environment, runtime, patch, "fixed")
+            except _Stop as stop:
+                self.fix_stopped = stop.reason
+
+    async def review(self, plan: ProbePlan, patch: FrozenPatch, revision: str) -> bool:
+        """One outcome-blind review of ``patch`` on ``revision``; True when it bound to that patch and revision."""
+        validity = (await self.agent(lambda: self.ops.review(f"review-{revision}", self.case, plan, patch, revision))
+                    ).output
+        if validity is None:
+            return False
+        self.validity.append(validity)
+        return True
 
     async def prepare(self, runtime: Runtime, plan: ProbePlan) -> Environment:
         """One Builder episode, trusted replay, and at most one more episode fed the failure's tail (A2)."""
@@ -448,7 +482,7 @@ class _Composition:
         raise _Stop(TerminalReason.BUILD_FAILED)
 
     async def author(self, runtime: Runtime, plan: ProbePlan, environment: Environment) -> FrozenPatch:
-        """Each Prober sees only its own brief; D3 gives a not_run or errored author one revision."""
+        """Each Prober sees only its own brief; the D3 check gives a not_run or errored author one revision."""
         ops, case = self.ops, self.case
         briefs = {"control": plan.control, "exploit": plan.exploit}
         drafts: dict[str, ProbeDraft] = {}
@@ -463,7 +497,7 @@ class _Composition:
         corrections: dict[str, str] = {}
         for role in ROLES:
             diagnosis = (await self.code(ops.diagnose(f"diagnose-{role}", environment, runtime, patch, role))).output
-            if diagnosis.outcome in (Outcome.NOT_RUN, Outcome.ERRORED):
+            if diagnosis.check != "ok":
                 corrections[role] = diagnosis.diagnostics or ""
         for role, diagnostics in corrections.items():
             revised = (await self.agent(lambda: ops.probe(f"probe-{role}-revision", briefs[role], runtime, case,

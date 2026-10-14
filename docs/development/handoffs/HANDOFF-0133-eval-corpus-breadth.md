@@ -4,7 +4,7 @@ kind: handoff
 title: Eval breadth sets and the agent/language/set layout
 status: recorded
 updated: 2026-10-14
-related: [PLAN-0098, ISSUE-0010, SPEC-0023, SPEC-0078]
+related: [PLAN-0098, ISSUE-0010]
 ---
 
 # Eval breadth sets and the agent/language/set layout

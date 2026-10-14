@@ -4,7 +4,7 @@ kind: spec
 title: Corsair v2 architecture
 status: accepted
 updated: 2026-10-14
-related: [PLAN-0097, SPEC-0078, SPEC-0079, SPEC-0080, SPEC-0081]
+related: [PLAN-0097]
 ---
 
 # Corsair v2 architecture
@@ -65,7 +65,7 @@ Investigate runs before Build (A1). The Investigator plans on read-only source w
 
 ### Agents
 
-Each agent is self-contained under `src/corsair/v2/agents/<name>/`, holding `agent.yaml` (a native `AgentSpec`), `agent.py`, `tools.py`, `skills/`, `evals/` (its cases and promoted baseline) and a placeholder `release-policy.yaml`. The release policy stays empty and nothing enforces it until the gates resume. This is the package shape [SPEC-0080](SPEC-0080-native-agent-manifests.md) and [SPEC-0081](SPEC-0081-native-harness-capabilities.md) adopted. Guidance lives in native Harness Skills.
+Each agent is self-contained under `src/corsair/v2/agents/<name>/`, holding `agent.yaml` (a native `AgentSpec`), `agent.py`, `tools.py`, `skills/`, `evals/` (its cases and promoted baseline) and a placeholder `release-policy.yaml`. The release policy stays empty and nothing enforces it until the gates resume. This is the package shape the v1 manifest and Harness specs (SPEC-0080, SPEC-0081) adopted; those records remain on main. Guidance lives in native Harness Skills.
 
 | Agent | Job | Tools | Done when |
 | --- | --- | --- | --- |
@@ -88,7 +88,19 @@ Authors cannot run tests (D3). After both drafts are frozen, trusted code makes 
 
 `anomalous` maps to `ok` because returning it would hint at the outcome. Application code can run before the test body, from a fixture, a setup hook, a module import or a class initializer. Any line of runtime output, even one that names the author's own file, can therefore carry an observation of the target. So runtime output is never returned.
 
-The only text returned is mechanical by construction. Each matrix row may declare a syntax-check template that parses or compiles the probe file without running application code, for example `python -m py_compile {file}`, `node --check {file}`, `ruby -c {file}` or the row's test-compile step. Trusted code runs it before the check run, and its output is returned in full, capped at 4 KiB. A row whose check can execute code, such as `perl -c` running BEGIN blocks, must not declare one, and the authors on that row get only the fixed hints. Nobody sees the discarded outcome: not the authors, not the Reviewer, not the rule table. The Reviewer then reviews the final frozen bytes. Execute runs only bytes that carry a bound review, and any change after review needs a fresh review before Execute.
+The only text returned is mechanical by construction. Each matrix row may declare a syntax-check template that parses or compiles the probe file without running application code, for example `python -m py_compile {file}`, `node --check {file}`, `ruby -c {file}` or the row's test-compile step. Trusted code runs it before the check run, and its output is returned in full, capped at 4 KiB. A row whose check can execute code, such as `perl -c` running BEGIN blocks, must not declare one, and the authors on that row get only the fixed hints. Nobody sees the discarded outcome: not the authors, not the Reviewer, not the rule table. The Reviewer then reviews the frozen bytes, with a bounded feedback loop below. Execute runs only bytes that carry a bound review, and any change after review needs a fresh review before Execute.
+
+#### Review feedback loop
+
+When the Reviewer judges a probe invalid, that probe's author gets the review back and may revise, for a limited number of rounds (Al, 2026-10-14). Execute never runs inside the loop, so the loop stays outcome-blind.
+
+1. **Rounds.** A review round reviews the whole frozen pair. There are at most three rounds (Al: three reviews in total): the first review and up to two re-reviews. After a round where either probe is invalid, each author whose probe is invalid gets one revision, so each author has at most two review revisions. These are separate from the one mechanical revision above. Every round and revision spends the one total budget (A2), and exhausting it ends the loop.
+2. **Feedback.** An author receives only its own probe's review: the names of the failed checks (`calls_real_target`, `exercises_condition`, `assertion_relevant`, `doubles_only_dependencies`), the Reviewer's defect text (at most four defects of 1 KiB each) and the Reviewer's citations, kept only if they resolve to the author's own test file or to source the author may already read. It never receives a run result or mechanical outcome beyond the fixed hints above, the other probe's brief, draft or review, Grounding output, or any oracle. The Reviewer is outcome-blind, so its feedback carries no observation of the target.
+3. **Re-binding.** A revision is a new `ProbeDraft` whose `revision_of` is the digest of the draft it replaces. The unrevised probe keeps its bytes. Trusted code freezes a new `FrozenPatch` with a new digest, runs the mechanical check on each changed draft, and asks for a fresh review of the whole new pair. Every `Validity` binds to the new digest, so a review of an earlier pair never counts.
+4. **End.** The loop ends when both probes are valid, which goes to Execute on the reviewed digest, or when three rounds have run or the budget is exhausted with either probe still invalid. Then nothing executes and R2 gives INCONCLUSIVE (`test_invalid`), as before. An author whose probe was already valid is never asked to revise. If a fresh round rejects that probe, its author gets a revision only while rounds remain.
+5. **Recording.** Each round and each revision is its own stage step (`review.<n>`, `probe.<role>.r<n>`) with its input, output, usage and bound digest. The verdict records the number of rounds and each author's revision count. For evals, every probe-author call is one attempt: a prober's `clean_attempt_rate` counts only drafts accepted at the first review, and a separate `accepted_within_limit` rate and mean revision count measure the loop. Each Reviewer call is one Reviewer eval case.
+
+Example: the first live run's Reviewer rejected an exploit probe that patched `subprocess` globally instead of where the target module imports it (`doubles_only_dependencies` false, citing the patch line). Under this loop the Exploit Prober gets that defect and citation, patches at the import site, and the new pair is reviewed again.
 
 A missing CWE skill never causes a refusal. The run is tagged `uncovered_cwe` for eval slicing.
 
@@ -179,7 +191,7 @@ The fix result carries a terminal reason from the same mapping over the fixed-re
 
 ### Corrections, caches, modes and fact origins
 
-- **A2, corrections under one total budget.** A schema error goes back to the same role. A review defect goes back to that author alone, for one revision and a fresh review. A setup failure gets one more Builder episode. A seam that cannot exercise the condition gets one replan. An unknown dispatch stops the attempt. Per-stage limits never reset the total.
+- **A2, corrections under one total budget.** A schema error goes back to the same role. A review defect goes back to that author alone, for up to two review revisions, each with a fresh review of the re-frozen pair (Review feedback loop). A setup failure gets one more Builder episode. A seam that cannot exercise the condition gets one replan. An unknown dispatch stops the attempt. Per-stage limits never reset the total.
 - **A3, three cache levels.** A recipe suggestion from similar manifests is revalidated before use. An exact environment artifact (exact source, recipe, image and dependency closure) can be reused. Execution evidence is never relabelled as a fresh run.
 - **A4, explicit scope mode.** Repository-native and minimal-component modes are recorded as a scope choice. v1's pytest route disables project config, which can strip what a finding depends on.
 - **A5, origin labels.** Each fact carries an origin label (`platform_observed`, `native_test_reported`, `model_reviewed` or `declared`).
