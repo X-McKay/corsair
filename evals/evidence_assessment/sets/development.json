@@ -1,0 +1,23 @@
+{
+  "held_out": false,
+  "cases": {
+    "python/true_pair": "b2a7277556b1b8db59cca6d0c6cb460ca66f5526caaf5a8bf95ad733d8e4cbbb",
+    "python/failed_control": "380c1de1c62adc9e89d1a7405e22eba1f7ea8eb661b32ecb92bc7b856aceea83",
+    "python/skipped_security_test": "b047c0338aa437459f0c0b25b406136b1adc43b8e380eabf74ad5bcfec57d24b",
+    "python/erroring_security_test": "b9e8695d72b08b547599f9020b4a0d04687de59f91e05ccf9497f0d0a36cc3e1",
+    "python/discovery_error": "4bf7b5685a4034675b4fadf9b005bea53a5d4db655380120e9983dc55af789c4",
+    "python/unknown_delivery": "7b780c4f89a7a9edda9f171f06f905f360d18c9f047809b61f4a43058dcdf6a7",
+    "python/candidate_timeout": "0ecaad2ea663b01caac876c096a03bdf24900c22d285df637a5ee0240a1cd912",
+    "python/candidate_sandbox_denial": "15f34e63f6c5c7b466a885c5100f219480da82aa6df06ce7aa1bed7d14a058d6",
+    "python/baseline_sandbox_denial": "e7405fd58fa925c1be6ee3004a317c37c5f85749070b35a3127c668c26e34bfe",
+    "python/contradictory_baseline_repeats": "9c2365ebb53ae7fb752c0c0ac7f9d9cf6eec37a0ecce5c40a64cf70608c54017",
+    "python/unrelated_baseline_exception": "f4541b06ffa77d042bcfaabec63f4c346199bb6fecad8ef735e73781fecba198",
+    "python/missing_baseline_witness": "c66cbc3eff83dfeb5b9886b81a511baa374dd5ca6e574522d2677115a34424ce",
+    "python/candidate_safe_behavior_differs": "91773665b06206468ba36592ee5bb14fb29d1fefafe730810d6d48e9a858a6b4",
+    "python/noncomparable_environment": "c02f184ded2c6298f368400e7ab06f04d1987468a8d82d216bd08de5403744b1",
+    "python/patch_digest_mismatch": "86fe727905c3a480f8abb2fd54d67adb784b43eff494228bf050a42b0cf7cde6",
+    "python/no_candidate_revision": "bbbf6b3522fe7cd8d715f6618e4954ffccfe1c4d9416e8575cac5c898777c4db",
+    "python/injected_verification_claim": "0e7844ebd9e90916e3961586d409932b9ef3dceeb7d6949510a79b5c6fef2d66",
+    "python/security_pass_with_observed_open": "43466fb6f2ab5973db6285196b9f9f4a00a6bf553a4499232692fd89588c2bd7"
+  }
+}

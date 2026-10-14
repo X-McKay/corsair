@@ -1,0 +1,100 @@
+{
+  "status": "ready",
+  "symbol": "count_lines",
+  "target_path": "reports.py",
+  "required_lines": [
+    5,
+    7
+  ],
+  "adversarial_markers": [
+    "touch",
+    "$(",
+    "`",
+    "&&",
+    "||"
+  ],
+  "witness_markers": [
+    "popen",
+    "process",
+    "subprocess",
+    "system"
+  ],
+  "required_reads": [
+    "reports.py",
+    "test_line_counts.py"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_path": "test_reports_security.py",
+      "test_id": "test_reports_security.py::test_benign_line_count",
+      "fixture_setup": [
+        "Create tmp_path/data.txt containing three lines"
+      ],
+      "implementation_call": "reports.count_lines(tmp_path, 'data.txt')",
+      "input": "filename 'data.txt', an ordinary file in the directory",
+      "required_behavior": "Returns 3",
+      "observable_witness": "The only process audit event during the call is the shell running wc -l < data.txt, with no extra command",
+      "source_references": [
+        {
+          "path": "reports.py",
+          "start_line": 5,
+          "end_line": 7
+        }
+      ]
+    },
+    "security": {
+      "test_path": "test_reports_security.py",
+      "test_id": "test_reports_security.py::test_security_filename_not_executed",
+      "fixture_setup": [
+        "Create tmp_path/data.txt containing three lines",
+        "Confirm tmp_path/pwned does not exist before the call"
+      ],
+      "implementation_call": "reports.count_lines(tmp_path, 'data.txt; touch pwned')",
+      "input": "filename 'data.txt; touch pwned', which appends a second shell command",
+      "required_behavior": "The filename is never interpreted by a shell: the call is rejected with ValueError or treats it as one literal name, and tmp_path/pwned is never created",
+      "observable_witness": "No process audit event shows a shell or a touch command started with the injected text, and tmp_path/pwned does not exist after the call",
+      "source_references": [
+        {
+          "path": "reports.py",
+          "start_line": 5,
+          "end_line": 7
+        }
+      ]
+    },
+    "security_expectation": {
+      "failure_type": "AssertionError",
+      "safe_behavior": "no_shell_command_execution"
+    },
+    "discovery_command": [
+      "python",
+      "-m",
+      "pytest",
+      "--collect-only",
+      "-q"
+    ],
+    "evidence_requirements": [
+      "Native discovery finds exactly the two planned test ids",
+      "Process audit events captured per test",
+      "Native JUnit outcome per test"
+    ],
+    "citations": [
+      {
+        "path": "reports.py",
+        "start_line": 5,
+        "end_line": 7
+      },
+      {
+        "path": "test_line_counts.py",
+        "start_line": 1,
+        "end_line": 8
+      }
+    ],
+    "limitations": [
+      "Component scope only: the plan does not show that application callers pass uploaded filenames",
+      "Audit events observe processes started from the test process only"
+    ]
+  }
+}

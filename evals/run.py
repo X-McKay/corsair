@@ -44,6 +44,8 @@ class Suite:
     note: str = ""
     # Sets served by another module than `module`, e.g. the chain's benchmark case cohorts.
     set_modules: dict[str, str] = field(default_factory=dict)
+    # Whether the suite's sets are per-case directories that `--language` can narrow (evals/cases.py).
+    languages: bool = True
 
 
 SUITES: dict[str, Suite] = {
@@ -55,7 +57,9 @@ SUITES: dict[str, Suite] = {
         "development": ("--cases", "development"), "heldout3": ("--cases", "heldout3"), "unit": ("--cases", "unit"),
         "breadth": ("--cases", "breadth")}),
     "authoring": Suite("evals.test_authoring.evaluate", {"development": (), "unit": ("--cases", "unit"),
-                                                            "breadth": ("--cases", "breadth")},
+                                                            "breadth": ("--cases", "breadth"),
+                                                            # Fails today for recorded production gaps (PLAN-0094).
+                                                            "breadth_pending": ("--cases", "breadth_pending")},
                        note="runs answered by injected observations or the static host runner; tests are not executed"),
     "assessment": Suite("evals.evidence_assessment.evaluate", {
         "development": ("--split", "development"), "held_out": ("--split", "held_out"), "unit": (),
@@ -65,7 +69,7 @@ SUITES: dict[str, Suite] = {
                    live=("--live", "identification,planning,assessment"),
                    note="fixture: live authoring needs the sandbox, so authoring stays scripted on the host; cohorts "
                         "(evals/case_e2e/cohorts.yaml) run every stage live over image-only Docker ports",
-                   set_modules={"jest": "evals.case_e2e.evaluate"}),
+                   set_modules={"jest": "evals.case_e2e.evaluate"}, languages=False),
 }
 # Agents without an isolated eval set yet, and where the gap is planned.
 MISSING = {}
@@ -193,16 +197,21 @@ def _reference(agent_dir: Path, set_name: str, mode: str, run_id: str) -> tuple[
 
 
 def run(agent: str, set_name: str, provider_config: Path | None, repeat: int | None, note: str,
-        results: Path = RESULTS) -> int:
+        results: Path = RESULTS, language: str | None = None) -> int:
     suite = SUITES[agent]
     mode = "live" if provider_config else "scripted"
     agent_dir = results / agent
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    module = suite.set_modules.get(set_name, suite.module)
+    argv = [sys.executable, "-m", module, "--evidence", "", *suite.sets[set_name]]
+    if language:
+        # One language of a set is its own comparison line: baselines and references key on `<set>.<language>`.
+        argv += ["--language", language]
+        set_name = f"{set_name}.{language}"
     run_id = f"{stamp}-{set_name}-{mode}"
     run_dir = agent_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
-    module = suite.set_modules.get(set_name, suite.module)
-    argv = [sys.executable, "-m", module, "--evidence", str(run_dir / "evidence"), *suite.sets[set_name]]
+    argv[4] = str(run_dir / "evidence")
     if provider_config:
         argv += ["--provider-config", str(provider_config.resolve()), *(() if module != suite.module else suite.live)]
     if repeat is not None:
@@ -250,6 +259,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--set", dest="set_name", help="Case set; defaults to the suite's first set")
     parser.add_argument("--provider-config", type=Path, help="Per-agent provider JSON (or legacy LocalModelConfig); omitted means scripted")
     parser.add_argument("--repeat", type=int)
+    parser.add_argument("--language", help="Only this language's cases of the set (python, java, javascript, ruby, perl, common)")
     parser.add_argument("--note", default="", help="Free text recorded with the run, e.g. what changed")
     parser.add_argument("--promote", metavar="RUN", help="Make RUN the baseline for its set and mode instead of running")
     parser.add_argument("--results", type=Path, default=RESULTS, help=argparse.SUPPRESS)
@@ -257,7 +267,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.agent in MISSING:
         parser.error(f"{args.agent}: {MISSING[args.agent]}")
     if args.promote:
-        if not re.fullmatch(r"[0-9TZ]+-[a-z0-9_]+-(scripted|live)", args.promote):
+        if not re.fullmatch(r"[0-9TZ]+-[a-z0-9_]+(\.[a-z]+)?-(scripted|live)", args.promote):
             parser.error("RUN must be a run id from index.jsonl")
         promote(args.agent, args.promote, args.results)
         return 0
@@ -265,7 +275,9 @@ def main(argv: list[str] | None = None) -> int:
     set_name = args.set_name or next(iter(suite.sets))
     if set_name not in suite.sets:
         parser.error(f"{args.agent} sets: {', '.join(suite.sets)}")
-    return run(args.agent, set_name, args.provider_config, args.repeat, args.note, args.results)
+    if args.language and not suite.languages:
+        parser.error(f"{args.agent} sets are not split by language")
+    return run(args.agent, set_name, args.provider_config, args.repeat, args.note, args.results, args.language)
 
 
 if __name__ == "__main__":

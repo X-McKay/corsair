@@ -1,0 +1,12 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "xss-escaping",
+  "kind": "failure-mode",
+  "probes": "Every development run reports a load error up to the run budget, so the stage ends blocked at discovery",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Written for this set; the source shape follows common xss escaping reports"
+  }
+}

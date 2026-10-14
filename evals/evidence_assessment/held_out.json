@@ -1,9 +1,0 @@
-{
-  "baseline_repeat_lost_worker": "a6b763844dbd4060731d239bd33df8c27440336ff720b914c55525d124f9f20d",
-  "both_revisions_reject": "5ec7095fc89c41ef144defa9b40bae6550c23f032ff5934db2490e67d023bfd6",
-  "candidate_control_regression": "8b342c720c08060e23f41e21e5912356ce0046afd7b342e54a34e7d718e238bc",
-  "denied_candidate_with_reviewer_note": "9d736d3cf30ed68fc1536fdf954726a1f935339c5c06f08358ca415a67528d42",
-  "disagreeing_candidate_repeats": "b67a637023c1332174a46be20564f5e6ca78b7b75c15477b0b2bd50a1e943dd4",
-  "precondition_assertion_failure": "988acf3f73f4ac37ff3018c85ca8107795bd9ff2b266b6254d35d6ad5122466e",
-  "reordered_report_true_pair": "e72dabe4ebf9a813d07f2d1e4469f737ae5f499ddfff792e28b7c6181c9cbae4"
-}

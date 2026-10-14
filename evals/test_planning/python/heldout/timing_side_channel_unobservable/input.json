@@ -1,0 +1,52 @@
+{
+  "scope": "component",
+  "identification": {
+    "status": "ready",
+    "scope": "component",
+    "reason": null,
+    "reported_issue": "token_matches compares API tokens with ==, which can leak how many leading characters are right through response timing. Analyze this component only.",
+    "target": {
+      "symbol": "token_matches",
+      "source": {
+        "path": "tokens.py",
+        "start_line": 1,
+        "end_line": 4,
+        "quote": "def token_matches(expected: str, supplied: str) -> bool:\n    if len(expected) != len(supplied):\n        return False\n    return expected == supplied"
+      }
+    }
+  },
+  "source_files": [
+    {
+      "path": "tokens.py",
+      "content": "def token_matches(expected: str, supplied: str) -> bool:\n    if len(expected) != len(supplied):\n        return False\n    return expected == supplied\n"
+    },
+    {
+      "path": "test_tokens_existing.py",
+      "content": "import tokens\n\n\ndef test_matching_token():\n    assert tokens.token_matches(\"abc123\", \"abc123\")\n"
+    }
+  ],
+  "environment": {
+    "language": "Python",
+    "runtime": "CPython 3.12",
+    "framework": "pytest 9.0.2",
+    "discovery_command": [
+      "python",
+      "-m",
+      "pytest",
+      "--collect-only",
+      "-q"
+    ],
+    "approved_test_paths": [
+      "test_tokens_security.py"
+    ],
+    "baseline_test": {
+      "test_id": "test_tokens_existing.py::test_matching_token",
+      "path": "test_tokens_existing.py"
+    },
+    "scratch_location": "The per-test pytest tmp_path directory; fixtures must not be created elsewhere",
+    "observation_facilities": [
+      "Python sys.addaudithook 'open' audit events recording the file paths opened during a test",
+      "Native JUnit XML outcomes and captured stdout per test"
+    ]
+  }
+}

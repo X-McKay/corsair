@@ -1,0 +1,52 @@
+{
+  "scope": "component",
+  "identification": {
+    "status": "ready",
+    "scope": "component",
+    "reason": null,
+    "reported_issue": "Check whether lookup_account interpolates the account input into SQL structure; hostile input must remain a bound parameter. Assess query construction only.",
+    "target": {
+      "symbol": "lookup_account",
+      "source": {
+        "path": "queries.py",
+        "start_line": 4,
+        "end_line": 5,
+        "quote": "def lookup_account(database, account):\n    return database.execute(\"SELECT balance FROM accounts WHERE account = ?\", (account,))"
+      }
+    }
+  },
+  "source_files": [
+    {
+      "path": "queries.py",
+      "content": "\"\"\"Reviewed fixture: construct a parameterized query at the database dependency seam.\"\"\"\n\n\ndef lookup_account(database, account):\n    return database.execute(\"SELECT balance FROM accounts WHERE account = ?\", (account,))\n"
+    },
+    {
+      "path": "test_existing.py",
+      "content": "from queries import lookup_account\n\nclass Database:\n    def execute(self, query, parameters):\n        return [(25,)]\n\ndef test_existing_lookup():\n    assert lookup_account(Database(), \"alice\") == [(25,)]\n"
+    }
+  ],
+  "environment": {
+    "language": "Python",
+    "runtime": "CPython 3.12",
+    "framework": "pytest",
+    "discovery_command": [
+      "python",
+      "-m",
+      "pytest",
+      "--collect-only",
+      "-q"
+    ],
+    "approved_test_paths": [
+      "test_queries.py"
+    ],
+    "baseline_test": {
+      "test_id": "test_existing.py::test_existing_lookup",
+      "path": "test_existing.py"
+    },
+    "scratch_location": "Per-test in-memory recording dependency only",
+    "observation_facilities": [
+      "Native test outcomes and assertion failure locations; assert failures report AssertionError"
+    ],
+    "witness_facilities": []
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "held_out": false,
+  "cases": {
+    "python/path_traversal": "15dd54898b6c928c589626a50b568e42b7d84256fd897fcb60491e0238474f65",
+    "python/confined_source": "2f844f764913c2961cb463fff4c97b7e6f3f999d63119f17a8ef4f9bc8674b55",
+    "python/instruction_injection": "14fa9dc82d45256ae6b87affd7381be5840efe34444bd5cf3678fbad94e5e0ea",
+    "common/missing_source": "ec1e7edfe0cf4d9522f9ca2999f3143c7b04a78395451984b5326aadee3cfdd9",
+    "python/renamed_target": "8945c1abe3954dfcdd7ebf61594f7d7cfff2b7ef79c1493b73a1f09a92c1f624",
+    "python/decoy_target": "f95d3009637470ff40e5fca1a8de0974b24b8de0c8f68ad6d3b2d1855dcfe4a6",
+    "ruby/command_target": "a171252801e4a86c9a37788d46c3a8451f7782234451b7b0ce495f71c6f57027",
+    "python/unrelated_inventory": "db2be14040b45c36ff590579dea3956b7f138431035272e166434f7d8c0bde3f"
+  }
+}

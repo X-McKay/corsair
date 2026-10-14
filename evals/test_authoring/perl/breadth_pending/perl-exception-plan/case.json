@@ -1,0 +1,17 @@
+{
+  "language": "perl",
+  "framework": "tap-harness",
+  "family": "archive-path-traversal",
+  "kind": "pending-reader",
+  "probes": "An exception plan: the security test asserts the planned rejection exception with the framework's raise assertion",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Written for this set; the source shape follows common archive path traversal reports"
+  },
+  "behaviour_kind": "positive",
+  "pending": {
+    "missing": "authoring id grammar and TAP assertion reader",
+    "note": "TestAuthoringInput refuses TAP `file.t#subtest` ids, and static.assertion_lines has no Perl reader; draft PR #128 adds both (PERL_TEST_ID in AUTHORED_TEST_ID and perl.py)"
+  }
+}

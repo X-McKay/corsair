@@ -1,0 +1,12 @@
+{
+  "language": "python",
+  "framework": "pytest",
+  "family": "preference_update_mass_assignment",
+  "kind": "moved",
+  "probes": "Moved unchanged from cases-heldout-3.yaml (heldout3 set); the suite README describes what it exercises.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Corsair-authored; previously evals/test_planning/cases-heldout-3.yaml"
+  }
+}

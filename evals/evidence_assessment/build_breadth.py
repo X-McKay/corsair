@@ -12,7 +12,7 @@ baseline revision and the frozen test patch. Digests are computed here, never wr
   cases carry the plan as text, as the existing unit set does).
 
 The oracle constrains only the validity flags a case's property decides; case names, families and oracles never
-enter an item. Run ``python -m evals.evidence_assessment.build_breadth`` to rewrite ``cases/``, then freeze the set
+enter an item. Run ``python -m evals.evidence_assessment.build_breadth`` to rewrite ``<language>/breadth/``, then freeze the set
 with ``python -m evals.cases evidence_assessment breadth --freeze``; ``--check`` compares without writing.
 """
 import argparse
@@ -27,7 +27,7 @@ from corsair.agents.evidence_assessment.contracts import ValidityInput
 from corsair.core.disposition import ExpectedFailure, ObservationPlan
 from corsair.ports.test_runner import native_test_function
 
-CASES = Path(__file__).with_name("cases")
+SUITE_ROOT = Path(__file__).parent
 FLAGS = ("source_linked", "condition_exercised", "assertions_relevant", "dependency_scope_valid")
 VALID = dict.fromkeys(FLAGS, True)
 SYNTHETIC = {"source": "synthetic", "license": "n/a (synthetic)",
@@ -1789,12 +1789,13 @@ def render() -> dict[str, dict[str, str]]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--check", action="store_true", help="compare with cases/ without writing")
+    parser.add_argument("--check", action="store_true", help="compare with <language>/breadth/ without writing")
     args = parser.parse_args()
     differing = []
     for name, parts in render().items():
         for part, content in parts.items():
-            path = CASES / name / f"{part}.json"
+            language = json.loads(parts["case"])["language"]
+            path = SUITE_ROOT / language / "breadth" / name / f"{part}.json"
             if args.check:
                 if not path.exists() or path.read_text() != content:
                     differing.append(str(path))

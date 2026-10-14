@@ -1,0 +1,112 @@
+{
+  "status": "ready",
+  "symbol": "store_avatar",
+  "target_path": "avatars.py",
+  "required_lines": [
+    4,
+    8
+  ],
+  "adversarial_markers": [
+    ".htm",
+    ".svg",
+    ".js",
+    ".php",
+    ".exe",
+    ".txt"
+  ],
+  "witness_effect": "file_open",
+  "witness_markers": [
+    "open"
+  ],
+  "required_reads": [
+    "avatars.py",
+    "test_avatars_existing.py"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_id": "test_avatars_security.py::test_benign_png_upload",
+      "test_path": "test_avatars_security.py",
+      "fixture_setup": [
+        "Create tmp_path/uploads/ as the upload directory"
+      ],
+      "implementation_call": "avatars.store_avatar(uploads, 'portrait.png', b'png-sentinel')",
+      "input": "filename 'portrait.png', an allowed image type, with benign bytes",
+      "required_behavior": "Returns tmp_path/uploads/portrait.png and that file holds exactly the supplied bytes",
+      "observable_witness": "An open audit event for tmp_path/uploads/portrait.png is recorded during the call",
+      "witness": {
+        "facility": "open_events",
+        "effect": "file_open",
+        "subject": "uploads/portrait.png",
+        "expectation": "occurs"
+      },
+      "source_references": [
+        {
+          "path": "avatars.py",
+          "start_line": 4,
+          "end_line": 8
+        }
+      ]
+    },
+    "security": {
+      "test_id": "test_avatars_security.py::test_security_rejects_non_image_upload",
+      "test_path": "test_avatars_security.py",
+      "fixture_setup": [
+        "Create tmp_path/uploads/ as the upload directory",
+        "Confirm tmp_path/uploads/portrait.html does not exist before the call"
+      ],
+      "implementation_call": "avatars.store_avatar(uploads, 'portrait.html', b'<p>sentinel</p>')",
+      "input": "filename 'portrait.html', a non-image type, with harmless sentinel markup",
+      "required_behavior": "The disallowed upload is not stored: tmp_path/uploads/portrait.html is never opened or created",
+      "observable_witness": "No open audit event for tmp_path/uploads/portrait.html is recorded during the call (application observation); a sandbox or policy denial is recorded separately and is not a rejection",
+      "witness": {
+        "facility": "open_events",
+        "effect": "file_open",
+        "subject": "uploads/portrait.html",
+        "expectation": "absent"
+      },
+      "source_references": [
+        {
+          "path": "avatars.py",
+          "start_line": 4,
+          "end_line": 8
+        }
+      ]
+    },
+    "security_expectation": {
+      "failure_type": "AssertionError",
+      "safe_behavior": "no_file_open"
+    },
+    "discovery_command": [
+      "python",
+      "-m",
+      "pytest",
+      "--collect-only",
+      "-q"
+    ],
+    "evidence_requirements": [
+      "Native discovery finds exactly the two planned test ids",
+      "Open audit events captured per test as a witness artifact",
+      "Native JUnit outcome and failure location per test"
+    ],
+    "citations": [
+      {
+        "path": "avatars.py",
+        "start_line": 4,
+        "end_line": 8
+      },
+      {
+        "path": "test_avatars_existing.py",
+        "start_line": 1,
+        "end_line": 8
+      }
+    ],
+    "limitations": [
+      "Component scope only: the plan does not show how the web server serves stored uploads",
+      "One disallowed type is covered, not every non-image extension",
+      "Audit events observe Python-level opens in the test process only"
+    ]
+  }
+}

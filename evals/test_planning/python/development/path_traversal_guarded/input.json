@@ -1,0 +1,59 @@
+{
+  "scope": "component",
+  "identification": {
+    "status": "ready",
+    "scope": "component",
+    "reason": null,
+    "reported_issue": "The read_document function accepts a user supplied filename. Check whether ../outside.txt could be read outside the configured documents directory. Analyze this component only.",
+    "target": {
+      "symbol": "read_document",
+      "source": {
+        "path": "documents.py",
+        "start_line": 3,
+        "end_line": 7,
+        "quote": "def read_document(root: Path, filename: str) -> str:\n    allowed = root.resolve()\n    candidate = (allowed / filename).resolve()\n    candidate.relative_to(allowed)\n    return candidate.read_text()"
+      }
+    }
+  },
+  "source_files": [
+    {
+      "path": "documents.py",
+      "content": "from pathlib import Path\n\ndef read_document(root: Path, filename: str) -> str:\n    allowed = root.resolve()\n    candidate = (allowed / filename).resolve()\n    candidate.relative_to(allowed)\n    return candidate.read_text()\n"
+    },
+    {
+      "path": "test_existing.py",
+      "content": "from pathlib import Path\n\nimport documents\n\n\ndef test_reads_existing_document(tmp_path: Path):\n    (tmp_path / \"note.txt\").write_text(\"hello\")\n    assert documents.read_document(tmp_path, \"note.txt\") == \"hello\"\n"
+    }
+  ],
+  "environment": {
+    "language": "Python",
+    "runtime": "CPython 3.12",
+    "framework": "pytest 9.0.2",
+    "discovery_command": [
+      "python",
+      "-m",
+      "pytest",
+      "--collect-only",
+      "-q"
+    ],
+    "approved_test_paths": [
+      "test_documents.py"
+    ],
+    "baseline_test": {
+      "test_id": "test_existing.py::test_reads_existing_document",
+      "path": "test_existing.py"
+    },
+    "scratch_location": "The per-test pytest tmp_path directory; fixtures must not be created elsewhere",
+    "observation_facilities": [
+      "Python sys.addaudithook 'open' audit events recording the file paths opened during a test",
+      "Native JUnit XML outcomes and captured stdout per test"
+    ],
+    "witness_facilities": [
+      {
+        "id": "audit_open",
+        "kind": "file_open",
+        "description": "Python sys.addaudithook 'open' events recording each path the test process opens during the call"
+      }
+    ]
+  }
+}

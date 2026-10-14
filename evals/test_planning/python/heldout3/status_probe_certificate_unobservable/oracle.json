@@ -1,0 +1,21 @@
+{
+  "status": "unsupported",
+  "required_reads": [
+    "status_probe.py"
+  ],
+  "reference_plan": {
+    "status": "unsupported",
+    "scope": "component",
+    "missing_capability": "Showing that an invalid certificate is refused needs a TLS handshake or socket connection observation; the only listed witness facility records file opens",
+    "limitations": [
+      "No test specification is produced; the concern remains untested at this scope"
+    ],
+    "citations": [
+      {
+        "path": "status_probe.py",
+        "start_line": 9,
+        "end_line": 15
+      }
+    ]
+  }
+}

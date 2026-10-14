@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import shutil
 
 import pytest
 from pydantic import ValidationError
@@ -18,8 +19,9 @@ from corsair.agents.test_planning import (
     UnsupportedTestPlanDraft, create_test_planning_agent, planning_prompt,
 )
 from corsair.agents.test_planning.skills import SKILL_TEXT
+from evals.cases import manifest
 from evals.test_planning.evaluate import (
-    DATASETS, MANIFESTS, RETIRED, EvaluationBudget, dataset, evaluate, passed, plan_checks,
+    DATASETS, RETIRED, SUITE, EvaluationBudget, dataset, evaluate, passed, plan_checks,
 )
 
 
@@ -314,7 +316,7 @@ def test_scratch_check_rejects_fixtures_outside_the_scratch_location():
     assert "../" in plan.security.input
 
 
-@pytest.mark.parametrize("name", sorted(set(MANIFESTS) - {"unit"}))
+@pytest.mark.parametrize("name", [name for name in DATASETS if manifest(SUITE, name)["held_out"]])
 def test_heldout_cases_stay_disjoint_and_retired_sets_cannot_run_again(tmp_path, name):
     heldout = dataset(name)
     assert len(heldout.cases) == 6 and {c.metadata.status for c in heldout.cases} == {"ready", "unsupported"}
@@ -332,11 +334,14 @@ def test_heldout_cases_stay_disjoint_and_retired_sets_cannot_run_again(tmp_path,
 
 
 def test_heldout_evaluation_refuses_a_changed_case(tmp_path, monkeypatch):
+    import evals.cases
     import evals.test_planning.evaluate as module
-    changed = tmp_path / "cases-heldout.yaml"
-    changed.write_text((module.ROOT / module.DATASETS["heldout"]).read_text().replace("touch pwned", "touch owned", 1))
-    monkeypatch.setitem(module.DATASETS, "heldout", str(changed))
-    with pytest.raises(ValueError, match="frozen manifest"):
+    shutil.copytree(evals.cases.EVALS / SUITE, tmp_path / SUITE)
+    changed = next(path for path in sorted((tmp_path / SUITE).glob("*/heldout/*/*.json"))
+                   if "touch pwned" in path.read_text())
+    changed.write_text(changed.read_text().replace("touch pwned", "touch owned", 1))
+    monkeypatch.setattr(evals.cases, "EVALS", tmp_path)
+    with pytest.raises(ValueError, match="frozen heldout manifest"):
         module.check_manifest("heldout")
 
 

@@ -1,0 +1,43 @@
+{
+  "script": [
+    {
+      "write": "misnamed"
+    },
+    {
+      "run": true
+    },
+    {
+      "read": "src/test/java/com/example/badge/BadgeSecurityTest.java"
+    },
+    {
+      "read": "src/test/java/com/example/TestSupport.java"
+    },
+    {
+      "write": "reference"
+    },
+    {
+      "run": true
+    }
+  ],
+  "runner_runs": [
+    {
+      "status": "collection_error",
+      "errors": "E   No tests matching com.example.badge.BadgeSecurityTest#securityEscapesMarkup were executed; found com.example.badge.BadgeSecurityTest#securityEscapesLabel"
+    },
+    {
+      "status": "discovered",
+      "control": "passed",
+      "security": "failed",
+      "security_failure": "org.opentest4j.AssertionFailedError"
+    }
+  ],
+  "status": "patch",
+  "runs": 2,
+  "security_assertion_lines": [
+    17
+  ],
+  "files": {
+    "reference": "package com.example.badge;\n\nimport static org.junit.jupiter.api.Assertions.assertEquals;\nimport static org.junit.jupiter.api.Assertions.assertFalse;\n\nimport org.junit.jupiter.api.Test;\n\nclass BadgeSecurityTest {\n    @Test\n    void benignControl() {\n        assertEquals(\"<span class=\\\"badge\\\">ok</span>\", Badge.render(\"ok\"));\n    }\n\n    @Test\n    void securityEscapesMarkup() {\n        String html = Badge.render(\"<script>alert(1)</script>\");\n        assertFalse(html.contains(\"<script>\"));\n    }\n}\n",
+    "misnamed": "package com.example.badge;\n\nimport static org.junit.jupiter.api.Assertions.assertEquals;\nimport static org.junit.jupiter.api.Assertions.assertFalse;\n\nimport org.junit.jupiter.api.Test;\n\nclass BadgeSecurityTest {\n    @Test\n    void benignControl() {\n        assertEquals(\"<span class=\\\"badge\\\">ok</span>\", Badge.render(\"ok\"));\n    }\n\n    @Test\n    void securityEscapesLabel() {\n        String html = Badge.render(\"<script>alert(1)</script>\");\n        assertFalse(html.contains(\"<script>\"));\n    }\n}\n"
+  }
+}

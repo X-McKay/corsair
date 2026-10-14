@@ -1,0 +1,12 @@
+{
+  "held_out": false,
+  "cases": {
+    "python/real-seam-return-and-exception": "b979e01bb4b9ec858adc2e4a0ca662751c8417b438282506f73f6178d656e9c8",
+    "python/copied-implementation": "ee1ee105148637cd926086e836fc423be92c79fddacffadd7fbd965329d192c8",
+    "python/mocked-entry-point": "8a60b3e4b05d7da419002d7c691abcff362fd49fb889dab21387b013999ae072",
+    "python/vacuous-assertions": "d727a7d755f4c3a60aab087d87d5839a366620042f0f2534dfd3c8cabcca8c63",
+    "python/double-owns-security-guard": "3d62b563561e25ce71264a43a09c6a1b5e2bf5404277769646e121ed6eed3688",
+    "python/wrong-source-module": "5dd916e690911f96a9e5768127a0597c3c0e263d333f057a3486c39003a82c59",
+    "python/benign-input-used-for-exploit": "81565a852addb4b24ed240a99e9fe31a8d379e74918c5a1bcecdcc37063559b4"
+  }
+}

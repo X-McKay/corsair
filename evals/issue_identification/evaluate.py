@@ -3,7 +3,6 @@
 import argparse
 import asyncio
 from dataclasses import dataclass
-from hashlib import sha256
 import json
 from pathlib import Path
 from time import perf_counter
@@ -29,13 +28,13 @@ from corsair.agents.issue_identification.contracts import IssueIdentification, I
 from corsair.inference.config import load_agent_config
 from corsair.inference.models import configured_model
 from corsair.agents.issue_analysis.tools import FixtureDependencies
-from evals.cases import load_set, set_digest
+from evals.cases import LANGUAGES, load_set, set_digest, set_names
 from evals.issue_analysis.evaluate import describe_model, record_count
 from evals.issue_analysis.live import NoUnknownToolAttempts, ProviderUsageCoverage, message_counts, output_tool_names
 
 ROOT = Path(__file__).parent
 SUITE = "issue_identification"
-CASE_SETS = ("development", "breadth")
+CASE_SETS = tuple(set_names(SUITE))
 
 
 class SelectionOracle(BaseModel):
@@ -73,23 +72,19 @@ class MatchesSelection(Evaluator[IssueAnalysisInput, IssueIdentification, Select
         return selection_checks(ctx.inputs, ctx.output, ctx.metadata)
 
 
-def dataset(cases: str = "development") -> Dataset[IssueAnalysisInput, IssueIdentification, SelectionOracle]:
-    """development is the native YAML dataset; other sets are per-case directories (evals/cases.py)."""
-    if cases == "development":
-        return Dataset[IssueAnalysisInput, IssueIdentification, SelectionOracle].from_file(
-            ROOT / "cases.yaml", custom_evaluator_types=(MatchesSelection,),
-        )
+def dataset(cases: str = "development", language: str | None = None) -> Dataset[IssueAnalysisInput, IssueIdentification, SelectionOracle]:
+    """One frozen set of per-case directories (evals/cases.py), optionally one language."""
     if cases not in CASE_SETS:
         raise ValueError(f"unknown identification case set {cases!r}")
     return Dataset[IssueAnalysisInput, IssueIdentification, SelectionOracle](
         name=f"issue-identification-{cases}", evaluators=[MatchesSelection()],
         cases=[Case(name=case.name, inputs=IssueAnalysisInput.model_validate(case.input),
-                    metadata=SelectionOracle.model_validate(case.oracle)) for case in load_set(SUITE, cases)],
+                    metadata=SelectionOracle.model_validate(case.oracle)) for case in load_set(SUITE, cases, language)],
     )
 
 
 def dataset_sha256(cases: str = "development") -> str:
-    return sha256((ROOT / "cases.yaml").read_bytes()).hexdigest() if cases == "development" else set_digest(SUITE, cases)
+    return set_digest(SUITE, cases)
 
 
 def scripted_model(inputs: IssueAnalysisInput, oracle: SelectionOracle) -> FunctionModel:
@@ -117,11 +112,12 @@ class EvaluationBudget(BaseModel):
     output_retries: int = Field(default=1, ge=0, le=1, strict=True)
 
 
-async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, cases: str = "development"):
+async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, cases: str = "development",
+                   language: str | None = None):
     # Reserve before the first request; rerunning the same attempt is always refused.
     evidence.mkdir(parents=True, exist_ok=False)
     logfire.configure(send_to_logfire=False, console=False)
-    corpus = dataset(cases)
+    corpus = dataset(cases, language)
     scripted = model is None
     fixture_models = {case.inputs.input_digest: scripted_model(case.inputs, case.metadata) for case in corpus.cases} if scripted else {}
     actual_model = model if model is not None else next(iter(fixture_models.values()))
@@ -130,7 +126,7 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, case
                 "prompt_version": PROMPT_VERSION, "config_version": CONFIG_VERSION, "skill_sha256": SKILL_SHA256,
                 "toolset_sha256": TOOLSET_SHA256,
                 "budget": budget.model_dump(), "task_retries": 0, "max_concurrency": 1,
-                "dataset_sha256": dataset_sha256(cases),
+                "dataset": cases, "language": language, "dataset_sha256": dataset_sha256(cases),
                 "output_contract": IssueIdentification.__name__, "draft_contract": IssueIdentificationDraft.__name__}
     (evidence / "configuration.json").write_text(json.dumps(metadata, indent=2))
     corpus.evaluators.append(NoUnknownToolAttempts())
@@ -197,17 +193,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--provider-config", type=Path, help="Explicit provider configuration JSON; omitted means scripted fixture only")
-    parser.add_argument("--cases", choices=CASE_SETS, default="development",
-                        help="development: cases.yaml; breadth: per-language set under cases/ (sets/breadth.json)")
+    parser.add_argument("--cases", choices=CASE_SETS, default="development", help="a set under sets/")
+    parser.add_argument("--language", choices=LANGUAGES, help="only this language's cases of the set")
     args = parser.parse_args()
     if args.evidence.exists() or args.evidence.is_symlink():
         parser.error("evidence path already exists")
     async def run():
         if args.provider_config is None:
-            return await evaluate(args.evidence, EvaluationBudget(), cases=args.cases)
+            return await evaluate(args.evidence, EvaluationBudget(), cases=args.cases, language=args.language)
         config = load_agent_config(args.provider_config, "identification")
         async with configured_model(config) as model:
-            return await evaluate(args.evidence, EvaluationBudget(), model=model, cases=args.cases)
+            return await evaluate(args.evidence, EvaluationBudget(), model=model, cases=args.cases, language=args.language)
     report = asyncio.run(run())
     report.print(include_input=False, include_output=False)
     if not passed(report):

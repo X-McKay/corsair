@@ -1,0 +1,12 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "xss-escaping",
+  "kind": "failure-mode",
+  "probes": "After a run that does not discover the planned id, the author reads its own written test and a path not in the source (answered typed), then fixes it",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Written for this set; the source shape follows common xss escaping reports"
+  }
+}

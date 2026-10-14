@@ -1,0 +1,26 @@
+{
+  "script": [
+    {
+      "write": "reference"
+    },
+    {
+      "run": true
+    }
+  ],
+  "runner_runs": [
+    {
+      "status": "discovered",
+      "control": "passed",
+      "security": "failed",
+      "security_failure": "org.opentest4j.AssertionFailedError"
+    }
+  ],
+  "status": "patch",
+  "runs": 1,
+  "security_assertion_lines": [
+    27
+  ],
+  "files": {
+    "reference": "package com.example.notes;\n\nimport static org.junit.jupiter.api.Assertions.assertEquals;\nimport static org.junit.jupiter.api.Assertions.assertNull;\n\nimport java.nio.charset.StandardCharsets;\nimport java.nio.file.Files;\nimport java.nio.file.Path;\nimport org.junit.jupiter.api.Test;\nimport org.junit.jupiter.api.io.TempDir;\n\nclass NotesSecurityTest {\n    @TempDir\n    Path dir;\n\n    @Test\n    void benignControl() throws Exception {\n        Path root = Files.createDirectory(dir.resolve(\"notes\"));\n        Files.write(root.resolve(\"todo.txt\"), \"milk\".getBytes(StandardCharsets.UTF_8));\n        assertEquals(\"milk\", Notes.read(root, \"todo.txt\"));\n    }\n\n    @Test\n    void securityStaysInsideRoot() throws Exception {\n        Path root = Files.createDirectory(dir.resolve(\"notes\"));\n        Files.write(dir.resolve(\"secret.txt\"), \"top secret\".getBytes(StandardCharsets.UTF_8));\n        assertNull(Notes.read(root, \"../secret.txt\"));\n    }\n}\n"
+  }
+}
