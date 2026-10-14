@@ -9,8 +9,8 @@ from typing import Any
 from pydantic_ai import Agent
 from pydantic_ai.models.test import TestModel
 
-from corsair.v2.chain import Stages
-from corsair.v2.contracts import (AgentUsage, BuildResult, Case, Citation, Environment, ExitClass, Finding,
+from corsair.chain import Stages
+from corsair.contracts import (AgentUsage, BuildResult, Case, Citation, Environment, ExitClass, Finding,
                                   FrozenPatch, Label, Outcome, ProbeBrief, ProbeDraft, ProbeFacts, ProbePlan, ProbeRun,
                                   ProbeValidity, Recipe, Revision, Runtime, TerminalReason, Validity, Verdict)
 
@@ -96,6 +96,11 @@ class Fakes:
     raises: dict[str, BaseException] = field(default_factory=dict)
     usages: dict[str, AgentUsage] = field(default_factory=dict)
     grounding: bool = False
+    # (revision, role) -> outcomes of its runs in call order (passed once the list runs out)
+    outcomes: dict[tuple[str, str], list[str]] = field(default_factory=dict)
+    # invalid roles per vulnerable review in call order; overrides ``rejections`` while it lasts
+    review_invalid: list[set[str]] = field(default_factory=list)
+    real_decide: bool = False  # decide with rules.decide instead of the fixed R4/R1 answer
     calls: list[tuple[str, tuple, dict]] = field(default_factory=list)
 
     def names(self) -> list[str]:
@@ -161,17 +166,24 @@ class Fakes:
         bound = patch if revision not in self.unbound else patch.model_copy(update={"sha256": "f" * 64})
         seen = len([1 for _, kw in self.of("review") if kw["revision"] == revision])
         invalid = frozenset(role for role, n in self.rejections.items() if revision == "vulnerable" and seen <= n)
+        if revision == "vulnerable" and seen <= len(self.review_invalid):
+            invalid = frozenset(self.review_invalid[seen - 1])
         return validity(bound, revision, invalid), self.usages.get("reviewer", usage("reviewer"))
 
     def execute(self, environment, runtime, patch, role, *, revision="vulnerable"):
         self._log("execute", environment, runtime, patch, role, revision=revision)
         if revision == "fixed" and "execute" in self.fixed_raises:
             raise self.fixed_raises["execute"]
-        return run(patch, role, revision)
+        queued = self.outcomes.get((revision, role))
+        return run(patch, role, revision, Outcome(queued.pop(0)) if queued else Outcome.PASSED)
 
-    def decide(self, case, *, runtime, build, plan, validity, runs, stopped=None, fix_stopped=None):
+    def decide(self, case, *, runtime, build, plan, validity, runs, stopped=None, fix_stopped=None, attempts=()):
         self._log("decide", case, runtime=runtime, build=build, plan=plan, validity=validity, runs=runs,
-                  stopped=stopped, fix_stopped=fix_stopped)
+                  stopped=stopped, fix_stopped=fix_stopped, attempts=attempts)
+        if self.real_decide:
+            from corsair.rules import decide
+            return decide(case, runtime=runtime, build=build, plan=plan, validity=validity, runs=runs,
+                          stopped=stopped, fix_stopped=fix_stopped, attempts=attempts)
         if stopped is not None:
             return Verdict(case_id=case.case_id, label=Label.ERROR, rule_id="R1", terminal_reason=stopped,
                            finding="none", fix="not_applicable", runs=runs, validity=validity)

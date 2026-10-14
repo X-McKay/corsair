@@ -1,0 +1,12 @@
+{
+  "case_id": "corpus:c2bb8e5a111f88d4",
+  "finding": {
+    "title": "Prefix handling of double-separator paths in FilenameUtils.getPrefixLength",
+    "description": "FilenameUtils.getPrefixLength computes the prefix of a file name; for names starting with two separators it treats the text up to the next separator as a UNC server prefix, which FilenameUtils.normalize then keeps out of its '..' resolution.",
+    "file_path": "src/main/java/org/apache/commons/io/FilenameUtils.java",
+    "start_line": 685,
+    "symbol": "getPrefixLength",
+    "cwe": "CWE-20"
+  },
+  "source": "../../../../../benchmarks/corpus/permissive-reduced/java/commons-io/b"
+}

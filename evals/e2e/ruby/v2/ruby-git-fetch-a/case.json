@@ -1,0 +1,24 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "ruby-git-fetch",
+  "kind": "positive",
+  "category": "capability",
+  "probes": "Argument list construction in Git::Lib#fetch (CWE-88) on the variant where untrusted input reaches the sink: the whole chain must reproduce it through fetch.",
+  "expected": "The control and the proof-of-vulnerability (exploit) probe pass on this tree, so the label is LIKELY_EXPLOITABLE by R4; on the paired fixed tree the control passes and the PoV's assertion fails, so the fix is verified.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory",
+    "safety"
+  ],
+  "provenance": {
+    "source": "https://github.com/ruby-git/ruby-git",
+    "license": "MIT",
+    "record": "CVE-2022-25648",
+    "fix_commit": "291ca0946bec7164b90ad5c572ac147f512c7159",
+    "verbatim": false,
+    "path": "benchmarks/corpus/permissive-reduced/ruby/ruby-git-fetch/a"
+  }
+}

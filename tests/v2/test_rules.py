@@ -4,10 +4,10 @@ The exploit probe is a proof-of-vulnerability test (SPEC-0082 D12): ``passed`` o
 reported condition was demonstrated."""
 import pytest
 
-from corsair.v2.contracts import (BuildResult, Case, Citation, ExitClass, Finding, Label, Origin, Outcome, ProbeBrief,
-                                  ProbeFacts, ProbePlan, ProbeRun, ProbeValidity, Recipe, Revision, Runtime,
-                                  TerminalReason as T, Validity)
-from corsair.v2.rules import RULES, decide
+from corsair.contracts import (Attempt, BuildResult, Case, Citation, ExitClass, Finding, Label, Origin, Outcome,
+                                  ProbeBrief, ProbeFacts, ProbePlan, ProbeRun, ProbeValidity, Recipe, Revision,
+                                  Runtime, TerminalReason as T, Validity)
+from corsair.rules import RULES, decide
 
 PATCH, OTHER = "a" * 64, "b" * 64
 REV = Revision(source="/tmp/rev", tree_sha256="c" * 64)
@@ -103,8 +103,8 @@ CASES = [
     ("control missing", full(runs=runs(control=None)),
      ("R3", Label.INCONCLUSIVE, T.PROBE_NOT_RUN, "inconclusive")),
     ("reproduced", full(), ("R4", Label.LIKELY_EXPLOITABLE, T.OK, "reproduced")),
-    ("not reproduced", full(runs=runs(exploit="assertion_failed")),
-     ("R5", Label.LIKELY_NOT_EXPLOITABLE, T.OK, "not_reproduced")),
+    ("one failed PoV is not enough for R5", full(runs=runs(exploit="assertion_failed")),
+     ("R6", Label.INCONCLUSIVE, T.NO_VALID_OBSERVATION, "inconclusive")),
     ("PoV passed on both revisions", full(runs=runs() + runs(control="passed", exploit="passed", revision="fixed")),
      ("R6", Label.INCONCLUSIVE, T.NOT_DIFFERENTIAL, "inconclusive")),
     ("PoV passed on the fix with a failing fixed control",
@@ -149,7 +149,7 @@ def test_rule_table(kwargs, expected):
 def test_every_rule_is_covered_and_ids_are_unique():
     ids = [rule.id for rule in RULES]
     assert len(ids) == len(set(ids)) and ids[-1] == "R6"
-    assert {c[2][0] for c in CASES} == set(ids)
+    assert {c[2][0] for c in CASES} | {c[2][0] for c in SECOND} == set(ids)
 
 
 def fixed(**changes):
@@ -255,7 +255,7 @@ def test_facts_origin_and_evidence_kept():
 def test_a_vulnerable_harness_error_before_start_is_inconclusive_not_error(role):
     """A collection or import error of the probe file (pytest exits 2, which the row maps to harness_error) never
     started the body: it is the author's not_run, so the case is INCONCLUSIVE probe_not_run, never ERROR."""
-    from corsair.v2.outcome import classify
+    from corsair.outcome import classify
     facts = ProbeFacts(exit_code=2, exit_class=ExitClass.HARNESS_ERROR, start_marker=False, end_marker=False,
                        token_in_output=False)
     broken = ProbeRun(role=role, revision="vulnerable", patch_sha256=PATCH, facts=facts, outcome=classify(facts))
@@ -269,3 +269,102 @@ def test_a_vulnerable_harness_error_before_start_is_inconclusive_not_error(role)
     infra = broken.model_copy(update={"facts": started, "outcome": classify(started)})
     verdict = decide(CASE, **full(runs=tuple(sorted((infra, other), key=lambda r: r.role))))
     assert (verdict.label, verdict.rule_id, verdict.terminal_reason) == (Label.ERROR, "R1", T.INFRA_ERROR)
+
+
+# --- Two exploit attempts (SPEC-0082 D18) -------------------------------------------------------------------------
+
+CONTROL = "e" * 64  # the control draft's digest, the same in both attempts
+
+
+def attempts(second=OTHER, control=CONTROL):
+    return (Attempt(number=1, patch_sha256=PATCH, control_sha256=CONTROL),
+            Attempt(number=2, patch_sha256=second, control_sha256=control))
+
+
+def second(exploit="assertion_failed", a2_review=None, first_exploit="assertion_failed", **changes):
+    """Attempt 1 ran a reviewed pair whose PoV failed; attempt 2 ran only its new PoV (the control is reused)."""
+    kwargs = full(validity=(review(), review(patch=OTHER) if a2_review is None else a2_review),
+                  runs=runs(exploit=first_exploit) + ((run("exploit", exploit, patch=OTHER),) if exploit else ()),
+                  attempts=attempts())
+    kwargs.update(changes)
+    return kwargs
+
+
+SECOND = [
+    ("both PoVs assertion_failed", second(), ("R5", Label.LIKELY_NOT_EXPLOITABLE, T.OK, "not_reproduced")),
+    ("second PoV passed", second(exploit="passed"), ("R4", Label.LIKELY_EXPLOITABLE, T.OK, "reproduced")),
+    ("second exploit rejected", second(a2_review=review(patch=OTHER, exploit=False)),
+     ("R2", Label.INCONCLUSIVE, T.TEST_INVALID, "inconclusive")),
+    ("reused control rejected in the second review", second(a2_review=review(patch=OTHER, control=False)),
+     ("R2", Label.INCONCLUSIVE, T.TEST_INVALID, "inconclusive")),
+    ("second pair never reviewed", second(validity=(review(),), exploit=None),
+     ("R2", Label.INCONCLUSIVE, T.TEST_INVALID, "inconclusive")),
+    ("attempt 1's review never counts for the second pair", second(validity=(review(),)),
+     ("R2", Label.INCONCLUSIVE, T.TEST_INVALID, "inconclusive")),
+    ("second attempt froze no pair", second(validity=(review(),), exploit=None, attempts=(
+        Attempt(number=1, patch_sha256=PATCH, control_sha256=CONTROL), Attempt(number=2))),
+     ("R2", Label.INCONCLUSIVE, T.TEST_INVALID, "inconclusive")),
+    ("second PoV errored", second(exploit="errored"), ("R6", Label.INCONCLUSIVE, T.PROBE_ERRORED, "inconclusive")),
+    ("second PoV anomalous", second(exploit="anomalous"),
+     ("R6", Label.INCONCLUSIVE, T.PROBE_ANOMALOUS, "inconclusive")),
+    ("second PoV not run", second(exploit="not_run"), ("R6", Label.INCONCLUSIVE, T.PROBE_NOT_RUN, "inconclusive")),
+    ("second PoV infra", second(exploit="infra"), ("R1", Label.ERROR, T.INFRA_ERROR, "none")),
+    ("provider error in the second attempt", second(stopped="provider_error", exploit=None),
+     ("R1", Label.ERROR, T.PROVIDER_ERROR, "none")),
+    ("budget exhausted in the second attempt", second(stopped="budget_exhausted", exploit=None),
+     ("R7", Label.INCONCLUSIVE, T.BUDGET_EXHAUSTED, "inconclusive")),
+    ("a different control is not attempt 1's control run", second(attempts=attempts(control="f" * 64)),
+     ("R3", Label.INCONCLUSIVE, T.PROBE_NOT_RUN, "inconclusive")),
+    ("attempt 1 did not fail its PoV", second(first_exploit="errored"),
+     ("R6", Label.INCONCLUSIVE, T.NO_VALID_OBSERVATION, "inconclusive")),
+    ("second PoV run bound to attempt 1's pair", second(exploit=None, runs=runs(exploit="assertion_failed")),
+     ("R6", Label.INCONCLUSIVE, T.PROBE_NOT_RUN, "inconclusive")),
+]
+
+
+@pytest.mark.parametrize(("kwargs", "expected"), [c[1:] for c in SECOND], ids=[c[0] for c in SECOND])
+def test_second_attempt_rule_table(kwargs, expected):
+    verdict = decide(CASE, **kwargs)
+    assert (verdict.rule_id, verdict.label, verdict.terminal_reason, verdict.finding) == expected
+    assert verdict.attempt == 2 and len(verdict.attempts) == 2
+    assert verdict.sensitivity == ("unverified" if expected[0] == "R5" else None)
+
+
+def test_r5_needs_a_second_attempt_and_always_carries_sensitivity():
+    one = decide(CASE, **full(runs=runs(exploit="assertion_failed"), attempts=attempts()[:1]))
+    assert (one.rule_id, one.attempt, one.sensitivity) == ("R6", 1, None)
+    both = decide(CASE, **second())
+    assert (both.label, both.sensitivity, both.attempt) == (Label.LIKELY_NOT_EXPLOITABLE, "unverified", 2)
+    assert both.facts_origin["vulnerable.exploit.exit_class"] is Origin.NATIVE_TEST_REPORTED
+    assert both.facts_origin["a2.vulnerable.exploit.exit_class"] is Origin.NATIVE_TEST_REPORTED
+    assert both.facts_origin["a2.vulnerable.validity"] is Origin.MODEL_REVIEWED
+
+
+def test_second_attempt_fix_verification_reads_its_own_pair():
+    a2_fixed = (run("control", "passed", "fixed", OTHER), run("exploit", "assertion_failed", "fixed", OTHER))
+    kwargs = second(exploit="passed", validity=(review(), review(patch=OTHER), review("fixed", patch=OTHER)))
+    kwargs["runs"] += a2_fixed
+    verdict = decide(FIXED_CASE, **kwargs)
+    assert (verdict.rule_id, verdict.fix, verdict.fix_reason) == ("R4", "verified", T.OK)
+    # A fixed review of attempt 1's pair never verifies attempt 2's.
+    kwargs["validity"] = (review(), review(patch=OTHER), review("fixed"))
+    assert decide(FIXED_CASE, **kwargs).fix_reason is T.TEST_INVALID
+    # The second PoV passing on the fix as well is not differential.
+    kwargs = second(exploit="passed")
+    kwargs["runs"] += (run("exploit", "passed", "fixed", OTHER),)
+    assert (decide(FIXED_CASE, **kwargs).rule_id, decide(FIXED_CASE, **kwargs).terminal_reason) == (
+        "R6", T.NOT_DIFFERENTIAL)
+    r5 = decide(FIXED_CASE, **second())
+    assert (r5.rule_id, r5.fix, r5.fix_reason) == ("R5", "not_verified", T.NO_VALID_OBSERVATION)
+
+
+def test_attempts_must_be_in_order_and_runs_unique_per_pair():
+    with pytest.raises(ValueError):
+        decide(CASE, **second(attempts=attempts()[::-1]))
+    with pytest.raises(ValueError):
+        decide(CASE, **second(attempts=(Attempt(number=2, patch_sha256=OTHER),)))
+    with pytest.raises(ValueError):
+        kwargs = second()
+        decide(CASE, **{**kwargs, "runs": kwargs["runs"] + (run("exploit", "passed", patch=OTHER),)})
+    with pytest.raises(ValueError):
+        decide(CASE, **second(validity=(review(), review(patch=OTHER), review(patch=OTHER))))

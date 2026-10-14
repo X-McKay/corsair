@@ -17,14 +17,15 @@ spec.loader.exec_module(release_check)
 
 @pytest.fixture(scope="module")
 def grounding_summary(tmp_path_factory):
-    """A real scripted grounding run's summary, relabelled as the live run a person would commit."""
+    """A real scripted grounding run's summary, relabelled as the live run a person would commit, in the committed
+    baseline's shape (``evals/run.py --commit-baseline`` keeps the rollups and drops the attempt rows)."""
     results = tmp_path_factory.mktemp("results")
     assert eval_run.main(["grounding", "--results", str(results)]) == 0
     (run,) = [path for path in (results / "grounding").iterdir() if path.is_dir()]
     summary = json.loads((run / "summary.json").read_text())
     summary["mode"] = summary["identity"]["mode"] = "live"
     summary["identity"]["provider"] = {"grounding": {"profile": "local"}}
-    return summary
+    return {key: value for key, value in summary.items() if key != "attempts"}
 
 
 @pytest.fixture
@@ -66,8 +67,8 @@ def test_a_current_baseline_passes_the_thresholds_proposed_from_it(isolated, gro
     isolated(grounding_summary, thresholds)
     # a scripted run never exhausts a budget, but records no status per attempt; a live one does
     summary = copy.deepcopy(grounding_summary)
-    for row in summary["attempts"]:
-        row["status"] = row.get("status") or "ok"
+    overall = summary["rollups"]["all"]
+    overall["statuses"], overall["status_unreported"] = {"ok": overall["attempts"]}, 0
     isolated(summary)
     assert release_check.check_one("grounding", "development") == ("pass", [])
 
@@ -97,18 +98,18 @@ def test_a_scripted_or_narrowed_run_is_never_a_release_baseline(isolated, ground
     assert "baseline mode is 'scripted', not live" in reasons and "baseline is a language-narrowed run" in reasons
 
 
-def row(language, expected, label=None, fix=True):
-    return {"language": language, "expected_label": expected, "label": label or expected,
-            "assertions": {"label": (label or expected) == expected, "outcome_fields": fix}}
+def language(exploitable=(1, 1), safe=(1, 1)):
+    """A per-language rollup's dispositions: (passed, total) per expected label."""
+    per_label = {label: {"passed": passed, "total": total}
+                 for label, (passed, total) in (("LIKELY_EXPLOITABLE", exploitable), ("LIKELY_NOT_EXPLOITABLE", safe))
+                 if total}
+    return {"dispositions": {"accuracy_by_expected_label": per_label}}
 
 
 def test_the_gate_counts_a_language_only_when_both_directions_are_right():
-    exploitable, safe = "LIKELY_EXPLOITABLE", "LIKELY_NOT_EXPLOITABLE"
-    attempts = [row("python", exploitable), row("python", safe),
-                row("java", exploitable), row("java", safe, label=exploitable),  # false positive on the fix side
-                row("perl", exploitable, fix=False), row("perl", safe),          # fix result wrong
-                row("ruby", exploitable),                                        # one direction only
-                row("common", exploitable), row("common", safe),                 # language-free never counts
-                row("javascript", safe), row("javascript", exploitable)]
-    assert release_check.decisive_languages({"attempts": attempts}) == ["javascript", "python"]
-
+    by_language = {"python": language(), "javascript": language(exploitable=(2, 3), safe=(1, 4)),
+                   "java": language(safe=(0, 2)),         # every not-exploitable case mislabelled
+                   "ruby": language(safe=(0, 0)),         # one direction only
+                   "perl": {"dimensions": {}},            # no chain dispositions
+                   "common": language()}                  # language-free never counts
+    assert release_check.decisive_languages({"rollups": {"by_language": by_language}}) == ["javascript", "python"]

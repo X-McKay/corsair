@@ -4,9 +4,9 @@ import uuid
 
 import pytest
 
-from corsair.v2.build import environment_key, recipe_sha256, replay
-from corsair.v2.contracts import Case, ExitClass, Finding, Recipe, Revision, Runtime
-from corsair.v2.workspace.docker import docker, docker_available
+from corsair.build import environment_key, recipe_sha256, replay
+from corsair.contracts import Case, ExitClass, Finding, Recipe, Revision, Runtime
+from corsair.workspace.docker import docker, docker_available
 
 IMAGE = "corsair-python:ebf057997574de59"
 needs_docker = pytest.mark.skipif(
@@ -110,8 +110,8 @@ def test_network_only_during_setup(tmp_path, cleanup_images):
 
 
 def test_a_recipe_never_overwrites_the_revisions_own_files(tmp_path):
-    from corsair.v2.contracts import Case, Finding, Recipe, RecipeFile, Revision, Runtime
-    from corsair.v2.build import replay
+    from corsair.contracts import Case, Finding, Recipe, RecipeFile, Revision, Runtime
+    from corsair.build import replay
     (tmp_path / "app.py").write_text("x = 1\n")
     case = Case(case_id="c", finding=Finding(title="t"), revision=Revision(source=str(tmp_path), tree_sha256="0" * 64))
     runtime = Runtime(row_id="r", image="unused", framework="f", skill="s", run_template=("true",),

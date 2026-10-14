@@ -50,5 +50,5 @@ def test_ci_never_reaches_a_model(path):
 
 def test_every_runtime_row_gets_a_job_from_its_toolchain_source():
     from tools.ci_rows import rows
-    from corsair.v2 import matrix
+    from corsair import matrix
     assert [row["id"] for row in rows()] == [row.id for row in matrix.load()]

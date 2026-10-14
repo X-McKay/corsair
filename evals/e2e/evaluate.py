@@ -1,6 +1,6 @@
 """Whole-chain eval of v2: ``python -m evals.e2e.evaluate --set v2`` (or ``make eval AGENT=chain SET=v2``).
 
-Each case's ``input.json`` goes through v2 intake (``intake.from_issue_json``) and then ``corsair.v2.chain.run_case``:
+Each case's ``input.json`` goes through v2 intake (``intake.from_issue_json``) and then ``corsair.chain.run_case``:
 the real routing (``compose`` over ``LocalOps``), the real Select over ``deploy/v2/runtime-matrix.yaml`` and the
 real Decide (``rules.decide``), recorded by a ``RunRecorder`` in the attempt's fresh working directory.
 
@@ -8,7 +8,7 @@ real Decide (``rules.decide``), recorded by a ``RunRecorder`` in the attempt's f
   stages, the Builder workspace, trusted replay, the D3 check and Execute replay the case oracle's ``replay`` block
   (evaluator-only, never in ``input.json``); the models handed to ``run_case`` refuse any call. A case without the
   observation a stage needs gets a ``LookupError`` from that stage, which the chain records as ``infra_error``.
-- **Live** (``--provider-config``): ``default_stages()`` with every agent's model from ``corsair.v2.models``. It
+- **Live** (``--provider-config``): ``default_stages()`` with every agent's model from ``corsair.models``. It
   needs Docker and a reachable endpoint and refuses to start without Docker.
 
 The ``replay`` block (README "Scorer"): ``plan`` (status, citations), ``build`` (one entry per Builder episode:
@@ -42,14 +42,14 @@ from pydantic import BaseModel, ValidationError
 from pydantic_ai.models import Model
 from pydantic_ai.models.function import FunctionModel
 
-from corsair.v2 import intake, matrix
-from corsair.v2.chain import MAX_REVIEWS, Stages, default_stages, run_case
-from corsair.v2.contracts import (AgentUsage, BuildResult, Case, Citation, Environment, ExitClass, Label, Outcome,
-                                  ProbeBrief, ProbeDraft, ProbeFacts, ProbePlan, ProbeRun, ProbeValidity, Recipe,
-                                  Runtime, Validity, Verdict)
-from corsair.v2.outcome import classify
-from corsair.v2.record import RunRecorder, to_json
-from corsair.v2.rules import RULES, decide
+from corsair import intake, matrix
+from corsair.chain import MAX_REVIEWS, Stages, default_stages, run_case
+from corsair.contracts import (AgentUsage, Attempt as ExploitAttempt, BuildResult, Case, Citation, Environment,
+                                  ExitClass, Label, Outcome, ProbeBrief, ProbeDraft, ProbeFacts, ProbePlan, ProbeRun,
+                                  ProbeValidity, Recipe, Runtime, Validity, Verdict)
+from corsair.outcome import classify
+from corsair.record import RunRecorder, to_json
+from corsair.rules import RULES, decide
 from evals.agent_eval import AgentEval, Attempt, main
 from evals.cases import EVALS, CHAIN, EvalCase
 
@@ -120,7 +120,7 @@ def _digest(value: BaseModel) -> str:
     return hashlib.sha256(json.dumps(value.model_dump(mode="json"), sort_keys=True).encode()).hexdigest()
 
 
-_FACTS = {  # the platform facts each raw outcome is classified from (corsair.v2.outcome), for a well-formed ProbeRun
+_FACTS = {  # the platform facts each raw outcome is classified from (corsair.outcome), for a well-formed ProbeRun
     "passed": dict(exit_code=0, exit_class=ExitClass.PASS, start_marker=True, end_marker=True, token_in_output=False,
                    check_marker="holds"),
     "assertion_failed": dict(exit_code=1, exit_class=ExitClass.TEST_FAILED, start_marker=True, end_marker=False,
@@ -135,13 +135,32 @@ _FACTS = {  # the platform facts each raw outcome is classified from (corsair.v2
 
 
 class Replay:
-    """Fake stage callables answering from one case's ``replay`` block, in call order."""
+    """Fake stage callables answering from one case's ``replay`` block, in call order.
+
+    A second exploit attempt (SPEC-0082 D18) starts at the second fresh exploit draft. From then on the check,
+    review and outcomes answer from the optional ``attempt2`` block (same shape as ``check``, ``review`` and
+    ``outcomes``); without one, attempt 2 repeats attempt 1's last recorded exploit check, last recorded review of
+    each revision and recorded outcomes, which is each oracle's own expected path for an independent PoV.
+    """
 
     def __init__(self, key: str, replay: Mapping[str, Any] | None):
         self.key, self.replay = key, replay or {}
         self.episodes = 0
-        self.checks: dict[str, int] = {}
-        self.reviews: dict[str, int] = {}
+        self.attempt = 1
+        self.fresh_exploits = 0
+        self.checks: dict[tuple[int, str], int] = {}
+        self.reviews: dict[tuple[int, str], int] = {}
+
+    def recorded(self, *path: str) -> Any:
+        """Attempt 2 reads ``attempt2.<path>`` when recorded, else ``None`` (the caller falls back)."""
+        if self.attempt == 1:
+            return self.need(*path)
+        value: Any = self.replay.get("attempt2")
+        for part in path:
+            if not isinstance(value, Mapping) or part not in value:
+                return None
+            value = value[part]
+        return value
 
     def need(self, *path: str) -> Any:
         value: Any = self.replay
@@ -187,6 +206,9 @@ class Replay:
 
     async def _probe(self, role, brief, runtime, model, *, source_root, diagnostics=None, previous=None,
                      review_feedback=None):
+        if role == "exploit" and previous is None and diagnostics is None and review_feedback is None:
+            self.fresh_exploits += 1
+            self.attempt = min(self.fresh_exploits, 2)
         source = f"recorded {role} probe; writes its markers under CORSAIR_MARKER_DIR" + (
             "" if previous is None else f"; revision of {_digest(previous)[:12]}")
         draft = ProbeDraft(role=role, test_file=brief.test_file, test_name=brief.test_name, source=source)
@@ -198,23 +220,31 @@ class Replay:
     async def exploit_probe(self, brief, runtime, model, **kwargs):
         return await self._probe("exploit", brief, runtime, model, **kwargs)
 
+    @staticmethod
+    def _listed(value: Any) -> list:
+        return [value] if isinstance(value, (str, Mapping)) else list(value)
+
     def diagnose(self, environment, runtime, draft):
-        recorded = self.need("check", draft.role)
-        recorded = [recorded] if isinstance(recorded, str) else list(recorded)
-        n = self.checks.get(draft.role, 0)
+        recorded = self.recorded("check", draft.role)
+        if recorded is None:  # attempt 2 without its own record: attempt 1's last check of this role
+            recorded = self._listed(self.need("check", draft.role))[-1:]
+        recorded = self._listed(recorded)
+        n = self.checks.get((self.attempt, draft.role), 0)
         if n >= len(recorded):
             raise LookupError(f"{self.key}: the oracle replay records {len(recorded)} {draft.role} check(s)")
-        self.checks[draft.role] = n + 1
+        self.checks[(self.attempt, draft.role)] = n + 1
         check = recorded[n]
         return check, None if check == "ok" else f"check: {check}\nhint: recorded mechanical failure"
 
     async def review(self, case, plan, patch, model, *, source_root, revision="vulnerable", runtime=None):
-        rounds = self.need("review", revision)
-        rounds = [rounds] if isinstance(rounds, Mapping) else list(rounds)
-        n = self.reviews.get(revision, 0)
+        rounds = self.recorded("review", revision)
+        if rounds is None:  # attempt 2 without its own record: attempt 1's last review of this revision
+            rounds = self._listed(self.need("review", revision))[-1:]
+        rounds = self._listed(rounds)
+        n = self.reviews.get((self.attempt, revision), 0)
         if n >= len(rounds):
             raise LookupError(f"{self.key}: the oracle replay records {len(rounds)} {revision} review(s)")
-        self.reviews[revision] = n + 1
+        self.reviews[(self.attempt, revision)] = n + 1
         entry = rounds[n]
         citations = tuple(Citation(**item) for item in entry.get("citations") or ())
 
@@ -228,7 +258,7 @@ class Replay:
                         exploit=one("exploit")), _usage("reviewer")
 
     def execute(self, environment, runtime, patch, role, *, revision="vulnerable"):
-        outcome = self.need("outcomes", revision, role)
+        outcome = self.recorded("outcomes", revision, role) or self.need("outcomes", revision, role)
         facts = ProbeFacts(**_FACTS[outcome])
         if classify(facts) is not Outcome(outcome):  # the recorded facts must read as the recorded outcome today
             raise ValueError(f"{self.key}: recorded facts for {outcome} classify as {classify(facts).value}")
@@ -402,7 +432,13 @@ _PHASES = (
     (r"diagnose-(control|exploit)|probe-(control|exploit)-revision|review\.\d+|"
      r"probe\.(control|exploit)\.r\d+(\.revision)?|diagnose\.(control|exploit)\.r\d+", 5, None),
     (r"review-fixed", 6, 1), (r"execute-(control|exploit)-vulnerable", 7, 1), (r"replay-fixed", 8, 1),
-    (r"execute-(control|exploit)-fixed", 9, 1), (r"decide", 10, 1),
+    (r"execute-(control|exploit)-fixed", 9, 1),
+    # The second exploit attempt (D18): a new PoV only, its own check and review loop, then its runs.
+    (r"probe-exploit\.a2", 9.1, 1),
+    (r"diagnose-exploit(\.\d+)?\.a2|probe-exploit-revision(\.\d+)?\.a2|review\.a2\.\d+|"
+     r"probe\.exploit\.r\d+(\.revision(\.\d+)?)?\.a2|diagnose\.exploit\.r\d+(\.\d+)?\.a2", 9.2, None),
+    (r"execute-exploit-vulnerable\.a2", 9.3, 1), (r"review-fixed\.a2", 9.4, 1), (r"replay-fixed\.a2", 9.5, 1),
+    (r"execute-(control|exploit)-fixed\.a2", 9.6, 1), (r"decide", 10, 1),
 )
 
 
@@ -416,21 +452,33 @@ def trajectory(steps: list[str], verdict: Verdict) -> bool:
         phases.append(match[0])
     if not steps or steps[-1] != "decide" or phases != sorted(phases) or steps.count("select") != 1:
         return False
-    reviews = [int(step.split(".")[1]) for step in steps if re.fullmatch(r"review\.\d+", step)]
-    if reviews != list(range(1, len(reviews) + 1)) or len(reviews) > MAX_REVIEWS or verdict.review_rounds != len(reviews):
+    second = any(step.endswith(".a2") for step in steps)
+    if second != (len(verdict.attempts) == 2):
         return False
-    for role in ROLES:
-        asked = [step for step in steps if re.fullmatch(rf"probe\.{role}\.r\d+", step)]
-        if len(asked) > MAX_REVIEWS - 1 or verdict.revisions.get(role, 0) != len(asked):
+    attempts = verdict.attempts or (ExploitAttempt(number=1, review_rounds=verdict.review_rounds,
+                                                   revisions=verdict.revisions),)
+    for attempt in attempts:  # each attempt's review loop inside its bound; attempt 2 revises only the PoV
+        tag, review = ("", "review.{}") if attempt.number == 1 else (".a2", "review.a2.{}")
+        pattern = r"review\.\d+" if attempt.number == 1 else r"review\.a2\.\d+"
+        reviews = [int(step.rsplit(".", 1)[1]) for step in steps if re.fullmatch(pattern, step)]
+        if reviews != list(range(1, len(reviews) + 1)) or len(reviews) > MAX_REVIEWS or \
+                attempt.review_rounds != len(reviews):
             return False
-        for step in asked:  # a review revision follows the review it answers
-            n = int(step.split(".r")[1])
-            if f"review.{n}" not in steps or steps.index(f"review.{n}") > steps.index(step):
+        for role in ROLES:
+            asked = [step for step in steps if re.fullmatch(rf"probe\.{role}\.r\d+{re.escape(tag)}", step)]
+            if len(asked) > MAX_REVIEWS - 1 or attempt.revisions.get(role, 0) != len(asked):
                 return False
-    executed = {revision for step in steps for revision in ("vulnerable", "fixed")
-                if re.fullmatch(rf"execute-(control|exploit)-{revision}", step)}
-    valid = {v.revision for v in verdict.validity if v.control.valid and v.exploit.valid}
-    return executed <= valid  # only reviewed, valid bytes ran
+            for step in asked:  # a review revision follows the review it answers
+                n = int(step.split(".r")[1].split(".")[0])
+                if review.format(n) not in steps or steps.index(review.format(n)) > steps.index(step):
+                    return False
+        executed = {revision for step in steps for revision in ("vulnerable", "fixed")
+                    if re.fullmatch(rf"execute-(control|exploit)-{revision}{re.escape(tag)}", step)}
+        valid = {v.revision for v in verdict.validity if v.control.valid and v.exploit.valid
+                 and (attempt.patch_sha256 is None or v.patch_sha256 == attempt.patch_sha256)}
+        if not executed <= valid:  # only reviewed, valid bytes ran
+            return False
+    return True
 
 
 def check(case: EvalCase, attempt: Attempt) -> dict[str, bool]:

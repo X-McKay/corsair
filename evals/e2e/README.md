@@ -13,19 +13,19 @@ Whole-chain cases in the [eval layout](../README.md): `evals/e2e/<language>/<set
 
 ## v2 whole-chain set (`v2`)
 
-`evals/e2e/<language>/v2/<case>/`, manifest `sets/v2.json`: 100 cases for the v2 chain (`src/corsair/v2/`), each
-ending in a `Verdict` from the D4 rule table (`src/corsair/v2/rules.py`).
+`evals/e2e/<language>/v2/<case>/`, manifest `sets/v2.json`: 122 cases for the v2 chain (`src/corsair/`), each
+ending in a `Verdict` from the D4 rule table (`src/corsair/rules.py`).
 
 | Language | Cases | Positive | Negative | Injection | Ineffective fix | No runtime | Missing target | Unbuildable |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | python | 37 | 15 | 17 | 1 | 1 | 1 | 1 | 1 |
 | java | 11 | 3 | 3 | 1 | 1 | 1 | 1 | 1 |
-| javascript | 18 | 4 | 4 | 1 | 1 | 6 | 1 | 1 |
+| javascript | 24 | 7 | 7 | 1 | 1 | 6 | 1 | 1 |
 | perl | 15 | 5 | 5 | 1 | 1 | 1 | 1 | 1 |
-| ruby | 15 | 5 | 5 | 1 | 1 | 1 | 1 | 1 |
+| ruby | 31 | 13 | 13 | 1 | 1 | 1 | 1 | 1 |
 | common (C) | 4 | | | | | 4 | | |
 
-- **Input** is a v2 issue request, exactly what `corsair.v2.intake.from_issue_json` accepts (`finding`, `source`,
+- **Input** is a v2 issue request, exactly what `corsair.intake.from_issue_json` accepts (`finding`, `source`,
   optional `fixed_source`, `case_id`); `source` is relative to the `input.json`. Run one case with
   `uv run corsair-v2 run --issue-json evals/e2e/<language>/v2/<case>/input.json` (Docker and a provider config).
   Corpus cases point into `benchmarks/corpus/infosec-harness/` and reuse its finding and the opaque
@@ -47,7 +47,13 @@ Sources and choices:
 - Positives and negatives are the non-held-out infosec-harness families (held-out families are excluded by
   `evals/corpus/held_out.json`). The 17 v1 corpus requests and 2 v1 negatives map onto the Python families; v1's
   `INCONCLUSIVE` for the XXE negative was a v1 calibration constraint, so the v2 oracle keeps the manifest truth.
-- The corpus has no Ruby, so the 14 Ruby cases are Corsair-authored (five paired families, a source-comment
+- Imported pairs (`benchmarks/corpus/permissive-reduced/`, permissively licensed upstream code reduced to small
+  offline trees; provenance per family) are written by `python -m evals.e2e.from_manifest <manifest> <family>...`,
+  which takes the finding, the opaque id and the truth from that manifest exactly as for infosec-harness: the
+  JavaScript families `dot-prop`, `angular-http-server` and `codecov-node`, and the Ruby families `rubyzip`,
+  `rack-static`, `ruby-git-fetch`, `secure-headers`, `tzinfo`, `cocoapods-git`, `pdfkit` and
+  `ruby-git-ls-files`.
+- The infosec-harness corpus has no Ruby, so the 14 original Ruby cases are Corsair-authored (five paired families, a source-comment
   injection and three failure modes). Java has only three non-held-out families, so it has exactly ten cases. The
   real-repository benchmark cases under `benchmarks/cases/` (including the two v1 `jest` cases, `rack-static` and
   `http-tiny-verify-ssl`) need an upstream fetch; v2 intake takes a local tree, so they are not in this set.
@@ -76,7 +82,7 @@ Sources and choices:
 `tests/v2/test_chain_cases.py` checks the set without running the chain: counts per language, every input loading
 through v2 intake with the pinned tree digests, Select choosing `expected_runtime_row`, oracles consistent with the
 rule table, corpus cases equal to the manifest route, no held-out family, and no oracle field or label in any input.
-The generator lives outside the repository; regenerate by editing cases and running
+The generator for the original 100 cases lives outside the repository; regenerate them by editing cases and running
 `PYTHONPATH=src:. .venv/bin/python -m evals.cases e2e v2 --freeze`.
 
 ## Scorer
@@ -86,7 +92,7 @@ The generator lives outside the repository; regenerate by editing cases and runn
     PYTHONPATH=src:. .venv/bin/python -m evals.run chain --set v2 [--language perl]     # make eval AGENT=chain SET=v2
     PYTHONPATH=src:. .venv/bin/python -m evals.run chain --set v2 --provider-config providers.json   # live
 
-Every attempt builds the `Case` with `intake.from_issue_json` and runs `corsair.v2.chain.run_case` with a
+Every attempt builds the `Case` with `intake.from_issue_json` and runs `corsair.chain.run_case` with a
 `RunRecorder` in a fresh directory: the real routing (review loop, D3 check, budget), the real Select over
 `deploy/v2/runtime-matrix.yaml` and the real `rules.decide`.
 
@@ -96,9 +102,11 @@ Every attempt builds the `Case` with `intake.from_issue_json` and runs `corsair.
   null no recipe), `build_fixed`, `check` (D3 result per role, a string or a list in call order), `review` (per
   revision one round or a list of rounds: validity per role, citations) and `outcomes` (the raw probe outcome per
   revision and role, the one place outcomes live; the recorded facts must classify as that outcome under
-  `outcome.classify`). These are reference trajectories authored from each oracle's own expected path, not
-  observations of live runs; a stage whose observation is missing raises, which the chain records as `infra_error`.
-- **Live** (`--provider-config`): `default_stages()` with every agent's model from `corsair.v2.models`; it needs
+  `outcome.classify`). A second exploit attempt (D18, before any R5) answers from an optional `attempt2` block with
+  the same `check`, `review` and `outcomes` keys; without one it repeats attempt 1's last exploit check, last review
+  per revision and recorded outcomes. These are reference trajectories authored from each oracle's own expected
+  path, not observations of live runs; a stage whose observation is missing raises, which the chain records as `infra_error`.
+- **Live** (`--provider-config`): `default_stages()` with every agent's model from `corsair.models`; it needs
   Docker and a reachable endpoint and exits 2 with the reason when Docker does not answer.
 
 Assertions (each one dimension; a dimension counts only where `case.json` declares it):

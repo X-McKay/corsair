@@ -1,0 +1,21 @@
+# Operator-owned OpenShell policy for v2 sandboxes with no network: probes, baselines and every replayed
+# environment after setup. Agents and project files never edit it; the backend refuses a document outside this
+# shape (src/corsair/workspace/openshell.py, check_policy).
+#
+# NOT YET TRUSTED: this document is v1's qualified identity policy (`git show 9c3bc62:policies/openshell/identity.yaml`)
+# plus /opt read-only (where the Java images keep the JDK and the offline Maven closure; v1's toolchain gate granted
+# those /opt paths one by one). It has not passed the live policy gate, so nothing run under it is live evidence yet.
+# Open live questions: whether /opt is enough for every runtime-matrix image (v1 granted /lib64 only for Node 8's
+# non-merged-/usr base, which v2 does not use), and which user the gateway's process defaults run commands as.
+#
+# Writable: the native sandbox workdir /sandbox (include_workdir, where trusted code copies the tree and runs) and
+# /tmp ($CORSAIR_MARKER_DIR, HOME=/tmp in the toolchain images, and the staging area for copies). Everything else the
+# toolchains need is read-only. No provider or network grants.
+version: 1
+filesystem_policy:
+  include_workdir: true
+  read_only: [/bin, /usr, /lib, /opt, /proc, /dev/urandom, /etc, /var/log]
+  read_write: [/tmp, /dev/null]
+landlock:
+  compatibility: hard_requirement
+network_policies: {}

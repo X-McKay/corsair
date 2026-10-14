@@ -1,6 +1,6 @@
 # Gates, CI and release policy for v2
 
-Status: **prepared, not enabled** (2026-10-14). Merging the PR that carries this document turns on the full CI
+Status: **prepared, not enabled** (2026-10-14; rebased onto the `src/corsair` package layout). Merging the PR that carries this document turns on the full CI
 described below; it is held until the enabling gate holds. Architecture and the deferral itself:
 [SPEC-0082](../development/specs/SPEC-0082-corsair-v2-architecture.md#acceptance-and-validation).
 
@@ -23,9 +23,10 @@ Gates, full CI and release policies return when `make gate-status` exits 0. That
 2. The chain's committed live baseline gets both directions right in at least three languages. For each counted
    language, at least one case is expected LIKELY_EXPLOITABLE, is labelled so, and has the correct fix result on the
    fixed revision. At least one other case is expected LIKELY_NOT_EXPLOITABLE and is labelled so. Language-free
-   (`common`) cases do not count.
+   (`common`) cases do not count. The gate reads the per-language dispositions in the committed baseline; a correct
+   LIKELY_EXPLOITABLE label already requires the differential result on the fixed revision (D12, rule R4).
 
-Today it reports 0 of 6 agent baselines, no Reviewer suite and 0 of 3 languages.
+Today it reports 0 of 6 agent baselines and 0 of 3 languages.
 
 ## CI when enabled (`.github/workflows/development.yml`)
 
@@ -48,8 +49,8 @@ whose verdict is not `pass` exits 1.
 
 `make release-check` (`tools/release_check.py check`) passes an agent only when all of these hold:
 
-- The committed baseline `<eval root>/baselines/<set>-live.json` exists. It is the promoted run's `summary.json`,
-  copied with `make baseline-commit AGENT= RUN=`.
+- The committed baseline `<eval root>/baselines/<set>-live.json` exists. It is the promoted run's `summary.json`
+  without per-attempt rows, written by `make baseline-commit AGENT= RUN=` (`evals/run.py --commit-baseline`).
 - The baseline is a whole-set live run.
 - The baseline measured the agent as it stands. Every identity key its eval spec records must match: prompt version,
   config version, skill digest, toolset digest and, for the chain, evaluator version, review limit and matrix digest.
@@ -81,8 +82,8 @@ values they accept.
   given the error-cost order).
 - **G3, required checks.** Recommended branch protection on develop is `offline-guards` and every
   `scripted-evals (*)`, with `runtime-row (*)` required when it runs. On main, add `release-check`.
-- **G4, reading of "both directions".** As implemented: a correct exploitable label with a correct fix result, plus a
-  correct not-exploitable label, in the same language. Al may want a stricter reading, such as the same case pair on
+- **G4, reading of "both directions".** As implemented: a correct exploitable label (which already carries the
+  differential result on the fixed revision), plus a correct not-exploitable label, in the same language. Al may want a stricter reading, such as the same case pair on
   both revisions or more than one pair per language.
 - **G5, chain identity.** The chain baseline's identity covers its evaluator, review limit and matrix. Each agent's
   identity is checked on that agent's own baseline, not on the chain's. A stricter rule would also stale the chain

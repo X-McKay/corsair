@@ -8,11 +8,11 @@ from pathlib import Path
 import pytest
 import yaml
 
-from corsair.v2 import matrix
-from corsair.v2.contracts import Case, Finding, Revision
+from corsair import matrix
+from corsair.contracts import Case, Finding, Revision
 
 ROOT = Path(__file__).resolve().parents[2]
-SKILLS = ROOT / "src/corsair/v2/skills/frameworks"
+SKILLS = ROOT / "src/corsair/skills/frameworks"
 PLACEHOLDERS = {"file", "name", "class", "module"}
 
 

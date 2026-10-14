@@ -13,8 +13,8 @@ the gates on. Three subcommands, all offline and deterministic:
 ``propose`` Print suggested thresholds for one agent from its committed baseline. It never edits a policy, which is
             operator-owned; a person copies what they accept.
 
-Baselines live beside the cases: ``<eval root>/baselines/<set>-live.json`` is a copy of the promoted run's
-summary.json (``make baseline-commit AGENT= RUN=``). An unobserved metric or missing provenance is unknown, which
+Baselines live beside the cases: ``<eval root>/baselines/<set>-live.json`` is the promoted run's summary without
+per-attempt rows, written by ``make baseline-commit AGENT= RUN=`` (``evals/run.py --commit-baseline``). An unobserved metric or missing provenance is unknown, which
 never passes.
 
 Usage: uv run --locked python tools/release_check.py {check,gate,propose AGENT} [--agent NAME ...]
@@ -24,7 +24,6 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
-import shutil
 import sys
 from pathlib import Path
 
@@ -51,7 +50,7 @@ def evaluated() -> list[str]:
 
 
 def spec_identity(agent: str) -> dict:
-    module = "evals.e2e.evaluate" if agent == CHAIN else f"corsair.v2.agents.{agent}.evals.evaluate"
+    module = "evals.e2e.evaluate" if agent == CHAIN else f"corsair.agents.{agent}.evals.evaluate"
     return dict(importlib.import_module(module).SPEC.identity)
 
 
@@ -127,16 +126,16 @@ def check(agents: list[str]) -> int:
 
 
 def decisive_languages(summary: dict) -> list[str]:
-    """Languages where the live chain got both directions right: a correct LIKELY_EXPLOITABLE (with its fix result)
-    and a correct LIKELY_NOT_EXPLOITABLE. Language-free (``common``) cases do not count."""
-    correct: dict[str, set[str]] = {}
-    for row in summary.get("attempts") or []:
-        assertions = row.get("assertions") or {}
-        if (row.get("language") not in (None, "common") and row.get("expected_label") in DECISIVE
-                and row.get("label") == row.get("expected_label")
-                and assertions.get("label") is True and assertions.get("outcome_fields") is True):
-            correct.setdefault(row["language"], set()).add(row["expected_label"])
-    return sorted(language for language, labels in correct.items() if labels == set(DECISIVE))
+    """Languages where the live chain got both directions right: at least one case expected LIKELY_EXPLOITABLE
+    labelled so and at least one expected LIKELY_NOT_EXPLOITABLE labelled so. A committed baseline carries the
+    per-language dispositions, not per-attempt rows; a LIKELY_EXPLOITABLE label already requires the differential
+    result on the fixed revision (D12/R4). Language-free (``common``) cases do not count."""
+    languages = []
+    for language, group in sorted(((summary.get("rollups") or {}).get("by_language") or {}).items()):
+        per_label = (group.get("dispositions") or {}).get("accuracy_by_expected_label") or {}
+        if language != "common" and all((per_label.get(label) or {}).get("passed", 0) >= 1 for label in DECISIVE):
+            languages.append(language)
+    return languages
 
 
 def gate() -> int:
@@ -201,19 +200,6 @@ def propose(agent: str) -> int:
     return 0
 
 
-def commit_baseline(agent: str, run: str, results: Path) -> int:
-    """Copy a promoted live run's summary.json to the committed baseline path for its set."""
-    source = results / agent / run / "summary.json"
-    summary = json.loads(source.read_text())
-    if summary.get("mode") != "live" or summary.get("language"):
-        raise SystemExit(f"{run}: only a whole-set live run can be a committed baseline")
-    target = baseline_path(agent, summary["set"])
-    target.parent.mkdir(exist_ok=True)
-    shutil.copyfile(source, target)
-    print(f"{target.relative_to(ROOT)} <- {source}")
-    return 0
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -222,18 +208,12 @@ def main(argv: list[str] | None = None) -> int:
     commands.add_parser("gate")
     proposal = commands.add_parser("propose")
     proposal.add_argument("agent", choices=(*AGENTS, CHAIN))
-    commit = commands.add_parser("commit")
-    commit.add_argument("agent", choices=(*AGENTS, CHAIN))
-    commit.add_argument("run")
-    commit.add_argument("--results", type=Path, default=ROOT / ".runs/evals")
     args = parser.parse_args(argv)
     if args.command == "check":
         return check(args.agent or evaluated())
     if args.command == "gate":
         return gate()
-    if args.command == "propose":
-        return propose(args.agent)
-    return commit_baseline(args.agent, args.run, args.results)
+    return propose(args.agent)
 
 
 if __name__ == "__main__":

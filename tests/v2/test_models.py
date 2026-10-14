@@ -7,7 +7,7 @@ import pytest
 from pydantic import ValidationError
 from pydantic_ai.models.openai import OpenAIChatModel
 
-from corsair.v2.models import AGENTS, ProviderConfig, agent_models, load_provider_config
+from corsair.models import AGENTS, ProviderConfig, agent_models, load_provider_config
 
 LOCAL = Path(__file__).resolve().parents[2] / "config" / "v2" / "providers.local.json"
 

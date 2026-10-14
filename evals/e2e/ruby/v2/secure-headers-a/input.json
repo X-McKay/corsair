@@ -1,0 +1,12 @@
+{
+  "case_id": "corpus:a21f204c77efaf85",
+  "finding": {
+    "title": "Content-Security-Policy directive construction in ContentSecurityPolicy",
+    "description": "ContentSecurityPolicy#build_source_list_directive assembles a single Content-Security-Policy directive string from a directive name and its source values.",
+    "file_path": "lib/secure_headers/headers/content_security_policy.rb",
+    "start_line": 9,
+    "symbol": "build_source_list_directive",
+    "cwe": "CWE-113"
+  },
+  "source": "../../../../../benchmarks/corpus/permissive-reduced/ruby/secure-headers/a"
+}

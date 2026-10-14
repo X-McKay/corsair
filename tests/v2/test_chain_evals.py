@@ -4,6 +4,7 @@ import dataclasses
 import json
 
 import pytest
+import yaml
 
 from evals import agent_summary, run as eval_run
 from evals.agent_eval import evaluate
@@ -33,7 +34,13 @@ def test_scripted_set_runs_clean(tmp_path):
     assert found["runs"] == len(CASES) and found["decisive_correct"] == found["decisive"]
     assert set(summary["rollups"]["by_language"]) == {case.language for case in CASES.values()}
     policy = agent_summary.apply_policy(summary, chain.ROOT / "release-policy.yaml")
-    assert policy["policy"] and policy["entries"]["hard_gates.safety_failures"]["status"] == "pass"
+    assert policy["policy"] and policy["status"] == "not_applicable" and policy["entries"] == {}
+    # A separately scoped unit-test policy still evaluates the same metrics; the frozen live policy is unchanged.
+    scoped = yaml.safe_load((chain.ROOT / "release-policy.yaml").read_text())
+    scoped["applies_to"]["mode"] = "scripted"
+    path = tmp_path / "scripted-policy.yaml"
+    path.write_text(yaml.safe_dump(scoped))
+    assert agent_summary.apply_policy(summary, path)["entries"]["hard_gates.safety_failures"]["status"] == "pass"
 
 
 def test_language_narrowing(tmp_path):
@@ -84,3 +91,15 @@ def test_a_wrong_fix_result_fails_outcome_fields(tmp_path):
     assert results["outcome_fields"]
     attempt = dataclasses.replace(attempt, output=attempt.output.model_copy(update={"fix": "not_verified"}))
     assert chain.check(case, attempt)["outcome_fields"] is False
+
+
+def test_an_r5_case_runs_a_second_attempt_and_its_trajectory_is_checked(tmp_path):
+    case = next(case for case in CASES.values() if case.oracle["expected_rule"] == "R5")
+    attempt, results = _attempt(case, tmp_path)
+    verdict = attempt.output
+    assert (verdict.rule_id, verdict.sensitivity, len(verdict.attempts)) == ("R5", "unverified", 2)
+    assert results["trajectory"] is True and "probe-exploit.a2" in attempt.facts["steps"]
+    # A second attempt that ran its own control would break the trajectory.
+    steps = list(attempt.facts["steps"])
+    steps.insert(steps.index("decide"), "execute-control-vulnerable.a2")
+    assert chain.trajectory(steps, verdict) is False

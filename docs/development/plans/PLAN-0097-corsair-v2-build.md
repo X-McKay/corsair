@@ -29,7 +29,7 @@ Lanes within a phase can run in parallel. A phase starts once the contracts it c
 
 Phase 0, develop setup:
 
-- [ ] Remove v1's `src`, `tests` and eval runners from develop (D11 default). Keep images, the matrix, corpus and benchmark data, and the docs records. v2 lives in `src/corsair/v2` (PR #133) and declares its runtime dependencies in `[project]`, not in the dev group.
+- [ ] Remove v1's `src`, `tests` and eval runners from develop (D11 default). Keep images, the matrix, corpus and benchmark data, and the docs records. v2 lives in `src/corsair/v2` (PR #133) and moved up to `src/corsair` on 2026-10-14 (Al: package move before the main cutover) and declares its runtime dependencies in `[project]`, not in the dev group.
 - [ ] Cut develop's PR path to one offline job, `make test-v2`, until something runs end to end (Al, 08:28Z). The v1 suites, the image gate and the qualification and record guards stay runnable by hand. The "Shorter CI with gates deferred" thread owns this step.
 
 Phase 1, contracts and layout:
@@ -81,6 +81,8 @@ After phase 5, on Al's call:
 
 Each step records its actual commands and results here, including failed attempts. A failure is never replaced by its later successful rerun.
 
+2026-10-14, D18 (branch `claude/v2-d18`): the chain runs a second, blind exploit attempt before R5, reusing attempt 1's control bytes in a new pair with its own digest, exploit-only D3 check and review loop; `rules.decide` reads `attempts` and decides on the last attempt; R5 needs two `assertion_failed` PoVs and carries `sensitivity: unverified`. Scripted only (fake stages and the scripted e2e replay); no live model or Docker run. `uv run --locked python -m pytest -q -n auto tests`: 1722 passed, 55 skipped.
+
 ## Decisions and next action
 
 Decisions are recorded in SPEC-0082. Defaults this plan uses until Al decides otherwise:
@@ -88,5 +90,7 @@ Decisions are recorded in SPEC-0082. Defaults this plan uses until Al decides ot
 - D10: the Investigator does not read Grounding output.
 - D11: v1 is removed from develop in phase 0.
 - R5 lists its calibration without requiring it.
+
+D18 (Al, 2026-10-14 11:26Z) adds a phase 3/4 step: before R5, run one independent second exploit attempt reusing the first control, decide over both attempts, and stamp every R5 `sensitivity: unverified` until the corpus measures LNE precision per language and vulnerability class.
 
 Next action: phase 0 and the phase 1 contracts, in the "v2 build on develop" thread.

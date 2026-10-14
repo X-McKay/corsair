@@ -27,7 +27,7 @@ A held-out set's manifest says `"held_out": true`; its case ids are never cited 
 
 ## v2 agent evals
 
-Each v2 agent keeps its eval inside its package, `src/corsair/v2/agents/<agent>/evals/`:
+Each v2 agent keeps its eval inside its package, `src/corsair/agents/<agent>/evals/`:
 `evaluate.py` (one `AgentEval` for the shared runner [`agent_eval.py`](agent_eval.py)), `README.md`,
 `release-policy.yaml` (placeholder), `sets/<set>.json` and `<language>/<set>/<case>/{input,oracle,case}.json`.
 The whole chain's cases live under [`e2e/`](e2e/README.md), set `v2`. Every v2 `case.json` also carries `category`
@@ -44,8 +44,19 @@ PYTHONPATH=src:. python -m evals.run <agent> --set development --provider-config
 A run writes `command.json`, `attempts.jsonl`, `receipts/`, `summary.json` (schema `corsair-eval-summary/v1`:
 dimensions passed/total; `wall_s`, `requests`, `tool_calls`, `input_tokens`, `output_tokens`, `tokens` and `retries`;
 the parameters each agent ran with and status counts, overall and by language and kind. Names follow the run record
-`corsair-v2-run/1` ([RUN_RECORD.md](../src/corsair/v2/RUN_RECORD.md)): a value the provider did not report is null,
+`corsair-v2-run/1` ([RUN_RECORD.md](../src/corsair/RUN_RECORD.md)): a value the provider did not report is null,
 never zero, and a total with an unknown in it is null; for labelled rows, the decisive rate, accuracy per label and abstention
 rates by terminal reason), `policy.json` (pass, fail, unknown or not_set per policy entry; gates are deferred, so it
 never changes the exit code) and `comparison.md` against the promoted baseline. A scripted run checks plumbing and
 oracle consistency only; baselines come from live runs.
+
+Live baselines run one agent after another (one live inference user at a time) on a host with the provider config
+(and Docker for the chain), then a person chooses the run to keep:
+
+```sh
+make eval-live-baselines PROVIDER_CONFIG=PATH [AGENTS="grounding builder"] [NOTE=...]   # prints each run id
+make baseline-commit AGENT=<agent> RUN=<run id>   # whole set, clean checkout; writes <agent evals>/baselines/<set>-<mode>.json
+```
+
+The committed file is the run's summary without per-attempt rows, plus its policy status; comparisons fall back to it
+on a checkout that does not hold the run under `.runs/`.

@@ -1,4 +1,4 @@
-"""Shared runner for a v2 agent's isolated eval: ``python -m corsair.v2.agents.<agent>.evals.evaluate``.
+"""Shared runner for a v2 agent's isolated eval: ``python -m corsair.agents.<agent>.evals.evaluate``.
 
 Each v2 agent's ``evals/evaluate.py`` declares one ``AgentEval`` and calls ``main``. The runner owns everything that
 must mean the same for every agent:
@@ -6,11 +6,11 @@ must mean the same for every agent:
 - cases come from the agent's frozen sets (``evals.cases.load_set`` on ``agent_root``), optionally one language;
 - each attempt runs the agent's real stage once, in a fresh working directory, with native Pydantic Evals
   (``Dataset.evaluate``, ``repeat``, one at a time); scripted mode replays the case oracle through the agent's own
-  ``FunctionModel`` with real requests blocked, live mode uses ``corsair.v2.models`` for that agent's profile;
+  ``FunctionModel`` with real requests blocked, live mode uses ``corsair.models`` for that agent's profile;
 - every assertion is tagged with exactly one dimension (``AgentEval.dimensions``) so the summary can roll accuracy up
   per eval type, language and case kind;
 - efficiency and parameters come from the stage's ``AgentUsage`` under the run-record names (``corsair-v2-run/1``,
-  ``src/corsair/v2/RUN_RECORD.md``): a value the provider did not report stays null, never zero, and a sum with a
+  ``src/corsair/RUN_RECORD.md``): a value the provider did not report stays null, never zero, and a sum with a
   null in it is null.
 
 Evidence written under ``--evidence``: ``configuration.json`` (identity), ``attempts.jsonl`` (one row per attempt,
@@ -35,8 +35,8 @@ from pydantic_ai.models import Model
 from pydantic_evals import Case, Dataset, set_eval_attribute
 from pydantic_evals.evaluators import Evaluator, EvaluatorContext
 
-from corsair.v2.agents.common.usage import count_retries
-from corsair.v2.contracts import AgentUsage
+from corsair.agents.common.usage import count_retries
+from corsair.contracts import AgentUsage
 from evals.cases import DIMENSIONS, LANGUAGES, EvalCase, agent_root, load_set, set_digest
 
 SCHEMA = "corsair-agent-attempts/v1"
@@ -109,7 +109,7 @@ class _Checks(Evaluator):
 
 @asynccontextmanager
 async def _live_model(spec: AgentEval, provider_config: Path):
-    from corsair.v2.models import agent_models, load_provider_config
+    from corsair.models import agent_models, load_provider_config
     agents = spec.live_agents or (spec.agent,)
     async with agent_models(load_provider_config(provider_config), agents) as built:
         yield dict(built) if spec.live_agents else built[spec.agent]
@@ -141,7 +141,7 @@ def provider_identity(provider_config: Path, agents: tuple[str, ...]) -> dict[st
     endpoint host only, no scheme, credentials, path or query). No credential is read."""
     from urllib.parse import urlsplit
 
-    from corsair.v2.models import load_provider_config
+    from corsair.models import load_provider_config
     config = load_provider_config(provider_config)
     return {agent: {"profile": config.agents[agent], "provider_host": urlsplit(config.profile(agent).base_url).hostname,
                     "model": config.profile(agent).model_name} for agent in agents}
@@ -205,10 +205,11 @@ async def evaluate(spec: AgentEval, evidence: Path, set_name: str, *, language: 
         key = item.source_case_name or item.name
         values = {name: bool(result.value) for name, result in item.assertions.items()}
         rows.append(_row(spec, by_key[key], values, item.attributes, failure=(
-            "; ".join(f"{f.name}: {f.error_message}" for f in item.evaluator_failures) or None)))
+            "; ".join(f"{f.name}: {f.error_message}" for f in item.evaluator_failures) or None),
+            failure_kind="evaluator" if item.evaluator_failures else None))
     for failure in report.failures:
         key = failure.source_case_name or failure.name
-        rows.append(_row(spec, by_key[key], {}, {}, failure=failure.error_message[:2_000]))
+        rows.append(_row(spec, by_key[key], {}, {}, failure=failure.error_message[:2_000], failure_kind="task"))
     with (evidence / "attempts.jsonl").open("w") as out:
         out.write(json.dumps({"schema": SCHEMA, "agent": spec.agent, "set": set_name, "language": language}) + "\n")
         for row in rows:
@@ -217,7 +218,7 @@ async def evaluate(spec: AgentEval, evidence: Path, set_name: str, *, language: 
 
 
 def _row(spec: AgentEval, case: EvalCase, values: dict[str, bool], attributes: Mapping[str, Any], *,
-         failure: str | None) -> dict:
+         failure: str | None, failure_kind: str | None = None) -> dict:
     # A dimension counts only where the case declares it measures it, so an assertion that passes trivially on a case
     # it does not apply to (no injection, no target) cannot inflate that dimension's rate. Pass/fail still uses all.
     declared = set(case.case.get("dimensions") or DIMENSIONS)
@@ -233,7 +234,8 @@ def _row(spec: AgentEval, case: EvalCase, values: dict[str, bool], attributes: M
             "passed": bool(values) and failure is None and all(values.values()),
             "assertions": values, "dimensions": dimensions,
             "failed_assertions": sorted(name for name, value in values.items() if not value),
-            "failure": failure, **metrics, "parameters": attributes.get("parameters") or {},
+            "failure": failure, "failure_kind": failure_kind, **metrics,
+            "parameters": attributes.get("parameters") or {},
             **{name: attributes.get(name) for name in ROW_FACTS},
             **{name: attributes[name] for name in LABEL_FACTS if attributes.get(name) is not None}}
 

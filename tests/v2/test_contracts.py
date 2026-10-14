@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from corsair.v2.contracts import Citation, Finding, ProbeDraft
+from corsair.contracts import Citation, Finding, ProbeDraft
 
 
 def test_safe_paths_refuse_absolute_and_climbing():

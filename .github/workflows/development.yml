@@ -91,7 +91,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ "$EVENT" = pull_request ] && ! git diff --name-only "$BASE_SHA"...HEAD | grep -qE \
-            '^(deploy/v2/|deploy/qualification/toolchains/|tools/(toolchain_images|v2_canary)\.py|src/corsair/v2/(skills/frameworks/|workspace/|execute|outcome|matrix|build))'; then
+            '^(deploy/v2/|deploy/qualification/toolchains/|tools/(toolchain_images|v2_canary)\.py|src/corsair/(skills/frameworks/|workspace/|execute|outcome|matrix|build))'; then
             echo 'rows=[]' >> "$GITHUB_OUTPUT"
           else
             echo "rows=$(uv run --locked python tools/ci_rows.py)" >> "$GITHUB_OUTPUT"

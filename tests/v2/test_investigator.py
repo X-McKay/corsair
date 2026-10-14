@@ -8,11 +8,11 @@ from pydantic_ai.durable_exec.temporal import TemporalDurability
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.usage import RunUsage
 
-from corsair.v2.agents.common.framework import guidance_block
-from corsair.v2.agents.common.usage import to_agent_usage
-from corsair.v2.agents.investigator.agent import SPEC, create_agent, investigate, render_prompt
-from corsair.v2.agents.investigator.validation import citation_problem, plan_problems
-from corsair.v2.contracts import Case, Citation, ExitClass, Finding, ProbePlan, Revision, Runtime
+from corsair.agents.common.framework import guidance_block
+from corsair.agents.common.usage import to_agent_usage
+from corsair.agents.investigator.agent import SPEC, create_agent, investigate, render_prompt
+from corsair.agents.investigator.validation import citation_problem, plan_problems
+from corsair.contracts import Case, Citation, ExitClass, Finding, ProbePlan, Revision, Runtime
 from tests.v2.agent_scripts import INPUT_TOKENS, OUTPUT_TOKENS, Script, tool_returns
 
 SOURCE = '''import os
@@ -174,3 +174,22 @@ def test_factory_direct_and_durable_construction():
     assert durable.name == "investigator"
     with pytest.raises(TypeError):
         create_agent("openai:gpt-x")
+
+
+def test_a_plan_must_be_about_the_code_the_finding_names(tmp_path):
+    from corsair.agents.investigator.validation import finding_problems
+    from corsair.contracts import Citation, Finding, ProbeBrief
+    (tmp_path / "app.py").write_text("def get_user(name):\n    return name\n")
+    cite = Citation(path="app.py", start_line=1, end_line=1, quote="def get_user(name):")
+    brief = dict(test_file="tests/test_x.py", target="get_user", seam="direct call", input_description="i",
+                 property_to_assert="p", citations=(cite,))
+    plan = ProbePlan(status="planned", target="get_user",
+                     control=ProbeBrief(role="control", test_name="test_c", **brief),
+                     exploit=ProbeBrief(role="exploit", test_name="test_e", **{**brief, "test_file": "tests/test_y.py"}))
+    absent = Finding(title="t", symbol="findInvoices", file_path="src/InvoiceRepository.java")
+    assert "target_not_found" in finding_problems(plan, tmp_path, absent)[0]
+    assert finding_problems(plan, tmp_path, Finding(title="t", symbol="get_user", file_path="app.py")) == []
+    other = Finding(title="t", symbol="get_user", file_path="app.py")
+    elsewhere = plan.model_copy(update={"target": "other"})
+    assert finding_problems(elsewhere, tmp_path, other) == []  # a citation quote names the symbol
+    assert finding_problems(ProbePlan(status="target_not_found", reason="r"), tmp_path, absent) == []

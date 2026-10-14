@@ -5,11 +5,11 @@ import uuid
 
 import pytest
 
-from corsair.v2 import execute
-from corsair.v2.build import replay
-from corsair.v2.contracts import Environment, ExitClass, FrozenPatch, Outcome, ProbeDraft, ProbeFacts, Recipe
-from corsair.v2.reconcile import sweep
-from corsair.v2.workspace.docker import DockerConfig, create, docker, labels
+from corsair import execute
+from corsair.build import replay
+from corsair.contracts import Environment, ExitClass, FrozenPatch, Outcome, ProbeDraft, ProbeFacts, Recipe
+from corsair.reconcile import sweep
+from corsair.workspace.docker import DockerConfig, create, docker, labels
 from tests.v2.test_build_replay import BASELINE, RUNTIME, make_case, needs_docker
 
 SYNTAX_RUNTIME = RUNTIME.model_copy(update={"syntax_check": (

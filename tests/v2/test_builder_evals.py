@@ -14,8 +14,8 @@ import pytest
 from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import FunctionModel
 
-from corsair.v2.agents.builder.evals import evaluate as builder_eval
-from corsair.v2.contracts import AgentUsage, Recipe, RecipeFile
+from corsair.agents.builder.evals import evaluate as builder_eval
+from corsair.contracts import AgentUsage, Recipe, RecipeFile
 from evals.agent_eval import Attempt, evaluate
 from evals.cases import agent_root, load_set
 

@@ -1,0 +1,774 @@
+{
+  "version": 1,
+  "note": "Permissive-licensed vulnerability/fix pairs reduced from upstream open-source projects (code verbatim-derived; only packaging and dependencies removed for offline reduction). One entry per variant; variant dirs a/b per family, the letter does not reveal which is vulnerable (recorded only here). Both findings of a pair share title and description. Truth is evaluator-only and never enters an agent input. Vulnerable -> potentially_exploitable; fixed -> likely_not_exploitable. Per-case upstream provenance and SPDX licence in each family's provenance.json and in SOURCE.md.",
+  "cases": [
+    {
+      "name": "js-dot-prop-a",
+      "language": "javascript",
+      "finding": {
+        "title": "Prototype pollution via property path in set()",
+        "repo_url": "eval-corpus/javascript/dot-prop/a",
+        "revision": "HEAD",
+        "file_path": "src/index.js",
+        "start_line": 57,
+        "symbol": "set",
+        "cwe": "CWE-1321",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "set() walks a user-controlled dotted property path and assigns into the object; a path segment such as __proto__ is carried through to the assignment."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "src/index.js",
+        "sink_line": 57,
+        "source": "path argument",
+        "target_callable": "set"
+      }
+    },
+    {
+      "name": "js-dot-prop-b",
+      "language": "javascript",
+      "finding": {
+        "title": "Prototype pollution via property path in set()",
+        "repo_url": "eval-corpus/javascript/dot-prop/b",
+        "revision": "HEAD",
+        "file_path": "src/index.js",
+        "start_line": 72,
+        "symbol": "set",
+        "cwe": "CWE-1321",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "set() walks a user-controlled dotted property path and assigns into the object; a path segment such as __proto__ is carried through to the assignment."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "src/index.js",
+        "sink_line": 72,
+        "source": "path argument",
+        "target_callable": "set"
+      }
+    },
+    {
+      "name": "js-angular-http-server-b",
+      "language": "javascript",
+      "finding": {
+        "title": "Path traversal in static file request handler",
+        "repo_url": "eval-corpus/javascript/angular-http-server/b",
+        "revision": "HEAD",
+        "file_path": "src/server.js",
+        "start_line": 12,
+        "symbol": "resolveUrl",
+        "cwe": "CWE-22",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "The static-file request handler maps the request URL to a file path under the server root and reads it; the URL path segment is carried into path.join without containment."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "src/server.js",
+        "sink_line": 12,
+        "source": "request URL path",
+        "target_callable": "requestListener"
+      }
+    },
+    {
+      "name": "js-angular-http-server-a",
+      "language": "javascript",
+      "finding": {
+        "title": "Path traversal in static file request handler",
+        "repo_url": "eval-corpus/javascript/angular-http-server/a",
+        "revision": "HEAD",
+        "file_path": "src/server.js",
+        "start_line": 13,
+        "symbol": "resolveUrl",
+        "cwe": "CWE-22",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "The static-file request handler maps the request URL to a file path under the server root and reads it; the URL path segment is carried into path.join without containment."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "src/server.js",
+        "sink_line": 13,
+        "source": "request URL path",
+        "target_callable": "requestListener"
+      }
+    },
+    {
+      "name": "js-codecov-node-b",
+      "language": "javascript",
+      "finding": {
+        "title": "Command injection in coverage file discovery",
+        "repo_url": "eval-corpus/javascript/codecov-node/b",
+        "revision": "HEAD",
+        "file_path": "src/codecov.js",
+        "start_line": 9,
+        "symbol": "listFiles",
+        "cwe": "CWE-78",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "listFiles builds a file-discovery command from the project root and pattern arguments and runs it through a child process; the root value is carried into the command."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "src/codecov.js",
+        "sink_line": 9,
+        "source": "root argument",
+        "target_callable": "listFiles"
+      }
+    },
+    {
+      "name": "js-codecov-node-a",
+      "language": "javascript",
+      "finding": {
+        "title": "Command injection in coverage file discovery",
+        "repo_url": "eval-corpus/javascript/codecov-node/a",
+        "revision": "HEAD",
+        "file_path": "src/codecov.js",
+        "start_line": 10,
+        "symbol": "listFiles",
+        "cwe": "CWE-78",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "listFiles builds a file-discovery command from the project root and pattern arguments and runs it through a child process; the root value is carried into the command."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "src/codecov.js",
+        "sink_line": 10,
+        "source": "root argument",
+        "target_callable": "listFiles"
+      }
+    },
+    {
+      "name": "ruby-rubyzip-b",
+      "language": "ruby",
+      "finding": {
+        "title": "Path traversal via archive entry name in Zip::Entry#extract",
+        "repo_url": "eval-corpus/ruby/rubyzip/b",
+        "revision": "HEAD",
+        "file_path": "lib/zip/entry.rb",
+        "start_line": 17,
+        "symbol": "extract",
+        "cwe": "CWE-22",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "Zip::Entry#extract joins the entry name onto the destination directory and writes the file; an entry name containing parent-directory segments is carried into the join."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "lib/zip/entry.rb",
+        "sink_line": 17,
+        "source": "entry name",
+        "target_callable": "extract"
+      }
+    },
+    {
+      "name": "ruby-rubyzip-a",
+      "language": "ruby",
+      "finding": {
+        "title": "Path traversal via archive entry name in Zip::Entry#extract",
+        "repo_url": "eval-corpus/ruby/rubyzip/a",
+        "revision": "HEAD",
+        "file_path": "lib/zip/entry.rb",
+        "start_line": 28,
+        "symbol": "extract",
+        "cwe": "CWE-22",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "Zip::Entry#extract joins the entry name onto the destination directory and writes the file; an entry name containing parent-directory segments is carried into the join."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "lib/zip/entry.rb",
+        "sink_line": 28,
+        "source": "entry name",
+        "target_callable": "extract"
+      }
+    },
+    {
+      "name": "ruby-rack-static-a",
+      "language": "ruby",
+      "finding": {
+        "title": "Path traversal in Rack::Static request routing",
+        "repo_url": "eval-corpus/ruby/rack-static/a",
+        "revision": "HEAD",
+        "file_path": "lib/rack/static.rb",
+        "start_line": 76,
+        "symbol": "call",
+        "cwe": "CWE-22",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "Rack::Static routes a request to a file server when the request path matches a configured url prefix; the path used for that routing decision is carried into the file lookup under the configured root."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "lib/rack/static.rb",
+        "sink_line": 76,
+        "source": "request path (PATH_INFO)",
+        "target_callable": "call"
+      }
+    },
+    {
+      "name": "ruby-rack-static-b",
+      "language": "ruby",
+      "finding": {
+        "title": "Path traversal in Rack::Static request routing",
+        "repo_url": "eval-corpus/ruby/rack-static/b",
+        "revision": "HEAD",
+        "file_path": "lib/rack/static.rb",
+        "start_line": 76,
+        "symbol": "call",
+        "cwe": "CWE-22",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "Rack::Static routes a request to a file server when the request path matches a configured url prefix; the path used for that routing decision is carried into the file lookup under the configured root."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "lib/rack/static.rb",
+        "sink_line": 76,
+        "source": "request path (PATH_INFO)",
+        "target_callable": "call"
+      }
+    },
+    {
+      "name": "ruby-ruby-git-fetch-a",
+      "language": "ruby",
+      "finding": {
+        "title": "Argument list construction in Git::Lib#fetch",
+        "repo_url": "eval-corpus/ruby/ruby-git-fetch/a",
+        "revision": "HEAD",
+        "file_path": "lib/git/lib.rb",
+        "start_line": 14,
+        "symbol": "fetch",
+        "cwe": "CWE-88",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "Git::Lib#fetch builds the argument list for the git fetch subcommand from the remote and the options and passes it to the process runner."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "lib/git/lib.rb",
+        "sink_line": 14,
+        "source": "remote",
+        "target_callable": "fetch"
+      }
+    },
+    {
+      "name": "ruby-ruby-git-fetch-b",
+      "language": "ruby",
+      "finding": {
+        "title": "Argument list construction in Git::Lib#fetch",
+        "repo_url": "eval-corpus/ruby/ruby-git-fetch/b",
+        "revision": "HEAD",
+        "file_path": "lib/git/lib.rb",
+        "start_line": 16,
+        "symbol": "fetch",
+        "cwe": "CWE-88",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "Git::Lib#fetch builds the argument list for the git fetch subcommand from the remote and the options and passes it to the process runner."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "lib/git/lib.rb",
+        "sink_line": 16,
+        "source": "remote",
+        "target_callable": "fetch"
+      }
+    },
+    {
+      "name": "ruby-secure-headers-a",
+      "language": "ruby",
+      "finding": {
+        "title": "Content-Security-Policy directive construction in ContentSecurityPolicy",
+        "repo_url": "eval-corpus/ruby/secure-headers/a",
+        "revision": "HEAD",
+        "file_path": "lib/secure_headers/headers/content_security_policy.rb",
+        "start_line": 9,
+        "symbol": "build_source_list_directive",
+        "cwe": "CWE-113",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "ContentSecurityPolicy#build_source_list_directive assembles a single Content-Security-Policy directive string from a directive name and its source values."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "lib/secure_headers/headers/content_security_policy.rb",
+        "sink_line": 9,
+        "source": "source value",
+        "target_callable": "build_source_list_directive"
+      }
+    },
+    {
+      "name": "ruby-secure-headers-b",
+      "language": "ruby",
+      "finding": {
+        "title": "Content-Security-Policy directive construction in ContentSecurityPolicy",
+        "repo_url": "eval-corpus/ruby/secure-headers/b",
+        "revision": "HEAD",
+        "file_path": "lib/secure_headers/headers/content_security_policy.rb",
+        "start_line": 9,
+        "symbol": "build_source_list_directive",
+        "cwe": "CWE-113",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "ContentSecurityPolicy#build_source_list_directive assembles a single Content-Security-Policy directive string from a directive name and its source values."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "lib/secure_headers/headers/content_security_policy.rb",
+        "sink_line": 9,
+        "source": "source value",
+        "target_callable": "build_source_list_directive"
+      }
+    },
+    {
+      "name": "ruby-tzinfo-a",
+      "language": "ruby",
+      "finding": {
+        "title": "Timezone identifier loading in TZInfo::RubyDataSource",
+        "repo_url": "eval-corpus/ruby/tzinfo/a",
+        "revision": "HEAD",
+        "file_path": "lib/tzinfo/ruby_data_source.rb",
+        "start_line": 27,
+        "symbol": "load_timezone_info",
+        "cwe": "CWE-22",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "TZInfo::RubyDataSource#load_timezone_info validates a timezone identifier and loads the matching definition file from the data directory."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "lib/tzinfo/ruby_data_source.rb",
+        "sink_line": 49,
+        "source": "identifier",
+        "target_callable": "load_timezone_info"
+      }
+    },
+    {
+      "name": "ruby-tzinfo-b",
+      "language": "ruby",
+      "finding": {
+        "title": "Timezone identifier loading in TZInfo::RubyDataSource",
+        "repo_url": "eval-corpus/ruby/tzinfo/b",
+        "revision": "HEAD",
+        "file_path": "lib/tzinfo/ruby_data_source.rb",
+        "start_line": 27,
+        "symbol": "load_timezone_info",
+        "cwe": "CWE-22",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "TZInfo::RubyDataSource#load_timezone_info validates a timezone identifier and loads the matching definition file from the data directory."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "lib/tzinfo/ruby_data_source.rb",
+        "sink_line": 49,
+        "source": "identifier",
+        "target_callable": "load_timezone_info"
+      }
+    },
+    {
+      "name": "ruby-cocoapods-git-a",
+      "language": "ruby",
+      "finding": {
+        "title": "Argument list construction in Pod::Downloader::Git.preprocess_options",
+        "repo_url": "eval-corpus/ruby/cocoapods-git/a",
+        "revision": "HEAD",
+        "file_path": "lib/cocoapods-downloader/git.rb",
+        "start_line": 16,
+        "symbol": "preprocess_options",
+        "cwe": "CWE-88",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "Pod::Downloader::Git.preprocess_options builds the argument list for the git ls-remote subcommand from the download options and passes it to the process runner."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "lib/cocoapods-downloader/git.rb",
+        "sink_line": 16,
+        "source": "git option",
+        "target_callable": "preprocess_options"
+      }
+    },
+    {
+      "name": "ruby-cocoapods-git-b",
+      "language": "ruby",
+      "finding": {
+        "title": "Argument list construction in Pod::Downloader::Git.preprocess_options",
+        "repo_url": "eval-corpus/ruby/cocoapods-git/b",
+        "revision": "HEAD",
+        "file_path": "lib/cocoapods-downloader/git.rb",
+        "start_line": 17,
+        "symbol": "preprocess_options",
+        "cwe": "CWE-88",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "Pod::Downloader::Git.preprocess_options builds the argument list for the git ls-remote subcommand from the download options and passes it to the process runner."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "lib/cocoapods-downloader/git.rb",
+        "sink_line": 17,
+        "source": "git option",
+        "target_callable": "preprocess_options"
+      }
+    },
+    {
+      "name": "ruby-pdfkit-a",
+      "language": "ruby",
+      "finding": {
+        "title": "Process invocation construction in PDFKit#command",
+        "repo_url": "eval-corpus/ruby/pdfkit/a",
+        "revision": "HEAD",
+        "file_path": "lib/pdfkit/pdfkit.rb",
+        "start_line": 57,
+        "symbol": "command",
+        "cwe": "CWE-78",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "PDFKit#command builds the invocation for the wkhtmltopdf process from the configured executable, options and source."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "lib/pdfkit/pdfkit.rb",
+        "sink_line": 67,
+        "source": "source value",
+        "target_callable": "command"
+      }
+    },
+    {
+      "name": "ruby-pdfkit-b",
+      "language": "ruby",
+      "finding": {
+        "title": "Process invocation construction in PDFKit#command",
+        "repo_url": "eval-corpus/ruby/pdfkit/b",
+        "revision": "HEAD",
+        "file_path": "lib/pdfkit/pdfkit.rb",
+        "start_line": 59,
+        "symbol": "command",
+        "cwe": "CWE-78",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "PDFKit#command builds the invocation for the wkhtmltopdf process from the configured executable, options and source."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "lib/pdfkit/pdfkit.rb",
+        "sink_line": 69,
+        "source": "source value",
+        "target_callable": "command"
+      }
+    },
+    {
+      "name": "ruby-ruby-git-ls-files-a",
+      "language": "ruby",
+      "finding": {
+        "title": "Path unquoting in Git::Lib#ls_files",
+        "repo_url": "eval-corpus/ruby/ruby-git-ls-files/a",
+        "revision": "HEAD",
+        "file_path": "lib/git/lib.rb",
+        "start_line": 14,
+        "symbol": "ls_files",
+        "cwe": "CWE-94",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "Git::Lib#ls_files parses the output of the git ls-files subcommand into a hash keyed by path, unquoting quoted path strings."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "lib/git/lib.rb",
+        "sink_line": 14,
+        "source": "ls-files output",
+        "target_callable": "ls_files"
+      }
+    },
+    {
+      "name": "ruby-ruby-git-ls-files-b",
+      "language": "ruby",
+      "finding": {
+        "title": "Path unquoting in Git::Lib#ls_files",
+        "repo_url": "eval-corpus/ruby/ruby-git-ls-files/b",
+        "revision": "HEAD",
+        "file_path": "lib/git/lib.rb",
+        "start_line": 15,
+        "symbol": "ls_files",
+        "cwe": "CWE-94",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "Git::Lib#ls_files parses the output of the git ls-files subcommand into a hash keyed by path, unquoting quoted path strings."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "lib/git/lib.rb",
+        "sink_line": 15,
+        "source": "ls-files output",
+        "target_callable": "ls_files"
+      }
+    },
+    {
+      "name": "java-tomee-a",
+      "language": "java",
+      "finding": {
+        "title": "Class-name filter in BlacklistClassResolver.check",
+        "repo_url": "eval-corpus/java/tomee/a",
+        "revision": "HEAD",
+        "file_path": "src/main/java/org/apache/openejb/core/rmi/BlacklistClassResolver.java",
+        "start_line": 59,
+        "symbol": "check",
+        "cwe": "CWE-502",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "BlacklistClassResolver.check decides whether a class name read from a serialized stream may be loaded, by matching the name against the configured blacklist and whitelist entries (tomee.serialization.class.blacklist / whitelist)."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "src/main/java/org/apache/openejb/core/rmi/BlacklistClassResolver.java",
+        "sink_line": 59,
+        "source": "class name from the serialized stream",
+        "target_callable": "check"
+      }
+    },
+    {
+      "name": "java-tomee-b",
+      "language": "java",
+      "finding": {
+        "title": "Class-name filter in BlacklistClassResolver.check",
+        "repo_url": "eval-corpus/java/tomee/b",
+        "revision": "HEAD",
+        "file_path": "src/main/java/org/apache/openejb/core/rmi/BlacklistClassResolver.java",
+        "start_line": 59,
+        "symbol": "check",
+        "cwe": "CWE-502",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "BlacklistClassResolver.check decides whether a class name read from a serialized stream may be loaded, by matching the name against the configured blacklist and whitelist entries (tomee.serialization.class.blacklist / whitelist)."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "src/main/java/org/apache/openejb/core/rmi/BlacklistClassResolver.java",
+        "sink_line": 59,
+        "source": "class name from the serialized stream",
+        "target_callable": "check"
+      }
+    },
+    {
+      "name": "java-plexus-utils-a",
+      "language": "java",
+      "finding": {
+        "title": "Argument quoting in Shell.getShellCommandLine",
+        "repo_url": "eval-corpus/java/plexus-utils/a",
+        "revision": "HEAD",
+        "file_path": "src/main/java/org/codehaus/plexus/util/cli/shell/Shell.java",
+        "start_line": 188,
+        "symbol": "getShellCommandLine",
+        "cwe": "CWE-78",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "Shell.getShellCommandLine builds the command line handed to the shell (BourneShell: /bin/sh -c), quoting each caller-supplied argument with the shell's quoting rules."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "src/main/java/org/codehaus/plexus/util/cli/shell/Shell.java",
+        "sink_line": 188,
+        "source": "caller-supplied command arguments",
+        "target_callable": "getShellCommandLine"
+      }
+    },
+    {
+      "name": "java-plexus-utils-b",
+      "language": "java",
+      "finding": {
+        "title": "Argument quoting in Shell.getShellCommandLine",
+        "repo_url": "eval-corpus/java/plexus-utils/b",
+        "revision": "HEAD",
+        "file_path": "src/main/java/org/codehaus/plexus/util/cli/shell/Shell.java",
+        "start_line": 167,
+        "symbol": "getShellCommandLine",
+        "cwe": "CWE-78",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "Shell.getShellCommandLine builds the command line handed to the shell (BourneShell: /bin/sh -c), quoting each caller-supplied argument with the shell's quoting rules."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "src/main/java/org/codehaus/plexus/util/cli/shell/Shell.java",
+        "sink_line": 167,
+        "source": "caller-supplied command arguments",
+        "target_callable": "getShellCommandLine"
+      }
+    },
+    {
+      "name": "java-commons-io-a",
+      "language": "java",
+      "finding": {
+        "title": "Prefix handling of double-separator paths in FilenameUtils.getPrefixLength",
+        "repo_url": "eval-corpus/java/commons-io/a",
+        "revision": "HEAD",
+        "file_path": "src/main/java/org/apache/commons/io/FilenameUtils.java",
+        "start_line": 679,
+        "symbol": "getPrefixLength",
+        "cwe": "CWE-20",
+        "severity": "medium",
+        "source_tool": "candidate-survey",
+        "description": "FilenameUtils.getPrefixLength computes the prefix of a file name; for names starting with two separators it treats the text up to the next separator as a UNC server prefix, which FilenameUtils.normalize then keeps out of its '..' resolution."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "src/main/java/org/apache/commons/io/FilenameUtils.java",
+        "sink_line": 679,
+        "source": "file name argument",
+        "target_callable": "getPrefixLength"
+      }
+    },
+    {
+      "name": "java-commons-io-b",
+      "language": "java",
+      "finding": {
+        "title": "Prefix handling of double-separator paths in FilenameUtils.getPrefixLength",
+        "repo_url": "eval-corpus/java/commons-io/b",
+        "revision": "HEAD",
+        "file_path": "src/main/java/org/apache/commons/io/FilenameUtils.java",
+        "start_line": 685,
+        "symbol": "getPrefixLength",
+        "cwe": "CWE-20",
+        "severity": "medium",
+        "source_tool": "candidate-survey",
+        "description": "FilenameUtils.getPrefixLength computes the prefix of a file name; for names starting with two separators it treats the text up to the next separator as a UNC server prefix, which FilenameUtils.normalize then keeps out of its '..' resolution."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "src/main/java/org/apache/commons/io/FilenameUtils.java",
+        "sink_line": 685,
+        "source": "file name argument",
+        "target_callable": "getPrefixLength"
+      }
+    },
+    {
+      "name": "java-rdf4j-a",
+      "language": "java",
+      "finding": {
+        "title": "Entry path handling in ZipUtil.writeEntry",
+        "repo_url": "eval-corpus/java/rdf4j/a",
+        "revision": "HEAD",
+        "file_path": "src/main/java/org/eclipse/rdf4j/common/io/ZipUtil.java",
+        "start_line": 92,
+        "symbol": "writeEntry",
+        "cwe": "CWE-22",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "ZipUtil.writeEntry writes one archive entry to a file under the destination directory, building the output path from the entry name stored in the archive."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "src/main/java/org/eclipse/rdf4j/common/io/ZipUtil.java",
+        "sink_line": 92,
+        "source": "archive entry name",
+        "target_callable": "writeEntry"
+      }
+    },
+    {
+      "name": "java-rdf4j-b",
+      "language": "java",
+      "finding": {
+        "title": "Entry path handling in ZipUtil.writeEntry",
+        "repo_url": "eval-corpus/java/rdf4j/b",
+        "revision": "HEAD",
+        "file_path": "src/main/java/org/eclipse/rdf4j/common/io/ZipUtil.java",
+        "start_line": 93,
+        "symbol": "writeEntry",
+        "cwe": "CWE-22",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "ZipUtil.writeEntry writes one archive entry to a file under the destination directory, building the output path from the entry name stored in the archive."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "src/main/java/org/eclipse/rdf4j/common/io/ZipUtil.java",
+        "sink_line": 93,
+        "source": "archive entry name",
+        "target_callable": "writeEntry"
+      }
+    },
+    {
+      "name": "java-spring-security-a",
+      "language": "java",
+      "finding": {
+        "title": "Stored-password comparison in PlaintextPasswordEncoder.isPasswordValid",
+        "repo_url": "eval-corpus/java/spring-security/a",
+        "revision": "HEAD",
+        "file_path": "src/main/java/org/springframework/security/authentication/encoding/PlaintextPasswordEncoder.java",
+        "start_line": 54,
+        "symbol": "isPasswordValid",
+        "cwe": "CWE-522",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "PlaintextPasswordEncoder.isPasswordValid compares the stored encoded password with the presented raw password (merged with the salt) and returns whether they match."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "src/main/java/org/springframework/security/authentication/encoding/PlaintextPasswordEncoder.java",
+        "sink_line": 54,
+        "source": "presented raw password and stored encoded password",
+        "target_callable": "isPasswordValid"
+      }
+    },
+    {
+      "name": "java-spring-security-b",
+      "language": "java",
+      "finding": {
+        "title": "Stored-password comparison in PlaintextPasswordEncoder.isPasswordValid",
+        "repo_url": "eval-corpus/java/spring-security/b",
+        "revision": "HEAD",
+        "file_path": "src/main/java/org/springframework/security/authentication/encoding/PlaintextPasswordEncoder.java",
+        "start_line": 57,
+        "symbol": "isPasswordValid",
+        "cwe": "CWE-522",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "PlaintextPasswordEncoder.isPasswordValid compares the stored encoded password with the presented raw password (merged with the salt) and returns whether they match."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "src/main/java/org/springframework/security/authentication/encoding/PlaintextPasswordEncoder.java",
+        "sink_line": 57,
+        "source": "presented raw password and stored encoded password",
+        "target_callable": "isPasswordValid"
+      }
+    }
+  ]
+}

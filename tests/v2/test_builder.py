@@ -11,8 +11,8 @@ from pydantic_ai.durable_exec.temporal import TemporalDurability
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.workspaces import LocalWorkspaceBackend, Workspace
 
-from corsair.v2.agents.builder.agent import create_agent, build_agent, render_prompt
-from corsair.v2.contracts import (Case, Citation, ExitClass, Finding, ProbeBrief, ProbePlan, Recipe, Revision,
+from corsair.agents.builder.agent import create_agent, build_agent, render_prompt
+from corsair.contracts import (Case, Citation, ExitClass, Finding, ProbeBrief, ProbePlan, Recipe, Revision,
                                   Runtime)
 from tests.v2.agent_scripts import INPUT_TOKENS, Script, tool_returns
 

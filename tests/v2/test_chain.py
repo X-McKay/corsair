@@ -6,9 +6,9 @@ import pytest
 from pydantic_ai.exceptions import ModelHTTPError, UsageLimitExceeded
 
 from chain_fakes import PLAN, RECIPE, Fakes, case, draft, models
-from corsair.v2.chain import MAX_REVIEWS, Budget, draft_digest, freeze, review_feedback, run_case
-from corsair.v2.contracts import FrozenPatch, ProbePlan, ProbeRun
-from corsair.v2.record import RunRecorder
+from corsair.chain import MAX_REVIEWS, Budget, draft_digest, freeze, review_feedback, run_case
+from corsair.contracts import FrozenPatch, ProbePlan, ProbeRun
+from corsair.record import RunRecorder
 
 
 def go(fakes: Fakes, tmp_path, *, fixed=False, budget=Budget()):
@@ -312,7 +312,7 @@ def test_at_most_three_reviews_and_then_nothing_executes(tmp_path):
 
 
 def test_real_rules_read_a_still_invalid_pair_as_test_invalid(tmp_path):
-    from corsair.v2.rules import decide
+    from corsair.rules import decide
     fakes = Fakes(rejections={"control": 99})
     fakes.decide = lambda case, **kw: (fakes._log("decide", case, **kw), decide(case, **kw))[1]
     verdict, _ = go(fakes, tmp_path)
@@ -418,7 +418,7 @@ def test_review_feedback_is_built_from_one_probe_validity_only():
 
 
 def test_a_builder_refusal_stops_at_build_failed_with_its_reason_and_no_second_episode(tmp_path):
-    from corsair.v2.contracts import Recipe
+    from corsair.contracts import Recipe
     fakes = Fakes(recipes=[Recipe(blocked="no compiler in this image")])
     _, decided = go(fakes, tmp_path)
     assert decided["stopped"] == "build_failed" and "replay" not in fakes.names()
@@ -427,7 +427,7 @@ def test_a_builder_refusal_stops_at_build_failed_with_its_reason_and_no_second_e
 
 @pytest.mark.parametrize("failures", [1, 2, 3])
 def test_d3_corrects_until_the_check_reads_ok(tmp_path, failures):
-    from corsair.v2.chain import MAX_MECHANICAL_FIXES
+    from corsair.chain import MAX_MECHANICAL_FIXES
     # The first draft and the first failures - 1 corrections fail; correction number ``failures`` reads ok.
     fakes = Fakes(diagnose_outcomes={"control": ["errored"] * failures})
     verdict, _ = go(fakes, tmp_path)
@@ -449,7 +449,7 @@ def test_d3_corrects_until_the_check_reads_ok(tmp_path, failures):
 
 
 def test_d3_stops_after_the_last_correction_and_reviews_the_last_draft(tmp_path):
-    from corsair.v2.chain import MAX_MECHANICAL_FIXES
+    from corsair.chain import MAX_MECHANICAL_FIXES
     fakes = Fakes(diagnose_outcomes={"exploit": "not_run"})  # every check of the exploit fails
     verdict, _ = go(fakes, tmp_path)
     assert len(fakes.of("probe-exploit")) == 1 + MAX_MECHANICAL_FIXES
@@ -469,7 +469,7 @@ def test_d3_budget_exhaustion_mid_corrections_stops_the_run(tmp_path):
 
 
 def test_d3_corrections_after_a_review_revision_are_bounded_per_draft_version(tmp_path):
-    from corsair.v2.chain import MAX_MECHANICAL_FIXES
+    from corsair.chain import MAX_MECHANICAL_FIXES
     # The first draft fails twice then reads ok; the review revision fails every check.
     outcomes = ["errored", "errored", "ok"] + ["not_run"] * 4
     fakes = Fakes(rejections={"exploit": 1}, diagnose_outcomes={"exploit": outcomes})
@@ -480,3 +480,138 @@ def test_d3_corrections_after_a_review_revision_are_bounded_per_draft_version(tm
     assert [s for s in steps if s.startswith("diagnose.exploit.r1")] == [
         "diagnose.exploit.r1", "diagnose.exploit.r1.1", "diagnose.exploit.r1.2", "diagnose.exploit.r1.3"]
     assert verdict.mechanical_fixes == {"exploit": 2 + MAX_MECHANICAL_FIXES}
+
+
+# --- Second exploit attempt before LIKELY_NOT_EXPLOITABLE (SPEC-0082 D18) -----------------------------------------
+
+FAILED_TWICE = {("vulnerable", "exploit"): ["assertion_failed", "assertion_failed"]}
+
+
+def steps(tmp_path, run_dir="run"):
+    return [t["step"] for t in json.loads((tmp_path / "runs" / run_dir / "timings.json").read_text())]
+
+
+def fresh_exploit_calls(fakes):
+    return [(args, kw) for args, kw in fakes.of("probe-exploit")
+            if kw["previous"] is None and kw["diagnostics"] is None and kw["review_feedback"] is None]
+
+
+def test_r5_only_after_two_failed_pocs_with_sensitivity_unverified(tmp_path):
+    fakes = Fakes(outcomes={k: list(v) for k, v in FAILED_TWICE.items()}, real_decide=True)
+    verdict, decided = go(fakes, tmp_path)
+    assert (verdict.label.value, verdict.rule_id, verdict.sensitivity, verdict.attempt) == (
+        "LIKELY_NOT_EXPLOITABLE", "R5", "unverified", 2)
+    assert steps(tmp_path) == ["select", "investigate", "build", "replay-build", "probe-control", "probe-exploit",
+                               "diagnose-control", "diagnose-exploit", "review.1", "execute-control-vulnerable",
+                               "execute-exploit-vulnerable", "probe-exploit.a2", "diagnose-exploit.a2", "review.a2.1",
+                               "execute-exploit-vulnerable.a2", "decide"]
+    # Three native tests on the vulnerable revision: one control and two independent PoVs.
+    assert [(r.role, r.revision) for r in decided["runs"]] == [("control", "vulnerable"), ("exploit", "vulnerable"),
+                                                               ("exploit", "vulnerable")]
+    first, second = decided["attempts"]
+    assert (first.number, second.number) == (1, 2) and first.patch_sha256 != second.patch_sha256
+    assert first.control_sha256 == second.control_sha256
+    assert [v.patch_sha256 for v in decided["validity"]] == [first.patch_sha256, second.patch_sha256]
+    summary = json.loads((tmp_path / "runs" / "run" / "summary.json").read_text())
+    assert summary["sensitivity"] == "unverified"
+    assert [(a["number"], a["exploit_outcome"], a["review_rounds"], a["first_review_valid"], a["decided"])
+            for a in summary["attempts"]] == [
+        (1, "assertion_failed", 1, {"control": True, "exploit": True}, False),
+        (2, "assertion_failed", 1, {"control": True, "exploit": True}, True)]
+    assert summary["outcome"]["probes"]["vulnerable"]["exploit"]["patch_sha256"] == second.patch_sha256
+
+
+def test_second_attempt_prober_is_blind_and_the_control_bytes_are_reused(tmp_path):
+    # Attempt 1's exploit is rejected once and revised from its review, and its control gets a D3 correction.
+    fakes = Fakes(outcomes={k: list(v) for k, v in FAILED_TWICE.items()}, rejections={"exploit": 1},
+                  diagnose_outcomes={"control": ["errored", "ok"]})
+    go(fakes, tmp_path)
+    fresh = fresh_exploit_calls(fakes)
+    assert len(fresh) == 2
+    (brief_1, *_), _ = fresh[0]
+    (brief_2, *_), kwargs = fresh[1]
+    assert brief_2 == brief_1 == PLAN.exploit  # the same brief, and nothing of attempt 1
+    assert (kwargs["previous"], kwargs["diagnostics"], kwargs["review_feedback"]) == (None, None, None)
+    a1_final = fakes.of("execute")[0][0][2]  # the pair attempt 1 executed
+    a2_review = [args[2] for args, kw in fakes.of("review")][-1]
+    assert a2_review.control == a1_final.control  # byte for byte, D3 correction included
+    assert a2_review.control.model_dump_json() == a1_final.control.model_dump_json()
+    assert a2_review.exploit != a1_final.exploit and a2_review.sha256 != a1_final.sha256
+    # Only the new PoV gets the D3 check, and the control is never run again on the vulnerable revision.
+    assert [args[2].role for args, _ in fakes.of("diagnose")][-1] == "exploit"
+    assert [(a[3], kw["revision"]) for a, kw in fakes.of("execute")] == [
+        ("control", "vulnerable"), ("exploit", "vulnerable"), ("exploit", "vulnerable")]
+
+
+def test_a_passing_second_poc_is_r4_with_its_own_fixed_run(tmp_path):
+    fakes = Fakes(outcomes={("vulnerable", "exploit"): ["assertion_failed", "passed"],
+                            ("fixed", "exploit"): ["assertion_failed", "assertion_failed"]}, real_decide=True)
+    verdict, decided = go(fakes, tmp_path, fixed=True)
+    assert (verdict.label.value, verdict.rule_id, verdict.attempt, verdict.sensitivity) == (
+        "LIKELY_EXPLOITABLE", "R4", 2, None)
+    assert (verdict.fix, verdict.fix_reason.value) == ("verified", "ok")
+    tail = steps(tmp_path)[steps(tmp_path).index("probe-exploit.a2"):]
+    assert tail == ["probe-exploit.a2", "diagnose-exploit.a2", "review.a2.1", "execute-exploit-vulnerable.a2",
+                    "review-fixed.a2", "replay-fixed.a2", "execute-control-fixed.a2", "execute-exploit-fixed.a2",
+                    "decide"]
+
+
+def test_a_failed_second_poc_runs_no_fixed_revision(tmp_path):
+    fakes = Fakes(outcomes={k: list(v) for k, v in FAILED_TWICE.items()}, real_decide=True)
+    verdict, _ = go(fakes, tmp_path, fixed=True)
+    assert verdict.rule_id == "R5" and (verdict.fix, verdict.fix_reason.value) == ("not_verified",
+                                                                                   "no_valid_observation")
+    assert not [s for s in steps(tmp_path) if s.endswith("fixed.a2")]
+
+
+def test_a_second_pair_still_invalid_after_three_reviews_is_r2(tmp_path):
+    fakes = Fakes(outcomes={("vulnerable", "exploit"): ["assertion_failed"]},
+                  review_invalid=[set(), {"exploit"}, {"exploit"}, {"exploit"}], real_decide=True)
+    verdict, decided = go(fakes, tmp_path)
+    assert (verdict.label.value, verdict.rule_id, verdict.terminal_reason.value) == ("INCONCLUSIVE", "R2",
+                                                                                     "test_invalid")
+    names = steps(tmp_path)
+    assert [s for s in names if s.startswith("review.a2.")] == ["review.a2.1", "review.a2.2", "review.a2.3"]
+    assert [s for s in names if s.startswith("probe.")] == ["probe.exploit.r1.a2", "probe.exploit.r2.a2"]
+    assert "execute-exploit-vulnerable.a2" not in names and verdict.attempts[1].review_rounds == 3
+    assert verdict.attempts[1].revisions == {"exploit": 2} and verdict.review_rounds == 1
+
+
+def test_a_rejected_control_in_the_second_attempt_ends_it_as_r2(tmp_path):
+    fakes = Fakes(outcomes={("vulnerable", "exploit"): ["assertion_failed"]},
+                  review_invalid=[set(), {"control"}], real_decide=True)
+    verdict, _ = go(fakes, tmp_path)
+    assert (verdict.rule_id, verdict.terminal_reason.value) == ("R2", "test_invalid")
+    names = steps(tmp_path)
+    assert [s for s in names if "a2" in s] == ["probe-exploit.a2", "diagnose-exploit.a2", "review.a2.1"]
+    assert len(fakes.of("probe-control")) == 1  # the control never revises in attempt 2
+
+
+@pytest.mark.parametrize("calls, last", [(5, "execute-exploit-vulnerable"), (6, "diagnose-exploit.a2")])
+def test_budget_exhaustion_in_the_second_attempt_is_never_r5(tmp_path, calls, last):
+    # Calls: investigate, build, two probes, review.1 (= 5), then probe-exploit.a2 (= 6), then review.a2.1.
+    fakes = Fakes(outcomes={k: list(v) for k, v in FAILED_TWICE.items()}, real_decide=True)
+    verdict, decided = go(fakes, tmp_path, budget=Budget(max_agent_calls=calls))
+    assert (verdict.label.value, verdict.rule_id, verdict.terminal_reason.value) == ("INCONCLUSIVE", "R7",
+                                                                                     "budget_exhausted")
+    assert steps(tmp_path)[-2:] == [last, "decide"] and len(decided["attempts"]) == 2
+
+
+@pytest.mark.parametrize("outcomes, rule", [
+    ({}, "R4"),
+    ({("vulnerable", "control"): ["assertion_failed"], ("vulnerable", "exploit"): ["assertion_failed"]}, "R3"),
+    ({("vulnerable", "exploit"): ["errored"]}, "R6"),
+])
+def test_no_second_attempt_after_any_other_first_result(tmp_path, outcomes, rule):
+    fakes = Fakes(outcomes=outcomes, real_decide=True)
+    verdict, decided = go(fakes, tmp_path)
+    assert verdict.rule_id == rule and len(fresh_exploit_calls(fakes)) == 1
+    assert len(decided["attempts"]) == 1 and verdict.attempt == 1
+    assert not [s for s in steps(tmp_path) if "a2" in s]
+
+
+def test_no_second_attempt_after_a_first_review_that_stays_negative(tmp_path):
+    fakes = Fakes(rejections={"exploit": 99}, outcomes={k: list(v) for k, v in FAILED_TWICE.items()},
+                  real_decide=True)
+    verdict, _ = go(fakes, tmp_path)
+    assert verdict.rule_id == "R2" and len(fresh_exploit_calls(fakes)) == 1

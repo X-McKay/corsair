@@ -69,8 +69,11 @@ Every case's `case.json` records source, commit, path and licence.
 | [vercel/ms](https://github.com/vercel/ms) 0.7.0 `dc61e2f` (ReDoS) | MIT | identification 1, planning 1 |
 | [sinatra/sinatra](https://github.com/sinatra/sinatra) v2.0.0 `5de6498` and rack-protection v2.0.1 `4831ab6` | MIT | identification 1, planning 1 |
 | Corsair-authored synthetic cases | n/a | environment 50, identification 24, planning 24, authoring 40, assessment 44 |
+| Permissive upstream gems reduced to small offline trees under `benchmarks/corpus/permissive-reduced/` (per-family `provenance.json`, SPDX checked at the pinned fix commit; variant letter does not reveal which is vulnerable, answer key in `manifest.json`) | MIT / BSD / Apache-2.0 | v2 whole-chain set (`evals/e2e`): JavaScript `dot-prop`, `angular-http-server`, `codecov-node`; Ruby `rubyzip`, `rack-static`, with further Ruby families in progress |
 
-Evaluated and not used: OWASP Benchmark and WebGoat (GPL), SecBench.js (no licence), Juliet Java, CWE-Bench-Java, vulpy and the Ruby gems surveyed (usable licences, not imported in this pass), Perl modules under Artistic-1.0/GPL dual licence (owner decision pending). Downloads were kept in their own directories and read with `python3 -I` scripts outside them; nothing downloaded was run or imported. No held-out corpus family was opened.
+A later import pass (tracked in [HANDOFF-0137](../handoffs/HANDOFF-0137-permissive-reduced-corpus.md)) brings permissive upstream code into `benchmarks/corpus/permissive-reduced/`: the JavaScript families and the Ruby gems are now being imported there as reduced vulnerable/fixed pairs, so the "surveyed but not imported" note below applied only to the original breadth pass.
+
+Evaluated and not used in the original breadth pass: OWASP Benchmark and WebGoat (GPL), SecBench.js (no licence), Juliet Java, CWE-Bench-Java, vulpy and the Ruby gems surveyed (usable licences, since imported in a later pass under `benchmarks/corpus/permissive-reduced/`), Perl modules under Artistic-1.0/GPL dual licence (owner decision pending). Downloads were kept in their own directories and read with `python3 -I` scripts outside them; nothing downloaded was run or imported. No held-out corpus family was opened.
 
 ## Validation and progress
 

@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from corsair.v2 import intake, matrix
-from corsair.v2.contracts import Label, TerminalReason
-from corsair.v2.rules import RULES
+from corsair import intake, matrix
+from corsair.contracts import Label, TerminalReason
+from corsair.rules import RULES
 from evals.cases import EVALS, load_set
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -72,7 +72,7 @@ def test_no_oracle_content_in_input(case):
     if "manifest_case" in truth:
         assert truth["manifest_case"] not in text  # manifest names carry the answer
     # A case id that names the behaviour (target-absent, ...) carries the answer; such cases let intake assign one.
-    assert "case_id" not in case.input or re.fullmatch(r"[a-z-]+-[a-z]", case.name), case.key
+    assert "case_id" not in case.input or re.fullmatch(r"[a-z0-9-]+-[a-z]", case.name), case.key
 
 
 @pytest.mark.parametrize("case", CASES, ids=[case.key for case in CASES])
@@ -101,12 +101,12 @@ def test_corpus_cases_match_the_manifest_route():
     corpus = [case for case in CASES if case.input.get("case_id", "").startswith("corpus:")]
     assert corpus
     for case in corpus:
-        name = case.oracle["truth"]["manifest_case"]
-        expected = intake.load_corpus_case(MANIFEST, name)
+        name, manifest = case.oracle["truth"]["manifest_case"], ROOT / case.oracle["truth"]["manifest"]
+        expected = intake.load_corpus_case(manifest, name)
         loaded = intake.from_issue_json(_path(case))
         assert (loaded.case_id, loaded.finding, loaded.revision) == (
             expected.case_id, expected.finding, expected.revision), case.key
-        assert intake.load_oracle(MANIFEST, name)["expected_label"] in (
+        assert intake.load_oracle(manifest, name)["expected_label"] in (
             case.oracle["expected_label"], *case.oracle["acceptable_labels"]) or case.oracle[
             "expected_terminal_reason"] == "no_runtime", case.key
 
@@ -119,6 +119,6 @@ def test_no_held_out_family_is_used():
         assert not any(re.search(rf"{re.escape(family)}(?![a-z0-9])", text) for family in held for text in texts), \
             case.key
         name = case.oracle.get("truth", {}).get("manifest_case")
-        if name is not None:
+        if name is not None and ROOT / case.oracle["truth"]["manifest"] == MANIFEST:
             _, language, topic, _ = entries[name]["finding"]["repo_url"].split("/")
             assert f"ih-{language}-{topic}" not in held
