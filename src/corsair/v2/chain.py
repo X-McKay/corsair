@@ -583,6 +583,9 @@ class _Composition:
                 feedback = "The previous episode proposed no recipe."
                 self.build = BuildResult(recipe=None, replayed=False, reason="the Builder proposed no recipe")
                 continue
+            if recipe.blocked:  # a reasoned refusal is final: another episode would not change the tree
+                self.build = BuildResult(recipe=recipe, replayed=False, reason=f"Builder refused: {recipe.blocked}")
+                raise _Stop(TerminalReason.BUILD_FAILED)
             replayed = (await self.code(ops.replay(f"replay-{step}", self.case, runtime, recipe, "vulnerable"))).output
             self.build = replayed.build
             if replayed.build.replayed and replayed.environment is not None:
