@@ -143,3 +143,22 @@ qualify-openshell-v2:
 	CORSAIR_EVIDENCE_DIR="$(abspath $(CORSAIR_QUAL_RUN))" \
 	uv run --locked python -m pytest $(PYTEST_ROOT) tests/v2 -m openshell --tb=short \
 		--evidence-dir "$(CORSAIR_QUAL_RUN)" --junitxml "$(CORSAIR_QUAL_RUN)/junit.xml"
+
+# Read-only UI over v2 run records and eval runs (docs/runbooks/local-ui.md, SPEC-0084). Node 22.6+; it launches no
+# work. `make ui` serves ui/dist and the API on http://127.0.0.1:8765 from .runs/evals, .runs/v2/runs and the v2 matrix.
+.PHONY: ui-install ui-build ui-check ui-test ui
+ui-install:
+	npm --prefix ui ci
+
+ui-build:
+	npm --prefix ui run build
+
+ui-check:
+	npm --prefix ui test
+	npm --prefix ui run build
+
+ui-test:
+	npm --prefix ui run test:e2e
+
+ui:
+	PYTHONPATH="$(CURDIR)/src:$(CURDIR)" uv run --locked python -m corsair.web --root "$(CURDIR)"

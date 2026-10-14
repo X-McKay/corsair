@@ -1,7 +1,8 @@
 # Gates, CI and release policy for v2
 
-Status: **prepared, not enabled** (2026-10-14; rebased onto the `src/corsair` package layout). Merging the PR that carries this document turns on the full CI
-described below; it is held until the enabling gate holds. Architecture and the deferral itself:
+Status: **CI enabled on develop** (2026-10-14, Al's go on PR #162). Release policies stay `enforced: false` until
+the build owner commits live baselines and the thresholds are adopted, so `release-check` toward main fails until
+then. Architecture and the deferral itself:
 [SPEC-0082](../development/specs/SPEC-0082-corsair-v2-architecture.md#acceptance-and-validation).
 
 ## Rules that do not change

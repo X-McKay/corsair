@@ -81,7 +81,7 @@ from typing import Any, Generic, TypeVar
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_ai.models import Model
 
-from .agents.common.usage import call_parameters, count_retries
+from .agents.common.usage import call_parameters, count_retries, refusal_reason
 from .contracts import (AgentUsage, Attempt, BuildResult, Case, CheckResult, Environment, FrozenPatch, Outcome,
                         ProbeBrief, ProbeDraft, ProbePlan, ProbeRun, ProbeValidity, Recipe, Runtime, TerminalReason,
                         Validity, Verdict)
@@ -314,6 +314,9 @@ class LocalOps:
                                                                  if getattr(usage, key) is None}})
         if messages:  # the captured history is complete even when the run raised
             usage = usage.model_copy(update={"retries": count_retries(messages)})
+            reason = refusal_reason(messages) if usage.status == "output_invalid" else None
+            if reason is not None:  # why the last answer was refused, next to the upstream detail
+                usage = usage.model_copy(update={"error": "; ".join(filter(None, (usage.error, reason)))[:2_000]})
         if failure is None and output is None and usage.status in ("provider_error", "budget_exhausted",
                                                                     "infra_error"):
             failure = TerminalReason(usage.status)

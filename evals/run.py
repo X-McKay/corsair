@@ -388,8 +388,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--promote", metavar="RUN", help="Make RUN the baseline for its set and mode instead of running")
     parser.add_argument("--commit-baseline", metavar="RUN",
                         help="v2: promote RUN and write its committed baseline file instead of running")
-    parser.add_argument("--results", type=Path, default=RESULTS, help=argparse.SUPPRESS)
+    parser.add_argument("--results", type=Path, default=os.environ.get("CORSAIR_EVAL_RESULTS") or RESULTS,
+                        help="Results directory, e.g. storage shared with the UI (default: CORSAIR_EVAL_RESULTS or "
+                             ".runs/evals)")
     args = parser.parse_args(argv)
+    args.results = Path(args.results).resolve()
     if args.agent in MISSING:
         parser.error(f"{args.agent}: {MISSING[args.agent]}")
     for chosen in filter(None, (args.promote, args.commit_baseline)):

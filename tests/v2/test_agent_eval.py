@@ -158,3 +158,21 @@ def test_live_runs_record_the_resolved_provider_profile(tmp_path):
                                   "agents": {agent: "local" for agent in MODEL_AGENTS}}))
     assert provider_identity(config, ("builder",)) == {
         "builder": {"profile": "local", "provider_host": "llm.example", "model": "m"}}  # run-record names
+
+
+def test_a_run_directory_recorded_in_the_workdir_outlives_it(tmp_path):
+    root = _root(tmp_path)
+    spec = _spec(root)
+
+    async def run(case, model, workdir):
+        attempt = await spec.run(case, model, workdir)
+        (workdir / "run" / "agents").mkdir(parents=True)
+        (workdir / "run" / "agents" / "investigate.messages.json").write_text("[]")
+        attempt.run_dir = workdir / "run"
+        return attempt
+
+    asyncio.run(evaluate(AgentEval(**{**spec.__dict__, "run": run}), tmp_path / "evidence", "dev"))
+    evidence = tmp_path / "evidence"
+    receipts = [json.loads(path.read_text()) for path in sorted((evidence / "receipts").iterdir())]
+    assert [receipt["run_dir"] for receipt in receipts] == ["runs/0001", "runs/0002"]
+    assert all((evidence / receipt["run_dir"] / "agents" / "investigate.messages.json").exists() for receipt in receipts)

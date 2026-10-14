@@ -10,7 +10,8 @@ Every v2 agent stage calls ``run_recorded`` so status and telemetry mean the sam
   model settings, the ``UsageLimits`` passed, the agent's retry settings) and the agent's ``agent.yaml`` metadata
   (``call_parameters``); ``retries`` counts the retry prompts in the run's message history;
 - the status says why there is no output: ``budget_exhausted`` (a native ``UsageLimits`` cap), ``output_invalid``
-  (output retries spent) or ``provider_error`` (the model endpoint failed). Anything else propagates, since it is a
+  (output retries spent; the caller holding the history adds ``refusal_reason``) or ``provider_error`` (the model
+  endpoint failed). Anything else propagates, since it is a
   defect or an infrastructure failure the caller must attribute itself.
 """
 from __future__ import annotations
@@ -30,6 +31,7 @@ from pydantic_ai.messages import ModelMessage, ModelRequest, RetryPromptPart
 from pydantic_ai.models import Model
 from pydantic_ai.usage import RunUsage, UsageLimits
 
+from corsair.agents.common.prompted_output import NO_OUTPUT
 from corsair.contracts import AgentUsage
 
 AgentName = Literal["grounding", "builder", "investigator", "control_prober", "exploit_prober", "reviewer"]
@@ -119,6 +121,26 @@ def count_retries(messages: Iterable[ModelMessage]) -> int:
     """Retry prompts (an invalid output or a failed tool call sent back to the model) in a run's history."""
     return sum(isinstance(part, RetryPromptPart) for message in messages if isinstance(message, ModelRequest)
                for part in message.parts)
+
+
+def refusal_reason(messages: Iterable[ModelMessage]) -> str | None:
+    """Why the run's last final answer was refused, as ``<kind>: <feedback>``; None when no answer was refused.
+
+    Only output retries count (a retry prompt with no tool name); kinds follow ``prompted_output``: ``reasoning_only``
+    (reasoning but no text), ``multiple_objects`` (more than one complete JSON object), else ``invalid_output`` (no JSON
+    object, or one that fails the output schema).
+    """
+    last = None
+    for message in messages:
+        if isinstance(message, ModelRequest):
+            last = next((part for part in reversed(message.parts)
+                         if isinstance(part, RetryPromptPart) and part.tool_name is None), last)
+    if last is None:
+        return None
+    text = last.content if isinstance(last.content, str) else last.model_response()
+    kind = ("reasoning_only" if text.startswith(NO_OUTPUT.split("{}")[0]) else
+            "multiple_objects" if "complete JSON objects" in text else "invalid_output")
+    return f"{kind}: {text}"
 
 
 def to_agent_usage(agent: AgentName, usage: RunUsage | None, *, model: Model | None = None,

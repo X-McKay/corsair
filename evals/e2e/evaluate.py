@@ -381,7 +381,7 @@ async def run(case: EvalCase, models: Mapping[str, Model], workdir: Path) -> Att
         "source_roots": sorted({entry["source_root"] for entry in log if "source_root" in entry}),
         "probe_files": sorted({entry["test_file"] for entry in log if "test_file" in entry}),
     }
-    attempt = Attempt(output=verdict, usage=_usage_totals(usage_rows, wall, verdict), facts=facts)
+    attempt = Attempt(output=verdict, usage=_usage_totals(usage_rows, wall, verdict), facts=facts, run_dir=run_dir)
     attempt.stage_inputs = [entry["text"] for entry in log]  # not dumped into receipts
     return attempt
 

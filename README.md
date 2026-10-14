@@ -43,6 +43,10 @@ termination, cleanup, or resumability. An unfinished recorded run is `incomplete
 
 Evidence lands under `.runs/` and is never committed.
 
+To browse it, `make ui-install ui-build ui` serves a read-only UI on http://127.0.0.1:8765: run records with their
+verdict, probe outcomes, review and cost; every agent's eval runs against their reference; agents and baselines; the
+runtime matrix; and Temporal/OpenShell reachability. See the [UI runbook](docs/runbooks/local-ui.md).
+
 ## Layout
 
 ```text
