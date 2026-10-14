@@ -1,16 +1,44 @@
 name: Development guards
 
+# The PR path runs only the offline suites: `make test-config` (unit, configuration, record and workflow guards, agent
+# fixtures) split over parallel jobs, and `make test-v2`. Milestone gates (kind, OpenShell, admission, toolchain images)
+# run on demand only (`make qualify-*`, the manual `Toolchain images (image-only)` workflow). CI never calls a model.
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, develop]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# A newer push to the same PR supersedes its running check; pushes to main and develop always finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  offline-guards:
+  offline-shard:
+    name: offline-shard (${{ matrix.shard }}/3)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.12.23"
+          python-version: "3.12"
+      - run: make test-config
+        env:
+          TEST_SHARD: ${{ matrix.shard }}/3
+
+  v2-offline:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -21,4 +49,15 @@ jobs:
         with:
           version: "0.12.23"
           python-version: "3.12"
-      - run: make test-config
+      - run: make test-v2
+
+  # One stable check name for branch protection: green only when every offline job passed.
+  offline-guards:
+    needs: [offline-shard, v2-offline]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: test "$RESULTS" = "success success"
+        env:
+          RESULTS: ${{ needs.offline-shard.result }} ${{ needs.v2-offline.result }}

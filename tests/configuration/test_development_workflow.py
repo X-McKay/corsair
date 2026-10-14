@@ -3,6 +3,7 @@ from datetime import date
 from pathlib import Path
 import re
 
+import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -87,13 +88,38 @@ def test_repository_markdown_links_resolve():
 def test_development_ci_has_only_read_permissions_and_pinned_actions():
     config = yaml.safe_load((ROOT / ".github/workflows/development.yml").read_text())
     assert config["permissions"] == {"contents": "read"}
-    steps = config["jobs"]["offline-guards"]["steps"]
-    for step in steps:
-        if "uses" in step:
-            assert re.fullmatch(r"[a-z0-9-]+/[a-z0-9-]+@[0-9a-f]{40}", step["uses"])
-        if step.get("uses", "").startswith("actions/checkout@"):
-            assert step["with"]["persist-credentials"] is False
-    assert [s["run"] for s in steps if "run" in s] == ["make test-config"]
+    for job in config["jobs"].values():
+        for step in job["steps"]:
+            if "uses" in step:
+                assert re.fullmatch(r"[a-z0-9-]+/[a-z0-9-]+@[0-9a-f]{40}", step["uses"])
+            if step.get("uses", "").startswith("actions/checkout@"):
+                assert step["with"]["persist-credentials"] is False
+
+
+def test_development_ci_shards_run_the_whole_offline_suite():
+    """Every shard k/n of 1..n runs `make test-config`, v2 runs `make test-v2`, and `offline-guards` fails unless all pass."""
+    jobs = yaml.safe_load((ROOT / ".github/workflows/development.yml").read_text())["jobs"]
+    shards = jobs["offline-shard"]
+    count = len(shards["strategy"]["matrix"]["shard"])
+    assert shards["strategy"]["matrix"]["shard"] == list(range(1, count + 1))
+    runs = [step for step in shards["steps"] if "run" in step]
+    assert [step["run"] for step in runs] == ["make test-config"]
+    assert runs[0]["env"]["TEST_SHARD"] == "${{ matrix.shard }}/" + str(count)
+    assert [step["run"] for step in jobs["v2-offline"]["steps"] if "run" in step] == ["make test-v2"]
+    guard = jobs["offline-guards"]
+    assert guard["needs"] == ["offline-shard", "v2-offline"] and guard["if"] == "always()"
+    assert guard["steps"][0]["env"]["RESULTS"] == " ".join("${{ needs.%s.result }}" % name for name in guard["needs"])
+
+
+def test_test_shards_partition_the_collection():
+    from tests.conftest import shard
+    items = list(range(23))
+    parts = [shard(items, f"{k}/4") for k in range(1, 5)]
+    assert sorted(i for part in parts for i in part) == items
+    assert max(map(len, parts)) - min(map(len, parts)) <= 1
+    for bad in ("0/3", "4/3"):
+        with pytest.raises(ValueError):
+            shard(items, bad)
 
 
 def test_held_out_cases_match_manifest_and_stay_unnamed_in_records():
