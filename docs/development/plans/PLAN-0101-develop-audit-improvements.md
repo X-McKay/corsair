@@ -50,3 +50,19 @@ The user requested independent PRs on 2026-10-14: PLAN-0102 (evaluation accounti
 Reuse argparse, native Rich 15.0.0, native Pydantic Evals and existing record/callback interfaces. The only new renderer is a small presentation adapter; no scheduler, provider protocol, trace parser, Typer/Textual application or second skill registry. Unknown telemetry stays null. Upstream run-record names and OpenShell selection/SDK/authority are preserved.
 
 Prioritize native Temporal retry/artifact boundaries, cited/bounded negative Reviewer evidence and executable counterfactual oracles, statistically defined per-language paired live comparisons, and licensed benchmark admission. For the newly implemented OpenShell backend, carry cleanup confirmation, require generation-bound ownership and qualify exact effective policy before promotion. Follow current SPEC-0083/coordinator gate decisions; do not infer a live pass from source or mocks. See [HANDOFF-0137](../handoffs/HANDOFF-0137-develop-audit-improvements.md) for continuation.
+
+## Final split-base alignment
+
+All independent code/documentation PRs preserve develop `bdbb2a91135f61bb33cd19ec3a4421cf284094f5`, including native live-baseline/commit helpers and D18 source standards. The source audit/initial experiment remain explicitly anchored to their earlier snapshots. No D18 verdict implementation or live baseline promotion is part of this patch. Each branch carries independent final-base validation; the combined archive is separately tested.
+
+## Published independent review units
+
+### Published independent code review units and final integration
+
+| Draft PR | Scope | Standalone serial / four-worker | Post-cleanup focused |
+| --- | --- | --- | --- |
+| [174](https://github.com/X-McKay/corsair/pull/174) | Evaluation accounting and declared policy scope | 1637 passed, 113 skipped (both) | 20 passed |
+| [175](https://github.com/X-McKay/corsair/pull/175) | CLI presentation, JSON and direct lifecycle receipts | 1646 passed, 113 skipped (both) | 29 passed |
+| [176](https://github.com/X-McKay/corsair/pull/176) | Shared developer skills and configuration golden path | 1637 passed, 113 skipped (both) | 107 passed |
+
+All are base-aligned to `bdbb2a91135f61bb33cd19ec3a4421cf284094f5`; none is merged. The separate documentation-only PR contains no code from these three areas. Final combined reviewed source: **1658 passed, 113 skipped**, both serial and four-worker; post-cleanup re-test **128 passed**. Documentation configuration checks: **101 passed**. Skips and fixture passes are not native platform or inference/disposition qualification.

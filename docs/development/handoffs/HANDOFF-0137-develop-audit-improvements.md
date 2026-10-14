@@ -39,3 +39,17 @@ For SPEC-0083/OpenShell, native lifecycle/exec are already reused. Remaining P1s
 ```text
 Read AGENTS.md, docs/development/CURRENT.md, PLAN-0101, this handoff and the audit's moving-branch update. Inspect branch/source and verify the active gate; preserve the upstream OpenShell/Reviewer/D3 work. Use the Corsair development skill. Choose one bounded next component: Reviewer negative-evidence/counterfactual validity with frozen evaluator checks, or explicit paired per-language live metric/cohort semantics. Reuse native PydanticAI/Pydantic Evals; retain failed attempts, unknown telemetry and grouped holdout discipline. Do not infer native execution from fixtures or run a coordinator-owned gateway without handover. Run focused tests, affected scripted suites and serial/fixed-parallel checks as needed, clean up/re-test, update living records/CURRENT.md and append a new handoff.
 ```
+
+Final PR bases were aligned to `bdbb2a91135f61bb33cd19ec3a4421cf284094f5` after native live-baseline helpers and D18 were recorded upstream. Preserve those helpers/standards; use the final per-PR/combined evidence, not only the earlier 06d4cbe counts. D18 implementation/qualified negative precision remains outside this audit patch.
+
+## Published independent review units
+
+### Published independent code review units and final integration
+
+| Draft PR | Scope | Standalone serial / four-worker | Post-cleanup focused |
+| --- | --- | --- | --- |
+| [174](https://github.com/X-McKay/corsair/pull/174) | Evaluation accounting and declared policy scope | 1637 passed, 113 skipped (both) | 20 passed |
+| [175](https://github.com/X-McKay/corsair/pull/175) | CLI presentation, JSON and direct lifecycle receipts | 1646 passed, 113 skipped (both) | 29 passed |
+| [176](https://github.com/X-McKay/corsair/pull/176) | Shared developer skills and configuration golden path | 1637 passed, 113 skipped (both) | 107 passed |
+
+All are base-aligned to `bdbb2a91135f61bb33cd19ec3a4421cf284094f5`; none is merged. The separate documentation-only PR contains no code from these three areas. Final combined reviewed source: **1658 passed, 113 skipped**, both serial and four-worker; post-cleanup re-test **128 passed**. Documentation configuration checks: **101 passed**. Skips and fixture passes are not native platform or inference/disposition qualification.

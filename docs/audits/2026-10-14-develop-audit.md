@@ -16,6 +16,9 @@ Important updates to the earlier findings:
 
 The remaining high-leverage priorities are **native Temporal retry/durability boundaries**, effective release/shared artifact provenance, cited and bounded negative review/counterfactual validation, mode-separated paired live evaluations and licensed native benchmark admission, plus evidence-based qualification of the actual OpenShell adapter. The initial audit sections below remain traceable source findings at the starting snapshot; this update prevents resolved gaps from being misreported as current.
 
+
+**Final PR-base alignment:** all four independent PRs are based on `bdbb2a91135f61bb33cd19ec3a4421cf284094f5`, the last inspected develop snapshot. Upstream PR #168 added native serial live-baseline/commit helpers and eligible live-whole-run baseline checks; these are preserved, not reimplemented. PR #170 records D18: the independent second failed exploit attempt, artifact-bound review and LNE sensitivity/separate precision standard. This audit does not implement or claim to qualify that newly recorded verdict change. The earlier `06d4cbe` source findings/validation remain historical; final-base standalone and combined results are recorded in the delivery table. No baseline was promoted and no production prompt/model/gateway was run.
+
 ## Most important confirmed findings at the starting snapshot
 
 1. **P0 — Temporal mode does not implement the accepted per-model/per-tool PydanticAI durability design.** `SPEC-0082` requires native `TemporalDurability` for each model request and tool call, but [`workflow.py:1–26`](https://github.com/X-McKay/corsair/blob/bc3c25fa46686bdf3120b96caac174c39c8285af/src/corsair/v2/workflow.py#L1-L26) deliberately runs each entire agent episode as one Temporal activity. Static inspection found zero production `TemporalDurability` constructors and zero PydanticAI plugin registrations. A retry can therefore repeat earlier model/tool work in an agent episode, while provider errors converted into returned `StepResult`s do not trigger the declared model activity retry. This is a direct divergence from the accepted architecture, not an argument for a rewrite.
@@ -362,6 +365,16 @@ These are source-confirmed opportunities, **not changes silently folded into the
 At the user's request, the delivered code is separated into three independently base-aligned draft PRs: **evaluation accounting/policy scope**, **CLI presentation/JSON/direct lifecycle**, and **shared developer skills/golden-path checks**. A fourth **documentation-only audit/benchmark-roadmap PR** carries the source report and central handoff. Each code PR has its own plan/current-work entry and standalone focused, serial/four-worker, cleanup and post-cleanup validation. None requires cherry-picking another code PR to test. The combined reviewed source is also packaged, clearly separate from the individual PRs and from private raw experiment evidence.
 
 No native Temporal migration, new OpenShell backend, production prompt, public benchmark accuracy, or release-baseline promotion is presented as implemented. Those proposals require the explicit design/evidence steps above rather than large speculative changes in an unrelated PR.
+
+### Published independent code review units and final integration
+
+| Draft PR | Scope | Standalone serial / four-worker | Post-cleanup focused |
+| --- | --- | --- | --- |
+| [174](https://github.com/X-McKay/corsair/pull/174) | Evaluation accounting and declared policy scope | 1637 passed, 113 skipped (both) | 20 passed |
+| [175](https://github.com/X-McKay/corsair/pull/175) | CLI presentation, JSON and direct lifecycle receipts | 1646 passed, 113 skipped (both) | 29 passed |
+| [176](https://github.com/X-McKay/corsair/pull/176) | Shared developer skills and configuration golden path | 1637 passed, 113 skipped (both) | 107 passed |
+
+All are base-aligned to `bdbb2a91135f61bb33cd19ec3a4421cf284094f5`; none is merged. The separate documentation-only PR contains no code from these three areas. Final combined reviewed source: **1658 passed, 113 skipped**, both serial and four-worker; post-cleanup re-test **128 passed**. Documentation configuration checks: **101 passed**. Skips and fixture passes are not native platform or inference/disposition qualification.
 
 ## Remaining qualification limits
 
