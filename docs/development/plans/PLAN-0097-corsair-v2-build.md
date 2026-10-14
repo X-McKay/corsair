@@ -53,7 +53,7 @@ Phase 3, agents. Each agent ships with its own eval set, a scripted suite and a 
 
 - [ ] Investigator: merges identification and planning; uses search; declares the component.
 - [ ] Builder: recipe, trusted replay and the three cache levels.
-- [ ] Control Prober and Exploit Prober as separate packages over a shared probe-protocol skill, framework skills, write tool and draft contract. Add the trusted single-run correction step and the review feedback loop (at most four review rounds, three review revisions per author, outcome-blind feedback, re-frozen digest each round).
+- [ ] Control Prober and Exploit Prober as separate packages over a shared probe-protocol skill, framework skills, write tool and draft contract. Add the trusted single-run correction step and the review feedback loop (at most three review rounds, two review revisions per author, outcome-blind feedback, re-frozen digest each round).
 - [ ] Reviewer: frozen labelled pairs, including copy, mock-the-target and vacuous-assertion traps.
 - [ ] Grounding placeholder, behind two ports, each with an in-memory fixture stub:
   - ADO work-item intake: field map, header parser, backfill and skip list.

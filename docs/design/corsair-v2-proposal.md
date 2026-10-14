@@ -566,11 +566,11 @@ The Codex review of PR #134 found three gaps. All three are fixed in SPEC-0082, 
   - Authors never get runtime output, because even a line that names their own file can carry the application's message. A not\_run or errored draft gets back its mechanical class and a fixed hint chosen from the exit class and the markers.
   - Authors also get the full output of the matrix row's optional syntax check, such as `python -m py_compile`, `node --check`, `ruby -c` or a test-compile step. That check runs no application code, and a row whose check could run code, such as `perl -c`, declares none.
   - R1 now covers every vulnerable-revision probe whose outcome is `infra`, so infrastructure failures always read as ERROR.
-- **Review feedback loop (Al, 14 October; three revision rounds; supersedes "one revision" for review defects).**
-  - A review round reviews the whole frozen pair, with at most four rounds: the first review and three re-reviews. Each author whose probe is invalid gets one revision per round, so at most three review revisions each, separate from the one mechanical revision. All of it spends the one total budget.
+- **Review feedback loop (Al, 14 October; three reviews in total; supersedes "one revision" for review defects).**
+  - A review round reviews the whole frozen pair, with at most three rounds: the first review and two re-reviews. Each author whose probe is invalid gets one revision per round, so at most two review revisions each, separate from the one mechanical revision. All of it spends the one total budget.
   - An author gets only its own probe's review: the failed check names, the Reviewer's defect text (at most four defects of 1 KiB) and citations that resolve to its own file or source it may read. It never gets a run result, the other probe's brief, draft or review, Grounding output or an oracle. Execute never runs inside the loop.
   - Each revision sets `revision_of`, re-freezes a new patch digest, re-runs the mechanical check on the changed draft and gets a fresh review of the whole pair. Reviews of an earlier digest never count.
-  - Still invalid after four rounds or when the budget runs out: nothing executes and R2 gives INCONCLUSIVE (`test_invalid`).
+  - Still invalid after three rounds or when the budget runs out: nothing executes and R2 gives INCONCLUSIVE (`test_invalid`).
   - Each round and revision is its own recorded step. A prober's `clean_attempt_rate` counts only drafts accepted at the first review; `accepted_within_limit` and the mean revision count measure the loop.
   - Example: the first live run's exploit probe patched `subprocess` globally instead of at the target's import site. The Exploit Prober now gets that defect and its citation, revises, and the pair is reviewed again.
 
