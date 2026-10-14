@@ -178,7 +178,7 @@
         "repo_url": "eval-corpus/ruby/rubyzip/a",
         "revision": "HEAD",
         "file_path": "lib/zip/entry.rb",
-        "start_line": 29,
+        "start_line": 28,
         "symbol": "extract",
         "cwe": "CWE-22",
         "severity": "high",
@@ -189,7 +189,7 @@
         "expected_verdict": "likely_not_exploitable",
         "reachability": "neutralized",
         "sink_file": "lib/zip/entry.rb",
-        "sink_line": 29,
+        "sink_line": 28,
         "source": "entry name",
         "target_callable": "extract"
       }
