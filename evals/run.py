@@ -44,16 +44,14 @@ class Suite:
     note: str = ""
     # Sets served by another module than `module`, e.g. the chain's benchmark case cohorts.
     set_modules: dict[str, str] = field(default_factory=dict)
-    # Whether the suite's sets are per-case directories that `--language` can narrow (evals/cases.py).
-    languages: bool = True
 
 
 SUITES: dict[str, Suite] = {
     "control_authoring": Suite("evals.control_authoring.evaluate", {"development": (), "transfer": ("--agent", "control_authoring")},
-        set_modules={"transfer": "evals.experiments.staged_baseline.evaluate"}, languages=False,
+        set_modules={"transfer": "evals.experiments.staged_baseline.evaluate"},
         note="source drafts only; transfer requires REPEAT=1; contract scores require separate source review and native execution"),
     "exploit_authoring": Suite("evals.exploit_authoring.evaluate", {"development": (), "transfer": ("--agent", "exploit_authoring")},
-        set_modules={"transfer": "evals.experiments.staged_baseline.evaluate"}, languages=False,
+        set_modules={"transfer": "evals.experiments.staged_baseline.evaluate"},
         note="source drafts only; transfer requires REPEAT=1; contract scores require separate source review and native execution"),
     "environment": Suite("evals.environment.evaluate", {"development": (), "development-v2": ("--cases", "development-v2"),
                                                         "breadth": ("--cases", "breadth")},
@@ -84,8 +82,18 @@ SUITES: dict[str, Suite] = {
                    note="fixture chain uses independent authors; non-live stages are scripted and the host runner admits "
                         "only reviewed fixture bytes; Docker cohorts (benchmark-case sets under evals/e2e/) run selected "
                         "production stages on image-only ports",
-                   set_modules={"jest": "evals.case_e2e.evaluate"}, languages=False),
+                   set_modules={"jest": "evals.case_e2e.evaluate"}),
 }
+# Scorers whose CLI narrows a per-case set to one language (`--language`, evals/cases.py); every other set refuses
+# EVAL_LANGUAGE before anything runs.
+LANGUAGE_MODULES = frozenset({"evals.environment.evaluate", "evals.issue_identification.evaluate", "evals.test_planning.evaluate",
+                              "evals.test_authoring.evaluate", "evals.evidence_assessment.unit_test"})
+
+
+def narrows_by_language(suite: Suite, set_name: str) -> bool:
+    return suite.set_modules.get(set_name, suite.module) in LANGUAGE_MODULES
+
+
 # Agents without an isolated eval set yet, and where the gap is planned.
 MISSING = {}
 
@@ -296,8 +304,8 @@ def main(argv: list[str] | None = None) -> int:
     set_name = args.set_name or next(iter(suite.sets))
     if set_name not in suite.sets:
         parser.error(f"{args.agent} sets: {', '.join(suite.sets)}")
-    if args.language and not suite.languages:
-        parser.error(f"{args.agent} sets are not split by language")
+    if args.language and not narrows_by_language(suite, set_name):
+        parser.error(f"{args.agent} set {set_name} is not split by language")
     return run(args.agent, set_name, args.provider_config, args.repeat, args.note, args.results, args.language)
 
 
