@@ -2,7 +2,7 @@
 id: PLAN-0104
 kind: plan
 title: Shared developer skills and configuration golden path
-status: in_progress
+status: complete
 updated: 2026-10-14
 related: [SPEC-0082]
 ---
@@ -13,7 +13,7 @@ related: [SPEC-0082]
 
 Restore make test-config; remove obsolete duplicated v1 architecture from five canonical skills, fix exact current-work paths and verified dynamic scorer discovery, and preserve native Codex symlinks/current qualification authority. Structural guards do not certify model/client compliance.
 
-This independent draft PR is based on develop integration snapshot `06d4cbe21b891051811f80559a478881c061ee86`. Other audit changes live in separate PRs, not prerequisites of this branch. The central source-backed audit/HANDOFF-0137 will be delivered in a separate documentation PR; this branch carries its own scoped record and current-work entry.
+This independent draft PR is based on develop integration snapshot `bdbb2a91135f61bb33cd19ec3a4421cf284094f5`. Other audit changes live in separate PRs, not prerequisites of this branch. The central source-backed audit/HANDOFF-0137 will be delivered in a separate documentation PR; this branch carries its own scoped record and current-work entry.
 
 ## Implementation and validation
 
@@ -24,3 +24,16 @@ Unrun/unknown: production provider accuracy, Docker/kind/gateway policy and nati
 ## Next action
 
 Complete standalone validation and publish this draft for independent review. Do not merge automatically. Preserve failed evidence and explicit unknowns; follow current gate/coordinator decisions for any later live run.
+
+## Final standalone evidence
+
+Final base `bdbb2a91135f61bb33cd19ec3a4421cf284094f5` preserves D18 source standards and native live-baseline/commit helpers. The original `06d4cbe` checks remain private history; no D18 verdict implementation is included here.
+
+| Check | Passed | Skipped |
+| --- | --- | --- |
+| Focused | 107 | 0 |
+| Four-worker full suite | 1637 | 113 |
+| Serial full suite | 1637 | 113 |
+| Post-cleanup focused re-test | 107 | 0 |
+
+Final diff cleanup check passed. Shared skill/discovery/configuration guards passed; actual client compliance unrun. Skipped tests are not native qualification. Production models, Docker/kind/gateway, backend end-to-end dispositions and held-out accuracy remain unrun. No private `.runs/`, `.state/`, credentials, raw logs or weights are committed.
