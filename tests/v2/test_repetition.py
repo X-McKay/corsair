@@ -34,3 +34,18 @@ def test_tools_outside_the_read_set_are_never_guarded():
     script = Script([("run", {"argv": ["make"]})] * 4 + ["done"])
     asyncio.run(Agent(script.model, tools=[run], capabilities=[read_loop_guard()]).run("go"))
     assert len(runs) == 4
+
+
+def test_tools_are_withdrawn_before_either_cap_so_the_agent_can_answer():
+    from pydantic_ai.usage import RunUsage, UsageLimits
+    from corsair.v2.agents.common.budget import HEADROOM, within_tool_budget
+
+    class Ctx:
+        def __init__(self, tool_calls, requests):
+            self.usage = RunUsage(tool_calls=tool_calls, requests=requests)
+            self.usage_limits = UsageLimits(request_limit=40, tool_calls_limit=30)
+
+    tools = ["t"]
+    assert asyncio.run(within_tool_budget(Ctx(30 - HEADROOM - 1, 5), tools)) == tools
+    assert asyncio.run(within_tool_budget(Ctx(30 - HEADROOM, 5), tools)) == []
+    assert asyncio.run(within_tool_budget(Ctx(5, 40 - HEADROOM), tools)) == []

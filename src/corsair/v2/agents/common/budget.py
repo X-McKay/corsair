@@ -11,9 +11,22 @@ from pydantic_ai.capabilities import PrepareTools
 from pydantic_ai.tools import ToolDefinition
 
 
+HEADROOM = 3
+"""Tools go this many calls or requests before either cap: a model can emit several calls in one response, and an
+answer (plus one output correction) still needs requests. Live chain run 20261014T110211Z hit both caps outright:
+31 tool calls against a cap of 30, and an Investigator that reached its 40th request without answering."""
+
+
 async def within_tool_budget(ctx: RunContext, tools: list[ToolDefinition]) -> list[ToolDefinition]:
-    cap = ctx.usage_limits.tool_calls_limit if ctx.usage_limits is not None else None
-    return [] if cap is not None and ctx.usage.tool_calls >= cap else tools
+    limits = ctx.usage_limits
+    if limits is None:
+        return tools
+    tool_cap, request_cap = limits.tool_calls_limit, limits.request_limit
+    if tool_cap is not None and ctx.usage.tool_calls >= tool_cap - HEADROOM:
+        return []
+    if request_cap is not None and ctx.usage.requests >= request_cap - HEADROOM:
+        return []
+    return tools
 
 
 def tool_budget() -> PrepareTools:
