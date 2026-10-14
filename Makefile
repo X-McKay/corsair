@@ -1,4 +1,5 @@
 .PHONY: test test-v2 eval eval-baseline baseline-commit eval-live-baselines canary toolchain-images maven-hashes
+.PHONY: test-config
 export UV_CACHE_DIR ?= $(CURDIR)/.cache/uv
 # pytest otherwise infers its root from argument paths, so an evidence dir inside another checkout (for example
 # the main repository's .runs from a worktree) would load that checkout's config and code.
@@ -15,6 +16,9 @@ test-v2:
 	uv run --locked python -m pytest $(PYTEST_ROOT) -n $(TEST_WORKERS) tests
 
 test: test-v2
+
+test-config:
+	uv run --locked python -m pytest $(PYTEST_ROOT) tests/configuration
 
 # One agent's isolated eval suite on the host; results under .runs/evals/<agent>/.
 # AGENT=grounding|builder|investigator|control_prober|exploit_prober|reviewer (cases, sets and release policy in
