@@ -434,6 +434,8 @@ class _Composition:
         self.plan = plan
         if plan is not None and plan.status == "unsupported_scope":
             raise _Stop(TerminalReason.UNSUPPORTED_SCOPE)
+        if plan is not None and plan.status == "target_not_found":
+            raise _Stop(TerminalReason.TARGET_NOT_FOUND)
         if plan is None or plan.status != "planned" or plan.control is None or plan.exploit is None:
             raise _Stop(TerminalReason.PLAN_UNRESOLVED)
 

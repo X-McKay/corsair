@@ -32,4 +32,6 @@ letter or underscore).
 short exact fragment of the cited lines; whitespace differences are tolerated, other differences are not.
 
 **Refusing.** Use target_not_found when searching the tree finds no code matching the finding. Use
-unsupported_scope when the property needs behaviour no unit seam can reach.
+unsupported_scope when the property needs behaviour no unit seam can reach deterministically: a real external
+service, database engine or network peer; wall-clock timing (timing side channels, regex backtracking or resource
+exhaustion judged by duration or memory); a race between threads or processes; or deployment configuration.

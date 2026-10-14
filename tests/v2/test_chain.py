@@ -44,7 +44,8 @@ def test_fixed_revision_is_reviewed_replayed_and_executed(tmp_path):
 @pytest.mark.parametrize("setup, reason, last", [
     (dict(runtime=None), "no_runtime", "select"),
     (dict(plan=None), "plan_unresolved", "investigate"),
-    (dict(plan=ProbePlan(status="target_not_found", reason="x")), "plan_unresolved", "investigate"),
+    (dict(plan=ProbePlan(status="target_not_found", reason="x")), "target_not_found", "investigate"),
+    (dict(plan=ProbePlan(status="unresolved", reason="x")), "plan_unresolved", "investigate"),
     (dict(plan=ProbePlan(status="unsupported_scope", reason="x")), "unsupported_scope", "investigate"),
     (dict(plan=PLAN.model_copy(update={"exploit": None})), "plan_unresolved", "investigate"),
     (dict(raises={"investigate": ModelHTTPError(503, "m")}), "provider_error", "investigate"),
