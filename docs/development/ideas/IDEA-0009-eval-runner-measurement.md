@@ -4,7 +4,7 @@ kind: idea
 title: Simple eval runner measurement and comparison improvements
 status: proposed
 updated: 2026-10-13
-related: [IDEA-0008, SPEC-0044, PLAN-0048]
+related: [IDEA-0008]
 ---
 
 # Simple eval runner measurement and comparison improvements
