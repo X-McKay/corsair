@@ -17,6 +17,6 @@ retries:
   tools: 3
   output: 2
 metadata:
-  prompt_version: reviewer-v2-3
+  prompt_version: reviewer-v2-5
   request_limit: 24
   tool_calls_limit: 30
