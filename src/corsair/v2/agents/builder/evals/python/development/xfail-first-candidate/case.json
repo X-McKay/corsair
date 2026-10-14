@@ -1,0 +1,22 @@
+{
+  "language": "python",
+  "framework": "pytest",
+  "family": "baseline-not-passed",
+  "kind": "negative",
+  "category": "capability",
+  "probes": "The first candidate is marked xfail and exits 0 as xfailed; another test passes.",
+  "expected": "A recipe whose baseline is test_collapses_separators (setup may be empty: the declared pytest is the image's); the xfailed test is never the baseline.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "evals/environment/python/breadth/python-xfail-baseline-rechosen",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/environment/python/breadth/python-xfail-baseline-rechosen; the Makefile install line now spells the recorded pip argv verbatim; requirements.txt declares only pytest, which the row's image provides, so no setup is required; the tree's component and test sources were written to agree with the recorded output; native runs are recorded in the row's run_template form"
+  }
+}

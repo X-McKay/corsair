@@ -1,0 +1,21 @@
+{
+  "language": "perl",
+  "framework": "test-more",
+  "family": "unknown-delivery",
+  "kind": "failure-mode",
+  "category": "failure-mode",
+  "probes": "The workspace loses the cpanm install without an exit status.",
+  "expected": "The lost workspace propagates as an infrastructure outcome: no recipe, no usage, nothing runs after it.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "trajectory"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "evals/environment/perl/breadth/perl-unknown-delivery",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/environment/perl/breadth/perl-unknown-delivery; the tree's component and test sources were written to agree with the recorded output; native runs are recorded in the row's run_template form"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "language": "perl",
+  "framework": "test-more",
+  "family": "baseline-not-passed",
+  "kind": "negative",
+  "category": "capability",
+  "probes": "The first .t file passes only by skipping a subtest; another file passes fully.",
+  "expected": "A recipe whose baseline is t/lock.t; t/flock_nfs.t (one subtest skipped) is never the baseline.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "evals/environment/perl/breadth/perl-skip-baseline-rechosen",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/environment/perl/breadth/perl-skip-baseline-rechosen; the tree's component and test sources were written to agree with the recorded output; native runs are recorded in the row's run_template form"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "language": "javascript",
+  "framework": "jest",
+  "family": "discovery-failure",
+  "kind": "failure-mode",
+  "category": "failure-mode",
+  "probes": "jest.config.js names a setupFiles module that does not exist, so Jest refuses to start any test.",
+  "expected": "No recipe: Jest's configuration names a missing setup file, for every test file. Existing files cannot be changed, and a written smoke test does not stand in for a project that does not build or run.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "trajectory"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "evals/environment/javascript/breadth/javascript-setupfiles-discovery-failure",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/environment/javascript/breadth/javascript-setupfiles-discovery-failure; the tree's component and test sources were written to agree with the recorded output; native runs are recorded in the row's run_template form"
+  }
+}

@@ -1,0 +1,207 @@
+{
+  "source_files": [
+    {
+      "path": ".github/workflows/maven.yml",
+      "content": "name: build\non: [push, pull_request]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-java@v4\n        with:\n          distribution: temurin\n          java-version: '17'\n      - run: mvn -B dependency:go-offline\n      - run: mvn -B -o verify\n"
+    },
+    {
+      "path": "pom.xml",
+      "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.acme</groupId>\n  <artifactId>mail-render</artifactId>\n  <version>1.4.0-SNAPSHOT</version>\n  <properties>\n    <maven.compiler.release>17</maven.compiler.release>\n    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>\n  </properties>\n  <dependencies>\n    <dependency>\n      <groupId>org.junit.jupiter</groupId>\n      <artifactId>junit-jupiter</artifactId>\n      <version>5.14.4</version>\n      <scope>test</scope>\n    </dependency>\n  </dependencies>\n</project>\n"
+    },
+    {
+      "path": "src/main/java/org/acme/mail/Template.java",
+      "content": "package org.acme.mail;\n\npublic class Template {\n    public String escape(String s) {\n        return s.replace(\"<\", \"&lt;\").replace(\">\", \"&gt;\");\n    }\n\n    public String render(String s, String locale) {\n        return \"ar\".equals(locale) ? \"\\u202B\" + s : s;\n    }\n}\n"
+    },
+    {
+      "path": "src/test/java/org/acme/mail/TemplateTest.java",
+      "content": "package org.acme.mail;\n\nimport org.junit.jupiter.api.Disabled;\nimport org.junit.jupiter.api.Test;\n\nimport static org.junit.jupiter.api.Assertions.assertEquals;\n\nclass TemplateTest {\n    @Disabled(\"RTL fonts are not installed on CI agents\")\n    @Test\n    void rendersRtlLocale() {\n        assertEquals(\"\\u202Bhi\", new Template().render(\"hi\", \"ar\"));\n    }\n\n    @Test\n    void escapesHtmlEntities() {\n        assertEquals(\"&lt;b&gt;\", new Template().escape(\"<b>\"));\n    }\n}\n"
+    }
+  ],
+  "row_id": "junit5-maven-temurin17",
+  "plan": {
+    "status": "planned",
+    "target": "src/main/java/org/acme/mail/Template",
+    "citations": [
+      {
+        "path": "src/main/java/org/acme/mail/Template.java",
+        "start_line": 1,
+        "end_line": 1,
+        "quote": "package org.acme.mail;"
+      }
+    ]
+  },
+  "feedback": null,
+  "workspace_fixture": {
+    "observations": [
+      {
+        "argv": [
+          "mvn",
+          "-B",
+          "dependency:go-offline"
+        ],
+        "exit_code": 0,
+        "output": ""
+      },
+      {
+        "argv": [
+          "mvn",
+          "-B",
+          "-o",
+          "compile"
+        ],
+        "exit_code": 0,
+        "output": "",
+        "needs": [
+          [
+            "mvn",
+            "-B",
+            "dependency:go-offline"
+          ]
+        ],
+        "unmet": {
+          "exit_code": 1,
+          "output": "[ERROR] Failed to execute goal on project app: Could not resolve dependencies: Cannot access central (https://repo.maven.apache.org/maven2) in offline mode and the artifact org.junit.jupiter:junit-jupiter:jar:5.14.4 has not been downloaded from it before.\n[INFO] BUILD FAILURE\n"
+        }
+      },
+      {
+        "argv": [
+          "mvn",
+          "-B",
+          "-o",
+          "test",
+          "-DlistTests=true"
+        ],
+        "exit_code": 0,
+        "output": "org.acme.mail.TemplateTest#rendersRtlLocale\norg.acme.mail.TemplateTest#escapesHtmlEntities\n",
+        "needs": [
+          [
+            "mvn",
+            "-B",
+            "dependency:go-offline"
+          ]
+        ],
+        "unmet": {
+          "exit_code": 1,
+          "output": "[ERROR] Failed to execute goal on project app: Could not resolve dependencies: Cannot access central (https://repo.maven.apache.org/maven2) in offline mode and the artifact org.junit.jupiter:junit-jupiter:jar:5.14.4 has not been downloaded from it before.\n[INFO] BUILD FAILURE\n"
+        }
+      },
+      {
+        "argv": [
+          "mvn",
+          "-B",
+          "-o",
+          "test",
+          "-Dtest=TemplateTest#rendersRtlLocale"
+        ],
+        "exit_code": 0,
+        "output": "[INFO] Running org.acme.mail.TemplateTest\n[WARNING] Tests run: 1, Failures: 0, Errors: 0, Skipped: 1, Time elapsed: 0.01 s -- in org.acme.mail.TemplateTest\n[INFO] \n[INFO] Results:\n[INFO] \n[WARNING] Tests run: 1, Failures: 0, Errors: 0, Skipped: 1\n[INFO] \n[INFO] BUILD SUCCESS\n",
+        "needs": [
+          [
+            "mvn",
+            "-B",
+            "dependency:go-offline"
+          ]
+        ],
+        "unmet": {
+          "exit_code": 1,
+          "output": "[ERROR] Failed to execute goal on project app: Could not resolve dependencies: Cannot access central (https://repo.maven.apache.org/maven2) in offline mode and the artifact org.junit.jupiter:junit-jupiter:jar:5.14.4 has not been downloaded from it before.\n[INFO] BUILD FAILURE\n"
+        }
+      },
+      {
+        "argv": [
+          "mvn",
+          "-B",
+          "-o",
+          "test",
+          "-Dtest=TemplateTest#escapesHtmlEntities"
+        ],
+        "exit_code": 0,
+        "output": "[INFO] -------------------------------------------------------\n[INFO]  T E S T S\n[INFO] -------------------------------------------------------\n[INFO] Running org.acme.mail.TemplateTest\n[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.042 s -- in org.acme.mail.TemplateTest\n[INFO] \n[INFO] Results:\n[INFO] \n[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0\n[INFO] \n[INFO] ------------------------------------------------------------------------\n[INFO] BUILD SUCCESS\n[INFO] ------------------------------------------------------------------------\n",
+        "needs": [
+          [
+            "mvn",
+            "-B",
+            "dependency:go-offline"
+          ]
+        ],
+        "unmet": {
+          "exit_code": 1,
+          "output": "[ERROR] Failed to execute goal on project app: Could not resolve dependencies: Cannot access central (https://repo.maven.apache.org/maven2) in offline mode and the artifact org.junit.jupiter:junit-jupiter:jar:5.14.4 has not been downloaded from it before.\n[INFO] BUILD FAILURE\n"
+        }
+      },
+      {
+        "argv": [
+          "/usr/share/maven/bin/mvn",
+          "-B",
+          "-ntp",
+          "-o",
+          "-Dmaven.repo.local=.corsair-m2",
+          "-Dtest=TemplateTest#rendersRtlLocale",
+          "-DtrimStackTrace=false",
+          "test"
+        ],
+        "exit_code": 0,
+        "output": "[INFO] Running org.acme.mail.TemplateTest\n[WARNING] Tests run: 1, Failures: 0, Errors: 0, Skipped: 1, Time elapsed: 0.01 s -- in org.acme.mail.TemplateTest\n[INFO] \n[INFO] Results:\n[INFO] \n[WARNING] Tests run: 1, Failures: 0, Errors: 0, Skipped: 1\n[INFO] \n[INFO] BUILD SUCCESS\n",
+        "needs": [
+          [
+            "mvn",
+            "-B",
+            "dependency:go-offline"
+          ]
+        ],
+        "unmet": {
+          "exit_code": 1,
+          "output": "[ERROR] Failed to execute goal on project app: Could not resolve dependencies: Cannot access central (https://repo.maven.apache.org/maven2) in offline mode and the artifact org.junit.jupiter:junit-jupiter:jar:5.14.4 has not been downloaded from it before.\n[INFO] BUILD FAILURE\n"
+        }
+      },
+      {
+        "argv": [
+          "/usr/share/maven/bin/mvn",
+          "-B",
+          "-ntp",
+          "-o",
+          "-Dmaven.repo.local=.corsair-m2",
+          "-Dtest=TemplateTest#escapesHtmlEntities",
+          "-DtrimStackTrace=false",
+          "test"
+        ],
+        "exit_code": 0,
+        "output": "[INFO] Running org.acme.mail.TemplateTest\n[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.042 s -- in org.acme.mail.TemplateTest\n[INFO] \n[INFO] Results:\n[INFO] \n[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0\n[INFO] \n[INFO] BUILD SUCCESS\n",
+        "needs": [
+          [
+            "mvn",
+            "-B",
+            "dependency:go-offline"
+          ]
+        ],
+        "unmet": {
+          "exit_code": 1,
+          "output": "[ERROR] Failed to execute goal on project app: Could not resolve dependencies: Cannot access central (https://repo.maven.apache.org/maven2) in offline mode and the artifact org.junit.jupiter:junit-jupiter:jar:5.14.4 has not been downloaded from it before.\n[INFO] BUILD FAILURE\n"
+        }
+      },
+      {
+        "argv": [
+          "mvn",
+          "-v"
+        ],
+        "exit_code": 0,
+        "output": "Apache Maven 3.10.0\nJava version: 17.0.20.1, vendor: Eclipse Adoptium\n"
+      }
+    ],
+    "written_file_run": {
+      "exit_code": 0,
+      "output": "[INFO] Running {class}\n[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0\n[INFO] BUILD SUCCESS\n",
+      "needs": [
+        [
+          "mvn",
+          "-B",
+          "dependency:go-offline"
+        ]
+      ],
+      "unmet": {
+        "exit_code": 1,
+        "output": "[ERROR] Failed to execute goal on project app: Could not resolve dependencies: Cannot access central (https://repo.maven.apache.org/maven2) in offline mode and the artifact org.junit.jupiter:junit-jupiter:jar:5.14.4 has not been downloaded from it before.\n[INFO] BUILD FAILURE\n"
+      }
+    }
+  }
+}

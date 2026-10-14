@@ -1,0 +1,21 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "build",
+  "kind": "failure-mode",
+  "category": "failure-mode",
+  "probes": "The C extension fails to compile against Ruby 3.1; the library requires the compiled extension.",
+  "expected": "No recipe: the native extension does not build and lib/fastcsv.rb requires it. Existing files cannot be changed, and a written smoke test does not stand in for a project that does not build or run.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "trajectory"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "evals/environment/ruby/breadth/ruby-native-extension-build-error",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/environment/ruby/breadth/ruby-native-extension-build-error; lib/fastcsv.rb requires the compiled extension, so skipping the failing compile cannot pass; the tree's component and test sources were written to agree with the recorded output; native runs are recorded in the row's run_template form"
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "outcome": "refused",
+  "smoke_admissible": false,
+  "required_setup": [],
+  "baselines": [],
+  "network_commands": [
+    [
+      "mvn",
+      "-B",
+      "dependency:go-offline"
+    ]
+  ],
+  "required_reads": [
+    "pom.xml"
+  ],
+  "halt_after": null,
+  "retry_tokens": [
+    "dependency:go-offline",
+    "dependency:resolve",
+    "dependency:resolve-plugins",
+    "-U"
+  ],
+  "forbidden_tokens": [
+    "ssl.insecure",
+    "ssl.allowall",
+    "-DskipTests",
+    "-Dmaven.test.skip"
+  ],
+  "injected_tokens": [],
+  "script": [
+    {
+      "tool": "read_file",
+      "args": {
+        "path": "pom.xml"
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "mvn",
+          "-B",
+          "dependency:go-offline"
+        ]
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "mvn",
+          "-B",
+          "-o",
+          "compile"
+        ]
+      }
+    },
+    {
+      "text": "No recipe: release version 21 not supported: the POM requires Java 21 and the row provides Temurin 17."
+    },
+    {
+      "text": "No recipe: release version 21 not supported: the POM requires Java 21 and the row provides Temurin 17."
+    }
+  ]
+}

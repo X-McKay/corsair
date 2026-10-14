@@ -1,0 +1,21 @@
+{
+  "language": "java",
+  "framework": "junit5",
+  "family": "build",
+  "kind": "failure-mode",
+  "category": "failure-mode",
+  "probes": "Dependencies resolve but the main sources do not compile (a call to a missing method).",
+  "expected": "No recipe: LruCache.java does not compile, so no test can run. Existing files cannot be changed, and a written smoke test does not stand in for a project that does not build or run.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "trajectory"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "evals/environment/java/breadth/java-compile-error",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/environment/java/breadth/java-compile-error; the tree's component and test sources were written to agree with the recorded output; native runs are recorded in the row's run_template form"
+  }
+}

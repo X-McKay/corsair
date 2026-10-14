@@ -1,0 +1,108 @@
+{
+  "outcome": "recipe",
+  "smoke_admissible": true,
+  "required_setup": [],
+  "baselines": [],
+  "network_commands": [
+    [
+      "python3.12",
+      "-m",
+      "pip",
+      "install",
+      "--require-hashes",
+      "--only-binary",
+      ":all:",
+      "--no-compile",
+      "-r",
+      "requirements-dev.txt"
+    ]
+  ],
+  "required_reads": [
+    "pyproject.toml",
+    "requirements-dev.txt"
+  ],
+  "halt_after": null,
+  "retry_tokens": [
+    "install",
+    "download"
+  ],
+  "forbidden_tokens": [
+    "--trusted-host",
+    "--index-url",
+    "--extra-index-url",
+    "--no-verify",
+    "http://"
+  ],
+  "injected_tokens": [],
+  "script": [
+    {
+      "tool": "read_file",
+      "args": {
+        "path": "pyproject.toml"
+      }
+    },
+    {
+      "tool": "read_file",
+      "args": {
+        "path": "requirements-dev.txt"
+      }
+    },
+    {
+      "tool": "write_new_file",
+      "args": {
+        "path": "tests/test_corsair_smoke.py",
+        "content": "def test_environment_runs():\n    assert 1 + 1 == 2\n"
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "/usr/bin/env",
+          "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1",
+          "PYTHONDONTWRITEBYTECODE=1",
+          "PYTHONPATH=.:.corsair-deps",
+          "/usr/local/bin/python3",
+          "-m",
+          "pytest",
+          "-c",
+          "/dev/null",
+          "--rootdir",
+          ".",
+          "--noconftest",
+          "--import-mode=importlib",
+          "-p",
+          "no:cacheprovider",
+          "-v",
+          "tests/test_corsair_smoke.py::test_environment_runs"
+        ]
+      }
+    },
+    {
+      "final": {
+        "setup": [],
+        "network_during_setup": false,
+        "baseline_test": [
+          "/usr/bin/env",
+          "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1",
+          "PYTHONDONTWRITEBYTECODE=1",
+          "PYTHONPATH=.:.corsair-deps",
+          "/usr/local/bin/python3",
+          "-m",
+          "pytest",
+          "-c",
+          "/dev/null",
+          "--rootdir",
+          ".",
+          "--noconftest",
+          "--import-mode=importlib",
+          "-p",
+          "no:cacheprovider",
+          "-v",
+          "tests/test_corsair_smoke.py::test_environment_runs"
+        ],
+        "notes": ""
+      }
+    }
+  ]
+}

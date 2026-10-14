@@ -1,0 +1,22 @@
+{
+  "language": "python",
+  "framework": "pytest",
+  "family": "toolchain-version",
+  "kind": "refusal",
+  "category": "failure-mode",
+  "probes": "The README and documents.py require Python 3.13; the row is CPython 3.12.",
+  "expected": "No recipe: documents.py refuses to import on Python 3.12. Existing files cannot be changed, and a written smoke test does not stand in for a project that does not build or run.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "trajectory",
+    "robustness"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "evals/environment/python/development-v2/unsupported-toolchain",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/environment/python/development-v2/unsupported-toolchain; v1 had no observations; documents.py now carries the version guard and the import failure is recorded; the requirements now declare attrs, which documents.py imports, so the declared install is needed; the tree's component and test sources were written to agree with the recorded output; native runs are recorded in the row's run_template form"
+  }
+}

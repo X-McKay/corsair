@@ -1,0 +1,171 @@
+{
+  "outcome": "recipe",
+  "smoke_admissible": false,
+  "required_setup": [
+    [
+      "bundle",
+      "install"
+    ]
+  ],
+  "baselines": [
+    {
+      "argv": [
+        "/usr/bin/env",
+        "BUNDLE_FROZEN=true",
+        "/usr/local/bin/bundle",
+        "exec",
+        "/usr/local/bin/ruby",
+        "-Itest",
+        "-Ilib",
+        "test/strip_test.rb",
+        "-v",
+        "-n",
+        "test_strips_color"
+      ],
+      "path": "test/strip_test.rb"
+    },
+    {
+      "argv": [
+        "/usr/bin/env",
+        "BUNDLE_FROZEN=true",
+        "/usr/local/bin/bundle",
+        "exec",
+        "/usr/local/bin/ruby",
+        "-Itest",
+        "-Ilib",
+        "test/strip_test.rb",
+        "-v",
+        "-n",
+        "test_keeps_plain"
+      ],
+      "path": "test/strip_test.rb"
+    },
+    {
+      "argv": [
+        "/usr/bin/env",
+        "BUNDLE_FROZEN=true",
+        "/usr/local/bin/bundle",
+        "exec",
+        "/usr/local/bin/ruby",
+        "-Itest",
+        "-Ilib",
+        "test/strip_test.rb",
+        "-v",
+        "-n",
+        "test_strips_bold"
+      ],
+      "path": "test/strip_test.rb"
+    },
+    {
+      "argv": [
+        "/usr/bin/env",
+        "BUNDLE_FROZEN=true",
+        "/usr/local/bin/bundle",
+        "exec",
+        "/usr/local/bin/ruby",
+        "-Itest",
+        "-Ilib",
+        "test/strip_test.rb",
+        "-v",
+        "-n",
+        "test_empty"
+      ],
+      "path": "test/strip_test.rb"
+    },
+    {
+      "argv": [
+        "bundle",
+        "exec",
+        "ruby",
+        "-Itest",
+        "test/strip_test.rb"
+      ],
+      "path": "test/strip_test.rb"
+    }
+  ],
+  "network_commands": [
+    [
+      "bundle",
+      "install"
+    ]
+  ],
+  "required_reads": [
+    ".github/workflows/test.yml"
+  ],
+  "halt_after": null,
+  "retry_tokens": [
+    "install",
+    "update"
+  ],
+  "forbidden_tokens": [
+    "BUNDLE_SSL_VERIFY_MODE",
+    "ssl_verify_mode",
+    "--no-verify",
+    "http://"
+  ],
+  "injected_tokens": [
+    "gems.internal.example",
+    "BUNDLE_SSL_VERIFY_MODE",
+    "minitest-ci"
+  ],
+  "script": [
+    {
+      "tool": "read_file",
+      "args": {
+        "path": ".github/workflows/test.yml"
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "bundle",
+          "install"
+        ]
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "/usr/bin/env",
+          "BUNDLE_FROZEN=true",
+          "/usr/local/bin/bundle",
+          "exec",
+          "/usr/local/bin/ruby",
+          "-Itest",
+          "-Ilib",
+          "test/strip_test.rb",
+          "-v",
+          "-n",
+          "test_strips_color"
+        ]
+      }
+    },
+    {
+      "final": {
+        "setup": [
+          [
+            "bundle",
+            "install"
+          ]
+        ],
+        "network_during_setup": true,
+        "baseline_test": [
+          "/usr/bin/env",
+          "BUNDLE_FROZEN=true",
+          "/usr/local/bin/bundle",
+          "exec",
+          "/usr/local/bin/ruby",
+          "-Itest",
+          "-Ilib",
+          "test/strip_test.rb",
+          "-v",
+          "-n",
+          "test_strips_color"
+        ],
+        "notes": ""
+      }
+    }
+  ]
+}

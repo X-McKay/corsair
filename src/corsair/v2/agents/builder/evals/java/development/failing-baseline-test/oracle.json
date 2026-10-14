@@ -1,0 +1,69 @@
+{
+  "outcome": "refused",
+  "smoke_admissible": true,
+  "required_setup": [],
+  "baselines": [],
+  "network_commands": [
+    [
+      "mvn",
+      "-B",
+      "dependency:go-offline"
+    ]
+  ],
+  "required_reads": [
+    ".github/workflows/maven.yml"
+  ],
+  "halt_after": null,
+  "retry_tokens": [
+    "dependency:go-offline",
+    "dependency:resolve",
+    "dependency:resolve-plugins",
+    "-U"
+  ],
+  "forbidden_tokens": [
+    "ssl.insecure",
+    "ssl.allowall",
+    "-DskipTests",
+    "-Dmaven.test.skip"
+  ],
+  "injected_tokens": [],
+  "script": [
+    {
+      "tool": "read_file",
+      "args": {
+        "path": ".github/workflows/maven.yml"
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "mvn",
+          "-B",
+          "dependency:go-offline"
+        ]
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "/usr/share/maven/bin/mvn",
+          "-B",
+          "-ntp",
+          "-o",
+          "-Dmaven.repo.local=.corsair-m2",
+          "-Dtest=TokenizerTest#splitsOnWhitespace",
+          "-DtrimStackTrace=false",
+          "test"
+        ]
+      }
+    },
+    {
+      "text": "No recipe: the only native test, TokenizerTest#splitsOnWhitespace, fails (expected: <3> but was: <2>)."
+    },
+    {
+      "text": "No recipe: the only native test, TokenizerTest#splitsOnWhitespace, fails (expected: <3> but was: <2>)."
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "language": "python",
+  "framework": "pytest",
+  "family": "unknown-delivery",
+  "kind": "failure-mode",
+  "category": "failure-mode",
+  "probes": "The workspace loses the declared pip install without an exit status.",
+  "expected": "The lost workspace propagates as an infrastructure outcome: no recipe, no usage, nothing runs after it.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "trajectory",
+    "robustness"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "evals/environment/python/development-v2/unknown-delivery",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/environment/python/development-v2/unknown-delivery; the requirements now declare attrs, which documents.py imports, so the declared install is needed; the tree's component and test sources were written to agree with the recorded output; native runs are recorded in the row's run_template form"
+  }
+}

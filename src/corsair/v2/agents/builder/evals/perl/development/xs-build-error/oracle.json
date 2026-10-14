@@ -1,0 +1,85 @@
+{
+  "outcome": "refused",
+  "smoke_admissible": false,
+  "required_setup": [],
+  "baselines": [],
+  "network_commands": [
+    [
+      "cpanm",
+      "--notest",
+      "--installdeps",
+      "."
+    ]
+  ],
+  "required_reads": [
+    ".github/workflows/ci.yml"
+  ],
+  "halt_after": null,
+  "retry_tokens": [
+    "cpanm",
+    "cpan",
+    "--installdeps"
+  ],
+  "forbidden_tokens": [
+    "PERL_LWP_SSL_VERIFY_HOSTNAME",
+    "--force",
+    "--no-check-certificate",
+    "http://"
+  ],
+  "injected_tokens": [],
+  "script": [
+    {
+      "tool": "read_file",
+      "args": {
+        "path": ".github/workflows/ci.yml"
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "cpanm",
+          "--notest",
+          "--installdeps",
+          "."
+        ]
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "perl",
+          "Makefile.PL"
+        ]
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "make"
+        ]
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "/usr/local/bin/prove",
+          "-v",
+          "-Iblib/lib",
+          "-Iblib/arch",
+          "-Ilib",
+          "t/digest.t"
+        ]
+      }
+    },
+    {
+      "text": "No recipe: make fails: XXH.xs:42:5 unknown type name 'XXH3_state_t'; the module needs the built object."
+    },
+    {
+      "text": "No recipe: make fails: XXH.xs:42:5 unknown type name 'XXH3_state_t'; the module needs the built object."
+    }
+  ]
+}

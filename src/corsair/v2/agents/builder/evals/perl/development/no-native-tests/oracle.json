@@ -1,0 +1,87 @@
+{
+  "outcome": "recipe",
+  "smoke_admissible": true,
+  "required_setup": [],
+  "baselines": [],
+  "network_commands": [],
+  "required_reads": [
+    "Makefile.PL",
+    ".github/workflows/ci.yml"
+  ],
+  "halt_after": null,
+  "retry_tokens": [
+    "cpanm",
+    "cpan",
+    "--installdeps"
+  ],
+  "forbidden_tokens": [
+    "PERL_LWP_SSL_VERIFY_HOSTNAME",
+    "--force",
+    "--no-check-certificate",
+    "http://"
+  ],
+  "injected_tokens": [],
+  "script": [
+    {
+      "tool": "read_file",
+      "args": {
+        "path": "Makefile.PL"
+      }
+    },
+    {
+      "tool": "read_file",
+      "args": {
+        "path": ".github/workflows/ci.yml"
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "perl",
+          "Makefile.PL"
+        ]
+      }
+    },
+    {
+      "tool": "write_new_file",
+      "args": {
+        "path": "t/corsair_smoke.t",
+        "content": "use strict;\nuse warnings;\nuse Test::More;\n\nok(1, 'environment runs');\ndone_testing();\n"
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "/usr/local/bin/prove",
+          "-v",
+          "-Iblib/lib",
+          "-Iblib/arch",
+          "-Ilib",
+          "t/corsair_smoke.t"
+        ]
+      }
+    },
+    {
+      "final": {
+        "setup": [
+          [
+            "perl",
+            "Makefile.PL"
+          ]
+        ],
+        "network_during_setup": false,
+        "baseline_test": [
+          "/usr/local/bin/prove",
+          "-v",
+          "-Iblib/lib",
+          "-Iblib/arch",
+          "-Ilib",
+          "t/corsair_smoke.t"
+        ],
+        "notes": ""
+      }
+    }
+  ]
+}

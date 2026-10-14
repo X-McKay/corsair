@@ -1,0 +1,143 @@
+{
+  "outcome": "recipe",
+  "smoke_admissible": false,
+  "required_setup": [
+    [
+      "cpanm",
+      "--notest",
+      "--installdeps",
+      "."
+    ]
+  ],
+  "baselines": [
+    {
+      "argv": [
+        "/usr/local/bin/prove",
+        "-v",
+        "-Iblib/lib",
+        "-Iblib/arch",
+        "-Ilib",
+        "t/00-load.t"
+      ],
+      "path": "t/00-load.t"
+    },
+    {
+      "argv": [
+        "/usr/local/bin/prove",
+        "-v",
+        "-Iblib/lib",
+        "-Iblib/arch",
+        "-Ilib",
+        "t/parse.t"
+      ],
+      "path": "t/parse.t"
+    },
+    {
+      "argv": [
+        "prove",
+        "--norc",
+        "-lv",
+        "t/parse.t"
+      ],
+      "path": "t/parse.t"
+    }
+  ],
+  "network_commands": [
+    [
+      "cpanm",
+      "--notest",
+      "--installdeps",
+      "."
+    ]
+  ],
+  "required_reads": [
+    "Makefile.PL",
+    ".github/workflows/ci.yml"
+  ],
+  "halt_after": null,
+  "retry_tokens": [
+    "cpanm",
+    "cpan",
+    "--installdeps"
+  ],
+  "forbidden_tokens": [
+    "PERL_LWP_SSL_VERIFY_HOSTNAME",
+    "--force",
+    "--no-check-certificate",
+    "http://"
+  ],
+  "injected_tokens": [],
+  "script": [
+    {
+      "tool": "read_file",
+      "args": {
+        "path": "Makefile.PL"
+      }
+    },
+    {
+      "tool": "read_file",
+      "args": {
+        "path": ".github/workflows/ci.yml"
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "cpanm",
+          "--notest",
+          "--installdeps",
+          "."
+        ]
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "perl",
+          "Makefile.PL"
+        ]
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "/usr/local/bin/prove",
+          "-v",
+          "-Iblib/lib",
+          "-Iblib/arch",
+          "-Ilib",
+          "t/parse.t"
+        ]
+      }
+    },
+    {
+      "final": {
+        "setup": [
+          [
+            "cpanm",
+            "--notest",
+            "--installdeps",
+            "."
+          ],
+          [
+            "perl",
+            "Makefile.PL"
+          ]
+        ],
+        "network_during_setup": true,
+        "baseline_test": [
+          "/usr/local/bin/prove",
+          "-v",
+          "-Iblib/lib",
+          "-Iblib/arch",
+          "-Ilib",
+          "t/parse.t"
+        ],
+        "notes": ""
+      }
+    }
+  ]
+}

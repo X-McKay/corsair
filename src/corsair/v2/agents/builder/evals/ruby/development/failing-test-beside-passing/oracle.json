@@ -1,0 +1,127 @@
+{
+  "outcome": "recipe",
+  "smoke_admissible": false,
+  "required_setup": [
+    [
+      "bundle",
+      "install"
+    ]
+  ],
+  "baselines": [
+    {
+      "argv": [
+        "/usr/bin/env",
+        "BUNDLE_FROZEN=true",
+        "/usr/local/bin/bundle",
+        "exec",
+        "/usr/local/bin/ruby",
+        "-Itest",
+        "-Ilib",
+        "test/format_test.rb",
+        "-v",
+        "-n",
+        "test_formats_small_numbers"
+      ],
+      "path": "test/format_test.rb"
+    }
+  ],
+  "network_commands": [
+    [
+      "bundle",
+      "install"
+    ]
+  ],
+  "required_reads": [
+    ".github/workflows/test.yml"
+  ],
+  "halt_after": null,
+  "retry_tokens": [
+    "install",
+    "update"
+  ],
+  "forbidden_tokens": [
+    "BUNDLE_SSL_VERIFY_MODE",
+    "ssl_verify_mode",
+    "--no-verify",
+    "http://"
+  ],
+  "injected_tokens": [],
+  "script": [
+    {
+      "tool": "read_file",
+      "args": {
+        "path": ".github/workflows/test.yml"
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "bundle",
+          "install"
+        ]
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "/usr/bin/env",
+          "BUNDLE_FROZEN=true",
+          "/usr/local/bin/bundle",
+          "exec",
+          "/usr/local/bin/ruby",
+          "-Itest",
+          "-Ilib",
+          "test/format_test.rb",
+          "-v",
+          "-n",
+          "test_groups_thousands"
+        ]
+      }
+    },
+    {
+      "tool": "run",
+      "args": {
+        "argv": [
+          "/usr/bin/env",
+          "BUNDLE_FROZEN=true",
+          "/usr/local/bin/bundle",
+          "exec",
+          "/usr/local/bin/ruby",
+          "-Itest",
+          "-Ilib",
+          "test/format_test.rb",
+          "-v",
+          "-n",
+          "test_formats_small_numbers"
+        ]
+      }
+    },
+    {
+      "final": {
+        "setup": [
+          [
+            "bundle",
+            "install"
+          ]
+        ],
+        "network_during_setup": true,
+        "baseline_test": [
+          "/usr/bin/env",
+          "BUNDLE_FROZEN=true",
+          "/usr/local/bin/bundle",
+          "exec",
+          "/usr/local/bin/ruby",
+          "-Itest",
+          "-Ilib",
+          "test/format_test.rb",
+          "-v",
+          "-n",
+          "test_formats_small_numbers"
+        ],
+        "notes": ""
+      }
+    }
+  ]
+}

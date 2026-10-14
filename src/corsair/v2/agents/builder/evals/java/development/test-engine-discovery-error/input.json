@@ -1,0 +1,127 @@
+{
+  "source_files": [
+    {
+      "path": ".github/workflows/maven.yml",
+      "content": "name: build\non: [push, pull_request]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-java@v4\n        with:\n          distribution: temurin\n          java-version: '17'\n      - run: mvn -B dependency:go-offline\n      - run: mvn -B -o verify\n"
+    },
+    {
+      "path": "pom.xml",
+      "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.acme</groupId>\n  <artifactId>geo-index</artifactId>\n  <version>1.4.0-SNAPSHOT</version>\n  <properties>\n    <maven.compiler.release>17</maven.compiler.release>\n    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>\n  </properties>\n  <dependencies>\n    <dependency>\n      <groupId>org.junit.jupiter</groupId>\n      <artifactId>junit-jupiter</artifactId>\n      <version>5.14.4</version>\n      <scope>test</scope>\n    </dependency>\n    <dependency>\n      <groupId>org.junit.platform</groupId>\n      <artifactId>junit-platform-commons</artifactId>\n      <version>1.8.2</version>\n      <scope>test</scope>\n    </dependency>\n  </dependencies>\n</project>\n"
+    },
+    {
+      "path": "src/main/java/org/acme/geoindex/GeoIndex.java",
+      "content": "package org.acme.geoindex;\n\npublic class GeoIndex {\n    public int nearest(int[] points, int x) {\n        int best = points[0];\n        for (int p : points) {\n            if (Math.abs(p - x) < Math.abs(best - x)) {\n                best = p;\n            }\n        }\n        return best;\n    }\n}\n"
+    },
+    {
+      "path": "src/test/java/org/acme/geoindex/GeoIndexTest.java",
+      "content": "package org.acme.geoindex;\n\nimport org.junit.jupiter.api.Test;\n\nimport static org.junit.jupiter.api.Assertions.*;\n\nclass GeoIndexTest {\n    @Test\n    void findsNearest() {\n        assertEquals(5, new GeoIndex().nearest(new int[] {1, 5, 9}, 6));\n    }\n}\n"
+    }
+  ],
+  "row_id": "junit5-maven-temurin17",
+  "plan": {
+    "status": "planned",
+    "target": "src/main/java/org/acme/geoindex/GeoIndex",
+    "citations": [
+      {
+        "path": "src/main/java/org/acme/geoindex/GeoIndex.java",
+        "start_line": 1,
+        "end_line": 1,
+        "quote": "package org.acme.geoindex;"
+      }
+    ]
+  },
+  "feedback": null,
+  "workspace_fixture": {
+    "observations": [
+      {
+        "argv": [
+          "mvn",
+          "-B",
+          "dependency:go-offline"
+        ],
+        "exit_code": 0,
+        "output": ""
+      },
+      {
+        "argv": [
+          "mvn",
+          "-B",
+          "-o",
+          "compile"
+        ],
+        "exit_code": 0,
+        "output": "[INFO] BUILD SUCCESS\n",
+        "needs": [
+          [
+            "mvn",
+            "-B",
+            "dependency:go-offline"
+          ]
+        ],
+        "unmet": {
+          "exit_code": 1,
+          "output": "[ERROR] Failed to execute goal on project app: Could not resolve dependencies: Cannot access central (https://repo.maven.apache.org/maven2) in offline mode and the artifact org.junit.jupiter:junit-jupiter:jar:5.14.4 has not been downloaded from it before.\n[INFO] BUILD FAILURE\n"
+        }
+      },
+      {
+        "argv": [
+          "mvn",
+          "-B",
+          "-o",
+          "test",
+          "-DlistTests=true"
+        ],
+        "exit_code": 1,
+        "output": "[INFO]  T E S T S\n[ERROR] There was an error in the forked process\n[ERROR] TestEngine with ID 'junit-jupiter' failed to discover tests\n[ERROR] org.junit.platform.commons.JUnitException: TestEngine with ID 'junit-jupiter' failed to discover tests\nCaused by: java.lang.NoSuchMethodError: 'java.util.Optional org.junit.platform.commons.util.AnnotationUtils.findAnnotation(java.lang.Class, java.lang.Class, boolean)'\n[INFO] BUILD FAILURE\n"
+      },
+      {
+        "argv": [
+          "/usr/share/maven/bin/mvn",
+          "-B",
+          "-ntp",
+          "-o",
+          "-Dmaven.repo.local=.corsair-m2",
+          "-Dtest=GeoIndexTest#findsNearest",
+          "-DtrimStackTrace=false",
+          "test"
+        ],
+        "exit_code": 1,
+        "output": "[INFO]  T E S T S\n[ERROR] There was an error in the forked process\n[ERROR] TestEngine with ID 'junit-jupiter' failed to discover tests\n[ERROR] org.junit.platform.commons.JUnitException: TestEngine with ID 'junit-jupiter' failed to discover tests\nCaused by: java.lang.NoSuchMethodError: 'java.util.Optional org.junit.platform.commons.util.AnnotationUtils.findAnnotation(java.lang.Class, java.lang.Class, boolean)'\n[INFO] BUILD FAILURE\n",
+        "needs": [
+          [
+            "mvn",
+            "-B",
+            "dependency:go-offline"
+          ]
+        ],
+        "unmet": {
+          "exit_code": 1,
+          "output": "[ERROR] Failed to execute goal on project app: Could not resolve dependencies: Cannot access central (https://repo.maven.apache.org/maven2) in offline mode and the artifact org.junit.jupiter:junit-jupiter:jar:5.14.4 has not been downloaded from it before.\n[INFO] BUILD FAILURE\n"
+        }
+      },
+      {
+        "argv": [
+          "mvn",
+          "-v"
+        ],
+        "exit_code": 0,
+        "output": "Apache Maven 3.10.0\nJava version: 17.0.20.1, vendor: Eclipse Adoptium\n"
+      }
+    ],
+    "written_file_run": {
+      "exit_code": 1,
+      "output": "[INFO]  T E S T S\n[ERROR] There was an error in the forked process\n[ERROR] TestEngine with ID 'junit-jupiter' failed to discover tests\n[ERROR] org.junit.platform.commons.JUnitException: TestEngine with ID 'junit-jupiter' failed to discover tests\nCaused by: java.lang.NoSuchMethodError: 'java.util.Optional org.junit.platform.commons.util.AnnotationUtils.findAnnotation(java.lang.Class, java.lang.Class, boolean)'\n[INFO] BUILD FAILURE\n",
+      "needs": [
+        [
+          "mvn",
+          "-B",
+          "dependency:go-offline"
+        ]
+      ],
+      "unmet": {
+        "exit_code": 1,
+        "output": "[ERROR] Failed to execute goal on project app: Could not resolve dependencies: Cannot access central (https://repo.maven.apache.org/maven2) in offline mode and the artifact org.junit.jupiter:junit-jupiter:jar:5.14.4 has not been downloaded from it before.\n[INFO] BUILD FAILURE\n"
+      }
+    }
+  }
+}

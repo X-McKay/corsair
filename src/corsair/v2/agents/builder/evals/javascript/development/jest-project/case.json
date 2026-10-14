@@ -1,0 +1,22 @@
+{
+  "language": "javascript",
+  "framework": "jest",
+  "family": "ready",
+  "kind": "positive",
+  "category": "smoke",
+  "probes": "A Jest project with npm ci declared in CI.",
+  "expected": "A recipe with the declared install npm ci --ignore-scripts (network_during_setup true) and one passing native test as baseline, a test in test/parse.test.js, in the row's run form or a recorded native form.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "grounding",
+    "trajectory"
+  ],
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "evals/environment/javascript/breadth/javascript-jest-ready",
+    "license": "n/a (synthetic)",
+    "notes": "converted from evals/environment/javascript/breadth/javascript-jest-ready; the tree's component and test sources were written to agree with the recorded output; native runs are recorded in the row's run_template form"
+  }
+}
