@@ -69,7 +69,7 @@ class Diagnose(Protocol):
     A completed run returns no diagnostics, so the author can fix mechanics but never steer toward an outcome.
     """
 
-    def __call__(self, environment: Environment, runtime: Runtime, patch: FrozenPatch, role: str
+    def __call__(self, environment: Environment, runtime: Runtime, draft: ProbeDraft
                  ) -> tuple[Outcome, str | None]: ...
 
 
