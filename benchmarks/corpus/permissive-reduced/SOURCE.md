@@ -32,6 +32,10 @@ SPDX licence, NVD CWE, pointer source and what the reduction removed.
 | rack-static | ruby | CWE-22 | rack/rack | CVE-2025-27610 | MIT |
 | ruby-git-fetch | ruby | CWE-88 | ruby-git/ruby-git | CVE-2022-25648 | MIT |
 | secure-headers | ruby | CWE-113 | github/secure_headers | CVE-2020-5216 | Apache-2.0 |
+| tzinfo | ruby | CWE-22 | tzinfo/tzinfo | CVE-2022-31163 | MIT |
+| cocoapods-git | ruby | CWE-88 | CocoaPods/cocoapods-downloader | CVE-2022-24440 | MIT |
+| pdfkit | ruby | CWE-78 | pdfkit/pdfkit | CVE-2022-25765 | MIT |
+| ruby-git-ls-files | ruby | CWE-94 | ruby-git/ruby-git | CVE-2022-46648 | MIT |
 
 ## Pointer sources
 

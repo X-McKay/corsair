@@ -54,10 +54,22 @@ On `develop`:
   `rubyzip` (CVE-2018-1000544, CWE-22, BSD-2-Clause) and `rack-static`
   (CVE-2025-27610, CWE-22, MIT). The v2 chain set is at 110 cases, Ruby 19.
 
-In flight (this PR): Ruby `ruby-git-fetch` (CVE-2022-25648, CWE-88, MIT) and
-`secure-headers` (CVE-2020-5216, CWE-113, Apache-2.0). Each verified offline:
-`ruby -c` clean, loads with `-Ilib`, the a/b diff is only the upstream code
-difference, no leak words, property observable in-process with no network.
+Merged since (#183): Ruby `ruby-git-fetch` (CVE-2022-25648, CWE-88, MIT) and
+`secure-headers` (CVE-2020-5216, CWE-113, Apache-2.0). Provenance-key fix merged
+(#184): all Ruby families use `fix_commit`/`parent_commit`.
+
+Batch-3 (this PR): Ruby `tzinfo` (CVE-2022-31163, CWE-22, MIT — identifier-check
+anchor, loader require), `cocoapods-git` (CVE-2022-24440, CWE-88, MIT — git
+ls-remote argument guard), `pdfkit` (CVE-2022-25765, CWE-78, MIT — shell-string
+vs argv-array invocation) and `ruby-git-ls-files` (CVE-2022-46648, CWE-94, MIT —
+`eval` vs `EscapedPath` unquoting). Also pins `rubyzip` provenance
+`fix_commit`/`parent_commit` from the `v1.2.2`/`v1.2.1` tags to the commit SHAs
+`d07b13a6…`/`98f4f2ed…`. Each pair verified offline on the container runtime:
+`ruby -c` clean, loads with `-Ilib`, the a/b diff is only the upstream fix, no
+leak words, and the property is observable in-process (vulnerable demonstrates it,
+fixed does not) with no network. Ruby is at 8 families; permissive + pure-Ruby +
+in-process-observable distinct-CWE scarcity makes ~8 the realistic count, not a
+clean 10 — reported rather than forced.
 
 ## Parked / constrained (findings)
 
@@ -84,12 +96,12 @@ disallowed); the real count is reported rather than forced.
 
 ## Next
 
-- Carve the remaining Ruby families (candidate list and observables in
-  `/mnt/project-files/notes/corpus-import-a7mob0/ruby-next-candidates.md`):
-  `tzinfo` (CWE-22-via-require), `pdfkit` (CWE-78), `cocoapods-downloader`
-  git/hg (CWE-88), `ruby-git` ls-files eval (CWE-94), and `multi_xml` if the
-  eval thread accepts the symbol-coercion PoV.
-- Then Java as its own PR (strongest exemplar: a tomee CWE-502 deserialization
-  case; park the too-large/duplicate/licence-unconfirmed rest).
+- Batch-3 carved the strongest remaining Ruby candidates (`tzinfo`,
+  `cocoapods-git`, `pdfkit`, `ruby-git-ls-files`). Remaining distinct permissive
+  pure-Ruby in-process candidates are thin; `multi_xml` stays parked (D14/D16),
+  and `cocoapods` hg (CVE-2022-21223) is the same fix commit as `cocoapods-git`
+  so it is a same-fix duplicate and is not imported. Report the real Ruby count
+  (8) at set close rather than forcing 10.
+- Java is handled by a dedicated corpus thread, not this one.
 - Each batch lands as a PR against `develop`; the eval thread generates and
   validates the chain cases from it.

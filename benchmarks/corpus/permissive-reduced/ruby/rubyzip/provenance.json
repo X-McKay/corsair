@@ -7,9 +7,9 @@
   "record": "CVE-2018-1000544",
   "pointer_source": "Ruby Advisory Database / eval-thread pick (metadata only)",
   "upstream_spdx": "BSD-2-Clause",
-  "spdx_verified": "raw.githubusercontent LICENSE.md, 2026-10-14",
-  "parent_commit": "v1.2.1",
-  "fix_commit": "v1.2.2",
+  "spdx_verified": "raw.githubusercontent LICENSE.md, 2026-10-14; fix_commit/parent_commit are the commits the v1.2.2 / v1.2.1 release tags resolve to in rubyzip/rubyzip",
+  "parent_commit": "98f4f2ed9b3a26bb94e8a539d2c3464e0266fc41",
+  "fix_commit": "d07b13a6cf0a413e010c48879aebd9576bfb5f68",
   "verbatim": false,
   "kept_files": [
     {
