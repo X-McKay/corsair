@@ -45,3 +45,15 @@ def test_development_records_never_cite_a_held_out_case():
     cited = [(str(path), case) for path in (ROOT / "docs/development").rglob("*") if path.is_file()
              for case in held_out if case in path.read_text(errors="replace")]
     assert not cited
+
+
+def test_eval_language_is_forwarded_only_to_scorers_that_accept_it():
+    """`make eval ... EVAL_LANGUAGE=` forwards `--language` only where the set's scorer defines it; others refuse."""
+    import importlib.util
+    from evals.run import SUITES, narrows_by_language
+    for agent, suite in SUITES.items():
+        for set_name in suite.sets:
+            module = suite.set_modules.get(set_name, suite.module)
+            source = Path(importlib.util.find_spec(module).origin).read_text()
+            accepts = '"--language"' in source or "'--language'" in source
+            assert narrows_by_language(suite, set_name) == accepts, (agent, set_name, module)

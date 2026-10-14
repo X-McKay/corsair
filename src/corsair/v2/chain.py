@@ -310,7 +310,8 @@ class LocalOps:
     async def diagnose(self, step: str, environment: Environment, runtime: Runtime, patch: FrozenPatch,
                        role: str) -> StepResult[Diagnosis]:
         def call() -> Diagnosis:
-            outcome, diagnostics = self.stages.diagnose(environment, runtime, patch, role)
+            draft = patch.control if role == "control" else patch.exploit
+            outcome, diagnostics = self.stages.diagnose(environment, runtime, draft)
             keep = outcome in (Outcome.NOT_RUN, Outcome.ERRORED)
             return Diagnosis(outcome=outcome, diagnostics=diagnostics if keep else None)
 

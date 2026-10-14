@@ -1,9 +1,7 @@
 name: Development guards
 
-# Minimal PR path until something runs end to end (Al, 2026-10-14): only the v2 offline suite, no model. The v1 offline
-# suite (`make test-config`: unit, configuration, record and workflow guards) runs from `offline-v1.yml` on manual
-# dispatch and pushes to main; milestone gates (kind, OpenShell, admission, toolchain images) run on demand only. Full
-# CI, gates and release policies return once end-to-end runs and agent baselines exist.
+# The offline suite (`make test-v2`), no model and no cluster. Toolchain images build on demand only
+# (toolchain-images.yml). Gates and release policies return once end-to-end runs and agent baselines exist.
 on:
   pull_request:
   push:

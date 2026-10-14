@@ -1,7 +1,7 @@
 """One command per agent: run its eval suite on the host and file the result for comparison (SPEC-0044).
 
-    make eval AGENT=planning [SET=heldout3] [PROVIDER_CONFIG=<providers.json>] [REPEAT=3] [NOTE=...]
-    make eval-baseline AGENT=planning RUN=<run id>
+    make eval AGENT=<agent> [SET=<set>] [PROVIDER_CONFIG=<providers.json>] [REPEAT=3] [NOTE=...]
+    make eval-baseline AGENT=<agent> RUN=<run id>
 
 Each suite keeps its own CLI and native report; this wrapper only chooses an evidence directory, runs the
 suite in a subprocess with the repository's PYTHONPATH, and writes a summary and a comparison against the
@@ -44,48 +44,20 @@ class Suite:
     note: str = ""
     # Sets served by another module than `module`, e.g. the chain's benchmark case cohorts.
     set_modules: dict[str, str] = field(default_factory=dict)
-    # Whether the suite's sets are per-case directories that `--language` can narrow (evals/cases.py).
-    languages: bool = True
 
 
-SUITES: dict[str, Suite] = {
-    "control_authoring": Suite("evals.control_authoring.evaluate", {"development": (), "transfer": ("--agent", "control_authoring")},
-        set_modules={"transfer": "evals.experiments.staged_baseline.evaluate"}, languages=False,
-        note="source drafts only; transfer requires REPEAT=1; contract scores require separate source review and native execution"),
-    "exploit_authoring": Suite("evals.exploit_authoring.evaluate", {"development": (), "transfer": ("--agent", "exploit_authoring")},
-        set_modules={"transfer": "evals.experiments.staged_baseline.evaluate"}, languages=False,
-        note="source drafts only; transfer requires REPEAT=1; contract scores require separate source review and native execution"),
-    "environment": Suite("evals.environment.evaluate", {"development": (), "development-v2": ("--cases", "development-v2"),
-                                                        "breadth": ("--cases", "breadth")},
-                         note="synthetic observations; setup commands never execute on the host"),
-    "identification": Suite("evals.issue_identification.evaluate", {"development": (), "breadth": ("--cases", "breadth"),
-                                                                    "transfer-v2": ()}, repeat=False,
-                            set_modules={"transfer-v2": "evals.experiments.staged_baseline.identification_v2"}),
-    "planning": Suite("evals.test_planning.evaluate", {
-        # heldout and heldout2 are retired (SPEC-0040); the suite refuses them, so they are not offered here.
-        "development": ("--cases", "development"), "heldout3": ("--cases", "heldout3"), "unit": ("--cases", "unit"),
-        "unit-v2": ("--cases", "unit-v2"), "unit-first": ("--cases", "unit-first"), "breadth": ("--cases", "breadth"),
-        "transfer-v2": ()},
-        set_modules={"transfer-v2": "evals.experiments.staged_baseline.planning_v2"}),
-    "authoring": Suite("evals.test_authoring.evaluate", {"development": (), "unit": ("--cases", "unit"),
-                                                            "breadth": ("--cases", "breadth"),
-                                                            # Fails today for recorded production gaps (ISSUE-0010).
-                                                            "breadth_pending": ("--cases", "breadth_pending")},
-                       note="historical combined-author suite; injected/static observations only, generated tests are not executed"),
-    "assessment": Suite("evals.evidence_assessment.evaluate", {
-        "development": ("--split", "development"), "held_out": ("--split", "held_out"), "unit": (),
-        "unit-transfer": ("--cases", "unit-transfer"), "breadth_pending": ("--cases", "breadth_pending"),
-        "unit-disposition-v2": ("--version", "v2")},
-        set_modules={"unit": "evals.evidence_assessment.unit_test", "unit-transfer": "evals.evidence_assessment.unit_test",
-                     "breadth_pending": "evals.evidence_assessment.unit_test",
-                     "unit-disposition-v2": "evals.experiments.staged_baseline.unit_disposition"}),
-    "chain": Suite("evals.fixture_chain.evaluate", {"fixture": (), "jest": ("--cohort", "jest")},
-                   live=("--live", "identification,planning,assessment"),
-                   note="fixture chain uses independent authors; non-live stages are scripted and the host runner admits "
-                        "only reviewed fixture bytes; Docker cohorts (benchmark-case sets under evals/e2e/) run selected "
-                        "production stages on image-only ports",
-                   set_modules={"jest": "evals.case_e2e.evaluate"}, languages=False),
-}
+# v2 agents register their suites here as they gain one (src/corsair/v2/README.md); the v1 suites were removed.
+SUITES: dict[str, Suite] = {}
+
+# Scorers whose CLI narrows a per-case set to one language (`--language`, evals/cases.py); every other set refuses
+# EVAL_LANGUAGE before anything runs. v2 agents add theirs as they register.
+LANGUAGE_MODULES: frozenset[str] = frozenset()
+
+
+def narrows_by_language(suite: Suite, set_name: str) -> bool:
+    return suite.set_modules.get(set_name, suite.module) in LANGUAGE_MODULES
+
+
 # Agents without an isolated eval set yet, and where the gap is planned.
 MISSING = {}
 
@@ -296,8 +268,8 @@ def main(argv: list[str] | None = None) -> int:
     set_name = args.set_name or next(iter(suite.sets))
     if set_name not in suite.sets:
         parser.error(f"{args.agent} sets: {', '.join(suite.sets)}")
-    if args.language and not suite.languages:
-        parser.error(f"{args.agent} sets are not split by language")
+    if args.language and not narrows_by_language(suite, set_name):
+        parser.error(f"{args.agent} set {set_name} is not split by language")
     return run(args.agent, set_name, args.provider_config, args.repeat, args.note, args.results, args.language)
 
 
