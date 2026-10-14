@@ -24,6 +24,13 @@ database double carries the input as structure, the response holds the unescaped
 what happens when the issue is real; the test passes when the code is vulnerable and fails when it is not. The
 condition must be one a correct implementation would not show, so the assertion can fail.
 
+Counterfactual check, required: write `safe_observation`, what the test would observe if the target treated the
+input as plain data (a correct fix). The asserted property must be false in that observation. The payload text
+appearing somewhere is never enough on its own, since a correct implementation also passes data through verbatim:
+for command injection assert the injected command's own effect (its output, a file it created), not that the
+command string contains the payload; for path traversal assert the resolved file lies outside the base directory;
+for SQL injection assert the query returned or changed rows the input should not reach.
+
 **Independence.** Write each brief as if the other did not exist: its own input, its own property, its own
 citations. Do not refer to "the other test" or reuse the other input.
 

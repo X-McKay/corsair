@@ -95,6 +95,8 @@ def render_prompt(brief: ProbeBrief, runtime: Runtime, *, diagnostics: str | Non
         f"Seam: {brief.seam}",
         f"Input: {brief.input_description}",
         f"Property to assert: {brief.property_to_assert}",
+        *([f"On a correct implementation the test would observe (the assertion must fail there): "
+           f"{brief.safe_observation}"] if brief.safe_observation else []),
         f"Dependencies that may be doubled: {brief.doubles or 'none named'}",
         f"Cited source:\n{citations}",
     ]

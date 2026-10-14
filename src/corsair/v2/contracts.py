@@ -170,6 +170,9 @@ class ProbeBrief(Frozen):
     input_description: str = Field(min_length=1, max_length=2_000)
     property_to_assert: str = Field(min_length=1, max_length=2_000)
     doubles: str = Field(default="", max_length=2_000, description="Dependencies that may be doubled, if any")
+    safe_observation: str = Field(default="", max_length=1_000,
+                                  description="Exploit only: what the test observes on a correct implementation, "
+                                              "where its assertion must fail")
     citations: tuple[Citation, ...] = Field(min_length=1, max_length=16)
 
 
