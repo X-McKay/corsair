@@ -6,7 +6,7 @@
   "probes": "Java zip extraction planned as a fixture-state observation: no file appears outside the destination inside @TempDir.",
   "provenance": {
     "source": "https://github.com/github/codeql",
-    "commit": "main (fetched 2026-10-14)",
+    "commit": "b6a9c9a442f61c5c3c86fb0e6c28bf0af29f3d8d",
     "path": "java/ql/src/Security/CWE/CWE-022/examples/ZipSlipBad.java",
     "license": "MIT",
     "notes": "Shape adapted from the CodeQL ZipSlip query-help example; code written for this case."

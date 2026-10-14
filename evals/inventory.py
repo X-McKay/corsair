@@ -15,11 +15,13 @@ import json
 
 from evals.cases import LANGUAGES, load_set, set_names
 
-# make eval AGENT= name -> eval package
+# make eval AGENT= name -> eval package; e2e is the chain's case data (AGENT=chain)
 SUITES = {"environment": "environment", "identification": "issue_identification", "planning": "test_planning",
-          "authoring": "test_authoring", "assessment": "evidence_assessment"}
+          "authoring": "test_authoring", "assessment": "evidence_assessment", "e2e": "e2e"}
 RETIRED = {("planning", "heldout"), ("planning", "heldout2")}
 PENDING = {("authoring", "breadth_pending")}
+# Issue requests run through `corsair run --issue-json`, not scored by `make eval`.
+REQUESTS = {("e2e", "corpus"), ("e2e", "corpus_negative")}
 
 
 def counts() -> dict[tuple[str, str], Counter]:
@@ -31,7 +33,7 @@ def counts() -> dict[tuple[str, str], Counter]:
 def totals(found: dict[tuple[str, str], Counter]) -> dict[str, Counter]:
     result = {agent: Counter() for agent in SUITES}
     for key, counter in found.items():
-        if key not in RETIRED | PENDING:
+        if key not in RETIRED | PENDING | REQUESTS:
             result[key[0]].update(counter)
     return result
 
@@ -43,11 +45,12 @@ def markdown(found: dict[tuple[str, str], Counter]) -> str:
         cells = []
         for language in LANGUAGES:
             parts = [f"{name} {counter[language]}" for (a, name), counter in found.items()
-                     if a == agent and (a, name) not in RETIRED | PENDING and counter[language]]
+                     if a == agent and (a, name) not in RETIRED | PENDING | REQUESTS and counter[language]]
             cells.append(f"**{summed[agent][language]}**" + (f" ({', '.join(parts)})" if parts else ""))
         lines.append(f"| {agent} | " + " | ".join(cells) + " |")
     for title, keys in (("Pending, not counted (fail today for a recorded production gap)", PENDING),
-                        ("Retired, not counted (the suite refuses them)", RETIRED)):
+                        ("Retired, not counted (the suite refuses them)", RETIRED),
+                        ("Issue requests, not counted (run with corsair run, no make eval scorer)", REQUESTS)):
         rows = [f"{agent} {name}: " + ", ".join(f"{language} {count}" for language, count in sorted(found[(agent, name)].items()))
                 for agent, name in sorted(keys) if (agent, name) in found]
         if rows:

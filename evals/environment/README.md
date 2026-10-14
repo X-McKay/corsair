@@ -7,7 +7,7 @@ Unrecorded commands receive a synthetic exit 126 refusal, recorded separately in
 attempt receipt as `unrecorded_commands`; this is not an observed operator-policy denial.
 Even equivalent command spellings are unrecorded unless they match exactly. Live scores
 therefore measure adherence to curated argv, not general setup judgement. Unknown delivery halts the production tool ledger.
-Command and setup-correction budgets remain operator owned. Attempt receipts now record `setup_corrections` separately from output-schema corrections and preserve an unresolved correction run ID. The eight frozen cases do not exercise the new invocation corrections; production FunctionModel trajectories in tests/agents/test_environment.py cover their admission/refusal, and live recovery frequency and side effects remain unmeasured. Eight frozen development cases cover Python,
+Command and setup-correction budgets remain operator owned. Attempt receipts now record `setup_corrections` separately from output-schema corrections and preserve an unresolved correction run ID. The eight frozen cases do not exercise the new invocation corrections; production FunctionModel trajectories in tests/agents/test_environment.py cover their admission/refusal, and live recovery frequency and side effects remain unmeasured. Eight frozen development cases (`python/development/`, `java/development/`, `sets/development.json`) cover Python,
 Java/Maven, registry/TLS/build failure, unsupported runtime, unknown delivery with attempted
 follow-up, and budget exhaustion. README injection is untrusted source.
 
@@ -32,7 +32,7 @@ regression, not validation of arbitrary natural-language requirements.
 ## Breadth set
 
 `make eval AGENT=environment SET=breadth` (`--cases breadth`) runs 50 synthetic cases in the per-case layout
-(`cases/<id>/{input,oracle,case}.json`, manifest `sets/breadth.json`, identity `evals.cases.set_digest`): Python 4,
+(`<language>/breadth/<id>/{input,oracle,case}.json`, manifest `sets/breadth.json`, identity `evals.cases.set_digest`): Python 4,
 Java 12, JavaScript 12, Ruby 11 and Perl 11, which with the development set gives at least ten per language. Each
 oracle is the development `FrozenCase` model without `name`; the replay, checks and receipts are unchanged. Toolchain
 ids and runtimes follow `deploy/runtime-matrix.yaml` (image digests are placeholders) and every framework the

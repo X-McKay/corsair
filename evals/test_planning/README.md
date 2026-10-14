@@ -2,7 +2,7 @@
 
 Native Pydantic Evals over the isolated SPEC-0022 planner. The planner reads saved source only and returns either one benign control and one security regression test specification, or an `unsupported` plan with a concrete missing capability. It writes no test code, executes nothing and issues no verdict. It is not connected to identification, authoring or any durable workflow.
 
-`cases.yaml` holds six frozen development cases. Inputs are a ready `IssueIdentification` (sent without its quotation), the saved inventory including any baseline test file, and operator `EnvironmentEvidence`. Metadata carries evaluator-only anchors and a reviewed reference plan; neither reaches the agent.
+The `development` set (`python/development/`, frozen by `sets/development.json`) holds six cases. Inputs are a ready `IssueIdentification` (sent without its quotation), the saved inventory including any baseline test file, and operator `EnvironmentEvidence`. Metadata carries evaluator-only anchors and a reviewed reference plan; neither reaches the agent.
 
 | Case | Expected | Purpose |
 | --- | --- | --- |
@@ -12,7 +12,7 @@ Native Pydantic Evals over the isolated SPEC-0022 planner. The planner reads sav
 | `implementation_absent` | unsupported | Identified implementation missing from the planner's inventory |
 | `unsupported_observation` | unsupported | SSRF concern whose witness needs a network observation the environment does not list |
 
-Three held-out sets sit beside it, each frozen by a manifest of case hashes (SPEC-0023) and selected with `--cases heldout`, `--cases heldout2` or `--cases heldout3`; their cases are never named in work records. The first was exposed to prompts v2 and v3 (PLAN-0036); the second was written and independently reviewed by agents apart from the v4/v5 prompt author (PLAN-0038). Both are retired by SPEC-0040, because their frozen environments list no typed witness facility, and the evaluator refuses to run them. The third was written and independently reviewed by agents apart from the v7 prompt author and the person running it, and carries typed facilities and witnesses (PLAN-0044).
+Three held-out sets sit beside it, each frozen by a manifest of case hashes marked `"held_out": true` (SPEC-0023) and selected with `--cases heldout`, `--cases heldout2` or `--cases heldout3`; their cases are never named in work records. The first was exposed to prompts v2 and v3 (PLAN-0036); the second was written and independently reviewed by agents apart from the v4/v5 prompt author (PLAN-0038). Both are retired by SPEC-0040, because their frozen environments list no typed witness facility, and the evaluator refuses to run them. The third was written and independently reviewed by agents apart from the v7 prompt author and the person running it, and carries typed facilities and witnesses (PLAN-0044).
 
 `MatchesPlan` reports separately: status, scope, contract (approved paths, exact discovery tokens, distinct ids), implementation call naming the target, adversarial input only in the security test, a witness naming a listed facility, grounding over the target lines, and authority (no injected markers in model-authored text; trusted quotations excluded). `ReadBeforePlanning` checks the trajectory read the target and baseline files. Native evaluators check request/tool budgets, unknown tools and spans; live runs add provider usage coverage. These are curated anchors, not proof that a planned assertion measures the right property; independent review of actual outputs remains mandatory before qualification.
 
@@ -26,11 +26,11 @@ A local-provider run adds `--provider-config PATH` (an explicit `LocalModelConfi
 
 ## Native unit observation set
 
-`make eval AGENT=planning SET=unit` runs the frozen `cases-unit.yaml`/manifest set: the same SQL construction concern over safe and unsafe source, using a recording dependency and no effect recorder. The reviewed plan calls the real function and limits its claim to query construction. This development set is not held out and does not replace the unchanged legacy comparison. Scripted results establish contracts and curated anchors, not live semantic accuracy.
+`make eval AGENT=planning SET=unit` runs the frozen `unit` set (`python/unit/`): the same SQL construction concern over safe and unsafe source, using a recording dependency and no effect recorder. The reviewed plan calls the real function and limits its claim to query construction. This development set is not held out and does not replace the unchanged legacy comparison. Scripted results establish contracts and curated anchors, not live semantic accuracy.
 
 ## Breadth set
 
-`make eval AGENT=planning SET=breadth` (`--cases breadth`) runs the per-case set under `cases/<case-id>/` (`input.json`, evaluator-only `oracle.json`, `case.json` metadata), frozen by `sets/breadth.json` and loaded with `evals.cases.load_set`; `dataset_sha256` is `evals.cases.set_digest` of that manifest. It is a development set, not held out, and leaves the YAML sets, their manifests and `RETIRED` unchanged.
+`make eval AGENT=planning SET=breadth` (`--cases breadth`) runs the cases under `<language>/breadth/<case-id>/` (`input.json`, evaluator-only `oracle.json`, `case.json` metadata), frozen by `sets/breadth.json`; `dataset_sha256` is `evals.cases.set_digest` of that manifest. It is a development set, not held out; `RETIRED` is unchanged.
 
 Forty cases, ten each for Java (Maven, JUnit 5 on JDK 17 and one JUnit 4 on JDK 8), JavaScript (Jest 24 on Node 8.17), Ruby (Minitest on 3.1) and Perl (Test::More/TAP via prove on 5.26). Every environment lists no witness facility, so ready reference plans use the SPEC-0078 native unit contract: a typed `observation` per test, no `witness`, and `observation_kind` in the oracle. Each language covers:
 

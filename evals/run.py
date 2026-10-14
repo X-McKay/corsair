@@ -68,7 +68,7 @@ SUITES: dict[str, Suite] = {
     "chain": Suite("evals.fixture_chain.evaluate", {"fixture": (), "jest": ("--cohort", "jest")},
                    live=("--live", "identification,planning,assessment"),
                    note="fixture: live authoring needs the sandbox, so authoring stays scripted on the host; cohorts "
-                        "(evals/case_e2e/cohorts.yaml) run every stage live over image-only Docker ports",
+                        "(benchmark-case sets under evals/e2e/) run every stage live over image-only Docker ports",
                    set_modules={"jest": "evals.case_e2e.evaluate"}, languages=False),
 }
 # Agents without an isolated eval set yet, and where the gap is planned.

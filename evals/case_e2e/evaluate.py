@@ -20,19 +20,18 @@ import logfire
 from pydantic import BaseModel, ConfigDict, TypeAdapter
 from pydantic_evals import Case, Dataset, set_eval_attribute
 from pydantic_evals.evaluators import Evaluator
-import yaml
 
 from corsair.inference.config import InferenceConfig, inference_config, load_inference
 from corsair.composition.receipts import AGENT_STAGES, VERSION_FIELDS, VERSIONS
 from corsair.investigate import images
 from corsair.investigation.results import STAGES, cohort_summary, markdown
+from evals.cases import load_set, set_names
 from evals.issue_analysis.evaluate import record_count
 
 from .case import entry
 from .run import run_case
 
 ROOT = Path(__file__).parent
-COHORTS = ROOT / "cohorts.yaml"
 CASES = ROOT.parents[1] / "benchmarks/cases"
 
 
@@ -58,11 +57,15 @@ class CaseChecks(Evaluator[CaseInput, CaseOutcome, None]):
         return checks
 
 
+def cohorts() -> list[str]:
+    """End-to-end sets whose cases name benchmark cases (evals/e2e/<language>/<set>/<case>/input.json: {"case": id})."""
+    return [name for name in set_names("e2e") if all(set(case.input) == {"case"} for case in load_set("e2e", name))]
+
+
 def cohort(name: str) -> tuple[str, ...]:
-    cohorts = yaml.safe_load(COHORTS.read_text())
-    if name not in cohorts:
-        raise ValueError(f"unknown cohort {name!r}; cohorts: {', '.join(cohorts)}")
-    return tuple(cohorts[name])
+    if name not in cohorts():
+        raise ValueError(f"unknown cohort {name!r}; cohorts: {', '.join(cohorts())}")
+    return tuple(case.input["case"] for case in load_set("e2e", name))
 
 
 def _digest(name: str, cases: tuple[str, ...]) -> str:

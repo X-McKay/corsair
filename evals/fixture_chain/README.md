@@ -2,6 +2,8 @@
 
 Native Pydantic Evals over the whole E2E-0 composition ([SPEC-0031](../../docs/development/specs/SPEC-0031-fixture-direct-composition.md)) on variants of the reviewed [SPEC-0018](../../docs/development/specs/SPEC-0018-native-two-test-fixture.md) pair, as designed in [SPEC-0035](../../docs/development/specs/SPEC-0035-assessment-evals-and-durable-chain.md).
 
+The cases are the end-to-end `fixture` set, one directory each under [`../e2e/python/fixture/`](../e2e/README.md) (`input.json` is the `ChainInput`, `oracle.json` the `ChainOracle`).
+
 `Case.inputs` (`ChainInput`) is evaluator-owned: which reviewed variant (`vulnerable`/`fixed`) each purpose's fresh workspace holds (`development`, `baseline`, `candidate`), or an issue whose source is absent. Agents never see it; the issue carries only the baseline variant's saved source and the fixture_e2e environment evidence. `ChainOracle` holds the expected stop stage, gate triple and whether the assessment is admitted.
 
 | Case | Mapping | Expected now | Once SPEC-0033 witness capture lands |

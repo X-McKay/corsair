@@ -10,7 +10,7 @@
     "java/java-transfer-sql-dependency": "522624219c6c122a0db4ba91f6f4aeb42b2f114898d0027c7d9ce8be90bc21f8",
     "java/java-traversal-rejected-exception": "24ec699360b350a9d4da044eabe713ab650583dec314ccd868ba4dbe5a4b90eb",
     "java/java-xxe-guarded-loader": "52422f81c253ce0c17d46476d1f2005883f5bf88f0282a88b00ff33c605a8f88",
-    "java/java-zip-extraction-fixture-state": "ccba726b949ad2b3f6cfec96ef6f801bdf1d5d52031f7d99ef0a4a429ded6bea",
+    "java/java-zip-extraction-fixture-state": "4a7afa806521d42585ac2e97028c6adca331884cfd0895d4c124f25facc1e594",
     "javascript/javascript-archive-extraction-fixture-state": "14122d00460a981e266f5b1a5e865438c5226805a19013d6f9f583bbfae03ecc",
     "javascript/javascript-command-construction-dependency": "58b4a8153f3b0bd4048c19853f523bd84055bcdfc2856c76ff01862a8f95a94a",
     "javascript/javascript-html-escape-return-value": "e739432ef0c3861b1b83fa55a834e9b0bd3124cf91fa7b239d4a3057934471ec",
