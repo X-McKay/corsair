@@ -145,6 +145,102 @@
         "source": "root argument",
         "target_callable": "listFiles"
       }
+    },
+    {
+      "name": "ruby-rubyzip-b",
+      "language": "ruby",
+      "finding": {
+        "title": "Path traversal via archive entry name in Zip::Entry#extract",
+        "repo_url": "eval-corpus/ruby/rubyzip/b",
+        "revision": "HEAD",
+        "file_path": "lib/zip/entry.rb",
+        "start_line": 17,
+        "symbol": "extract",
+        "cwe": "CWE-22",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "Zip::Entry#extract joins the entry name onto the destination directory and writes the file; an entry name containing parent-directory segments is carried into the join."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "lib/zip/entry.rb",
+        "sink_line": 17,
+        "source": "entry name",
+        "target_callable": "extract"
+      }
+    },
+    {
+      "name": "ruby-rubyzip-a",
+      "language": "ruby",
+      "finding": {
+        "title": "Path traversal via archive entry name in Zip::Entry#extract",
+        "repo_url": "eval-corpus/ruby/rubyzip/a",
+        "revision": "HEAD",
+        "file_path": "lib/zip/entry.rb",
+        "start_line": 29,
+        "symbol": "extract",
+        "cwe": "CWE-22",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "Zip::Entry#extract joins the entry name onto the destination directory and writes the file; an entry name containing parent-directory segments is carried into the join."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "lib/zip/entry.rb",
+        "sink_line": 29,
+        "source": "entry name",
+        "target_callable": "extract"
+      }
+    },
+    {
+      "name": "ruby-rack-static-a",
+      "language": "ruby",
+      "finding": {
+        "title": "Path traversal in Rack::Static request routing",
+        "repo_url": "eval-corpus/ruby/rack-static/a",
+        "revision": "HEAD",
+        "file_path": "lib/rack/static.rb",
+        "start_line": 76,
+        "symbol": "call",
+        "cwe": "CWE-22",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "Rack::Static routes a request to a file server when the request path matches a configured url prefix; the path used for that routing decision is carried into the file lookup under the configured root."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "lib/rack/static.rb",
+        "sink_line": 76,
+        "source": "request path (PATH_INFO)",
+        "target_callable": "call"
+      }
+    },
+    {
+      "name": "ruby-rack-static-b",
+      "language": "ruby",
+      "finding": {
+        "title": "Path traversal in Rack::Static request routing",
+        "repo_url": "eval-corpus/ruby/rack-static/b",
+        "revision": "HEAD",
+        "file_path": "lib/rack/static.rb",
+        "start_line": 76,
+        "symbol": "call",
+        "cwe": "CWE-22",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "Rack::Static routes a request to a file server when the request path matches a configured url prefix; the path used for that routing decision is carried into the file lookup under the configured root."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "lib/rack/static.rb",
+        "sink_line": 76,
+        "source": "request path (PATH_INFO)",
+        "target_callable": "call"
+      }
     }
   ]
 }

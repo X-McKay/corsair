@@ -1,0 +1,39 @@
+{
+  "family": "rack-static",
+  "language": "ruby",
+  "cwe": "CWE-22",
+  "runtime_row": "minitest-ruby31",
+  "upstream_repo": "https://github.com/rack/rack",
+  "record": "CVE-2025-27610",
+  "pointer_source": "Ruby Advisory Database / eval-thread pick (metadata only)",
+  "upstream_spdx": "MIT",
+  "spdx_verified": "MIT-LICENSE at commit 50caab74, 2026-10-14",
+  "parent_ref": "50caab74~1",
+  "fix_ref": "50caab74",
+  "verbatim": false,
+  "kept_files": [
+    {
+      "path": "lib/rack/static.rb",
+      "upstream": "lib/rack/static.rb + lib/rack/utils.rb",
+      "note": "Static routing methods (route_file / overwrite_file_path / add_index_root? / can_serve) and the request-path normalization (Utils.clean_path_info, Utils.unescape_path, PATH_SEPS, URI_PARSER) are upstream-verbatim from rack @50caab74; the one-line difference between variants is exactly the normalization applied before the can_serve check that the fix commit introduced"
+    }
+  ],
+  "stand_ins": [
+    {
+      "replaces": "Rack::Files collaborator",
+      "with": "Rack::FileReader, a minimal reader that returns the file under root for env[PATH_INFO] (or 404)",
+      "note": "performs the real on-disk path resolution that makes the property observable but decides nothing about routing"
+    },
+    {
+      "replaces": "downstream Rack application",
+      "with": "a plain object returning a 404 response",
+      "note": "stands in for the wrapped app the middleware falls through to"
+    }
+  ],
+  "reduction_removed": [
+    "Static gzip / cascade / header_rules / mime handling in call, unrelated to the routing check the fix touched",
+    "Rack::Files implementation and the rest of Rack::Utils / Rack::Mime",
+    "call reduced to the can_serve decision plus the file_server/app dispatch"
+  ],
+  "pov_note": "Benign control and proof-of-vulnerability probes authored by the Corsair chain at run time; none authored here. Property observable in-process: a request routed under a configured url prefix with a relative-parent segment reaches a file outside that prefix (vulnerable) vs is rejected to the wrapped app (fixed). No outbound network."
+}

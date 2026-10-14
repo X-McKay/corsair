@@ -1,0 +1,34 @@
+{
+  "family": "rubyzip",
+  "language": "ruby",
+  "cwe": "CWE-22",
+  "runtime_row": "minitest-ruby31",
+  "upstream_repo": "https://github.com/rubyzip/rubyzip",
+  "record": "CVE-2018-1000544",
+  "pointer_source": "Ruby Advisory Database / eval-thread pick (metadata only)",
+  "upstream_spdx": "BSD-2-Clause",
+  "spdx_verified": "raw.githubusercontent LICENSE.md, 2026-10-14",
+  "parent_ref": "v1.2.1",
+  "fix_ref": "v1.2.2",
+  "verbatim": false,
+  "kept_files": [
+    {
+      "path": "lib/zip/entry.rb",
+      "upstream": "lib/zip/entry.rb",
+      "note": "Zip::Entry name predicate + extract; the entry-name predicate logic (cleanpath/relative/expand check) is upstream-verbatim from v1.2.2"
+    }
+  ],
+  "stand_ins": [
+    {
+      "replaces": "upstream archive read/decompression + create_file collaborator",
+      "with": "a plain in-memory File.write of @content",
+      "note": "does not touch the entry-name safety logic"
+    }
+  ],
+  "reduction_removed": [
+    "Zip::Entry fields/methods unrelated to name handling + extraction",
+    "upstream predicate method name (name_safe?) neutralised to valid_entry_name? and its weakness-explaining comment removed, for corpus hygiene; predicate logic unchanged",
+    "extract signature reduced to extract(dest_dir)"
+  ],
+  "pov_note": "Benign control and proof-of-vulnerability probes authored by the Corsair chain at run time; none authored here. Property observable in-process via a file written outside the destination dir (vulnerable) vs skipped (fixed)."
+}
