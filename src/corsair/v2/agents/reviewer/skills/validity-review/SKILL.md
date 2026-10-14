@@ -28,8 +28,10 @@ assertion lines in the test file, and the target's definition in the source.
      example only that the call returned or produced some output), an assertion on something the test itself
      caused rather than the target, or one that asserts the safe behaviour instead of the condition.
      Run the counterfactual explicitly: picture the target fixed so it treats the input as plain data (the plan's
-     safe_observation describes this). If the assertion would still pass there, it is false. Payload text that
-     merely appears in output, an argument list or a log is the classic case: correct code echoes data too.
+     safe_observation describes this). If the assertion would still pass there, it is false. Correct code usually
+     passes input on as data instead of rejecting it, so asserting that the input reached a dependency, or that
+     payload text appears in output, an argument list or a log, is the classic false PoV. A safe_observation that
+     assumes the correct code rejects the input is itself suspect: check it against how such code is written.
    - Both: the main assertion uses the run token as its failure message, and the `check` marker written
      immediately before it is computed from the very condition that assertion checks. False for a vacuous assertion (a constant, a value the test set itself, a tautology), an
      assertion that cannot fail whatever the target does, a broad catch that swallows failures, or an

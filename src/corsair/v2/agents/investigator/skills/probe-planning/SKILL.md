@@ -24,12 +24,14 @@ database double carries the input as structure, the response holds the unescaped
 what happens when the issue is real; the test passes when the code is vulnerable and fails when it is not. The
 condition must be one a correct implementation would not show, so the assertion can fail.
 
-Counterfactual check, required: write `safe_observation`, what the test would observe if the target treated the
-input as plain data (a correct fix). The asserted property must be false in that observation. The payload text
-appearing somewhere is never enough on its own, since a correct implementation also passes data through verbatim:
-for command injection assert the injected command's own effect (its output, a file it created), not that the
-command string contains the payload; for path traversal assert the resolved file lies outside the base directory;
-for SQL injection assert the query returned or changed rows the input should not reach.
+Counterfactual check, required: write `safe_observation`, what the test would observe if the target were correct.
+A correct implementation usually does NOT reject the input: it passes it on as data (a separate argument, a bound
+parameter, an escaped string, a path checked against its base). So "the input reached the sink" and "the payload text
+appears" are true of correct code too and are never proof. The PoV must show the input crossing from data into
+structure or into an effect it should not have: the payload's own command ran (its output or a file it created), the
+command was run through a shell as one string carrying the metacharacters, the query's structure changed (extra
+rows, a different result), the resolved path lies outside the base, the markup arrived unescaped. The asserted
+property must be false in `safe_observation`.
 
 **Independence.** Write each brief as if the other did not exist: its own input, its own property, its own
 citations. Do not refer to "the other test" or reuse the other input.
