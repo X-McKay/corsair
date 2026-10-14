@@ -7,7 +7,8 @@ Layout of ``<root>/<run_id>/``:
 - ``agents/<step>.messages.json``: the native PydanticAI message history of an agent call, when captured.
 - ``usage.json``: one ``AgentUsage`` per agent call, in order; ``timings.json``: per-stage wall time, in order.
 - ``grounding.json``: the advisory grounding brief, when Ground ran. Nothing downstream reads it.
-- ``verdict.json`` and ``summary.json`` (label, rule id, terminal reason and totals; unknown totals are null).
+- ``verdict.json`` and ``summary.json`` (label, rule id, terminal reason, per-author review results and totals;
+  unknown values are null).
 
 State lives in the files, not in the object, so a Temporal activity on any worker sharing the filesystem can reopen
 the run directory and append to it. Steps run one at a time per run, so read-modify-write appends do not race.
@@ -130,6 +131,7 @@ class RunRecorder:
             "terminal_reason": verdict.terminal_reason.value,
             "finding": verdict.finding,
             "fix": verdict.fix,
+            "review": _review(verdict),
             "totals": {
                 "agent_calls": len(usage),
                 "requests": _total(u.requests for u in usage),
@@ -143,6 +145,20 @@ class RunRecorder:
         }
         self._write("summary.json", summary)
         return summary
+
+
+def _review(verdict: Verdict) -> dict[str, Any]:
+    """Per-author review results for evals: first-time pass, revisions used and recovery (invalid at the first
+    review, valid on the final one). Unknown stays None."""
+    final = next((v for v in verdict.validity if v.revision == "vulnerable"), None)
+    authors = {}
+    for role in ("control", "exploit"):
+        first = verdict.first_review_valid.get(role)
+        last = None if final is None else getattr(final, role).valid
+        authors[role] = {"first_review_valid": first, "revisions_used": verdict.revisions.get(role, 0),
+                         "final_valid": last,
+                         "recovered": None if first is None else (first is False and last is True)}
+    return {"rounds": verdict.review_rounds, "authors": authors}
 
 
 def _total_float(values: Iterable[float | None]) -> float | None:

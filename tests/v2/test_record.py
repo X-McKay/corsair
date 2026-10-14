@@ -23,7 +23,7 @@ def test_run_directory_holds_every_stage_usage_messages_and_verdict(tmp_path):
     assert _load(run / "case.json")["case_id"] == "case-1"
     assert _load(run / "run.json")["mode"] == "direct"
     steps = ["ground", "select", "investigate", "build", "replay-build", "probe-control", "probe-exploit",
-             "diagnose-control", "diagnose-exploit", "review-vulnerable", "execute-control-vulnerable",
+             "diagnose-control", "diagnose-exploit", "review.1", "execute-control-vulnerable",
              "execute-exploit-vulnerable", "decide"]
     assert [t["step"] for t in _load(run / "timings.json")] == steps
     for step in steps:
@@ -44,6 +44,9 @@ def test_run_directory_holds_every_stage_usage_messages_and_verdict(tmp_path):
     summary = _load(run / "summary.json")
     assert (summary["label"], summary["rule_id"], summary["terminal_reason"]) == ("LIKELY_EXPLOITABLE", "R4", "ok")
     assert summary["totals"]["agent_calls"] == 6
+    assert summary["review"] == {"rounds": 1, "authors": {
+        role: {"first_review_valid": True, "revisions_used": 0, "final_valid": True, "recovered": False}
+        for role in ("control", "exploit")}}
     assert summary["totals"]["requests"] == 6 and summary["totals"]["tokens"] == 90
     assert summary["totals"]["tool_calls"] == 0 and summary["totals"]["wall_s"] is not None
 

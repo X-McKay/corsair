@@ -11,11 +11,11 @@ from .agent import NAME, ROLE, SPEC, create_agent
 
 
 async def probe(brief: ProbeBrief, runtime: Runtime, model: Model, *, source_root: Path,
-                diagnostics: str | None = None, previous: ProbeDraft | None = None
-                ) -> tuple[ProbeDraft | None, AgentUsage]:
+                diagnostics: str | None = None, previous: ProbeDraft | None = None,
+                review_feedback: str | None = None) -> tuple[ProbeDraft | None, AgentUsage]:
     """Write this role's draft from its own brief only; None when blocked or the run failed (see usage.status)."""
     if brief.role != ROLE:
         raise ValueError(f"the {NAME} takes only a {ROLE} brief")
     agent = create_agent(model, framework=runtime.skill)
     return await run_prober(agent, NAME, SPEC, brief, runtime, model, source_root=source_root,
-                            diagnostics=diagnostics, previous=previous)
+                            diagnostics=diagnostics, previous=previous, review_feedback=review_feedback)

@@ -181,3 +181,23 @@ async def test_packaged_skills_load_natively_and_a_missing_framework_skill_is_to
                       if type(part).__name__ == "LoadCapabilityReturnPart")
     assert "SAFE behaviour" in loaded and "CORSAIR_MARKER_DIR" in loaded and usage.status == "ok"
     assert framework_skills("no-such-framework") == []
+
+
+async def test_review_revision_shows_only_the_review_and_its_own_previous_draft(tree):
+    seen = []
+    previous = ProbeDraft(role="exploit", test_file="tests/test_unsafe.src", test_name="test_unsafe",
+                          source=EXPLOIT_SOURCE)
+    revised = EXPLOIT_SOURCE.replace("target(", "real_target(")
+    feedback = ("Failed checks: calls_real_target\nDefects:\n- calls a local copy, not the target\n"
+                "Cited lines:\n- lib/target.txt:2-2\n    function target(name)")
+    model = scripted([("write_test_file", {"path": "tests/test_unsafe.src", "content": revised})], seen=seen)
+    draft, usage = await exploit_prober.probe(brief("exploit"), RUNTIME, model, source_root=tree,
+                                              previous=previous, review_feedback=feedback)
+    assert draft.source == revised and usage.status == "ok"
+    assert draft.revision_of == sha256(EXPLOIT_SOURCE.encode()).hexdigest()
+    prompt = str(seen[0][0].parts)
+    assert "calls a local copy, not the target" in prompt and "lib/target.txt:2-2" in prompt
+    assert "safe(target('../x'))" in prompt and "untrusted data" in prompt
+    assert "Check result" not in prompt and "test_ordinary" not in prompt
+    with pytest.raises(ValueError):
+        await exploit_prober.probe(brief("exploit"), RUNTIME, model, source_root=tree, review_feedback=feedback)

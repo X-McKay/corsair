@@ -50,11 +50,25 @@ def usage(agent: str, **values: Any) -> AgentUsage:
     return AgentUsage(agent=agent, **{**known, **values})
 
 
-def validity(patch: FrozenPatch, revision: str) -> Validity:
+def validity(patch: FrozenPatch, revision: str, invalid: frozenset[str] = frozenset()) -> Validity:
     def one(role):
+        if role in invalid:
+            return rejected(role)
         return ProbeValidity(role=role, valid=True, calls_real_target=True, exercises_condition=True,
                              assertion_relevant=True, doubles_only_dependencies=True)
     return Validity(patch_sha256=patch.sha256, revision=revision, control=one("control"), exploit=one("exploit"))
+
+
+def rejected(role: str) -> ProbeValidity:
+    """A negative judgement citing this probe's own file, the source and (to test filtering) the other test file."""
+    other = "exploit" if role == "control" else "control"
+    return ProbeValidity(
+        role=role, valid=False, calls_real_target=False, exercises_condition=True, assertion_relevant=False,
+        doubles_only_dependencies=True,
+        defects=tuple(f"{role} defect {i}" for i in range(6)) + ("x" * 3_000,),
+        citations=(Citation(path=brief(role).test_file, start_line=1, end_line=1, quote=f"{role} own line"),
+                   Citation(path="src/a.x", start_line=1, end_line=2, quote="def target(x):\n    return x"),
+                   Citation(path=brief(other).test_file, start_line=1, end_line=1, quote=f"{other} secret line")))
 
 
 def run(patch: FrozenPatch, role: str, revision: str, outcome: Outcome = Outcome.PASSED) -> ProbeRun:
@@ -73,6 +87,8 @@ class Fakes:
     replays: list[bool] = field(default_factory=lambda: [True])
     diagnose_outcomes: dict[str, str] = field(default_factory=dict)  # role -> ok, not_run or errored
     revised: dict[str, ProbeDraft | None] = field(default_factory=dict)
+    rejections: dict[str, int] = field(default_factory=dict)  # role -> how many vulnerable reviews reject it first
+    review_revised: dict[str, ProbeDraft | None] = field(default_factory=dict)  # role -> review revision output
     fixed_replays: bool = True
     fixed_raises: dict[str, BaseException] = field(default_factory=dict)  # step name -> raised on the fixed revision only
     unbound: set[str] = field(default_factory=set)  # revisions whose review binds to another patch
@@ -114,10 +130,14 @@ class Fakes:
                              reason="" if ok else "baseline test failed: missing module")
         return result, ENVIRONMENT if ok else None
 
-    async def _probe(self, role, brief, runtime, model, *, source_root, diagnostics=None, previous=None):
+    async def _probe(self, role, brief, runtime, model, *, source_root, diagnostics=None, previous=None,
+                     review_feedback=None):
         self._log(f"probe-{role}", brief, runtime, source_root=source_root, diagnostics=diagnostics,
-                  previous=previous)
-        out = draft(role) if previous is None else self.revised.get(role, draft(role, "revised"))
+                  previous=previous, review_feedback=review_feedback)
+        if review_feedback is not None:
+            out = self.review_revised.get(role, draft(role, f"review-revised {len(self.of(f'probe-{role}'))}"))
+        else:
+            out = draft(role) if previous is None else self.revised.get(role, draft(role, "revised"))
         return out, self.usages.get(f"{role}_prober", usage(f"{role}_prober"))
 
     async def control_probe(self, brief, runtime, model, **kwargs):
@@ -136,7 +156,9 @@ class Fakes:
         if revision == "fixed" and "review" in self.fixed_raises:
             raise self.fixed_raises["review"]
         bound = patch if revision not in self.unbound else patch.model_copy(update={"sha256": "f" * 64})
-        return validity(bound, revision), self.usages.get("reviewer", usage("reviewer"))
+        seen = len([1 for _, kw in self.of("review") if kw["revision"] == revision])
+        invalid = frozenset(role for role, n in self.rejections.items() if revision == "vulnerable" and seen <= n)
+        return validity(bound, revision, invalid), self.usages.get("reviewer", usage("reviewer"))
 
     def execute(self, environment, runtime, patch, role, *, revision="vulnerable"):
         self._log("execute", environment, runtime, patch, role, revision=revision)
