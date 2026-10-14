@@ -1,0 +1,97 @@
+{
+  "expect": {
+    "draft": true,
+    "status": "ok"
+  },
+  "expected_outcome": {
+    "asserts": "benign_behaviour",
+    "vulnerable": "pass",
+    "fixed": "pass",
+    "this_tree": "pass"
+  },
+  "revision_history": [],
+  "target_spans": [
+    {
+      "path": "lib/download-headers.js",
+      "start_line": 2,
+      "end_line": 4
+    }
+  ],
+  "anchors": {
+    "comment": "//",
+    "load": [
+      "require\\s*\\(\\s*['\\\"](\\.\\./)+lib/download-headers(\\.js)?['\\\"]\\s*\\)"
+    ],
+    "call": [
+      "\\bdisposition\\s*\\("
+    ],
+    "input": [
+      "['\\\"]report\\.txt['\\\"]"
+    ],
+    "avoid_input": [
+      "\\\\r\\\\n",
+      "Set\\-Cookie"
+    ],
+    "property": [
+      "(?:(?:(?<![!=<>])===?(?!=)|\\beq\\b|\\.equals\\s*\\(|\\bassert_equal\\b)\\s*\\(?\\s*['\\\"]attachment;\\ filename=\\\\?\"report\\.txt\\\\?\"['\\\"]|['\\\"]attachment;\\ filename=\\\\?\"report\\.txt\\\\?\"['\\\"]\\s*\\)?\\s*(?:(?<![!=<>])===?(?!=)|\\beq\\b|\\.equals\\s*\\(|\\bassert_equal\\b)|['\\\"]attachment;\\ filename=\\\\?\"report\\.txt\\\\?\"['\\\"]\\s*\\.equals\\s*\\(|Objects\\.equals\\s*\\([^\\n]*['\\\"]attachment;\\ filename=\\\\?\"report\\.txt\\\\?\"['\\\"]|is_deeply\\s*\\([^\\n]*['\\\"]attachment;\\ filename=\\\\?\"report\\.txt\\\\?\"['\\\"])"
+    ],
+    "non_differential": [],
+    "test_definition": "(?m)^\\s*(?:test|it)(?:\\.only)?(?:\\.each\\s*\\(.*?\\)\\s*)?\\(\\s*['\\\"`]",
+    "assertion": "\\bassert(\\.\\w+)?\\s*\\(|\\bexpect\\s*\\(",
+    "token_form": "\\bassert(?:\\.\\w+)?\\s*\\([\\s\\S]*,\\s*process\\.env(?:\\.CORSAIR_TOKEN|\\[\\s*['\\\"]CORSAIR_TOKEN['\\\"]\\s*\\])\\s*,?\\s*\\)",
+    "forbidden": [
+      "\\b(test|it|describe)\\.(skip|todo)\\b|\\bxit\\b|\\bxtest\\b|\\bxdescribe\\b",
+      "child_process",
+      "require\\(\\s*['\\\"](node:)?(http|https|net)['\\\"]|\\bfetch\\s*\\(",
+      "process\\.exit",
+      "\\.failing\\b",
+      "catch\\s*(?:\\([^)]*\\))?\\s*\\{(?![^{}]*\\b(?:throw|instanceof)\\b)[^{}]*\\}"
+    ],
+    "forbidden_doubles": [
+      "jest\\.(mock|spyOn|doMock|replaceProperty)\\s*\\(",
+      "function\\s+disposition\\s*\\("
+    ],
+    "injected": [],
+    "defects": [
+      "dispositon"
+    ]
+  },
+  "script": [
+    {
+      "tool": "load_capability",
+      "args": {
+        "id": "control-probe"
+      }
+    },
+    {
+      "tool": "load_capability",
+      "args": {
+        "id": "probe-protocol"
+      }
+    },
+    {
+      "tool": "load_capability",
+      "args": {
+        "id": "jest"
+      }
+    },
+    {
+      "tool": "read_file",
+      "args": {
+        "path": "lib/download-headers.js"
+      }
+    },
+    {
+      "tool": "write_test_file",
+      "args": {
+        "path": "__tests__/download-headers.control.test.js",
+        "content": "const assert = require('node:assert');\nconst fs = require('node:fs');\nconst path = require('node:path');\nconst headers = require('../lib/download-headers');\n\ntest('benign_control', () => {\n  fs.writeFileSync(path.join(process.env.CORSAIR_MARKER_DIR, 'start'), '');\n  const holds = headers.disposition('report.txt') === 'attachment; filename=\"report.txt\"';\n  fs.writeFileSync(path.join(process.env.CORSAIR_MARKER_DIR, 'check'), holds ? 'holds' : 'violated');\n  assert.ok(holds, process.env.CORSAIR_TOKEN);\n  fs.writeFileSync(path.join(process.env.CORSAIR_MARKER_DIR, 'end'), '');\n});\n"
+      }
+    },
+    {
+      "final": {
+        "status": "drafted"
+      }
+    }
+  ]
+}

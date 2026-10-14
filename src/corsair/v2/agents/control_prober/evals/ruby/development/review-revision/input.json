@@ -1,0 +1,43 @@
+{
+  "row_id": "minitest-ruby31",
+  "brief": {
+    "role": "control",
+    "test_file": "test/redirects_control_test.rb",
+    "test_name": "test_benign_control",
+    "target": "lib/redirects.rb: Redirects.after_login(target)",
+    "seam": "Call the real Redirects.after_login through its public interface",
+    "input_description": "target '/account', a path on this site",
+    "property_to_assert": "Returns '/account' unchanged",
+    "doubles": "",
+    "citations": [
+      {
+        "path": "lib/redirects.rb",
+        "start_line": 3,
+        "end_line": 6
+      },
+      {
+        "path": "test/redirects_test.rb",
+        "start_line": 1,
+        "end_line": 8
+      }
+    ]
+  },
+  "source_files": [
+    {
+      "path": "lib/redirects.rb",
+      "content": "# Where to send a user after sign-in.\nmodule Redirects\n  def self.after_login(target)\n    return '/' if target.nil? || target.empty?\n    target\n  end\nend\n"
+    },
+    {
+      "path": "test/redirects_test.rb",
+      "content": "require 'minitest/autorun'\nrequire 'redirects'\n\nclass RedirectsTest < Minitest::Test\n  def test_defaults_to_home\n    assert_equal '/', Redirects.after_login(nil)\n  end\nend\n"
+    }
+  ],
+  "previous": {
+    "role": "control",
+    "test_file": "test/redirects_control_test.rb",
+    "test_name": "test_benign_control",
+    "source": "require 'minitest/autorun'\nrequire 'redirects'\n\nclass RedirectsControlTest < Minitest::Test\n  def test_benign_control\n    File.write(File.join(ENV.fetch('CORSAIR_MARKER_DIR'), 'start'), '')\n    holds = Redirects.after_login('/home') == '/account'\n    File.write(File.join(ENV.fetch('CORSAIR_MARKER_DIR'), 'check'), holds ? 'holds' : 'violated')\n    assert holds, ENV.fetch('CORSAIR_TOKEN')\n    File.write(File.join(ENV.fetch('CORSAIR_MARKER_DIR'), 'end'), '')\n  end\nend\n",
+    "revision_of": "03ba88eb52adef5d2dfae5a8609bad20a15963be86ba184b8875110162b7b5dd"
+  },
+  "review_feedback": "Failed checks: exercises_condition\nDefects:\n- The test calls Redirects.after_login with '/home' instead of the brief's input '/account', so it never exercises the condition the brief describes.\nCited lines:\n- test/redirects_control_test.rb:7-7\n        holds = Redirects.after_login('/home') == '/account'"
+}

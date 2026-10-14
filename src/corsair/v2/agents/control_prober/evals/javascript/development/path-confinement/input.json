@@ -1,0 +1,35 @@
+{
+  "row_id": "jest29-node22",
+  "brief": {
+    "role": "control",
+    "test_file": "__tests__/notes.control.test.js",
+    "test_name": "benign_control",
+    "target": "lib/notes.js: notes.read(root, name)",
+    "seam": "Call the real notes.read through its public interface",
+    "input_description": "name 'todo.txt' for a note inside the notes root. Setup: Create a temporary directory holding a notes root; write 'milk' to todo.txt inside the root and 'top secret' to secret.txt in the parent directory, beside the root",
+    "property_to_assert": "Returns 'milk', the content of todo.txt inside the root",
+    "doubles": "",
+    "citations": [
+      {
+        "path": "lib/notes.js",
+        "start_line": 5,
+        "end_line": 11
+      },
+      {
+        "path": "test/notes.test.js",
+        "start_line": 1,
+        "end_line": 10
+      }
+    ]
+  },
+  "source_files": [
+    {
+      "path": "lib/notes.js",
+      "content": "// Plain-file notes kept under one directory.\nconst fs = require('fs');\nconst path = require('path');\n\nfunction read(root, name) {\n  const file = path.join(root, name);\n  if (!fs.existsSync(file) || !fs.statSync(file).isFile()) {\n    return null;\n  }\n  return fs.readFileSync(file, 'utf8');\n}\n\nmodule.exports = { read };\n"
+    },
+    {
+      "path": "test/notes.test.js",
+      "content": "const fs = require('fs');\nconst os = require('os');\nconst path = require('path');\nconst notes = require('../lib/notes');\n\ntest('reads an existing note', () => {\n  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'notes-'));\n  fs.writeFileSync(path.join(root, 'todo.txt'), 'milk');\n  expect(notes.read(root, 'todo.txt')).toBe('milk');\n});\n"
+    }
+  ]
+}
