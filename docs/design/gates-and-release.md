@@ -88,16 +88,11 @@ values they accept.
   identity is checked on that agent's own baseline, not on the chain's. A stricter rule would also stale the chain
   baseline when any agent changes.
 
-## Blockers found while preparing (must be fixed before enabling)
+## Blockers found while preparing
 
-These are matrix and image facts, not CI changes. They belong to the build owner.
-
-- `junit5-maven-temurin17` names `corsair-java:c7e6b24f0068035d`, but the source now builds `…:109e2050ebebe84e` (the
-  matrix comment records the drift). `runtime-row` fails until the row is re-pinned to an image built from the
-  current source.
-- `junit4-maven-temurin8` names `corsair-java8:81777d352ab28226`, but the source builds `…:996a570a7e03c327`.
-- `jest29-node22` names an image whose source (`deploy/qualification/toolchains/node22`, commit aa417fc) is not on
-  develop, and `tools/toolchain_images.py` has no `node22` entry. Its job fails until the source lands.
-- The Reviewer has no eval suite, so the gate cannot hold until it has one (HANDOFF-0135).
+- Resolved by PR #166 (611f52a): both Maven rows now name the images their sources build, and the `node22` image
+  source is back on develop, so every row's tag is reproducible from source.
+- The Reviewer eval suite arrives with PR #165. Once it merges, `reviewer` joins the `scripted-evals` matrix, and
+  `tests/v2/test_workflows.py` keeps the two in step.
 - `tests/v2/test_workspace_docker.py` pinned a Python tag that no longer matched the source. It now reads the
   matrix's Python row, so CI can build the image and run the conformance suite.
