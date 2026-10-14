@@ -25,7 +25,9 @@ SPDX licence, NVD CWE, pointer source and what the reduction removed.
 
 | Family | Language | CWE | Upstream | Record | Licence |
 | --- | --- | --- | --- | --- | --- |
-| protopollution | javascript | CWE-1321 | sindresorhus/dot-prop | CVE-2020-8116 | MIT |
+| dot-prop | javascript | CWE-1321 | sindresorhus/dot-prop | CVE-2020-8116 | MIT |
+| angular-http-server | javascript | CWE-22 | simonh1000/angular-http-server | GHSA-4rvg-955w-h68q | Apache-2.0 |
+| codecov-node | javascript | CWE-78 | codecov/codecov-node | CVE-2020-15123 | MIT |
 
 ## Pointer sources
 

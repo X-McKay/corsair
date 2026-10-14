@@ -3,11 +3,11 @@
   "note": "Permissive-licensed vulnerability/fix pairs reduced from upstream open-source projects (code verbatim-derived; only packaging and dependencies removed for offline reduction). One entry per variant; variant dirs a/b per family, the letter does not reveal which is vulnerable (recorded only here). Both findings of a pair share title and description. Truth is evaluator-only and never enters an agent input. Vulnerable -> potentially_exploitable; fixed -> likely_not_exploitable. Per-case upstream provenance and SPDX licence in each family's provenance.json and in SOURCE.md.",
   "cases": [
     {
-      "name": "js-protopollution-a",
+      "name": "js-dot-prop-a",
       "language": "javascript",
       "finding": {
         "title": "Prototype pollution via property path in set()",
-        "repo_url": "javascript/protopollution/a",
+        "repo_url": "javascript/dot-prop/a",
         "revision": "HEAD",
         "file_path": "src/index.js",
         "start_line": 57,
@@ -27,11 +27,11 @@
       }
     },
     {
-      "name": "js-protopollution-b",
+      "name": "js-dot-prop-b",
       "language": "javascript",
       "finding": {
         "title": "Prototype pollution via property path in set()",
-        "repo_url": "javascript/protopollution/b",
+        "repo_url": "javascript/dot-prop/b",
         "revision": "HEAD",
         "file_path": "src/index.js",
         "start_line": 72,
@@ -48,6 +48,102 @@
         "sink_line": 72,
         "source": "path argument",
         "target_callable": "set"
+      }
+    },
+    {
+      "name": "js-angular-http-server-b",
+      "language": "javascript",
+      "finding": {
+        "title": "Path traversal in static file request handler",
+        "repo_url": "javascript/angular-http-server/b",
+        "revision": "HEAD",
+        "file_path": "src/server.js",
+        "start_line": 12,
+        "symbol": "resolveUrl",
+        "cwe": "CWE-22",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "The static-file request handler maps the request URL to a file path under the server root and reads it; the URL path segment is carried into path.join without containment."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "src/server.js",
+        "sink_line": 12,
+        "source": "request URL path",
+        "target_callable": "requestListener"
+      }
+    },
+    {
+      "name": "js-angular-http-server-a",
+      "language": "javascript",
+      "finding": {
+        "title": "Path traversal in static file request handler",
+        "repo_url": "javascript/angular-http-server/a",
+        "revision": "HEAD",
+        "file_path": "src/server.js",
+        "start_line": 13,
+        "symbol": "resolveUrl",
+        "cwe": "CWE-22",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "The static-file request handler maps the request URL to a file path under the server root and reads it; the URL path segment is carried into path.join without containment."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "src/server.js",
+        "sink_line": 13,
+        "source": "request URL path",
+        "target_callable": "requestListener"
+      }
+    },
+    {
+      "name": "js-codecov-node-b",
+      "language": "javascript",
+      "finding": {
+        "title": "Command injection in coverage file discovery",
+        "repo_url": "javascript/codecov-node/b",
+        "revision": "HEAD",
+        "file_path": "src/codecov.js",
+        "start_line": 9,
+        "symbol": "listFiles",
+        "cwe": "CWE-78",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "listFiles builds a file-discovery command from the project root and pattern arguments and runs it through a child process; the root value is carried into the command."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "src/codecov.js",
+        "sink_line": 9,
+        "source": "root argument",
+        "target_callable": "listFiles"
+      }
+    },
+    {
+      "name": "js-codecov-node-a",
+      "language": "javascript",
+      "finding": {
+        "title": "Command injection in coverage file discovery",
+        "repo_url": "javascript/codecov-node/a",
+        "revision": "HEAD",
+        "file_path": "src/codecov.js",
+        "start_line": 10,
+        "symbol": "listFiles",
+        "cwe": "CWE-78",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "listFiles builds a file-discovery command from the project root and pattern arguments and runs it through a child process; the root value is carried into the command."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "src/codecov.js",
+        "sink_line": 10,
+        "source": "root argument",
+        "target_callable": "listFiles"
       }
     }
   ]

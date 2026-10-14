@@ -1,0 +1,19 @@
+{
+  "family": "codecov-node",
+  "language": "javascript",
+  "cwe": "CWE-78",
+  "runtime_row": "jest29-node22",
+  "upstream_repo": "https://github.com/codecov/codecov-node",
+  "record": "CVE-2020-15123",
+  "pointer_source": "SecBench.js candidate (metadata only)",
+  "upstream_spdx": "MIT",
+  "spdx_verified": "raw.githubusercontent LICENSE at fix commit, 2026-10-14",
+  "parent_commit": "5f6cc62d4f",
+  "fix_commit": "c0711c6566",
+  "verbatim": false,
+  "reduction_removed": [
+    "reduced (not verbatim): the file-discovery child-process call extracted from lib/codecov.js to a minimal module; upload/reporting, git helpers and other exec calls dropped",
+    "vulnerable listFiles = execSync('find ' + root + ' ' + patterns) (pre-fix); fixed listFiles = execFileSync('find', [root, ...patterns]) per commit c0711c6566 (string shell command -> argv array)"
+  ],
+  "pov_note": "Benign control and proof-of-vulnerability probes authored by the Corsair chain at run time; none authored here."
+}
