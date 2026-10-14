@@ -44,12 +44,20 @@ class Suite:
     note: str = ""
     # Sets served by another module than `module`, e.g. the chain's benchmark case cohorts.
     set_modules: dict[str, str] = field(default_factory=dict)
-    # Whether the suite's sets are per-case directories that `--language` can narrow (evals/cases.py).
-    languages: bool = True
 
 
 # v2 agents register their suites here as they gain one (src/corsair/v2/README.md); the v1 suites were removed.
 SUITES: dict[str, Suite] = {}
+
+# Scorers whose CLI narrows a per-case set to one language (`--language`, evals/cases.py); every other set refuses
+# EVAL_LANGUAGE before anything runs. v2 agents add theirs as they register.
+LANGUAGE_MODULES: frozenset[str] = frozenset()
+
+
+def narrows_by_language(suite: Suite, set_name: str) -> bool:
+    return suite.set_modules.get(set_name, suite.module) in LANGUAGE_MODULES
+
+
 # Agents without an isolated eval set yet, and where the gap is planned.
 MISSING = {}
 
@@ -260,8 +268,8 @@ def main(argv: list[str] | None = None) -> int:
     set_name = args.set_name or next(iter(suite.sets))
     if set_name not in suite.sets:
         parser.error(f"{args.agent} sets: {', '.join(suite.sets)}")
-    if args.language and not suite.languages:
-        parser.error(f"{args.agent} sets are not split by language")
+    if args.language and not narrows_by_language(suite, set_name):
+        parser.error(f"{args.agent} set {set_name} is not split by language")
     return run(args.agent, set_name, args.provider_config, args.repeat, args.note, args.results, args.language)
 
 
