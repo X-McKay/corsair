@@ -7,6 +7,10 @@
     evals/<suite>/sets/<set>.json
       {"held_out": false, "cases": {"<language>/<case id>": "<sha256>", ...}}
 
+A v2 agent keeps the same layout in its own package, ``src/corsair/v2/agents/<agent>/evals/`` (``agent_root``),
+beside its ``release-policy.yaml``; every function here takes either a suite name under evals/ or that root path.
+v2 cases also name the eval types they measure in ``case.json`` ``dimensions`` (``DIMENSIONS``).
+
 `<suite>` is the agent's eval package (evals/run.py maps `make eval AGENT=` names onto it); end-to-end cases use
 evals/e2e/ the same way. `<language>` is python, java, javascript, ruby, perl, or common for a case with no
 language (no source at all, injection only). A case hash is the SHA-256 of the canonical JSON of its three files,
@@ -21,12 +25,19 @@ never pass it to an agent.
 
 from dataclasses import dataclass
 from hashlib import sha256
+from importlib.resources import files
 import json
 from pathlib import Path
 import re
 from typing import Any
 
 EVALS = Path(__file__).resolve().parent
+# v2 agents keep their evals in their own package: <agent package>/evals/ (same layout, rooted there). This is the
+# one place that names the package; it changes once if the v2 tree moves.
+AGENTS_PACKAGE = "corsair.v2.agents"
+AGENTS = ("grounding", "builder", "investigator", "control_prober", "exploit_prober", "reviewer")
+# Eval types a v2 case may name in case.json `dimensions` (efficiency is measured on every attempt, never pass/fail).
+DIMENSIONS = ("correctness", "contract", "grounding", "trajectory", "robustness", "safety")
 CASE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$")
 LANGUAGES = ("python", "java", "javascript", "ruby", "perl", "common")
 CASE_FIELDS = {"language", "framework", "family", "probes", "kind", "provenance"}
@@ -44,6 +55,21 @@ class EvalCase:
     @property
     def key(self) -> str:
         return f"{self.language}/{self.name}"
+
+
+def agent_root(agent: str) -> Path:
+    """A v2 agent's eval root, resolved through its package; an agent without an evals/ directory is refused."""
+    if agent not in AGENTS:
+        raise ValueError(f"unknown v2 agent {agent!r}")
+    root = Path(str(files(f"{AGENTS_PACKAGE}.{agent}") / "evals"))
+    if not root.is_dir():
+        raise ValueError(f"{agent} has no evals/ directory under {AGENTS_PACKAGE}")
+    return root
+
+
+def eval_root(suite: str | Path) -> Path:
+    """A suite name under evals/, or an eval root path (a v2 agent's evals/ directory)."""
+    return suite if isinstance(suite, Path) else EVALS / suite
 
 
 def _read(directory: Path) -> EvalCase:
@@ -67,18 +93,20 @@ def check_case(case: EvalCase) -> None:
         raise ValueError(f"{case.key}: case.json language {meta['language']!r} does not match its directory")
     if not PROVENANCE_FIELDS <= set(meta["provenance"]):
         raise ValueError(f"{case.key}: provenance needs {sorted(PROVENANCE_FIELDS)}")
+    if "dimensions" in meta and (not meta["dimensions"] or not set(meta["dimensions"]) <= set(DIMENSIONS)):
+        raise ValueError(f"{case.key}: dimensions must be a non-empty subset of {DIMENSIONS}")
 
 
-def manifest(suite: str, name: str) -> dict:
-    return json.loads((EVALS / suite / "sets" / f"{name}.json").read_text())
+def manifest(suite: str | Path, name: str) -> dict:
+    return json.loads((eval_root(suite) / "sets" / f"{name}.json").read_text())
 
 
-def set_names(suite: str) -> list[str]:
-    directory = EVALS / suite / "sets"
+def set_names(suite: str | Path) -> list[str]:
+    directory = eval_root(suite) / "sets"
     return sorted(path.stem for path in directory.glob("*.json")) if directory.is_dir() else []
 
 
-def load_set(suite: str, name: str, language: str | None = None) -> list[EvalCase]:
+def load_set(suite: str | Path, name: str, language: str | None = None) -> list[EvalCase]:
     """The set's cases in manifest order, optionally one language; refused when a case differs from its hash."""
     frozen = manifest(suite, name)
     cases = []
@@ -86,7 +114,7 @@ def load_set(suite: str, name: str, language: str | None = None) -> list[EvalCas
         case_language, case_id = key.split("/", 1)
         if language is not None and case_language != language:
             continue
-        case = _read(EVALS / suite / case_language / name / case_id)
+        case = _read(eval_root(suite) / case_language / name / case_id)
         check_case(case)
         if case_hash(case) != digest:
             raise ValueError(f"{suite} case {key} differs from the frozen {name} manifest")
@@ -96,18 +124,18 @@ def load_set(suite: str, name: str, language: str | None = None) -> list[EvalCas
     return cases
 
 
-def set_digest(suite: str, name: str) -> str:
+def set_digest(suite: str | Path, name: str) -> str:
     return sha256(json.dumps(manifest(suite, name), sort_keys=True).encode()).hexdigest()
 
 
-def case_directories(suite: str, name: str) -> list[Path]:
-    return sorted(path for language in LANGUAGES for path in (EVALS / suite / language / name).glob("*")
+def case_directories(suite: str | Path, name: str) -> list[Path]:
+    return sorted(path for language in LANGUAGES for path in (eval_root(suite) / language / name).glob("*")
                   if path.is_dir())
 
 
-def freeze(suite: str, name: str, *, held_out: bool | None = None, order: list[str] | None = None) -> dict:
+def freeze(suite: str | Path, name: str, *, held_out: bool | None = None, order: list[str] | None = None) -> dict:
     """Rewrite a set manifest from its case directories; ``order`` (case keys) keeps a curated order."""
-    path = EVALS / suite / "sets" / f"{name}.json"
+    path = eval_root(suite) / "sets" / f"{name}.json"
     if held_out is None:
         held_out = json.loads(path.read_text())["held_out"] if path.exists() else False
     cases = {}
@@ -129,10 +157,11 @@ def freeze(suite: str, name: str, *, held_out: bool | None = None, order: list[s
     return frozen
 
 
-def write_case(suite: str, name: str, case_id: str, language: str, input: Any, oracle: Any, case: dict,
+def write_case(suite: str | Path, name: str, case_id: str, language: str, input: Any, oracle: Any, case: dict,
                root: Path = EVALS) -> Path:
-    """Write one case directory: indented JSON, keys in the given order; ``root`` defaults to this evals tree."""
-    directory = root / suite / language / name / case_id
+    """Write one case directory: indented JSON, keys in the given order; ``root`` defaults to this evals tree.
+    ``suite`` may instead be an eval root path (a v2 agent's evals/ directory), which ``root`` then does not prefix."""
+    directory = (suite if isinstance(suite, Path) else root / suite) / language / name / case_id
     directory.mkdir(parents=True, exist_ok=True)
     for part, value in (("input", input), ("oracle", oracle), ("case", case)):
         (directory / f"{part}.json").write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n")
@@ -146,6 +175,8 @@ def main() -> None:
     parser.add_argument("set")
     parser.add_argument("--freeze", action="store_true", help="rewrite the manifest from the set's case directories")
     args = parser.parse_args()
+    if args.suite in AGENTS:
+        args.suite = agent_root(args.suite)
     if args.freeze:
         frozen = freeze(args.suite, args.set)
         print(f"{args.suite}/{args.set}: {len(frozen['cases'])} cases frozen")

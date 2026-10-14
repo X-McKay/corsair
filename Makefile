@@ -35,7 +35,9 @@ test-v2:
 	uv run --locked python -m pytest $(PYTEST_ROOT) -n $(TEST_WORKERS) tests/v2
 
 # One agent's isolated eval suite on the host (SPEC-0044); results under .runs/evals/<agent>/.
-# AGENT=identification|planning|control_authoring|exploit_authoring|authoring|environment|assessment|chain; optional SET,
+# v2: AGENT=grounding|builder|investigator|control_prober|exploit_prober|reviewer (cases, sets and release policy in
+# src/corsair/v2/agents/<agent>/evals/; summary.json, comparison.md and policy.json per run).
+# v1: AGENT=identification|planning|control_authoring|exploit_authoring|authoring|environment|assessment|chain; optional SET,
 # EVAL_LANGUAGE (one language of a per-case set: python|java|javascript|ruby|perl|common), PROVIDER_CONFIG, REPEAT, NOTE.
 eval:
 	uv run --locked python -m evals.run "$(AGENT)" $(if $(SET),--set "$(SET)") $(if $(EVAL_LANGUAGE),--language "$(EVAL_LANGUAGE)") $(if $(PROVIDER_CONFIG),--provider-config "$(PROVIDER_CONFIG)") $(if $(REPEAT),--repeat "$(REPEAT)") $(if $(NOTE),--note "$(NOTE)")

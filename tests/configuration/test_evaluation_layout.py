@@ -4,16 +4,24 @@ from pathlib import Path
 
 import pytest
 
-from evals.cases import EVALS, LANGUAGES, case_directories, load_set, manifest, set_names
+from evals.cases import AGENTS, LANGUAGES, case_directories, eval_root, load_set, manifest, set_names
 from evals.inventory import SUITES
 
 ROOT = Path(__file__).resolve().parents[2]
-PER_CASE_SUITES = sorted({*SUITES.values(), "e2e"})
+# v1 suites under evals/ and every v2 agent's own evals/ directory (a Path)
+PER_CASE_SUITES = sorted({*SUITES.values(), "e2e"}, key=str)
 SETS = [(suite, name) for suite in PER_CASE_SUITES for name in set_names(suite)]
 
 
 def test_every_agent_suite_has_per_case_sets():
-    assert all(set_names(suite) for suite in SUITES.values())
+    assert all(set_names(suite) for agent, suite in SUITES.items() if agent not in AGENTS)
+
+
+@pytest.mark.parametrize("agent", AGENTS)
+def test_v2_cases_name_their_dimensions(agent):
+    for name in set_names(SUITES[agent]):
+        for case in load_set(SUITES[agent], name):
+            assert case.case.get("dimensions"), (agent, case.key)
 
 
 @pytest.mark.parametrize(("suite", "name"), SETS)
@@ -33,7 +41,7 @@ def test_language_directories_hold_only_sets():
     for suite in PER_CASE_SUITES:
         names = set(set_names(suite))
         for language in LANGUAGES:
-            directory = EVALS / suite / language
+            directory = eval_root(suite) / language
             if directory.is_dir():
                 assert {path.name for path in directory.iterdir()} <= names, directory
 
