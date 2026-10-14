@@ -6,6 +6,13 @@ the finding and the terminal reason, and its id is stored on the Verdict so a re
 refine its terminal reason from the facts (for example R3 names ``probe_not_run`` when the control never
 started) but never its label.
 
+The exploit probe is a proof-of-vulnerability (PoV) test (SPEC-0082, D12): it asserts that the reported condition
+occurs, so it passes on the vulnerable revision and fails on the fixed one. ``outcome.classify`` is unchanged
+(``passed`` means the asserted property held); only this table reads the exploit that way round. A vulnerable PoV
+pass is LIKELY_EXPLOITABLE (R4) unless the PoV also passed on the fixed revision, which is INCONCLUSIVE
+``not_differential`` (R6): a condition that "occurs" on the fix as well was not shown to be the reported one. Only a
+decisive fixed-revision pass changes the label; any other fixed-revision result only affects the fix result.
+
 Every INCONCLUSIVE from the evidence has its own reason. A probe that did not give a decisive outcome maps to
 ``probe_not_run`` (not run, or no run recorded), ``probe_errored`` or ``probe_anomalous``, in that order of
 precedence; ``no_valid_observation`` is left for the rest. The fix result uses the same mapping for its reason.
@@ -133,15 +140,22 @@ def _r3(f: Facts) -> TerminalReason | None:
     return _probe_reason(outcome) or R.NO_VALID_OBSERVATION
 
 
+def _differential(f: Facts) -> bool:
+    """False only when the PoV passed on the fixed revision too; any other fixed result leaves the label alone."""
+    return f.outcome("fixed", "exploit") is not Outcome.PASSED
+
+
 def _r4(f: Facts) -> TerminalReason | None:
-    return R.OK if f.outcome("vulnerable", "exploit") is Outcome.ASSERTION_FAILED else None
+    return R.OK if f.outcome("vulnerable", "exploit") is Outcome.PASSED and _differential(f) else None
 
 
 def _r5(f: Facts) -> TerminalReason | None:
-    return R.OK if f.outcome("vulnerable", "exploit") is Outcome.PASSED else None
+    return R.OK if f.outcome("vulnerable", "exploit") is Outcome.ASSERTION_FAILED else None
 
 
 def _r6(f: Facts) -> TerminalReason | None:
+    if f.outcome("vulnerable", "exploit") is Outcome.PASSED:
+        return R.NOT_DIFFERENTIAL  # R4 declined it: the PoV passed on the fixed revision as well
     return _probe_reason(f.outcome("vulnerable", "exploit")) or R.NO_VALID_OBSERVATION
 
 
@@ -155,17 +169,22 @@ RULES: tuple[Rule, ...] = (
          Label.INCONCLUSIVE, "inconclusive", _r2),
     Rule("R3", "Vulnerable control not passed: control_failed when its assertion failed, else probe_not_run, "
          "probe_errored or probe_anomalous", Label.INCONCLUSIVE, "inconclusive", _r3),
-    Rule("R4", "Vulnerable exploit assertion_failed", Label.LIKELY_EXPLOITABLE, "reproduced", _r4),
-    Rule("R5", "Vulnerable exploit passed", Label.LIKELY_NOT_EXPLOITABLE, "not_reproduced", _r5),
-    Rule("R6", "Anything else: probe_not_run, probe_errored or probe_anomalous from the vulnerable exploit, else "
-         "no_valid_observation", Label.INCONCLUSIVE, "inconclusive", _r6),
+    Rule("R4", "Vulnerable PoV (exploit) passed: the reported condition was demonstrated, and the PoV did not also "
+         "pass on the fixed revision", Label.LIKELY_EXPLOITABLE, "reproduced", _r4),
+    Rule("R5", "Vulnerable PoV (exploit) assertion_failed: the condition was not demonstrated; calibration, when "
+         "recorded, is listed and never counts as proof of absence", Label.LIKELY_NOT_EXPLOITABLE, "not_reproduced",
+         _r5),
+    Rule("R6", "Anything else: not_differential when the PoV passed on both revisions, else probe_not_run, "
+         "probe_errored or probe_anomalous from the vulnerable exploit, else no_valid_observation",
+         Label.INCONCLUSIVE, "inconclusive", _r6),
 )
 """Evaluation order is the tuple order; ids name rules, not ranks (R7 is checked after R1)."""
 
-FIX_RULE = ("verified: R4 on the vulnerable revision, control and exploit passed on the fixed revision, a positive "
-            "review of the fixed revision, and one frozen patch throughout; not_applicable without a fixed revision; "
-            "otherwise not_verified, with the first matching reason: the verdict's own reason when it is not R4 "
-            "(no_valid_observation for R5), the fixed-revision stop, infra_error for a fixed infra run, test_invalid "
+FIX_RULE = ("verified: R4 on the vulnerable revision; on the fixed revision the control passed and the PoV "
+            "(exploit) assertion_failed; a positive review of the fixed revision; and one frozen patch throughout. "
+            "not_applicable without a fixed revision; otherwise not_verified, with the first matching reason: the "
+            "verdict's own reason when it is not R4 (no_valid_observation for R5, not_differential when the PoV "
+            "passed on both revisions), the fixed-revision stop, infra_error for a fixed infra run, test_invalid "
             "for a missing or negative fixed review, probe_not_run / probe_errored / probe_anomalous over the fixed "
             "runs, control_failed for a fixed control assertion failure, else no_valid_observation")
 
@@ -184,13 +203,13 @@ def _fix(f: Facts, rule: Rule, reason: TerminalReason
     validity = f.bound_validity("fixed")
     if f.patch_sha256 is None or validity is None or not (validity.control.valid and validity.exploit.valid):
         return "not_verified", R.TEST_INVALID
-    if control is Outcome.PASSED and exploit is Outcome.PASSED:
-        return "verified", R.OK
+    if control is Outcome.PASSED and exploit is Outcome.ASSERTION_FAILED:
+        return "verified", R.OK  # the PoV no longer demonstrates the condition, and ordinary behaviour holds
     if probe := _probe_reason(control, exploit):
         return "not_verified", probe
     if control is Outcome.ASSERTION_FAILED:
         return "not_verified", R.CONTROL_FAILED
-    return "not_verified", R.NO_VALID_OBSERVATION  # the exploit still fails on the fixed revision
+    return "not_verified", R.NO_VALID_OBSERVATION
 
 
 def _origins(f: Facts) -> dict[str, Origin]:

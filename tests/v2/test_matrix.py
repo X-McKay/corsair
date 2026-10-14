@@ -114,6 +114,6 @@ def test_pytest_canary_pair_on_its_image():
     assert {kind: c["outcome"] for kind, c in evidence["canaries"].items()} == {"pass": "passed",
                                                                                  "fail": "assertion_failed"}
     assert evidence["admitted"] and all(c["cleanup_confirmed"] for c in evidence["canaries"].values())
-    assert all(c["facts"]["check_marker"] == {"pass": "safe", "fail": "unsafe"}[kind]
+    assert all(c["facts"]["check_marker"] == {"pass": "holds", "fail": "violated"}[kind]
                for kind, c in evidence["canaries"].items())
     assert all(c["syntax_check"]["holds"] for c in evidence["canaries"].values())

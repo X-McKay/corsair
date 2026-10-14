@@ -15,34 +15,34 @@ O = Outcome  # noqa: E741
 TABLE = [
     # infra first
     ((None, None, True, True, False, False, None), O.INFRA),  # timeout
-    ((None, None, False, True, True, False, "safe"), O.INFRA),  # container failed, no exit code
-    ((0, E.PASS, True, True, True, False, "safe"), O.INFRA),  # a timeout is never trusted, whatever else was seen
+    ((None, None, False, True, True, False, "holds"), O.INFRA),  # container failed, no exit code
+    ((0, E.PASS, True, True, True, False, "holds"), O.INFRA),  # a timeout is never trusted, whatever else was seen
     ((2, E.HARNESS_ERROR, False, True, False, False, None), O.INFRA),
     ((2, E.HARNESS_ERROR, False, False, False, False, None), O.INFRA),  # infra outranks a missing start
-    ((137, E.HARNESS_ERROR, False, True, True, True, "unsafe"), O.INFRA),  # a signal the row maps to harness_error
+    ((137, E.HARNESS_ERROR, False, True, True, True, "violated"), O.INFRA),  # a signal the row maps to harness_error
     # not_run
-    ((5, E.NO_TESTS, False, True, True, False, "safe"), O.NOT_RUN),
+    ((5, E.NO_TESTS, False, True, True, False, "holds"), O.NOT_RUN),
     ((5, E.NO_TESTS, False, False, False, False, None), O.NOT_RUN),
     ((1, E.TEST_FAILED, False, False, False, False, None), O.NOT_RUN),  # compile or collection error
-    ((0, E.PASS, False, False, True, False, "safe"), O.NOT_RUN),
+    ((0, E.PASS, False, False, True, False, "holds"), O.NOT_RUN),
     ((9, E.UNKNOWN, False, False, False, False, None), O.NOT_RUN),
     # the three exact rows
-    ((0, E.PASS, False, True, True, False, "safe"), O.PASSED),
-    ((1, E.TEST_FAILED, False, True, False, True, "unsafe"), O.ASSERTION_FAILED),  # either role's assertion
+    ((0, E.PASS, False, True, True, False, "holds"), O.PASSED),
+    ((1, E.TEST_FAILED, False, True, False, True, "violated"), O.ASSERTION_FAILED),  # either role's assertion
     ((1, E.TEST_FAILED, False, True, False, False, None), O.ERRORED),  # raised before the check marker
     # anomalous
-    ((0, E.PASS, False, True, False, False, "safe"), O.ANOMALOUS),  # pass with no end: exited early
-    ((0, E.PASS, False, True, True, True, "safe"), O.ANOMALOUS),  # token on a pass: printed outside the assertion
-    ((0, E.PASS, False, True, True, False, "unsafe"), O.ANOMALOUS),  # passed although its check says unsafe
+    ((0, E.PASS, False, True, False, False, "holds"), O.ANOMALOUS),  # pass with no end: exited early
+    ((0, E.PASS, False, True, True, True, "holds"), O.ANOMALOUS),  # token on a pass: printed outside the assertion
+    ((0, E.PASS, False, True, True, False, "violated"), O.ANOMALOUS),  # passed although its check says violated
     ((0, E.PASS, False, True, True, False, None), O.ANOMALOUS),  # passed without writing a check
     ((1, E.TEST_FAILED, False, True, False, True, None), O.ANOMALOUS),  # token without a check: code printed it
-    ((1, E.TEST_FAILED, False, True, False, True, "safe"), O.ANOMALOUS),  # failed although its check says safe
-    ((1, E.TEST_FAILED, False, True, False, False, "unsafe"), O.ANOMALOUS),  # unsafe check but no token
-    ((1, E.TEST_FAILED, False, True, False, False, "safe"), O.ANOMALOUS),  # failed after a safe check, no token
-    ((1, E.TEST_FAILED, False, True, True, True, "unsafe"), O.ANOMALOUS),  # end after a failure: soft assertion
+    ((1, E.TEST_FAILED, False, True, False, True, "holds"), O.ANOMALOUS),  # failed although its check says holds
+    ((1, E.TEST_FAILED, False, True, False, False, "violated"), O.ANOMALOUS),  # violated check but no token
+    ((1, E.TEST_FAILED, False, True, False, False, "holds"), O.ANOMALOUS),  # failed after a holds check, no token
+    ((1, E.TEST_FAILED, False, True, True, True, "violated"), O.ANOMALOUS),  # end after a failure: soft assertion
     ((1, E.TEST_FAILED, False, True, True, False, None), O.ANOMALOUS),
-    ((9, E.UNKNOWN, False, True, True, False, "safe"), O.ANOMALOUS),  # unknown exit class is never decisive
-    ((9, None, False, True, False, True, "unsafe"), O.ANOMALOUS),  # no class recorded reads as unknown
+    ((9, E.UNKNOWN, False, True, True, False, "holds"), O.ANOMALOUS),  # unknown exit class is never decisive
+    ((9, None, False, True, False, True, "violated"), O.ANOMALOUS),  # no class recorded reads as unknown
 ]
 
 
@@ -57,7 +57,7 @@ def test_table_rows(row, expected):
 
 
 ALL = list(itertools.product((None, 0), (None, *ExitClass), (False, True), (False, True), (False, True),
-                             (False, True), (None, "safe", "unsafe")))
+                             (False, True), (None, "holds", "violated")))
 
 
 @pytest.mark.parametrize("row", ALL)
@@ -71,9 +71,9 @@ def test_every_combination_obeys_the_table(row):
         assert (outcome is O.NOT_RUN) == (effective is E.NO_TESTS or not start)
     ran = not infra and effective is not E.NO_TESTS and start
     # Only the exact rows give their outcome; everything else that ran is anomalous.
-    assert (outcome is O.PASSED) == (ran and effective is E.PASS and end and not token and check == "safe")
+    assert (outcome is O.PASSED) == (ran and effective is E.PASS and end and not token and check == "holds")
     assert (outcome is O.ASSERTION_FAILED) == (ran and effective is E.TEST_FAILED and not end and token
-                                               and check == "unsafe")
+                                               and check == "violated")
     assert (outcome is O.ERRORED) == (ran and effective is E.TEST_FAILED and not end and not token and check is None)
 
 
@@ -85,7 +85,8 @@ def test_exit_class_lookup():
 
 
 @pytest.mark.parametrize(("content", "expected"), [
-    (b"safe", "safe"), (b"unsafe\n", "unsafe"), ("  safe \r\n", "safe"), (None, None), (b"", None),
-    (b"SAFE", None), (b"safe unsafe", None), (b"true", None), (b"\xff\xfe", None), (b"un safe", None)])
-def test_read_check_accepts_only_safe_or_unsafe(content, expected):
+    (b"holds", "holds"), (b"violated\n", "violated"), ("  holds \r\n", "holds"), (None, None), (b"", None),
+    (b"HOLDS", None), (b"holds violated", None), (b"safe", None), (b"unsafe", None), (b"true", None),
+    (b"\xff\xfe", None), (b"vio lated", None)])
+def test_read_check_accepts_only_holds_or_violated(content, expected):
     assert read_check(content) == expected

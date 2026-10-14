@@ -156,8 +156,8 @@ async def diagnose(run_dir: str, step: str, environment: Environment, runtime: R
 
 @activity.defn(name="corsair.v2.review")
 async def review(run_dir: str, step: str, case: Case, plan: ProbePlan, patch: FrozenPatch,
-                 revision: str) -> StepResult[Validity]:
-    return await _ops(run_dir).review(step, case, plan, patch, revision)
+                 revision: str, runtime: Runtime | None = None) -> StepResult[Validity]:
+    return await _ops(run_dir).review(step, case, plan, patch, revision, runtime)
 
 
 @activity.defn(name="corsair.v2.execute")
@@ -227,8 +227,8 @@ class ActivityOps:
     def diagnose(self, step, environment, runtime, patch, role):
         return self._container(diagnose, step, environment, runtime, patch, role)
 
-    def review(self, step, case, plan, patch, revision):
-        return self._agent(review, step, case, plan, patch, revision)
+    def review(self, step, case, plan, patch, revision, runtime=None):
+        return self._agent(review, step, case, plan, patch, revision, runtime)
 
     def execute(self, step, environment, runtime, patch, role, revision):
         return self._container(execute, step, environment, runtime, patch, role, revision)

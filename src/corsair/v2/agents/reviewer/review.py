@@ -13,7 +13,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_ai import ModelRetry, RunContext
 
-from ...contracts import Case, Citation, FrozenPatch, ProbeDraft, ProbePlan, ProbeValidity
+from ...contracts import Case, Citation, FrozenPatch, ProbeDraft, ProbePlan, ProbeValidity, Runtime
 from ..probing.source import numbered, source_lines
 
 CHECKS = ("calls_real_target", "exercises_condition", "assertion_relevant", "doubles_only_dependencies")
@@ -53,10 +53,13 @@ def _probe_block(draft: ProbeDraft) -> str:
             f"{numbered(draft.source)}")
 
 
-def render_prompt(case: Case, plan: ProbePlan, patch: FrozenPatch) -> str:
+def render_prompt(case: Case, plan: ProbePlan, patch: FrozenPatch, runtime: Runtime | None = None) -> str:
     finding = case.finding
-    lines = [
-        "Review the two frozen probe tests below.",
+    lines = ["Review the two frozen probe tests below."]
+    if runtime is not None:
+        lines.append(f"Test framework: {runtime.framework}. Load the skill `{runtime.skill}` if it is offered; "
+                     "judge marker placement by its pattern.")
+    lines += [
         "Reported finding (untrusted):",
         f"  title: {finding.title}",
         f"  description: {finding.description or '-'}",

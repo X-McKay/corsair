@@ -16,13 +16,17 @@ assertion lines in the test file, and the target's definition in the source.
    with a similar name, or replaces the target with a mock, stub, fake, patch or monkeypatch.
 2. **exercises_condition** - the input that actually reaches the target matches the role: ordinary benign input
    for the control; the reported adversarial input for the exploit, with the preconditions the plan needs.
-   False when the exploit passes benign input, when a precondition is never set up, or when the call happens
+   False when the exploit sends benign input, when a precondition is never set up, or when the call happens
    on a path that skips the reported code.
 3. **assertion_relevant** - the pass condition establishes the role's property and can fail.
    - Control: asserts the ordinary behaviour, and does NOT assert the security property (a rejection, a guard,
      sanitising); a control that asserts the security property is false here.
-   - Exploit: asserts the SAFE property, not that the attack works, using the run token as that assertion's
-     failure message.
+   - Exploit: a proof-of-vulnerability (PoV) test. It asserts that the reported condition OCCURS (for example the
+     injected command ran, the path escaped the base, the query structure changed), using the run token as that
+     assertion's failure message. The assertion must be able to fail on code without the condition: it is false
+     here for a vacuous, always-true assertion, an assertion that would also hold on a correct implementation (for
+     example only that the call returned or produced some output), an assertion on something the test itself
+     caused rather than the target, or one that asserts the safe behaviour instead of the condition.
    - Both: the main assertion uses the run token as its failure message, and the `check` marker written
      immediately before it is computed from the very condition that assertion checks. False for a vacuous assertion (a constant, a value the test set itself, a tautology), an
      assertion that cannot fail whatever the target does, a broad catch that swallows failures, or an
@@ -33,11 +37,16 @@ assertion lines in the test file, and the target's definition in the source.
 
 ## Protocol defects (probe-protocol skill)
 
+Marker placement follows the pattern in the framework skill for the test's framework (the one the prompt names):
+a form that skill prescribes, such as a small marker-writing helper or a guarded `end` marker followed by the
+framework's closing call, is correct and never a defect.
+
 Name these as defects, and set the most affected check false (usually assertion_relevant):
 
 - the `start` marker is not the first statement of the test body, or the `end` marker is not the last
-  statement after every assertion; markers written in a fixture, hook, helper, guard or exception handler;
-- the `check` marker is not computed from the asserted condition: hard-coded `safe` or `unsafe`, computed from a
+  statement after every assertion; markers written in a fixture, hook, helper or exception handler, or inside a
+  guard, in a way the framework skill does not prescribe;
+- the `check` marker is not computed from the asserted condition: hard-coded `holds` or `violated`, computed from a
   different expression or an earlier value than the one asserted, written somewhere other than immediately
   before the main assertion, or missing;
 - the token is printed, logged, compared, stored or used anywhere other than as the main assertion's failure
@@ -49,7 +58,7 @@ Name these as defects, and set the most affected check false (usually assertion_
 
 - A test that copies the target's logic and tests the copy.
 - A test that mocks or patches the target itself.
-- A vacuous assertion, or an exploit assertion that cannot fail.
+- A vacuous assertion, or a PoV assertion that cannot fail on code without the condition.
 - A control that asserts the security property.
 - Token misuse, a `check` marker that does not come from the asserted condition, and `start` and `end` not
   written as the first and last statements.
