@@ -1,0 +1,12 @@
+{
+  "language": "perl",
+  "framework": "tap-harness",
+  "family": "hardcoded-credential",
+  "kind": "abstention",
+  "probes": "The identified Perl module is missing from the inventory (only its TAP test is saved): the planner must abstain.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic; the implementation file is deliberately withheld from the inventory."
+  }
+}

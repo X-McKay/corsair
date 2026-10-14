@@ -1,0 +1,53 @@
+{
+  "scope": "component",
+  "identification": {
+    "status": "ready",
+    "scope": "component",
+    "reason": null,
+    "reported_issue": "ArchiveImporter.extract unpacks theme archives uploaded by administrators. An entry named ../escaped.txt may be written outside the destination directory (zip slip). Analyze this component only.",
+    "target": {
+      "symbol": "extract",
+      "source": {
+        "path": "src/main/java/com/example/imports/ArchiveImporter.java",
+        "start_line": 16,
+        "end_line": 31,
+        "quote": "    public static int extract(InputStream archive, Path destination) throws IOException {\n        int written = 0;\n        try (ZipInputStream zip = new ZipInputStream(archive)) {\n            ZipEntry entry;\n            while ((entry = zip.getNextEntry()) != null) {\n                Path target = destination.resolve(entry.getName());\n                if (entry.isDirectory()) {\n                    Files.createDirectories(target);\n                } else {\n                    Files.createDirectories(target.getParent());\n                    Files.copy(zip, target, StandardCopyOption.REPLACE_EXISTING);\n                    written++;\n                }\n            }\n        }\n        return written;"
+      }
+    }
+  },
+  "source_files": [
+    {
+      "path": "src/main/java/com/example/imports/ArchiveImporter.java",
+      "content": "package com.example.imports;\n\nimport java.io.IOException;\nimport java.io.InputStream;\nimport java.nio.file.Files;\nimport java.nio.file.Path;\nimport java.nio.file.StandardCopyOption;\nimport java.util.zip.ZipEntry;\nimport java.util.zip.ZipInputStream;\n\npublic final class ArchiveImporter {\n    private ArchiveImporter() {\n    }\n\n    /** Unpack an uploaded theme archive into the destination directory. */\n    public static int extract(InputStream archive, Path destination) throws IOException {\n        int written = 0;\n        try (ZipInputStream zip = new ZipInputStream(archive)) {\n            ZipEntry entry;\n            while ((entry = zip.getNextEntry()) != null) {\n                Path target = destination.resolve(entry.getName());\n                if (entry.isDirectory()) {\n                    Files.createDirectories(target);\n                } else {\n                    Files.createDirectories(target.getParent());\n                    Files.copy(zip, target, StandardCopyOption.REPLACE_EXISTING);\n                    written++;\n                }\n            }\n        }\n        return written;\n    }\n}\n"
+    },
+    {
+      "path": "src/test/java/com/example/imports/ArchiveImporterTest.java",
+      "content": "package com.example.imports;\n\nimport static org.junit.jupiter.api.Assertions.assertEquals;\n\nimport java.io.ByteArrayInputStream;\nimport java.io.ByteArrayOutputStream;\nimport java.nio.file.Path;\nimport java.util.zip.ZipEntry;\nimport java.util.zip.ZipOutputStream;\nimport org.junit.jupiter.api.Test;\nimport org.junit.jupiter.api.io.TempDir;\n\nclass ArchiveImporterTest {\n    @Test\n    void countsWrittenFiles(@TempDir Path dir) throws Exception {\n        ByteArrayOutputStream bytes = new ByteArrayOutputStream();\n        try (ZipOutputStream zip = new ZipOutputStream(bytes)) {\n            zip.putNextEntry(new ZipEntry(\"a.css\"));\n            zip.write(new byte[] {1});\n        }\n        assertEquals(1, ArchiveImporter.extract(new ByteArrayInputStream(bytes.toByteArray()), dir));\n    }\n}\n"
+    }
+  ],
+  "environment": {
+    "language": "Java",
+    "runtime": "OpenJDK 17",
+    "framework": "junit5",
+    "discovery_command": [
+      "mvn",
+      "-o",
+      "-B",
+      "-q",
+      "test-compile"
+    ],
+    "approved_test_paths": [
+      "src/test/java/com/example/imports/ArchiveImporterSecurityTest.java"
+    ],
+    "baseline_test": {
+      "test_id": "com.example.imports.ArchiveImporterTest#countsWrittenFiles",
+      "path": "src/test/java/com/example/imports/ArchiveImporterTest.java"
+    },
+    "scratch_location": "The per-test JUnit @TempDir directory; fixtures must not be created elsewhere",
+    "observation_facilities": [
+      "Native Maven Surefire XML outcomes per test with failure type and location; JUnit 5 assertion failures, including assertThrows when no exception is thrown, report org.opentest4j.AssertionFailedError",
+      "JUnit 5 @TempDir per-test directories and assertThrows for a specific exception type"
+    ],
+    "witness_facilities": []
+  }
+}

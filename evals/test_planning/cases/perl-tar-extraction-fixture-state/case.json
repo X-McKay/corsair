@@ -1,0 +1,12 @@
+{
+  "language": "perl",
+  "framework": "tap-harness",
+  "family": "zip-slip",
+  "kind": "positive",
+  "probes": "Tar member extraction with core Archive::Tar planned as a fixture-state observation in a File::Temp tempdir.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic Theme module using core Archive::Tar."
+  }
+}

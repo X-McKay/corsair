@@ -1,0 +1,50 @@
+{
+  "scope": "component",
+  "identification": {
+    "status": "ready",
+    "scope": "component",
+    "reason": null,
+    "reported_issue": "findAccount looks up an account by a name from the support console. Check whether the name is interpolated into SQL structure; hostile input must remain a bound parameter. Assess query construction only.",
+    "target": {
+      "symbol": "findAccount",
+      "source": {
+        "path": "lib/accounts.js",
+        "start_line": 4,
+        "end_line": 5,
+        "quote": "function findAccount(db, name, callback) {\n  db.query(\"SELECT id, balance FROM accounts WHERE name = '\" + name + \"'\", [], callback);"
+      }
+    }
+  },
+  "source_files": [
+    {
+      "path": "lib/accounts.js",
+      "content": "'use strict';\n\n// Look up an account by the name typed into the support console.\nfunction findAccount(db, name, callback) {\n  db.query(\"SELECT id, balance FROM accounts WHERE name = '\" + name + \"'\", [], callback);\n}\n\nmodule.exports = { findAccount };\n"
+    },
+    {
+      "path": "test/accounts.test.js",
+      "content": "'use strict';\nconst { findAccount } = require('../lib/accounts');\n\ntest('returns_rows', (done) => {\n  const db = { query: (sql, params, cb) => cb(null, [{ id: 1, balance: 25 }]) };\n  findAccount(db, 'alice', (err, rows) => {\n    expect(rows).toEqual([{ id: 1, balance: 25 }]);\n    done();\n  });\n});\n"
+    }
+  ],
+  "environment": {
+    "language": "JavaScript",
+    "runtime": "Node.js 8.17",
+    "framework": "jest",
+    "discovery_command": [
+      "node_modules/.bin/jest",
+      "--listTests"
+    ],
+    "approved_test_paths": [
+      "test/accounts.security.test.js"
+    ],
+    "baseline_test": {
+      "test_id": "test/accounts.test.js::returns_rows",
+      "path": "test/accounts.test.js"
+    },
+    "scratch_location": "Per-test in-memory recording dependency only",
+    "observation_facilities": [
+      "Native Jest 24 JSON report per test with failure messages and locations; expect() matcher failures report Error",
+      "jest.fn and jest.mock module doubles that record calls and arguments"
+    ],
+    "witness_facilities": []
+  }
+}

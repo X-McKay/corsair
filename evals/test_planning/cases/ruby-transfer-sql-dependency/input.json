@@ -1,0 +1,56 @@
+{
+  "scope": "component",
+  "identification": {
+    "status": "ready",
+    "scope": "component",
+    "reason": null,
+    "reported_issue": "Orders.for_customer searches orders by the customer name from the support search box. Check whether the name is interpolated into SQL structure; hostile input must remain a bound parameter. Assess query construction only.",
+    "target": {
+      "symbol": "for_customer",
+      "source": {
+        "path": "lib/orders.rb",
+        "start_line": 5,
+        "end_line": 6,
+        "quote": "  def self.for_customer(db, customer)\n    db.execute(\"SELECT id, total FROM orders WHERE customer = '#{customer}'\")"
+      }
+    }
+  },
+  "source_files": [
+    {
+      "path": "lib/orders.rb",
+      "content": "# frozen_string_literal: true\n\nmodule Orders\n  # Orders for the customer named in the support search box.\n  def self.for_customer(db, customer)\n    db.execute(\"SELECT id, total FROM orders WHERE customer = '#{customer}'\")\n  end\nend\n"
+    },
+    {
+      "path": "test/orders_test.rb",
+      "content": "# frozen_string_literal: true\n\nrequire 'minitest/autorun'\nrequire 'orders'\n\nclass OrdersTest < Minitest::Test\n  FakeDb = Struct.new(:rows) do\n    def execute(*_args)\n      rows\n    end\n  end\n\n  def test_returns_rows\n    assert_equal [[1, 25]], Orders.for_customer(FakeDb.new([[1, 25]]), 'alice')\n  end\nend\n"
+    }
+  ],
+  "environment": {
+    "language": "Ruby",
+    "runtime": "Ruby 3.1",
+    "framework": "minitest",
+    "discovery_command": [
+      "bundle",
+      "exec",
+      "rake",
+      "test",
+      "TESTOPTS=--verbose"
+    ],
+    "approved_test_paths": [
+      "test/orders_security_test.rb"
+    ],
+    "baseline_test": {
+      "test_id": "test/orders_test.rb::OrdersTest#test_returns_rows",
+      "path": "test/orders_test.rb"
+    },
+    "scratch_location": "Per-test in-memory recording dependency only",
+    "observation_facilities": [
+      "Native Minitest results per test with failure class and location",
+      "Minitest assert_raises for a specific exception class and Dir.mktmpdir per-test directories"
+    ],
+    "assertion_facts": [
+      "Minitest assertion failures, including assert_raises when the expected exception is not raised, report Minitest::Assertion. Match the planned native failure type."
+    ],
+    "witness_facilities": []
+  }
+}

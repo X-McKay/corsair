@@ -1,0 +1,12 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "sql-injection",
+  "kind": "transfer",
+  "probes": "Transfer of the Python recording-database unit shape (sql_dependency) into a Minitest test with a duck-typed db double.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic sqlite3-style execute helper."
+  }
+}

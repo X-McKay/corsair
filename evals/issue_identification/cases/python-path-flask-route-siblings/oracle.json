@@ -1,0 +1,10 @@
+{
+  "status": "ready",
+  "symbol": "user_picture2",
+  "path": "app.py",
+  "required_lines": [
+    13,
+    16
+  ],
+  "max_span": 8
+}

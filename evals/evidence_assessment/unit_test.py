@@ -21,13 +21,19 @@ from corsair.agents.evidence_assessment.contracts import ValidityInput
 from corsair.agents.evidence_assessment.dependencies import AssessmentDependencies
 from corsair.inference.config import load_agent_config
 from corsair.inference.models import configured_model
+from evals.cases import load_set, set_digest
 from evals.evidence_assessment.evaluate import EvaluationBudget, describe_model, record_count
 
 CASES = Path(__file__).with_name('unit_test_cases.json')
 FLAGS = ('source_linked', 'condition_exercised', 'assertions_relevant', 'dependency_scope_valid')
 
 
-def dataset():
+def dataset(cases='unit'):
+    """``unit`` is the original seven-case JSON set; ``breadth`` is the per-case set under ``cases/``."""
+    if cases == 'breadth':
+        return Dataset(name="unit-test-validity-breadth", cases=[Case(name=c.name,
+            inputs=ValidityInput.model_validate_json(json.dumps(c.input)), metadata=c.oracle)
+            for c in load_set('evidence_assessment', 'breadth')])
     return Dataset(name="unit-test-validity", cases=[Case(name=c['name'], inputs=ValidityInput.model_validate_json(json.dumps(c['inputs'])),
         metadata=c['expected']) for c in json.loads(CASES.read_text())])
 
@@ -63,9 +69,9 @@ def scripted_model(inputs, expected):
     return FunctionModel(respond)
 
 
-async def evaluate(destination, repeat=1, model=None):
+async def evaluate(destination, repeat=1, model=None, cases='unit'):
     destination.mkdir(parents=True, exist_ok=False)
-    corpus = dataset()
+    corpus = dataset(cases)
     corpus.evaluators.append(ValidityScore())
     offline = model is None
     budget = EvaluationBudget(repeat=repeat)
@@ -74,7 +80,8 @@ async def evaluate(destination, repeat=1, model=None):
         'model': describe_model(model or next(iter(selected.values()))),
         'prompt_version': PROMPT_VERSION, 'config_version': CONFIG_VERSION,
         'skill_sha256': SKILL_SHA256, 'toolset_sha256': TOOLSET_SHA256,
-        'dataset_sha256': sha256(CASES.read_bytes()).hexdigest(), 'budget': budget.model_dump(),
+        'dataset_sha256': (set_digest('evidence_assessment', 'breadth') if cases == 'breadth'
+                           else sha256(CASES.read_bytes()).hexdigest()), 'budget': budget.model_dump(),
         'task_retries': 0, 'max_concurrency': 1}
     (destination / 'configuration.json').write_text(json.dumps(metadata, indent=2))
 
@@ -111,13 +118,14 @@ def main():
     parser.add_argument('--evidence', type=Path, required=True)
     parser.add_argument('--repeat', type=int, default=1)
     parser.add_argument('--provider-config', type=Path)
+    parser.add_argument('--cases', choices=('unit', 'breadth'), default='unit')
     args = parser.parse_args()
     async def run():
         if args.provider_config is None:
-            return await evaluate(args.evidence, args.repeat)
+            return await evaluate(args.evidence, args.repeat, cases=args.cases)
         config = load_agent_config(args.provider_config, 'assessment')
         async with configured_model(config) as model:
-            return await evaluate(args.evidence, args.repeat, model)
+            return await evaluate(args.evidence, args.repeat, model, cases=args.cases)
     raise SystemExit(0 if asyncio.run(run()) else 1)
 
 if __name__ == '__main__':

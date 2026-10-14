@@ -1,0 +1,54 @@
+{
+  "scope": "component",
+  "identification": {
+    "status": "ready",
+    "scope": "component",
+    "reason": null,
+    "reported_issue": "Notify::send_notice receives the recipient address from the contact form. An address such as ann@example.test; touch pwned may be executed by a shell. Assess command construction only.",
+    "target": {
+      "symbol": "send_notice",
+      "source": {
+        "path": "lib/Notify.pm",
+        "start_line": 6,
+        "end_line": 8,
+        "quote": "sub send_notice {\n    my ($run, $recipient, $subject) = @_;\n    return $run->(\"mail -s '$subject' $recipient < notice.txt\");"
+      }
+    }
+  },
+  "source_files": [
+    {
+      "path": "lib/Notify.pm",
+      "content": "package Notify;\nuse strict;\nuse warnings;\n\n# Send a plain-text notice with the system mailer; $run executes a command.\nsub send_notice {\n    my ($run, $recipient, $subject) = @_;\n    return $run->(\"mail -s '$subject' $recipient < notice.txt\");\n}\n\n1;\n"
+    },
+    {
+      "path": "t/notify.t",
+      "content": "use strict;\nuse warnings;\nuse Test::More;\nuse Notify;\n\nsubtest returns_runner_status => sub {\n    is(Notify::send_notice(sub { 0 }, 'ann@example.test', 'Hi'), 0, 'status');\n};\n\ndone_testing;\n"
+    }
+  ],
+  "environment": {
+    "language": "Perl",
+    "runtime": "Perl 5.26",
+    "framework": "tap-harness",
+    "discovery_command": [
+      "prove",
+      "--norc",
+      "-l",
+      "-r",
+      "--dry",
+      "t"
+    ],
+    "approved_test_paths": [
+      "t/notify-security.t"
+    ],
+    "baseline_test": {
+      "test_id": "t/notify.t#returns_runner_status",
+      "path": "t/notify.t"
+    },
+    "scratch_location": "Per-test in-memory recording dependency only",
+    "observation_facilities": [
+      "Native TAP results per top-level Test::More subtest from prove, with got/expected diagnostics or the die message",
+      "File::Temp tempdir per subtest and eval blocks capturing a die message in $@"
+    ],
+    "witness_facilities": []
+  }
+}

@@ -42,6 +42,7 @@ from corsair.inference.config import load_agent_config
 from corsair.inference.models import configured_model
 from corsair.ports.execution import ExecutionReceipt, ExecutionError
 from corsair.ports.sandbox import SandboxHandle
+from evals.cases import load_set, set_digest
 from evals.issue_analysis.evaluate import describe_model, record_count
 from evals.issue_analysis.live import (
     NoUnknownToolAttempts,
@@ -216,9 +217,14 @@ class EvaluationBudget(BaseModel):
     output_retries: int = Field(default=1, ge=0, le=1, strict=True)
 
 
-async def evaluate(evidence, budget, model=None, provider=None):
-    evidence.mkdir(parents=True, exist_ok=False)
-    logfire.configure(send_to_logfire=False, console=False)
+def load_cases(name="development"):
+    """Frozen cases of one set and that set's identity; the development file keeps its own manifest digest."""
+    if name == "breadth":
+        cases = [
+            FrozenCase.model_validate({"name": c.name, "inputs": c.input, **c.oracle}).model_dump(mode="json")
+            for c in load_set("environment", "breadth")
+        ]
+        return cases, set_digest("environment", "breadth")
     raw = (ROOT / "cases.json").read_bytes()
     if (
         sha256(raw).hexdigest()
@@ -228,6 +234,13 @@ async def evaluate(evidence, budget, model=None, provider=None):
     cases = [
         FrozenCase.model_validate(c).model_dump(mode="json") for c in json.loads(raw)
     ]
+    return cases, sha256(raw).hexdigest()
+
+
+async def evaluate(evidence, budget, model=None, provider=None, dataset="development"):
+    evidence.mkdir(parents=True, exist_ok=False)
+    logfire.configure(send_to_logfire=False, console=False)
+    cases, dataset_sha256 = load_cases(dataset)
     scripted_mode = model is None
     metadata = {
         "mode": "scripted_fixture" if scripted_mode else "direct_local_provider",
@@ -236,8 +249,8 @@ async def evaluate(evidence, budget, model=None, provider=None):
         "setup_max_corrections": SetupBudget().max_corrections,
         "skill_sha256": SKILL_SHA256,
         "toolset_sha256": TOOLSET_SHA256,
-        "dataset": "development",
-        "dataset_sha256": sha256((ROOT / "cases.json").read_bytes()).hexdigest(),
+        "dataset": dataset,
+        "dataset_sha256": dataset_sha256,
         "model": describe_model(model or scripted(cases[0])),
         "execution": "synthetic_observations_not_executed",
         "budget": budget.model_dump(),
@@ -246,7 +259,7 @@ async def evaluate(evidence, budget, model=None, provider=None):
     }
     (evidence / "configuration.json").write_text(json.dumps(metadata, indent=2))
     corpus = Dataset(
-        name="environment-development-v1",
+        name=f"environment-{dataset}-v1",
         cases=[
             Case(
                 name=c["name"],
@@ -410,12 +423,13 @@ def main():
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--provider-config", type=Path)
     parser.add_argument("--repeat", type=int, default=2)
+    parser.add_argument("--cases", choices=("development", "breadth"), default="development")
     args = parser.parse_args()
 
     async def run():
         budget = EvaluationBudget(repeat=args.repeat)
         if args.provider_config is None:
-            return await evaluate(args.evidence, budget)
+            return await evaluate(args.evidence, budget, dataset=args.cases)
         config = load_agent_config(args.provider_config, "environment")
         async with configured_model(config) as model:
             return await evaluate(
@@ -423,6 +437,7 @@ def main():
                 budget,
                 model,
                 config.model_dump(mode="json", exclude={"api_key_env"}),
+                dataset=args.cases,
             )
 
     report = asyncio.run(run())

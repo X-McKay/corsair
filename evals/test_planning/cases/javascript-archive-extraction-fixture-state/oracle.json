@@ -1,0 +1,98 @@
+{
+  "status": "ready",
+  "symbol": "writeEntries",
+  "target_path": "lib/unpack.js",
+  "required_lines": [
+    6,
+    13
+  ],
+  "adversarial_markers": [
+    "../"
+  ],
+  "witness_markers": [
+    "existssync",
+    "escaped.txt"
+  ],
+  "observation_kind": "fixture_state",
+  "required_reads": [
+    "lib/unpack.js",
+    "test/unpack.test.js"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_id": "test/unpack.security.test.js::unpack::writes_member_inside_destination",
+      "test_path": "test/unpack.security.test.js",
+      "fixture_setup": [
+        "Create a per-test directory dir with fs.mkdtempSync(path.join(os.tmpdir(), 'case-'))",
+        "Create dir/theme/ as the destination"
+      ],
+      "implementation_call": "writeEntries(path.join(dir, 'theme'), [{ name: 'site.css', data: 'benign' }])",
+      "input": "one entry named 'site.css'",
+      "required_behavior": "Returns 1 and dir/theme/site.css contains 'benign'",
+      "observable_witness": "fs.readFileSync of dir/theme/site.css in the fixture after the real call",
+      "observation": {
+        "kind": "fixture_state",
+        "property": "Returns 1 and dir/theme/site.css contains 'benign'",
+        "seam": "require('../lib/unpack') and call the real writeEntries"
+      },
+      "source_references": [
+        {
+          "path": "lib/unpack.js",
+          "start_line": 6,
+          "end_line": 13
+        }
+      ]
+    },
+    "security": {
+      "test_id": "test/unpack.security.test.js::unpack::keeps_members_inside_destination",
+      "test_path": "test/unpack.security.test.js",
+      "fixture_setup": [
+        "Create a per-test directory dir with fs.mkdtempSync(path.join(os.tmpdir(), 'case-'))",
+        "Create dir/theme/ as the destination"
+      ],
+      "implementation_call": "writeEntries(path.join(dir, 'theme'), [{ name: '../escaped.txt', data: 'hostile' }])",
+      "input": "one entry named '../escaped.txt'",
+      "required_behavior": "The call throws an Error rejecting the member, and after the call dir/escaped.txt does not exist",
+      "observable_witness": "expect(() => writeEntries(...)).toThrow() then expect(fs.existsSync(path.join(dir, 'escaped.txt'))).toBe(false) in the fixture",
+      "observation": {
+        "kind": "fixture_state",
+        "property": "The call throws an Error rejecting the member, and after the call dir/escaped.txt does not exist",
+        "seam": "require('../lib/unpack') and call the real writeEntries"
+      },
+      "source_references": [
+        {
+          "path": "lib/unpack.js",
+          "start_line": 6,
+          "end_line": 13
+        }
+      ]
+    },
+    "security_expectation": {
+      "failure_type": "Error",
+      "safe_behavior": "Error"
+    },
+    "discovery_command": [
+      "node_modules/.bin/jest",
+      "--listTests"
+    ],
+    "evidence_requirements": [
+      "Native discovery lists the planned test file and both planned test ids run",
+      "Both the control and the exploit probe execute with native Jest outcomes and failure messages",
+      "Review the real source call, adversarial input and assertions before execution"
+    ],
+    "citations": [
+      {
+        "path": "lib/unpack.js",
+        "start_line": 6,
+        "end_line": 13
+      }
+    ],
+    "limitations": [
+      "Only file-system state inside the per-test directory is observed",
+      "Archive parsing is outside this component; entries are supplied already parsed"
+    ]
+  }
+}

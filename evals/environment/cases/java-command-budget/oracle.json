@@ -1,0 +1,63 @@
+{
+  "required_reads": [
+    ".github/workflows/maven.yml"
+  ],
+  "commands": [
+    [
+      "mvn",
+      "-B",
+      "dependency:go-offline"
+    ],
+    [
+      "mvn",
+      "-B",
+      "-o",
+      "compile"
+    ],
+    [
+      "mvn",
+      "-B",
+      "-o",
+      "test",
+      "-DlistTests=true"
+    ],
+    [
+      "mvn",
+      "-B",
+      "-o",
+      "test",
+      "-Dtest=AuditTrailTest#appendsEntries"
+    ]
+  ],
+  "observations": [
+    {
+      "exit": 0,
+      "stdout": "[INFO] BUILD SUCCESS\n"
+    },
+    {
+      "exit": 0,
+      "stdout": "[INFO] BUILD SUCCESS\n"
+    },
+    {
+      "exit": 0,
+      "stdout": "org.acme.audit.AuditTrailTest#appendsEntries\n"
+    },
+    {
+      "exit": 0,
+      "stdout": "[INFO] -------------------------------------------------------\n[INFO]  T E S T S\n[INFO] -------------------------------------------------------\n[INFO] Running org.acme.audit.AuditTrailTest\n[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.042 s -- in org.acme.audit.AuditTrailTest\n[INFO] \n[INFO] Results:\n[INFO] \n[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0\n[INFO] \n[INFO] ------------------------------------------------------------------------\n[INFO] BUILD SUCCESS\n[INFO] ------------------------------------------------------------------------\n"
+    }
+  ],
+  "draft": {
+    "status": "blocked",
+    "layer": "unknown",
+    "evidence": "setup command budget exhausted before discovery and baseline",
+    "run_ids": [],
+    "citations": []
+  },
+  "status": "blocked",
+  "layer": "unknown",
+  "max_commands": 2,
+  "toolchain_id": "temurin-17-maven",
+  "requirement_patterns": [],
+  "checkout_paths": null
+}

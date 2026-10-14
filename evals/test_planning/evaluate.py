@@ -18,7 +18,7 @@ from pydantic_ai import capture_run_messages, models
 from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart, ToolReturnPart
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RunUsage, UsageLimits
-from pydantic_evals import Dataset, set_eval_attribute
+from pydantic_evals import Case, Dataset, set_eval_attribute
 from pydantic_evals.evaluators import Evaluator, HasMatchingSpan, MaxModelRequests, MaxToolCalls
 import yaml
 
@@ -32,6 +32,7 @@ from corsair.agents.test_planning.dependencies import PlanningDependencies
 from corsair.agents.test_planning.prompts import PROMPT_VERSION, SKILL_SHA256, planning_prompt
 from corsair.agents.test_planning.tools import TOOLSET_ID, TOOLSET_SHA256
 from corsair.agents.test_planning.validation import _symbol_occurs
+from evals.cases import load_set, set_digest
 from evals.issue_analysis.evaluate import describe_model, record_count
 from evals.issue_analysis.live import NoUnknownToolAttempts, ProviderUsageCoverage, message_counts, output_tool_names
 
@@ -43,6 +44,8 @@ DATASETS = {"development": "cases.yaml", "heldout": "cases-heldout.yaml", "heldo
             "heldout3": "cases-heldout-3.yaml", "unit": "cases-unit.yaml"}
 # Held-out sets written before SPEC-0040 typed witnesses: frozen, exposed and no longer runnable.
 RETIRED = frozenset({"heldout", "heldout2"})
+# PLAN-0094 per-case sets (evals/test_planning/cases/<id>/, frozen by evals/test_planning/sets/<set>.json).
+CASE_SETS = frozenset({"breadth"})
 # SPEC-0023: a manifest of case name and content hash beside each held-out dataset.
 MANIFESTS = {"heldout": "cases-heldout.manifest.json", "heldout2": "cases-heldout-2.manifest.json",
              "heldout3": "cases-heldout-3.manifest.json", "unit": "cases-unit.manifest.json"}
@@ -133,6 +136,10 @@ def check_manifest(name: str) -> None:
 
 
 def dataset(name: str = "development") -> Dataset[TestPlanningInput, PlanOutput, PlanOracle]:
+    if name in CASE_SETS:
+        return Dataset[TestPlanningInput, PlanOutput, PlanOracle](name=f"test-planning-{name}", cases=[
+            Case(name=case.name, inputs=TestPlanningInput.model_validate(case.input),
+                 metadata=PlanOracle.model_validate(case.oracle)) for case in load_set("test_planning", name)])
     return Dataset[TestPlanningInput, PlanOutput, PlanOracle].from_file(
         ROOT / DATASETS[name], custom_evaluator_types=(MatchesPlan, ReadBeforePlanning),
     )
@@ -181,7 +188,8 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, case
                 "model": describe_model(actual_model), "weights_identity": "not_applicable" if scripted else "unknown",
                 "prompt_version": PROMPT_VERSION, "config_version": CONFIG_VERSION, "skill_sha256": SKILL_SHA256,
                 "toolset_id": TOOLSET_ID, "toolset_sha256": TOOLSET_SHA256, "budget": budget.model_dump(), "task_retries": 0, "max_concurrency": 1,
-                "dataset": cases, "dataset_sha256": sha256((ROOT / DATASETS[cases]).read_bytes()).hexdigest(),
+                "dataset": cases, "dataset_sha256": set_digest("test_planning", cases) if cases in CASE_SETS
+                else sha256((ROOT / DATASETS[cases]).read_bytes()).hexdigest(),
                 "provider": provider,
                 "output_contract": "ReadyTestPlan | UnsupportedTestPlan",
                 "draft_contract": "ReadyTestPlanDraft | UnsupportedTestPlanDraft"}
@@ -253,7 +261,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--provider-config", type=Path, help="Explicit provider configuration JSON; omitted means scripted fixture only")
-    parser.add_argument("--cases", choices=sorted(DATASETS), default="development")
+    parser.add_argument("--cases", choices=sorted(set(DATASETS) | CASE_SETS), default="development")
     parser.add_argument("--repeat", type=int, default=EvaluationBudget().repeat)
     args = parser.parse_args()
     if args.evidence.exists() or args.evidence.is_symlink():

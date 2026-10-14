@@ -1,0 +1,14 @@
+{
+  "language": "java",
+  "framework": "junit5",
+  "family": "zip-slip",
+  "kind": "positive",
+  "probes": "Java zip extraction planned as a fixture-state observation: no file appears outside the destination inside @TempDir.",
+  "provenance": {
+    "source": "https://github.com/github/codeql",
+    "commit": "main (fetched 2026-10-14)",
+    "path": "java/ql/src/Security/CWE/CWE-022/examples/ZipSlipBad.java",
+    "license": "MIT",
+    "notes": "Shape adapted from the CodeQL ZipSlip query-help example; code written for this case."
+  }
+}

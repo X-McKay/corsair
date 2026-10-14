@@ -1,0 +1,12 @@
+{
+  "language": "java",
+  "framework": "junit5",
+  "family": "csv-injection",
+  "kind": "abstention",
+  "probes": "The identified Java class is missing from the saved inventory (only its baseline test is present): the planner must not plan against unseen source.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic; the implementation file is deliberately withheld from the inventory."
+  }
+}

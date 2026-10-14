@@ -1,0 +1,33 @@
+{
+  "required_reads": [
+    ".github/workflows/maven.yml"
+  ],
+  "commands": [
+    [
+      "mvn",
+      "-B",
+      "dependency:go-offline"
+    ]
+  ],
+  "observations": [
+    {
+      "exit": 1,
+      "stdout": "[ERROR] Failed to execute goal org.apache.maven.plugins:maven-dependency-plugin:3.8.1:go-offline (default-cli) on project billing-core: Could not transfer artifact org.junit:junit-bom:pom:5.14.4 from/to central (https://repo.maven.apache.org/maven2): PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target\n"
+    }
+  ],
+  "draft": {
+    "status": "blocked",
+    "layer": "tls",
+    "evidence": "PKIX path building failed",
+    "run_ids": [
+      1
+    ],
+    "citations": []
+  },
+  "status": "blocked",
+  "layer": "tls",
+  "max_commands": 12,
+  "toolchain_id": "temurin-17-maven",
+  "requirement_patterns": [],
+  "checkout_paths": null
+}

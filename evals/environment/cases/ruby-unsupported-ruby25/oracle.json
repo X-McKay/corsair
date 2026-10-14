@@ -1,0 +1,27 @@
+{
+  "required_reads": [
+    "Gemfile"
+  ],
+  "commands": [],
+  "observations": [],
+  "draft": {
+    "status": "unsupported",
+    "requirement": "Ruby ~> 2.5.0 is required by the Gemfile but the prepared toolchain is Ruby 3.1.7",
+    "citations": [
+      {
+        "path": "Gemfile",
+        "start_line": 2,
+        "end_line": 2
+      }
+    ]
+  },
+  "status": "unsupported",
+  "layer": null,
+  "max_commands": 12,
+  "toolchain_id": "ruby-3.1-bundler",
+  "requirement_patterns": [
+    "(?i)\\bRuby\\s+(?:~>\\s*)?2\\.5(?:\\.0)?\\b",
+    "(?i)\\bRuby\\s+3\\.1(?:\\.7)?\\b"
+  ],
+  "checkout_paths": null
+}

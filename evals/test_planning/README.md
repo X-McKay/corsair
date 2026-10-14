@@ -27,3 +27,19 @@ A local-provider run adds `--provider-config PATH` (an explicit `LocalModelConfi
 ## Native unit observation set
 
 `make eval AGENT=planning SET=unit` runs the frozen `cases-unit.yaml`/manifest set: the same SQL construction concern over safe and unsafe source, using a recording dependency and no effect recorder. The reviewed plan calls the real function and limits its claim to query construction. This development set is not held out and does not replace the unchanged legacy comparison. Scripted results establish contracts and curated anchors, not live semantic accuracy.
+
+## Breadth set
+
+`make eval AGENT=planning SET=breadth` (`--cases breadth`) runs the per-case set under `cases/<case-id>/` (`input.json`, evaluator-only `oracle.json`, `case.json` metadata), frozen by `sets/breadth.json` and loaded with `evals.cases.load_set`; `dataset_sha256` is `evals.cases.set_digest` of that manifest. It is a development set, not held out, and leaves the YAML sets, their manifests and `RETIRED` unchanged.
+
+Forty cases, ten each for Java (Maven, JUnit 5 on JDK 17 and one JUnit 4 on JDK 8), JavaScript (Jest 24 on Node 8.17), Ruby (Minitest on 3.1) and Perl (Test::More/TAP via prove on 5.26). Every environment lists no witness facility, so ready reference plans use the SPEC-0078 native unit contract: a typed `observation` per test, no `witness`, and `observation_kind` in the oracle. Each language covers:
+
+| Kind | Cases per language |
+| --- | --- |
+| `positive` (ready) | rejected traversal (`exception`), HTML/escaping (`return_value`), command construction through an injected recording double (`dependency_call`), archive extraction into a per-test directory (`fixture_state`) |
+| `guarded` (ready) | guarded source; the plan must still exercise the guard (Java XXE, Jest prototype pollution, rack-protection path normalisation, Perl response splitting) |
+| `injection` (ready) | instructions inside the saved baseline test; `forbidden_markers` check they are not obeyed |
+| `abstention` (unsupported) | no executed baseline test; implementation absent from the inventory; a property the environment cannot observe (timing, ReDoS CPU time, TLS handshake, check-then-open race) |
+| `transfer` (ready) | the Python `sql_dependency` recording-database shape in the framework's idiom |
+
+Imported material: non-held-out `benchmarks/corpus/infosec-harness` variants (Java xxe/cmdi/sqli, JavaScript prototypepollution/cmdi/arginjection, Perl responsesplitting/xss/cmdi/sqli), sinatra rack-protection `path_traversal.rb` v2.0.1 (MIT) and an excerpt of vercel/ms 0.7.0 (MIT); the rest is synthetic. `case.json` records each source. Perl plans name `not_ok` as the security failure type because the TAP runner reports no exception type for a failed assertion. `tests/configuration/test_breadth_planning.py` checks the counts and that blanket approval, blanket refusal, a wrong symbol or observation kind, adversarial input in the control and obeyed injected text each fail the curated checks. Scripted results establish contracts and anchors only, not live planning quality.

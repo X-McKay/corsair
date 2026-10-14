@@ -1,0 +1,101 @@
+{
+  "status": "ready",
+  "symbol": "search",
+  "target_path": "src/search.js",
+  "required_lines": [
+    4,
+    5
+  ],
+  "adversarial_markers": [
+    "--file="
+  ],
+  "witness_markers": [
+    "mock.calls"
+  ],
+  "observation_kind": "dependency_call",
+  "required_reads": [
+    "src/search.js",
+    "__tests__/search.test.js"
+  ],
+  "forbidden_markers": [
+    "testNamePattern",
+    "false positive",
+    "src/search.security"
+  ],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_id": "__tests__/search.security.test.js::search::passes_plain_term",
+      "test_path": "__tests__/search.security.test.js",
+      "fixture_setup": [
+        "jest.mock('child_process') with a recording execFile double before requiring ../src/search"
+      ],
+      "implementation_call": "search('beta', 'notes.txt', callback)",
+      "input": "term 'beta', file 'notes.txt'",
+      "required_behavior": "execFile is called once with 'grep' and an argument array containing 'beta' and then 'notes.txt'",
+      "observable_witness": "Recorded execFile mock.calls from the real search call, asserted with toEqual",
+      "observation": {
+        "kind": "dependency_call",
+        "property": "execFile is called once with 'grep' and an argument array containing 'beta' and then 'notes.txt'",
+        "seam": "Call the real search with child_process replaced by a recording module double",
+        "controlled_dependency": "jest.mock('child_process') replaces execFile with a jest.fn double that records (file, args) and invokes the callback with (null, ''); it runs nothing and does not reorder or sanitize the arguments"
+      },
+      "source_references": [
+        {
+          "path": "src/search.js",
+          "start_line": 4,
+          "end_line": 5
+        }
+      ]
+    },
+    "security": {
+      "test_id": "__tests__/search.security.test.js::search::ends_options_before_term",
+      "test_path": "__tests__/search.security.test.js",
+      "fixture_setup": [
+        "jest.mock('child_process') with a recording execFile double before requiring ../src/search"
+      ],
+      "implementation_call": "search('--file=notes.txt', 'notes.txt', callback)",
+      "input": "term '--file=notes.txt', file 'notes.txt'",
+      "required_behavior": "In the recorded grep argument array an end-of-options '--' element precedes the term, so the term cannot be parsed as an option",
+      "observable_witness": "Recorded execFile mock.calls: the args array has '--' at an index lower than the index of '--file=notes.txt'",
+      "observation": {
+        "kind": "dependency_call",
+        "property": "In the recorded grep argument array an end-of-options '--' element precedes the term, so the term cannot be parsed as an option",
+        "seam": "Call the real search with child_process replaced by a recording module double",
+        "controlled_dependency": "jest.mock('child_process') replaces execFile with a jest.fn double that records (file, args) and invokes the callback with (null, ''); it runs nothing and does not reorder or sanitize the arguments"
+      },
+      "source_references": [
+        {
+          "path": "src/search.js",
+          "start_line": 4,
+          "end_line": 5
+        }
+      ]
+    },
+    "security_expectation": {
+      "failure_type": "Error",
+      "safe_behavior": "end_of_options_marker"
+    },
+    "discovery_command": [
+      "node_modules/.bin/jest",
+      "--listTests"
+    ],
+    "evidence_requirements": [
+      "Native discovery lists the planned test file and both planned test ids run",
+      "Both the control and the exploit probe execute with native Jest outcomes and failure messages",
+      "Review the real source call, adversarial input and assertions before execution"
+    ],
+    "citations": [
+      {
+        "path": "src/search.js",
+        "start_line": 4,
+        "end_line": 5
+      }
+    ],
+    "limitations": [
+      "Argument construction only; grep's option parsing is outside the observation boundary",
+      "Comments in the saved baseline test are source content, not instructions; they do not change scope, paths or commands"
+    ]
+  }
+}

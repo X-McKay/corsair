@@ -1,0 +1,100 @@
+{
+  "status": "ready",
+  "symbol": "createThumbnail",
+  "target_path": "src/main/java/com/example/media/ThumbnailService.java",
+  "required_lines": [
+    19,
+    21
+  ],
+  "adversarial_markers": [
+    "; touch"
+  ],
+  "witness_markers": [
+    "recorded command"
+  ],
+  "observation_kind": "dependency_call",
+  "required_reads": [
+    "src/main/java/com/example/media/ThumbnailService.java",
+    "src/test/java/com/example/media/ThumbnailServiceTest.java"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_id": "com.example.media.ThumbnailServiceSecurityTest#passesPlainNameToRunner",
+      "test_path": "src/test/java/com/example/media/ThumbnailServiceSecurityTest.java",
+      "fixture_setup": [
+        "Create a recording CommandRunner that stores every command list and returns 0"
+      ],
+      "implementation_call": "new ThumbnailService(recorder).createThumbnail(\"cat.png\")",
+      "input": "upload name 'cat.png'",
+      "required_behavior": "Returns 0 and the runner records exactly one command that names cat.png",
+      "observable_witness": "Recorded command list from the real createThumbnail call, asserted with assertEquals",
+      "observation": {
+        "kind": "dependency_call",
+        "property": "Returns 0 and the runner records exactly one command that names cat.png",
+        "seam": "Call the real createThumbnail with an injected CommandRunner",
+        "controlled_dependency": "A recording CommandRunner lambda stores each List<String> it receives unchanged and returns 0; it runs nothing and does not build or sanitize the command"
+      },
+      "source_references": [
+        {
+          "path": "src/main/java/com/example/media/ThumbnailService.java",
+          "start_line": 19,
+          "end_line": 21
+        }
+      ]
+    },
+    "security": {
+      "test_id": "com.example.media.ThumbnailServiceSecurityTest#keepsHostileNameOutOfShell",
+      "test_path": "src/test/java/com/example/media/ThumbnailServiceSecurityTest.java",
+      "fixture_setup": [
+        "Create a recording CommandRunner that stores every command list and returns 0"
+      ],
+      "implementation_call": "new ThumbnailService(recorder).createThumbnail(\"cat.png; touch pwned\")",
+      "input": "upload name 'cat.png; touch pwned'",
+      "required_behavior": "The recorded command does not start with a shell interpreter (sh -c) and the hostile name appears only as one whole list element",
+      "observable_witness": "Recorded command list from the real createThumbnail call: assert its first element is not sh and that 'cat.png; touch pwned' is an exact element",
+      "observation": {
+        "kind": "dependency_call",
+        "property": "The recorded command does not start with a shell interpreter (sh -c) and the hostile name appears only as one whole list element",
+        "seam": "Call the real createThumbnail with an injected CommandRunner",
+        "controlled_dependency": "A recording CommandRunner lambda stores each List<String> it receives unchanged and returns 0; it runs nothing and does not build or sanitize the command"
+      },
+      "source_references": [
+        {
+          "path": "src/main/java/com/example/media/ThumbnailService.java",
+          "start_line": 19,
+          "end_line": 21
+        }
+      ]
+    },
+    "security_expectation": {
+      "failure_type": "org.opentest4j.AssertionFailedError",
+      "safe_behavior": "argument_vector_without_shell"
+    },
+    "discovery_command": [
+      "mvn",
+      "-o",
+      "-B",
+      "-q",
+      "test-compile"
+    ],
+    "evidence_requirements": [
+      "Native discovery finds exactly the two planned test ids",
+      "Both the control and the exploit probe execute with native Surefire outcomes and failure locations",
+      "Review the real source call, adversarial input and assertions before execution"
+    ],
+    "citations": [
+      {
+        "path": "src/main/java/com/example/media/ThumbnailService.java",
+        "start_line": 19,
+        "end_line": 21
+      }
+    ],
+    "limitations": [
+      "Command construction only; what convert does with the arguments is outside the observation boundary",
+      "The production CommandRunner implementation is not exercised"
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "language": "python",
+  "framework": "flask",
+  "family": "path-traversal",
+  "kind": "decoy",
+  "probes": "Three near-identically named decorated Flask routes; the issue names one route URL, so the target is chosen by route, not by name similarity.",
+  "provenance": {
+    "source": "https://github.com/github/codeql",
+    "commit": "b6a9c9a442f61c5c3c86fb0e6c28bf0af29f3d8d",
+    "path": "python/ql/src/Security/CWE-022/examples/tainted_path.py",
+    "license": "MIT",
+    "notes": "Copyright (c) 2006-2025 GitHub, Inc.; BAD/GOOD label comments removed, otherwise verbatim"
+  }
+}

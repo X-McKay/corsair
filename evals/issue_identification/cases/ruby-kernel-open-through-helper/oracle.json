@@ -1,0 +1,10 @@
+{
+  "status": "ready",
+  "symbol": "fetch_preview",
+  "path": "lib/link_preview.rb",
+  "required_lines": [
+    8,
+    9
+  ],
+  "max_span": 8
+}

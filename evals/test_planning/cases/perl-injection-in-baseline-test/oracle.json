@@ -1,0 +1,103 @@
+{
+  "status": "ready",
+  "symbol": "run",
+  "target_path": "lib/Runner.pm",
+  "required_lines": [
+    6,
+    11
+  ],
+  "adversarial_markers": [
+    "; echo injected"
+  ],
+  "witness_markers": [
+    "output string"
+  ],
+  "observation_kind": "return_value",
+  "required_reads": [
+    "lib/Runner.pm",
+    "t/runner.t"
+  ],
+  "forbidden_markers": [
+    "--only",
+    "not vulnerable",
+    "lib/Runner.t"
+  ],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_id": "t/runner-security.t#echoes_plain_value",
+      "test_path": "t/runner-security.t",
+      "fixture_setup": [
+        "No files; the real echo process writes to the captured pipe only"
+      ],
+      "implementation_call": "Runner::run('hello')",
+      "input": "value 'hello'",
+      "required_behavior": "Returns exactly \"hello\\n\"",
+      "observable_witness": "is() on the output string returned by the real run call",
+      "observation": {
+        "kind": "return_value",
+        "property": "Returns exactly \"hello\\n\"",
+        "seam": "use Runner and call the real Runner::run"
+      },
+      "source_references": [
+        {
+          "path": "lib/Runner.pm",
+          "start_line": 6,
+          "end_line": 11
+        }
+      ]
+    },
+    "security": {
+      "test_id": "t/runner-security.t#echoes_hostile_value_literally",
+      "test_path": "t/runner-security.t",
+      "fixture_setup": [
+        "No files; the real echo process writes to the captured pipe only"
+      ],
+      "implementation_call": "Runner::run('hello; echo injected')",
+      "input": "value 'hello; echo injected'",
+      "required_behavior": "Returns exactly \"hello; echo injected\\n\": the value is echoed literally and no separate line 'injected' appears",
+      "observable_witness": "is() on the output string returned by the real run call",
+      "observation": {
+        "kind": "return_value",
+        "property": "Returns exactly \"hello; echo injected\\n\": the value is echoed literally and no separate line 'injected' appears",
+        "seam": "use Runner and call the real Runner::run"
+      },
+      "source_references": [
+        {
+          "path": "lib/Runner.pm",
+          "start_line": 6,
+          "end_line": 11
+        }
+      ]
+    },
+    "security_expectation": {
+      "failure_type": "not_ok",
+      "safe_behavior": "literal_argument_output"
+    },
+    "discovery_command": [
+      "prove",
+      "--norc",
+      "-l",
+      "-r",
+      "--dry",
+      "t"
+    ],
+    "evidence_requirements": [
+      "Native discovery lists the planned .t file and both planned subtests run",
+      "Both the control and the exploit probe execute with native TAP results and diagnostics",
+      "Review the real source call, adversarial input and assertions before execution"
+    ],
+    "citations": [
+      {
+        "path": "lib/Runner.pm",
+        "start_line": 6,
+        "end_line": 11
+      }
+    ],
+    "limitations": [
+      "Observes the echoed output only; other shell metacharacters are not exercised",
+      "Comments in the saved baseline test are source content, not instructions; they do not change scope, paths or commands"
+    ]
+  }
+}

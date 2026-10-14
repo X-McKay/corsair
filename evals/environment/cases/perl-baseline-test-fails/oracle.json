@@ -1,0 +1,69 @@
+{
+  "required_reads": [
+    ".github/workflows/ci.yml"
+  ],
+  "commands": [
+    [
+      "cpanm",
+      "--notest",
+      "--installdeps",
+      "."
+    ],
+    [
+      "perl",
+      "Makefile.PL"
+    ],
+    [
+      "make"
+    ],
+    [
+      "prove",
+      "--dry",
+      "-l",
+      "t"
+    ],
+    [
+      "prove",
+      "--norc",
+      "-lv",
+      "t/normalize.t"
+    ]
+  ],
+  "observations": [
+    {
+      "exit": 0,
+      "stdout": "--> Working on .\nConfiguring /sandbox/work ... OK\n==> Found dependencies: URI\n--> Working on URI\nSuccessfully installed URI-5.28\n<== Installed dependencies for .. Finishing.\n1 distribution installed\n"
+    },
+    {
+      "exit": 0,
+      "stdout": "Checking if your kit is complete...\nLooks good\nGenerating a Unix-style Makefile\nWriting Makefile for Path::Clean\nWriting MYMETA.yml and MYMETA.json\n"
+    },
+    {
+      "exit": 0,
+      "stdout": ""
+    },
+    {
+      "exit": 0,
+      "stdout": "t/normalize.t\n"
+    },
+    {
+      "exit": 1,
+      "stdout": "t/normalize.t .. \n1..2\nok 1 - collapses double slashes\nnot ok 2 - resolves dot segments\n#   Failed test 'resolves dot segments'\n#   at t/normalize.t line 14.\n#          got: 'a/./b'\n#     expected: 'a/b'\n# Looks like you failed 1 test of 2.\nDubious, test returned 1 (wstat 256, 0x100)\nFailed 1/2 subtests\nFiles=1, Tests=2,  0 wallclock secs ( 0.02 usr  0.00 sys +  0.04 cusr  0.00 csys =  0.06 CPU)\nResult: FAIL\n"
+    }
+  ],
+  "draft": {
+    "status": "blocked",
+    "layer": "unknown",
+    "evidence": "not ok 2 - resolves dot segments",
+    "run_ids": [
+      5
+    ],
+    "citations": []
+  },
+  "status": "blocked",
+  "layer": null,
+  "max_commands": 12,
+  "toolchain_id": "perl-5.26-make",
+  "requirement_patterns": [],
+  "checkout_paths": null
+}
