@@ -13,13 +13,13 @@ Whole-chain cases in the [eval layout](../README.md): `evals/e2e/<language>/<set
 
 ## v2 whole-chain set (`v2`)
 
-`evals/e2e/<language>/v2/<case>/`, manifest `sets/v2.json`: 122 cases for the v2 chain (`src/corsair/`), each
+`evals/e2e/<language>/v2/<case>/`, manifest `sets/v2.json`: 132 cases for the v2 chain (`src/corsair/`), each
 ending in a `Verdict` from the D4 rule table (`src/corsair/rules.py`).
 
 | Language | Cases | Positive | Negative | Injection | Ineffective fix | No runtime | Missing target | Unbuildable |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | python | 37 | 15 | 17 | 1 | 1 | 1 | 1 | 1 |
-| java | 11 | 3 | 3 | 1 | 1 | 1 | 1 | 1 |
+| java | 21 | 8 | 8 | 1 | 1 | 1 | 1 | 1 |
 | javascript | 24 | 7 | 7 | 1 | 1 | 6 | 1 | 1 |
 | perl | 15 | 5 | 5 | 1 | 1 | 1 | 1 | 1 |
 | ruby | 31 | 13 | 13 | 1 | 1 | 1 | 1 | 1 |
@@ -52,9 +52,9 @@ Sources and choices:
   which takes the finding, the opaque id and the truth from that manifest exactly as for infosec-harness: the
   JavaScript families `dot-prop`, `angular-http-server` and `codecov-node`, and the Ruby families `rubyzip`,
   `rack-static`, `ruby-git-fetch`, `secure-headers`, `tzinfo`, `cocoapods-git`, `pdfkit` and
-  `ruby-git-ls-files`.
+  `ruby-git-ls-files`, and the Java families `tomee`, `plexus-utils`, `commons-io`, `rdf4j` and `spring-security`.
 - The infosec-harness corpus has no Ruby, so the 14 original Ruby cases are Corsair-authored (five paired families, a source-comment
-  injection and three failure modes). Java has only three non-held-out families, so it has exactly ten cases. The
+  injection and three failure modes). Java has only three non-held-out infosec-harness families; the other Java pairs are imported. The
   real-repository benchmark cases under `benchmarks/cases/` (including the two v1 `jest` cases, `rack-static` and
   `http-tiny-verify-ssl`) need an upstream fetch; v2 intake takes a local tree, so they are not in this set.
 - No runtime: the vitest and `node --test` JavaScript families, the C families and one synthetic tree per other
