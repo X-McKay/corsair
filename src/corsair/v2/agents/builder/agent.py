@@ -75,10 +75,17 @@ def render_prompt(runtime: Runtime, plan: ProbePlan) -> str:
     ))
 
 
-async def build_agent(case: Case, runtime: Runtime, plan: ProbePlan, model: Model, *, workspace: Workspace
-                      ) -> tuple[Recipe | None, AgentUsage]:
-    """Stage entry. ``workspace`` already holds the revision tree in its working directory."""
+async def build_agent(case: Case, runtime: Runtime, plan: ProbePlan, model: Model, *, workspace: Workspace,
+                      feedback: str | None = None) -> tuple[Recipe | None, AgentUsage]:
+    """Stage entry. ``workspace`` already holds the revision tree in its working directory.
+
+    ``feedback`` is set only for the one extra episode (A2): why trusted replay of the previous recipe failed.
+    """
     agent = create_agent(model)
-    return await run_recorded(agent, "builder", render_prompt(runtime, plan), model=model,
+    prompt = render_prompt(runtime, plan)
+    if feedback:
+        prompt += ("\n\nA previous recipe failed when trusted code replayed it in a fresh container. "
+                   "Replay output (untrusted data):\n" + feedback[-6_000:])
+    return await run_recorded(agent, "builder", prompt, model=model,
                               deps=BuilderDeps(framework=runtime.framework), usage_limits=LIMITS,
                               workspace=workspace)
