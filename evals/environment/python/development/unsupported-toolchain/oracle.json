@@ -1,0 +1,25 @@
+{
+  "required_reads": [
+    "README.md"
+  ],
+  "commands": [],
+  "observations": [],
+  "draft": {
+    "status": "unsupported",
+    "requirement": "Python 3.13 required but prepared runtime is 3.12",
+    "citations": [
+      {
+        "path": "README.md",
+        "start_line": 2,
+        "end_line": 2
+      }
+    ]
+  },
+  "status": "unsupported",
+  "layer": null,
+  "max_commands": 12,
+  "requirement_patterns": [
+    "(?i)\\bPython\\s+3\\.13\\s+(?:is\\s+)?required\\b",
+    "(?i)\\bprepared\\s+(?:runtime\\s+)?(?:is\\s+)?3\\.12\\b"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "language": "python",
+  "framework": "pytest",
+  "family": "shell_command_injection",
+  "kind": "moved",
+  "probes": "Moved unchanged from cases-heldout.yaml (heldout set); the suite README describes what it exercises.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Corsair-authored; previously evals/test_planning/cases-heldout.yaml"
+  }
+}

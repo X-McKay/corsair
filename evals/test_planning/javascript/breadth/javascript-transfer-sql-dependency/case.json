@@ -1,0 +1,12 @@
+{
+  "language": "javascript",
+  "framework": "jest",
+  "family": "sql-injection",
+  "kind": "transfer",
+  "probes": "Transfer of the Python recording-database unit shape (sql_dependency) into a Jest callback-style db double.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic mysql-style callback query helper."
+  }
+}

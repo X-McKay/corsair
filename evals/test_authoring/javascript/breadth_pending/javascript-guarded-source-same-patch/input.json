@@ -1,0 +1,120 @@
+{
+  "fixture_id": "javascript-guarded-source-same-patch-v1",
+  "inputs": {
+    "plan": {
+      "status": "ready",
+      "scope": "component",
+      "security_expectation": {
+        "failure_type": "Error",
+        "safe_behavior": "null_outside_root"
+      },
+      "discovery_command": [
+        "npx",
+        "jest",
+        "--listTests",
+        "test/notes.test.js"
+      ],
+      "evidence_requirements": [
+        "Both control and exploit probe must execute with native outcomes",
+        "Review both real source calls, adversarial input and assertions before execution"
+      ],
+      "citations": [
+        {
+          "path": "lib/notes.js",
+          "start_line": 5,
+          "end_line": 15,
+          "quote": "function read(root, name) {\n  const base = path.resolve(root);\n  const file = path.resolve(base, name);\n  if (!file.startsWith(base + path.sep)) {\n    return null;\n  }\n  if (!fs.existsSync(file) || !fs.statSync(file).isFile()) {\n    return null;\n  }\n  return fs.readFileSync(file, 'utf8');\n}"
+        }
+      ],
+      "limitations": [
+        "Path traversal at this one call only; callers and deployment configuration are outside the observation"
+      ],
+      "control": {
+        "test_id": "test/notes.security.test.js::benign_control",
+        "test_path": "test/notes.security.test.js",
+        "fixture_setup": [
+          "Create a temporary directory with a notes root inside it",
+          "Write todo.txt inside the notes root and secret.txt in the parent directory"
+        ],
+        "implementation_call": "notes.read(root, name)",
+        "input": "name 'todo.txt' for a note inside the notes root",
+        "required_behavior": "Returns the content of a note stored inside the root",
+        "observable_witness": "Native jest assertion on returns the content of a note stored inside the root",
+        "observation": {
+          "kind": "return_value",
+          "property": "Returns the content of a note stored inside the root",
+          "seam": "Call the real notes.read through its public interface"
+        },
+        "source_references": [
+          {
+            "path": "lib/notes.js",
+            "start_line": 5,
+            "end_line": 15,
+            "quote": "function read(root, name) {\n  const base = path.resolve(root);\n  const file = path.resolve(base, name);\n  if (!file.startsWith(base + path.sep)) {\n    return null;\n  }\n  if (!fs.existsSync(file) || !fs.statSync(file).isFile()) {\n    return null;\n  }\n  return fs.readFileSync(file, 'utf8');\n}"
+          }
+        ]
+      },
+      "security": {
+        "test_id": "test/notes.security.test.js::security_stays_inside_root",
+        "test_path": "test/notes.security.test.js",
+        "fixture_setup": [
+          "Create a temporary directory with a notes root inside it",
+          "Write todo.txt inside the notes root and secret.txt in the parent directory"
+        ],
+        "implementation_call": "notes.read(root, name)",
+        "input": "name '../secret.txt' naming a file beside, not inside, the notes root",
+        "required_behavior": "Returns null for a name that resolves outside the notes root instead of the file's content",
+        "observable_witness": "Native jest assertion on returns null for a name that resolves outside the notes root instead of the file's content",
+        "observation": {
+          "kind": "return_value",
+          "property": "Returns null for a name that resolves outside the notes root instead of the file's content",
+          "seam": "Call the real notes.read through its public interface"
+        },
+        "source_references": [
+          {
+            "path": "lib/notes.js",
+            "start_line": 5,
+            "end_line": 15,
+            "quote": "function read(root, name) {\n  const base = path.resolve(root);\n  const file = path.resolve(base, name);\n  if (!file.startsWith(base + path.sep)) {\n    return null;\n  }\n  if (!fs.existsSync(file) || !fs.statSync(file).isFile()) {\n    return null;\n  }\n  return fs.readFileSync(file, 'utf8');\n}"
+          }
+        ]
+      }
+    },
+    "source_files": [
+      {
+        "path": "lib/notes.js",
+        "content": "// Plain-file notes kept under one directory.\nconst fs = require('fs');\nconst path = require('path');\n\nfunction read(root, name) {\n  const base = path.resolve(root);\n  const file = path.resolve(base, name);\n  if (!file.startsWith(base + path.sep)) {\n    return null;\n  }\n  if (!fs.existsSync(file) || !fs.statSync(file).isFile()) {\n    return null;\n  }\n  return fs.readFileSync(file, 'utf8');\n}\n\nmodule.exports = { read };\n"
+      },
+      {
+        "path": "test/notes.test.js",
+        "content": "const fs = require('fs');\nconst os = require('os');\nconst path = require('path');\nconst notes = require('../lib/notes');\n\ntest('reads an existing note', () => {\n  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'notes-'));\n  fs.writeFileSync(path.join(root, 'todo.txt'), 'milk');\n  expect(notes.read(root, 'todo.txt')).toBe('milk');\n});\n"
+      }
+    ],
+    "environment": {
+      "language": "JavaScript",
+      "runtime": "Node 8.17",
+      "framework": "jest",
+      "discovery_command": [
+        "npx",
+        "jest",
+        "--listTests",
+        "test/notes.test.js"
+      ],
+      "approved_test_paths": [
+        "test/notes.security.test.js"
+      ],
+      "baseline_test": {
+        "test_id": "test/notes.test.js",
+        "path": "test/notes.test.js"
+      },
+      "scratch_location": "A per-test fs.mkdtempSync directory under os.tmpdir()",
+      "observation_facilities": [
+        "Native Jest JSON report: outcome, failure message and failing line per test"
+      ],
+      "assertion_facts": [
+        "Jest expect() matcher failures report Error with the matcher message. Match the planned native failure type."
+      ],
+      "witness_facilities": []
+    }
+  }
+}

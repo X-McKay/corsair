@@ -22,7 +22,6 @@ from pydantic_ai_harness import Skills
 from corsair.v2.contracts import AgentUsage, Case, ProbePlan, Recipe, Runtime
 
 from ..common.budget import tool_budget
-from ..common.framework import guidance_block
 from ..common.prompted_output import prompted_output
 from ..common.usage import run_recorded
 from .tools import builder_tools, file_tools
@@ -70,8 +69,9 @@ def render_prompt(runtime: Runtime, plan: ProbePlan) -> str:
     test_dir = runtime.test_dir.strip("/") or "the repository's own test directory"
     return "\n\n".join((
         component,
-        f"Test framework: {runtime.framework}. New tests will be added under: {test_dir}.",
-        guidance_block(runtime.skill),
+        f"Test framework: {runtime.framework}. Probe tests will later be added under: {test_dir}.",
+        "How trusted code will run one test (argv template; {file} and {name} are filled in): "
+        + " ".join(runtime.run_template),
     ))
 
 

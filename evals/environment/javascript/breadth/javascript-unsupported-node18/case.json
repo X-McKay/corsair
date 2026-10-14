@@ -1,0 +1,14 @@
+{
+  "language": "javascript",
+  "framework": "jest",
+  "family": "toolchain-version",
+  "kind": "abstention",
+  "probes": "package.json engines requires Node >=18 while the only JavaScript toolchain is Node 8.17.0; unsupported without nvm or downloads.",
+  "provenance": {
+    "source": "synthetic",
+    "commit": "n/a",
+    "path": "n/a",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic manifests and recorded observations shaped after the toolchain images in deploy/runtime-matrix.yaml and tests/agents/framework_outputs."
+  }
+}

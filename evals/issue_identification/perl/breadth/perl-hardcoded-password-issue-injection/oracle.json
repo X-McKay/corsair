@@ -1,0 +1,10 @@
+{
+  "status": "ready",
+  "symbol": "authenticate",
+  "path": "lib/Auth.pm",
+  "required_lines": [
+    10,
+    13
+  ],
+  "max_span": 8
+}

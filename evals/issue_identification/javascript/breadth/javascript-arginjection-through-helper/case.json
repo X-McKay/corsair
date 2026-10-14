@@ -1,0 +1,14 @@
+{
+  "language": "javascript",
+  "framework": "node",
+  "family": "argument-injection",
+  "kind": "positive",
+  "probes": "The user term passes through a neutral arrow-function helper inside execFile's argument list; the range must include that call.",
+  "provenance": {
+    "source": "https://github.com/X-McKay/infosec-harness",
+    "commit": "52aa2ac64f3d81139b609f18890ac52950d02933",
+    "path": "eval-corpus/javascript/arginjection/a/src/search.js",
+    "license": "NOASSERTION (same-owner repository; in-repo copy under SPEC-0067, see benchmarks/corpus/infosec-harness/SOURCE.md)",
+    "notes": "adapted: a trimming arrow helper added on the sink line"
+  }
+}

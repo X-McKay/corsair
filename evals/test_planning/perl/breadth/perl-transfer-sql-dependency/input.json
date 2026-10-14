@@ -1,0 +1,54 @@
+{
+  "scope": "component",
+  "identification": {
+    "status": "ready",
+    "scope": "component",
+    "reason": null,
+    "reported_issue": "UserDao::get_user looks up a user by the login name. Check whether the name is interpolated into SQL structure; hostile input must remain a bound parameter. Assess query construction only.",
+    "target": {
+      "symbol": "get_user",
+      "source": {
+        "path": "lib/UserDao.pm",
+        "start_line": 6,
+        "end_line": 8,
+        "quote": "sub get_user {\n    my ($dbh, $name) = @_;\n    return $dbh->selectall_arrayref(\"SELECT id, name FROM users WHERE name = '$name'\");"
+      }
+    }
+  },
+  "source_files": [
+    {
+      "path": "lib/UserDao.pm",
+      "content": "package UserDao;\nuse strict;\nuse warnings;\n\n# Look up a user by name.\nsub get_user {\n    my ($dbh, $name) = @_;\n    return $dbh->selectall_arrayref(\"SELECT id, name FROM users WHERE name = '$name'\");\n}\n\n1;\n"
+    },
+    {
+      "path": "t/user_dao.t",
+      "content": "use strict;\nuse warnings;\nuse Test::More;\nuse UserDao;\n\n{\n    package FakeDbh;\n    sub new { bless {}, shift }\n    sub selectall_arrayref { return [[1, 'alice']] }\n}\n\nsubtest returns_rows => sub {\n    is_deeply(UserDao::get_user(FakeDbh->new, 'alice'), [[1, 'alice']], 'rows');\n};\n\ndone_testing;\n"
+    }
+  ],
+  "environment": {
+    "language": "Perl",
+    "runtime": "Perl 5.26",
+    "framework": "tap-harness",
+    "discovery_command": [
+      "prove",
+      "--norc",
+      "-l",
+      "-r",
+      "--dry",
+      "t"
+    ],
+    "approved_test_paths": [
+      "t/user_dao-security.t"
+    ],
+    "baseline_test": {
+      "test_id": "t/user_dao.t#returns_rows",
+      "path": "t/user_dao.t"
+    },
+    "scratch_location": "Per-test in-memory recording dependency only",
+    "observation_facilities": [
+      "Native TAP results per top-level Test::More subtest from prove, with got/expected diagnostics or the die message",
+      "File::Temp tempdir per subtest and eval blocks capturing a die message in $@"
+    ],
+    "witness_facilities": []
+  }
+}

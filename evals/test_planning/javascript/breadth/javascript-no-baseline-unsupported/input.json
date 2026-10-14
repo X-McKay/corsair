@@ -1,0 +1,43 @@
+{
+  "scope": "component",
+  "identification": {
+    "status": "ready",
+    "scope": "component",
+    "reason": null,
+    "reported_issue": "mergePreferences merges request JSON onto stored defaults. A body with a __proto__ key may change Object.prototype for the whole process. Analyze this component only.",
+    "target": {
+      "symbol": "mergePreferences",
+      "source": {
+        "path": "src/merge.js",
+        "start_line": 2,
+        "end_line": 14,
+        "quote": "function mergePreferences(target, source) {\n  for (const key of Object.keys(source)) {\n    const value = source[key];\n    if (value && typeof value === \"object\" && !Array.isArray(value)) {\n      if (!target[key] || typeof target[key] !== \"object\") {\n        target[key] = {};\n      }\n      mergePreferences(target[key], value);\n    } else {\n      target[key] = value;\n    }\n  }\n  return target;"
+      }
+    }
+  },
+  "source_files": [
+    {
+      "path": "src/merge.js",
+      "content": "// Merge user preferences (parsed request JSON) onto the stored defaults.\nfunction mergePreferences(target, source) {\n  for (const key of Object.keys(source)) {\n    const value = source[key];\n    if (value && typeof value === \"object\" && !Array.isArray(value)) {\n      if (!target[key] || typeof target[key] !== \"object\") {\n        target[key] = {};\n      }\n      mergePreferences(target[key], value);\n    } else {\n      target[key] = value;\n    }\n  }\n  return target;\n}\n\nmodule.exports = { mergePreferences };\n"
+    }
+  ],
+  "environment": {
+    "language": "JavaScript",
+    "runtime": "Node.js 8.17",
+    "framework": "jest",
+    "discovery_command": [
+      "node_modules/.bin/jest",
+      "--listTests"
+    ],
+    "approved_test_paths": [
+      "__tests__/merge.security.test.js"
+    ],
+    "baseline_test": null,
+    "scratch_location": "Per-test in-memory objects; Object.prototype is restored in afterEach",
+    "observation_facilities": [
+      "Native Jest 24 JSON report per test with failure messages and locations; expect() matcher failures report Error",
+      "jest.fn and jest.mock module doubles that record calls and arguments"
+    ],
+    "witness_facilities": []
+  }
+}

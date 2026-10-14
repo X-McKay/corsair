@@ -3,7 +3,6 @@
 import argparse
 import asyncio
 from dataclasses import dataclass
-from hashlib import sha256
 import json
 from pathlib import Path
 import re
@@ -19,9 +18,8 @@ from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart, Tool
 from evals.native_skills import load_skills
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RunUsage, UsageLimits
-from pydantic_evals import Dataset, set_eval_attribute
+from pydantic_evals import Case, Dataset, set_eval_attribute
 from pydantic_evals.evaluators import Evaluator, HasMatchingSpan, MaxModelRequests, MaxToolCalls
-import yaml
 
 from corsair.inference.config import load_agent_config
 from corsair.inference.models import configured_model
@@ -33,6 +31,7 @@ from corsair.agents.test_planning.dependencies import PlanningDependencies
 from corsair.agents.test_planning.prompts import PROMPT_VERSION, SKILL_SHA256, planning_prompt
 from corsair.agents.test_planning.tools import TOOLSET_ID, TOOLSET_SHA256
 from corsair.agents.test_planning.validation import _symbol_occurs
+from evals.cases import LANGUAGES, load_set, set_digest, set_names
 from evals.test_planning.drafts import component_draft
 from evals.issue_analysis.evaluate import describe_model, record_count
 from evals.issue_analysis.live import NoUnknownToolAttempts, ProviderUsageCoverage, message_counts, output_tool_names
@@ -41,13 +40,11 @@ ROOT = Path(__file__).parent
 # Development cases shaped prompts v1-v5; each held-out set was frozen before any provider saw it
 # (heldout was exposed to v2/v3 in PLAN-0036; heldout2 was written and reviewed apart from the v4/v5 prompt author;
 # heldout3 carries SPEC-0040 typed facilities and witnesses and was written apart from the prompt author).
-DATASETS = {"development": "cases.yaml", "heldout": "cases-heldout.yaml", "heldout2": "cases-heldout-2.yaml",
-            "heldout3": "cases-heldout-3.yaml", "unit": "cases-unit.yaml", "unit-v2": "cases-unit-v2.yaml", "unit-first": "cases-unit-first-v2.yaml"}
+SUITE = "test_planning"
+# Every set is a frozen manifest of per-case directories (evals/cases.py): <language>/<set>/<case>/.
+DATASETS = tuple(set_names(SUITE))
 # Held-out sets written before SPEC-0040 typed witnesses: frozen, exposed and no longer runnable.
 RETIRED = frozenset({"heldout", "heldout2"})
-# SPEC-0023: a manifest of case name and content hash beside each held-out dataset.
-MANIFESTS = {"heldout": "cases-heldout.manifest.json", "heldout2": "cases-heldout-2.manifest.json",
-             "heldout3": "cases-heldout-3.manifest.json", "unit": "cases-unit.manifest.json", "unit-v2": "cases-unit-v2.manifest.json", "unit-first": "cases-unit-first-v2.manifest.json"}
 # Fixture setup reaching the parent of the scratch location or a fixed host directory (PLAN-0025 review finding).
 OUTSIDE_SCRATCH = re.compile(r"\.parent\b|(?<![\w.])/(?:tmp|var|etc|home|root)\b|(?<![\w.])~/", re.IGNORECASE)
 PlanOutput = ReadyTestPlan | UnsupportedTestPlan
@@ -131,22 +128,15 @@ class ReadBeforePlanning(Evaluator[TestPlanningInput, PlanOutput, PlanOracle]):
         return {"required_reads": ctx.metadata is not None and set(ctx.metadata.required_reads) <= read}
 
 
-def case_hashes(name: str) -> dict[str, str]:
-    """Content hash per case, over the canonical JSON of its YAML entry."""
-    cases = yaml.safe_load((ROOT / DATASETS[name]).read_text())["cases"]
-    return {case["name"]: sha256(json.dumps(case, sort_keys=True).encode()).hexdigest() for case in cases}
-
-
 def check_manifest(name: str) -> None:
-    """Refuse a held-out dataset whose cases differ from its frozen manifest."""
-    if name in MANIFESTS and case_hashes(name) != json.loads((ROOT / MANIFESTS[name]).read_text()):
-        raise ValueError(f"{DATASETS[name]} differs from its frozen manifest {MANIFESTS[name]}")
+    """Refuse a dataset whose cases differ from its frozen manifest (SPEC-0023)."""
+    load_set(SUITE, name)
 
 
-def dataset(name: str = "development") -> Dataset[TestPlanningInput, PlanOutput, PlanOracle]:
-    return Dataset[TestPlanningInput, PlanOutput, PlanOracle].from_file(
-        ROOT / DATASETS[name], custom_evaluator_types=(MatchesPlan, ReadBeforePlanning),
-    )
+def dataset(name: str = "development", language: str | None = None) -> Dataset[TestPlanningInput, PlanOutput, PlanOracle]:
+    return Dataset[TestPlanningInput, PlanOutput, PlanOracle](name=f"test-planning-{name}", cases=[
+        Case(name=case.name, inputs=TestPlanningInput.model_validate(case.input),
+             metadata=PlanOracle.model_validate(case.oracle)) for case in load_set(SUITE, name, language)])
 
 
 def scripted_model(oracle: PlanOracle) -> FunctionModel:
@@ -181,7 +171,7 @@ class EvaluationBudget(BaseModel):
 
 
 async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, cases: str = "development", provider=None,
-                   corpus=None, dataset_identity: dict | None = None):
+                   language: str | None = None, corpus=None, dataset_identity: dict | None = None):
     if cases in RETIRED:
         raise ValueError(f"{cases} is retired: its environments list no typed witness facilities (SPEC-0040)")
     supplied_corpus = corpus is not None
@@ -200,7 +190,7 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, case
     # Reserve before the first request; rerunning the same attempt is always refused.
     evidence.mkdir(parents=True, exist_ok=False)
     logfire.configure(send_to_logfire=False, console=False)
-    corpus = corpus if supplied_corpus else dataset(cases)
+    corpus = corpus if supplied_corpus else dataset(cases, language)
     scripted = model is None
     fixture_models = {case.inputs.input_digest: scripted_model(case.metadata) for case in corpus.cases} if scripted else {}
     actual_model = model if model is not None else next(iter(fixture_models.values()))
@@ -209,7 +199,8 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, case
                 "prompt_version": PROMPT_VERSION, "config_version": CONFIG_VERSION, "skill_sha256": SKILL_SHA256,
                 "toolset_id": TOOLSET_ID, "toolset_sha256": TOOLSET_SHA256, "budget": budget.model_dump(), "task_retries": 0, "max_concurrency": 1,
                 "evaluator_version": "planning-v2" if cases in ("unit-first", "unit-v2") else "planning-v1",
-                "dataset": cases, "dataset_sha256": dataset_identity["dataset_sha256"] if supplied_corpus else sha256((ROOT / DATASETS[cases]).read_bytes()).hexdigest(),
+                "dataset": cases, "language": language,
+                "dataset_sha256": dataset_identity["dataset_sha256"] if supplied_corpus else set_digest(SUITE, cases),
                 "provider": provider,
                 "output_contract": "ReadyTestPlan | UnsupportedTestPlan",
                 "draft_contract": "ReadyTestPlanDraft | UnsupportedTestPlanDraft"}
@@ -286,7 +277,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--provider-config", type=Path, help="Explicit provider configuration JSON; omitted means scripted fixture only")
-    parser.add_argument("--cases", choices=sorted(DATASETS), default="development")
+    parser.add_argument("--cases", choices=DATASETS, default="development")
+    parser.add_argument("--language", choices=LANGUAGES, help="only this language's cases of the set")
     parser.add_argument("--repeat", type=int, default=EvaluationBudget().repeat)
     args = parser.parse_args()
     if args.evidence.exists() or args.evidence.is_symlink():
@@ -294,10 +286,10 @@ def main():
     async def run():
         budget = EvaluationBudget(repeat=args.repeat)
         if args.provider_config is None:
-            return await evaluate(args.evidence, budget, cases=args.cases)
+            return await evaluate(args.evidence, budget, cases=args.cases, language=args.language)
         config = load_agent_config(args.provider_config, "planning")
         async with configured_model(config) as model:
-            return await evaluate(args.evidence, budget, model=model, cases=args.cases,
+            return await evaluate(args.evidence, budget, model=model, cases=args.cases, language=args.language,
                                   provider=config.model_dump(mode="json", exclude={"api_key_env"}))
     report = asyncio.run(run())
     report.print(include_input=False, include_output=False)

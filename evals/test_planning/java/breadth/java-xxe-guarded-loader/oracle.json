@@ -1,0 +1,100 @@
+{
+  "status": "ready",
+  "symbol": "loadTitle",
+  "target_path": "src/main/java/com/example/XmlLoader.java",
+  "required_lines": [
+    13,
+    20
+  ],
+  "adversarial_markers": [
+    "<!ENTITY"
+  ],
+  "witness_markers": [
+    "saxparseexception",
+    "assertthrows"
+  ],
+  "observation_kind": "exception",
+  "required_reads": [
+    "src/main/java/com/example/XmlLoader.java",
+    "src/test/java/com/example/XmlLoaderTest.java"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_id": "com.example.XmlLoaderSecurityTest#loadsPlainTitle",
+      "test_path": "src/test/java/com/example/XmlLoaderSecurityTest.java",
+      "fixture_setup": [
+        "Create @TempDir/secret.txt containing a distinct secret sentinel"
+      ],
+      "implementation_call": "new XmlLoader().loadTitle(xml)",
+      "input": "xml '<title>Quarterly</title>' with no DOCTYPE",
+      "required_behavior": "Returns exactly 'Quarterly'",
+      "observable_witness": "assertEquals on the String returned by the real loadTitle call",
+      "observation": {
+        "kind": "exception",
+        "property": "Returns exactly 'Quarterly'",
+        "seam": "Call the real XmlLoader.loadTitle with an in-memory document"
+      },
+      "source_references": [
+        {
+          "path": "src/main/java/com/example/XmlLoader.java",
+          "start_line": 13,
+          "end_line": 20
+        }
+      ]
+    },
+    "security": {
+      "test_id": "com.example.XmlLoaderSecurityTest#rejectsExternalEntity",
+      "test_path": "src/test/java/com/example/XmlLoaderSecurityTest.java",
+      "fixture_setup": [
+        "Create @TempDir/secret.txt containing a distinct secret sentinel",
+        "Build the document from secret.txt's file URI: <!DOCTYPE title [<!ENTITY x SYSTEM \"<uri>\">]><title>&x;</title>"
+      ],
+      "implementation_call": "new XmlLoader().loadTitle(xml)",
+      "input": "xml with <!DOCTYPE title [<!ENTITY x SYSTEM \"file:...secret.txt\">]> and <title>&x;</title>",
+      "required_behavior": "The call throws org.xml.sax.SAXParseException for the DOCTYPE and never returns the secret sentinel",
+      "observable_witness": "assertThrows(SAXParseException.class, ...) around the real loadTitle call; a returned title containing the sentinel fails the test",
+      "observation": {
+        "kind": "exception",
+        "property": "The call throws org.xml.sax.SAXParseException for the DOCTYPE and never returns the secret sentinel",
+        "seam": "Call the real XmlLoader.loadTitle with an in-memory document"
+      },
+      "source_references": [
+        {
+          "path": "src/main/java/com/example/XmlLoader.java",
+          "start_line": 13,
+          "end_line": 20
+        }
+      ]
+    },
+    "security_expectation": {
+      "failure_type": "org.opentest4j.AssertionFailedError",
+      "safe_behavior": "org.xml.sax.SAXParseException"
+    },
+    "discovery_command": [
+      "mvn",
+      "-o",
+      "-B",
+      "-q",
+      "test-compile"
+    ],
+    "evidence_requirements": [
+      "Native discovery finds exactly the two planned test ids",
+      "Both the control and the exploit probe execute with native Surefire outcomes and failure locations",
+      "Review the real source call, adversarial input and assertions before execution"
+    ],
+    "citations": [
+      {
+        "path": "src/main/java/com/example/XmlLoader.java",
+        "start_line": 13,
+        "end_line": 20
+      }
+    ],
+    "limitations": [
+      "Component scope only: the JDK's default parser implementation is the one exercised",
+      "Parameter entities and XInclude variants are not exercised by these two tests"
+    ]
+  }
+}

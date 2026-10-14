@@ -1,0 +1,12 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "open-redirect",
+  "kind": "negative",
+  "probes": "The exploit passes the scheme-relative URL to the real guard but asserts only that its allow-list argument was not modified, ignoring the returned target.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Written for this set; the property under review is in the frozen test patch, not the source."
+  }
+}

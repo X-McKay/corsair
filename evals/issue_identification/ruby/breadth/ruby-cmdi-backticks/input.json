@@ -1,0 +1,11 @@
+{
+  "fixture_id": "ruby-cmdi-backticks",
+  "issue": "Generating a PDF for a report named `q3; rm -rf tmp` also runs the second command. Locate ReportBuilder#build_pdf.",
+  "scope": "component",
+  "source_files": [
+    {
+      "path": "lib/report_builder.rb",
+      "content": "class ReportBuilder\n  def initialize(dir)\n    @dir = dir\n  end\n\n  def build_pdf(name)\n    `wkhtmltopdf #{@dir}/#{name}.html #{@dir}/#{name}.pdf`\n  end\nend\n"
+    }
+  ]
+}

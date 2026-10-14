@@ -1,0 +1,23 @@
+{
+  "script": [
+    {
+      "write": "reference"
+    },
+    {
+      "run": true
+    }
+  ],
+  "runner_runs": [
+    {
+      "status": "static"
+    }
+  ],
+  "status": "patch",
+  "runs": 1,
+  "security_assertion_lines": [
+    9
+  ],
+  "files": {
+    "reference": "const path = require('path');\nconst archive = require('../lib/archive-paths');\n\ntest('benign_control', () => {\n  expect(archive.destination('out', 'docs/a.txt')).toBe(path.join('out', 'docs/a.txt'));\n});\n\ntest('security_refuses_escaping_entry', () => {\n  expect(() => archive.destination('out', '../../etc/cron.d/job')).toThrow(RangeError);\n});\n"
+  }
+}

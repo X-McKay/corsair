@@ -1,0 +1,36 @@
+{
+  "script": [
+    {
+      "write": "reference"
+    },
+    {
+      "run": true
+    },
+    {
+      "run": true
+    },
+    {
+      "run": true
+    }
+  ],
+  "runner_runs": [
+    {
+      "status": "collection_error",
+      "errors": "E   Can't locate Badge/Helpers.pm in @INC (you may need to install the Badge::Helpers module) at t/badge_security.t line 5."
+    },
+    {
+      "status": "collection_error",
+      "errors": "E   Can't locate Badge/Helpers.pm in @INC (you may need to install the Badge::Helpers module) at t/badge_security.t line 5."
+    },
+    {
+      "status": "collection_error",
+      "errors": "E   Can't locate Badge/Helpers.pm in @INC (you may need to install the Badge::Helpers module) at t/badge_security.t line 5."
+    }
+  ],
+  "status": "blocked",
+  "layer": "discovery",
+  "runs": 3,
+  "files": {
+    "reference": "use strict;\nuse warnings;\nuse Test::More;\nuse Badge;\n\nsubtest benign_control => sub {\n    is(Badge::render('ok'), '<span class=\"badge\">ok</span>', 'renders a plain label');\n};\n\nsubtest security_escapes_markup => sub {\n    my $html = Badge::render('<script>alert(1)</script>');\n    unlike($html, qr/<script>/, 'does not emit the label as markup');\n};\n\ndone_testing();\n"
+  }
+}

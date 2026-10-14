@@ -1,0 +1,56 @@
+{
+  "scope": "component",
+  "identification": {
+    "status": "ready",
+    "scope": "component",
+    "reason": null,
+    "reported_issue": "Attachments.fetch_attachment receives the attachment name from the download URL. A name such as ../outside.txt may read files outside the attachment root. Analyze this component only.",
+    "target": {
+      "symbol": "fetch_attachment",
+      "source": {
+        "path": "lib/attachments.rb",
+        "start_line": 5,
+        "end_line": 6,
+        "quote": "  def self.fetch_attachment(root, name)\n    File.read(File.join(root, name))"
+      }
+    }
+  },
+  "source_files": [
+    {
+      "path": "lib/attachments.rb",
+      "content": "# frozen_string_literal: true\n\nmodule Attachments\n  # Return the stored attachment body for a download request.\n  def self.fetch_attachment(root, name)\n    File.read(File.join(root, name))\n  end\nend\n"
+    },
+    {
+      "path": "test/attachments_test.rb",
+      "content": "# frozen_string_literal: true\n\nrequire 'minitest/autorun'\nrequire 'tmpdir'\nrequire 'attachments'\n\nclass AttachmentsTest < Minitest::Test\n  def test_reads_stored_attachment\n    Dir.mktmpdir do |dir|\n      File.write(File.join(dir, 'a.txt'), 'hello')\n      assert_equal 'hello', Attachments.fetch_attachment(dir, 'a.txt')\n    end\n  end\nend\n"
+    }
+  ],
+  "environment": {
+    "language": "Ruby",
+    "runtime": "Ruby 3.1",
+    "framework": "minitest",
+    "discovery_command": [
+      "bundle",
+      "exec",
+      "rake",
+      "test",
+      "TESTOPTS=--verbose"
+    ],
+    "approved_test_paths": [
+      "test/attachments_security_test.rb"
+    ],
+    "baseline_test": {
+      "test_id": "test/attachments_test.rb::AttachmentsTest#test_reads_stored_attachment",
+      "path": "test/attachments_test.rb"
+    },
+    "scratch_location": "A per-test Dir.mktmpdir directory removed in teardown; fixtures must not be created elsewhere",
+    "observation_facilities": [
+      "Native Minitest results per test with failure class and location",
+      "Minitest assert_raises for a specific exception class and Dir.mktmpdir per-test directories"
+    ],
+    "assertion_facts": [
+      "Minitest assertion failures, including assert_raises when the expected exception is not raised, report Minitest::Assertion. Match the planned native failure type."
+    ],
+    "witness_facilities": []
+  }
+}

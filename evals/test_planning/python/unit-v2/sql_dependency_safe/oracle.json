@@ -1,0 +1,101 @@
+{
+  "status": "ready",
+  "symbol": "lookup_account",
+  "target_path": "queries.py",
+  "required_lines": [
+    4,
+    5
+  ],
+  "adversarial_markers": [],
+  "required_reads": [
+    "queries.py",
+    "test_existing.py"
+  ],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "security_expectation": {
+      "failure_type": "AssertionError",
+      "safe_behavior": "bound_parameter"
+    },
+    "discovery_command": [
+      "python",
+      "-m",
+      "pytest",
+      "--collect-only",
+      "-q"
+    ],
+    "evidence_requirements": [
+      "Both control and exploit probe must execute with native outcomes",
+      "Review both real source calls, adversarial input and assertions before execution"
+    ],
+    "citations": [
+      {
+        "path": "queries.py",
+        "start_line": 4,
+        "end_line": 5
+      }
+    ],
+    "limitations": [
+      "Query construction only; database engine behavior is outside the observation boundary"
+    ],
+    "control": {
+      "test_id": "test_queries.py::test_benign_control",
+      "test_path": "test_queries.py",
+      "fixture_setup": [
+        "Create an in-memory recording database dependency returning [(25,)] and recording query plus parameters unchanged"
+      ],
+      "implementation_call": "queries.lookup_account(database, account)",
+      "input": "account 'alice'",
+      "required_behavior": "Benign lookup returns rows and records the expected query with its account argument",
+      "observable_witness": "Recorded query and parameter arguments from the real lookup_account call",
+      "observation": {
+        "kind": "dependency_call",
+        "property": "Benign lookup returns rows and records the expected query with its account argument",
+        "seam": "Call the real imported lookup_account with an injected database dependency",
+        "controlled_dependency": "RecordingDatabase.execute records query and parameters unchanged and returns fixed rows; it does not construct or sanitize the query"
+      },
+      "source_references": [
+        {
+          "path": "queries.py",
+          "start_line": 4,
+          "end_line": 5
+        }
+      ]
+    },
+    "security": {
+      "test_id": "test_queries.py::test_security_preserves_query_structure",
+      "test_path": "test_queries.py",
+      "fixture_setup": [
+        "Create an in-memory recording database dependency returning [(25,)] and recording query plus parameters unchanged"
+      ],
+      "implementation_call": "queries.lookup_account(database, account)",
+      "input": "account \"alice' OR 1=1 --\"",
+      "required_behavior": "Hostile input remains a bound parameter and never enters SQL structure",
+      "observable_witness": "Recorded query and parameter arguments from the real lookup_account call",
+      "observation": {
+        "kind": "dependency_call",
+        "property": "Hostile input remains a bound parameter and never enters SQL structure",
+        "seam": "Call the real imported lookup_account with an injected database dependency",
+        "controlled_dependency": "RecordingDatabase.execute records query and parameters unchanged and returns fixed rows; it does not construct or sanitize the query"
+      },
+      "source_references": [
+        {
+          "path": "queries.py",
+          "start_line": 4,
+          "end_line": 5
+        }
+      ]
+    }
+  },
+  "adversarial_patterns": [
+    "(?i)'\\s+OR\\s+([0-9]+)\\s*=\\s*\\1(?=\\s|--|['\"]?$)",
+    "(?i)'\\s+OR\\s+'([a-z0-9_]+)'\\s*=\\s*'\\1'?(?=\\s|--|[\"']?$)"
+  ],
+  "observation_mode": "unit_test",
+  "property_markers": [
+    "parameter",
+    "structure",
+    "query"
+  ]
+}

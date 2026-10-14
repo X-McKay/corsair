@@ -1,0 +1,24 @@
+{
+  "script": [
+    {
+      "write": "reference"
+    },
+    {
+      "run": true
+    }
+  ],
+  "runner_runs": [
+    {
+      "status": "discovered",
+      "control": "failed",
+      "security": "failed",
+      "security_failure": "Minitest::Assertion"
+    }
+  ],
+  "status": "blocked",
+  "layer": "fixture",
+  "runs": 1,
+  "files": {
+    "reference": "require 'minitest/autorun'\nrequire 'tmpdir'\nrequire 'download_headers'\n\nclass DownloadHeadersSecurityTest < Minitest::Test\n  def test_benign_control\n    assert_equal 'attachment; filename=\"report.txt\"', DownloadHeaders.disposition('report.txt')\n  end\n\n  def test_security_keeps_one_header_line\n    value = DownloadHeaders.disposition(\"report.txt\\r\\nSet-Cookie: session=x\")\n    refute_match(/[\\r\\n]/, value)\n  end\nend\n"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "script": [
+    {
+      "write": "reference"
+    },
+    {
+      "run": true
+    }
+  ],
+  "runner_runs": [
+    {
+      "status": "static"
+    }
+  ],
+  "status": "patch",
+  "runs": 1,
+  "security_assertion_lines": [
+    20
+  ],
+  "files": {
+    "reference": "require 'minitest/autorun'\nrequire 'tmpdir'\nrequire 'notes'\n\nclass NotesSecurityTest < Minitest::Test\n  def test_benign_control\n    Dir.mktmpdir do |dir|\n      root = File.join(dir, 'notes')\n      Dir.mkdir(root)\n      File.write(File.join(root, 'todo.txt'), 'milk')\n      assert_equal 'milk', Notes.read(root, 'todo.txt')\n    end\n  end\n\n  def test_security_stays_inside_root\n    Dir.mktmpdir do |dir|\n      root = File.join(dir, 'notes')\n      Dir.mkdir(root)\n      File.write(File.join(dir, 'secret.txt'), 'top secret')\n      assert_nil Notes.read(root, '../secret.txt')\n    end\n  end\nend\n"
+  }
+}

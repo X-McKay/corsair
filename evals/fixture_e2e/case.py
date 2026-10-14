@@ -10,7 +10,6 @@ import re
 import sys
 
 import pytest
-import yaml
 from pydantic_ai.messages import ModelResponse, ToolCallPart, ToolReturnPart
 from pydantic_ai.models.function import FunctionModel
 from evals.native_skills import load_skills
@@ -24,6 +23,7 @@ from corsair.agents.test_planning.contracts import BaselineTest, EnvironmentEvid
 from corsair.composition.direct import CapturedReviewSource, FixtureCase
 from corsair.core.disposition import EnvironmentIdentity
 from corsair.ports.test_runner import WitnessRequest
+from evals.cases import load_set
 
 from .reviewed import DISCOVER, FIXTURE, PREFIX, REVIEWED_TEST, ReviewedLocalExecution, ReviewedWorkspace
 
@@ -132,8 +132,8 @@ def scripted_identification(case: str = "exploitable") -> FunctionModel:
 
 def historical_reference_plan(discovery: tuple[str, ...] = DISCOVER, case: str = "exploitable") -> dict:
     """The planning dataset's reference plan, its documents.py references spanning the case's identified target."""
-    cases = yaml.safe_load((REPOSITORY / "evals/test_planning/cases.yaml").read_text())["cases"]
-    plan = next(c for c in cases if c["name"] == "path_traversal_unguarded")["metadata"]["reference_plan"]
+    cases = load_set("test_planning", "development", "python")
+    plan = next(c for c in cases if c.name == "path_traversal_unguarded").oracle["reference_plan"]
     end = target_end(case)
 
     def span(references):

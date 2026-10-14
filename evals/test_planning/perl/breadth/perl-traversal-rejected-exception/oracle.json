@@ -1,0 +1,104 @@
+{
+  "status": "ready",
+  "symbol": "read_page",
+  "target_path": "lib/Docs.pm",
+  "required_lines": [
+    6,
+    12
+  ],
+  "adversarial_markers": [
+    "../"
+  ],
+  "witness_markers": [
+    "like($@"
+  ],
+  "observation_kind": "exception",
+  "required_reads": [
+    "lib/Docs.pm",
+    "t/docs.t"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_id": "t/docs-security.t#reads_page_inside_root",
+      "test_path": "t/docs-security.t",
+      "fixture_setup": [
+        "Create a per-subtest directory $dir with File::Temp::tempdir(CLEANUP => 1)",
+        "Create $dir/pages/ containing intro.txt with a benign sentinel",
+        "Create $dir/outside.txt, outside pages/, containing a distinct outside sentinel"
+      ],
+      "implementation_call": "Docs::read_page(\"$dir/pages\", 'intro.txt')",
+      "input": "name 'intro.txt' inside the page root",
+      "required_behavior": "Returns exactly the benign sentinel content",
+      "observable_witness": "is() on the string returned by the real read_page call",
+      "observation": {
+        "kind": "exception",
+        "property": "Returns exactly the benign sentinel content",
+        "seam": "use Docs and call the real Docs::read_page"
+      },
+      "source_references": [
+        {
+          "path": "lib/Docs.pm",
+          "start_line": 6,
+          "end_line": 12
+        }
+      ]
+    },
+    "security": {
+      "test_id": "t/docs-security.t#rejects_name_outside_root",
+      "test_path": "t/docs-security.t",
+      "fixture_setup": [
+        "Create a per-subtest directory $dir with File::Temp::tempdir(CLEANUP => 1)",
+        "Create $dir/pages/ containing intro.txt with a benign sentinel",
+        "Create $dir/outside.txt, outside pages/, containing a distinct outside sentinel",
+        "Read $dir/outside.txt before the call to show the fixture exists and is readable"
+      ],
+      "implementation_call": "Docs::read_page(\"$dir/pages\", '../outside.txt')",
+      "input": "name '../outside.txt', which resolves outside the page root",
+      "required_behavior": "The call dies with a message matching /outside the page root/ and never returns the outside sentinel; the cannot-open message cannot satisfy it because the outside file exists",
+      "observable_witness": "eval { } around the real read_page call, then like($@, qr/outside the page root/) and ok(!defined $result)",
+      "observation": {
+        "kind": "exception",
+        "property": "The call dies with a message matching /outside the page root/ and never returns the outside sentinel; the cannot-open message cannot satisfy it because the outside file exists",
+        "seam": "use Docs and call the real Docs::read_page"
+      },
+      "source_references": [
+        {
+          "path": "lib/Docs.pm",
+          "start_line": 6,
+          "end_line": 12
+        }
+      ]
+    },
+    "security_expectation": {
+      "failure_type": "not_ok",
+      "safe_behavior": "die_outside_root"
+    },
+    "discovery_command": [
+      "prove",
+      "--norc",
+      "-l",
+      "-r",
+      "--dry",
+      "t"
+    ],
+    "evidence_requirements": [
+      "Native discovery lists the planned .t file and both planned subtests run",
+      "Both the control and the exploit probe execute with native TAP results and diagnostics",
+      "Review the real source call, adversarial input and assertions before execution"
+    ],
+    "citations": [
+      {
+        "path": "lib/Docs.pm",
+        "start_line": 6,
+        "end_line": 12
+      }
+    ],
+    "limitations": [
+      "Component scope only: the plan does not show that the handler passes the raw URL name",
+      "Only the die message and returned content are observed"
+    ]
+  }
+}

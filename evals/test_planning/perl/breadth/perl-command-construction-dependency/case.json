@@ -1,0 +1,12 @@
+{
+  "language": "perl",
+  "framework": "tap-harness",
+  "family": "command-injection",
+  "kind": "positive",
+  "probes": "Perl shell command construction planned through an injected recording code reference (dependency_call).",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic Notify module with an injected runner."
+  }
+}

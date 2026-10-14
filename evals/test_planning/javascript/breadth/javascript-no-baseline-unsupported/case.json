@@ -1,0 +1,14 @@
+{
+  "language": "javascript",
+  "framework": "jest",
+  "family": "prototype-pollution",
+  "kind": "abstention",
+  "probes": "Jest project whose __tests__ directory is empty: without an executed baseline the planner must return unsupported.",
+  "provenance": {
+    "source": "https://github.com/X-McKay/infosec-harness",
+    "commit": "52aa2ac64f3d81139b609f18890ac52950d02933",
+    "path": "eval-corpus/javascript/prototypepollution/a/src/merge.js",
+    "license": "n/a (same owner; imported under SPEC-0067, see benchmarks/corpus/infosec-harness/SOURCE.md)",
+    "notes": "Upstream variant ships only __tests__/.gitkeep, so no baseline exists."
+  }
+}

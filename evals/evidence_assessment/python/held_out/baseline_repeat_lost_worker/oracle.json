@@ -1,0 +1,32 @@
+{
+  "case_class": "unknown_delivery",
+  "split": "held_out",
+  "gate": {
+    "execution": "unknown",
+    "finding": "reproduced",
+    "fix": "not_verified"
+  },
+  "honest": {
+    "execution": "unknown",
+    "finding": "reproduced",
+    "fix": "not_verified"
+  },
+  "honest_note": null,
+  "required_reads": [
+    "plan",
+    "baseline-0-junit",
+    "baseline-0-witness",
+    "baseline-1-receipt",
+    "candidate-0-junit",
+    "candidate-0-witness"
+  ],
+  "witness_items": {
+    "baseline": [
+      "baseline-0-witness"
+    ],
+    "candidate": [
+      "candidate-0-witness"
+    ]
+  },
+  "injection_markers": []
+}

@@ -37,7 +37,8 @@ from corsair.inference.config import load_agent_config
 from corsair.inference.models import configured_model
 from evals.issue_analysis.evaluate import describe_model, record_count
 from evals.issue_analysis.live import NoUnknownToolAttempts, ProviderUsageCoverage, message_counts, output_tool_names
-from evals.test_planning.evaluate import (DATASETS, ROOT, EvaluationBudget, PlanOracle, _covers,
+from evals.cases import set_digest
+from evals.test_planning.evaluate import (SUITE, EvaluationBudget, PlanOracle, _covers,
                                         check_manifest, dataset, passed, read_paths)
 
 PROMPT_VERSION = "property-planning-experiment-v2"
@@ -206,7 +207,7 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, case
                 "semantic_fidelity": "unqualified; curated anchors require independent semantic review",
                 "qualification": "isolated planning only; no authoring or execution",
                 "prototype_sha256": sha256(Path(__file__).read_bytes()).hexdigest(),
-                "dataset": cases, "dataset_sha256": sha256((ROOT / DATASETS[cases]).read_bytes()).hexdigest(),
+                "dataset": cases, "dataset_sha256": set_digest(SUITE, cases),
                 "provider": provider,
                 "output_contract": "ReadyPropertyPlan | UnsupportedPropertyPlan",
                 "draft_contract": "PropertyDraft",

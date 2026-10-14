@@ -1,0 +1,12 @@
+{
+  "language": "javascript",
+  "framework": "jest24",
+  "family": "path-traversal",
+  "kind": "negative",
+  "probes": "The fs double's realpathSync throws for paths outside /srv/assets, so the asserted rejection is raised by the double before readAsset's own check runs.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Written for this set; the property under review is in the frozen test patch, not the source."
+  }
+}

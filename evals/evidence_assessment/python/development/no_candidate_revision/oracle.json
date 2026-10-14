@@ -1,0 +1,26 @@
+{
+  "case_class": "no_candidate_revision",
+  "split": "development",
+  "gate": {
+    "execution": "completed",
+    "finding": "reproduced",
+    "fix": "not_applicable"
+  },
+  "honest": {
+    "execution": "completed",
+    "finding": "reproduced",
+    "fix": "not_applicable"
+  },
+  "honest_note": null,
+  "required_reads": [
+    "plan",
+    "baseline-0-junit",
+    "baseline-0-witness"
+  ],
+  "witness_items": {
+    "baseline": [
+      "baseline-0-witness"
+    ]
+  },
+  "injection_markers": []
+}

@@ -1,0 +1,31 @@
+{
+  "script": [
+    {
+      "write": "broken"
+    },
+    {
+      "run": true
+    },
+    {
+      "write": "reference"
+    },
+    {
+      "run": true
+    }
+  ],
+  "runner_runs": [
+    {
+      "status": "collection_error"
+    },
+    {
+      "status": "static"
+    }
+  ],
+  "status": "patch",
+  "runs": 2,
+  "security_assertion_lines": [
+    64,
+    65,
+    66
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "required_reads": [
+    "package.json",
+    ".travis.yml"
+  ],
+  "commands": [
+    [
+      "npm",
+      "ci",
+      "--ignore-scripts"
+    ],
+    [
+      "npm",
+      "run",
+      "build"
+    ]
+  ],
+  "observations": [
+    {
+      "exit": 0,
+      "stdout": "added 523 packages in 9.81s\n"
+    },
+    {
+      "exit": 1,
+      "stdout": "\n> tiny-router@2.1.0 build /sandbox/work\n> babel src -d lib\n\nSyntaxError: src/router.js: Unexpected token (14:6)\n\n  12 |   match(path) {\n  13 |     const { params, ...rest } = this.parse(path);\n> 14 |       ...rest\n     |       ^\nnpm ERR! code ELIFECYCLE\nnpm ERR! errno 1\nnpm ERR! tiny-router@2.1.0 build: `babel src -d lib`\n"
+    }
+  ],
+  "draft": {
+    "status": "blocked",
+    "layer": "build",
+    "evidence": "SyntaxError: src/router.js: Unexpected token (14:6)",
+    "run_ids": [
+      2
+    ],
+    "citations": []
+  },
+  "status": "blocked",
+  "layer": "build",
+  "max_commands": 12,
+  "toolchain_id": "node-8.17.0-npm",
+  "requirement_patterns": [],
+  "checkout_paths": null
+}

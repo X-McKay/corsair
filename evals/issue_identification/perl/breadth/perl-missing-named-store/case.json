@@ -1,0 +1,11 @@
+{
+  "language": "perl",
+  "framework": "perl",
+  "family": "unsafe-deserialization",
+  "kind": "abstention",
+  "probes": "A neighbouring cookie module is captured but the named Session::Store package is not.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)"
+  }
+}

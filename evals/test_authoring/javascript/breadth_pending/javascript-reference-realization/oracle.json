@@ -1,0 +1,23 @@
+{
+  "script": [
+    {
+      "write": "reference"
+    },
+    {
+      "run": true
+    }
+  ],
+  "runner_runs": [
+    {
+      "status": "static"
+    }
+  ],
+  "status": "patch",
+  "runs": 1,
+  "security_assertion_lines": [
+    22
+  ],
+  "files": {
+    "reference": "const fs = require('fs');\nconst os = require('os');\nconst path = require('path');\nconst notes = require('../lib/notes');\n\nfunction scratch() {\n  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'notes-'));\n  const root = path.join(dir, 'notes');\n  fs.mkdirSync(root);\n  return { dir, root };\n}\n\ntest('benign_control', () => {\n  const { root } = scratch();\n  fs.writeFileSync(path.join(root, 'todo.txt'), 'milk');\n  expect(notes.read(root, 'todo.txt')).toBe('milk');\n});\n\ntest('security_stays_inside_root', () => {\n  const { dir, root } = scratch();\n  fs.writeFileSync(path.join(dir, 'secret.txt'), 'top secret');\n  expect(notes.read(root, '../secret.txt')).toBeNull();\n});\n"
+  }
+}

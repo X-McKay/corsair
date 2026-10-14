@@ -1,0 +1,8 @@
+{
+  "revisions": {
+    "development": "vulnerable",
+    "baseline": "vulnerable",
+    "candidate": "fixed"
+  },
+  "source": "saved"
+}

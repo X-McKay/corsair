@@ -1,0 +1,10 @@
+{
+  "status": "ready",
+  "symbol": "search_entries",
+  "path": "search.rb",
+  "required_lines": [
+    1,
+    3
+  ],
+  "max_span": 8
+}

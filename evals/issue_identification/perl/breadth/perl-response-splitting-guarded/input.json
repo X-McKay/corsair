@@ -1,0 +1,15 @@
+{
+  "fixture_id": "perl-response-splitting-guarded",
+  "issue": "redirect_headers builds a Location header from a caller value. A reporter believes %0d%0aSet-Cookie: could inject a header. Locate the header construction.",
+  "scope": "component",
+  "source_files": [
+    {
+      "path": "cpanfile",
+      "content": "requires 'perl', '5.010';\n"
+    },
+    {
+      "path": "lib/Responder.pm",
+      "content": "package Responder;\nuse strict;\nuse warnings;\n\n# Build the raw HTTP response headers for a redirect to $location.\nsub redirect_headers {\n    my ($location) = @_;\n    $location =~ s/[\\r\\n]//g;\n    return \"HTTP/1.1 302 Found\\r\\nLocation: $location\\r\\nContent-Length: 0\\r\\n\\r\\n\";\n}\n\n1;\n"
+    }
+  ]
+}

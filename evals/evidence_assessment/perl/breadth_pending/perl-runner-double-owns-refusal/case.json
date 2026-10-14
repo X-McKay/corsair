@@ -1,0 +1,12 @@
+{
+  "language": "perl",
+  "framework": "test-more",
+  "family": "command-injection",
+  "kind": "negative",
+  "probes": "The runner double refuses shell metacharacters itself, so the exploit asserts a refusal the production archive code never makes.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Written for this set; the property under review is in the frozen test patch, not the source."
+  }
+}

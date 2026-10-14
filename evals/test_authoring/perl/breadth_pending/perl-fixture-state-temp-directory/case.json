@@ -1,0 +1,17 @@
+{
+  "language": "perl",
+  "framework": "tap-harness",
+  "family": "upload-path-traversal",
+  "kind": "pending-reader",
+  "probes": "A fixture_state plan: the security test observes a temporary directory for a file written outside it",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Written for this set; the source shape follows common upload path traversal reports"
+  },
+  "behaviour_kind": "positive",
+  "pending": {
+    "missing": "authoring id grammar and TAP assertion reader",
+    "note": "TestAuthoringInput refuses TAP `file.t#subtest` ids, and static.assertion_lines has no Perl reader; draft PR #128 adds both (PERL_TEST_ID in AUTHORED_TEST_ID and perl.py)"
+  }
+}

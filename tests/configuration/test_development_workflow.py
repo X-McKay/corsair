@@ -126,19 +126,3 @@ def test_test_shards_partition_the_collection():
         with pytest.raises(ValueError):
             shard(items, bad)
 
-
-def test_held_out_cases_match_manifest_and_stay_unnamed_in_records():
-    """SPEC-0023: held-out cases are frozen by manifest and never cited by name in work records."""
-    import json
-    from evals.test_planning.evaluate import MANIFESTS, ROOT as EVALS, case_hashes
-    for name, manifest in MANIFESTS.items():
-        frozen = json.loads((EVALS / manifest).read_text())
-        assert case_hashes(name) == frozen, f"held-out dataset {name} differs from {manifest}"
-        # Development/unit manifests freeze fixtures, but only held-out sets prohibit disclosure.
-        if not name.startswith("heldout"):
-            continue
-        records = [path for kind in ("plans", "issues", "handoffs", "specs", "ideas")
-                   for path in (ROOT / "docs/development" / kind).glob("*.md")]
-        for path in records:
-            text = path.read_text()
-            assert not [case for case in frozen if case in text], f"{path.name} names a held-out case"

@@ -1,0 +1,59 @@
+{
+  "scope": "component",
+  "identification": {
+    "status": "ready",
+    "scope": "component",
+    "reason": null,
+    "reported_issue": "apply_preferences copies every field of the submitted settings form onto the Preferences object. Only theme and language are meant to be user-editable, but a crafted form can also set internal attributes such as store_path and make the service write its preferences file somewhere else. Analyze this component only.",
+    "target": {
+      "symbol": "apply_preferences",
+      "source": {
+        "path": "preferences.py",
+        "start_line": 16,
+        "end_line": 20,
+        "quote": "def apply_preferences(prefs: Preferences, updates: dict[str, str]) -> None:\n    \"\"\"Apply the fields a user submitted from the settings form, then persist them.\"\"\"\n    for key, value in updates.items():\n        setattr(prefs, key, value)\n    prefs.save()"
+      }
+    }
+  },
+  "source_files": [
+    {
+      "path": "preferences.py",
+      "content": "import json\nfrom pathlib import Path\n\n\nclass Preferences:\n    def __init__(self, store_path: Path):\n        self.store_path = store_path\n        self.theme = \"light\"\n        self.language = \"en\"\n\n    def save(self) -> None:\n        with open(self.store_path, \"w\") as handle:\n            json.dump({\"theme\": self.theme, \"language\": self.language}, handle)\n\n\ndef apply_preferences(prefs: Preferences, updates: dict[str, str]) -> None:\n    \"\"\"Apply the fields a user submitted from the settings form, then persist them.\"\"\"\n    for key, value in updates.items():\n        setattr(prefs, key, value)\n    prefs.save()\n"
+    },
+    {
+      "path": "test_preferences_existing.py",
+      "content": "import json\nfrom pathlib import Path\n\nimport preferences\n\n\ndef test_saves_theme(tmp_path: Path):\n    prefs = preferences.Preferences(tmp_path / \"prefs.json\")\n    preferences.apply_preferences(prefs, {\"theme\": \"dark\"})\n    assert json.loads((tmp_path / \"prefs.json\").read_text())[\"theme\"] == \"dark\"\n"
+    }
+  ],
+  "environment": {
+    "language": "Python",
+    "runtime": "CPython 3.12",
+    "framework": "pytest 9.0.2",
+    "discovery_command": [
+      "python",
+      "-m",
+      "pytest",
+      "--collect-only",
+      "-q"
+    ],
+    "approved_test_paths": [
+      "test_preferences_security.py"
+    ],
+    "baseline_test": {
+      "test_id": "test_preferences_existing.py::test_saves_theme",
+      "path": "test_preferences_existing.py"
+    },
+    "scratch_location": "The per-test pytest tmp_path directory; fixtures must not be created elsewhere",
+    "observation_facilities": [
+      "Python sys.addaudithook 'open' audit events recording the file paths opened during a test",
+      "Native JUnit XML outcomes and captured stdout per test"
+    ],
+    "witness_facilities": [
+      {
+        "id": "open_events",
+        "kind": "file_open",
+        "description": "Python sys.addaudithook 'open' events recording each path the test process opens during the call"
+      }
+    ]
+  }
+}

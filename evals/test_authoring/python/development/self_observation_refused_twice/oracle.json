@@ -1,0 +1,18 @@
+{
+  "script": [
+    {
+      "write": "self_observing"
+    },
+    {
+      "write": "self_observing"
+    }
+  ],
+  "runner_runs": [
+    {
+      "status": "static"
+    }
+  ],
+  "status": "blocked",
+  "runs": 0,
+  "layer": "admission"
+}

@@ -1,0 +1,120 @@
+{
+  "fixture_id": "ruby-guarded-source-same-patch-v1",
+  "inputs": {
+    "plan": {
+      "status": "ready",
+      "scope": "component",
+      "security_expectation": {
+        "failure_type": "Minitest::Assertion",
+        "safe_behavior": "nil_outside_root"
+      },
+      "discovery_command": [
+        "ruby",
+        "-Ilib",
+        "-Itest",
+        "test/notes_test.rb"
+      ],
+      "evidence_requirements": [
+        "Both control and exploit probe must execute with native outcomes",
+        "Review both real source calls, adversarial input and assertions before execution"
+      ],
+      "citations": [
+        {
+          "path": "lib/notes.rb",
+          "start_line": 3,
+          "end_line": 9,
+          "quote": "  def self.read(root, name)\n    base = File.expand_path(root)\n    path = File.expand_path(name, base)\n    return nil unless path.start_with?(base + File::SEPARATOR)\n    return nil unless File.file?(path)\n    File.read(path)\n  end"
+        }
+      ],
+      "limitations": [
+        "Path traversal at this one call only; callers and deployment configuration are outside the observation"
+      ],
+      "control": {
+        "test_id": "test/notes_security_test.rb::NotesSecurityTest#test_benign_control",
+        "test_path": "test/notes_security_test.rb",
+        "fixture_setup": [
+          "Create a temporary directory with a notes root inside it",
+          "Write todo.txt inside the notes root and secret.txt in the parent directory"
+        ],
+        "implementation_call": "Notes.read(root, name)",
+        "input": "name 'todo.txt' for a note inside the notes root",
+        "required_behavior": "Returns the content of a note stored inside the root",
+        "observable_witness": "Native minitest assertion on returns the content of a note stored inside the root",
+        "observation": {
+          "kind": "return_value",
+          "property": "Returns the content of a note stored inside the root",
+          "seam": "Call the real Notes.read through its public interface"
+        },
+        "source_references": [
+          {
+            "path": "lib/notes.rb",
+            "start_line": 3,
+            "end_line": 9,
+            "quote": "  def self.read(root, name)\n    base = File.expand_path(root)\n    path = File.expand_path(name, base)\n    return nil unless path.start_with?(base + File::SEPARATOR)\n    return nil unless File.file?(path)\n    File.read(path)\n  end"
+          }
+        ]
+      },
+      "security": {
+        "test_id": "test/notes_security_test.rb::NotesSecurityTest#test_security_stays_inside_root",
+        "test_path": "test/notes_security_test.rb",
+        "fixture_setup": [
+          "Create a temporary directory with a notes root inside it",
+          "Write todo.txt inside the notes root and secret.txt in the parent directory"
+        ],
+        "implementation_call": "Notes.read(root, name)",
+        "input": "name '../secret.txt' naming a file beside, not inside, the notes root",
+        "required_behavior": "Returns nil for a name that resolves outside the notes root instead of the file's content",
+        "observable_witness": "Native minitest assertion on returns nil for a name that resolves outside the notes root instead of the file's content",
+        "observation": {
+          "kind": "return_value",
+          "property": "Returns nil for a name that resolves outside the notes root instead of the file's content",
+          "seam": "Call the real Notes.read through its public interface"
+        },
+        "source_references": [
+          {
+            "path": "lib/notes.rb",
+            "start_line": 3,
+            "end_line": 9,
+            "quote": "  def self.read(root, name)\n    base = File.expand_path(root)\n    path = File.expand_path(name, base)\n    return nil unless path.start_with?(base + File::SEPARATOR)\n    return nil unless File.file?(path)\n    File.read(path)\n  end"
+          }
+        ]
+      }
+    },
+    "source_files": [
+      {
+        "path": "lib/notes.rb",
+        "content": "# Plain-file notes kept under one directory.\nmodule Notes\n  def self.read(root, name)\n    base = File.expand_path(root)\n    path = File.expand_path(name, base)\n    return nil unless path.start_with?(base + File::SEPARATOR)\n    return nil unless File.file?(path)\n    File.read(path)\n  end\nend\n"
+      },
+      {
+        "path": "test/notes_test.rb",
+        "content": "require 'minitest/autorun'\nrequire 'tmpdir'\nrequire 'notes'\n\nclass NotesTest < Minitest::Test\n  def test_reads_existing_note\n    Dir.mktmpdir do |root|\n      File.write(File.join(root, 'todo.txt'), 'milk')\n      assert_equal 'milk', Notes.read(root, 'todo.txt')\n    end\n  end\nend\n"
+      }
+    ],
+    "environment": {
+      "language": "Ruby",
+      "runtime": "Ruby 3.1",
+      "framework": "minitest",
+      "discovery_command": [
+        "ruby",
+        "-Ilib",
+        "-Itest",
+        "test/notes_test.rb"
+      ],
+      "approved_test_paths": [
+        "test/notes_security_test.rb"
+      ],
+      "baseline_test": {
+        "test_id": "test/notes_test.rb::NotesTest#test_reads_existing_note",
+        "path": "test/notes_test.rb"
+      },
+      "scratch_location": "A per-test Dir.mktmpdir directory removed after the block",
+      "observation_facilities": [
+        "Native Minitest outcomes and assertion failure locations"
+      ],
+      "assertion_facts": [
+        "Minitest assertion failures, including assert_raises when the expected exception is not raised, report Minitest::Assertion. Match the planned native failure type."
+      ],
+      "witness_facilities": []
+    }
+  }
+}

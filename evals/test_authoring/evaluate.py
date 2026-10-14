@@ -7,14 +7,12 @@ runs are answered by injected observations or the static host runner (SPEC-0044)
 import argparse
 import asyncio
 from dataclasses import dataclass, replace
-from hashlib import sha256
 import json
 from pathlib import Path
 from time import perf_counter
 from typing import Literal
 from uuid import UUID, uuid4
 
-import yaml
 
 import logfire
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
@@ -23,7 +21,7 @@ from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, Tool
 from pydantic_ai.models.function import FunctionModel
 from openai import APIConnectionError
 from pydantic_ai.usage import RunUsage, UsageLimits
-from pydantic_evals import Dataset, set_eval_attribute
+from pydantic_evals import Case, Dataset, set_eval_attribute
 from pydantic_evals.evaluators import Evaluator, HasMatchingSpan, MaxModelRequests, MaxToolCalls
 
 from corsair.inference.config import load_agent_config
@@ -40,8 +38,10 @@ from corsair.agents.test_authoring.tools import RUN_TOOL, TOOLSET_SHA256, WRITE_
 from corsair.ports.test_runner import (
     ApprovedPatch, Discovery, Execution, FailureDetail, NativeTestRun, TestCaseResult,
 )
+from evals.cases import LANGUAGES, load_set, set_digest, set_names
 from evals.issue_analysis.evaluate import describe_model, record_count
 from evals.issue_analysis.live import NoUnknownToolAttempts, ProviderUsageCoverage, message_counts, output_tool_names
+from evals.test_authoring import languages
 from evals.test_authoring.admission import admission_facts, witness_hooks
 from evals.test_authoring.static_runner import StaticRunner
 
@@ -68,6 +68,8 @@ class ScriptedRun(BaseModel):
     security: Literal["passed", "failed", "skipped"] = "failed"
     # The failed security test's reported type; another type than the plan's is an error before the assertion.
     security_failure: str = "AssertionError"
+    # A collection_error's native discovery text; omitted keeps the pytest text the development set was frozen with.
+    errors: str | None = None
 
 
 class AuthoringCase(BaseModel):
@@ -86,6 +88,9 @@ class AuthoringOracle(BaseModel):
     runs: int
     layer: str | None = None
     security_assertion_lines: tuple[int, ...] = ()
+    # Named test files a per-case oracle carries for its scripted author's `write` steps; a name here takes
+    # precedence over the shared FILES, which the single-file sets use.
+    files: dict[str, str] = Field(default_factory=dict)
 
 
 class ScriptedRunner:
@@ -111,7 +116,8 @@ class ScriptedRunner:
             return self.static.run(patch, control_test_id=control_test_id, security_test_id=security_test_id,
                                    discovery_command=discovery_command, operation=operation)
         if scripted.status == "collection_error":
-            discovery = Discovery("collection_error", (), "E   SyntaxError: invalid syntax", discovery_command, None)
+            discovery = Discovery("collection_error", (), scripted.errors or "E   SyntaxError: invalid syntax",
+                                  discovery_command, None)
             return NativeTestRun(str(operation), patch.sha256, None, discovery, None, "confirmed", "discovery",
                                  "collection error")
         ids = (control_test_id, security_test_id)
@@ -137,6 +143,9 @@ def authoring_checks(inputs: TestAuthoringInput, output: AuthoringOutput, oracle
         return checks | {"layer": output.layer == oracle.layer and bool(output.reason.strip())}
     plan, approved = inputs.plan, inputs.environment.approved_test_paths
     files = {item.path: item.content for item in output.files}
+    language = languages.language_of(plan.security.test_id)
+    if language != "python":
+        return checks | _language_checks(language, inputs, output, oracle, files, live)
     symbol = plan.control.implementation_call.split("(")[0].split(".")[-1]
     absence = plan.security.test_id if plan.security_expectation.safe_behavior.startswith("no_") else None
     statics = [static_checks(files.get(spec.test_path, ""), spec.test_id, symbol, absence_test=absence)
@@ -154,6 +163,24 @@ def authoring_checks(inputs: TestAuthoringInput, output: AuthoringOutput, oracle
     if not live:
         checks["security_assertion_lines"] = output.security_assertion_lines == oracle.security_assertion_lines
     return checks | admission_facts(plan, files, output.security_assertion_lines)
+
+
+def _language_checks(language: str, inputs: TestAuthoringInput, output: TestPatch, oracle: AuthoringOracle,
+                     files: dict[str, str], live: bool) -> dict[str, bool]:
+    """The same check names for a Minitest, Jest, JUnit or TAP patch, from ``languages.py``'s facts."""
+    plan = inputs.plan
+    statics = [languages.static_facts(language, files.get(spec.test_path, ""), spec.test_id, spec.implementation_call)
+               for spec in (plan.control, plan.security)]
+    checks = {
+        "contract": set(files) <= set(inputs.environment.approved_test_paths)
+                    and output.control_test_id == plan.control.test_id
+                    and output.security_test_id == plan.security.test_id
+                    and output.discovery_command == plan.discovery_command,
+        "static_semantics": all(all(facts.values()) for facts in statics),
+    }
+    if not live:
+        checks["security_assertion_lines"] = output.security_assertion_lines == oracle.security_assertion_lines
+    return checks | languages.admission_facts(language, plan, files, output.security_assertion_lines)
 
 
 @dataclass
@@ -181,18 +208,17 @@ class AuthoringTrajectory(Evaluator[AuthoringCase, AuthoringOutput, AuthoringOra
                 "security_withheld": ctx.attributes.get("security_revealed") == 0}
 
 
-DATASETS = {"development": "cases.yaml", "unit": "cases-unit.yaml"}
+SUITE = "test_authoring"
+# Every set is a frozen manifest of per-case directories (evals/cases.py). breadth_pending holds cases production
+# refuses today for a recorded missing language capability; it runs through ``pending`` and is expected to fail
+# until that capability lands.
+DATASETS = tuple(set_names(SUITE))
 
 
-def dataset(name: str = "development") -> Dataset[AuthoringCase, AuthoringOutput, AuthoringOracle]:
-    if name == "unit":
-        cases = yaml.safe_load((ROOT / DATASETS[name]).read_text())["cases"]
-        hashes = {case["name"]: sha256(json.dumps(case, sort_keys=True).encode()).hexdigest() for case in cases}
-        if hashes != json.loads((ROOT / "cases-unit.manifest.json").read_text()):
-            raise ValueError("unit authoring cases differ from their frozen manifest")
-    return Dataset[AuthoringCase, AuthoringOutput, AuthoringOracle].from_file(
-        ROOT / DATASETS[name], custom_evaluator_types=(MatchesAuthoring, AuthoringTrajectory),
-    )
+def dataset(name: str = "development", language: str | None = None) -> Dataset[AuthoringCase, AuthoringOutput, AuthoringOracle]:
+    return Dataset[AuthoringCase, AuthoringOutput, AuthoringOracle](name=f"test-authoring-{name}", cases=[
+        Case(name=case.name, inputs=AuthoringCase.model_validate(case.input),
+             metadata=AuthoringOracle.model_validate(case.oracle)) for case in load_set(SUITE, name, language)])
 
 
 def scripted_model(inputs: TestAuthoringInput, oracle: AuthoringOracle) -> FunctionModel:
@@ -204,7 +230,8 @@ def scripted_model(inputs: TestAuthoringInput, oracle: AuthoringOracle) -> Funct
     steps = [ToolCallPart(READ_SOURCE_TOOL, {"path": path}) for path in reads]
     for step in oracle.script:
         if "write" in step:
-            steps.append(ToolCallPart(WRITE_TOOL, {"path": plan.security.test_path, "content": FILES[step["write"]]}))
+            content = oracle.files.get(step["write"]) or FILES[step["write"]]
+            steps.append(ToolCallPart(WRITE_TOOL, {"path": plan.security.test_path, "content": content}))
         elif "read" in step:
             steps.append(ToolCallPart(READ_SOURCE_TOOL, {"path": step["read"]}))
         else:
@@ -257,11 +284,12 @@ class EvaluationBudget(BaseModel):
     dev_runs: int = Field(default=3, ge=1, le=5, strict=True)
 
 
-async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, provider=None, cases="development"):
+async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, provider=None, cases="development",
+                   corpus: Dataset | None = None, language: str | None = None):
     """Host only: runs are answered by injected observations or the static host runner, never executed."""
     evidence.mkdir(parents=True, exist_ok=False)
     logfire.configure(send_to_logfire=False, console=False)
-    corpus = dataset(cases)
+    corpus = corpus if corpus is not None else dataset(cases, language)
     scripted = model is None
     oracles = {case.inputs.fixture_id: case.metadata for case in corpus.cases}
     fixture_models = {case.inputs.fixture_id: scripted_model(case.inputs.inputs, case.metadata) for case in corpus.cases} if scripted else {}
@@ -272,7 +300,7 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, prov
                 "prompt_version": PROMPT_VERSION, "config_version": CONFIG_VERSION, "skill_sha256": SKILL_SHA256,
                 "toolset_sha256": TOOLSET_SHA256,
                 "budget": budget.model_dump(), "task_retries": 0, "max_concurrency": 1,
-                "dataset": cases, "dataset_sha256": sha256((ROOT / DATASETS[cases]).read_bytes()).hexdigest(),
+                "dataset": cases, "language": language, "dataset_sha256": set_digest(SUITE, cases),
                 "output_contract": "TestPatch | BlockedAuthoring",
                 "draft_contract": "AuthoredPatchDraft | BlockedAuthoringDraft"}
     (evidence / "configuration.json").write_text(json.dumps(metadata, indent=2))
@@ -337,6 +365,36 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, prov
     return report
 
 
+# The production refusal a pending case records today: the authoring contracts admit pytest and Minitest ids only.
+INPUT_GRAMMAR = "is not a supported native node id"
+
+
+async def pending(evidence: Path, budget: EvaluationBudget) -> dict[str, dict]:
+    """Run breadth_pending case by case, scripted: a case production refuses as input is recorded with that
+    refusal; an admitted one runs as any other case. Every outcome is written to ``pending.json``."""
+    evidence.mkdir(parents=True, exist_ok=False)
+    outcomes: dict[str, dict] = {}
+    for case in load_set(SUITE, "breadth_pending"):
+        try:
+            inputs = AuthoringCase.model_validate(case.input)
+        except ValueError as exc:
+            errors = exc.errors() if hasattr(exc, "errors") else [{"msg": str(exc)}]
+            outcomes[case.name] = {"outcome": "refused_input", "reason": "; ".join(e["msg"] for e in errors)}
+            continue
+        corpus = Dataset[AuthoringCase, AuthoringOutput, AuthoringOracle](name=f"test-authoring-pending-{case.name}", cases=[
+            Case(name=case.name, inputs=inputs, metadata=AuthoringOracle.model_validate(case.oracle))])
+        report = await evaluate(evidence / case.name, budget, cases="breadth_pending", corpus=corpus)
+        retries = sorted({part["content"] if isinstance(part["content"], str) else json.dumps(part["content"])
+                          for receipt in (evidence / case.name).glob("attempt-*.json")
+                          for message in json.loads(receipt.read_text())["messages"]
+                          for part in message.get("parts", ()) if part.get("part_kind") == "retry-prompt"})
+        outcomes[case.name] = ({"outcome": "passed"} if passed(report) else
+                               {"outcome": "failed", "reason": "; ".join(f.error_message for f in report.failures)
+                                or "evaluator checks failed", "retries": retries})
+    (evidence / "pending.json").write_text(json.dumps(outcomes, indent=2))
+    return outcomes
+
+
 def passed(report) -> bool:
     return bool(report.cases) and not report.failures and not report.report_evaluator_failures and all(
         not case.evaluator_failures and case.assertions and all(item.value for item in case.assertions.values())
@@ -348,19 +406,31 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--provider-config", type=Path, help="Explicit provider configuration JSON; omitted means scripted fixture only")
-    parser.add_argument("--cases", choices=sorted(DATASETS), default="development")
+    parser.add_argument("--cases", choices=DATASETS, default="development")
+    parser.add_argument("--language", choices=LANGUAGES, help="only this language's cases of the set")
     parser.add_argument("--repeat", type=int, default=EvaluationBudget().repeat)
     args = parser.parse_args()
     if args.evidence.exists() or args.evidence.is_symlink():
         parser.error("evidence path already exists")
 
+    if args.cases == "breadth_pending":
+        if args.provider_config is not None:
+            parser.error("breadth_pending runs scripted only")
+        outcomes = asyncio.run(pending(args.evidence, EvaluationBudget(repeat=args.repeat)))
+        for name, outcome in outcomes.items():
+            print(f"{name}: {outcome['outcome']} {outcome.get('reason', '')}")
+        print(f"pending: {sum(o['outcome'] == 'passed' for o in outcomes.values())}/{len(outcomes)} passed")
+        if not all(outcome["outcome"] == "passed" for outcome in outcomes.values()):
+            raise SystemExit(1)
+        return
+
     async def run():
         budget = EvaluationBudget(repeat=args.repeat)
         if args.provider_config is None:
-            return await evaluate(args.evidence, budget, cases=args.cases)
+            return await evaluate(args.evidence, budget, cases=args.cases, language=args.language)
         config = load_agent_config(args.provider_config, "authoring")
         async with configured_model(config) as model:
-            return await evaluate(args.evidence, budget, model=model, cases=args.cases,
+            return await evaluate(args.evidence, budget, model=model, cases=args.cases, language=args.language,
                                   provider=config.model_dump(mode="json", exclude={"api_key_env"}))
     report = asyncio.run(run())
     report.print(include_input=False, include_output=False)

@@ -1,0 +1,101 @@
+{
+  "status": "ready",
+  "symbol": "getUser",
+  "target_path": "src/main/java/com/example/UserDao.java",
+  "required_lines": [
+    10,
+    12
+  ],
+  "adversarial_markers": [
+    "OR '1'='1"
+  ],
+  "witness_markers": [
+    "sql",
+    "parameter"
+  ],
+  "observation_kind": "dependency_call",
+  "required_reads": [
+    "src/main/java/com/example/UserDao.java",
+    "src/test/java/com/example/UserDaoTest.java"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_id": "com.example.UserDaoSecurityTest#looksUpPlainName",
+      "test_path": "src/test/java/com/example/UserDaoSecurityTest.java",
+      "fixture_setup": [
+        "Create a recording Connection with java.lang.reflect.Proxy over Connection, Statement and PreparedStatement"
+      ],
+      "implementation_call": "new UserDao().getUser(connection, \"alice\")",
+      "input": "name 'alice'",
+      "required_behavior": "The connection records exactly one query for the users table whose lookup value is alice",
+      "observable_witness": "Recorded SQL text and bound parameters from the real getUser call, asserted with assertEquals",
+      "observation": {
+        "kind": "dependency_call",
+        "property": "The connection records exactly one query for the users table whose lookup value is alice",
+        "seam": "Call the real UserDao.getUser with an injected Connection double",
+        "controlled_dependency": "A java.lang.reflect.Proxy Connection records the SQL text given to createStatement/executeQuery or prepareStatement and every setString parameter, and returns a null ResultSet; it does not construct, parse or sanitize SQL"
+      },
+      "source_references": [
+        {
+          "path": "src/main/java/com/example/UserDao.java",
+          "start_line": 10,
+          "end_line": 12
+        }
+      ]
+    },
+    "security": {
+      "test_id": "com.example.UserDaoSecurityTest#keepsHostileNameOutOfSql",
+      "test_path": "src/test/java/com/example/UserDaoSecurityTest.java",
+      "fixture_setup": [
+        "Create a recording Connection with java.lang.reflect.Proxy over Connection, Statement and PreparedStatement"
+      ],
+      "implementation_call": "new UserDao().getUser(connection, \"alice' OR '1'='1\")",
+      "input": "name \"alice' OR '1'='1\"",
+      "required_behavior": "The recorded SQL text does not contain the hostile name and the name is recorded only as a bound setString parameter",
+      "observable_witness": "Recorded SQL text and bound parameters from the real getUser call: assertFalse(sql.contains(\"OR '1'='1\")) and the parameter list equals the hostile name",
+      "observation": {
+        "kind": "dependency_call",
+        "property": "The recorded SQL text does not contain the hostile name and the name is recorded only as a bound setString parameter",
+        "seam": "Call the real UserDao.getUser with an injected Connection double",
+        "controlled_dependency": "A java.lang.reflect.Proxy Connection records the SQL text given to createStatement/executeQuery or prepareStatement and every setString parameter, and returns a null ResultSet; it does not construct, parse or sanitize SQL"
+      },
+      "source_references": [
+        {
+          "path": "src/main/java/com/example/UserDao.java",
+          "start_line": 10,
+          "end_line": 12
+        }
+      ]
+    },
+    "security_expectation": {
+      "failure_type": "java.lang.AssertionError",
+      "safe_behavior": "bound_parameter"
+    },
+    "discovery_command": [
+      "mvn",
+      "-o",
+      "-B",
+      "-q",
+      "test-compile"
+    ],
+    "evidence_requirements": [
+      "Native discovery finds exactly the two planned test ids",
+      "Both the control and the exploit probe execute with native Surefire outcomes",
+      "Review the real source call, adversarial input and assertions before execution"
+    ],
+    "citations": [
+      {
+        "path": "src/main/java/com/example/UserDao.java",
+        "start_line": 10,
+        "end_line": 12
+      }
+    ],
+    "limitations": [
+      "Query construction only; database engine behavior is outside the observation boundary",
+      "JUnit 4 on JDK 8: the Proxy double needs no extra test dependency"
+    ]
+  }
+}

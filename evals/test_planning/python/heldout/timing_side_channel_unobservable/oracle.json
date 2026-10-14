@@ -1,0 +1,21 @@
+{
+  "status": "unsupported",
+  "required_reads": [
+    "tokens.py"
+  ],
+  "reference_plan": {
+    "status": "unsupported",
+    "scope": "component",
+    "missing_capability": "Observing a timing leak needs a repeated high-resolution timing measurement facility, which the environment does not list; outcomes and file opens cannot show it",
+    "limitations": [
+      "No test specification is produced; the concern remains untested at this scope"
+    ],
+    "citations": [
+      {
+        "path": "tokens.py",
+        "start_line": 1,
+        "end_line": 4
+      }
+    ]
+  }
+}

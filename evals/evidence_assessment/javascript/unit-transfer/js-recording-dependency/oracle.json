@@ -1,0 +1,215 @@
+{
+  "expected": {
+    "source_linked": true,
+    "condition_exercised": true,
+    "assertions_relevant": true,
+    "dependency_scope_valid": true
+  },
+  "scripted_review": {
+    "revision": "baseline",
+    "control": {
+      "test_id": "preview.test.js::control",
+      "production_binding": {
+        "called_symbol": "renderPreview",
+        "status": "production",
+        "call_site": {
+          "item_id": "patch",
+          "start_line": 5,
+          "end_line": 5
+        },
+        "definition_site": {
+          "item_id": "baseline-source",
+          "start_line": 1,
+          "end_line": 3
+        },
+        "evidence": {
+          "statement": "The import or method binding and definition show whether the call resolves to production or the local copy.",
+          "citations": [
+            {
+              "item_id": "patch",
+              "start_line": 1,
+              "end_line": 1
+            },
+            {
+              "item_id": "baseline-source",
+              "start_line": 1,
+              "end_line": 1
+            }
+          ]
+        }
+      },
+      "input_exercise": {
+        "observed_input": "Alice",
+        "status": "benign",
+        "preconditions": "established",
+        "evidence": {
+          "statement": "The call-site literal is compared with the plan and reported input.",
+          "citations": [
+            {
+              "item_id": "patch",
+              "start_line": 1,
+              "end_line": 1
+            },
+            {
+              "item_id": "test-plan",
+              "start_line": 1,
+              "end_line": 1
+            },
+            {
+              "item_id": "reported-condition",
+              "start_line": 1,
+              "end_line": 1
+            }
+          ]
+        }
+      },
+      "assertion": {
+        "asserted_property": "Fixed template and unchanged user value recorded by client, with ok returned",
+        "status": "benign_behavior",
+        "evidence": {
+          "statement": "The assertions inspect the exact recorded template and value, not only whether the client was called.",
+          "citations": [
+            {
+              "item_id": "patch",
+              "start_line": 1,
+              "end_line": 1
+            },
+            {
+              "item_id": "test-plan",
+              "start_line": 1,
+              "end_line": 1
+            },
+            {
+              "item_id": "reported-condition",
+              "start_line": 1,
+              "end_line": 1
+            }
+          ]
+        }
+      },
+      "dependencies": {
+        "substitutions": [
+          "Rendering client records arguments unchanged and returns ok; production argument construction is retained"
+        ],
+        "scope": "dependencies_only",
+        "evidence": {
+          "statement": "Only the rendering client is substituted; its recorder has no security decision.",
+          "citations": [
+            {
+              "item_id": "patch",
+              "start_line": 1,
+              "end_line": 1
+            },
+            {
+              "item_id": "baseline-source",
+              "start_line": 1,
+              "end_line": 1
+            }
+          ]
+        }
+      }
+    },
+    "exploit": {
+      "test_id": "preview.test.js::exploit",
+      "production_binding": {
+        "called_symbol": "renderPreview",
+        "status": "production",
+        "call_site": {
+          "item_id": "patch",
+          "start_line": 10,
+          "end_line": 10
+        },
+        "definition_site": {
+          "item_id": "baseline-source",
+          "start_line": 1,
+          "end_line": 3
+        },
+        "evidence": {
+          "statement": "The import or method binding and definition show whether the call resolves to production or the local copy.",
+          "citations": [
+            {
+              "item_id": "patch",
+              "start_line": 1,
+              "end_line": 1
+            },
+            {
+              "item_id": "baseline-source",
+              "start_line": 1,
+              "end_line": 1
+            }
+          ]
+        }
+      },
+      "input_exercise": {
+        "observed_input": "{{admin}}",
+        "status": "reported_adversarial",
+        "preconditions": "established",
+        "evidence": {
+          "statement": "The call-site literal is compared with the plan and reported input.",
+          "citations": [
+            {
+              "item_id": "patch",
+              "start_line": 1,
+              "end_line": 1
+            },
+            {
+              "item_id": "test-plan",
+              "start_line": 1,
+              "end_line": 1
+            },
+            {
+              "item_id": "reported-condition",
+              "start_line": 1,
+              "end_line": 1
+            }
+          ]
+        }
+      },
+      "assertion": {
+        "asserted_property": "Fixed template and unchanged user value recorded by client, with ok returned",
+        "status": "security_property",
+        "evidence": {
+          "statement": "The assertions inspect the exact recorded template and value, not only whether the client was called.",
+          "citations": [
+            {
+              "item_id": "patch",
+              "start_line": 1,
+              "end_line": 1
+            },
+            {
+              "item_id": "test-plan",
+              "start_line": 1,
+              "end_line": 1
+            },
+            {
+              "item_id": "reported-condition",
+              "start_line": 1,
+              "end_line": 1
+            }
+          ]
+        }
+      },
+      "dependencies": {
+        "substitutions": [
+          "Rendering client records arguments unchanged and returns ok; production argument construction is retained"
+        ],
+        "scope": "dependencies_only",
+        "evidence": {
+          "statement": "Only the rendering client is substituted; its recorder has no security decision.",
+          "citations": [
+            {
+              "item_id": "patch",
+              "start_line": 1,
+              "end_line": 1
+            },
+            {
+              "item_id": "baseline-source",
+              "start_line": 1,
+              "end_line": 1
+            }
+          ]
+        }
+      }
+    }
+  }
+}

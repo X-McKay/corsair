@@ -16,7 +16,7 @@ from pathlib import Path
 from .artifacts import ArtifactStore
 from .contracts import BuildResult, Case, Environment, Recipe, Runtime
 from .workspace.docker import (LABEL, ContainerExists, DockerConfig, Exec, copy_tree_in, create, docker, exec_once,
-                               labels, make_workdir, owner, remove)
+                               labels, make_workdir, owner, remove, write_file)
 
 SETUP_TIMEOUT_S = 1800.0
 BASELINE_TIMEOUT_S = 600.0
@@ -86,6 +86,8 @@ def replay(case: Case, runtime: Runtime, recipe: Recipe, *, revision: str = "vul
         uid, gid = owner(name)
         make_workdir(name, workdir, uid, gid)
         copy_tree_in(name, Path(tree.source), workdir, uid, gid)
+        for added in recipe.files:
+            write_file(name, f"{workdir}/{added.path}", added.content.encode())
         for index, step in enumerate(recipe.setup, 1):
             result = exec_once(name, step, workdir=workdir, timeout=setup_timeout)
             _record(log, step, result)

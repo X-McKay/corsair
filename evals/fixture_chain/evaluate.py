@@ -22,7 +22,7 @@ from pydantic import BaseModel, ConfigDict, TypeAdapter
 from pydantic_ai import models
 from pydantic_ai.messages import RetryPromptPart
 from pydantic_ai.durable_exec.temporal import PydanticAIPlugin
-from pydantic_evals import Dataset, set_eval_attribute
+from pydantic_evals import Case, Dataset, set_eval_attribute
 from pydantic_evals.evaluators import Evaluator
 from temporalio.client import Client
 
@@ -41,10 +41,12 @@ from evals.fixture_e2e.reviewed import FIXTURE, PREFIX, ReviewedLocalExecution, 
 from evals.fixture_e2e.run import STAGES, VERSION_FIELDS, VERSIONS, Journal, attempt_record, result_record
 from corsair.workflows.chain import run_durable
 from corsair.workflows.chain_runtime import ChainResult, FailureRecord
+from evals.cases import load_set, set_digest
 from evals.issue_analysis.evaluate import describe_model, record_count
 
 ROOT = Path(__file__).parent
-CASES = ROOT / "cases.yaml"
+# The fixture chain's cases: the end-to-end `fixture` set (evals/e2e/python/fixture/<case>/, PLAN-0098).
+SUITE, SET = "e2e", "fixture"
 Purpose = Literal["development", "baseline", "candidate"]
 Variant = Literal["vulnerable", "fixed"]
 
@@ -106,7 +108,9 @@ ChainDataset = Dataset[ChainInput, ChainOutcome, ChainOracle]
 
 
 def dataset() -> ChainDataset:
-    return ChainDataset.from_file(CASES, custom_evaluator_types=(ChainChecks,))
+    return ChainDataset(name="fixture-chain-v2", cases=[
+        Case(name=case.name, inputs=ChainInput.model_validate(case.input), metadata=ChainOracle.model_validate(case.oracle))
+        for case in load_set(SUITE, SET)])
 
 
 def _digest(path: Path) -> str:
@@ -205,7 +209,7 @@ async def evaluate(evidence: Path, budget: CompositionBudget = CompositionBudget
                 "versions": {stage: dict(zip(VERSION_FIELDS, VERSIONS[stage]))
                              for stage in STAGES},
                 "runner": "reviewed_host_workspace", "witness_capture": "none", "repeat": repeat, "max_concurrency": 1,
-                "task_retries": 0, "dataset_sha256": _digest(CASES), "source": {"python": sys.version}}
+                "task_retries": 0, "dataset_sha256": set_digest(SUITE, SET), "source": {"python": sys.version}}
     (evidence / "configuration.json").write_text(json.dumps(metadata, indent=2))
     corpus.evaluators.append(ChainChecks())
 

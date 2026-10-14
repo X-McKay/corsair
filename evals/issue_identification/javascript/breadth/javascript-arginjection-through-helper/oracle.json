@@ -1,0 +1,10 @@
+{
+  "status": "ready",
+  "symbol": "search",
+  "path": "src/search.js",
+  "required_lines": [
+    6,
+    7
+  ],
+  "max_span": 8
+}

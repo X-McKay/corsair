@@ -1,0 +1,11 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "authentication-bypass",
+  "kind": "abstention",
+  "probes": "Only a Minitest file for the named class is captured; a test is not the implementation, so information is missing.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)"
+  }
+}

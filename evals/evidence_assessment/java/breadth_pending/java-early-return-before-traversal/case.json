@@ -1,0 +1,12 @@
+{
+  "language": "java",
+  "framework": "junit5",
+  "family": "path-traversal",
+  "kind": "negative",
+  "probes": "The exploit returns early because the secret fixture it checks for is never created, so the traversal call is never reached.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Written for this set; the property under review is in the frozen test patch, not the source."
+  }
+}

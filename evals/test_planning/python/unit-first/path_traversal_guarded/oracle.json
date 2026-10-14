@@ -1,0 +1,107 @@
+{
+  "status": "ready",
+  "symbol": "read_document",
+  "target_path": "documents.py",
+  "required_lines": [
+    3,
+    7
+  ],
+  "adversarial_markers": [
+    "../"
+  ],
+  "required_reads": [
+    "documents.py",
+    "test_existing.py"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_id": "test_documents.py::test_benign_control",
+      "test_path": "test_documents.py",
+      "fixture_setup": [
+        "Create tmp_path/allowed/ containing document.txt with a benign sentinel",
+        "Create tmp_path/outside.txt, outside allowed/, containing a distinct outside sentinel"
+      ],
+      "implementation_call": "documents.read_document(allowed, 'document.txt')",
+      "input": "filename 'document.txt' inside the allowed root",
+      "required_behavior": "Returns exactly the benign sentinel content",
+      "observable_witness": "Native assertion on the benign return value",
+      "source_references": [
+        {
+          "path": "documents.py",
+          "start_line": 3,
+          "end_line": 7
+        }
+      ],
+      "observation": {
+        "kind": "return_value",
+        "property": "Returns exactly the benign sentinel content",
+        "seam": "Call the imported real documents.read_document function with the existing temporary directory fixture"
+      }
+    },
+    "security": {
+      "test_id": "test_documents.py::test_security_rejects_outside_read",
+      "test_path": "test_documents.py",
+      "fixture_setup": [
+        "Create tmp_path/allowed/ containing document.txt with a benign sentinel",
+        "Create tmp_path/outside.txt, outside allowed/, containing a distinct outside sentinel",
+        "Read tmp_path/outside.txt before the call to show the fixture exists and is readable"
+      ],
+      "implementation_call": "documents.read_document(allowed, '../outside.txt')",
+      "input": "filename '../outside.txt', which resolves outside the allowed root",
+      "required_behavior": "The call is rejected with the confinement ValueError and returns no content; the outside file is never opened",
+      "observable_witness": "Native assertion on the specific ValueError rejecting a path outside the root",
+      "source_references": [
+        {
+          "path": "documents.py",
+          "start_line": 3,
+          "end_line": 7
+        }
+      ],
+      "observation": {
+        "kind": "exception",
+        "property": "The call is rejected with the confinement ValueError and returns no content; the outside file is never opened",
+        "seam": "Call the imported real documents.read_document function with the existing temporary directory fixture"
+      }
+    },
+    "security_expectation": {
+      "failure_type": "AssertionError",
+      "safe_behavior": "ValueError"
+    },
+    "discovery_command": [
+      "python",
+      "-m",
+      "pytest",
+      "--collect-only",
+      "-q"
+    ],
+    "evidence_requirements": [
+      "Exactly both probes execute with native per-probe outcomes",
+      "Review source linkage, preconditions and property assertions before execution"
+    ],
+    "citations": [
+      {
+        "path": "documents.py",
+        "start_line": 3,
+        "end_line": 7
+      },
+      {
+        "path": "test_existing.py",
+        "start_line": 1,
+        "end_line": 8
+      }
+    ],
+    "limitations": [
+      "Component property only; application callers and filesystem engine behavior are outside the claim"
+    ]
+  },
+  "observation_mode": "unit_test",
+  "property_markers": [
+    "reject",
+    "ValueError",
+    "outside",
+    "content"
+  ]
+}

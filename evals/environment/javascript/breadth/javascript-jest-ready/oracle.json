@@ -1,0 +1,101 @@
+{
+  "required_reads": [
+    "package.json",
+    ".travis.yml"
+  ],
+  "commands": [
+    [
+      "npm",
+      "ci",
+      "--ignore-scripts"
+    ],
+    [
+      "node",
+      "--check",
+      "index.js"
+    ],
+    [
+      "node",
+      "node_modules/jest/bin/jest.js",
+      "--ci",
+      "--listTests"
+    ],
+    [
+      "node",
+      "node_modules/jest/bin/jest.js",
+      "--ci",
+      "--json",
+      "--runTestsByPath",
+      "test/parse.test.js"
+    ]
+  ],
+  "observations": [
+    {
+      "exit": 0,
+      "stdout": "added 523 packages in 9.81s\n"
+    },
+    {
+      "exit": 0,
+      "stdout": ""
+    },
+    {
+      "exit": 0,
+      "stdout": "/sandbox/work/test/parse.test.js\n/sandbox/work/test/stringify.test.js\n"
+    },
+    {
+      "exit": 0,
+      "stdout": "{\"numFailedTestSuites\":0,\"numFailedTests\":0,\"numPassedTestSuites\":1,\"numPassedTests\":2,\"numPendingTestSuites\":0,\"numPendingTests\":0,\"numRuntimeErrorTestSuites\":0,\"numTodoTests\":0,\"numTotalTestSuites\":1,\"numTotalTests\":2,\"openHandles\":[],\"startTime\":1791904230868,\"success\":true,\"testResults\":[{\"assertionResults\":[{\"ancestorTitles\":[],\"failureMessages\":[],\"fullName\":\"parses repeated keys\",\"location\":null,\"status\":\"passed\",\"title\":\"parses repeated keys\"},{\"ancestorTitles\":[],\"failureMessages\":[],\"fullName\":\"decodes plus as space\",\"location\":null,\"status\":\"passed\",\"title\":\"decodes plus as space\"}],\"endTime\":1791904231837,\"message\":\"\",\"name\":\"/sandbox/work/test/parse.test.js\",\"startTime\":1791904231277,\"status\":\"passed\",\"summary\":\"\"}],\"wasInterrupted\":false}"
+    }
+  ],
+  "draft": {
+    "status": "ready",
+    "toolchain_id": "node-8.17.0-npm",
+    "recipe": [
+      {
+        "phase": "dependency",
+        "command": [
+          "npm",
+          "ci",
+          "--ignore-scripts"
+        ],
+        "source": {
+          "path": ".travis.yml",
+          "start_line": 5,
+          "end_line": 5
+        }
+      }
+    ],
+    "build_command": [
+      "node",
+      "--check",
+      "index.js"
+    ],
+    "discovery_command": [
+      "node",
+      "node_modules/jest/bin/jest.js",
+      "--ci",
+      "--listTests"
+    ],
+    "framework": "jest",
+    "baseline_test_id": "test/parse.test.js",
+    "baseline_test_path": "test/parse.test.js",
+    "baseline_test_command": [
+      "node",
+      "node_modules/jest/bin/jest.js",
+      "--ci",
+      "--json",
+      "--runTestsByPath",
+      "test/parse.test.js"
+    ],
+    "approved_test_paths": [
+      "test/corsair_control.test.js",
+      "test/corsair_security.test.js"
+    ]
+  },
+  "status": "ready",
+  "layer": null,
+  "max_commands": 12,
+  "toolchain_id": "node-8.17.0-npm",
+  "requirement_patterns": [],
+  "checkout_paths": null
+}

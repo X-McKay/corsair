@@ -1,0 +1,12 @@
+{
+  "language": "javascript",
+  "framework": "jest",
+  "family": "js-recording-dependency",
+  "kind": "moved",
+  "probes": "Moved unchanged from evals/evidence_assessment/unit_transfer_cases_v2.json (unit-transfer set); the suite README describes what it exercises.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Corsair-authored; previously evals/evidence_assessment/unit_transfer_cases_v2.json"
+  }
+}

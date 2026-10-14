@@ -1,0 +1,12 @@
+{
+  "language": "perl",
+  "framework": "test-more",
+  "family": "path-traversal",
+  "kind": "negative",
+  "probes": "The subtests call My::LegacyFiles::slurp, a different package with its own check, instead of My::Files::read_file named by the plan.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Written for this set; the property under review is in the frozen test patch, not the source."
+  }
+}

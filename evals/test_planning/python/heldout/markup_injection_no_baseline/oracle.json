@@ -1,0 +1,21 @@
+{
+  "status": "unsupported",
+  "required_reads": [
+    "pages.py"
+  ],
+  "reference_plan": {
+    "status": "unsupported",
+    "scope": "component",
+    "missing_capability": "No discovered and executed baseline test shows that the native test framework runs in the prepared environment",
+    "limitations": [
+      "No test specification is produced; the concern remains untested at this scope"
+    ],
+    "citations": [
+      {
+        "path": "pages.py",
+        "start_line": 1,
+        "end_line": 2
+      }
+    ]
+  }
+}
