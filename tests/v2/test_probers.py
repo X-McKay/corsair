@@ -8,10 +8,10 @@ from pydantic_ai.messages import ModelResponse, RetryPromptPart, TextPart, ToolC
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.models.test import TestModel
 
-from corsair.v2.agents import control_prober, exploit_prober
-from corsair.v2.agents.probing.agent import framework_skills
-from corsair.v2.agents.probing.draft import protocol_defects
-from corsair.v2.contracts import Citation, ExitClass, ProbeBrief, ProbeDraft, Runtime
+from corsair.agents import control_prober, exploit_prober
+from corsair.agents.probing.agent import framework_skills
+from corsair.agents.probing.draft import protocol_defects
+from corsair.contracts import Citation, ExitClass, ProbeBrief, ProbeDraft, Runtime
 
 CONTROL_SOURCE = ("def test_ordinary():\n    open(env['CORSAIR_MARKER_DIR'] + '/start')\n"
                   "    assert target('a') == 'a', env['CORSAIR_TOKEN']\n")

@@ -4,8 +4,8 @@ import itertools
 
 import pytest
 
-from corsair.v2.contracts import ExitClass, Outcome, ProbeFacts
-from corsair.v2.outcome import classify, exit_class, read_check
+from corsair.contracts import ExitClass, Outcome, ProbeFacts
+from corsair.outcome import classify, exit_class, read_check
 
 E = ExitClass
 O = Outcome  # noqa: E741

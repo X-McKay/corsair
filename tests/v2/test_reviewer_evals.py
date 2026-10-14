@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 from pydantic_ai import capture_run_messages, models
 
-from corsair.v2.agents.reviewer.evals.evaluate import (
+from corsair.agents.reviewer.evals.evaluate import (
     DIMENSIONS,
     OPTIONAL,
     SPEC,
@@ -20,15 +20,15 @@ from corsair.v2.agents.reviewer.evals.evaluate import (
     run,
     scripted,
 )
-from corsair.v2.agents.reviewer.review import CHECKS
-from corsair.v2.contracts import Citation
+from corsair.agents.reviewer.review import CHECKS
+from corsair.contracts import Citation
 from evals.agent_eval import evaluate
 from evals.cases import CATEGORIES, agent_root, load_set
 
 LANGUAGES = ("python", "java", "javascript", "ruby", "perl")
 CASES = load_set(agent_root("reviewer"), "development")
 BY_KEY = {case.key: case for case in CASES}
-PROBERS = Path(__file__).parents[2] / "src/corsair/v2/agents"
+PROBERS = Path(__file__).parents[2] / "src/corsair/agents"
 
 
 def _attempt(case):

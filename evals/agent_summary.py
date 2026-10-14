@@ -4,7 +4,7 @@
 language and by case kind: per dimension passed/total, clean attempts, and efficiency (mean, p50, p90, total) over
 observed samples only. A metric no attempt reported has ``observed: 0`` and null statistics, never zero; ``total``
 is null when any attempt left it unreported (a sum with an unknown in it is unknown). Metric and parameter names
-follow the run record (``corsair-v2-run/1``, ``src/corsair/v2/RUN_RECORD.md``).
+follow the run record (``corsair-v2-run/1``, ``src/corsair/RUN_RECORD.md``).
 
 ``apply_policy`` reads the agent's ``evals/release-policy.yaml`` and reports pass, fail or unknown per entry. While
 gates are deferred it never changes the run's exit code. An entry whose threshold is null is ``not_set``; an entry

@@ -1,6 +1,6 @@
 """Whole-chain eval of v2: ``python -m evals.e2e.evaluate --set v2`` (or ``make eval AGENT=chain SET=v2``).
 
-Each case's ``input.json`` goes through v2 intake (``intake.from_issue_json``) and then ``corsair.v2.chain.run_case``:
+Each case's ``input.json`` goes through v2 intake (``intake.from_issue_json``) and then ``corsair.chain.run_case``:
 the real routing (``compose`` over ``LocalOps``), the real Select over ``deploy/v2/runtime-matrix.yaml`` and the
 real Decide (``rules.decide``), recorded by a ``RunRecorder`` in the attempt's fresh working directory.
 
@@ -8,7 +8,7 @@ real Decide (``rules.decide``), recorded by a ``RunRecorder`` in the attempt's f
   stages, the Builder workspace, trusted replay, the D3 check and Execute replay the case oracle's ``replay`` block
   (evaluator-only, never in ``input.json``); the models handed to ``run_case`` refuse any call. A case without the
   observation a stage needs gets a ``LookupError`` from that stage, which the chain records as ``infra_error``.
-- **Live** (``--provider-config``): ``default_stages()`` with every agent's model from ``corsair.v2.models``. It
+- **Live** (``--provider-config``): ``default_stages()`` with every agent's model from ``corsair.models``. It
   needs Docker and a reachable endpoint and refuses to start without Docker.
 
 The ``replay`` block (README "Scorer"): ``plan`` (status, citations), ``build`` (one entry per Builder episode:
@@ -42,14 +42,14 @@ from pydantic import BaseModel, ValidationError
 from pydantic_ai.models import Model
 from pydantic_ai.models.function import FunctionModel
 
-from corsair.v2 import intake, matrix
-from corsair.v2.chain import MAX_REVIEWS, Stages, default_stages, run_case
-from corsair.v2.contracts import (AgentUsage, Attempt as ExploitAttempt, BuildResult, Case, Citation, Environment,
+from corsair import intake, matrix
+from corsair.chain import MAX_REVIEWS, Stages, default_stages, run_case
+from corsair.contracts import (AgentUsage, Attempt as ExploitAttempt, BuildResult, Case, Citation, Environment,
                                   ExitClass, Label, Outcome, ProbeBrief, ProbeDraft, ProbeFacts, ProbePlan, ProbeRun,
                                   ProbeValidity, Recipe, Runtime, Validity, Verdict)
-from corsair.v2.outcome import classify
-from corsair.v2.record import RunRecorder, to_json
-from corsair.v2.rules import RULES, decide
+from corsair.outcome import classify
+from corsair.record import RunRecorder, to_json
+from corsair.rules import RULES, decide
 from evals.agent_eval import AgentEval, Attempt, main
 from evals.cases import EVALS, CHAIN, EvalCase
 
@@ -120,7 +120,7 @@ def _digest(value: BaseModel) -> str:
     return hashlib.sha256(json.dumps(value.model_dump(mode="json"), sort_keys=True).encode()).hexdigest()
 
 
-_FACTS = {  # the platform facts each raw outcome is classified from (corsair.v2.outcome), for a well-formed ProbeRun
+_FACTS = {  # the platform facts each raw outcome is classified from (corsair.outcome), for a well-formed ProbeRun
     "passed": dict(exit_code=0, exit_class=ExitClass.PASS, start_marker=True, end_marker=True, token_in_output=False,
                    check_marker="holds"),
     "assertion_failed": dict(exit_code=1, exit_class=ExitClass.TEST_FAILED, start_marker=True, end_marker=False,

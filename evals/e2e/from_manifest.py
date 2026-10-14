@@ -14,7 +14,7 @@ import argparse
 import json
 from pathlib import Path
 
-from corsair.v2 import intake, matrix
+from corsair import intake, matrix
 
 ROOT = Path(__file__).resolve().parents[2]
 E2E = ROOT / "evals/e2e"

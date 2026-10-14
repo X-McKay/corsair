@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from corsair.v2 import intake, matrix
-from corsair.v2.contracts import Label, TerminalReason
-from corsair.v2.rules import RULES
+from corsair import intake, matrix
+from corsair.contracts import Label, TerminalReason
+from corsair.rules import RULES
 from evals.cases import EVALS, load_set
 
 ROOT = Path(__file__).resolve().parents[2]

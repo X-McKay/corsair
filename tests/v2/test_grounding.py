@@ -6,17 +6,17 @@ from pydantic import ValidationError
 from pydantic_ai.durable_exec.temporal import TemporalDurability
 from pydantic_ai.models.test import TestModel
 
-from corsair.v2.agents.grounding.agent import create_agent, ground, render_prompt
-from corsair.v2.agents.grounding.citations import validate_citations
-from corsair.v2.agents.grounding.contracts import (FindingInput, GroundingBrief, GroundingContext,
+from corsair.agents.grounding.agent import create_agent, ground, render_prompt
+from corsair.agents.grounding.citations import validate_citations
+from corsair.agents.grounding.contracts import (FindingInput, GroundingBrief, GroundingContext,
                                                    Precedent, Skip)
-from corsair.v2.agents.grounding.graph import (CWE_PEERS, InMemoryGraph, gather, hops_in_range, query_text_for,
+from corsair.agents.grounding.graph import (CWE_PEERS, InMemoryGraph, gather, hops_in_range, query_text_for,
                                                source_location)
-from corsair.v2.agents.grounding.intake import (FixtureWorkItems, InMemoryWriteBack, IntakeTooLarge,
+from corsair.agents.grounding.intake import (FixtureWorkItems, InMemoryWriteBack, IntakeTooLarge,
                                                 backfill_location_from_graph, check_wiql, parse_scan_header,
                                                 work_item_to_finding)
-from corsair.v2.agents.grounding.tools import render_context
-from corsair.v2.contracts import Finding
+from corsair.agents.grounding.tools import render_context
+from corsair.contracts import Finding
 from tests.v2.agent_scripts import Script, tool_returns
 
 HEADER = ("<div>Scanner report</div><div>Project:   Payments</div><p>Repository: payments-api</p>"

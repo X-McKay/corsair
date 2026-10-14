@@ -21,9 +21,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-from corsair.v2.contracts import Environment, Recipe, RecipeFile
-from corsair.v2.intake import tree_sha256
-from corsair.v2.workspace import Sandboxes, SandboxExists, SandboxSpec, labels
+from corsair.contracts import Environment, Recipe, RecipeFile
+from corsair.intake import tree_sha256
+from corsair.workspace import Sandboxes, SandboxExists, SandboxSpec, labels
 from tests.v2.live_cleanup import record_cleanup, remove_confirmed
 
 MATRIX = Path(__file__).resolve().parents[2] / "deploy/v2/runtime-matrix.yaml"
@@ -40,7 +40,7 @@ class Backend:
 
 
 def _docker() -> Backend:
-    from corsair.v2.workspace.docker import DockerSandboxes, docker, docker_available
+    from corsair.workspace.docker import DockerSandboxes, docker, docker_available
 
     if not docker_available() or docker("image", "inspect", DOCKER_IMAGE).returncode != 0:
         pytest.skip(f"docker or {DOCKER_IMAGE} unavailable")
@@ -54,7 +54,7 @@ def _docker() -> Backend:
 def _openshell() -> Backend:
     if not OPENSHELL_CONFIG:
         pytest.skip("CORSAIR_OPENSHELL_CONFIG is not set (no gateway)")
-    from corsair.v2.workspace.openshell import OpenShellSandboxes
+    from corsair.workspace.openshell import OpenShellSandboxes
 
     live = OpenShellSandboxes.from_config(Path(OPENSHELL_CONFIG))
     # The python image, so the network tests have an HTTPS client; else the operator's choice, else the first.

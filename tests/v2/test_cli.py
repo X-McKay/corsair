@@ -9,14 +9,14 @@ import pytest
 from rich.console import Console
 
 from chain_fakes import Fakes, case, models
-from corsair.v2 import cli
-from corsair.v2.chain import LocalOps, run_case
-from corsair.v2.presentation import StageReporter, agent_table, console
-from corsair.v2.record import RunRecorder
+from corsair import cli
+from corsair.chain import LocalOps, run_case
+from corsair.presentation import StageReporter, agent_table, console
+from corsair.record import RunRecorder
 
 
 def _fake_cli(monkeypatch, tmp_path):
-    from corsair.v2 import chain, models as model_config
+    from corsair import chain, models as model_config
     fakes = Fakes()
     monkeypatch.setattr(cli, "_intake", lambda args: case(tmp_path))
     monkeypatch.setattr(chain, "default_stages", fakes.stages)
@@ -94,7 +94,7 @@ def test_nonterminal_reporter_does_not_animate_and_escapes_controls(capsys):
 def test_tty_reporter_logs_and_updates_native_live_display(monkeypatch):
     sink = io.StringIO()
     tty = Console(file=sink, force_terminal=True, width=100)
-    import corsair.v2.presentation as presentation
+    import corsair.presentation as presentation
     monkeypatch.setattr(presentation, "console", lambda **kwargs: tty)
     monkeypatch.setenv("TERM", "xterm-256color")
     with StageReporter() as progress:
@@ -117,7 +117,7 @@ def test_code_step_emits_start_and_one_terminal_event(tmp_path):
 
 
 def test_direct_cancel_propagates_and_records_no_invented_verdict(tmp_path, monkeypatch):
-    from corsair.v2 import chain
+    from corsair import chain
 
     async def cancelled(case, ops, budget):
         ops._report("select", "started")
@@ -142,7 +142,7 @@ def test_agent_table_uses_unknown_not_zero():
 
 def test_cancelled_json_run_emits_one_result_and_exit_130(tmp_path, monkeypatch, capsys):
     _fake_cli(monkeypatch, tmp_path)
-    from corsair.v2 import chain
+    from corsair import chain
 
     async def cancelled(case, ops, budget):
         ops._report("select", "started")
@@ -161,7 +161,7 @@ def test_cancelled_json_run_emits_one_result_and_exit_130(tmp_path, monkeypatch,
 
 @pytest.mark.parametrize("state", ["interrupted", "recorded", "running", None])
 def test_unwritten_or_unknown_lifecycle_states_are_incomplete(tmp_path, state):
-    from corsair.v2.runs import details
+    from corsair.runs import details
 
     path = tmp_path / "record"
     path.mkdir()
@@ -170,7 +170,7 @@ def test_unwritten_or_unknown_lifecycle_states_are_incomplete(tmp_path, state):
 
 
 def test_public_printable_is_shared_by_comparison_and_rich_without_mutating_json(tmp_path, capsys):
-    from corsair.v2.runs import printable
+    from corsair.runs import printable
 
     value = "unsafe\x1b[2J\n\x7f\x85[bold]"
     escaped = "unsafe\\x1b[2J\\x0a\\x7f\\x85[bold]"

@@ -8,11 +8,11 @@ from pydantic_ai.durable_exec.temporal import TemporalDurability
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.usage import RunUsage
 
-from corsair.v2.agents.common.framework import guidance_block
-from corsair.v2.agents.common.usage import to_agent_usage
-from corsair.v2.agents.investigator.agent import SPEC, create_agent, investigate, render_prompt
-from corsair.v2.agents.investigator.validation import citation_problem, plan_problems
-from corsair.v2.contracts import Case, Citation, ExitClass, Finding, ProbePlan, Revision, Runtime
+from corsair.agents.common.framework import guidance_block
+from corsair.agents.common.usage import to_agent_usage
+from corsair.agents.investigator.agent import SPEC, create_agent, investigate, render_prompt
+from corsair.agents.investigator.validation import citation_problem, plan_problems
+from corsair.contracts import Case, Citation, ExitClass, Finding, ProbePlan, Revision, Runtime
 from tests.v2.agent_scripts import INPUT_TOKENS, OUTPUT_TOKENS, Script, tool_returns
 
 SOURCE = '''import os
@@ -177,8 +177,8 @@ def test_factory_direct_and_durable_construction():
 
 
 def test_a_plan_must_be_about_the_code_the_finding_names(tmp_path):
-    from corsair.v2.agents.investigator.validation import finding_problems
-    from corsair.v2.contracts import Citation, Finding, ProbeBrief
+    from corsair.agents.investigator.validation import finding_problems
+    from corsair.contracts import Citation, Finding, ProbeBrief
     (tmp_path / "app.py").write_text("def get_user(name):\n    return name\n")
     cite = Citation(path="app.py", start_line=1, end_line=1, quote="def get_user(name):")
     brief = dict(test_file="tests/test_x.py", target="get_user", seam="direct call", input_description="i",

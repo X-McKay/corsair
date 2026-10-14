@@ -4,10 +4,10 @@ The exploit probe is a proof-of-vulnerability test (SPEC-0082 D12): ``passed`` o
 reported condition was demonstrated."""
 import pytest
 
-from corsair.v2.contracts import (Attempt, BuildResult, Case, Citation, ExitClass, Finding, Label, Origin, Outcome,
+from corsair.contracts import (Attempt, BuildResult, Case, Citation, ExitClass, Finding, Label, Origin, Outcome,
                                   ProbeBrief, ProbeFacts, ProbePlan, ProbeRun, ProbeValidity, Recipe, Revision,
                                   Runtime, TerminalReason as T, Validity)
-from corsair.v2.rules import RULES, decide
+from corsair.rules import RULES, decide
 
 PATCH, OTHER = "a" * 64, "b" * 64
 REV = Revision(source="/tmp/rev", tree_sha256="c" * 64)
@@ -255,7 +255,7 @@ def test_facts_origin_and_evidence_kept():
 def test_a_vulnerable_harness_error_before_start_is_inconclusive_not_error(role):
     """A collection or import error of the probe file (pytest exits 2, which the row maps to harness_error) never
     started the body: it is the author's not_run, so the case is INCONCLUSIVE probe_not_run, never ERROR."""
-    from corsair.v2.outcome import classify
+    from corsair.outcome import classify
     facts = ProbeFacts(exit_code=2, exit_class=ExitClass.HARNESS_ERROR, start_marker=False, end_marker=False,
                        token_in_output=False)
     broken = ProbeRun(role=role, revision="vulnerable", patch_sha256=PATCH, facts=facts, outcome=classify(facts))

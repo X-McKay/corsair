@@ -9,8 +9,8 @@ from typing import Any
 from pydantic_ai import Agent
 from pydantic_ai.models.test import TestModel
 
-from corsair.v2.chain import Stages
-from corsair.v2.contracts import (AgentUsage, BuildResult, Case, Citation, Environment, ExitClass, Finding,
+from corsair.chain import Stages
+from corsair.contracts import (AgentUsage, BuildResult, Case, Citation, Environment, ExitClass, Finding,
                                   FrozenPatch, Label, Outcome, ProbeBrief, ProbeDraft, ProbeFacts, ProbePlan, ProbeRun,
                                   ProbeValidity, Recipe, Revision, Runtime, TerminalReason, Validity, Verdict)
 
@@ -181,7 +181,7 @@ class Fakes:
         self._log("decide", case, runtime=runtime, build=build, plan=plan, validity=validity, runs=runs,
                   stopped=stopped, fix_stopped=fix_stopped, attempts=attempts)
         if self.real_decide:
-            from corsair.v2.rules import decide
+            from corsair.rules import decide
             return decide(case, runtime=runtime, build=build, plan=plan, validity=validity, runs=runs,
                           stopped=stopped, fix_stopped=fix_stopped, attempts=attempts)
         if stopped is not None:

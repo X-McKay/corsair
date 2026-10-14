@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from corsair.v2 import execute, reconcile
-from corsair.v2.build import replay
-from corsair.v2.contracts import Environment, Outcome, Recipe
-from corsair.v2.workspace import sandboxes
-from corsair.v2.workspace.port import Exec, SandboxExists, Sandboxes, sandbox_name
+from corsair import execute, reconcile
+from corsair.build import replay
+from corsair.contracts import Environment, Outcome, Recipe
+from corsair.workspace import sandboxes
+from corsair.workspace.port import Exec, SandboxExists, Sandboxes, sandbox_name
 from tests.v2.test_build_replay import BASELINE, RUNTIME, make_case
 from tests.v2.test_execute import draft, frozen
 
@@ -178,7 +178,7 @@ def test_the_reconciler_sweeps_the_given_backend():
 
 def test_replay_uses_the_configured_backend_when_none_is_passed(tmp_path, monkeypatch):
     fake = Recording(sealed="")
-    monkeypatch.setattr("corsair.v2.build.configured", lambda: fake)
+    monkeypatch.setattr("corsair.build.configured", lambda: fake)
     built, _ = replay(make_case(Path(tmp_path) / "tree"), RUNTIME, Recipe(baseline_test=BASELINE),
                       artifacts=tmp_path / "a")
     assert built.replayed

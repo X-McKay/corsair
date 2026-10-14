@@ -1,7 +1,7 @@
 # Corsair v2 runtime matrix (redesign sections 6 and 13, D8). Operator-owned data: agents and project files never
 # edit it, and trusted code never branches on `language`, which is carried for reports only.
 #
-# One row per (image, framework). Select (src/corsair/v2/matrix.py) walks rows in order and takes the first whose
+# One row per (image, framework). Select (src/corsair/matrix.py) walks rows in order and takes the first whose
 # `detect` hints match the revision tree's root: a file glob, optionally with a substring the file must contain.
 # Execute fills `run_template` with {file} (the probe's test file), {name} (its test name), {class} (the file's
 # stem) and {module} (the file's path without extension, dotted), runs it once in the prepared environment with
@@ -9,7 +9,7 @@
 # (125 daemon, 126 not executable, 127 not found, 137 SIGKILL, 143 SIGTERM) are harness errors in every row.
 #
 # `evidence` is `canary-only` until tools/v2_canary.py classifies the row's two canaries (in
-# src/corsair/v2/skills/frameworks/<skill>/canary/) as `passed` and `assertion_failed` on the image; then
+# src/corsair/skills/frameworks/<skill>/canary/) as `passed` and `assertion_failed` on the image; then
 # `image-only`. `live` needs the kind/OpenShell gate. Evidence JSON lands in .runs/canary/<row>.json.
 # `canary_setup` runs before each canary only (offline); a real case gets its dependencies from Build.
 # `syntax_check` (optional) is an argv template, filled like `run_template`, that checks a probe file without running
