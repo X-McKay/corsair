@@ -28,7 +28,9 @@
       "environment": "local",
       "planning": "bedrock",
       "authoring": "compatible",
-      "assessment": "bedrock"
+      "assessment": "bedrock",
+      "control_authoring": "compatible",
+      "exploit_authoring": "compatible"
     }
   },
   "tickets": {

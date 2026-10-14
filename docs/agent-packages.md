@@ -1,6 +1,6 @@
 # Agent package convention
 
-Every agent under `src/corsair/agents/<role>/` places the same responsibilities in the same files, so a reader, reviewer or new agent knows where each piece lives. Accepted under [IDEA-0006](development/ideas/IDEA-0006-agent-package-convention-and-scaffolding.md) and specified by [SPEC-0052](development/specs/SPEC-0052-environment-agent-package-convention.md). The environment agent is the reference package; evidence assessment, test authoring, issue identification and test planning follow it; further agents follow it under [PLAN-0056](development/plans/PLAN-0056-agent-package-convention.md), preserving behaviour.
+Every agent under `src/corsair/agents/<role>/` places the same responsibilities in the same files, so a reader, reviewer or new agent knows where each piece lives. Accepted under [IDEA-0006](development/ideas/IDEA-0006-agent-package-convention-and-scaffolding.md) and specified by [SPEC-0052](development/specs/SPEC-0052-environment-agent-package-convention.md). The current native-spec migration is tracked in [SPEC-0080](development/specs/SPEC-0080-native-agent-manifests.md) and [PLAN-0095](development/plans/PLAN-0095-native-agent-manifests.md). Independent control/exploit packages are the first parity pilot; environment, inline/repository identification, planning and assessment migrate one role at a time; further agents follow it under [PLAN-0056](development/plans/PLAN-0056-agent-package-convention.md), preserving behaviour.
 
 This is a responsibility convention, not a file generator or base class. Create a file only when its responsibility exists: a tool-free agent has no `tools/`, and an agent with no stage-specific dependencies beyond its input has no `dependencies.py`.
 
@@ -9,10 +9,11 @@ This is a responsibility convention, not a file generator or base class. Create 
 ```text
 src/corsair/agents/<role>/
   __init__.py          small explicit public exports
-  agent.py             native PydanticAI factory only
+  agent.yaml           trusted native name/description/literal instructions and narrow metadata
+  agent.py             explicit native construction and role capability registry
   contracts.py         vendor-free typed inputs, drafts, results
   dependencies.py      injected ports, operator-owned budgets, trusted per-run state
-  prompts.py           instructions, prompt version, skill text and digest, typed-input rendering
+  prompts.py           typed-input rendering and compatible exports of manifest/skill identity
   validation.py        trusted output function (draft admission and finalization)
   tools/
     __init__.py        exports the toolset builder, digest and tool constants
@@ -27,10 +28,11 @@ Domain helpers keep meaningful names (`frameworks.py`, `static.py`) rather than 
 
 ## Responsibilities
 
-- `agent.py` assembles model, dependencies type, instructions, skill capability, toolsets, trusted output function, retries and instrumentation. It holds no domain logic and re-exports moved names its callers already import.
+- `agent.yaml` owns the role's static boundary instructions once. The supported envelope is native `name`, `description`, literal `instructions`, plus restricted metadata `config_version`, `prompt_version` and `capability_selection`. Do not place models, settings, schemas, ports, tools, retries, policy paths or arbitrary import strings in it. Referenced procedure stays in `skills/`; Python explicitly instantiates admitted capabilities.
+- `agent.py` assembles the explicit model, dependencies type, admitted capability registry/toolsets, trusted output function, retries, instrumentation and optional native durability through the shared native helper. It holds no domain logic and re-exports moved names its callers already import.
 - `contracts.py` holds typed data and intrinsic invariants; no SDK objects, run context or I/O.
 - `dependencies.py` holds the narrow ports the agent receives, operator-owned budgets the model cannot change, and per-run state the trusted finalizer reads. Concrete adapters are selected outside the package.
-- `prompts.py` renders the request from typed input only: no labels or oracles, no workspace discovery, no external calls. Skill text is read as UTF-8 and its SHA-256 is exported for run identity.
+- `prompts.py` renders the request from typed input only, exports versions/identity from the package spec and procedure text from its owned skill files, and does not duplicate the manifest's static instructions: no labels or oracles, no workspace discovery, no external calls. Skill text is read as UTF-8 and its SHA-256 is exported for run identity.
 - `validation.py` admits or refuses a draft against what this run actually observed, using `RunContext` and bounded `ModelRetry`. Stage behaviour stays distinct; there is no shared finalizer or repair loop.
 - `tools/<tool_name>.py` owns one tool's callable, argument annotations and descriptions, tool-specific validation and the observation model it returns. Shared source readers and runners are reused from their packages, not copied.
 - `tools/toolset.py` registers each tool explicitly with `FunctionToolset.add_function(..., name=..., retries=...)` under a stable toolset id. Adding a module offers nothing until it is registered here; there is no directory scanning, plugin loading or import-string registry.
@@ -41,14 +43,22 @@ Domain helpers keep meaningful names (`frameworks.py`, `static.py`) rather than 
 
 An agent offered more than one toolset (authoring: source reads, then writes and runs) exports one digest over all of them in offered order (`toolsets_sha256`). A toolset wrapped by a native `PrepareTools`-style rule (repository identification withdraws its tools when the byte budget is spent) is digested with the wrapper type and the rule's qualified name. An agent with two source modes (identification: inline files and a saved repository) keeps one factory, config version and digest per mode in the same package.
 
-No separate manifest or cross-mode receipt layer is added; IDEA-0006 section D waits for a second consumer.
+## Trusted native spec and operator policy
+
+`corsair.agents.spec.load_agent_spec(role)` accepts fixed role aliases mapped to package-owned manifests; it does not accept discovered repository paths. `build_agent(...)` uses native `Agent.from_spec` with an explicit native model, typed Python dependencies/output validator, role capability registry, retries and validation context. Only the existing optional native `TemporalDurability` capability may be added through the durability seam. Manifest selection invokes admitted registry builders; it does not merely record descriptive capability labels. Unknown fields, duplicate/unknown capability selections and arbitrary imports are refused.
+
+The manifest owns literal static instructions; skill files own procedures; Python owns contracts, validators, tool authority and durability. Preserve complete rendered instructions/capabilities before and after migration, including meaningful whitespace and order. Compatibility exports may read these owned sources but must not create a second instruction truth.
+
+Operator model configuration remains explicit: `load_inference(path)` validates JSON or YAML through the same `InferenceConfig`, with legacy JSON provider compatibility. Packaged `policy/model.yaml` is an inert example, not an automatic provider or fallback. Trusted `policy/budget.yaml` supplies validated defaults; `corsair.policy.budget.load_budget(path)` accepts that default or an explicit operator-owned flat `CompositionBudget` override. Request settings, run ceilings, retries and input-derived effective allowances remain separate native controls. Investigated source cannot choose active agent manifests or mutate these policies.
+
+Receipts distinguish the manifest digest (`spec_sha256`), selection digest, skill/tool/factory identities, selected model-policy file/resolved configuration and packaged/effective budget digests. Record effective limits/retries as well as named profiles. Direct, durable and isolated modes must resolve the same admitted values. A native loader, YAML presence or parity test does not qualify an agent/provider/runtime.
 
 ## Moving an agent to the convention
 
 1. Capture what the agent offers the model before the move: instructions, rendered prompt, tool definitions in order, output tools, toolset id and retries (a `FunctionModel` that records `AgentInfo`).
 2. Split the package; keep public imports working from their old modules.
 3. Show the capture is byte-identical after the move, pin the toolset digest in a toolset test, and run the agent's offline tests.
-4. Run `make eval AGENT=<role>` before and after; the only identity change allowed is `toolset_sha256` appearing.
-5. Record both runs and the capture result in the agent's plan.
+4. Run the role's isolated eval before and after with identical inputs/provider/settings. Preserve the original run; new manifest/policy/factory identities identify the migrated run. Separate body review, assertion metadata and native execution qualification.
+5. Record both runs, complete instruction/tool/schema/settings/limit parity and any unknown telemetry in the agent's plan. Retain saved histories and check direct/durable parity and appropriate replay without rewriting historical evidence.
 
 The shared [`corsair-agent-scaffold`](../.claude/skills/corsair-agent-scaffold/SKILL.md) skill walks through creating an agent or adding a tool against this convention. There is no generator; IDEA-0006 section F waits until a new agent needs one.

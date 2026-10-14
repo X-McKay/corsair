@@ -35,13 +35,16 @@ from corsair.agents.environment.contracts import (
 from corsair.agents.evidence_assessment.contracts import EvidenceAssessment
 from corsair.agents.issue_analysis.contracts import SourceFile
 from corsair.agents.issue_identification.contracts import IssueIdentification
+from corsair.composition.assembly import FrozenTestPatch
 from corsair.agents.test_authoring.contracts import AuthoringResult, TestAuthoringInput, TestPatch
+from corsair.agents.probe_authoring.contracts import Drafted, Blocked
+from corsair.agents.probe_authoring.dependencies import SpecialistDependencies
 from corsair.agents.test_authoring.dependencies import AuthoringBudget, AuthoringDependencies
 from corsair.agents.test_planning.contracts import ReadyTestPlan, TestPlan
 from corsair.composition.direct import (
     AGENTS, NO_CATALOG, NO_PREPARATION, AgentStage, BudgetExhausted, CompositionBudget, DirectRun, FixtureCase,
     Preparation, PreparationMissing, Purpose, RecordedFailure, Runners, RuntimeCatalogMissing, Stage, StageLimits,
-    cap_reached, prepare_environment,
+    cap_reached, prepare_environment, stage_output_retries,
 )
 from corsair.core.disposition import GateResult, ObservationPlan
 from corsair.nodes.runtime.contracts import RuntimeInputs, RuntimeOutcome
@@ -51,7 +54,7 @@ from corsair.ports.test_runner import ApprovedPatch, NativeTestRun, WitnessReque
 
 I = TypeVar("I")
 O = TypeVar("O")
-STAGES: tuple[AgentStage, ...] = ("identification", "planning", "authoring", "assessment")
+STAGES: tuple[AgentStage, ...] = ("identification", "planning", "control_authoring", "exploit_authoring", "assessment")
 # Native bytes (patch files, receipt output) cross as base64 so non-UTF-8 output survives the payload.
 BYTES = ConfigDict(frozen=True, ser_json_bytes="base64", val_json_bytes="base64")
 
@@ -67,7 +70,8 @@ class StageKeys:
     """The admitted model key each stage runs with; models themselves stay registered on the worker."""
     identification: str
     planning: str
-    authoring: str
+    control_authoring: str
+    exploit_authoring: str
     assessment: str
     # Only a case with setup source needs it; without it that case stops at `environment` (SPEC-0068).
     environment: str | None = None
@@ -112,7 +116,7 @@ class ChainRequest:
 
 
 StageOutput = (ReadyEnvironment | BlockedEnvironment | UnsupportedEnvironment | IssueIdentification | TestPlan
-               | AuthoringResult | EvidenceAssessment)
+               | Drafted | Blocked | EvidenceAssessment)
 
 
 @dataclass(frozen=True)
@@ -173,7 +177,7 @@ class ChainResult:
     attempts: tuple[AttemptRecord, ...]
     identification: IssueIdentification | None = None
     plan: ReadyTestPlan | None = None
-    patch: TestPatch | None = None
+    patch: TestPatch | FrozenTestPatch | None = None
     observation_plan: ObservationPlan | None = None
     executions: tuple[ExecutionRecord, ...] = ()
     gate: GateResult | None = None
@@ -223,6 +227,7 @@ def within(budget: CompositionBudget, ceiling: CompositionBudget) -> bool:
             and budget.admission_refusals <= ceiling.admission_refusals
             and budget.setup_commands <= ceiling.setup_commands
             and budget.output_retries == ceiling.output_retries
+            and budget.author_output_retries == ceiling.author_output_retries
             and all(getattr(getattr(budget, stage), cap) <= getattr(getattr(ceiling, stage), cap)
                     for stage in STAGES + ("environment",) for cap in caps))
 
@@ -238,14 +243,14 @@ class WorkerRunner:
 
 @dataclass(frozen=True)
 class AuthoringPayload:
-    """How ``AuthoringDependencies`` crosses an activity boundary: inputs, budget and the runner's purpose."""
+    """Historical combined-author compatibility only; not registered by the production chain. How ``AuthoringDependencies`` crosses an activity boundary: inputs, budget and the runner's purpose."""
     inputs: TestAuthoringInput
     runner: WorkerRunner
     budget: AuthoringBudget
 
 
 class AuthoringRunContext(TemporalRunContext[AuthoringDependencies]):
-    """Native ``run_context_type`` for the authoring stage.
+    """Historical combined-author ``run_context_type``; not a production chain stage.
 
     The authoring tools rebuild the patch and the development-run count from this run's messages, so
     they are carried; the development runner is resolved on the worker from the operator's ``Runners``.
@@ -263,6 +268,18 @@ class AuthoringRunContext(TemporalRunContext[AuthoringDependencies]):
         messages = ModelMessagesTypeAdapter.validate_python(ctx["messages"])
         return cls(**(ctx | {"messages": messages}),
                    deps=AuthoringDependencies(deps.inputs, runtime.runners("development"), deps.budget))
+
+
+class SpecialistRunContext(TemporalRunContext[SpecialistDependencies]):
+    """Own write calls cross native activities; no peer draft or execution port is carried."""
+    @classmethod
+    def serialize_run_context(cls, ctx: Any) -> dict[str, Any]:
+        return super().serialize_run_context(ctx) | {"messages": ctx.messages}
+
+    @classmethod
+    def deserialize_run_context(cls, ctx: dict[str, Any], deps: Any) -> "SpecialistRunContext":
+        messages = ModelMessagesTypeAdapter.validate_python(ctx["messages"])
+        return cls(**(ctx | {"messages": messages}), deps=deps)
 
 
 @dataclass(frozen=True)
@@ -317,12 +334,12 @@ def configure_chain(models: Mapping[str, Model], runners: Runners, *, activity_c
         raise ValueError("chain models need explicit keys other than 'default' and PydanticAI Model instances")
 
     def durability(stage: AgentStage) -> TemporalDurability[Any]:
-        if stage == "authoring":
+        if stage in ("control_authoring", "exploit_authoring"):
             return TemporalDurability(models=models, activity_config=activity_config,
-                                      deps_type=AuthoringPayload, run_context_type=AuthoringRunContext)
+                                      run_context_type=SpecialistRunContext)
         return TemporalDurability(models=models, activity_config=activity_config)
     # The default model only answers a request that named no key, which admission never lets through.
-    agents = {stage: AGENTS[stage](FunctionModel(_unselected), output_retries=ceiling.output_retries,
+    agents = {stage: AGENTS[stage](FunctionModel(_unselected), output_retries=stage_output_retries(stage, ceiling),
                                    durability=durability(stage)) for stage in STAGES}
     _runtime = ChainRuntime(agents, frozenset(models), runners, ceiling, catalog, dict(models), preparation)
     return _runtime

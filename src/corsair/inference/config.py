@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator,
 
 from .vllm import LocalModelConfig
 
-AgentName = Literal['identification', 'repository_identification', 'environment', 'planning', 'authoring', 'assessment']
+AgentName = Literal['identification', 'repository_identification', 'environment', 'planning', 'control_authoring', 'exploit_authoring', 'authoring', 'assessment']
 AGENTS = frozenset(AgentName.__args__)
 EnvName = Annotated[str, Field(pattern=r'^[A-Z_][A-Z0-9_]*$')]
 
@@ -94,7 +94,12 @@ def inference_config(value) -> InferenceConfig:
 
 def load_inference(path: Path) -> InferenceConfig:
     import json
-    value = json.loads(path.read_text())
+    path = Path(path)
+    if path.suffix.lower() in ('.yaml', '.yml'):
+        import yaml
+        value = yaml.safe_load(path.read_text())
+    else:
+        value = json.loads(path.read_text())
     if isinstance(value, dict) and 'inference' in value:
         from corsair.configuration import ProviderConfig
         return ProviderConfig.model_validate(value).inference

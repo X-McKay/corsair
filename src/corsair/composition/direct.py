@@ -19,10 +19,11 @@ from typing import Any, Awaitable, Callable, Literal, Protocol
 from uuid import UUID, uuid4
 
 from pydantic import Field
+from corsair.policy.budget import CompositionBudget, StageBudget, StageLimits
 from pydantic_ai import Agent, capture_run_messages
 from pydantic_ai.messages import ModelMessage, ModelRequest, RetryPromptPart
 from pydantic_ai.models import Model
-from pydantic_ai.usage import RunUsage, UsageLimits
+from pydantic_ai.usage import RunUsage
 
 from corsair.agents.environment.agent import create_environment_agent, environment_prompt
 from corsair.agents.environment.contracts import (BlockedEnvironment, EnvironmentInput, ReadyEnvironment, Toolchain,
@@ -37,9 +38,13 @@ from corsair.agents.issue_identification.contracts import IssueIdentification
 from corsair.agents.issue_analysis.tools import FixtureDependencies
 from corsair.agents.source.contracts import Contract
 from corsair.agents.source.tools import READ_LINE_LIMIT
-from corsair.agents.test_authoring.agent import authoring_prompt, create_test_authoring_agent
-from corsair.agents.test_authoring.contracts import DevelopmentWitness, TestAuthoringInput, TestPatch
-from corsair.agents.test_authoring.dependencies import AuthoringBudget, AuthoringDependencies
+from corsair.agents.control_authoring import (create_control_agent, project_control_input,
+    SpecialistDependencies, prompt_for as control_prompt)
+from corsair.agents.exploit_authoring import (create_exploit_agent, project_exploit_input,
+    prompt_for as exploit_prompt)
+from corsair.agents.probe_authoring.contracts import Drafted, Blocked
+from .assembly import FrozenTestPatch, assemble_patch
+from corsair.agents.test_authoring.contracts import TestPatch
 from corsair.agents.test_planning.agent import create_test_planning_agent
 from corsair.agents.test_planning.dependencies import PlanningDependencies
 from corsair.agents.test_planning.prompts import planning_prompt
@@ -57,76 +62,11 @@ from .evidence import evidence_items, review_items, freeze, observation_plan, ru
 from .progress import (Activity, GateDecided, RevisionEnded, RevisionStarted, RunEnded, RunEvent, RunObserver,
                        StageEnded, StageStarted, Usage, clean, current_observer, ignore)
 
-Stage = Literal["runtime", "environment", "identification", "planning", "authoring", "execution", "assessment"]
-AgentStage = Literal["environment", "identification", "planning", "authoring", "assessment"]
+Stage = Literal["runtime", "environment", "identification", "planning", "control_authoring", "exploit_authoring", "execution", "assessment"]
+AgentStage = Literal["environment", "identification", "planning", "control_authoring", "exploit_authoring", "assessment"]
 Purpose = Literal["development", "baseline", "candidate"]
 
 
-class StageLimits(Contract):
-    """One stage run's caps, derived from its own input and recorded in its receipt (SPEC-0043)."""
-    request_limit: int = Field(strict=True, gt=0)
-    tool_calls_limit: int = Field(strict=True, ge=0)
-    total_tokens_limit: int = Field(strict=True, gt=0)
-    timeout_seconds: float = Field(gt=0, allow_inf_nan=False)
-    # Derivation: windows needed to read the stage's readable inputs once, plus input-sized work calls.
-    read_windows: int = Field(strict=True, ge=0)
-    work_tool_calls: int = Field(strict=True, ge=0)
-    # Caps the operator's ceiling set below what the derivation gave, so a stop names its real source.
-    ceilings: tuple[Literal["request_limit", "tool_calls_limit", "total_tokens_limit"], ...] = ()
-
-    def usage_limits(self) -> UsageLimits:
-        return UsageLimits(request_limit=self.request_limit, tool_calls_limit=self.tool_calls_limit,
-                           total_tokens_limit=self.total_tokens_limit)
-
-
-class StageBudget(Contract):
-    """Operator-owned per-stage ceilings and derivation; the provider configuration owns the response cap.
-
-    A run's tool calls are its read windows plus its work calls plus ``slack_tool_calls``; requests are
-    those calls plus the output request and its retries plus one; tokens are ``tokens_per_request`` per
-    request. Each is capped by the ceiling here, so a derived cap never exceeds what the operator admitted.
-    """
-    request_limit: int = Field(strict=True, gt=0, le=64)
-    tool_calls_limit: int = Field(strict=True, ge=0, le=48)
-    total_tokens_limit: int = Field(strict=True, gt=0, le=262144)
-    timeout_seconds: float = Field(gt=0, le=1800, allow_inf_nan=False)
-    slack_tool_calls: int = Field(default=2, strict=True, ge=0, le=8)
-    tokens_per_request: int = Field(default=12000, strict=True, gt=0, le=32768)
-
-    def limits(self, read_windows: int, work_tool_calls: int, output_retries: int) -> StageLimits:
-        derived_tools = read_windows + work_tool_calls + self.slack_tool_calls
-        tools = min(derived_tools, self.tool_calls_limit)
-        derived_requests = tools + output_retries + 2
-        requests = min(derived_requests, self.request_limit)
-        derived_tokens = requests * self.tokens_per_request
-        clamped = (("tool_calls_limit", derived_tools > self.tool_calls_limit),
-                   ("request_limit", derived_requests > self.request_limit),
-                   ("total_tokens_limit", derived_tokens > self.total_tokens_limit))
-        return StageLimits(request_limit=requests, tool_calls_limit=tools,
-                           total_tokens_limit=min(derived_tokens, self.total_tokens_limit),
-                           timeout_seconds=self.timeout_seconds, read_windows=read_windows,
-                           work_tool_calls=work_tool_calls, ceilings=tuple(name for name, hit in clamped if hit))
-
-
-class CompositionBudget(Contract):
-    # The environment agent's isolated eval budget (evals/environment EvaluationBudget), not wider (SPEC-0068).
-    # Tokens: each request resends the whole conversation (about 5k tokens of instructions, skill and input before
-    # any tool output), so 8000 per request over the 16 requests; the former 48000 ceiling ended a short
-    # discovery after ten requests (first corpus case, 2026-10-13).
-    environment: StageBudget = StageBudget(request_limit=16, tool_calls_limit=20, total_tokens_limit=128000,
-                                           timeout_seconds=240, tokens_per_request=8000)
-    setup_commands: int = Field(default=12, strict=True, ge=1, le=16)
-    identification: StageBudget = StageBudget(request_limit=20, tool_calls_limit=16, total_tokens_limit=128000,
-                                              timeout_seconds=300, tokens_per_request=8000)
-    planning: StageBudget = StageBudget(request_limit=20, tool_calls_limit=16, total_tokens_limit=160000,
-                                        timeout_seconds=600, tokens_per_request=10000)
-    authoring: StageBudget = StageBudget(request_limit=32, tool_calls_limit=28, total_tokens_limit=262144,
-                                         timeout_seconds=900, slack_tool_calls=2, tokens_per_request=12000)
-    assessment: StageBudget = StageBudget(request_limit=32, tool_calls_limit=28, total_tokens_limit=262144,
-                                          timeout_seconds=600, slack_tool_calls=3, tokens_per_request=10000)
-    dev_runs: int = Field(default=3, strict=True, ge=1, le=5)
-    output_retries: int = Field(default=1, strict=True, ge=0, le=1)
-    admission_refusals: int = Field(default=1, strict=True, ge=0, le=2)
 
 
 Limit = Literal["request_limit", "tool_calls_limit", "total_tokens_limit", "timeout_seconds"]
@@ -135,7 +75,7 @@ Limit = Literal["request_limit", "tool_calls_limit", "total_tokens_limit", "time
 class BudgetExhausted(Contract):
     """The typed outcome of a stage that ended on one of its own caps instead of returning its output."""
     status: Literal["budget_exhausted"] = "budget_exhausted"
-    stage: Literal["environment", "identification", "planning", "authoring", "assessment"]
+    stage: Literal["environment", "identification", "planning", "control_authoring", "exploit_authoring", "assessment"]
     limit: Limit
     cap: float
     limits: StageLimits
@@ -143,6 +83,11 @@ class BudgetExhausted(Contract):
 
 def _windows(contents, window: int = READ_LINE_LIMIT) -> int:
     return sum(-(-len(content.splitlines()) // window) or 1 for content in contents)
+
+
+def stage_output_retries(stage: "AgentStage", budget: "CompositionBudget") -> int:
+    """Native output correction allowance belonging to this stage's operator budget."""
+    return budget.author_output_retries if stage in ("control_authoring", "exploit_authoring") else budget.output_retries
 
 
 def stage_limits(stage: "AgentStage", inputs: Any, budget: "CompositionBudget") -> StageLimits:
@@ -153,15 +98,12 @@ def stage_limits(stage: "AgentStage", inputs: Any, budget: "CompositionBudget") 
             reads, work = _windows(source.content for source in inputs.source_files), budget.setup_commands + 1
         case "identification" | "planning":
             reads, work = _windows(source.content for source in inputs.source_files), 0
-        case "authoring":
-            # Per development run: up to two writes of each planned test path and the run itself; plus each
-            # admission refusal the author may act on.
-            paths = {inputs.plan.control.test_path, inputs.plan.security.test_path}
+        case "control_authoring" | "exploit_authoring":
             reads = _windows(source.content for source in inputs.source_files)
-            work = budget.dev_runs * (2 * len(paths) + 1) + budget.admission_refusals
+            work = 2 + budget.admission_refusals  # Own file writes; no execution or sibling artifact.
         case "assessment":
             reads, work = _windows((item.content for item in inputs.items), WINDOW_LINES), 0
-    return getattr(budget, stage).limits(reads, work, budget.output_retries)
+    return getattr(budget, stage).limits(reads, work, stage_output_retries(stage, budget))
 
 
 def cap_reached(limits: StageLimits | None, usage: RunUsage | None) -> bool:
@@ -199,7 +141,8 @@ class StageModels:
     """One explicit model per stage; the same instance may serve several stages."""
     identification: Model
     planning: Model
-    authoring: Model
+    control_authoring: Model
+    exploit_authoring: Model
     assessment: Model
     environment: Model | None = None  # Needed only by cases that carry setup source (SPEC-0068)
 
@@ -298,7 +241,7 @@ class DirectRun:
     attempts: tuple[StageAttempt, ...]
     identification: IssueIdentification | None = None
     plan: ReadyTestPlan | None = None
-    patch: TestPatch | None = None
+    patch: TestPatch | FrozenTestPatch | None = None
     observation_plan: ObservationPlan | None = None
     executions: tuple[FrozenExecution, ...] = ()
     gate: GateResult | None = None
@@ -344,11 +287,11 @@ class RevisionExecutor(Protocol):
 
 AGENTS = {"environment": create_environment_agent, "identification": create_issue_identification_agent,
           "planning": create_test_planning_agent,
-          "authoring": create_test_authoring_agent, "assessment": create_evidence_assessment_agent}
+          "control_authoring": create_control_agent, "exploit_authoring": create_exploit_agent, "assessment": create_evidence_assessment_agent}
 
 
 def stage_call(stage: AgentStage, inputs: Any, budget: CompositionBudget, runner: TestRunner | None) -> tuple[str, Any]:
-    """Prompt and dependencies for one stage; the mode supplies the authoring stage's development runner."""
+    """Prompt and narrow dependencies for one stage; authors have no execution port."""
     match stage:
         case "environment":
             raise ValueError("the environment stage's dependencies hold a live sandbox; the mode builds them")
@@ -356,9 +299,10 @@ def stage_call(stage: AgentStage, inputs: Any, budget: CompositionBudget, runner
             return identification_prompt(inputs), FixtureDependencies(inputs)
         case "planning":
             return planning_prompt(inputs), PlanningDependencies(inputs)
-        case "authoring":
-            return authoring_prompt(inputs), AuthoringDependencies(inputs, runner, AuthoringBudget(
-                dev_runs=budget.dev_runs, admission_refusals=budget.admission_refusals))
+        case "control_authoring":
+            return control_prompt(inputs), SpecialistDependencies(inputs)
+        case "exploit_authoring":
+            return exploit_prompt(inputs), SpecialistDependencies(inputs)
         case "assessment":
             return assessment_prompt(inputs), AssessmentDependencies(inputs)
 
@@ -464,7 +408,7 @@ OBSERVED_IDENTITY = ("Environment image and recipe observed by the environment s
 async def run_direct(case: FixtureCase, models: StageModels, runners: Runners,
                      budget: CompositionBudget = CompositionBudget(), *, catalog: RuntimeCatalog | None = None,
                      preparation: Preparation | None = None, observe: RunObserver | None = None) -> DirectRun:
-    """One E2E-0 investigation over a baseline and candidate revision; never retries a stage.
+    """One split-authoring investigation over a baseline and candidate revision; never retries a stage.
 
     ``catalog`` is the operator's runtime matrix and prepared images; a case with build files needs it.
     ``preparation`` prepares the environment stage's sandbox; a case with setup source needs it and
@@ -475,8 +419,8 @@ async def run_direct(case: FixtureCase, models: StageModels, runners: Runners,
     async def invoke(stage: AgentStage, inputs: Any) -> StageAttempt:
         if stage == "environment":
             return await prepare_environment(inputs, models.environment, preparation, budget, observe)
-        agent = AGENTS[stage](getattr(models, stage), output_retries=budget.output_retries)
-        prompt, deps = stage_call(stage, inputs, budget, runners("development") if stage == "authoring" else None)
+        agent = AGENTS[stage](getattr(models, stage), output_retries=stage_output_retries(stage, budget))
+        prompt, deps = stage_call(stage, inputs, budget, None)
         return await _invoke(stage, agent, prompt, deps, stage_limits(stage, inputs, budget), observe)
 
     async def execute(revision, patch, **request) -> NativeTestRun:
@@ -657,9 +601,19 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         return stop("planning", failure_of("planning"), identification=identification)
     if not isinstance(plan, ReadyTestPlan):
         return stop("planning", f"plan unsupported: {plan.missing_capability}", identification=identification)
+    if plan.control.observation is None or plan.security.observation is None:
+        return stop("planning", "split authoring requires a typed native unit-test observation for both probes; "
+                    "a witness-only legacy plan is unsupported", identification=identification, plan=plan)
     ready("planning", lambda: f"control {plan.control.test_id}; security {plan.security.test_id}")
 
     request, unrequested = None, ()
+    if plan.security.observation is not None and case.witness_envelope is not None:
+        envelope = case.witness_envelope
+        if (identification.target is not None and envelope.target_path == identification.target.source.path
+                and envelope.target_symbol == identification.target.symbol):
+            request = envelope  # Supporting operator observation; never required to validate the native probes.
+        else:
+            unrequested = ("no witness requested: operator envelope differs from the identified target",)
     if plan.security.witness is not None:
         try:
             recorders = environment.witness_facilities if case.witness_from_recorders else ()
@@ -667,21 +621,32 @@ async def run_chain(case: FixtureCase, invoke: StageInvoker, execute: RevisionEx
         except ValueError as exc:
             # A legacy plan outside the available instrumentation envelope runs with an explicit limitation.
             unrequested = (f"no witness requested: {exc}"[:512],)
-    # Development runs observe the same envelope, so authoring can refuse a test that cannot see the effect.
-    development_witness = (DevelopmentWitness(target_path=request.target_path, target_symbol=request.target_symbol,
-                                              effect_name=request.effect_name) if request is not None else None)
-    try:
-        authoring_input = TestAuthoringInput(plan=plan, source_files=source_files, environment=environment,
-                                             witness=development_witness)
-    except ValueError as exc:
-        return stop("authoring", f"authoring input refused: {exc}"[:2048], identification=identification, plan=plan)
-    patch = await _stage("authoring", authoring_input)
-    if patch is None:
-        return stop("authoring", failure_of("authoring"), identification=identification, plan=plan)
-    if not isinstance(patch, TestPatch):
-        return stop("authoring", f"authoring blocked at {patch.layer}: {patch.reason}",
+    if plan.control.test_path == plan.security.test_path:
+        return stop("control_authoring", "independent authors require two distinct approved test paths",
                     identification=identification, plan=plan)
-    ready("authoring", lambda: f"{len(patch.files)} test file(s) written")
+    drafts = []
+    for stage, project in (("control_authoring", project_control_input),
+                           ("exploit_authoring", project_exploit_input)):
+        try:
+            inputs = project(plan, source_files, environment)
+        except ValueError as exc:
+            return stop(stage, f"{stage} input refused: {exc}"[:2048], identification=identification, plan=plan)
+        draft = await _stage(stage, inputs)
+        if draft is None:
+            return stop(stage, failure_of(stage), identification=identification, plan=plan)
+        if isinstance(draft, Blocked):
+            return stop(stage, f"{stage} blocked at {draft.layer}: {draft.reason}",
+                        identification=identification, plan=plan)
+        if not isinstance(draft, Drafted):
+            return stop(stage, f"{stage} returned an unsupported output", identification=identification, plan=plan)
+        if draft.input_digest != inputs.input_digest:
+            return stop(stage, f"{stage} returned another input identity", identification=identification, plan=plan)
+        drafts.append(draft)
+        ready(stage, lambda: "own test file drafted")
+    try:
+        patch = assemble_patch(plan, environment, *drafts)
+    except ValueError as exc:
+        return stop("execution", f"patch assembly refused: {exc}"[:2048], identification=identification, plan=plan)
 
     try:
         expected = observation_plan(plan, patch)

@@ -22,6 +22,7 @@ from pydantic_evals.evaluators import Evaluator, HasMatchingSpan, MaxModelReques
 
 from corsair.agents.issue_analysis.contracts import IssueAnalysisInput
 from corsair.agents.issue_identification import (
+    MANIFEST_IDENTITY,
     CONFIG_VERSION, PROMPT_VERSION, TOOLSET_SHA256, create_issue_identification_agent, identification_prompt,
 )
 from corsair.agents.issue_identification.skills import SKILL_SHA256
@@ -101,11 +102,19 @@ class EvaluationBudget(BaseModel):
     output_retries: int = Field(default=1, ge=0, le=1, strict=True)
 
 
-async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None):
+async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, corpus=None, dataset_identity=None):
+    """Native host harness; custom frozen corpora supply explicit operator dataset identity."""
+    if (corpus is None) != (dataset_identity is None):
+        raise ValueError("custom corpus and dataset_identity must be supplied together")
+    allowed_identity = {"dataset", "dataset_sha256", "evaluator_version", "source_manifest", "evaluator_source_sha256"}
+    if dataset_identity is not None and (not isinstance(dataset_identity, dict)
+            or not {"dataset", "dataset_sha256"} <= dataset_identity.keys()
+            or dataset_identity.keys() - allowed_identity):
+        raise ValueError("custom dataset identity must name its dataset/digest and only dataset fields")
     # Reserve before the first request; rerunning the same attempt is always refused.
     evidence.mkdir(parents=True, exist_ok=False)
     logfire.configure(send_to_logfire=False, console=False)
-    corpus = dataset()
+    corpus = dataset() if corpus is None else corpus
     scripted = model is None
     fixture_models = {case.inputs.input_digest: scripted_model(case.inputs, case.metadata) for case in corpus.cases} if scripted else {}
     actual_model = model if model is not None else next(iter(fixture_models.values()))
@@ -116,6 +125,9 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None):
                 "budget": budget.model_dump(), "task_retries": 0, "max_concurrency": 1,
                 "dataset_sha256": sha256((ROOT / "cases.yaml").read_bytes()).hexdigest(),
                 "output_contract": IssueIdentification.__name__, "draft_contract": IssueIdentificationDraft.__name__}
+    if dataset_identity is not None:
+        metadata.update(dataset_identity)
+    metadata |= MANIFEST_IDENTITY
     (evidence / "configuration.json").write_text(json.dumps(metadata, indent=2))
     corpus.evaluators.append(NoUnknownToolAttempts())
     if not scripted:

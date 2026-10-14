@@ -38,6 +38,7 @@ from corsair.agents.issue_identification import (
     create_repository_identification_agent, repository_identification_prompt,
 )
 from corsair.agents.issue_identification.skills import REPOSITORY_SKILL_SHA256 as SKILL_SHA256
+from corsair.agents.issue_identification.agent import REPOSITORY_MANIFEST_IDENTITY
 from corsair.agents.source.repository import RepositoryLimits, SourceTree, UnreadableSource
 from corsair.agents.source.repository_tools import REPOSITORY_TOOLS
 from evals.issue_analysis.evaluate import describe_model, record_count
@@ -192,6 +193,7 @@ async def live(evidence: Path, tree: SourceTree, model, budget: LiveBudget, limi
                 "toolset_sha256": TOOLSET_SHA256,
                 "budget": budget.model_dump(), "repository_limits": asdict(limits), "task_retries": 0, "max_concurrency": 1,
                 "dataset_sha256": sha256((ROOT / "cases.yaml").read_bytes()).hexdigest()}
+    metadata |= REPOSITORY_MANIFEST_IDENTITY
     (evidence / "configuration.json").write_text(json.dumps(metadata, indent=2))
     corpus.evaluators.extend(live_evaluators(budget))
 

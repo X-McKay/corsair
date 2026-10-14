@@ -30,7 +30,7 @@ from pydantic_evals.evaluators import (ConfusionMatrixEvaluator, Evaluator, HasM
                                        MaxToolCalls, ReportEvaluator)
 from pydantic_evals.reporting.analyses import ScalarResult, TableResult
 
-from corsair.agents.evidence_assessment import (CONFIG_VERSION, PROMPT_VERSION, SKILL_SHA256, TOOLSET_SHA256,
+from corsair.agents.evidence_assessment import (MANIFEST_IDENTITY, CONFIG_VERSION, PROMPT_VERSION, SKILL_SHA256, TOOLSET_SHA256,
                                                 assessment_prompt, create_evidence_assessment_agent)
 from corsair.agents.evidence_assessment.contracts import AssessmentInput, EvidenceAssessment, EvidenceRead
 from corsair.agents.evidence_assessment.dependencies import AssessmentDependencies
@@ -231,13 +231,21 @@ class EvaluationBudget(BaseModel):
 
 
 async def evaluate(evidence: Path, budget: EvaluationBudget, *, split: Split | Literal["all"] = "development",
-                   cases: tuple[str, ...] = (), model=None, scripted=None):
+                   cases: tuple[str, ...] = (), model=None, scripted=None, corpus=None, dataset_identity=None):
     """``cases`` narrows the split by name; ``scripted`` maps a case name to a FunctionModel, and is the honest
     scripted models when omitted with no ``model``."""
+    custom_corpus = corpus is not None
+    if custom_corpus != (dataset_identity is not None):
+        raise ValueError("custom corpus and dataset_identity must be supplied together")
+    allowed_identity = {"dataset", "dataset_sha256", "evaluator_version", "source_manifest", "evaluator_source_sha256", "witness_record_schema", "execution", "qualification"}
+    if dataset_identity is not None and (not isinstance(dataset_identity, dict)
+            or not {"dataset", "dataset_sha256"} <= dataset_identity.keys()
+            or dataset_identity.keys() - allowed_identity):
+        raise ValueError("custom dataset identity must name its dataset/digest and only dataset fields")
     # Reserve before the first request; rerunning the same attempt is always refused.
     evidence.mkdir(parents=True, exist_ok=False)
     logfire.configure(send_to_logfire=False, console=False)
-    corpus = dataset(split)
+    corpus = dataset(split) if corpus is None else corpus
     if cases:
         if set(cases) - {case.name for case in corpus.cases}:
             raise ValueError("unknown case for this split")
@@ -257,8 +265,13 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, split: Split | L
                 "task_retries": 0, "max_concurrency": 1,
                 "dataset_sha256": sha256(CASES.read_bytes()).hexdigest(),
                 "output_contract": EvidenceAssessment.__name__, "witness_record_schema": "corsair-witness-v2"}
+    if dataset_identity is not None:
+        metadata.update(dataset_identity)
+    metadata |= MANIFEST_IDENTITY
     (evidence / "configuration.json").write_text(json.dumps(metadata, indent=2))
-    corpus.evaluators.extend([ScoredAssessment(), RequiredReads(), FindingLabels(), NoUnknownToolAttempts(),
+    if not custom_corpus:
+        corpus.evaluators.append(ScoredAssessment())
+    corpus.evaluators.extend([RequiredReads(), FindingLabels(), NoUnknownToolAttempts(),
                               MaxModelRequests(max_requests=budget.request_limit),
                               MaxToolCalls(max_calls=budget.tool_calls_limit),
                               HasMatchingSpan(query={"has_attributes": {"gen_ai.operation.name": "chat"}},

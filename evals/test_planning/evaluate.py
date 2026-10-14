@@ -26,7 +26,7 @@ from corsair.inference.config import load_agent_config
 from corsair.inference.models import configured_model
 from corsair.agents.source.contracts import SourceRead
 from corsair.agents.source.tools import READ_SOURCE_TOOL
-from corsair.agents.test_planning.agent import CONFIG_VERSION, create_test_planning_agent
+from corsair.agents.test_planning.agent import MANIFEST_IDENTITY, CONFIG_VERSION, create_test_planning_agent
 from corsair.agents.test_planning.contracts import ReadyTestPlan, TestPlanningInput, UnsupportedTestPlan
 from corsair.agents.test_planning.dependencies import PlanningDependencies
 from corsair.agents.test_planning.prompts import PROMPT_VERSION, SKILL_SHA256, planning_prompt
@@ -176,14 +176,27 @@ class EvaluationBudget(BaseModel):
     output_retries: int = Field(default=1, ge=0, le=1, strict=True)
 
 
-async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, cases: str = "development", provider=None):
+async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, cases: str = "development", provider=None,
+                   corpus=None, dataset_identity: dict | None = None):
     if cases in RETIRED:
         raise ValueError(f"{cases} is retired: its environments list no typed witness facilities (SPEC-0040)")
-    check_manifest(cases)
+    supplied_corpus = corpus is not None
+    if supplied_corpus != (dataset_identity is not None):
+        raise ValueError('a supplied planning corpus and its frozen dataset identity must be given together')
+    if supplied_corpus:
+        if not isinstance(dataset_identity, dict):
+            raise ValueError('supplied planning dataset identity must be a dictionary')
+        allowed = {'dataset', 'dataset_sha256', 'evaluator_version', 'source_manifest', 'evaluator_source_sha256'}
+        if set(dataset_identity) - allowed:
+            raise ValueError('unsupported planning dataset identity fields')
+        if not {'dataset', 'dataset_sha256'} <= dataset_identity.keys():
+            raise ValueError('supplied planning dataset identity requires dataset and dataset_sha256')
+    else:
+        check_manifest(cases)
     # Reserve before the first request; rerunning the same attempt is always refused.
     evidence.mkdir(parents=True, exist_ok=False)
     logfire.configure(send_to_logfire=False, console=False)
-    corpus = dataset(cases)
+    corpus = corpus if supplied_corpus else dataset(cases)
     scripted = model is None
     fixture_models = {case.inputs.input_digest: scripted_model(case.metadata) for case in corpus.cases} if scripted else {}
     actual_model = model if model is not None else next(iter(fixture_models.values()))
@@ -192,10 +205,15 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, case
                 "prompt_version": PROMPT_VERSION, "config_version": CONFIG_VERSION, "skill_sha256": SKILL_SHA256,
                 "toolset_id": TOOLSET_ID, "toolset_sha256": TOOLSET_SHA256, "budget": budget.model_dump(), "task_retries": 0, "max_concurrency": 1,
                 "evaluator_version": "planning-v2" if cases in ("unit-first", "unit-v2") else "planning-v1",
-                "dataset": cases, "dataset_sha256": sha256((ROOT / DATASETS[cases]).read_bytes()).hexdigest(),
+                "dataset": cases, "dataset_sha256": dataset_identity["dataset_sha256"] if supplied_corpus else sha256((ROOT / DATASETS[cases]).read_bytes()).hexdigest(),
                 "provider": provider,
                 "output_contract": "ReadyTestPlan | UnsupportedTestPlan",
                 "draft_contract": "ReadyTestPlanDraft | UnsupportedTestPlanDraft"}
+    metadata |= MANIFEST_IDENTITY
+    if supplied_corpus:
+        metadata |= dataset_identity
+        metadata['execution'] = 'synthetic_fixture_baseline_not_executed'
+        metadata['qualification'] = 'Operator planning fixture only; native baselines and runtime/composition are unqualified.'
     (evidence / "configuration.json").write_text(json.dumps(metadata, indent=2))
     corpus.evaluators.append(NoUnknownToolAttempts())
     if not scripted:

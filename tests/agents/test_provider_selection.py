@@ -149,7 +149,8 @@ def test_e2e_stage_profiles_resolve_provider_per_agent_and_reject_cross_provider
     from evals.fixture_e2e.run import stage_configs
     resolved = stage_configs(config(), {'planning': {'response_token_limit': 8192}})
     assert resolved['planning'].provider == 'bedrock' and resolved['planning'].response_token_limit == 8192
-    assert resolved['authoring'].provider == 'openai_compatible'
+    assert resolved['control_authoring'].provider == 'openai_compatible'
+    assert resolved['exploit_authoring'].provider == 'openai_compatible'
     with pytest.raises(ValueError):
         stage_configs(config(), {'planning': {'thinking_mode': 'disabled'}})
     sparse = InferenceConfig(models=config().models, agents={'planning': 'deep'})

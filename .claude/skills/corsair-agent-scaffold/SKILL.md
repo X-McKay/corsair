@@ -1,6 +1,6 @@
 ---
 name: corsair-agent-scaffold
-description: Use when creating a new Corsair agent, adding a model-facing tool to an agent, or moving an existing agent package to the standard layout. Follows docs/agent-packages.md; there is no generator.
+description: Use when creating a new Corsair agent, adding a model-facing tool to an agent, or moving an existing agent package to the standard layout. Follows docs/agent-packages.md, trusted native AgentSpec manifests and operator policy; there is no generator.
 ---
 
 # Corsair agent scaffold
@@ -12,10 +12,18 @@ For investigation agents and tools, preserve the shared unit-test-first contract
 ## New agent
 
 1. Confirm the objective is a new role rather than a change to an existing agent. Write its spec: typed input and outcomes, narrow ports, authority, failure layers and the frozen eval set it ships with.
-2. Create only the files whose responsibilities exist, following the layout. Start from the environment agent (`src/corsair/agents/environment/`) as the reference.
-3. Put each model-facing tool in `tools/<tool_name>.py` and register it in `tools/toolset.py`; export `TOOLSET_SHA256` and pin it in a toolset test that also checks exact names, order, id and retries.
-4. Unimplemented behaviour must fail clearly. Never return a fabricated `ready` or register an unfinished tool. The agent starts unwired from any chain or workflow.
-5. Add the eval set under `evals/<role>/`, write `toolset_sha256` to its `configuration.json`, add a `SUITES` entry in `evals/run.py`, and run `make eval AGENT=<role>` scripted. Model-written code is never executed on the host.
+2. Create only files whose responsibilities exist. Check current migrated packages and `corsair.agents.spec` before copying a reference; all seven current factory variants use trusted native manifests, including repository identification.
+3. Add trusted package `agent.yaml` with only native name/description/literal instructions and the restricted config/prompt-version/capability-selection metadata. Keep static boundary instructions there once and procedure in owned skill files; `prompts.py` renders typed input and exposes compatible identities. Register the role's fixed package path in the helper's trusted alias map. Never discover/load investigated-repository manifests or arbitrary capability imports.
+4. Build through native `AgentSpec`/`Agent.from_spec` and the small shared helper, passing the explicit operator-selected native model, Python dependencies/output validator, role capability registry, retries/validation context and optional native Temporal durability. Keep schemas, validators, restricted tools, authority and durability in Python. Manifest selection must instantiate admitted registered capabilities. Do not introduce a custom base-class hierarchy or marker protocol.
+5. Put each model-facing tool in `tools/<tool_name>.py` and register it in `tools/toolset.py`; export `TOOLSET_SHA256` and pin it in a toolset test that also checks exact names, order, id and retries.
+6. Unimplemented behaviour must fail clearly. Never return a fabricated `ready` or register an unfinished tool. The agent starts unwired from any chain or workflow.
+7. Add the eval set under `evals/<role>/`, write `toolset_sha256` to its `configuration.json`, add a `SUITES` entry in `evals/run.py`, and run `make eval AGENT=<role>` scripted. Model-written code is never executed on the host; native host fixtures admit only exact operator-reviewed bytes.
+
+## Operator policy and identity
+
+Reuse explicit `InferenceConfig` loading and the typed `CompositionBudget`/input-derived limits. JSON provider compatibility remains; operator YAML uses the same validation, never a second credential/provider resolver or competing defaults. Packaged model policy is an inert example unless explicitly selected. Use the validated packaged budget default or an explicit operator-owned override; investigated agents cannot modify policy or select arbitrary files.
+
+Record resolved manifest/selection, policy, skill/tool/factory hashes and effective settings, limits and retries in native receipts. Compare direct, durable and isolated resolution; preserve old histories and measurements. Missing telemetry is unknown. Changing a manifest, skill, policy or helper requires relevant parity checks and isolated role baselines before composing it; loading YAML or passing structural checks alone is not semantic or runtime qualification.
 
 ## New tool on an existing agent
 
@@ -25,4 +33,4 @@ For investigation agents and tools, preserve the shared unit-test-first contract
 
 ## Moving an existing agent
 
-Follow "Moving an agent to the convention" in the convention document. The move must not change what the model is offered: capture before and after, require byte equality, and compare `make eval` runs. Do not move a package another open PR is changing; wait for it to merge.
+Follow "Moving an agent to the convention" in the convention document. The move must not change what the model is offered: capture before and after, require byte equality, and compare `make eval` runs. Inspect concurrent package changes and coordinate owners; preserve unrelated work and the user's current authorization. For native-spec migration compare rendered instructions, capability/tool schemas/order, contracts/validators, request settings, retries, derived limits and native durability before migrating the next role.

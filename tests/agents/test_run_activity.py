@@ -15,7 +15,7 @@ from corsair.composition.direct import StageModels, run_direct
 from corsair.composition.progress import (Activity, GateDecided, ModelFailed, ModelTurn, Retry, RevisionEnded,
                                           RevisionStarted, RunEnded, StageEnded, StageStarted, ToolCalled,
                                           ToolReturned, Usage, clean, observing, preview)
-from evals.fixture_e2e.case import (fixture_case, reviewed_runners, scripted_assessment, scripted_authoring,
+from evals.fixture_e2e.case import (fixture_case, reviewed_runners, scripted_assessment, scripted_control_authoring, scripted_exploit_authoring,
                                     scripted_identification, scripted_planning)
 
 
@@ -35,7 +35,7 @@ def store(tmp_path):
 def chain(store, root, observe=None, **overrides):
     (root / "work").mkdir(parents=True)
     models_ = dict(identification=scripted_identification(), planning=scripted_planning(),
-                   authoring=scripted_authoring(), assessment=scripted_assessment()) | overrides
+                   control_authoring=scripted_control_authoring(), exploit_authoring=scripted_exploit_authoring(), assessment=scripted_assessment()) | overrides
     return asyncio.run(run_direct(fixture_case(), StageModels(**models_), reviewed_runners(store, root / "work"),
                                   observe=observe))
 
@@ -53,7 +53,7 @@ def test_a_complete_run_reports_each_stage_revision_and_the_gate_in_order(store,
     assert run.stopped_at is None
     agent = lambda stage: [("StageStarted", stage, None), ("StageEnded", stage, "ready")]
     assert boundaries(events) == [
-        *agent("identification"), *agent("planning"), *agent("authoring"),
+        *agent("identification"), *agent("planning"), *agent("control_authoring"), *agent("exploit_authoring"), *agent("assessment"),
         ("StageStarted", "execution", None),
         ("RevisionStarted", "baseline", None), ("RevisionEnded", "baseline", "ran"),
         ("RevisionStarted", "candidate", None), ("RevisionEnded", "candidate", "ran"),
@@ -61,15 +61,15 @@ def test_a_complete_run_reports_each_stage_revision_and_the_gate_in_order(store,
         *agent("assessment"), ("GateDecided", None, None), ("RunEnded", None, None)]
     assert events[-1].verdict and events[-1].stopped_at is None
     # Each agent stage's end carries what it spent against its own caps, as its attempt records them.
-    ended = {e.stage: e.usage for e in events if isinstance(e, StageEnded) and e.usage}
-    for attempt in run.attempts:
-        spent = ended[attempt.stage]
+    ended = [e.usage for e in events if isinstance(e, StageEnded) and e.usage]
+    for attempt, spent in zip(run.attempts, ended):
         assert (spent.requests, spent.tool_calls, spent.tool_calls_limit) == (
             attempt.usage.requests, attempt.usage.tool_calls, attempt.limits.tool_calls_limit)
-    turns = [e for e in events if isinstance(e, ModelTurn) and e.stage == "authoring"]
+    turns = [e for e in events if isinstance(e, ModelTurn) and e.stage == "control_authoring"]
     assert [e.turn for e in turns] == list(range(1, len(turns) + 1)) and turns[-1].answered
-    tools = [(e.tool, e.outcome) for e in events if isinstance(e, ToolReturned) and e.stage == "authoring"]
-    assert ("write_test_file", "ok") in tools and ("run_tests", "ok") in tools
+    tools = [(e.tool, e.outcome) for e in events if isinstance(e, ToolReturned) and e.stage == "control_authoring"]
+    assert ("write_test_file", "ok") in tools
+    assert all(tool != "run_tests" for tool, _ in tools)
     baseline = next(e for e in events if isinstance(e, RevisionEnded) and e.revision == "baseline")
     assert "test_security_rejects_outside_read failed" in baseline.detail
 
@@ -247,7 +247,8 @@ def test_concurrent_calls_to_one_tool_keep_their_own_arguments():
     assert 'read_source(path="b.py") error' in error and 'read_source(path="a.py") ok' in ok
 
 
-def test_on_a_terminal_the_display_colors_its_lines_and_clears_its_status_line():
+def test_on_a_terminal_the_display_colors_its_lines_and_clears_its_status_line(monkeypatch):
+    monkeypatch.setenv("TERM", "xterm-256color")
     out = io.StringIO()
     console = Console(file=out, force_terminal=True, color_system="truecolor", width=200)
     with TerminalDisplay("case x", console=console) as display:

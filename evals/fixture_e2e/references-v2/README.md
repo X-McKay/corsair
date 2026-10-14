@@ -1,0 +1,9 @@
+# Reviewed split fixture v2
+
+These new operator-owned files replace the single test file only for current fixture composition. The original `benchmarks/fixtures/path-traversal/test_documents.py`, contained reference, planning datasets and saved histories remain historical and unchanged.
+
+Each reference pair has one benign control and one adversarial safety probe in distinct files. Both import the real captured `documents` implementation. The control asserts the ordinary returned sentinel. The adversarial probe first establishes a readable outside sentinel, invokes the production function with `../outside.txt`, accepts only the specific confinement `ValueError`, and asserts that outside content was not returned. This establishes the stated returned-content property; absence of any low-level file open is not the asserted property. `contained` also uses this ordinary interface and may return an empty result.
+
+The manifest freezes every admitted source byte. Current `ReviewedWorkspace` accepts only the exact two-file map selected by `split_reviewed_tests`; changed, missing, duplicate or extra bytes are refused before directory creation or interpreter execution. Independent scripted authors read production anchors and write only their own reference file, without development execution. A separate outcome-blind review sees source, plan, reported condition and frozen patch before either revision executes. Both native probe outcomes and cleanup are retained. Optional operator witnesses support these observations but are not required.
+
+`historical_reference_plan` and `scripted_authoring` preserve old fixture interfaces for historical tooling; neither is a current production composition route. Witness-only historical plans remain unsupported by current split composition. The split plan projection explicitly declares native unit observations; it does not re-label old witness evidence.

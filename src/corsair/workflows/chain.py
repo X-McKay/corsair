@@ -34,7 +34,7 @@ with workflow.unsafe.imports_passed_through():
     from corsair.agents.evidence_assessment.contracts import AssessmentInput, ValidityInput, EvidenceAssessment
     from corsair.agents.issue_analysis.contracts import IssueAnalysisInput
     from corsair.agents.issue_identification.contracts import IssueIdentification
-    from corsair.agents.test_authoring.contracts import AuthoringResult, TestAuthoringInput
+    from corsair.agents.probe_authoring.contracts import ControlInput, ExploitInput, Drafted, Blocked
     from corsair.agents.test_planning.contracts import TestPlan, TestPlanningInput
     from corsair.composition.direct import (
         NO_PREPARATION, AgentStage, CompositionBudget, FixtureCase, Preparation, PreparationMissing, RecordedFailure,
@@ -81,7 +81,7 @@ class ChainStage:
     async def invoke(self, request: StageRequest[Any]) -> StageRecord[Any]:
         runtime = _admit((request.model_key,), request.budget)
         prompt, deps = stage_call(self.stage, request.inputs, request.budget,
-                                  WorkerRunner("development") if self.stage == "authoring" else None)
+                                  None)
         usage, output, failure = RunUsage(), None, None
         with capture_run_messages() as messages:
             try:
@@ -111,12 +111,21 @@ class PlanningStage(ChainStage):
         return await self.invoke(request)
 
 
-@workflow.defn(name="corsair.chain.Authoring")
-class AuthoringStage(ChainStage):
-    stage = "authoring"
+@workflow.defn(name="corsair.chain.ControlAuthoring")
+class ControlAuthoringStage(ChainStage):
+    stage = "control_authoring"
 
     @workflow.run
-    async def run(self, request: StageRequest[TestAuthoringInput]) -> StageRecord[AuthoringResult]:
+    async def run(self, request: StageRequest[ControlInput]) -> StageRecord[Drafted | Blocked]:
+        return await self.invoke(request)
+
+
+@workflow.defn(name="corsair.chain.ExploitAuthoring")
+class ExploitAuthoringStage(ChainStage):
+    stage = "exploit_authoring"
+
+    @workflow.run
+    async def run(self, request: StageRequest[ExploitInput]) -> StageRecord[Drafted | Blocked]:
         return await self.invoke(request)
 
 
@@ -129,7 +138,7 @@ class AssessmentStage(ChainStage):
         return await self.invoke(request)
 
 
-CHILDREN = {"identification": IdentificationStage, "planning": PlanningStage, "authoring": AuthoringStage,
+CHILDREN = {"identification": IdentificationStage, "planning": PlanningStage, "control_authoring": ControlAuthoringStage, "exploit_authoring": ExploitAuthoringStage,
             "assessment": AssessmentStage}
 
 
@@ -205,7 +214,7 @@ class ChainInvestigation:
         return chain_result(await run_chain(request.case, invoke, execute, select, new_operation=workflow.uuid4))
 
 
-WORKFLOWS = (ChainInvestigation, IdentificationStage, PlanningStage, AuthoringStage, AssessmentStage)
+WORKFLOWS = (ChainInvestigation, IdentificationStage, PlanningStage, ControlAuthoringStage, ExploitAuthoringStage, AssessmentStage)
 
 
 @asynccontextmanager

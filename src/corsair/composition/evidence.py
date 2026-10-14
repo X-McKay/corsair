@@ -11,6 +11,7 @@ import re
 
 from corsair.agents.evidence_assessment.contracts import MAX_ITEM_CHARS, EvidenceAssessment, EvidenceItem
 from corsair.agents.issue_identification.contracts import IssueIdentification
+from corsair.composition.assembly import FrozenTestPatch
 from corsair.agents.test_authoring.contracts import TestPatch
 from corsair.agents.source.contracts import SourceFile
 from corsair.agents.test_planning.contracts import PlannedWitness, ReadyTestPlan, WitnessFacility
@@ -22,7 +23,7 @@ from corsair.ports.test_runner import ApprovedPatch, NativeTestRun, PatchFile, T
 TOKEN = re.compile(r'^[A-Za-z0-9_.:-]{1,128}$')
 
 
-def observation_plan(plan: ReadyTestPlan, patch: TestPatch) -> ObservationPlan:
+def observation_plan(plan: ReadyTestPlan, patch: TestPatch | FrozenTestPatch) -> ObservationPlan:
     """The agreed mapping; the patch must realize exactly this plan's two tests."""
     if (patch.control_test_id, patch.security_test_id) != (plan.control.test_id, plan.security.test_id):
         raise ValueError('patch test ids differ from the plan')
@@ -87,7 +88,7 @@ def witness_request(identification: IssueIdentification, envelope: WitnessReques
     return envelope
 
 
-def freeze(patch: TestPatch, approved_paths: tuple[str, ...]) -> ApprovedPatch:
+def freeze(patch: TestPatch | FrozenTestPatch, approved_paths: tuple[str, ...]) -> ApprovedPatch:
     """The exact bytes every revision executes; refused if they no longer hash to the authored digest."""
     frozen = ApprovedPatch(tuple(PatchFile(item.path, item.content.encode()) for item in patch.files), approved_paths)
     if frozen.sha256 != patch.patch_sha256:
@@ -174,7 +175,7 @@ def _receipt_summary(observed: NativeTestRun) -> str:
     return json.dumps(summary, indent=2, sort_keys=True)
 
 
-def review_items(plan: ObservationPlan, patch: TestPatch,
+def review_items(plan: ObservationPlan, patch: TestPatch | FrozenTestPatch,
                  review_sources: dict[Revision, tuple[SourceFile, ...]],
                  source_identities: dict[Revision, str],
                  test_plan: ReadyTestPlan, issue: str) -> tuple[EvidenceItem, ...]:
@@ -236,7 +237,7 @@ def _frozen_review_items(review: EvidenceAssessment) -> tuple[EvidenceItem, ...]
     return tuple(items)
 
 
-def evidence_items(plan: ObservationPlan, patch: TestPatch, environment: EnvironmentIdentity,
+def evidence_items(plan: ObservationPlan, patch: TestPatch | FrozenTestPatch, environment: EnvironmentIdentity,
                    runs: dict[Revision, tuple[NativeTestRun, ...]],
                    admitted: frozenset[Revision] | set[Revision] = frozenset(),
                    review_sources: dict[Revision, tuple[SourceFile, ...]] | None = None,

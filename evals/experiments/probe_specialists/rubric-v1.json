@@ -1,0 +1,97 @@
+{
+  "version": "probe-specialists-rubric-v1",
+  "primary": "Independently source-reviewed valid probe with actual native outcomes on both captured revisions; execution pending until sandbox calibration.",
+  "scope": "Four curated synthetic Python fixtures observing security consequences with actual SQLite, temporary file reads, output disclosure and in-memory state; not a representative benchmark or cross-language qualification.",
+  "role_metrics": {
+    "control": [
+      "real production binding",
+      "planned ordinary input and preconditions",
+      "non-vacuous stable ordinary behavior",
+      "unchanged control valid on both revisions",
+      "dependency limits"
+    ],
+    "exploit": [
+      "real production binding",
+      "planned adversarial condition",
+      "relevant safety assertion",
+      "dependency limits",
+      "unchanged probe fails unsafe and passes safe"
+    ]
+  },
+  "pair_metrics": [
+    "exactly two probes",
+    "fixture compatibility",
+    "independent contexts",
+    "native outcome per probe per revision",
+    "latency",
+    "requests",
+    "tool_calls",
+    "input_tokens",
+    "output_tokens",
+    "retries",
+    "failures"
+  ],
+  "oracle_visibility": "Labels, reference patches and paired revisions are operator-only; agent receives one captured revision and projected role task only.",
+  "cases": {
+    "query_parameters": {
+      "supported_claim": "Hostile account input can disclose balance rows belonging to other accounts. Controlled SQLite fixture and this exact SELECT only; no other engine, network database, transport authorization or production deployment claim.",
+      "source_only_review": "Control executes imported production lookup_account against real seeded SQLite and checks ordinary rows. Exploit uses quoted OR tautology on the same seed and asserts an empty result because no such literal account exists. Unsafe source returns alice and bob balances; fixed source binds hostile literal and returns no rows. No safety logic or parser is doubled; cursor results establish disclosure consequences.",
+      "expected_native_outcomes": {
+        "reported": {
+          "control": "passed",
+          "exploit": "failed"
+        },
+        "fixed": {
+          "control": "passed",
+          "exploit": "passed"
+        }
+      },
+      "native_execution": "unrun"
+    },
+    "path_containment": {
+      "supported_claim": "A traversal input can disclose a real file outside the configured document directory. Controlled POSIX temporary files and lexical ../ traversal only; no symlink races, arbitrary host secrets, platform portability or wider filesystem-policy claim.",
+      "source_only_review": "Control executes production read_document and reads real contained bytes. Exploit first establishes a real outside-root secret file, then calls production with ../private.txt. Only the specific production ContainmentError becomes a denied result; other exceptions fail execution. Unsafe returns secret bytes and violates the None assertion; fixed denies before FileReader. Reader performs real I/O and adds no guard.",
+      "expected_native_outcomes": {
+        "reported": {
+          "control": "passed",
+          "exploit": "failed"
+        },
+        "fixed": {
+          "control": "passed",
+          "exploit": "passed"
+        }
+      },
+      "native_execution": "unrun"
+    },
+    "authorization_state": {
+      "supported_claim": "An unauthorized actor can mutate another owner\u2019s item before permission denial. Synchronous supplied in-memory state only; no transport identity, persistence, database transaction or concurrency claim.",
+      "source_only_review": "Control imports rename_item and checks returned title and complete ordinary state. Exploit calls as another actor, binds exact exception and full before/after snapshot. Both unsafe and safe deny; only unsafe changes title first, so exception-only assertion would be insufficient. No dependency double replaces authorization or mutation.",
+      "expected_native_outcomes": {
+        "reported": {
+          "control": "passed",
+          "exploit": "failed"
+        },
+        "fixed": {
+          "control": "passed",
+          "exploit": "passed"
+        }
+      },
+      "native_execution": "unrun"
+    },
+    "public_profile_disclosure": {
+      "supported_claim": "A public profile response can disclose a private password-hash field and value. Returned dictionary boundary only; no HTTP transport, authentication, password cracking or deployed endpoint claim.",
+      "source_only_review": "Control invokes imported public_profile on a realistic record and checks ordinary display name. Exploit invokes same production function with the private field present, confirms ordinary response and asserts both private field and value are absent. Unsafe copies private data into output; fixed constructs only public display_name. No dependency can implement redaction or conceal output.",
+      "expected_native_outcomes": {
+        "reported": {
+          "control": "passed",
+          "exploit": "failed"
+        },
+        "fixed": {
+          "control": "passed",
+          "exploit": "passed"
+        }
+      },
+      "native_execution": "unrun"
+    }
+  }
+}

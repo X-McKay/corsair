@@ -25,7 +25,7 @@ from corsair.nodes.runtime.matrix import load
 from corsair.workflows.chain import ACTIVITY_CONFIG, WORKFLOWS, ChainInvestigation, chain_worker, run_durable
 from corsair.workflows.chain_runtime import STAGES, ChainRequest, StageKeys, configure_chain
 from evals.fixture_e2e.case import (
-    fixture_case, reviewed_runners, scripted_assessment, scripted_authoring, scripted_identification,
+    fixture_case, reviewed_runners, scripted_assessment, scripted_authoring, scripted_control_authoring, scripted_exploit_authoring, scripted_identification,
     scripted_planning,
 )
 from tests.agents.test_chain_environment_stage import (
@@ -48,7 +48,7 @@ def abstaining_identification():
 
 def stages(**overrides):
     values = dict(identification=scripted_identification(), planning=scripted_planning(),
-                  authoring=scripted_authoring(), assessment=scripted_assessment())
+                  control_authoring=scripted_control_authoring(), exploit_authoring=scripted_exploit_authoring(), assessment=scripted_assessment())
     return StageModels(**(values | overrides))
 
 
@@ -73,7 +73,7 @@ def store(tmp_path):
 async def histories(client, identity, destination):
     """Parent and every started child; each is saved and replayed natively."""
     saved = []
-    for workflow_id in (identity, *(f"{identity}/{stage}" for stage in STAGES)):
+    for workflow_id in (identity, *(f"{identity}/{stage}" for stage in STAGES), f"{identity}/assessment-validity"):
         handle = client.get_workflow_handle(workflow_id)
         try:
             history = await handle.fetch_history()
@@ -137,7 +137,7 @@ def test_durable_chain_routes_the_true_pair_like_direct_mode(temporal_address, r
             assert execution.observed.operation == str(execution.operation)
             assert execution.observed.cleanup == "confirmed"
         saved = dict(await histories(client, identity, request.config.getoption("--temporal-evidence-dir")))
-        assert set(saved) == {identity, *(f"{identity}/{stage}" for stage in STAGES)}
+        assert set(saved) == {identity, *(f"{identity}/{stage}" for stage in STAGES), f"{identity}/assessment-validity"}
         revisions = scheduled(saved[identity])
         assert [e.activity_task_scheduled_event_attributes.activity_type.name for e in revisions] == [
             "corsair.chain.execute_revision"] * 2
@@ -149,12 +149,16 @@ def test_durable_chain_routes_the_true_pair_like_direct_mode(temporal_address, r
         timeouts = [e.start_child_workflow_execution_initiated_event_attributes.workflow_execution_timeout
                     .ToTimedelta().total_seconds() for e in children]
         budget = CompositionBudget()
-        assert timeouts == [getattr(budget, stage).timeout_seconds for stage in STAGES]
-        # Model requests and tool calls of the authoring child are native activities, run_tests included.
-        authoring = [e.activity_task_scheduled_event_attributes.activity_type.name
-                     for e in scheduled(saved[f"{identity}/authoring"])]
-        assert sum(name.endswith("model_request") for name in authoring) == durable.attempts[2].usage.requests
-        assert sum("call_tool" in name for name in authoring) == durable.attempts[2].usage.tool_calls == 4
+        assert timeouts == [getattr(budget, stage).timeout_seconds for stage in (*STAGES[:-1], "assessment", "assessment")]
+        # Each independent author uses native activities; neither has an execution tool.
+        for stage, attempt in (("control_authoring", durable.attempts[2]),
+                               ("exploit_authoring", durable.attempts[3])):
+            activities = [e.activity_task_scheduled_event_attributes.activity_type.name
+                          for e in scheduled(saved[f"{identity}/{stage}"])]
+            assert sum(name.endswith("model_request") for name in activities) == attempt.usage.requests
+            assert sum("call_tool" in name for name in activities) == attempt.usage.tool_calls
+            assert not any("run_tests" in name for name in activities)
+
     asyncio.run(check())
 
 
@@ -195,7 +199,7 @@ def test_a_raising_revision_activity_is_recorded_once_and_stops_at_execution(
 
 
 @pytest.mark.parametrize("keys,budget,kind", [
-    (StageKeys("identification", "planning", "authoring", "unadmitted"), CompositionBudget(), "ModelKeyNotAdmitted"),
+    (StageKeys("identification", "planning", "control_authoring", "exploit_authoring", "unadmitted"), CompositionBudget(), "ModelKeyNotAdmitted"),
     (StageKeys(*STAGES), CompositionBudget(dev_runs=4), "BudgetNotAdmitted"),
 ])
 def test_parent_admission_refusal_closes_before_any_child(temporal_address, request, store, tmp_path, keys, budget,

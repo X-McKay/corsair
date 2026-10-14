@@ -89,9 +89,9 @@ class CommandRecord(Contract):
 class _Ready(Contract, Generic[Citation]):
     status: Literal["ready"]
     toolchain_id: Identifier
-    recipe: tuple[RecipeStep[Citation], ...] = Field(max_length=16)
-    build_command: Command
-    discovery_command: Command
+    recipe: tuple[RecipeStep[Citation], ...] = Field(max_length=16, description="Preparatory steps before the terminal build; exclude the separately reported build_command, discovery_command and baseline_test_command")
+    build_command: Command = Field(description="Terminal build after recipe; its successful execution is counted once, separately from recipe")
+    discovery_command: Command = Field(description="Native discovery after the terminal build; report separately from recipe")
     framework: str = Field(min_length=1, max_length=128, description="Native test framework identity, e.g. pytest or JUnit 5")
     baseline_test_id: str = Field(min_length=1, max_length=512, description="Test id exactly as printed by the discovery command")
     baseline_test_path: str = Field(min_length=1, max_length=256, description="Saved repository path of the baseline test file")

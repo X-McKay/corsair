@@ -31,7 +31,7 @@ REPOSITORY = Path(__file__).resolve().parents[1]
 RESULTS = REPOSITORY / ".runs" / "evals"
 # Top-level suite identity; the chain nests per-stage prompt/config/skill under "versions" and names its live stages.
 # toolset_sha256 digests the offered tool definitions (SPEC-0052); suites that do not report it leave it absent.
-IDENTITY = ("prompt_version", "config_version", "skill_sha256", "toolset_sha256", "versions", "live_stages", "composition", "model",
+IDENTITY = ("factory_source_sha256", "shared_helper_source_sha256", "spec_sha256", "capability_selection_sha256", "budget_policy_sha256", "effective_budget_sha256", "prompt_version", "config_version", "skill_sha256", "toolset_sha256", "versions", "live_stages", "composition", "model",
             "evaluator_version", "dataset", "dataset_sha256", "mode", "runner", "execution", "budget")
 
 
@@ -47,20 +47,30 @@ class Suite:
 
 
 SUITES: dict[str, Suite] = {
-    "environment": Suite("evals.environment.evaluate", {"development": ()}, note="synthetic observations; setup commands never execute on the host"),
-    "identification": Suite("evals.issue_identification.evaluate", {"development": ()}, repeat=False),
+    "control_authoring": Suite("evals.control_authoring.evaluate", {"development": (), "transfer": ("--agent", "control_authoring")},
+        set_modules={"transfer": "evals.experiments.staged_baseline.evaluate"},
+        note="source drafts only; transfer requires REPEAT=1; contract scores require separate source review and native execution"),
+    "exploit_authoring": Suite("evals.exploit_authoring.evaluate", {"development": (), "transfer": ("--agent", "exploit_authoring")},
+        set_modules={"transfer": "evals.experiments.staged_baseline.evaluate"},
+        note="source drafts only; transfer requires REPEAT=1; contract scores require separate source review and native execution"),
+    "environment": Suite("evals.environment.evaluate", {"development": (), "development-v2": ("--cases", "development-v2")}, note="synthetic observations; setup commands never execute on the host"),
+    "identification": Suite("evals.issue_identification.evaluate", {"development": (), "transfer-v2": ()}, repeat=False,
+        set_modules={"transfer-v2": "evals.experiments.staged_baseline.identification_v2"}),
     "planning": Suite("evals.test_planning.evaluate", {
         # heldout and heldout2 are retired (SPEC-0040); the suite refuses them, so they are not offered here.
-        "development": ("--cases", "development"), "heldout3": ("--cases", "heldout3"), "unit": ("--cases", "unit"), "unit-v2": ("--cases", "unit-v2"), "unit-first": ("--cases", "unit-first")}),
+        "development": ("--cases", "development"), "heldout3": ("--cases", "heldout3"), "unit": ("--cases", "unit"), "unit-v2": ("--cases", "unit-v2"), "unit-first": ("--cases", "unit-first"), "transfer-v2": ()},
+        set_modules={"transfer-v2": "evals.experiments.staged_baseline.planning_v2"}),
     "authoring": Suite("evals.test_authoring.evaluate", {"development": (), "unit": ("--cases", "unit")},
-                       note="runs answered by injected observations or the static host runner; tests are not executed"),
+                       note="historical combined-author suite; injected/static observations only, generated tests are not executed"),
     "assessment": Suite("evals.evidence_assessment.evaluate", {
-        "development": ("--split", "development"), "held_out": ("--split", "held_out"), "unit": (), "unit-transfer": ("--cases", "transfer")},
-        set_modules={"unit": "evals.evidence_assessment.unit_test", "unit-transfer": "evals.evidence_assessment.unit_test"}),
+        "development": ("--split", "development"), "held_out": ("--split", "held_out"), "unit": (), "unit-transfer": ("--cases", "transfer"),
+        "unit-disposition-v2": ("--version", "v2")},
+        set_modules={"unit": "evals.evidence_assessment.unit_test", "unit-transfer": "evals.evidence_assessment.unit_test",
+                     "unit-disposition-v2": "evals.experiments.staged_baseline.unit_disposition"}),
     "chain": Suite("evals.fixture_chain.evaluate", {"fixture": (), "jest": ("--cohort", "jest")},
                    live=("--live", "identification,planning,assessment"),
-                   note="fixture: live authoring needs the sandbox, so authoring stays scripted on the host; cohorts "
-                        "(evals/case_e2e/cohorts.yaml) run every stage live over image-only Docker ports",
+                   note="fixture chain uses independent authors; non-live stages are scripted and the host runner admits "
+                        "only reviewed fixture bytes; Docker cohorts run selected production stages on image-only ports",
                    set_modules={"jest": "evals.case_e2e.evaluate"}),
 }
 # Agents without an isolated eval set yet, and where the gap is planned.
@@ -259,7 +269,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.agent in MISSING:
         parser.error(f"{args.agent}: {MISSING[args.agent]}")
     if args.promote:
-        if not re.fullmatch(r"[0-9TZ]+-[a-z0-9_]+-(scripted|live)", args.promote):
+        if not re.fullmatch(r"[0-9TZ]+-[a-z0-9_-]+-(scripted|live)", args.promote):
             parser.error("RUN must be a run id from index.jsonl")
         promote(args.agent, args.promote, args.results)
         return 0

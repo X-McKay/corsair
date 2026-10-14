@@ -38,7 +38,7 @@ from corsair.nodes.witness import PROBE_SHA256, witness_evidence
 from corsair.ports.artifacts import ArtifactRef
 from corsair.ports.test_runner import Discovery, Execution, NativeTestRun, WitnessCapture, WitnessRequest
 from corsair.reports.junit import parse_junit
-from evals.fixture_e2e.case import (fixture_case, reviewed_runners, scripted_assessment, scripted_authoring,
+from evals.fixture_e2e.case import (fixture_case, reviewed_runners, scripted_assessment, scripted_control_authoring, scripted_exploit_authoring,
                                     scripted_identification, scripted_planning)
 from evals.fixture_e2e.reviewed import DISCOVER, FIXTURE, PREFIX, REVIEWED_TEST, ReviewedLocalExecution
 
@@ -66,41 +66,8 @@ def normalize(text: str, workspace: str) -> str:
 
 
 async def capture() -> None:
-    """Writes base/: the chain's frozen plan and patch, the declared identity and each variant's native output."""
-    with tempfile.TemporaryDirectory() as scratch:
-        root = Path(scratch)
-        (root / "artifacts").mkdir(mode=0o700)
-        (root / "work").mkdir()
-        with LocalArtifacts(root / "artifacts", max_bytes=1024 * 1024) as store, \
-                models.override_allow_model_requests(False):
-            run = await run_direct(fixture_case(), StageModels(scripted_identification(), scripted_planning(),
-                                                               scripted_authoring(), scripted_assessment()),
-                                   reviewed_runners(store, root / "work"))
-        assert run.stopped_at is None, run.reason
-        variants = {"baseline": "vulnerable", "candidate": "fixed"}
-        runs = {}
-        for e in run.executions:
-            observed, workspace = e.observed, str(root / "work" / e.revision)
-            assert observed.failure_layer is None and observed.cleanup == "confirmed"
-            (BASE / f"{variants[e.revision]}-junit.xml").write_text(
-                normalize(observed.execution.receipt.stdout.decode(), workspace))
-            runs[variants[e.revision]] = {"native_exit": observed.execution.receipt.native_exit,
-                                          "discovery": normalize(observed.discovery.receipt.stdout.decode(), workspace)}
-        # A real collection error: the reviewed test without any documents module beside it.
-        missing = root / "missing"
-        missing.mkdir()
-        (missing / REVIEWED_TEST).write_bytes((FIXTURE / REVIEWED_TEST).read_bytes())
-        handle = SandboxHandle(str(uuid4()), "reviewed", "local", "tests", str(uuid4()))
-        receipt = ReviewedLocalExecution(missing).execute(handle, DISCOVER + (REVIEWED_TEST,), uuid4())
-        runs["collection_error"] = {"native_exit": receipt.native_exit,
-                                    "discovery": normalize(receipt.stdout.decode(), str(missing))}
-        patch = run.patch.model_copy(update={"dev_runs": tuple(
-            r.model_copy(update={"operation": str(uuid5(NAMESPACE_URL, f"corsair-eval:development:{i}"))})
-            for i, r in enumerate(run.patch.dev_runs))})
-        (BASE / "capture.json").write_text(json.dumps({
-            "plan": run.observation_plan.model_dump(mode="json"), "patch": patch.model_dump(mode="json"),
-            "environment": fixture_case().environment_identity.model_dump(mode="json"), "runs": runs},
-            indent=2, sort_keys=True) + "\n")
+    """Keep the historical native base immutable after the split-graph transition."""
+    raise RuntimeError("legacy assessment base capture is frozen; capture split evidence in a new version, never overwrite historical measurements")
 
 
 # ---- typed transformations of the captured runs -------------------------------------------------------------------

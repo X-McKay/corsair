@@ -1,0 +1,51 @@
+stage_defaults:
+  slack_tool_calls: 2
+  tokens_per_request: 12000
+composition:
+  environment:
+    request_limit: 16
+    tool_calls_limit: 20
+    total_tokens_limit: 128000
+    timeout_seconds: 240.0
+    slack_tool_calls: 2
+    tokens_per_request: 8000
+  setup_commands: 12
+  identification:
+    request_limit: 20
+    tool_calls_limit: 16
+    total_tokens_limit: 128000
+    timeout_seconds: 300.0
+    slack_tool_calls: 2
+    tokens_per_request: 8000
+  planning:
+    request_limit: 20
+    tool_calls_limit: 16
+    total_tokens_limit: 160000
+    timeout_seconds: 600.0
+    slack_tool_calls: 2
+    tokens_per_request: 10000
+  control_authoring:
+    request_limit: 20
+    tool_calls_limit: 20
+    total_tokens_limit: 128000
+    timeout_seconds: 900.0
+    slack_tool_calls: 2
+    tokens_per_request: 12000
+  exploit_authoring:
+    request_limit: 20
+    tool_calls_limit: 20
+    total_tokens_limit: 128000
+    timeout_seconds: 900.0
+    slack_tool_calls: 2
+    tokens_per_request: 12000
+  assessment:
+    request_limit: 32
+    tool_calls_limit: 28
+    total_tokens_limit: 262144
+    timeout_seconds: 600.0
+    slack_tool_calls: 3
+    tokens_per_request: 10000
+  dev_runs: 3
+  output_retries: 1
+  author_output_retries: 2
+  admission_refusals: 1

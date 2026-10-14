@@ -11,7 +11,7 @@ from pydantic_ai.models.function import FunctionModel
 from corsair.agents.source.contracts import SourceFile
 from corsair.composition.direct import CapturedReviewSource, run_direct
 from evals.fixture_e2e.case import (
-    CASES, FIXTURE, INVENTORY, fixture_case, reference_plan, reviewed_runners, scripted_authoring,
+    CASES, FIXTURE, INVENTORY, fixture_case, reference_plan, reviewed_runners, scripted_control_authoring, scripted_exploit_authoring,
     scripted_identification,
 )
 from tests.agents.test_fixture_composition import stages, store
@@ -21,10 +21,10 @@ from evals.test_planning.drafts import component_draft
 def unit_planner():
     draft = reference_plan()
     for role in ("control", "security"):
-        draft[role].pop("witness")
+        draft[role].pop("witness", None)
         draft[role]["observation"] = {
             "kind": "return_value" if role == "control" else "exception",
-            "property": "Ordinary document contents" if role == "control" else "ValueError rejects traversal",
+            "property": "Ordinary document contents" if role == "control" else "Outside sentinel is not returned",
             "seam": "Existing read_document function interface",
         }
     async def respond(messages, info):
@@ -64,10 +64,10 @@ def unit_assessor(seen, candidate=True, fix_applicable=True):
                 return {'test_id': reference_plan()[role]['test_id'],
                     'production_binding': {'called_symbol': 'read_document', 'status': 'production',
                         'call_site': cite(patch), 'definition_site': cite(source), 'evidence': binding},
-                    'input_exercise': {'observed_input': 'note.txt' if role == 'control' else '../secret.txt',
+                    'input_exercise': {'observed_input': 'document.txt' if role == 'control' else '../outside.txt',
                         'status': 'benign' if role == 'control' else 'reported_adversarial',
                         'preconditions': 'established', 'evidence': property_evidence},
-                    'assertion': {'asserted_property': 'Benign contents' if role == 'control' else 'ValueError rejection',
+                    'assertion': {'asserted_property': 'Benign contents' if role == 'control' else 'Outside sentinel not returned',
                         'status': 'benign_behavior' if role == 'control' else 'security_property', 'evidence': property_evidence},
                     'dependencies': {'substitutions': [], 'scope': 'none', 'evidence': binding}}
             return {'revision': revision, 'control': probe('control'), 'exploit': probe('security')}
@@ -84,7 +84,7 @@ def unit_assessor(seen, candidate=True, fix_applicable=True):
 
 @pytest.mark.parametrize("candidate_source", ["present", "missing", "wrong_identity", "no_candidate"])
 def test_composition_uses_independent_unit_reviews_for_final_gate(store, tmp_path, candidate_source):
-    case = fixture_case()
+    case = replace(fixture_case(), witness_envelope=None)
     if candidate_source == "no_candidate":
         case = replace(case, revision_sources={"baseline": case.revision_sources["baseline"]})
     sources = {"baseline": CapturedReviewSource(case.revision_sources["baseline"], case.issue.source_files)}
@@ -136,7 +136,7 @@ def test_captured_review_sources_roundtrip_in_durable_chain_request():
     case = fixture_case()
     case = replace(case, review_sources={"baseline": CapturedReviewSource(
         case.revision_sources["baseline"], case.issue.source_files)})
-    request = ChainRequest(case, StageKeys("a", "b", "c", "d"), CompositionBudget())
+    request = ChainRequest(case, StageKeys("a", "b", "c", "d", "e"), CompositionBudget())
     adapter = TypeAdapter(ChainRequest)
     restored = adapter.validate_json(adapter.dump_json(request))
     assert restored == request

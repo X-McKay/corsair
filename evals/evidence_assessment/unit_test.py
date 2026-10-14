@@ -15,7 +15,7 @@ from pydantic_ai.usage import RunUsage
 from pydantic_evals import Case, Dataset, set_eval_attribute
 from pydantic_evals.evaluators import Evaluator
 
-from corsair.agents.evidence_assessment import (CONFIG_VERSION, PROMPT_VERSION, SKILL_SHA256,
+from corsair.agents.evidence_assessment import (MANIFEST_IDENTITY, CONFIG_VERSION, PROMPT_VERSION, SKILL_SHA256,
     TOOLSET_SHA256, assessment_prompt, create_evidence_assessment_agent)
 from corsair.agents.evidence_assessment.contracts import ValidityInput
 from corsair.agents.evidence_assessment.dependencies import AssessmentDependencies
@@ -115,6 +115,7 @@ async def evaluate(destination, repeat=1, model=None, cases=CASES):
         'evaluator_version': EVALUATOR_VERSION, 'dataset_file': cases.name,
         'dataset_sha256': sha256(cases.read_bytes()).hexdigest(), 'budget': budget.model_dump(),
         'task_retries': 0, 'max_concurrency': 1}
+    metadata |= MANIFEST_IDENTITY
     (destination / 'configuration.json').write_text(json.dumps(metadata, indent=2))
 
     async def task(inputs):
