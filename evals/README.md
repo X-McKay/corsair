@@ -49,3 +49,14 @@ never zero, and a total with an unknown in it is null; for labelled rows, the de
 rates by terminal reason), `policy.json` (pass, fail, unknown or not_set per policy entry; gates are deferred, so it
 never changes the exit code) and `comparison.md` against the promoted baseline. A scripted run checks plumbing and
 oracle consistency only; baselines come from live runs.
+
+Live baselines run one agent after another (one live inference user at a time) on a host with the provider config
+(and Docker for the chain), then a person chooses the run to keep:
+
+```sh
+make eval-live-baselines PROVIDER_CONFIG=PATH [AGENTS="grounding builder"] [NOTE=...]   # prints each run id
+make baseline-commit AGENT=<agent> RUN=<run id>   # whole set, clean checkout; writes <agent evals>/baselines/<set>-<mode>.json
+```
+
+The committed file is the run's summary without per-attempt rows, plus its policy status; comparisons fall back to it
+on a checkout that does not hold the run under `.runs/`.
