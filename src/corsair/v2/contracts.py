@@ -38,7 +38,7 @@ class ArtifactRef(Frozen):
     size: int = Field(ge=0)
 
 
-# --- 1. Intake (code) and Grounding (agent placeholder) ---------------------------------------------------------
+# --- 1. Intake (code) ---------------------------------------------------------------------------------------------
 
 
 class Finding(Frozen):
@@ -60,15 +60,6 @@ class Revision(Frozen):
     tree_sha256: str = Field(pattern=r"^[0-9a-f]{64}$", description="Digest over the tree's paths, modes and bytes")
 
 
-class GroundingContext(Frozen):
-    """What the Grounding agent adds to a ticket before investigation. Empty until that agent is implemented."""
-
-    related_issues: tuple[str, ...] = ()
-    prior_comments: tuple[str, ...] = ()
-    graph_facts: tuple[str, ...] = ()
-    summary: str = Field(default="", max_length=8_000)
-
-
 class Case(Frozen):
     """One reported issue against an exact revision, and optionally its fix revision."""
 
@@ -77,7 +68,6 @@ class Case(Frozen):
     finding: Finding
     revision: Revision
     fixed_revision: Revision | None = None
-    grounding: GroundingContext = GroundingContext()
 
 
 # --- 2. Select (code) -------------------------------------------------------------------------------------------
