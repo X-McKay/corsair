@@ -4,36 +4,44 @@ kind: plan
 title: Shared developer skills and configuration golden path
 status: complete
 updated: 2026-10-14
-related: [SPEC-0082]
+related: [SPEC-0082, SPEC-0083]
 ---
 
 # Shared developer skills and configuration golden path
 
 ## Scope and boundaries
 
-Restore make test-config; remove obsolete duplicated v1 architecture from five canonical skills, fix exact current-work paths and verified dynamic scorer discovery, and preserve native Codex symlinks/current qualification authority. Structural guards do not certify model/client compliance.
+PR #176 restores `make test-config`, removes duplicated retired v1 architecture from five canonical skills, fixes current-work paths and dynamic scorer discovery, and preserves Codex symlinks and qualification authority. Structural checks do not certify model/client compliance. The closed audit/roadmap PR #178 is not a dependency and is not pursued.
 
-This independent draft PR is based on develop integration snapshot `bdbb2a91135f61bb33cd19ec3a4421cf284094f5`. Other audit changes live in separate PRs, not prerequisites of this branch. The central source-backed audit/HANDOFF-0137 will be delivered in a separate documentation PR; this branch carries its own scoped record and current-work entry.
+## Review follow-up
 
-## Implementation and validation
+Rebased onto inspected develop `a00bbbc96d3b97838398693dea3dcae7c43da6bb`. Address the owner's 2026-10-14 review:
 
-Implementation is copied from the independently reviewed, reconciled integration worktree; native Temporal fixtures and all seven scripted evaluators passed there, but that does not replace standalone validation. Run `uv sync --locked --group dev`, focused tests, four-worker/serial full suites, final cleanup and re-test. Record actual results below before delivery.
+1. Restore a concise "Rules that do not bend" list in `corsair-base-image`: one exact runtime version per image, no nearby-version substitute, the same official base digest string in Dockerfile and matrix row, reviewed offline hash-pinned contents, non-root `USER 10001`, `HOME=/tmp`, fixture `/opt/corsair-fixture`, and no package added for one case.
+2. State the lighter toolchain entry criterion chosen on 2026-10-13: a row lands as `evidence: image-only` only after a plain-Docker build, gate body and one real case at both commits. Only `evidence: live` after a passed milestone gate counts as qualified.
+3. Link the active procedure at `docs/runbooks/openshell-v2.md`, retaining current coordinator/ownership/cleanup rules. Do not resurrect unavailable `qualify-image`/`archive-runs` commands from v1.
+4. Add cheap regression guards for the restored instructions and active runbook. Preserve one canonical skill source and existing `.agents/skills` symlinks.
+5. Re-run skill/configuration and full offline checks, cleanup/re-test and update the existing PR. Do not run a live image/cluster gate or merge automatically.
 
-Unrun/unknown: production provider accuracy, Docker/kind/gateway policy and native platform qualification, true backend end-to-end dispositions and native Claude/Codex client compliance. No baselines/prompts are promoted and no production service is deployed.
+## Validation
 
-## Next action
+Earlier bdbb2a91 standalone checks: configuration/focused 107 passed, full serial/four-worker 1637 passed/113 skipped. These are historical; a00bbbc review follow-up evidence is recorded below after execution.
 
-Complete standalone validation and publish this draft for independent review. Do not merge automatically. Preserve failed evidence and explicit unknowns; follow current gate/coordinator decisions for any later live run.
+Review follow-up validation completed on the pinned a00bbbc base; commands/results below.
 
-## Final standalone evidence
+Unrun: actual Claude/Codex client compliance, Docker image builds, real case-at-both-commits and milestone OpenShell gate. Restoring the instructions and checking their presence is not evidence those live steps passed. No rows, image pins, provider policies, agent prompts or baselines are changed/promoted. Keep `.runs/`, `.state/`, credentials and private diagnostics out of Git.
 
-Final base `bdbb2a91135f61bb33cd19ec3a4421cf284094f5` preserves D18 source standards and native live-baseline/commit helpers. The original `06d4cbe` checks remain private history; no D18 verdict implementation is included here.
+## Completed owner-review validation
 
-| Check | Passed | Skipped |
-| --- | --- | --- |
-| Focused | 107 | 0 |
-| Four-worker full suite | 1637 | 113 |
-| Serial full suite | 1637 | 113 |
-| Post-cleanup focused re-test | 107 | 0 |
+Base: `a00bbbc96d3b97838398693dea3dcae7c43da6bb`.
 
-Final diff cleanup check passed. Shared skill/discovery/configuration guards passed; actual client compliance unrun. Skipped tests are not native qualification. Production models, Docker/kind/gateway, backend end-to-end dispositions and held-out accuracy remain unrun. No private `.runs/`, `.state/`, credentials, raw logs or weights are committed.
+| Check | Result |
+| --- | --- |
+| Focused boundary/configuration tests | 108 passed |
+| Four-worker make test-v2 | 1703 passed, 113 skipped |
+| Serial make test-v2 | 1703 passed, 113 skipped |
+| Diff cleanup and focused re-test | diff check passed; 108 passed |
+
+All five skill metadata checks and make test-config passed. Structural guards do not prove real client compliance or a live image gate.
+
+All owner review items are addressed in this branch. The current PR/plan/index provide the next-session context: inspect source/CI, review the bounded diff and keep live qualification separate. PR #178 remains closed and no audit/roadmap continuation is part of this follow-up. Do not merge or promote automatically.

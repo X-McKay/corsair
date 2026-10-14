@@ -32,3 +32,14 @@ def test_config_golden_path_runs_only_configuration_suite():
     result = subprocess.run(["make", "-n", "test-config"], cwd=ROOT, text=True, capture_output=True, check=True)
     assert "uv run --locked python -m pytest" in result.stdout
     assert "tests/configuration" in result.stdout and "-n auto" not in result.stdout
+
+
+def test_base_image_skill_preserves_pins_layout_and_progressive_evidence():
+    text = (ROOT / ".claude/skills/corsair-base-image/SKILL.md").read_text()
+    for rule in ("one image per exact runtime version", "same digest string", "Dockerfile and its matrix row",
+                 "hash-pinned", "available offline", "USER 10001", "HOME=/tmp", "/opt/corsair-fixture",
+                 "Never add a package to an image for one case", "plain-Docker image build", "the gate body",
+                 "one real case at both commits", "evidence: image-only", "evidence: live", "milestone gate"):
+        assert rule in text
+    runbook = "docs/runbooks/openshell-v2.md"
+    assert runbook in text and (ROOT / runbook).is_file()
