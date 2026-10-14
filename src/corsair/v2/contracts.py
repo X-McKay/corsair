@@ -11,7 +11,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator
+from pydantic import AfterValidator, BaseModel, model_validator, ConfigDict, Field, field_validator
 
 CONTRACT_VERSION = "corsair-v2/1"
 
@@ -113,8 +113,17 @@ class Recipe(Frozen):
     files: tuple[RecipeFile, ...] = Field(default=(), max_length=4, description="New files, written before setup")
     setup: tuple[tuple[str, ...], ...] = Field(default=(), max_length=32, description="argv lists, run in order")
     network_during_setup: bool = False
-    baseline_test: tuple[str, ...] = Field(min_length=1, description="argv of one existing native test, or smoke")
+    baseline_test: tuple[str, ...] = Field(default=(), description="argv of one existing native test, or smoke")
     notes: str = Field(default="", max_length=4_000)
+    blocked: str = Field(default="", max_length=2_000,
+                         description="Why no recipe is possible (e.g. a dependency the image cannot install); empty "
+                                     "for a real recipe")
+
+    @model_validator(mode="after")
+    def _baseline_or_reason(self) -> "Recipe":
+        if not self.blocked and not self.baseline_test:
+            raise ValueError("a recipe needs a baseline_test, or a blocked reason")
+        return self
 
 
 class BuildResult(Frozen):

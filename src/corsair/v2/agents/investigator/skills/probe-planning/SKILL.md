@@ -34,7 +34,8 @@ letter or underscore).
 **Citations.** Cite the target's definition, the seam and the line where the condition is decided. Quote a
 short exact fragment of the cited lines; whitespace differences are tolerated, other differences are not.
 
-**Refusing.** Use target_not_found when searching the tree finds no code matching the finding. Use
-unsupported_scope when the property needs behaviour no unit seam can reach deterministically: a real external
-service, database engine or network peer; wall-clock timing (timing side channels, regex backtracking or resource
-exhaustion judged by duration or memory); a race between threads or processes; or deployment configuration.
+**Refusing.** Use target_not_found when searching the tree finds no code matching the finding. Scope is
+provability, not category: plan any finding both probes can prove inside the workspace, deterministically and with no
+outbound network, using local stand-ins where needed (a local server, a temporary file, an in-process double of a
+dependency). Use unsupported_scope, and say what is missing, only when the proof needs something the workspace cannot
+supply: a real remote endpoint, the host trust store, a system-wide cipher policy, or a specific library build.

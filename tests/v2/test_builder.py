@@ -104,3 +104,11 @@ def test_factory_direct_and_durable_construction():
     assert create_agent(TestModel(), durability=TemporalDurability()).name == "builder"
     with pytest.raises(TypeError):
         create_agent("openai:gpt-x")
+
+
+def test_a_reasoned_refusal_is_a_recipe_with_its_reason_and_no_commands(workspace):
+    script = Script([{"blocked": "the declared dependency needs a compiler the image lacks",
+                      "setup": [["make"]], "baseline_test": []}])
+    result, usage = build(script, workspace)
+    assert usage.status == "ok" and result.blocked.startswith("the declared dependency")
+    assert (result.setup, result.baseline_test, result.files) == ((), (), ())
