@@ -369,12 +369,12 @@ async def evaluate(evidence: Path, budget: EvaluationBudget, *, model=None, prov
 INPUT_GRAMMAR = "is not a supported native node id"
 
 
-async def pending(evidence: Path, budget: EvaluationBudget) -> dict[str, dict]:
+async def pending(evidence: Path, budget: EvaluationBudget, language: str | None = None) -> dict[str, dict]:
     """Run breadth_pending case by case, scripted: a case production refuses as input is recorded with that
     refusal; an admitted one runs as any other case. Every outcome is written to ``pending.json``."""
     evidence.mkdir(parents=True, exist_ok=False)
     outcomes: dict[str, dict] = {}
-    for case in load_set(SUITE, "breadth_pending"):
+    for case in load_set(SUITE, "breadth_pending", language):
         try:
             inputs = AuthoringCase.model_validate(case.input)
         except ValueError as exc:
@@ -416,7 +416,7 @@ def main():
     if args.cases == "breadth_pending":
         if args.provider_config is not None:
             parser.error("breadth_pending runs scripted only")
-        outcomes = asyncio.run(pending(args.evidence, EvaluationBudget(repeat=args.repeat)))
+        outcomes = asyncio.run(pending(args.evidence, EvaluationBudget(repeat=args.repeat), args.language))
         for name, outcome in outcomes.items():
             print(f"{name}: {outcome['outcome']} {outcome.get('reason', '')}")
         print(f"pending: {sum(o['outcome'] == 'passed' for o in outcomes.values())}/{len(outcomes)} passed")

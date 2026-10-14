@@ -66,8 +66,8 @@ class Diagnose(Protocol):
     """Trusted D3 mechanical check: runs one frozen probe once on the vulnerable revision, before review.
 
     Returns ``ok`` (any outcome other than not_run or errored; the outcome itself is discarded) with no feedback, or
-    ``not_run`` / ``errored`` with only the output lines that name the author's own test file (at most 20, token
-    redacted). Nothing from this run counts as evidence; only reviewed bytes are executed later.
+    ``not_run`` / ``errored`` with a fixed hint and the row's optional syntax-check output, never the run's own
+    output. Nothing from this run counts as evidence; only reviewed bytes are executed later.
     """
 
     def __call__(self, environment: Environment, runtime: Runtime, draft: ProbeDraft

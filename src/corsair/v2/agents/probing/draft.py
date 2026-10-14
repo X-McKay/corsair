@@ -69,7 +69,9 @@ async def write_test_file(ctx: RunContext[ProbeDeps], path: str, content: str) -
     if defects:
         return "refused, nothing written: " + "; ".join(defects)
     digest = sha256(content.encode()).hexdigest()
-    return f"{WRITTEN} {brief.test_file} ({len(content.encode())} bytes, sha256 {digest})"
+    return (f"{WRITTEN} {brief.test_file} ({len(content.encode())} bytes, sha256 {digest}). Trusted code holds the "
+            "draft; it is not added to the read-only source tree, so do not look for it there. If the draft is "
+            "complete, answer now with the JSON object.")
 
 
 def last_write(messages) -> str | None:

@@ -9,8 +9,8 @@ The D3 check run is mechanical only and never evidence. Each frozen draft runs o
 the run keeps one of three results, each with a defined next step:
 
 - ``ok`` (any outcome other than not_run or errored; the outcome is discarded): the draft goes to review as is.
-- ``not_run`` or ``errored``: that author alone gets the output lines naming its own test file and revises once
-  (A2). The revision is not checked again; a failed revision keeps the original draft. Both drafts are then
+- ``not_run`` or ``errored``: that author alone gets the class, a fixed hint and the row's syntax-check output
+  (never the run's output) and revises once (A2). The revision is not checked again; a failed revision keeps the original draft. Both drafts are then
   re-frozen, and only that final patch is reviewed and executed. Execute's own run of it is what Decide reads.
 
 A container failure of the check step itself stops the run as ``infra_error``, like any vulnerable-revision step.

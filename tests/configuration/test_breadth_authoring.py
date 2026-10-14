@@ -112,3 +112,9 @@ def test_pending_fails_only_for_the_missing_language_support(tmp_path):
         assert outcomes[case.name] == {
             "outcome": "refused_input",
             "reason": f"Value error, planned test id {control} is not a supported native node id"}, case.name
+
+
+def test_pending_narrowed_to_one_language_runs_only_that_language(tmp_path):
+    """`EVAL_LANGUAGE` labels the run `breadth_pending.<language>`, so the pending path must apply the same filter."""
+    outcomes = asyncio.run(pending(tmp_path / "pending", EvaluationBudget(repeat=1), "java"))
+    assert set(outcomes) == {case.name for case in load_set(SUITE, "breadth_pending", "java")}
