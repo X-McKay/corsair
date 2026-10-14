@@ -83,10 +83,11 @@ Authors cannot run tests (D3). After both drafts are frozen, trusted code makes 
 | Classifier outcome | Mechanical class | Next action |
 | --- | --- | --- |
 | passed, assertion_failed, anomalous | ok | Nothing is returned to the author; continue to review |
-| not_run, errored | not_run or errored | That author's own diagnostics are returned; one revision (A2), which is frozen again |
+| not_run | not_run | That author's own diagnostics (compiler, collection or harness output) are returned. The test body never started, so the output holds no observation of the target. One revision (A2), frozen again |
+| errored | errored | Only the exception type and the line of the author's own test file where it was raised are returned. No message, no output and no frames from application code. One revision (A2), frozen again |
 | infra | infra | The attempt stops with `infra_error` (R1, ERROR) |
 
-`anomalous` maps to `ok` because returning it would hint at the outcome. Nobody sees the discarded outcome: not the authors, not the Reviewer, not the rule table. The Reviewer then reviews the final frozen bytes. Execute runs only bytes that carry a bound review, and any change after review needs a fresh review before Execute.
+`anomalous` maps to `ok` because returning it would hint at the outcome. An `errored` run executed application code, so its message and logs stay hidden. The exception type and test-file line that are returned are the residual leak, recorded as a limitation. Nobody sees the discarded outcome: not the authors, not the Reviewer, not the rule table. The Reviewer then reviews the final frozen bytes. Execute runs only bytes that carry a bound review, and any change after review needs a fresh review before Execute.
 
 A missing CWE skill never causes a refusal. The run is tagged `uncovered_cwe` for eval slicing.
 
@@ -166,7 +167,14 @@ Otherwise the result is `not_verified`, or `not_applicable` when there is no fix
 
 Calibration (a detector self-test or an ablation run) is recorded as calibration and never as proof of absence. `refuted_in_scope` stays disabled.
 
-The terminal reason comes from a closed enum: `ok`, `no_runtime`, `build_failed`, `plan_unresolved`, `unsupported_scope`, `probe_not_run`, `probe_errored`, `probe_anomalous`, `test_invalid`, `control_failed`, `no_valid_observation`, `budget_exhausted`, `provider_error`, `infra_error`, `cleanup_unconfirmed`. R6 records `probe_anomalous` when either vulnerable-revision probe was `anomalous`, and `no_valid_observation` otherwise. A model may write a rationale once the label is fixed. It cannot change the label.
+The terminal reason comes from a closed enum: `ok`, `no_runtime`, `build_failed`, `plan_unresolved`, `unsupported_scope`, `probe_not_run`, `probe_errored`, `probe_anomalous`, `test_invalid`, `control_failed`, `no_valid_observation`, `budget_exhausted`, `provider_error`, `infra_error`, `cleanup_unconfirmed`. R6 takes its terminal reason from the vulnerable-revision probes, checking `not_run` first, then `errored`, then `anomalous`:
+
+- `probe_not_run` when either probe was `not_run`.
+- `probe_errored` when either probe was `errored`.
+- `probe_anomalous` when either probe was `anomalous`.
+- `no_valid_observation` otherwise.
+
+The fix result carries a terminal reason from the same mapping over the fixed-revision probes. A model may write a rationale once the label is fixed. It cannot change the label.
 
 ### Corrections, caches, modes and fact origins
 

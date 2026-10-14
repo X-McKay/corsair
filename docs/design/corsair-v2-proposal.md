@@ -557,6 +557,8 @@ The Codex review of PR #134 found three gaps. All three are fixed in SPEC-0082, 
 - **Review comes before any execution that counts.** The run after freezing is now a mechanical check only. It keeps `ok`, `not_run` or `errored` and discards the outcome. The Reviewer reviews the final frozen bytes, and Execute runs only reviewed bytes.
 - **A check marker attributes the failure.** Each test writes a check marker (`safe` or `unsafe`) immediately before its security assertion, and `assertion_failed` requires check `unsafe`. The token alone could not attribute a failure, because repository code can read and print it.
 - **ERROR is scoped to the vulnerable revision.** An infrastructure failure on the fixed revision makes only the fix result `not_verified`. It no longer replaces a reproduced finding with ERROR.
+- **Authors get only mechanical feedback.** A `not_run` result returns the author's full diagnostics, because the test body never started. An `errored` result returns only the exception type and the line in the author's own test file, because application code has already run. Every outcome of the check run has a defined next step, and the outcome table is read top to bottom with infrastructure exits first.
+- **Every INCONCLUSIVE has its own reason.** R6 reports `probe_not_run`, `probe_errored`, `probe_anomalous` or `no_valid_observation`, and the fix result uses the same mapping.
 
 ### Later changes on 14 October
 
