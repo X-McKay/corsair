@@ -1,15 +1,25 @@
-"""Explicit native fixed toolchain image preparation; no registry push."""
+"""Explicit native fixed toolchain image preparation; no registry push.
+
+    make toolchain-images TOOLCHAINS="python java"
+
+Builds each named image from deploy/qualification/toolchains/<name> (offline where the toolchain allows), runs its
+trusted control in a locked-down container, and writes a receipt to .cache/toolchains/<name>/build.json. Every native
+command's receipt lands under .runs/toolchains-image/<id>/.
+"""
 import argparse
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
+from pathlib import Path
 import re
 import shutil
+import subprocess
+import time
 import urllib.request
 import uuid
 
-from tests.qualification.support import ROOT, LOCK, Kubectl, require_owned_cluster
-
+ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / 'deploy/qualification/toolchains'
 CACHE = ROOT / '.cache/toolchains'
 DOCKER = ['docker', '--host=unix:///var/run/docker.sock']
@@ -57,12 +67,29 @@ def source_hashes(language=None):
     return {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(root.rglob('*')) if p.is_file()}
 
 
-def image_receipt(language):
-    receipt = json.loads((CACHE / language / 'image.json').read_text())
-    assert receipt['sources'] == source_hashes(language), 'Toolchain source changed after preparation'
-    assert receipt['base'] == BASES[language]
-    assert receipt['image'] == 'docker.io/library/corsair-' + language + '@' + receipt['manifest_digest']
-    return receipt
+class Native:
+    """Runs native commands and retains a receipt for each, including uncertain delivery."""
+
+    def __init__(self, evidence):
+        self.evidence = evidence
+        self.counter = 0
+
+    def native(self, argv, check=True, timeout=120, env=None):
+        self.counter += 1
+        receipt = {'argv': list(map(str, argv)), 'started_at': datetime.now(timezone.utc).isoformat()}
+        started = time.monotonic()
+        try:
+            result = subprocess.run(receipt['argv'], capture_output=True, text=True, timeout=timeout, env=env)
+            receipt.update(exit_code=result.returncode, stdout=result.stdout, stderr=result.stderr)
+        except subprocess.TimeoutExpired as error:
+            receipt.update(timed_out=True, stdout=(error.stdout or b'').decode(), stderr=(error.stderr or b'').decode())
+            raise RuntimeError('Native command timed out; remote completion unknown; see command receipt') from error
+        finally:
+            receipt['elapsed_seconds'] = time.monotonic() - started
+            (self.evidence / f'command-{self.counter:04d}.json').write_text(json.dumps(receipt, indent=2))
+        if check and result.returncode:
+            raise RuntimeError(f'Native infrastructure/resource error ({result.returncode}): {result.stderr[-2000:]}')
+        return result
 
 
 def tap_report(text, expected):
@@ -77,8 +104,8 @@ def tap_report(text, expected):
     return {'tests': len(expected), 'ids': list(expected), 'sha256': hashlib.sha256(text.encode()).hexdigest()}
 
 
-def control(kube, image, language):
-    cidfile = kube.evidence / (language + '-control.id')
+def control(runner, image, language):
+    cidfile = runner.evidence / (language + '-control.id')
     npm, jest = ' '.join(NPM), ' '.join(JEST)
     command = ('cp -R /opt/corsair-fixture /tmp/project; cp -R /opt/corsair-npm /tmp/npm; cd /tmp/project; ' + npm + ' --cache /tmp/npm ci --offline >&2; ' + jest + ' --json --outputFile=/tmp/result.json >&2; cat /tmp/result.json' if language in NODES else
                'cp -R /opt/corsair-fixture /tmp/project; cd /tmp/project; perl Makefile.PL; make; prove -b -v t/' if language in PERLS else
@@ -87,9 +114,9 @@ def control(kube, image, language):
     if language == 'ruby31':
         command = 'cp -R /opt/corsair-fixture /tmp/project; cd /tmp/project; ' + ' '.join(RUBY_RUN)
     try:
-        result = kube.native(DOCKER + ['run', '--rm', '--cidfile', str(cidfile), '--network=none', '--cap-drop=ALL', '--security-opt=no-new-privileges', '--user=10001:10001', image, '/bin/sh', '-ec', command], timeout=180)
+        result = runner.native(DOCKER + ['run', '--rm', '--cidfile', str(cidfile), '--network=none', '--cap-drop=ALL', '--security-opt=no-new-privileges', '--user=10001:10001', image, '/bin/sh', '-ec', command], timeout=180)
         if language in NODES:
-            (kube.evidence / (language + '-control-report.json')).write_text(json.dumps(jest_report(result.stdout, NODE_TESTS), indent=2))
+            (runner.evidence / (language + '-control-report.json')).write_text(json.dumps(jest_report(result.stdout, NODE_TESTS), indent=2))
         elif language in PERLS:
             tap_report(result.stdout, TAP_TESTS)
         elif language == 'ruby31':
@@ -98,83 +125,59 @@ def control(kube, image, language):
             assert 'tests="%d"' % (1 if language in PYTHONS else len(JAVA_TESTS)) in result.stdout and 'failures="0"' in result.stdout and 'skipped="0"' in result.stdout
             assert all(name in result.stdout for name in (('test_native_roundtrip',) if language in PYTHONS else JAVA_TESTS))
         if language.startswith('java'):
-            (kube.evidence / (language + '-maven-cache.sha256')).write_text(result.stdout.split('CACHE-BEGIN\n', 1)[1].split('CACHE-END\n', 1)[0])
+            (runner.evidence / (language + '-maven-cache.sha256')).write_text(result.stdout.split('CACHE-BEGIN\n', 1)[1].split('CACHE-END\n', 1)[0])
     finally:
         cleanup = {'confirmed': False}
         try:
             identity = cleanup['container_id'] = cidfile.read_text().strip()
-            current = kube.native(DOCKER + ['inspect', '--format', '{{.Id}} {{.Image}}', identity], check=False)
+            current = runner.native(DOCKER + ['inspect', '--format', '{{.Id}} {{.Image}}', identity], check=False)
             if current.returncode == 0:
                 assert current.stdout.strip() == identity + ' ' + image, 'Control identity differs; refusing cleanup'
-                kube.native(DOCKER + ['rm', '--force', identity])
-            absent = kube.native(DOCKER + ['inspect', '--format', '{{.Id}}', identity], check=False)
+                runner.native(DOCKER + ['rm', '--force', identity])
+            absent = runner.native(DOCKER + ['inspect', '--format', '{{.Id}}', identity], check=False)
             assert absent.returncode != 0 and 'no such object' in absent.stderr.lower()
             cleanup['confirmed'] = True
         finally:
-            (kube.evidence / (language + '-control-cleanup.json')).write_text(json.dumps(cleanup, indent=2))
+            (runner.evidence / (language + '-control-cleanup.json')).write_text(json.dumps(cleanup, indent=2))
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['build', 'load'])
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--language', choices=sorted(BASES), action='append', help='Prepare only these images (default: all)')
     args = parser.parse_args()
     os.umask(0o077)
     evidence = ROOT / '.runs/toolchains-image' / uuid.uuid4().hex
     evidence.mkdir(parents=True)
-    kube = Kubectl(ROOT / '.state/kind/kubeconfig', 'kind-corsair', evidence)
+    runner = Native(evidence)
     try:
-        node = require_owned_cluster(kube) if args.action == 'load' else None
         for language, base in BASES.items():
             if args.language and language not in args.language:
                 continue
             cache = CACHE / language
-            if args.action == 'build':
-                assert not cache.exists(), 'Existing attempt retained: inspect/archive it before new preparation'
-                cache.mkdir(parents=True)
-                context = cache / 'context'
-                shutil.copytree(SOURCE / language, context)
-                hashes = source_hashes(language)
-                if language in PYTHONS:
-                    wheel_dir = context / 'wheels'
-                    wheel_dir.mkdir()
-                    for wheel in json.loads((SOURCE / language / 'wheels.json').read_text()):
-                        data = urllib.request.urlopen(wheel['url'], timeout=30).read()
-                        assert hashlib.sha256(data).hexdigest() == wheel['sha256']
-                        (wheel_dir / wheel['filename']).write_bytes(data)
-                    (evidence / (language + '-wheels.json')).write_text((SOURCE / language / 'wheels.json').read_text())
-                source_digest = hashlib.sha256(json.dumps(hashes, sort_keys=True).encode()).hexdigest()
-                tag = 'docker.io/library/corsair-' + language + ':' + source_digest[:16]
-                kube.native(DOCKER + ['pull', base], timeout=180)
-                # Maven's trusted preparation explicitly downloads exact pinned artifacts;
-                # its strict native checksums and complete cache hashes are retained. Python, Perl and Ruby build offline.
-                # npm's trusted preparation installs only the checked-in lockfile, each tarball SHA-512 checked.
-                kube.native(DOCKER + ['build', '--network=' + ('none' if language in PYTHONS or language in PERLS or language == 'ruby31' else 'default'), '--pull=false', '--tag', tag, str(context)], timeout=300)
-                config = kube.native(DOCKER + ['image', 'inspect', '--format', '{{.Id}}', tag]).stdout.strip()
-                control(kube, config, language)
-                receipt = {'tag': tag, 'config_id': config, 'base': base, 'sources': hashes, 'evidence': str(evidence), 'trusted_control_passed': True}
-                (cache / 'build.json').write_text(json.dumps(receipt, indent=2))
-            else:
-                receipt = json.loads((cache / 'build.json').read_text())
-                assert receipt['sources'] == source_hashes(language) and receipt['base'] == base and receipt['trusted_control_passed'] is True
-                assert kube.native(DOCKER + ['image', 'inspect', '--format', '{{.Id}}', receipt['tag']]).stdout.strip() == receipt['config_id']
-                env = {key: os.environ[key] for key in ('PATH', 'LANG', 'LC_ALL', 'TZ') if key in os.environ}
-                env['KIND_EXPERIMENTAL_PROVIDER'] = 'docker'
-                kube.native([str(ROOT / '.tools/linux-amd64/kind'), 'load', 'docker-image', receipt['tag'], '--name', 'corsair'], env=env, timeout=180)
-                rows = kube.native(DOCKER + ['exec', 'corsair-control-plane', 'ctr', '-n', 'k8s.io', 'images', 'list']).stdout.splitlines()
-                row = [line.split() for line in rows if line.split()[0] == receipt['tag']]
-                assert len(row) == 1
-                digest = row[0][2]
-                data = kube.native(DOCKER + ['exec', 'corsair-control-plane', 'ctr', '-n', 'k8s.io', 'content', 'get', digest]).stdout.encode()
-                assert 'sha256:' + hashlib.sha256(data).hexdigest() == digest and json.loads(data)['config']['digest'] == receipt['config_id']
-                image = 'docker.io/library/corsair-' + language + '@' + digest
-                kube.native(DOCKER + ['exec', 'corsair-control-plane', 'ctr', '-n', 'k8s.io', 'images', 'tag', receipt['tag'], image])
-                loaded = dict(receipt, image=image, manifest_digest=digest)
-                if (cache / 'image.json').exists():
-                    assert loaded == image_receipt(language)
-                else:
-                    (cache / 'image.json').write_text(json.dumps(loaded, indent=2))
-                (evidence / (language + '-load.json')).write_text(json.dumps(dict(loaded, node_uid=node['metadata']['uid']), indent=2))
+            assert not cache.exists(), 'Existing attempt retained: inspect/archive it before new preparation'
+            cache.mkdir(parents=True)
+            context = cache / 'context'
+            shutil.copytree(SOURCE / language, context)
+            hashes = source_hashes(language)
+            if language in PYTHONS:
+                wheel_dir = context / 'wheels'
+                wheel_dir.mkdir()
+                for wheel in json.loads((SOURCE / language / 'wheels.json').read_text()):
+                    data = urllib.request.urlopen(wheel['url'], timeout=30).read()
+                    assert hashlib.sha256(data).hexdigest() == wheel['sha256']
+                    (wheel_dir / wheel['filename']).write_bytes(data)
+                (evidence / (language + '-wheels.json')).write_text((SOURCE / language / 'wheels.json').read_text())
+            source_digest = hashlib.sha256(json.dumps(hashes, sort_keys=True).encode()).hexdigest()
+            tag = 'docker.io/library/corsair-' + language + ':' + source_digest[:16]
+            runner.native(DOCKER + ['pull', base], timeout=180)
+            # Maven's trusted preparation explicitly downloads exact pinned artifacts;
+            # its strict native checksums and complete cache hashes are retained. Python, Perl and Ruby build offline.
+            # npm's trusted preparation installs only the checked-in lockfile, each tarball SHA-512 checked.
+            runner.native(DOCKER + ['build', '--network=' + ('none' if language in PYTHONS or language in PERLS or language == 'ruby31' else 'default'), '--pull=false', '--tag', tag, str(context)], timeout=300)
+            config = runner.native(DOCKER + ['image', 'inspect', '--format', '{{.Id}}', tag]).stdout.strip()
+            control(runner, config, language)
+            receipt = {'tag': tag, 'config_id': config, 'base': base, 'sources': hashes, 'evidence': str(evidence), 'trusted_control_passed': True}
+            (cache / 'build.json').write_text(json.dumps(receipt, indent=2))
         (evidence / 'result.json').write_text(json.dumps({'outcome': 'passed', 'runtime_qualified': False}))
     except Exception as error:
         (evidence / 'result.json').write_text(json.dumps({'outcome': 'failed', 'detail': str(error)}))

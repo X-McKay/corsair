@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 
 import pytest
 
-from tests.qualification.prepare_toolchains import BASES, SOURCE
+from tools.toolchain_images import BASES, SOURCE
 
 JAVA = sorted(name for name in BASES if (SOURCE / name / 'pom.xml').exists())
 LINE = re.compile(r'([0-9a-f]{64})  \./(\S+)')
