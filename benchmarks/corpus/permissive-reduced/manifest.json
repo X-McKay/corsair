@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "note": "Permissive-licensed vulnerability/fix pairs reduced from upstream open-source projects (code verbatim-derived; only packaging and dependencies removed for offline reduction). One entry per variant; variant dirs a/b per family, the letter does not reveal which is vulnerable (recorded only here). Both findings of a pair share title and description. Truth is evaluator-only and never enters an agent input. Vulnerable -> potentially_exploitable; fixed -> likely_not_exploitable. Per-case upstream provenance and SPDX licence in each family's provenance.json and in SOURCE.md.",
+  "cases": [
+    {
+      "name": "js-protopollution-a",
+      "language": "javascript",
+      "finding": {
+        "title": "Prototype pollution via property path in set()",
+        "repo_url": "javascript/protopollution/a",
+        "revision": "HEAD",
+        "file_path": "src/index.js",
+        "start_line": 57,
+        "symbol": "set",
+        "cwe": "CWE-1321",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "set() walks a user-controlled dotted property path and assigns into the object; a path segment such as __proto__ is carried through to the assignment."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "src/index.js",
+        "sink_line": 57,
+        "source": "path argument",
+        "target_callable": "set"
+      }
+    },
+    {
+      "name": "js-protopollution-b",
+      "language": "javascript",
+      "finding": {
+        "title": "Prototype pollution via property path in set()",
+        "repo_url": "javascript/protopollution/b",
+        "revision": "HEAD",
+        "file_path": "src/index.js",
+        "start_line": 72,
+        "symbol": "set",
+        "cwe": "CWE-1321",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "set() walks a user-controlled dotted property path and assigns into the object; a path segment such as __proto__ is carried through to the assignment."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "src/index.js",
+        "sink_line": 72,
+        "source": "path argument",
+        "target_callable": "set"
+      }
+    }
+  ]
+}
