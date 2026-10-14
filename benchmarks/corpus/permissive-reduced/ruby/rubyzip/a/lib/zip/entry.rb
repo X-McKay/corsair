@@ -1,7 +1,6 @@
 # Reduced from rubyzip (rubyzip/rubyzip) lib/zip/entry.rb: Zip::Entry name handling and
 # extraction. The archive read/decompress collaborator is replaced by a plain in-memory write
-# so the module runs offline; the entry-name predicate the fix adds is kept upstream-verbatim
-# (only its method name is neutralised).
+# so the module runs offline.
 require 'pathname'
 require 'fileutils'
 
