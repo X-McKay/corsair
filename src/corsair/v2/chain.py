@@ -279,6 +279,7 @@ class LocalOps:
 
     def _report(self, step: str, text: str) -> None:
         if text == "started":
+            # Activities open this recorder from their request's run_dir; progress is presentation only.
             self.record.started(step)
         if self.progress is not None:
             self.progress(step, text)

@@ -17,6 +17,15 @@ Client cancellation emits one JSON object and exit 130: `verdict` is null, `tota
 summary exists, and `client_interrupted: true` does not claim a remote workflow or command stopped.
 Its `state` comes only from the persisted receipt (direct cancellation: `cancelled`).
 
+**Comparison compatibility change:** older `runs compare` returned success with `-` columns for an
+absent run directory. It now returns **exit 2**, prints a diagnostic to stderr and emits no success
+output if any directory is missing, empty or malformed. Scripts should handle exit 2 or filter for
+actual recorded directories before comparison; valid legacy records remain readable with unknown fields.
+
+Stage dispatches update `last_started_step` through that operation's recorder, not the progress callback.
+In Temporal mode the worker opens only the request's shared `run_dir`; the display callback never chooses
+or creates a run directory. This does not change the shared-filesystem requirement or prove remote cleanup.
+
 ## `run.json`: what produced the run
 
 | field | type | meaning |

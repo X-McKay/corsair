@@ -47,7 +47,7 @@ def details(run_dir: Path) -> dict[str, Any]:
     if not all(isinstance(agent, dict) for agent in agents.values()):
         raise ValueError(f"agent aggregates must be JSON objects: {run_dir}")
     state = "completed" if summary.get("label") else run.get("state")
-    if state not in ("completed", "cancelled", "interrupted"):
+    if state not in ("completed", "cancelled"):
         state = "incomplete"
     return {"run": run, "summary": summary, "agents": agents, "totals": totals, "state": state}
 
@@ -85,13 +85,18 @@ def table(run_dirs: Iterable[Path]) -> str:
                      for line in lines)
 
 
+def printable(value: Any) -> str:
+    """Escape terminal control characters without changing the underlying recorded value."""
+    return "".join(char if ord(char) >= 32 and not 127 <= ord(char) <= 159 else f"\\x{ord(char):02x}"
+                   for char in str(value))
+
+
 def _cell(value: Any) -> str:
     if value is None:
         return "-"
     if isinstance(value, float):
         return f"{value:.1f}"
-    return "".join(char if ord(char) >= 32 and not 127 <= ord(char) <= 159 else f"\\x{ord(char):02x}"
-                   for char in str(value))
+    return printable(value)
 
 
-__all__ = ["COLUMNS", "details", "row", "table"]
+__all__ = ["COLUMNS", "details", "printable", "row", "table"]

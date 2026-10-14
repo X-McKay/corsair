@@ -124,8 +124,8 @@ async def _worker(args) -> int:
 
 
 def _compare(args) -> int:
-    from .presentation import _safe, agent_table, console
-    from .runs import row, table
+    from .presentation import agent_table, console
+    from .runs import printable, row, table
 
     rows = [row(path) for path in args.run_dirs]  # validate every input before emitting any success output
     if args.format == "json":
@@ -135,7 +135,7 @@ def _compare(args) -> int:
         if args.agents:
             out = console(color=args.color)
             for data in rows:
-                out.print("\nRun", _safe(data["run"]), markup=False)
+                out.print("\nRun", printable(data["run"]), markup=False)
                 out.print(agent_table(data["agents"]))
             out.print("Agent seconds sum recorded calls, not elapsed run time. Missing telemetry is unknown.")
     return 0
@@ -150,8 +150,9 @@ def main(argv: list[str] | None = None) -> int:
     except (KeyboardInterrupt, asyncio.CancelledError):
         return 130
     except (OSError, ValueError) as exc:
-        from .presentation import _safe, console
-        console(color=args.color, stderr=True).print(_safe(f"corsair-v2: {exc}"), markup=False)
+        from .presentation import console
+        from .runs import printable
+        console(color=args.color, stderr=True).print(printable(f"corsair-v2: {exc}"), markup=False)
         return 2
 
 

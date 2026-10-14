@@ -14,15 +14,13 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
 from rich.text import Text
 
-
-def _safe(value: Any) -> str:
-    return "".join(c if ord(c) >= 32 and not 127 <= ord(c) <= 159 else f"\\x{ord(c):02x}" for c in str(value))
+from .runs import printable
 
 
 def _value(value: Any) -> str:
     if value is None:
         return "unknown"
-    return f"{value:.1f}" if isinstance(value, float) else _safe(value)
+    return f"{value:.1f}" if isinstance(value, float) else printable(value)
 
 
 def console(*, color: str = "auto", stderr: bool = False) -> Console:
@@ -53,14 +51,14 @@ class StageReporter:
                                     else "INTERRUPTED", style="yellow"))
 
     def announce(self, text: str) -> None:
-        self.console.print(Text(_safe(text)))
+        self.console.print(Text(printable(text)))
 
     def __call__(self, step: str, status: str) -> None:
         state = "RUNNING" if status == "started" else "DONE" if status.startswith("ok ") else "STOPPED"
-        line = f"{state:<8} {_safe(step):<28} {_safe(status)}"
+        line = f"{state:<8} {printable(step):<28} {printable(status)}"
         self.console.print(Text(line, style="cyan" if state == "RUNNING" else "green" if state == "DONE" else "yellow"))
         if self.interactive:
-            description = f"{state} {_safe(step)}"
+            description = f"{state} {printable(step)}"
             if self.task is None:
                 self.task = self.progress.add_task(description, total=None)
             else:
@@ -76,16 +74,16 @@ def agent_table(agents: dict[str, dict[str, Any]]) -> Table:
     for name in ("Agent", "Calls", "Requests", "Input tokens", "Output tokens", "Tools", "Retries", "Agent s", "Status"):
         table.add_column(name)
     for name, usage in agents.items():
-        table.add_row(Text(_safe(name)), *(_value(usage.get(key)) for key in
+        table.add_row(Text(printable(name)), *(_value(usage.get(key)) for key in
                       ("calls", "requests", "input_tokens", "output_tokens", "tool_calls", "retries", "wall_s")),
-                      Text(", ".join(f"{_safe(status)}: {count}" for status, count in (usage.get("statuses") or {}).items())))
+                      Text(", ".join(f"{printable(status)}: {count}" for status, count in (usage.get("statuses") or {}).items())))
     return table
 
 
 def render_result(verdict: Any, run_dir: Any, data: dict[str, Any], *, color: str = "auto") -> None:
     out = console(color=color)
     out.print(Text(f"label: {verdict.label.value}\nrule: {verdict.rule_id}\n"
-                   f"terminal reason: {verdict.terminal_reason.value}\nrun dir: {_safe(run_dir)}", style="bold"))
+                   f"terminal reason: {verdict.terminal_reason.value}\nrun dir: {printable(run_dir)}", style="bold"))
     totals = data["totals"]
     out.print(Text(f"Elapsed s: {_value(totals.get('wall_s'))}  Tokens: {_value(totals.get('tokens'))}  "
                    f"Requests: {_value(totals.get('requests'))}  Tool calls: {_value(totals.get('tool_calls'))}"))

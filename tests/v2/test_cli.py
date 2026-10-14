@@ -157,3 +157,30 @@ def test_cancelled_json_run_emits_one_result_and_exit_130(tmp_path, monkeypatch,
     assert "CANCELLED" in captured.err and "\x1b" not in captured.out + captured.err
     receipt = json.loads((Path(result["run_dir"]) / "run.json").read_text())
     assert receipt["finished_at"] is None and receipt["stopped_at"]
+
+
+@pytest.mark.parametrize("state", ["interrupted", "recorded", "running", None])
+def test_unwritten_or_unknown_lifecycle_states_are_incomplete(tmp_path, state):
+    from corsair.v2.runs import details
+
+    path = tmp_path / "record"
+    path.mkdir()
+    (path / "run.json").write_text(json.dumps({"state": state}))
+    assert details(path)["state"] == "incomplete"
+
+
+def test_public_printable_is_shared_by_comparison_and_rich_without_mutating_json(tmp_path, capsys):
+    from corsair.v2.runs import printable
+
+    value = "unsafe\x1b[2J\n\x7f\x85[bold]"
+    escaped = "unsafe\\x1b[2J\\x0a\\x7f\\x85[bold]"
+    assert printable(value) == escaped
+    path = tmp_path / "record"
+    path.mkdir()
+    (path / "summary.json").write_text(json.dumps({"run_id": value, "agents": {value: {"calls": 1}}}))
+    assert cli.main(["runs", "compare", str(path), "--agents", "--color", "never"]) == 0
+    text = capsys.readouterr().out
+    assert escaped in text and "\x1b" not in text and "\x85" not in text
+    assert cli.main(["runs", "compare", str(path), "--format", "json"]) == 0
+    record = json.loads(capsys.readouterr().out)["runs"][0]
+    assert record["run"] == value and value in record["agents"]
