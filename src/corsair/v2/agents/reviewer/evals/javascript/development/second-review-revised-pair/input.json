@@ -1,0 +1,98 @@
+{
+  "row_id": "jest29-node22",
+  "finding": {
+    "title": "Open redirect in redirects.afterLogin",
+    "description": "A protocol-relative target such as //host is returned unchanged as the post-login redirect.",
+    "file_path": "lib/redirects.js",
+    "start_line": 2,
+    "symbol": "redirects.afterLogin",
+    "cwe": "CWE-601"
+  },
+  "plan": {
+    "status": "planned",
+    "target": "lib/redirects.js: redirects.afterLogin(target)",
+    "hypothesis": "If the input described for the exploit probe (target '//evil.example/phish', a scheme-relative URL to another host) reaches redirects.afterLogin without confinement or encoding, then: Returns '//evil.example/phish' unchanged, so the user is sent off the site (an unaffected implementation returns '/')",
+    "control": {
+      "role": "control",
+      "test_file": "__tests__/redirects.control.test.js",
+      "test_name": "benign_control",
+      "target": "lib/redirects.js: redirects.afterLogin(target)",
+      "seam": "Call the real redirects.afterLogin through its public interface",
+      "input_description": "target '/account', a path on this site",
+      "property_to_assert": "Returns '/account' unchanged",
+      "doubles": "",
+      "citations": [
+        {
+          "path": "lib/redirects.js",
+          "start_line": 2,
+          "end_line": 7
+        },
+        {
+          "path": "test/redirects.test.js",
+          "start_line": 1,
+          "end_line": 5
+        }
+      ]
+    },
+    "exploit": {
+      "role": "exploit",
+      "test_file": "__tests__/redirects.exploit.test.js",
+      "test_name": "security_redirects_offsite",
+      "target": "lib/redirects.js: redirects.afterLogin(target)",
+      "seam": "Call the real redirects.afterLogin through its public interface",
+      "input_description": "target '//evil.example/phish', a scheme-relative URL to another host",
+      "property_to_assert": "Returns '//evil.example/phish' unchanged, so the user is sent off the site (an unaffected implementation returns '/')",
+      "doubles": "",
+      "citations": [
+        {
+          "path": "lib/redirects.js",
+          "start_line": 2,
+          "end_line": 7
+        },
+        {
+          "path": "test/redirects.test.js",
+          "start_line": 1,
+          "end_line": 5
+        }
+      ]
+    },
+    "citations": [
+      {
+        "path": "lib/redirects.js",
+        "start_line": 2,
+        "end_line": 7
+      },
+      {
+        "path": "test/redirects.test.js",
+        "start_line": 1,
+        "end_line": 5
+      }
+    ]
+  },
+  "patch": {
+    "control": {
+      "role": "control",
+      "test_file": "__tests__/redirects.control.test.js",
+      "test_name": "benign_control",
+      "source": "const assert = require('node:assert');\nconst fs = require('node:fs');\nconst path = require('node:path');\nconst redirects = require('../lib/redirects');\n\ntest('benign_control', () => {\n  fs.writeFileSync(path.join(process.env.CORSAIR_MARKER_DIR, 'start'), '');\n  const holds = redirects.afterLogin('/account') === '/account';\n  fs.writeFileSync(path.join(process.env.CORSAIR_MARKER_DIR, 'check'), holds ? 'holds' : 'violated');\n  assert.ok(holds, process.env.CORSAIR_TOKEN);\n  fs.writeFileSync(path.join(process.env.CORSAIR_MARKER_DIR, 'end'), '');\n});\n",
+      "revision_of": "84fc4863c3327184170cc7666c31aa9560985eb9732e6f86465281cfe9f94011"
+    },
+    "exploit": {
+      "role": "exploit",
+      "test_file": "__tests__/redirects.exploit.test.js",
+      "test_name": "security_redirects_offsite",
+      "source": "const assert = require('node:assert');\nconst fs = require('node:fs');\nconst path = require('node:path');\nconst redirects = require('../lib/redirects');\n\ntest('security_redirects_offsite', () => {\n  fs.writeFileSync(path.join(process.env.CORSAIR_MARKER_DIR, 'start'), '');\n  const holds = redirects.afterLogin('//evil.example/phish') === '//evil.example/phish';\n  fs.writeFileSync(path.join(process.env.CORSAIR_MARKER_DIR, 'check'), holds ? 'holds' : 'violated');\n  assert.ok(holds, process.env.CORSAIR_TOKEN);\n  fs.writeFileSync(path.join(process.env.CORSAIR_MARKER_DIR, 'end'), '');\n});\n",
+      "revision_of": "2a0769913e66b0e2d080ac5fd901b9ad3d28c1d5e02bd7618d1d29d950902bbb"
+    }
+  },
+  "source_files": [
+    {
+      "path": "lib/redirects.js",
+      "content": "// Where to send a user after sign-in.\nfunction afterLogin(target) {\n  if (!target) {\n    return '/';\n  }\n  return target;\n}\n\nmodule.exports = { afterLogin };\n"
+    },
+    {
+      "path": "test/redirects.test.js",
+      "content": "const redirects = require('../lib/redirects');\n\ntest('defaults to home', () => {\n  expect(redirects.afterLogin('')).toBe('/');\n});\n"
+    }
+  ]
+}
