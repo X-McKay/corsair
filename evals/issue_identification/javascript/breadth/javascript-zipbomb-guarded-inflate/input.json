@@ -1,0 +1,15 @@
+{
+  "fixture_id": "javascript-zipbomb-guarded-inflate",
+  "issue": "inflate decompresses untrusted gzip uploads. A reporter believes a small archive that expands to gigabytes can exhaust memory. Locate the decompression implementation.",
+  "scope": "component",
+  "source_files": [
+    {
+      "path": "package.json",
+      "content": "{\n  \"name\": \"zipbomb\",\n  \"version\": \"1.0.0\",\n  \"private\": true,\n  \"scripts\": {\"test\": \"node --test\"}\n}\n"
+    },
+    {
+      "path": "src/inflate.js",
+      "content": "const zlib = require(\"zlib\");\n\n// Inflate an untrusted gzip buffer.\nconst MAX_OUTPUT = 1 << 20; // 1 MiB\n\nfunction inflate(buf) {\n  return zlib.gunzipSync(buf, { maxOutputLength: MAX_OUTPUT });\n}\n\nmodule.exports = { inflate };\n"
+    }
+  ]
+}

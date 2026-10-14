@@ -1,0 +1,10 @@
+{
+  "status": "ready",
+  "symbol": "read_document",
+  "path": "documents.py",
+  "required_lines": [
+    3,
+    4
+  ],
+  "max_span": 8
+}

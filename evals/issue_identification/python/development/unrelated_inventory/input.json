@@ -1,0 +1,11 @@
+{
+  "fixture_id": "unrelated_inventory",
+  "issue": "Locate the login token verification implementation for a report of accepting unsigned tokens.",
+  "scope": "component",
+  "source_files": [
+    {
+      "path": "formatting.py",
+      "content": "def title(text):\n    return text.strip()\n"
+    }
+  ]
+}

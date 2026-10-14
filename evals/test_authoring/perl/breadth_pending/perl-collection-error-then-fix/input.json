@@ -1,0 +1,116 @@
+{
+  "fixture_id": "perl-collection-error-then-fix-v1",
+  "inputs": {
+    "plan": {
+      "status": "ready",
+      "scope": "component",
+      "security_expectation": {
+        "failure_type": "not_ok",
+        "safe_behavior": "home_for_offsite_target"
+      },
+      "discovery_command": [
+        "prove",
+        "-l",
+        "t/redirects.t"
+      ],
+      "evidence_requirements": [
+        "Both control and exploit probe must execute with native outcomes",
+        "Review both real source calls, adversarial input and assertions before execution"
+      ],
+      "citations": [
+        {
+          "path": "lib/Redirects.pm",
+          "start_line": 6,
+          "end_line": 10,
+          "quote": "sub after_login {\n    my ($target) = @_;\n    return '/' unless defined $target && length $target;\n    return $target;\n}"
+        }
+      ],
+      "limitations": [
+        "Open redirect at this one call only; callers and deployment configuration are outside the observation"
+      ],
+      "control": {
+        "test_id": "t/redirects_security.t#benign_control",
+        "test_path": "t/redirects_security.t",
+        "fixture_setup": [
+          "No files; the call takes only the target string"
+        ],
+        "implementation_call": "Redirects::after_login($target)",
+        "input": "target '/account', a path on this site",
+        "required_behavior": "Returns the on-site path unchanged",
+        "observable_witness": "Native tap-harness assertion on returns the on-site path unchanged",
+        "observation": {
+          "kind": "return_value",
+          "property": "Returns the on-site path unchanged",
+          "seam": "Call the real Redirects::after_login through its public interface"
+        },
+        "source_references": [
+          {
+            "path": "lib/Redirects.pm",
+            "start_line": 6,
+            "end_line": 10,
+            "quote": "sub after_login {\n    my ($target) = @_;\n    return '/' unless defined $target && length $target;\n    return $target;\n}"
+          }
+        ]
+      },
+      "security": {
+        "test_id": "t/redirects_security.t#security_rejects_offsite_target",
+        "test_path": "t/redirects_security.t",
+        "fixture_setup": [
+          "No files; the call takes only the target string"
+        ],
+        "implementation_call": "Redirects::after_login($target)",
+        "input": "target '//evil.example/phish', a scheme-relative URL to another host",
+        "required_behavior": "Returns '/' instead of a target that leaves the site",
+        "observable_witness": "Native tap-harness assertion on returns '/' instead of a target that leaves the site",
+        "observation": {
+          "kind": "return_value",
+          "property": "Returns '/' instead of a target that leaves the site",
+          "seam": "Call the real Redirects::after_login through its public interface"
+        },
+        "source_references": [
+          {
+            "path": "lib/Redirects.pm",
+            "start_line": 6,
+            "end_line": 10,
+            "quote": "sub after_login {\n    my ($target) = @_;\n    return '/' unless defined $target && length $target;\n    return $target;\n}"
+          }
+        ]
+      }
+    },
+    "source_files": [
+      {
+        "path": "lib/Redirects.pm",
+        "content": "package Redirects;\n# Where to send a user after sign-in.\nuse strict;\nuse warnings;\n\nsub after_login {\n    my ($target) = @_;\n    return '/' unless defined $target && length $target;\n    return $target;\n}\n\n1;\n"
+      },
+      {
+        "path": "t/redirects.t",
+        "content": "use strict;\nuse warnings;\nuse Test::More;\nuse Redirects;\n\nis(Redirects::after_login(undef), '/', 'defaults to home');\n\ndone_testing();\n"
+      }
+    ],
+    "environment": {
+      "language": "Perl",
+      "runtime": "Perl 5.26",
+      "framework": "tap-harness",
+      "discovery_command": [
+        "prove",
+        "-l",
+        "t/redirects.t"
+      ],
+      "approved_test_paths": [
+        "t/redirects_security.t"
+      ],
+      "baseline_test": {
+        "test_id": "t/redirects.t",
+        "path": "t/redirects.t"
+      },
+      "scratch_location": "A per-subtest File::Temp tempdir with CLEANUP",
+      "observation_facilities": [
+        "Native TAP stream: outcome, failure location and diagnostics per top-level subtest"
+      ],
+      "assertion_facts": [
+        "A failed Test::More assertion is reported with failure type not_ok and a subtest that dies with die. Match the planned native failure type."
+      ],
+      "witness_facilities": []
+    }
+  }
+}

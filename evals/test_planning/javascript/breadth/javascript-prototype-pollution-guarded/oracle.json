@@ -1,0 +1,98 @@
+{
+  "status": "ready",
+  "symbol": "mergePreferences",
+  "target_path": "src/merge.js",
+  "required_lines": [
+    4,
+    17
+  ],
+  "adversarial_markers": [
+    "__proto__"
+  ],
+  "witness_markers": [
+    "object.prototype",
+    "polluted"
+  ],
+  "observation_kind": "fixture_state",
+  "required_reads": [
+    "src/merge.js",
+    "__tests__/merge.test.js"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_id": "__tests__/merge.security.test.js::merge::merges_plain_keys",
+      "test_path": "__tests__/merge.security.test.js",
+      "fixture_setup": [
+        "No files; parse the source object from a JSON string in the test",
+        "In afterEach, delete Object.prototype.polluted so a failing run cannot leak into the other test"
+      ],
+      "implementation_call": "mergePreferences({}, JSON.parse('{\"theme\": {\"color\": \"red\"}}'))",
+      "input": "source {\"theme\": {\"color\": \"red\"}}",
+      "required_behavior": "Returns {theme: {color: 'red'}} and a fresh {} has no polluted property",
+      "observable_witness": "expect(merged).toEqual(...) and expect(({}).polluted).toBeUndefined() after the real call",
+      "observation": {
+        "kind": "fixture_state",
+        "property": "Returns {theme: {color: 'red'}} and a fresh {} has no polluted property",
+        "seam": "require('../src/merge') and call the real mergePreferences"
+      },
+      "source_references": [
+        {
+          "path": "src/merge.js",
+          "start_line": 4,
+          "end_line": 17
+        }
+      ]
+    },
+    "security": {
+      "test_id": "__tests__/merge.security.test.js::merge::ignores_proto_key",
+      "test_path": "__tests__/merge.security.test.js",
+      "fixture_setup": [
+        "No files; parse the source object from a JSON string in the test",
+        "In afterEach, delete Object.prototype.polluted so a failing run cannot leak into the other test"
+      ],
+      "implementation_call": "mergePreferences({}, JSON.parse('{\"__proto__\": {\"polluted\": true}}'))",
+      "input": "source parsed from '{\"__proto__\": {\"polluted\": true}}' (an own __proto__ key)",
+      "required_behavior": "After the call Object.prototype has no polluted property: ({}).polluted is undefined",
+      "observable_witness": "expect(({}).polluted).toBeUndefined() and expect(Object.prototype.hasOwnProperty('polluted')).toBe(false) after the real call",
+      "observation": {
+        "kind": "fixture_state",
+        "property": "After the call Object.prototype has no polluted property: ({}).polluted is undefined",
+        "seam": "require('../src/merge') and call the real mergePreferences"
+      },
+      "source_references": [
+        {
+          "path": "src/merge.js",
+          "start_line": 4,
+          "end_line": 17
+        }
+      ]
+    },
+    "security_expectation": {
+      "failure_type": "Error",
+      "safe_behavior": "prototype_unchanged"
+    },
+    "discovery_command": [
+      "node_modules/.bin/jest",
+      "--listTests"
+    ],
+    "evidence_requirements": [
+      "Native discovery lists the planned test file and both planned test ids run",
+      "Both the control and the exploit probe execute with native Jest outcomes and failure messages",
+      "Review the real source call, adversarial input and assertions before execution"
+    ],
+    "citations": [
+      {
+        "path": "src/merge.js",
+        "start_line": 4,
+        "end_line": 17
+      }
+    ],
+    "limitations": [
+      "Only the __proto__ key is exercised; constructor.prototype paths are not",
+      "The shared Object.prototype is the observed fixture state and is restored after each test"
+    ]
+  }
+}

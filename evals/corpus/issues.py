@@ -6,7 +6,10 @@ history nor ref names say which variant is which. The issue JSON carries only wh
 title and neutral text, the repository, the revision and the other revision as `fixed_revision`. Verdicts, oracles,
 variant names and the upstream verification tests stay in `expected.json`, which the system never reads.
 
-    python -m evals.corpus.issues --root <operator-allowlisted dir> (--set corpus-python | --case <id> ...)
+    python -m evals.corpus.issues --root <operator-allowlisted dir> (--set corpus | --case <id> ...)
+
+The committed requests are the end-to-end `corpus` set (evals/e2e/python/corpus/<case id>/, PLAN-0098): there the
+issue JSON is `input.json` and the expected file `oracle.json`, and the set manifest lists the cohort.
 """
 import argparse
 import json
@@ -15,12 +18,13 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from evals.cases import EVALS, load_set
 from evals.corpus.cases import CORPUS, REPOSITORY, CorpusCase, case_digest, issue_text, load, snapshot
 
 SCHEMA = "corsair-issue-request/v1"
-COHORTS = Path(__file__).with_name("cohorts.json")
-# Committed issue files for the cohorts (`--root evals/corpus/issues`), so a checkout carries the case data.
-ISSUES = Path(__file__).with_name("issues")
+# End-to-end sets whose cases are committed corpus issue requests; a checkout carries the case data.
+COHORTS = ("corpus",)
+ISSUES = EVALS / "e2e/python/corpus"
 _IDENTITY = {"GIT_AUTHOR_NAME": "Corsair corpus", "GIT_AUTHOR_EMAIL": "corpus@corsair.invalid",
              "GIT_COMMITTER_NAME": "Corsair corpus", "GIT_COMMITTER_EMAIL": "corpus@corsair.invalid",
              "GIT_AUTHOR_DATE": "2026-01-01T00:00:00+0000", "GIT_COMMITTER_DATE": "2026-01-01T00:00:00+0000"}
@@ -73,14 +77,19 @@ def capture(case: CorpusCase, root: Path, corpus: Path = CORPUS) -> tuple[dict, 
     return issue, expected
 
 
+def cohort(name: str) -> list[str]:
+    """The case ids of one committed corpus set, in manifest order."""
+    return [case.name for case in load_set("e2e", name)]
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--root", type=Path, required=True)
     which = parser.add_mutually_exclusive_group(required=True)
-    which.add_argument("--set", dest="cohort", choices=sorted(json.loads(COHORTS.read_text())))
+    which.add_argument("--set", dest="cohort", choices=COHORTS)
     which.add_argument("--case", action="append")
     args = parser.parse_args(argv)
-    wanted = json.loads(COHORTS.read_text())[args.cohort] if args.cohort else args.case
+    wanted = cohort(args.cohort) if args.cohort else args.case
     cases = {case.case_id: case for case in load()}
     if unknown := sorted(set(wanted) - set(cases)):
         parser.error(f"unknown case ids: {', '.join(unknown)}")

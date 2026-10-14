@@ -6,7 +6,8 @@ from pydantic_ai import models
 
 from corsair.agents.evidence_assessment import assessment_prompt
 from corsair.core.disposition import Disposition
-from evals.evidence_assessment.evaluate import (CASES, EvaluationBudget, dataset, evaluate, load, passed,
+from evals.cases import load_set
+from evals.evidence_assessment.evaluate import (SPLITS, SUITE, EvaluationBudget, dataset, evaluate, load, passed,
                                                 scripted_model)
 
 
@@ -29,9 +30,14 @@ def run(tmp_path, cases, **scripted):
                                 scripted=models_ or None))
 
 
-def test_dataset_round_trips_through_the_native_file_format(tmp_path):
-    load().to_file(tmp_path / "cases.yaml", schema_path=None)
-    assert (tmp_path / "cases.yaml").read_bytes() == CASES.read_bytes()
+def test_dataset_round_trips_through_the_typed_contracts():
+    loaded = {case.name: case for case in load().cases}
+    for split in SPLITS:
+        for frozen in load_set(SUITE, split):
+            case = loaded[frozen.name]
+            assert case.inputs.model_dump(mode="json") == frozen.input, frozen.key
+            assert case.metadata.model_dump(mode="json", exclude_defaults=True) == {
+                key: value for key, value in frozen.oracle.items() if value not in (None, [], ())}, frozen.key
 
 
 def test_agent_inputs_carry_no_oracle_or_variant_text():

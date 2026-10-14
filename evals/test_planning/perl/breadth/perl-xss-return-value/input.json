@@ -1,0 +1,54 @@
+{
+  "scope": "component",
+  "identification": {
+    "status": "ready",
+    "scope": "component",
+    "reason": null,
+    "reported_issue": "Renderer::render turns visitor comments into HTML for the guestbook page. A comment containing <script> may be emitted as a live element. Analyze this component only.",
+    "target": {
+      "symbol": "render",
+      "source": {
+        "path": "lib/Renderer.pm",
+        "start_line": 8,
+        "end_line": 10,
+        "quote": "sub render {\n    my ($text) = @_;\n    return \"<div class='comment'>\" . $text . \"</div>\";"
+      }
+    }
+  },
+  "source_files": [
+    {
+      "path": "lib/Renderer.pm",
+      "content": "package Renderer;\nuse strict;\nuse warnings;\nuse Exporter 'import';\nour @EXPORT_OK = qw(render);\n\n# Render a comment into HTML.\nsub render {\n    my ($text) = @_;\n    return \"<div class='comment'>\" . $text . \"</div>\";\n}\n\n1;\n"
+    },
+    {
+      "path": "t/renderer.t",
+      "content": "use strict;\nuse warnings;\nuse Test::More;\nuse Renderer qw(render);\n\nsubtest wraps_comment => sub {\n    is(render('hello'), \"<div class='comment'>hello</div>\", 'wrapped');\n};\n\ndone_testing;\n"
+    }
+  ],
+  "environment": {
+    "language": "Perl",
+    "runtime": "Perl 5.26",
+    "framework": "tap-harness",
+    "discovery_command": [
+      "prove",
+      "--norc",
+      "-l",
+      "-r",
+      "--dry",
+      "t"
+    ],
+    "approved_test_paths": [
+      "t/renderer-security.t"
+    ],
+    "baseline_test": {
+      "test_id": "t/renderer.t#wraps_comment",
+      "path": "t/renderer.t"
+    },
+    "scratch_location": "Per-test in-memory recording dependency only",
+    "observation_facilities": [
+      "Native TAP results per top-level Test::More subtest from prove, with got/expected diagnostics or the die message",
+      "File::Temp tempdir per subtest and eval blocks capturing a die message in $@"
+    ],
+    "witness_facilities": []
+  }
+}

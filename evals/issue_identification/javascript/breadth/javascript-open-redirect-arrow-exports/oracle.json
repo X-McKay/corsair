@@ -1,0 +1,10 @@
+{
+  "status": "ready",
+  "symbol": "continueAfterLogin",
+  "path": "routes/auth.js",
+  "required_lines": [
+    7,
+    9
+  ],
+  "max_span": 8
+}

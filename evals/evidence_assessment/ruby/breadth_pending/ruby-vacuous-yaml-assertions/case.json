@@ -1,0 +1,12 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "unsafe-deserialization",
+  "kind": "negative",
+  "probes": "Both probes call the real ConfigLoader with the right inputs, but the assertions are constants that hold whatever load does.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Written for this set; the property under review is in the frozen test patch, not the source."
+  }
+}

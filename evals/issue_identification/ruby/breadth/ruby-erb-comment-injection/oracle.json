@@ -1,0 +1,10 @@
+{
+  "status": "ready",
+  "symbol": "render",
+  "path": "lib/mailer/template.rb",
+  "required_lines": [
+    11,
+    12
+  ],
+  "max_span": 8
+}

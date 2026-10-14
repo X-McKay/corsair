@@ -1,0 +1,10 @@
+{
+  "status": "ready",
+  "symbol": "with_status",
+  "path": "app/models/order.rb",
+  "required_lines": [
+    6,
+    7
+  ],
+  "max_span": 8
+}

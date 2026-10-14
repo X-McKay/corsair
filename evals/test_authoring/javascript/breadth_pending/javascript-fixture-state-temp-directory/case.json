@@ -1,0 +1,17 @@
+{
+  "language": "javascript",
+  "framework": "jest",
+  "family": "upload-path-traversal",
+  "kind": "pending-reader",
+  "probes": "A fixture_state plan: the security test observes a temporary directory for a file written outside it",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Written for this set; the source shape follows common upload path traversal reports"
+  },
+  "behaviour_kind": "positive",
+  "pending": {
+    "missing": "authoring id grammar",
+    "note": "TestAuthoringInput admits pytest and Minitest test ids only (AUTHORED_TEST_ID in src/corsair/agents/test_authoring/contracts.py); Jest ids are refused as input although static.assertion_lines already reads them through javascript.py"
+  }
+}

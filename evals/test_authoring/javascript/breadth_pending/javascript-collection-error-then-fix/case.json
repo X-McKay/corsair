@@ -1,0 +1,17 @@
+{
+  "language": "javascript",
+  "framework": "jest",
+  "family": "open-redirect",
+  "kind": "pending-reader",
+  "probes": "A first write that does not load gives a collection error; the author rewrites and the second run admits the patch",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Written for this set; the source shape follows common open redirect reports"
+  },
+  "behaviour_kind": "failure-mode",
+  "pending": {
+    "missing": "authoring id grammar",
+    "note": "TestAuthoringInput admits pytest and Minitest test ids only (AUTHORED_TEST_ID in src/corsair/agents/test_authoring/contracts.py); Jest ids are refused as input although static.assertion_lines already reads them through javascript.py"
+  }
+}

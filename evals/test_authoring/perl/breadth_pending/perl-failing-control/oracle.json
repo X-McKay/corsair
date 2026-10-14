@@ -1,0 +1,24 @@
+{
+  "script": [
+    {
+      "write": "reference"
+    },
+    {
+      "run": true
+    }
+  ],
+  "runner_runs": [
+    {
+      "status": "discovered",
+      "control": "failed",
+      "security": "failed",
+      "security_failure": "not_ok"
+    }
+  ],
+  "status": "blocked",
+  "layer": "fixture",
+  "runs": 1,
+  "files": {
+    "reference": "use strict;\nuse warnings;\nuse Test::More;\nuse DownloadHeaders;\n\nsubtest benign_control => sub {\n    is(DownloadHeaders::disposition('report.txt'), 'attachment; filename=\"report.txt\"', 'names the file');\n};\n\nsubtest security_keeps_one_header_line => sub {\n    my $value = DownloadHeaders::disposition(\"report.txt\\r\\nSet-Cookie: session=x\");\n    unlike($value, qr/[\\r\\n]/, 'stays one header line');\n};\n\ndone_testing();\n"
+  }
+}

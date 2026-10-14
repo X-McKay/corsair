@@ -3,12 +3,12 @@
 import json
 from uuid import uuid4
 
-from evals.environment.evaluate import HANDLE, ROOT, RecordedExecution
+from evals.environment.evaluate import HANDLE, RecordedExecution, load_cases
 from evals.run import compare
 
 
 def test_unknown_command_fails_closed_without_executing_it():
-    case = json.loads((ROOT / "cases.json").read_text())[0]
+    case = load_cases()[0][0]
     execution = RecordedExecution(case)
     receipt = execution.execute(
         HANDLE, ("sh", "-c", "touch /tmp/no-host-execution"), uuid4()
@@ -36,7 +36,7 @@ def test_ready_identity_checks_reject_wrong_toolchain_framework_and_discovery():
     from evals.environment.evaluate import EnvironmentChecks
     from corsair.agents.environment.contracts import EnvironmentInput
 
-    case = json.loads((ROOT / "cases.json").read_text())[0]
+    case = load_cases()[0][0]
     output = SimpleNamespace(
         status="ready",
         recipe=[],
@@ -96,7 +96,7 @@ def test_fixture_identity_and_outcome_labels_are_absent_from_agent_prompt():
     from corsair.agents.environment.agent import environment_prompt
     from corsair.agents.environment.contracts import EnvironmentInput
 
-    cases = json.loads((ROOT / "cases.json").read_text())
+    cases = load_cases()[0]
     for case in cases:
         inputs = EnvironmentInput.model_validate(case["inputs"])
         assert inputs.policy_profile == "setup-public"
@@ -119,7 +119,7 @@ def test_unsupported_requirement_rejects_inverted_runtime_claim_with_valid_citat
 
     case = next(
         c
-        for c in json.loads((ROOT / "cases.json").read_text())
+        for c in load_cases()[0]
         if c["status"] == "unsupported"
     )
     inputs = EnvironmentInput.model_validate(case["inputs"])
@@ -166,7 +166,7 @@ def environment_context(name):
     from types import SimpleNamespace
     from corsair.agents.environment.contracts import EnvironmentInput
 
-    case = next(c for c in json.loads((ROOT / "cases.json").read_text()) if c["name"] == name)
+    case = next(c for c in load_cases()[0] if c["name"] == name)
     draft = dict(case["draft"])
     draft["citations"] = [SimpleNamespace(**c) for c in draft.get("citations", [])]
     return SimpleNamespace(metadata=case, output=SimpleNamespace(**draft, receipts=[]),

@@ -1,0 +1,12 @@
+{
+  "language": "perl",
+  "framework": "tap-harness",
+  "family": "toctou-race",
+  "kind": "abstention",
+  "probes": "Check-then-open race: the property needs controlled concurrent interleaving the environment cannot give, and a sequential test only re-tests the existing check.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic spool writer."
+  }
+}

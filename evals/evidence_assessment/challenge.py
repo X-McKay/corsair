@@ -237,14 +237,14 @@ async def evaluate(destination, *, variant='challenge', cases='unit', repeat=1, 
     from corsair.agents.evidence_assessment.prompts import INSTRUCTIONS as CURRENT_INSTRUCTIONS
     from corsair.agents.evidence_assessment.contracts import ProposedDispositionDraft
     from evals.evidence_assessment.evaluate import EvaluationBudget, describe_model, read_items, record_count
-    from evals.evidence_assessment.unit_test import CASES, ValidityScore, dataset, scripted_model
+    from evals.evidence_assessment.unit_test import ValidityScore, dataset, scripted_model
+    from evals.cases import set_digest
     from evals.experiments.probe_validation.scoring import classify
     from evals.issue_analysis.live import message_counts, output_tool_names
 
     if variant not in ('current', 'challenge') or cases not in ('unit', 'transfer'):
         raise ValueError('unknown experiment variant or frozen case set')
-    path = CASES if cases == 'unit' else CASES.with_name('unit_transfer_cases_v2.json')
-    corpus = dataset(path)
+    corpus = dataset('unit' if cases == 'unit' else 'unit-transfer')
     rubric_path = Path(__file__).parents[1] / 'experiments' / 'probe_validation' / 'rubric-v1.json'
     rubric_bytes = rubric_path.read_bytes()
     rubric_sha = sha256(rubric_bytes).hexdigest()
@@ -279,7 +279,7 @@ async def evaluate(destination, *, variant='challenge', cases='unit', repeat=1, 
         'output_draft_schema_sha256': sha256(json.dumps((ChallengeDraft if variant == 'challenge' else ProposedDispositionDraft).model_json_schema(),
             sort_keys=True, separators=(',', ':')).encode()).hexdigest(),
         'schema_identity_scope': 'declared_pydantic_schema_before_provider_transform',
-        'dataset_file': path.name, 'dataset_sha256': sha256(path.read_bytes()).hexdigest(),
+        'dataset': corpus.name, 'dataset_sha256': set_digest('evidence_assessment', 'unit' if cases == 'unit' else 'unit-transfer'),
         'input_hashes': expected_hashes, 'rubric_sha256': rubric_sha,
         'evaluator_version': rubric['version'], 'budget': budget.model_dump(),
         'read_policy': 'full_patch_plan_condition_all_decisions' if variant == 'challenge' else

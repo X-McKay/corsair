@@ -1,0 +1,53 @@
+{
+  "scope": "component",
+  "identification": {
+    "status": "ready",
+    "scope": "component",
+    "reason": null,
+    "reported_issue": "feed_titles reads RSS documents fetched from subscriber-supplied URLs. A feed that declares an external entity pointing at a local file might pull that file's contents into the returned titles. Analyze this component only.",
+    "target": {
+      "symbol": "feed_titles",
+      "source": {
+        "path": "feeds.py",
+        "start_line": 25,
+        "end_line": 31,
+        "quote": "def feed_titles(document: bytes) -> list[str]:\n    handler = _Titles()\n    parser = xml.sax.make_parser()\n    parser.setFeature(feature_external_ges, True)\n    parser.setContentHandler(handler)\n    parser.parse(io.BytesIO(document))\n    return handler.titles"
+      }
+    }
+  },
+  "source_files": [
+    {
+      "path": "feeds.py",
+      "content": "import io\nimport xml.sax\nfrom xml.sax.handler import ContentHandler, feature_external_ges\n\n\nclass _Titles(ContentHandler):\n    def __init__(self) -> None:\n        super().__init__()\n        self.titles: list[str] = []\n        self._inside = False\n\n    def startElement(self, name, attrs):\n        self._inside = name == \"title\"\n        if self._inside:\n            self.titles.append(\"\")\n\n    def endElement(self, name):\n        self._inside = False\n\n    def characters(self, content):\n        if self._inside:\n            self.titles[-1] += content\n\n\ndef feed_titles(document: bytes) -> list[str]:\n    handler = _Titles()\n    parser = xml.sax.make_parser()\n    parser.setFeature(feature_external_ges, True)\n    parser.setContentHandler(handler)\n    parser.parse(io.BytesIO(document))\n    return handler.titles\n"
+    },
+    {
+      "path": "test_feeds_existing.py",
+      "content": "import feeds\n\n\ndef test_reads_titles():\n    document = b\"<rss><channel><title>News</title><item><title>First</title></item></channel></rss>\"\n    assert feeds.feed_titles(document) == [\"News\", \"First\"]\n"
+    }
+  ],
+  "environment": {
+    "language": "Python",
+    "runtime": "CPython 3.12",
+    "framework": "pytest 9.0.2",
+    "discovery_command": [
+      "python",
+      "-m",
+      "pytest",
+      "--collect-only",
+      "-q"
+    ],
+    "approved_test_paths": [
+      "test_feeds_security.py"
+    ],
+    "baseline_test": {
+      "test_id": "test_feeds_existing.py::test_reads_titles",
+      "path": "test_feeds_existing.py"
+    },
+    "scratch_location": "The per-test pytest tmp_path directory; fixtures must not be created elsewhere",
+    "observation_facilities": [
+      "Python sys.addaudithook 'open' audit events recording the path, mode and flags of every file opened during a test",
+      "Python sys.addaudithook 'urllib.Request' audit events recording every URL requested during a test",
+      "Native JUnit XML outcomes and captured stdout per test"
+    ]
+  }
+}

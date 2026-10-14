@@ -1,0 +1,12 @@
+{
+  "language": "ruby",
+  "framework": "minitest",
+  "family": "zip-slip",
+  "kind": "positive",
+  "probes": "Tar member extraction with the stdlib Gem::Package::TarReader planned as a fixture-state observation in Dir.mktmpdir.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic installer; the zip-slip shape of rubyzip's 1.2.2 fix realised with the stdlib tar reader."
+  }
+}

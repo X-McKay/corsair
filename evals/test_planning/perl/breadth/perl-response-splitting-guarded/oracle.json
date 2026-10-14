@@ -1,0 +1,100 @@
+{
+  "status": "ready",
+  "symbol": "redirect_headers",
+  "target_path": "lib/Responder.pm",
+  "required_lines": [
+    6,
+    9
+  ],
+  "adversarial_markers": [
+    "Set-Cookie"
+  ],
+  "witness_markers": [
+    "unlike",
+    "set-cookie"
+  ],
+  "observation_kind": "return_value",
+  "required_reads": [
+    "lib/Responder.pm",
+    "t/responder.t"
+  ],
+  "forbidden_markers": [],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_id": "t/responder-security.t#redirects_to_plain_location",
+      "test_path": "t/responder-security.t",
+      "fixture_setup": [
+        "No files; inputs are in-memory strings"
+      ],
+      "implementation_call": "Responder::redirect_headers('/home')",
+      "input": "location '/home'",
+      "required_behavior": "Returns a header block whose Location line is exactly 'Location: /home'",
+      "observable_witness": "like() on the header string returned by the real redirect_headers call",
+      "observation": {
+        "kind": "return_value",
+        "property": "Returns a header block whose Location line is exactly 'Location: /home'",
+        "seam": "use Responder and call the real Responder::redirect_headers"
+      },
+      "source_references": [
+        {
+          "path": "lib/Responder.pm",
+          "start_line": 6,
+          "end_line": 9
+        }
+      ]
+    },
+    "security": {
+      "test_id": "t/responder-security.t#keeps_crlf_out_of_headers",
+      "test_path": "t/responder-security.t",
+      "fixture_setup": [
+        "No files; inputs are in-memory strings"
+      ],
+      "implementation_call": "Responder::redirect_headers(\"/home\\r\\nSet-Cookie: session=attacker\")",
+      "input": "location \"/home\\r\\nSet-Cookie: session=attacker\"",
+      "required_behavior": "The returned header block has no line beginning with Set-Cookie:, and its header lines are exactly status, Location and Content-Length",
+      "observable_witness": "unlike($headers, qr/^Set-Cookie:/m) and a count of the CRLF-separated header lines on the string returned by the real call",
+      "observation": {
+        "kind": "return_value",
+        "property": "The returned header block has no line beginning with Set-Cookie:, and its header lines are exactly status, Location and Content-Length",
+        "seam": "use Responder and call the real Responder::redirect_headers"
+      },
+      "source_references": [
+        {
+          "path": "lib/Responder.pm",
+          "start_line": 6,
+          "end_line": 9
+        }
+      ]
+    },
+    "security_expectation": {
+      "failure_type": "not_ok",
+      "safe_behavior": "no_injected_header_line"
+    },
+    "discovery_command": [
+      "prove",
+      "--norc",
+      "-l",
+      "-r",
+      "--dry",
+      "t"
+    ],
+    "evidence_requirements": [
+      "Native discovery lists the planned .t file and both planned subtests run",
+      "Both the control and the exploit probe execute with native TAP results and diagnostics",
+      "Review the real source call, adversarial input and assertions before execution"
+    ],
+    "citations": [
+      {
+        "path": "lib/Responder.pm",
+        "start_line": 6,
+        "end_line": 9
+      }
+    ],
+    "limitations": [
+      "Only the returned header text is observed; the HTTP server's own header handling is outside the boundary",
+      "Bare LF or encoded variants are not exercised by these two tests"
+    ]
+  }
+}

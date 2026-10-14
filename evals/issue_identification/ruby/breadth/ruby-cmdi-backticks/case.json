@@ -1,0 +1,11 @@
+{
+  "language": "ruby",
+  "framework": "ruby",
+  "family": "command-injection",
+  "kind": "positive",
+  "probes": "Obvious single-method sink: backtick interpolation in a plain class method.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)"
+  }
+}

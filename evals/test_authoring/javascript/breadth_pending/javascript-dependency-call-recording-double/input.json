@@ -1,0 +1,120 @@
+{
+  "fixture_id": "javascript-dependency-call-recording-double-v1",
+  "inputs": {
+    "plan": {
+      "status": "ready",
+      "scope": "component",
+      "security_expectation": {
+        "failure_type": "Error",
+        "safe_behavior": "bound_parameter"
+      },
+      "discovery_command": [
+        "npx",
+        "jest",
+        "--listTests",
+        "test/accounts.test.js"
+      ],
+      "evidence_requirements": [
+        "Both control and exploit probe must execute with native outcomes",
+        "Review both real source calls, adversarial input and assertions before execution"
+      ],
+      "citations": [
+        {
+          "path": "lib/accounts.js",
+          "start_line": 2,
+          "end_line": 4,
+          "quote": "function balance(database, account) {\n  return database.query(\"SELECT balance FROM accounts WHERE account = '\" + account + \"'\", []);\n}"
+        }
+      ],
+      "limitations": [
+        "Sql injection at this one call only; callers and deployment configuration are outside the observation"
+      ],
+      "control": {
+        "test_id": "test/accounts.security.test.js::benign_control",
+        "test_path": "test/accounts.security.test.js",
+        "fixture_setup": [
+          "Create an in-memory recording database returning [[25]] and recording each query with its parameters"
+        ],
+        "implementation_call": "accounts.balance(database, account)",
+        "input": "account 'alice'",
+        "required_behavior": "Returns the database rows and issues exactly one query",
+        "observable_witness": "Native jest assertion on returns the database rows and issues exactly one query",
+        "observation": {
+          "kind": "dependency_call",
+          "property": "Returns the database rows and issues exactly one query",
+          "seam": "Call the real accounts.balance with an injected database object",
+          "controlled_dependency": "The recording database's query records the SQL and parameters unchanged and returns fixed rows; it neither builds nor sanitizes SQL"
+        },
+        "source_references": [
+          {
+            "path": "lib/accounts.js",
+            "start_line": 2,
+            "end_line": 4,
+            "quote": "function balance(database, account) {\n  return database.query(\"SELECT balance FROM accounts WHERE account = '\" + account + \"'\", []);\n}"
+          }
+        ]
+      },
+      "security": {
+        "test_id": "test/accounts.security.test.js::security_binds_account",
+        "test_path": "test/accounts.security.test.js",
+        "fixture_setup": [
+          "Create an in-memory recording database returning [[25]] and recording each query with its parameters"
+        ],
+        "implementation_call": "accounts.balance(database, account)",
+        "input": "account \"alice' OR 1=1 --\"",
+        "required_behavior": "The hostile account is passed as a bound parameter and never appears in the SQL text",
+        "observable_witness": "Native jest assertion on the hostile account is passed as a bound parameter and never appears in the SQL text",
+        "observation": {
+          "kind": "dependency_call",
+          "property": "The hostile account is passed as a bound parameter and never appears in the SQL text",
+          "seam": "Call the real accounts.balance with an injected database object",
+          "controlled_dependency": "The recording database's query records the SQL and parameters unchanged and returns fixed rows; it neither builds nor sanitizes SQL"
+        },
+        "source_references": [
+          {
+            "path": "lib/accounts.js",
+            "start_line": 2,
+            "end_line": 4,
+            "quote": "function balance(database, account) {\n  return database.query(\"SELECT balance FROM accounts WHERE account = '\" + account + \"'\", []);\n}"
+          }
+        ]
+      }
+    },
+    "source_files": [
+      {
+        "path": "lib/accounts.js",
+        "content": "// Account balance lookups against an injected database connection.\nfunction balance(database, account) {\n  return database.query(\"SELECT balance FROM accounts WHERE account = '\" + account + \"'\", []);\n}\n\nmodule.exports = { balance };\n"
+      },
+      {
+        "path": "test/accounts.test.js",
+        "content": "const accounts = require('../lib/accounts');\n\ntest('returns rows', () => {\n  const database = { query: () => [[25]] };\n  expect(accounts.balance(database, 'alice')).toEqual([[25]]);\n});\n"
+      }
+    ],
+    "environment": {
+      "language": "JavaScript",
+      "runtime": "Node 8.17",
+      "framework": "jest",
+      "discovery_command": [
+        "npx",
+        "jest",
+        "--listTests",
+        "test/accounts.test.js"
+      ],
+      "approved_test_paths": [
+        "test/accounts.security.test.js"
+      ],
+      "baseline_test": {
+        "test_id": "test/accounts.test.js",
+        "path": "test/accounts.test.js"
+      },
+      "scratch_location": "A per-test fs.mkdtempSync directory under os.tmpdir()",
+      "observation_facilities": [
+        "Native Jest JSON report: outcome, failure message and failing line per test"
+      ],
+      "assertion_facts": [
+        "Jest expect() matcher failures report Error with the matcher message. Match the planned native failure type."
+      ],
+      "witness_facilities": []
+    }
+  }
+}

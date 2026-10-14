@@ -1,0 +1,22 @@
+{
+  "held_out": false,
+  "cases": {
+    "python/ih-python-cmdi": "ef2a926eb174103d406f93df5097d7af168115c61f01fcb8a989beaa6449a1f6",
+    "python/ih-python-codeinjection": "e45a14ea8de49eb6d2f4e4c70a205cbccb939e3169e9208b4e6b0a5b622d2f3c",
+    "python/ih-python-deserialization": "f28739ab10c60c983559205408499d41ba644e7025ad04a8a581bc4be2a2181a",
+    "python/ih-python-errorexposure": "4817256d41079cefe64c7cb1eede265f1938a684dc5fd8301af2c1ed74ff813d",
+    "python/ih-python-healthcheck": "15a366b6474594a3e7260a11644b2b30316b00d5ad9b8a7dc651fe26fd0941d9",
+    "python/ih-python-jwtnone": "b546e7243b64d499d43daa633d8bd322b84ce1a5c620ef36e4f8a9884221e242",
+    "python/ih-python-massassignment": "a5cdb20e24e2692957a3a403d28a648033c24356261d462ad74f406df198307e",
+    "python/ih-python-nullderef": "b85dd52ba8b713dc8dd29eda2052b913cc7b2e0eacb577b2e80b82f91f71f5ac",
+    "python/ih-python-openredirect": "c6ea99dcab18b485975c79a455254863a497df442c90116f58b1a2d648dc2957",
+    "python/ih-python-pathtraversal": "923f0313397bb092fcf8026a7183e9b4b6a71c1e7798ce820ac884b98296aed2",
+    "python/ih-python-pwhash": "bf17181737e30ad45932115e8f11a43b081b4d6d75eb007903f778e420e53b68",
+    "python/ih-python-queryhelper": "a94b93c0ae5c5c22593149c0d7ca8a88c284a5ea692aef74123fe3f88736d401",
+    "python/ih-python-redos": "82c7ac51e0d4aad142b961c75a5642a3909ed7ecde83e8d743586de41a41294e",
+    "python/ih-python-ssrf": "cc395878dcef7192d470f36f019e000ea0f8f1f02b52e6e5bbdd853b12c1a4d2",
+    "python/ih-python-tempfile": "bc28c78df80d46af592ae124ecea41b2c19a0aae31380ad912465538139df2a4",
+    "python/ih-python-toctou": "8215cdcdb38a35171f127803fb6badc9da0217dd90e2ef94807935aff3cf5da6",
+    "python/ih-python-xxe": "863f3b395a3ad20ab2fbce75f7a6cff731f8e9994b92bf6e83264e6a5af6d312"
+  }
+}

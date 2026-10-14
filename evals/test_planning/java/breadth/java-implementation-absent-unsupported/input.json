@@ -1,0 +1,49 @@
+{
+  "scope": "component",
+  "identification": {
+    "status": "ready",
+    "scope": "component",
+    "reason": null,
+    "reported_issue": "InvoiceExporter.exportCsv writes customer-supplied descriptions into a CSV opened in spreadsheets. A description starting with =HYPERLINK( may be evaluated as a formula. Analyze this component only.",
+    "target": {
+      "symbol": "exportCsv",
+      "source": {
+        "path": "src/main/java/com/example/billing/InvoiceExporter.java",
+        "start_line": 7,
+        "end_line": 12,
+        "quote": "    public String exportCsv(List<String[]> rows) {\n        StringBuilder csv = new StringBuilder();\n        for (String[] row : rows) {\n            csv.append(String.join(\",\", row)).append(\"\\n\");\n        }\n        return csv.toString();"
+      }
+    }
+  },
+  "source_files": [
+    {
+      "path": "src/test/java/com/example/billing/InvoiceExporterTest.java",
+      "content": "package com.example.billing;\n\nimport static org.junit.jupiter.api.Assertions.assertEquals;\n\nimport java.util.Collections;\nimport org.junit.jupiter.api.Test;\n\nclass InvoiceExporterTest {\n    @Test\n    void writesOneRow() {\n        String csv = new InvoiceExporter().exportCsv(Collections.singletonList(new String[] {\"A-1\", \"10.00\"}));\n        assertEquals(\"A-1,10.00\\n\", csv);\n    }\n}\n"
+    }
+  ],
+  "environment": {
+    "language": "Java",
+    "runtime": "OpenJDK 17",
+    "framework": "junit5",
+    "discovery_command": [
+      "mvn",
+      "-o",
+      "-B",
+      "-q",
+      "test-compile"
+    ],
+    "approved_test_paths": [
+      "src/test/java/com/example/billing/InvoiceExporterSecurityTest.java"
+    ],
+    "baseline_test": {
+      "test_id": "com.example.billing.InvoiceExporterTest#writesOneRow",
+      "path": "src/test/java/com/example/billing/InvoiceExporterTest.java"
+    },
+    "scratch_location": "Per-test in-memory recording dependency only",
+    "observation_facilities": [
+      "Native Maven Surefire XML outcomes per test with failure type and location; JUnit 5 assertion failures, including assertThrows when no exception is thrown, report org.opentest4j.AssertionFailedError",
+      "JUnit 5 @TempDir per-test directories and assertThrows for a specific exception type"
+    ],
+    "witness_facilities": []
+  }
+}

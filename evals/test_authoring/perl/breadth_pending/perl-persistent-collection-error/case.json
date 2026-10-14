@@ -1,0 +1,17 @@
+{
+  "language": "perl",
+  "framework": "tap-harness",
+  "family": "xss-escaping",
+  "kind": "pending-reader",
+  "probes": "Every development run reports a load error up to the run budget, so the stage ends blocked at discovery",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Written for this set; the source shape follows common xss escaping reports"
+  },
+  "behaviour_kind": "failure-mode",
+  "pending": {
+    "missing": "authoring id grammar and TAP assertion reader",
+    "note": "TestAuthoringInput refuses TAP `file.t#subtest` ids, and static.assertion_lines has no Perl reader; draft PR #128 adds both (PERL_TEST_ID in AUTHORED_TEST_ID and perl.py)"
+  }
+}

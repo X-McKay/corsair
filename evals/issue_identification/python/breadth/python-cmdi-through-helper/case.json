@@ -1,0 +1,11 @@
+{
+  "language": "python",
+  "framework": "subprocess",
+  "family": "command-injection",
+  "kind": "positive",
+  "probes": "The tainted value passes through a neutral helper on the sink line; the range must cover the declaration and the shell call that uses the helper.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)"
+  }
+}

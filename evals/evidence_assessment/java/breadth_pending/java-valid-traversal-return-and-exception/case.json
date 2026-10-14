@@ -1,0 +1,12 @@
+{
+  "language": "java",
+  "framework": "junit5",
+  "family": "path-traversal",
+  "kind": "positive",
+  "probes": "Real DocumentStore seam: the control returns file content and the exploit asserts the specific rejection exception raised by production containment.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Written for this set; the property under review is in the frozen test patch, not the source."
+  }
+}

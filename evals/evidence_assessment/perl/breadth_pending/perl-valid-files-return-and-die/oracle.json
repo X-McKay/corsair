@@ -1,0 +1,8 @@
+{
+  "expected": {
+    "source_linked": true,
+    "condition_exercised": true,
+    "assertions_relevant": true,
+    "dependency_scope_valid": true
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "fixture_id": "python-missing-named-verifier",
+  "issue": "auth.tokens.verify_signature appears to accept JWTs whose header says alg=none. Locate verify_signature in auth/tokens.py at component scope.",
+  "scope": "component",
+  "source_files": [
+    {
+      "path": "auth/views.py",
+      "content": "from auth.tokens import verify_signature\n\n\ndef current_user(request):\n    token = request.headers.get(\"Authorization\", \"\").removeprefix(\"Bearer \")\n    claims = verify_signature(token)\n    return claims.get(\"sub\")\n"
+    }
+  ]
+}

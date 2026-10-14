@@ -1,0 +1,50 @@
+{
+  "scope": "component",
+  "identification": {
+    "status": "ready",
+    "scope": "component",
+    "reason": null,
+    "reported_issue": "countLines receives a file name chosen by the user in the reports page. A name such as notes.txt; touch pwned may be executed by a shell. Assess command construction only.",
+    "target": {
+      "symbol": "countLines",
+      "source": {
+        "path": "src/cmd.js",
+        "start_line": 4,
+        "end_line": 5,
+        "quote": "function countLines(path, cb) {\n  exec(\"wc -l \" + path, (err, stdout) => cb(stdout));"
+      }
+    }
+  },
+  "source_files": [
+    {
+      "path": "src/cmd.js",
+      "content": "const { exec } = require(\"child_process\");\n\n// Count lines in a file.\nfunction countLines(path, cb) {\n  exec(\"wc -l \" + path, (err, stdout) => cb(stdout));\n}\n\nmodule.exports = { countLines };\n"
+    },
+    {
+      "path": "__tests__/cmd.test.js",
+      "content": "'use strict';\nconst fs = require('fs');\nconst os = require('os');\nconst path = require('path');\nconst { countLines } = require('../src/cmd');\n\ntest('counts_lines', (done) => {\n  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'cmd-')), 'a.txt');\n  fs.writeFileSync(file, 'one\\ntwo\\n');\n  countLines(file, (stdout) => {\n    expect(stdout.trim().startsWith('2')).toBe(true);\n    done();\n  });\n});\n"
+    }
+  ],
+  "environment": {
+    "language": "JavaScript",
+    "runtime": "Node.js 8.17",
+    "framework": "jest",
+    "discovery_command": [
+      "node_modules/.bin/jest",
+      "--listTests"
+    ],
+    "approved_test_paths": [
+      "__tests__/cmd.security.test.js"
+    ],
+    "baseline_test": {
+      "test_id": "__tests__/cmd.test.js::counts_lines",
+      "path": "__tests__/cmd.test.js"
+    },
+    "scratch_location": "Per-test in-memory recording dependency only",
+    "observation_facilities": [
+      "Native Jest 24 JSON report per test with failure messages and locations; expect() matcher failures report Error",
+      "jest.fn and jest.mock module doubles that record calls and arguments"
+    ],
+    "witness_facilities": []
+  }
+}

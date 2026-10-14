@@ -1,0 +1,54 @@
+{
+  "scope": "component",
+  "identification": {
+    "status": "ready",
+    "scope": "component",
+    "reason": null,
+    "reported_issue": "Responder::redirect_headers builds the redirect from the return_to parameter. A value containing CR LF followed by Set-Cookie: may add headers to the response. Analyze this component only.",
+    "target": {
+      "symbol": "redirect_headers",
+      "source": {
+        "path": "lib/Responder.pm",
+        "start_line": 6,
+        "end_line": 9,
+        "quote": "sub redirect_headers {\n    my ($location) = @_;\n    $location =~ s/[\\r\\n]//g;\n    return \"HTTP/1.1 302 Found\\r\\nLocation: $location\\r\\nContent-Length: 0\\r\\n\\r\\n\";"
+      }
+    }
+  },
+  "source_files": [
+    {
+      "path": "lib/Responder.pm",
+      "content": "package Responder;\nuse strict;\nuse warnings;\n\n# Build the raw HTTP response headers for a redirect to $location.\nsub redirect_headers {\n    my ($location) = @_;\n    $location =~ s/[\\r\\n]//g;\n    return \"HTTP/1.1 302 Found\\r\\nLocation: $location\\r\\nContent-Length: 0\\r\\n\\r\\n\";\n}\n\n1;\n"
+    },
+    {
+      "path": "t/responder.t",
+      "content": "use strict;\nuse warnings;\nuse Test::More;\nuse Responder;\n\nsubtest builds_redirect => sub {\n    like(Responder::redirect_headers('/home'), qr{^Location: /home\\r$}m, 'location header');\n};\n\ndone_testing;\n"
+    }
+  ],
+  "environment": {
+    "language": "Perl",
+    "runtime": "Perl 5.26",
+    "framework": "tap-harness",
+    "discovery_command": [
+      "prove",
+      "--norc",
+      "-l",
+      "-r",
+      "--dry",
+      "t"
+    ],
+    "approved_test_paths": [
+      "t/responder-security.t"
+    ],
+    "baseline_test": {
+      "test_id": "t/responder.t#builds_redirect",
+      "path": "t/responder.t"
+    },
+    "scratch_location": "Per-test in-memory recording dependency only",
+    "observation_facilities": [
+      "Native TAP results per top-level Test::More subtest from prove, with got/expected diagnostics or the die message",
+      "File::Temp tempdir per subtest and eval blocks capturing a die message in $@"
+    ],
+    "witness_facilities": []
+  }
+}

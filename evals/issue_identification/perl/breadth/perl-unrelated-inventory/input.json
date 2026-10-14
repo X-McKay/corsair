@@ -1,0 +1,11 @@
+{
+  "fixture_id": "perl-unrelated-inventory",
+  "issue": "Directory::find_user builds an LDAP filter from the uid parameter; uid=*)(uid=* returns all entries. Locate the search implementation.",
+  "scope": "component",
+  "source_files": [
+    {
+      "path": "lib/Text/Banner.pm",
+      "content": "package Text::Banner;\nuse strict;\nuse warnings;\n\nsub banner {\n    my ($text) = @_;\n    return ('=' x length $text) . \"\\n$text\\n\" . ('=' x length $text);\n}\n\n1;\n"
+    }
+  ]
+}

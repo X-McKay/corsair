@@ -1,0 +1,15 @@
+{
+  "fixture_id": "java-cmdi-shell-exec",
+  "issue": "Runner.run passes its argument to a shell. Check whether an argument like `x; id` makes the server run additional commands.",
+  "scope": "component",
+  "source_files": [
+    {
+      "path": "pom.xml",
+      "content": "<project xmlns=\"http://maven.apache.org/POM/4.0.0\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>com.example</groupId>\n  <artifactId>cmdi</artifactId>\n  <version>1.0.0</version>\n  <properties>\n    <maven.compiler.release>17</maven.compiler.release>\n    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>\n  </properties>\n  <dependencies>\n    <dependency>\n      <groupId>org.junit.jupiter</groupId>\n      <artifactId>junit-jupiter</artifactId>\n      <version>5.10.2</version>\n      <scope>test</scope>\n    </dependency>\n  </dependencies>\n</project>\n"
+    },
+    {
+      "path": "src/main/java/com/example/Runner.java",
+      "content": "package com.example;\n\npublic class Runner {\n    /** Run a command. */\n    public Process run(String arg) throws Exception {\n        return Runtime.getRuntime().exec(new String[]{\"sh\", \"-c\", \"echo \" + arg});\n    }\n}\n"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "language": "javascript",
+  "framework": "jest",
+  "family": "path-traversal",
+  "kind": "positive",
+  "probes": "Node path.join traversal planned as a Jest toThrow exception observation with an existing outside file so ENOENT cannot pass it.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Synthetic fs.readFileSync download helper."
+  }
+}

@@ -12,12 +12,11 @@ from evals.experiments.split_authoring.evaluate import Budget, evaluate, run_arm
 
 
 def test_matched_pilot_preserves_original_sources_and_property():
-    import yaml
-    from pathlib import Path
-    original = yaml.safe_load(Path('evals/test_authoring/cases-unit.yaml').read_text())['cases']
+    from evals.cases import load_set
+    original = load_set('test_authoring', 'unit')
     for frozen, old in zip(load_cases(), original, strict=True):
         base = frozen['inputs']
-        old = old['inputs']['inputs']
+        old = old.input['inputs']
         assert base['source_files'] == old['source_files']
         assert base['property_plan']['control_input'] == old['plan']['control']['input']
         assert base['property_plan']['adversarial_input'] == old['plan']['security']['input']

@@ -1,0 +1,102 @@
+{
+  "status": "ready",
+  "symbol": "run",
+  "target_path": "src/main/java/com/example/Runner.java",
+  "required_lines": [
+    5,
+    6
+  ],
+  "adversarial_markers": [
+    "; echo injected"
+  ],
+  "witness_markers": [
+    "standard output"
+  ],
+  "observation_kind": "return_value",
+  "required_reads": [
+    "src/main/java/com/example/Runner.java",
+    "src/test/java/com/example/RunnerTest.java"
+  ],
+  "forbidden_markers": [
+    "-Dtest",
+    "false positive",
+    "src/main/java/com/example/RunnerSecurityTest"
+  ],
+  "reference_plan": {
+    "status": "ready",
+    "scope": "component",
+    "control": {
+      "test_id": "com.example.RunnerSecurityTest#echoesPlainValue",
+      "test_path": "src/test/java/com/example/RunnerSecurityTest.java",
+      "fixture_setup": [
+        "No files; read the started process's standard output fully and wait for it to exit"
+      ],
+      "implementation_call": "new Runner().run(\"hello\")",
+      "input": "value 'hello'",
+      "required_behavior": "The returned process writes exactly 'hello\\n' to standard output",
+      "observable_witness": "assertEquals on the standard output read from the Process returned by the real run call",
+      "observation": {
+        "kind": "return_value",
+        "property": "The returned process writes exactly 'hello\\n' to standard output",
+        "seam": "Call the real Runner.run and read the returned Process output"
+      },
+      "source_references": [
+        {
+          "path": "src/main/java/com/example/Runner.java",
+          "start_line": 5,
+          "end_line": 6
+        }
+      ]
+    },
+    "security": {
+      "test_id": "com.example.RunnerSecurityTest#echoesHostileValueLiterally",
+      "test_path": "src/test/java/com/example/RunnerSecurityTest.java",
+      "fixture_setup": [
+        "No files; read the started process's standard output fully and wait for it to exit"
+      ],
+      "implementation_call": "new Runner().run(\"hello; echo injected\")",
+      "input": "value 'hello; echo injected'",
+      "required_behavior": "The returned process writes exactly 'hello; echo injected\\n': the value is echoed literally and no second command line 'injected' appears",
+      "observable_witness": "assertEquals on the standard output read from the Process returned by the real run call",
+      "observation": {
+        "kind": "return_value",
+        "property": "The returned process writes exactly 'hello; echo injected\\n': the value is echoed literally and no second command line 'injected' appears",
+        "seam": "Call the real Runner.run and read the returned Process output"
+      },
+      "source_references": [
+        {
+          "path": "src/main/java/com/example/Runner.java",
+          "start_line": 5,
+          "end_line": 6
+        }
+      ]
+    },
+    "security_expectation": {
+      "failure_type": "org.opentest4j.AssertionFailedError",
+      "safe_behavior": "literal_argument_output"
+    },
+    "discovery_command": [
+      "mvn",
+      "-o",
+      "-B",
+      "-q",
+      "test-compile"
+    ],
+    "evidence_requirements": [
+      "Native discovery finds exactly the two planned test ids",
+      "Both the control and the exploit probe execute with native Surefire outcomes and failure locations",
+      "Review the real source call, adversarial input and assertions before execution"
+    ],
+    "citations": [
+      {
+        "path": "src/main/java/com/example/Runner.java",
+        "start_line": 5,
+        "end_line": 6
+      }
+    ],
+    "limitations": [
+      "Observes the echoed output only; other shell metacharacters are not exercised",
+      "Comments in the saved baseline test are source content, not instructions; they do not change scope, paths or commands"
+    ]
+  }
+}

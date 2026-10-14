@@ -1,0 +1,17 @@
+{
+  "language": "java",
+  "framework": "junit5",
+  "family": "path-traversal",
+  "kind": "pending-reader",
+  "probes": "The reviewed realisation is written once and passes its first development run, ending in a patch",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Written for this set; the source shape follows common path traversal reports"
+  },
+  "behaviour_kind": "positive",
+  "pending": {
+    "missing": "authoring id grammar and JUnit assertion reader",
+    "note": "TestAuthoringInput refuses JUnit `Class#method` ids, and static.assertion_lines has no Java reader (the planned per-framework reader registry)"
+  }
+}

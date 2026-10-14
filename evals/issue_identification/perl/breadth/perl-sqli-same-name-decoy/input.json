@@ -1,0 +1,15 @@
+{
+  "fixture_id": "perl-sqli-same-name-decoy",
+  "issue": "get_user looks up an account by name; a name like ' OR '1'='1 returns every row from the users table. Locate the database lookup.",
+  "scope": "component",
+  "source_files": [
+    {
+      "path": "lib/UserCache.pm",
+      "content": "package UserCache;\nuse strict;\nuse warnings;\n\nmy %by_name;\n\nsub get_user {\n    my ($name) = @_;\n    return $by_name{$name};\n}\n\n1;\n"
+    },
+    {
+      "path": "lib/UserDao.pm",
+      "content": "package UserDao;\nuse strict;\nuse warnings;\n\n# Look up a user by name.\nsub get_user {\n    my ($dbh, $name) = @_;\n    return $dbh->selectall_arrayref(\"SELECT id, name FROM users WHERE name = '$name'\");\n}\n\n1;\n"
+    }
+  ]
+}

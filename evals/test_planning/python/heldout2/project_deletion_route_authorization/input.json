@@ -1,0 +1,52 @@
+{
+  "scope": "component",
+  "identification": {
+    "status": "ready",
+    "scope": "component",
+    "reason": null,
+    "reported_issue": "Any signed-in user can delete another team's project: the DELETE /projects/<id> route appears to reach delete_project without the ownership check that the other project routes apply. Analyze this component only.",
+    "target": {
+      "symbol": "delete_project",
+      "source": {
+        "path": "projects.py",
+        "start_line": 1,
+        "end_line": 3,
+        "quote": "def delete_project(store: dict[str, dict], project_id: str) -> None:\n    \"\"\"Remove a project. Authorization is enforced by the route layer before this is called.\"\"\"\n    store.pop(project_id, None)"
+      }
+    }
+  },
+  "source_files": [
+    {
+      "path": "projects.py",
+      "content": "def delete_project(store: dict[str, dict], project_id: str) -> None:\n    \"\"\"Remove a project. Authorization is enforced by the route layer before this is called.\"\"\"\n    store.pop(project_id, None)\n"
+    },
+    {
+      "path": "test_projects_existing.py",
+      "content": "import projects\n\n\ndef test_deletes_existing_project():\n    store = {\"p1\": {\"owner\": \"alice\"}, \"p2\": {\"owner\": \"bob\"}}\n    projects.delete_project(store, \"p1\")\n    assert store == {\"p2\": {\"owner\": \"bob\"}}\n"
+    }
+  ],
+  "environment": {
+    "language": "Python",
+    "runtime": "CPython 3.12",
+    "framework": "pytest 9.0.2",
+    "discovery_command": [
+      "python",
+      "-m",
+      "pytest",
+      "--collect-only",
+      "-q"
+    ],
+    "approved_test_paths": [
+      "test_projects_security.py"
+    ],
+    "baseline_test": {
+      "test_id": "test_projects_existing.py::test_deletes_existing_project",
+      "path": "test_projects_existing.py"
+    },
+    "scratch_location": "The per-test pytest tmp_path directory; fixtures must not be created elsewhere",
+    "observation_facilities": [
+      "Python sys.addaudithook 'open' audit events recording the path, mode and flags of every file opened during a test",
+      "Native JUnit XML outcomes and captured stdout per test"
+    ]
+  }
+}

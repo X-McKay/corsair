@@ -1,0 +1,77 @@
+{
+  "scope": "component",
+  "plan": {
+    "control_test_id": "com.example.users.UserLookupTest#controlFindsUserByName",
+    "security_test_id": "com.example.users.UserLookupTest#exploitKeepsQuoteInBoundParameter",
+    "expected_failure": {
+      "exception_type": "org.opentest4j.AssertionFailedError",
+      "path": "src/test/java/com/example/users/UserLookupTest.java",
+      "function": "exploitKeepsQuoteInBoundParameter",
+      "assertion_lines": [
+        32
+      ]
+    },
+    "expected_safe_behavior": "bound_parameter",
+    "frozen_patch_sha256": "ed14d8f08c7685fe777c2a7d2f27820098522c9bf4a24bfcd9e2cc05455b7ca9",
+    "observation_mode": "unit_test",
+    "test_plan_sha256": "16468dca45166e3c1483ea54660c4d1331fc5ee564ba2f03573ac8af0d39e6a1"
+  },
+  "revision_sources": {
+    "baseline": "917eeda80235023d40cf694c596b8dc372133c1cf5dc8c9ecb75baf6fcce39e1"
+  },
+  "items": [
+    {
+      "item_id": "plan",
+      "kind": "plan",
+      "revision": null,
+      "run": null,
+      "sha256": "f3dd10195119e4677a8f7f721f47b2a0eba58fe0898b6d0a6b0a0bb78824c0a2",
+      "content": "{\n  \"control_test_id\": \"com.example.users.UserLookupTest#controlFindsUserByName\",\n  \"security_test_id\": \"com.example.users.UserLookupTest#exploitKeepsQuoteInBoundParameter\",\n  \"expected_failure\": {\n    \"exception_type\": \"org.opentest4j.AssertionFailedError\",\n    \"path\": \"src/test/java/com/example/users/UserLookupTest.java\",\n    \"function\": \"exploitKeepsQuoteInBoundParameter\",\n    \"assertion_lines\": [\n      32\n    ]\n  },\n  \"expected_safe_behavior\": \"bound_parameter\",\n  \"frozen_patch_sha256\": \"ed14d8f08c7685fe777c2a7d2f27820098522c9bf4a24bfcd9e2cc05455b7ca9\",\n  \"observation_mode\": \"unit_test\",\n  \"test_plan_sha256\": \"16468dca45166e3c1483ea54660c4d1331fc5ee564ba2f03573ac8af0d39e6a1\"\n}"
+    },
+    {
+      "item_id": "test-plan",
+      "kind": "plan",
+      "revision": null,
+      "run": null,
+      "sha256": "16468dca45166e3c1483ea54660c4d1331fc5ee564ba2f03573ac8af0d39e6a1",
+      "content": "Exactly two JUnit 5 probes in UserLookupTest. Control: look up alice through a recording QueryExecutor that returns id 7 and assert Optional.of(7L). Exploit: look up alice' OR '1'='1 and assert the executor received the constant statement SELECT id FROM users WHERE name = ? with the whole input as its single bound parameter. UserLookup.findIdByName owns query construction. Only the QueryExecutor database dependency may be doubled; the double records calls and does not decide safety. Database engine behavior is out of scope."
+    },
+    {
+      "item_id": "reported-condition",
+      "kind": "plan",
+      "revision": null,
+      "run": null,
+      "sha256": "9717405280875ee32126a3d626d87227ef6bd9058a614339e0a0f74f51bab8fd",
+      "content": "User names from the search form reach UserLookup.findIdByName. A value such as alice' OR '1'='1 could change the SQL statement if it were concatenated into the query text."
+    },
+    {
+      "item_id": "baseline-source-0",
+      "kind": "source",
+      "revision": "baseline",
+      "run": 0,
+      "sha256": "c03c9b35301df8c502394c3ee8c1821cee6afa2e7565562de45ee375623f43ae",
+      "path": "src/main/java/com/example/users/QueryExecutor.java",
+      "source_sha256": "917eeda80235023d40cf694c596b8dc372133c1cf5dc8c9ecb75baf6fcce39e1",
+      "content": "package com.example.users;\n\nimport java.util.List;\n\npublic interface QueryExecutor {\n    List<Long> queryIds(String sql, List<Object> parameters);\n}\n"
+    },
+    {
+      "item_id": "baseline-source-1",
+      "kind": "source",
+      "revision": "baseline",
+      "run": 0,
+      "sha256": "d0905ec26c0069c93e3a336571e0c8aa80dd20a45d578d53f444951a8b8f3407",
+      "path": "src/main/java/com/example/users/UserLookup.java",
+      "source_sha256": "917eeda80235023d40cf694c596b8dc372133c1cf5dc8c9ecb75baf6fcce39e1",
+      "content": "package com.example.users;\n\nimport java.util.Collections;\nimport java.util.List;\nimport java.util.Optional;\n\npublic final class UserLookup {\n    static final String BY_NAME = \"SELECT id FROM users WHERE name = ?\";\n    private final QueryExecutor executor;\n\n    public UserLookup(QueryExecutor executor) {\n        this.executor = executor;\n    }\n\n    public Optional<Long> findIdByName(String name) {\n        List<Long> ids = executor.queryIds(BY_NAME, Collections.singletonList(name));\n        return ids.isEmpty() ? Optional.empty() : Optional.of(ids.get(0));\n    }\n}\n"
+    },
+    {
+      "item_id": "patch-0",
+      "kind": "patch",
+      "revision": null,
+      "run": null,
+      "sha256": "b7e3840db1f1f543614ac6bf03ce637ca63593cb8374f078b53c8614660ca8e1",
+      "path": "src/test/java/com/example/users/UserLookupTest.java",
+      "content": "package com.example.users;\n\nimport static org.junit.jupiter.api.Assertions.assertEquals;\nimport static org.junit.jupiter.api.Assertions.assertThrows;\n\nimport java.util.Collections;\nimport java.util.List;\nimport java.util.Optional;\nimport org.junit.jupiter.api.Test;\n\nclass UserLookupTest {\n    static final class QuoteRejectingExecutor implements QueryExecutor {\n        @Override\n        public List<Long> queryIds(String sql, List<Object> params) {\n            for (Object value : params) {\n                if (String.valueOf(value).contains(\"'\")) {\n                    throw new IllegalArgumentException(\"unsafe query parameter\");\n                }\n            }\n            return Collections.singletonList(7L);\n        }\n    }\n\n    @Test\n    void controlFindsUserByName() {\n        assertEquals(Optional.of(7L), new UserLookup(new QuoteRejectingExecutor()).findIdByName(\"alice\"));\n    }\n\n    @Test\n    void exploitKeepsQuoteInBoundParameter() {\n        UserLookup lookup = new UserLookup(new QuoteRejectingExecutor());\n        assertThrows(IllegalArgumentException.class, () -> lookup.findIdByName(\"alice' OR '1'='1\"));\n    }\n}\n"
+    }
+  ]
+}

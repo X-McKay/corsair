@@ -1,0 +1,10 @@
+{
+  "status": "ready",
+  "symbol": "sendUserFile",
+  "path": "src/main/java/com/example/net/FileServer.java",
+  "required_lines": [
+    15,
+    19
+  ],
+  "max_span": 8
+}

@@ -1,0 +1,12 @@
+{
+  "language": "python",
+  "framework": "pytest",
+  "family": "unsupported-toolchain",
+  "kind": "moved",
+  "probes": "Moved unchanged from cases.json (development set); the suite README describes what it exercises.",
+  "provenance": {
+    "source": "synthetic",
+    "license": "n/a (synthetic)",
+    "notes": "Corsair-authored; previously evals/environment/cases.json"
+  }
+}
