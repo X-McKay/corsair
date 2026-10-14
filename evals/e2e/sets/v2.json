@@ -106,6 +106,10 @@
     "javascript/codecov-node-a": "8690c7dd820b5b48f063999b642fe943c1aef4ed62af9a0d2e915153965dee49",
     "javascript/codecov-node-b": "758f0b6fcdfdf60a4d601f6b58260338c768de3a8dced8550dbfaa3065bef956",
     "javascript/dot-prop-a": "6e6e13e56c4349b7d78b8329e00173ebf91a32a3c79f000c7b6730e126918bba",
-    "javascript/dot-prop-b": "2c7564f6b61add279f88900d9f9edf446ae96d741438e5aa83c02ad686b98ce4"
+    "javascript/dot-prop-b": "2c7564f6b61add279f88900d9f9edf446ae96d741438e5aa83c02ad686b98ce4",
+    "ruby/rack-static-a": "d3ffa0ea1bf04cf7649f6b9db3dbf498e48441e6c08380b785491e4d9e79b3b6",
+    "ruby/rack-static-b": "c9e7d29043804cd685e463de5ad886f2e2db3e754272bb925b93473ab152bcbb",
+    "ruby/rubyzip-a": "7606b099ff877fec230a46bd1e3265be0c8a26b87be7ddee82d878bdc20189a8",
+    "ruby/rubyzip-b": "c78bf3310471f661a9c8b9371e9290b5a8f68da37e57f08b7eeaba95f5a55377"
   }
 }

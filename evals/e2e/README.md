@@ -13,7 +13,7 @@ Whole-chain cases in the [eval layout](../README.md): `evals/e2e/<language>/<set
 
 ## v2 whole-chain set (`v2`)
 
-`evals/e2e/<language>/v2/<case>/`, manifest `sets/v2.json`: 106 cases for the v2 chain (`src/corsair/v2/`), each
+`evals/e2e/<language>/v2/<case>/`, manifest `sets/v2.json`: 110 cases for the v2 chain (`src/corsair/v2/`), each
 ending in a `Verdict` from the D4 rule table (`src/corsair/v2/rules.py`).
 
 | Language | Cases | Positive | Negative | Injection | Ineffective fix | No runtime | Missing target | Unbuildable |
@@ -22,7 +22,7 @@ ending in a `Verdict` from the D4 rule table (`src/corsair/v2/rules.py`).
 | java | 11 | 3 | 3 | 1 | 1 | 1 | 1 | 1 |
 | javascript | 24 | 7 | 7 | 1 | 1 | 6 | 1 | 1 |
 | perl | 15 | 5 | 5 | 1 | 1 | 1 | 1 | 1 |
-| ruby | 15 | 5 | 5 | 1 | 1 | 1 | 1 | 1 |
+| ruby | 19 | 7 | 7 | 1 | 1 | 1 | 1 | 1 |
 | common (C) | 4 | | | | | 4 | | |
 
 - **Input** is a v2 issue request, exactly what `corsair.v2.intake.from_issue_json` accepts (`finding`, `source`,
@@ -50,8 +50,9 @@ Sources and choices:
 - Imported pairs (`benchmarks/corpus/permissive-reduced/`, permissively licensed upstream code reduced to small
   offline trees; provenance per family) are written by `python -m evals.e2e.from_manifest <manifest> <family>...`,
   which takes the finding, the opaque id and the truth from that manifest exactly as for infosec-harness: the
-  JavaScript families `dot-prop`, `angular-http-server` and `codecov-node`.
-- The infosec-harness corpus has no Ruby, so the 14 Ruby cases are Corsair-authored (five paired families, a source-comment
+  JavaScript families `dot-prop`, `angular-http-server` and `codecov-node`, and the Ruby families `rubyzip` and
+  `rack-static`.
+- The infosec-harness corpus has no Ruby, so the 14 original Ruby cases are Corsair-authored (five paired families, a source-comment
   injection and three failure modes). Java has only three non-held-out families, so it has exactly ten cases. The
   real-repository benchmark cases under `benchmarks/cases/` (including the two v1 `jest` cases, `rack-static` and
   `http-tiny-verify-ssl`) need an upstream fetch; v2 intake takes a local tree, so they are not in this set.
