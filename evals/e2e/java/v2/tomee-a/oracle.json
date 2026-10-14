@@ -1,0 +1,87 @@
+{
+  "expected_label": "LIKELY_EXPLOITABLE",
+  "acceptable_labels": [
+    "LIKELY_EXPLOITABLE"
+  ],
+  "forbidden_labels": [
+    "LIKELY_NOT_EXPLOITABLE"
+  ],
+  "expected_rule": "R4",
+  "expected_terminal_reason": "ok",
+  "expected_finding": "reproduced",
+  "expected_fix": "verified",
+  "expected_runtime_row": "junit4-maven-temurin8",
+  "truth": {
+    "source": "manifest",
+    "manifest": "benchmarks/corpus/permissive-reduced/manifest.json",
+    "manifest_case": "java-tomee-a",
+    "manifest_truth": {
+      "expected_verdict": "potentially_exploitable",
+      "reachability": "reachable",
+      "sink_file": "src/main/java/org/apache/openejb/core/rmi/BlacklistClassResolver.java",
+      "sink_line": 59,
+      "source": "class name from the serialized stream",
+      "target_callable": "check"
+    }
+  },
+  "why": "Manifest truth potentially_exploitable (reachability reachable).",
+  "revision_tree_sha256": "7b01ca201e9b68b660be4ae8948bc09d9eb0e761d4397932fd0095d3d74c3d7b",
+  "fixed_tree_sha256": "904becfa83de5ca015b2bcb0e221d9a2cde339334e1084e46c1c62ccfb6206a0",
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "src/main/java/org/apache/openejb/core/rmi/BlacklistClassResolver.java",
+          "start_line": 59,
+          "end_line": 59,
+          "quote": "                if (name.startsWith(white)) {"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "src/main/java/org/apache/openejb/core/rmi/BlacklistClassResolver.java",
+            "start_line": 59,
+            "end_line": 59,
+            "quote": "                if (name.startsWith(white)) {"
+          }
+        ]
+      },
+      "fixed": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "src/main/java/org/apache/openejb/core/rmi/BlacklistClassResolver.java",
+            "start_line": 59,
+            "end_line": 59,
+            "quote": "                if (\"*\".equals(white) || name.startsWith(white)) {"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "passed"
+      },
+      "fixed": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    },
+    "build_fixed": true
+  }
+}
