@@ -47,9 +47,17 @@ from typing import TYPE_CHECKING, Any
 import anyio
 import grpc
 import yaml
-from pydantic_ai.workspaces import (CommandResult, SupportsCommands, WorkspaceBackend, WorkspaceCommand,
-                                    WorkspaceError, WorkspaceOutputLimitError, WorkspaceRef, WorkspaceTimeoutError,
-                                    WorkspaceUnavailableError)
+from pydantic_ai.workspaces import (
+    CommandResult,
+    SupportsCommands,
+    WorkspaceBackend,
+    WorkspaceCommand,
+    WorkspaceError,
+    WorkspaceOutputLimitError,
+    WorkspaceRef,
+    WorkspaceTimeoutError,
+    WorkspaceUnavailableError,
+)
 from pydantic_ai.workspaces.protocol import validate_timeout
 
 from .port import LABEL, RUN_LABEL, Exec, SandboxExists, SandboxSpec

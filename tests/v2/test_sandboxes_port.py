@@ -22,7 +22,7 @@ import pytest
 
 from corsair.v2.contracts import Environment, Recipe, RecipeFile
 from corsair.v2.intake import tree_sha256
-from corsair.v2.workspace import SandboxExists, Sandboxes, SandboxSpec, labels
+from corsair.v2.workspace import Sandboxes, SandboxExists, SandboxSpec, labels
 
 DOCKER_IMAGE = "corsair-python:ebf057997574de59"
 OPENSHELL_CONFIG = os.environ.get("CORSAIR_OPENSHELL_CONFIG")

@@ -15,16 +15,27 @@ import pytest
 import yaml
 from openshell import DeletionOutcome
 from openshell._proto import openshell_pb2
-from pydantic_ai.workspaces import (WorkspaceError, WorkspaceOutputLimitError, WorkspaceRef, WorkspaceTimeoutError,
-                                    WorkspaceUnavailableError)
+from pydantic_ai.workspaces import (
+    WorkspaceError,
+    WorkspaceOutputLimitError,
+    WorkspaceRef,
+    WorkspaceTimeoutError,
+    WorkspaceUnavailableError,
+)
 from pydantic_ai.workspaces.conformance import WorkspaceBackendSuite
 
 from corsair.v2.contracts import Environment, Recipe, RecipeFile
 from corsair.v2.intake import tree_sha256
 from corsair.v2.workspace import SandboxExists, SandboxSpec, labels
 from corsair.v2.workspace import openshell as backend
-from corsair.v2.workspace.openshell import (OpenShellConfig, OpenShellSandboxes, OpenShellWorkspace, label_value,
-                                            native_labels, native_name)
+from corsair.v2.workspace.openshell import (
+    OpenShellConfig,
+    OpenShellSandboxes,
+    OpenShellWorkspace,
+    label_value,
+    native_labels,
+    native_name,
+)
 from tests.v2.openshell_fake import ERROR, FakeGateway, FakeRpcError, Outcome
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -379,14 +390,13 @@ def test_remove_returns_false_on_anything_uncertain(sandboxes, gateway, made, fa
     elif fault == "survives":
         gateway.survives_delete = True
     else:
-        gateway.sandboxes[name]  # noqa: B018 - exists
-        original = gateway.get
-        gateway.get = lambda *a, **k: (_ for _ in ()).throw(FakeRpcError(grpc.StatusCode.UNAVAILABLE))
+        def unreachable(*args, **kwargs):
+            raise FakeRpcError(grpc.StatusCode.UNAVAILABLE)
+
+        gateway.get = unreachable
     assert sandboxes.remove(made) is False
-    if fault == "replaced":
+    if fault in ("replaced", "unreachable"):
         assert not any(call[0] == "delete" for call in gateway.calls)
-    if fault == "unreachable":
-        gateway.get = original
 
 
 def test_labelled_filters_by_sanitized_run(sandboxes, gateway):
