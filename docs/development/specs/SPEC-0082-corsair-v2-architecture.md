@@ -83,11 +83,10 @@ Authors cannot run tests (D3). After both drafts are frozen, trusted code makes 
 | Classifier outcome | Mechanical class | Next action |
 | --- | --- | --- |
 | passed, assertion_failed, anomalous | ok | Nothing is returned to the author; continue to review |
-| not_run | not_run | That author's own diagnostics (compiler, collection or harness output) are returned. The test body never started, so the output holds no observation of the target. One revision (A2), frozen again |
-| errored | errored | Only the exception type and the line of the author's own test file where it was raised are returned. No message, no output and no frames from application code. One revision (A2), frozen again |
+| not_run, errored | not_run or errored | Only output lines that name the author's own test file are returned, capped at 20 lines, with the mechanical class. Everything else is withheld. One revision (A2), frozen again |
 | infra | infra | The attempt stops with `infra_error` (R1, ERROR) |
 
-`anomalous` maps to `ok` because returning it would hint at the outcome. An `errored` run executed application code, so its message and logs stay hidden. The exception type and test-file line that are returned are the residual leak, recorded as a limitation. Nobody sees the discarded outcome: not the authors, not the Reviewer, not the rule table. The Reviewer then reviews the final frozen bytes. Execute runs only bytes that carry a bound review, and any change after review needs a fresh review before Execute.
+`anomalous` maps to `ok` because returning it would hint at the outcome. Application code can run before the test body, from a fixture, a setup hook, a module import or a class initializer, so a missing start marker does not prove an output is mechanical. Only lines that name the author's own test file are returned, for example a compiler error or a traceback frame in that file. They can still carry text from the application, and that residual is recorded as a limitation. Nobody sees the discarded outcome: not the authors, not the Reviewer, not the rule table. The Reviewer then reviews the final frozen bytes. Execute runs only bytes that carry a bound review, and any change after review needs a fresh review before Execute.
 
 A missing CWE skill never causes a refusal. The run is tagged `uncovered_cwe` for eval slicing.
 
@@ -119,7 +118,7 @@ For each run, trusted code sets four environment variables: `CORSAIR_MARKER_STAR
 
 - Each test writes the start marker as the first statement of its body and the end marker as the last, after its assertions.
 - Immediately before its security assertion, each test writes the check marker. It holds `safe` or `unsafe`, the value the assertion is about to test.
-- The exploit test puts the token in its security assertion's failure message. The control test carries no token.
+- Each test puts the token in the failure message of the assertion that follows its check marker. For the exploit test that is the security assertion; for the control test it is the benign-behaviour assertion. The role, not the token, says which probe failed.
 - Each probe runs alone, using the matrix row's run-one-test template filled with only the planned file and test name.
 - The container runtime gives the exit code, signal or timeout. The row's exit-code map sorts the code into `pass`, `test_failed`, `no_tests`, `harness_error` or `unknown`.
 
@@ -151,7 +150,7 @@ The label is a pure function of recorded facts. Rules are evaluated top to botto
 | R0 | Stopped before a model stage (no matrix row, build failed) | UNABLE_TO_RUN |
 | R1 | Provider or infrastructure failure before the vulnerable revision's probe outcomes are recorded | ERROR |
 | R2 | Review missing or negative for either probe on the vulnerable revision | INCONCLUSIVE (test_invalid) |
-| R3 | Vulnerable control not passed | INCONCLUSIVE (control_failed) |
+| R3 | Vulnerable control not passed | INCONCLUSIVE (`control_failed` when the control's outcome is assertion_failed, otherwise the reason its outcome maps to) |
 | R4 | Vulnerable security assertion_failed | LIKELY_EXPLOITABLE |
 | R5 | Vulnerable security passed, with its calibration listed | LIKELY_NOT_EXPLOITABLE |
 | R6 | Anything else | INCONCLUSIVE (no_valid_observation) |
@@ -167,7 +166,7 @@ Otherwise the result is `not_verified`, or `not_applicable` when there is no fix
 
 Calibration (a detector self-test or an ablation run) is recorded as calibration and never as proof of absence. `refuted_in_scope` stays disabled.
 
-The terminal reason comes from a closed enum: `ok`, `no_runtime`, `build_failed`, `plan_unresolved`, `unsupported_scope`, `probe_not_run`, `probe_errored`, `probe_anomalous`, `test_invalid`, `control_failed`, `no_valid_observation`, `budget_exhausted`, `provider_error`, `infra_error`, `cleanup_unconfirmed`. R6 takes its terminal reason from the vulnerable-revision probes, checking `not_run` first, then `errored`, then `anomalous`:
+The terminal reason comes from a closed enum: `ok`, `no_runtime`, `build_failed`, `plan_unresolved`, `unsupported_scope`, `probe_not_run`, `probe_errored`, `probe_anomalous`, `test_invalid`, `control_failed`, `no_valid_observation`, `budget_exhausted`, `provider_error`, `infra_error`, `cleanup_unconfirmed`. R3 and R6 take their terminal reason from the vulnerable-revision probes. R3 looks only at the control, R6 at both, checking `not_run` first, then `errored`, then `anomalous`:
 
 - `probe_not_run` when either probe was `not_run`.
 - `probe_errored` when either probe was `errored`.

@@ -559,6 +559,9 @@ The Codex review of PR #134 found three gaps. All three are fixed in SPEC-0082, 
 - **ERROR is scoped to the vulnerable revision.** An infrastructure failure on the fixed revision makes only the fix result `not_verified`. It no longer replaces a reproduced finding with ERROR.
 - **Authors get only mechanical feedback.** A `not_run` result returns the author's full diagnostics, because the test body never started. An `errored` result returns only the exception type and the line in the author's own test file, because application code has already run. Every outcome of the check run has a defined next step, and the outcome table is read top to bottom with infrastructure exits first.
 - **Every INCONCLUSIVE has its own reason.** R6 reports `probe_not_run`, `probe_errored`, `probe_anomalous` or `no_valid_observation`, and the fix result uses the same mapping.
+- **Fourth review round (supersedes the two bullets above where they differ).**
+  - Both tests carry the token in the assertion after their check marker, so a failed control assertion reads as `assertion_failed` and R3 records `control_failed` only then. Any other control outcome maps to `probe_not_run`, `probe_errored` or `probe_anomalous`.
+  - For `not_run` and `errored` alike, authors get back only output lines that name their own test file, at most 20. Application code can run before the test body starts, for example in a fixture or a module import.
 
 ### Later changes on 14 October
 
