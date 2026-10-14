@@ -30,6 +30,8 @@ SPDX licence, NVD CWE, pointer source and what the reduction removed.
 | codecov-node | javascript | CWE-78 | codecov/codecov-node | CVE-2020-15123 | MIT |
 | rubyzip | ruby | CWE-22 | rubyzip/rubyzip | CVE-2018-1000544 | BSD-2-Clause |
 | rack-static | ruby | CWE-22 | rack/rack | CVE-2025-27610 | MIT |
+| ruby-git-fetch | ruby | CWE-88 | ruby-git/ruby-git | CVE-2022-25648 | MIT |
+| secure-headers | ruby | CWE-113 | github/secure_headers | CVE-2020-5216 | Apache-2.0 |
 
 ## Pointer sources
 

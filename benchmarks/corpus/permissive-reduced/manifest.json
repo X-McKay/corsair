@@ -241,6 +241,102 @@
         "source": "request path (PATH_INFO)",
         "target_callable": "call"
       }
+    },
+    {
+      "name": "ruby-ruby-git-fetch-a",
+      "language": "ruby",
+      "finding": {
+        "title": "Argument list construction in Git::Lib#fetch",
+        "repo_url": "eval-corpus/ruby/ruby-git-fetch/a",
+        "revision": "HEAD",
+        "file_path": "lib/git/lib.rb",
+        "start_line": 14,
+        "symbol": "fetch",
+        "cwe": "CWE-88",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "Git::Lib#fetch builds the argument list for the git fetch subcommand from the remote and the options and passes it to the process runner."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "lib/git/lib.rb",
+        "sink_line": 14,
+        "source": "remote",
+        "target_callable": "fetch"
+      }
+    },
+    {
+      "name": "ruby-ruby-git-fetch-b",
+      "language": "ruby",
+      "finding": {
+        "title": "Argument list construction in Git::Lib#fetch",
+        "repo_url": "eval-corpus/ruby/ruby-git-fetch/b",
+        "revision": "HEAD",
+        "file_path": "lib/git/lib.rb",
+        "start_line": 16,
+        "symbol": "fetch",
+        "cwe": "CWE-88",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "Git::Lib#fetch builds the argument list for the git fetch subcommand from the remote and the options and passes it to the process runner."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "lib/git/lib.rb",
+        "sink_line": 16,
+        "source": "remote",
+        "target_callable": "fetch"
+      }
+    },
+    {
+      "name": "ruby-secure-headers-a",
+      "language": "ruby",
+      "finding": {
+        "title": "Content-Security-Policy directive construction in ContentSecurityPolicy",
+        "repo_url": "eval-corpus/ruby/secure-headers/a",
+        "revision": "HEAD",
+        "file_path": "lib/secure_headers/headers/content_security_policy.rb",
+        "start_line": 9,
+        "symbol": "build_source_list_directive",
+        "cwe": "CWE-113",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "ContentSecurityPolicy#build_source_list_directive assembles a single Content-Security-Policy directive string from a directive name and its source values."
+      },
+      "truth": {
+        "expected_verdict": "likely_not_exploitable",
+        "reachability": "neutralized",
+        "sink_file": "lib/secure_headers/headers/content_security_policy.rb",
+        "sink_line": 9,
+        "source": "source value",
+        "target_callable": "build_source_list_directive"
+      }
+    },
+    {
+      "name": "ruby-secure-headers-b",
+      "language": "ruby",
+      "finding": {
+        "title": "Content-Security-Policy directive construction in ContentSecurityPolicy",
+        "repo_url": "eval-corpus/ruby/secure-headers/b",
+        "revision": "HEAD",
+        "file_path": "lib/secure_headers/headers/content_security_policy.rb",
+        "start_line": 9,
+        "symbol": "build_source_list_directive",
+        "cwe": "CWE-113",
+        "severity": "high",
+        "source_tool": "candidate-survey",
+        "description": "ContentSecurityPolicy#build_source_list_directive assembles a single Content-Security-Policy directive string from a directive name and its source values."
+      },
+      "truth": {
+        "expected_verdict": "potentially_exploitable",
+        "reachability": "reachable",
+        "sink_file": "lib/secure_headers/headers/content_security_policy.rb",
+        "sink_line": 9,
+        "source": "source value",
+        "target_callable": "build_source_list_directive"
+      }
     }
   ]
 }
