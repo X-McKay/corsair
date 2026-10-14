@@ -16,6 +16,7 @@ Requirements: Linux, Python 3.12, `uv`; Docker for workspace, build and canary r
 
 ```shell
 make test-v2                     # offline suite (alias: make test); no model, no cluster; Docker tests skip without Docker
+make test-config                 # fast configuration and shared developer-skill guards
 make eval AGENT=<agent> [SET=<set>] [PROVIDER_CONFIG=<providers.json>]   # one agent's isolated eval
 make eval-baseline AGENT=<agent> RUN=<run id>                             # promote a run as that agent's baseline
 make canary                      # classify each runtime-matrix row's passing and failing canary on its image

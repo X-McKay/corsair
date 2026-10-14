@@ -1,44 +1,25 @@
 ---
 name: corsair-agent-scaffold
-description: Use when creating a new Corsair agent, adding a model-facing tool to an agent, or moving an existing agent package to the standard layout. Follows the agent package shape in SPEC-0082, trusted native AgentSpec manifests and operator policy; there is no generator.
+description: Use when creating a Corsair agent, adding a model-facing tool or moving an agent package. Follow SPEC-0082, trusted native AgentSpec/Harness capabilities, typed domain boundaries and isolated evaluation; there is no generator.
 ---
 
 # Corsair agent scaffold
 
-Read the Agents section of [SPEC-0082](../../../docs/development/specs/SPEC-0082-corsair-v2-architecture.md#agents) first; it is authoritative and this skill does not repeat it. Use `corsair-development` for records and `corsair-review` before finishing. This skill grants no tools, approves no graph integration and certifies nothing.
+Read `AGENTS.md` and SPEC-0082's Agents section. Use `corsair-development` and `corsair-review`. Inspect the current packages under `src/corsair/v2/agents/`; do not copy retired v1 paths, role lists or migration plans.
 
-For investigation agents and tools, preserve the shared unit-test-first contract across languages/frameworks/CWEs: exactly two native tests through existing real application seams; controlled dependencies retain the real logic owning the security property; source/condition/assertion validity is distinct from execution admission. Optional witnesses provide bounded supporting evidence. Do not add mandatory language-specific recorders or let missing database/filesystem telemetry alone reject a valid unit test. Evaluate both a sound seam-based test and invalid substitute/irrelevant assertions.
+## Add or change an agent
 
-## New agent
+1. Confirm one objective and whether an existing role can own it. Define typed input/output, restricted tools, failure attribution and the frozen eval cases it must satisfy. Keep new behavior unwired until its isolated checks pass.
+2. Follow the actual package shape: `agent.yaml`, `agent.py`, `tools.py`, `skills/` and `evals/`. Introduce subdirectories or shared helpers only for a demonstrated need; do not prescribe a new tool framework or base-class hierarchy.
+3. Keep short static instructions and descriptive prompt/config version metadata in trusted package `agent.yaml`; keep procedure in owned `SKILL.md` files. Load a fixed package path with native `AgentSpec.from_file(...)` and `Agent.from_spec(...)`. Never load manifests or arbitrary capabilities from an investigated repository.
+4. Pass the explicit native model, typed dependencies/output type, restricted Python capabilities, validators and resolved operator limits. Use the same factory for direct/isolated/durable callers. Verify actual Temporal registration and invocation before claiming durability; a constructor test alone is insufficient.
+5. Use native Harness `Skills` for progressive disclosure, with a trusted read-only package library. Distinguish catalog selection from filesystem authority and workspaces from isolation. Verify the pinned APIs and first-request/catalog/activation behavior; do not implement another skill loader or enable unrestricted Coder/delegation defaults.
+6. Keep source/probe validity, assigned write path, independent authors and outcome-blind review as code-enforced domain boundaries. Preserve root two-probe rules and the actual marker interface. A generic writable filesystem or shell capability is not a replacement for them.
 
-1. Confirm the objective is a new role rather than a change to an existing agent. Write its spec: typed input and outcomes, narrow ports, authority, failure layers and the frozen eval set it ships with.
-2. Create only files whose responsibilities exist. Check current migrated packages and `corsair.agents.spec` before copying a reference; all seven current factory variants use trusted native manifests, including repository identification.
-3. Add trusted package `agent.yaml` with only native name/description/literal instructions and the descriptive config/prompt-version metadata. Keep static boundary instructions there once and procedure in owned skill files; `prompts.py` renders typed input and exposes compatible identities. Load its fixed trusted package path with native `AgentSpec.from_file(...)`. Never discover/load investigated-repository manifests or arbitrary capability imports.
-4. Build directly through native `AgentSpec.from_file(...)` and `Agent.from_spec(...)`, passing the explicit operator-selected native model, Python dependencies/output validator, explicit Python capability instances, retries/validation context and optional native Temporal durability. Keep schemas, validators, restricted tools, authority and durability in Python. Keep capability authority/order explicit in Python; YAML has no selector. `factory_identity` hashes provenance only and does not construct agents. Keep owned skill files. Follow SPEC-0081/PLAN-0096 for the native Harness Skills adoption; verify installed native loading/disclosure rather than implementing a custom loader. SDK-agnostic schemas/adapters are deferred. Do not introduce a custom base-class hierarchy or marker protocol.
-5. Put each model-facing tool in `tools/<tool_name>.py` and register it in `tools/toolset.py`; export `TOOLSET_SHA256` and pin it in a toolset test that also checks exact names, order, id and retries.
-6. Unimplemented behaviour must fail clearly. Never return a fabricated `ready` or register an unfinished tool. The agent starts unwired from any chain or workflow.
-7. Add the eval set under `evals/<role>/`, write `toolset_sha256` to its `configuration.json`, add a `SUITES` entry in `evals/run.py`, and run `make eval AGENT=<role>` scripted. Model-written code is never executed on the host; native host fixtures admit only exact operator-reviewed bytes.
+## Add a tool and evaluate
 
-## Operator policy and identity
-
-Reuse explicit `InferenceConfig` loading and the typed `CompositionBudget`/input-derived limits. JSON provider compatibility remains; operator YAML uses the same validation, never a second credential/provider resolver or competing defaults. Packaged model policy is an inert example unless explicitly selected. Use the validated packaged budget default or an explicit operator-owned override; investigated agents cannot modify policy or select arbitrary files.
-
-Record resolved manifest, policy, skill/tool/factory hashes and effective settings, limits and retries in native receipts. Compare direct, durable and isolated resolution; preserve old histories and measurements. Missing telemetry is unknown. Changing a manifest, skill, policy or helper requires relevant parity checks and isolated role baselines before composing it; loading YAML or passing structural checks alone is not semantic or runtime qualification.
-
-## New tool on an existing agent
-
-1. Add `tools/<tool_name>.py` with the callable, annotated arguments, docstring description and returned observation model.
-2. Register it in `tools/toolset.py` in the intended offered position. Update the toolset test's names and pinned digest in the same change, and say why the model should be offered it.
-3. Run the agent's tests and `make eval AGENT=<role>`; report the `toolset_sha256` change and any score change against the baseline.
-
-## Moving an existing agent
-
-Follow "Moving an agent to the convention" in the convention document. The move must not change what the model is offered: capture before and after, require byte equality, and compare `make eval` runs. Inspect concurrent package changes and coordinate owners; preserve unrelated work and the user's current authorization. For native-spec migration compare rendered instructions, capability/tool schemas/order, contracts/validators, request settings, retries, derived limits and native durability before migrating the next role.
-
-## Native optional skill loading
-
-When enabling directory discovery or progressive disclosure, use PydanticAI Harness `Skills` rather than implementing another loader. First verify and pin its dependency against the admitted core SDK, then test native activation and validator/budget/durability interactions. Current factories use Harness0.55.0 with core2.55.0 and real native load_capability activation. Use the primary read-only workspace route for trusted package libraries so native Temporal can dispatch workspace operations; secondary Skills(workspace=...) reads in-process in this pin. `Skills` loads skill instructions; it does not itself read referenced resources or run scripts. Keep trusted package skill content separate from investigated source and preserve explicit tool authority.
-
-## Native Harness capability adoption
-
-Prefer native Harness capabilities before bespoke facilities, following SPEC-0081/PLAN-0096. Preserve the full package layout and explicit Python authority. Initial adoption is native Skills from trusted owned files plus a bounded capability reuse audit; verify actual installed APIs and offered tools/instructions. Do not enable full Coder defaults or unrestricted delegation. Initial tests and isolated evals run on the host outside OpenShell workflow with typed ports; Temporal direct/durable fixtures and OpenShell admission/cleanup remain distinct qualification gates. Record native disclosure changes as new source identities; deferred live baselines remain unrun, not zero failures.
+1. Put a callable with typed arguments, concise description and bounded returned observations in the existing tool module. Register through the native toolset/capability used by that package; test exact offered tools, policies, refusal paths and limits.
+2. Reuse explicit provider configuration and operator budgets; add no second credential resolver, silent fallback or investigated-repository policy authority. Record prompt/spec/skill/tool identities and effective settings; missing usage remains unknown.
+3. Add frozen cases under `src/corsair/v2/agents/<name>/evals/<language>/<set>/<case>/`, with agent-visible input separated from evaluator-only oracle. Reuse `evals.agent_eval.AgentEval` in the package's `evals/evaluate.py` entry point; `v2_suite()` in `evals/run.py` discovers it dynamically for known roles. A genuinely new role also needs the explicit role inventory updated, not a second static suite registry or separate harness.
+4. Run affected unit tests and `make eval AGENT=<name> SET=<set> EVAL_LANGUAGE=<language>`. Compare the same model/input/limits/mode and retain failures. Scripted clean cases establish plumbing, not inference accuracy or native workspace qualification. Record missing suites/baselines explicitly.
+5. For a move or native-capability migration, check before/after instruction/tool/schema/settings parity, then isolate changed behavior and evaluate before composing it. Preserve frozen histories and fixtures; do not rewrite them to make a score pass.
