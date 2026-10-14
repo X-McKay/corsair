@@ -1,5 +1,15 @@
 {
-  "outcome": "refused",
+  "outcome": "blocked",
+  "refusal": {
+    "kind": "blocked",
+    "cause": [
+      [
+        "parser.c",
+        "rb_tainted_str_new",
+        "extension"
+      ]
+    ]
+  },
   "smoke_admissible": false,
   "required_setup": [],
   "baselines": [],
@@ -77,10 +87,10 @@
       }
     },
     {
-      "text": "No recipe: rake compile fails: parser.c:88:12 implicit declaration of function 'rb_tainted_str_new'."
-    },
-    {
-      "text": "No recipe: rake compile fails: parser.c:88:12 implicit declaration of function 'rb_tainted_str_new'."
+      "final": {
+        "blocked": "rake compile fails: parser.c:88:12 implicit declaration of function 'rb_tainted_str_new'.",
+        "notes": ""
+      }
     }
   ]
 }

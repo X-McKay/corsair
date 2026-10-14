@@ -1,5 +1,16 @@
 {
-  "outcome": "refused",
+  "outcome": "blocked",
+  "refusal": {
+    "kind": "unsupported",
+    "cause": [
+      [
+        "2.5"
+      ],
+      [
+        "3.1"
+      ]
+    ]
+  },
   "smoke_admissible": false,
   "required_setup": [],
   "baselines": [],
@@ -41,10 +52,10 @@
       }
     },
     {
-      "text": "No recipe: Bundler refuses: the Gemfile specifies Ruby ~> 2.5.0 and the row provides Ruby 3.1.7."
-    },
-    {
-      "text": "No recipe: Bundler refuses: the Gemfile specifies Ruby ~> 2.5.0 and the row provides Ruby 3.1.7."
+      "final": {
+        "blocked": "Bundler refuses: the Gemfile specifies Ruby ~> 2.5.0 and the row provides Ruby 3.1.7.",
+        "notes": ""
+      }
     }
   ]
 }

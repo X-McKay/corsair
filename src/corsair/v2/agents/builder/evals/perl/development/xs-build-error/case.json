@@ -5,7 +5,7 @@
   "kind": "failure-mode",
   "category": "failure-mode",
   "probes": "make fails compiling the XS module; the Perl module loads the compiled object.",
-  "expected": "No recipe: the XS module does not build and lib/Digest/XXH.pm loads it. Existing files cannot be changed, and a written smoke test does not stand in for a project that does not build or run.",
+  "expected": "A blocked refusal whose reason names the cause: the XS module does not build and lib/Digest/XXH.pm loads it. It has no setup and no baseline. Existing files cannot be changed, and a written smoke test does not stand in for a project that does not build or run.",
   "dimensions": [
     "correctness",
     "contract",

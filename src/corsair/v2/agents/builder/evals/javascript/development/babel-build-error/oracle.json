@@ -1,5 +1,15 @@
 {
-  "outcome": "refused",
+  "outcome": "blocked",
+  "refusal": {
+    "kind": "blocked",
+    "cause": [
+      [
+        "router.js",
+        "syntaxerror",
+        "unexpected token"
+      ]
+    ]
+  },
   "smoke_admissible": false,
   "required_setup": [],
   "baselines": [],
@@ -80,10 +90,10 @@
       }
     },
     {
-      "text": "No recipe: npm run build fails: SyntaxError: src/router.js: Unexpected token (14:6); tests require lib/."
-    },
-    {
-      "text": "No recipe: npm run build fails: SyntaxError: src/router.js: Unexpected token (14:6); tests require lib/."
+      "final": {
+        "blocked": "npm run build fails: SyntaxError: src/router.js: Unexpected token (14:6); tests require lib/.",
+        "notes": ""
+      }
     }
   ]
 }

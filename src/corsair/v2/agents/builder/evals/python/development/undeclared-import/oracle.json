@@ -1,5 +1,13 @@
 {
-  "outcome": "refused",
+  "outcome": "blocked",
+  "refusal": {
+    "kind": "blocked",
+    "cause": [
+      [
+        "lxml"
+      ]
+    ]
+  },
   "smoke_admissible": false,
   "required_setup": [],
   "baselines": [],
@@ -83,10 +91,10 @@
       }
     },
     {
-      "text": "No recipe: tests/test_feed.py imports lxml, which requirements.txt does not declare; installing it would add a dependency."
-    },
-    {
-      "text": "No recipe: tests/test_feed.py imports lxml, which requirements.txt does not declare; installing it would add a dependency."
+      "final": {
+        "blocked": "tests/test_feed.py imports lxml, which requirements.txt does not declare; installing it would add a dependency.",
+        "notes": ""
+      }
     }
   ]
 }

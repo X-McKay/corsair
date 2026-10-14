@@ -1,5 +1,14 @@
 {
-  "outcome": "refused",
+  "outcome": "blocked",
+  "refusal": {
+    "kind": "blocked",
+    "cause": [
+      [
+        "setup-env",
+        "setupfiles"
+      ]
+    ]
+  },
   "smoke_admissible": false,
   "required_setup": [],
   "baselines": [],
@@ -70,10 +79,10 @@
       }
     },
     {
-      "text": "No recipe: Jest refuses to start: Module <rootDir>/test/setup-env.js in the setupFiles option was not found."
-    },
-    {
-      "text": "No recipe: Jest refuses to start: Module <rootDir>/test/setup-env.js in the setupFiles option was not found."
+      "final": {
+        "blocked": "Jest refuses to start: Module <rootDir>/test/setup-env.js in the setupFiles option was not found.",
+        "notes": ""
+      }
     }
   ]
 }

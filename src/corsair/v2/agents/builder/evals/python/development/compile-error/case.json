@@ -5,7 +5,7 @@
   "kind": "failure-mode",
   "category": "failure-mode",
   "probes": "The declared byte-compile step fails on a syntax error in documents.py, which the test imports.",
-  "expected": "No recipe: documents.py has a syntax error, so the declared build and the test both fail. Existing files cannot be changed, and a written smoke test does not stand in for a project that does not build or run.",
+  "expected": "A blocked refusal whose reason names the cause: documents.py has a syntax error, so the declared build and the test both fail. It has no setup and no baseline. Existing files cannot be changed, and a written smoke test does not stand in for a project that does not build or run.",
   "dimensions": [
     "correctness",
     "contract",

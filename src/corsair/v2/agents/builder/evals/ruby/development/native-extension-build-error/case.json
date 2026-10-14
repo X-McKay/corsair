@@ -5,7 +5,7 @@
   "kind": "failure-mode",
   "category": "failure-mode",
   "probes": "The C extension fails to compile against Ruby 3.1; the library requires the compiled extension.",
-  "expected": "No recipe: the native extension does not build and lib/fastcsv.rb requires it. Existing files cannot be changed, and a written smoke test does not stand in for a project that does not build or run.",
+  "expected": "A blocked refusal whose reason names the cause: the native extension does not build and lib/fastcsv.rb requires it. It has no setup and no baseline. Existing files cannot be changed, and a written smoke test does not stand in for a project that does not build or run.",
   "dimensions": [
     "correctness",
     "contract",

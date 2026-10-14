@@ -1,5 +1,16 @@
 {
-  "outcome": "refused",
+  "outcome": "blocked",
+  "refusal": {
+    "kind": "unsupported",
+    "cause": [
+      [
+        "3.13"
+      ],
+      [
+        "3.12"
+      ]
+    ]
+  },
   "smoke_admissible": false,
   "required_setup": [],
   "baselines": [],
@@ -85,10 +96,10 @@
       }
     },
     {
-      "text": "No recipe: documents.py raises ImportError: documents requires Python 3.13, and the row is CPython 3.12.15."
-    },
-    {
-      "text": "No recipe: documents.py raises ImportError: documents requires Python 3.13, and the row is CPython 3.12.15."
+      "final": {
+        "blocked": "documents.py raises ImportError: documents requires Python 3.13, and the row is CPython 3.12.15.",
+        "notes": ""
+      }
     }
   ]
 }

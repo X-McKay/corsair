@@ -1,5 +1,14 @@
 {
-  "outcome": "refused",
+  "outcome": "blocked",
+  "refusal": {
+    "kind": "blocked",
+    "cause": [
+      [
+        "403",
+        "forbidden"
+      ]
+    ]
+  },
   "smoke_admissible": false,
   "required_setup": [],
   "baselines": [
@@ -61,10 +70,10 @@
       }
     },
     {
-      "text": "No recipe: bundle install failed (registry 403)."
-    },
-    {
-      "text": "No recipe: bundle install failed (registry 403)."
+      "final": {
+        "blocked": "bundle install failed (registry 403).",
+        "notes": ""
+      }
     }
   ]
 }

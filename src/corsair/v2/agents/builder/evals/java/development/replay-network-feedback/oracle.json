@@ -1,5 +1,6 @@
 {
   "outcome": "recipe",
+  "refusal": null,
   "smoke_admissible": false,
   "required_setup": [
     [
@@ -79,6 +80,7 @@
       "args": {
         "argv": [
           "mvn",
+          "-Dmaven.repo.local=.corsair-m2",
           "-B",
           "dependency:go-offline"
         ]
@@ -104,6 +106,7 @@
         "setup": [
           [
             "mvn",
+            "-Dmaven.repo.local=.corsair-m2",
             "-B",
             "dependency:go-offline"
           ]

@@ -5,7 +5,7 @@
   "kind": "failure-mode",
   "category": "failure-mode",
   "probes": "The POM pins a JUnit Platform library older than Jupiter needs, so the engine cannot discover tests.",
-  "expected": "No recipe: JUnit cannot discover any test with the POM's mismatched platform pin. Existing files cannot be changed, and a written smoke test does not stand in for a project that does not build or run.",
+  "expected": "A blocked refusal whose reason names the cause: JUnit cannot discover any test with the POM's mismatched platform pin. It has no setup and no baseline. Existing files cannot be changed, and a written smoke test does not stand in for a project that does not build or run.",
   "dimensions": [
     "correctness",
     "contract",

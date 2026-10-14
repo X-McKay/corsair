@@ -5,7 +5,7 @@
   "kind": "negative",
   "category": "capability",
   "probes": "The first candidate test is @Disabled and exits 0 as skipped; the other test passes.",
-  "expected": "A recipe whose baseline is escapesHtmlEntities; the skipped rendersRtlLocale is never the baseline.",
+  "expected": "A recipe whose baseline is escapesHtmlEntities; the skipped rendersRtlLocale is never the baseline. The install may add the dependency-location option the row's run template names.",
   "dimensions": [
     "correctness",
     "contract",
@@ -17,6 +17,6 @@
     "commit": "n/a",
     "path": "evals/environment/java/breadth/java-skipped-baseline-rechosen",
     "license": "n/a (synthetic)",
-    "notes": "converted from evals/environment/java/breadth/java-skipped-baseline-rechosen; the tree's component and test sources were written to agree with the recorded output; native runs are recorded in the row's run_template form"
+    "notes": "converted from evals/environment/java/breadth/java-skipped-baseline-rechosen; the tree's component and test sources were written to agree with the recorded output; native runs are recorded in the row's run_template form; the scripted install adds the row's dependency-location option (#154)"
   }
 }

@@ -1,5 +1,14 @@
 {
-  "outcome": "refused",
+  "outcome": "blocked",
+  "refusal": {
+    "kind": "blocked",
+    "cause": [
+      [
+        "403",
+        "forbidden"
+      ]
+    ]
+  },
   "smoke_admissible": false,
   "required_setup": [],
   "baselines": [
@@ -63,10 +72,10 @@
       }
     },
     {
-      "text": "No recipe: the declared cpanm install failed (CPAN mirror 403)."
-    },
-    {
-      "text": "No recipe: the declared cpanm install failed (CPAN mirror 403)."
+      "final": {
+        "blocked": "the declared cpanm install failed (CPAN mirror 403).",
+        "notes": ""
+      }
     }
   ]
 }

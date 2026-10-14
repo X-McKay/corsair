@@ -1,5 +1,6 @@
 {
   "outcome": "recipe",
+  "refusal": null,
   "smoke_admissible": false,
   "required_setup": [],
   "baselines": [

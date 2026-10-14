@@ -1,5 +1,16 @@
 {
-  "outcome": "refused",
+  "outcome": "blocked",
+  "refusal": {
+    "kind": "blocked",
+    "cause": [
+      [
+        "certificate",
+        "tls",
+        "ssl",
+        "pkix"
+      ]
+    ]
+  },
   "smoke_admissible": false,
   "required_setup": [],
   "baselines": [
@@ -95,10 +106,10 @@
       }
     },
     {
-      "text": "No recipe: the declared pip install failed (certificate verification)."
-    },
-    {
-      "text": "No recipe: the declared pip install failed (certificate verification)."
+      "final": {
+        "blocked": "the declared pip install failed (certificate verification).",
+        "notes": ""
+      }
     }
   ]
 }

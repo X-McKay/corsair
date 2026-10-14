@@ -1,5 +1,17 @@
 {
-  "outcome": "refused",
+  "outcome": "blocked",
+  "refusal": {
+    "kind": "blocked",
+    "cause": [
+      [
+        "tokenizertest",
+        "splitsonwhitespace"
+      ],
+      [
+        "fail"
+      ]
+    ]
+  },
   "smoke_admissible": true,
   "required_setup": [],
   "baselines": [],
@@ -60,10 +72,10 @@
       }
     },
     {
-      "text": "No recipe: the only native test, TokenizerTest#splitsOnWhitespace, fails (expected: <3> but was: <2>)."
-    },
-    {
-      "text": "No recipe: the only native test, TokenizerTest#splitsOnWhitespace, fails (expected: <3> but was: <2>)."
+      "final": {
+        "blocked": "the only native test, TokenizerTest#splitsOnWhitespace, fails (expected: <3> but was: <2>).",
+        "notes": ""
+      }
     }
   ]
 }

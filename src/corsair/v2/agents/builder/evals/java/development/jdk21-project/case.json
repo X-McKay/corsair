@@ -5,7 +5,7 @@
   "kind": "refusal",
   "category": "failure-mode",
   "probes": "The POM requires Java 21 (and the source uses Java 21 pattern switches) but the row is Temurin 17.",
-  "expected": "No recipe: the compiler rejects release 21 on the Temurin 17 row. Existing files cannot be changed, and a written smoke test does not stand in for a project that does not build or run.",
+  "expected": "A refusal of the unsupported runtime (the typed blocked answer) whose reason names the cause: the compiler rejects release 21 on the Temurin 17 row. It has no setup and no baseline. Existing files cannot be changed, and a written smoke test does not stand in for a project that does not build or run.",
   "dimensions": [
     "correctness",
     "contract",

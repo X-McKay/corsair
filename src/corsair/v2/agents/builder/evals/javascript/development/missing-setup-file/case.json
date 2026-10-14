@@ -5,7 +5,7 @@
   "kind": "failure-mode",
   "category": "failure-mode",
   "probes": "jest.config.js names a setupFiles module that does not exist, so Jest refuses to start any test.",
-  "expected": "No recipe: Jest's configuration names a missing setup file, for every test file. Existing files cannot be changed, and a written smoke test does not stand in for a project that does not build or run.",
+  "expected": "A blocked refusal whose reason names the cause: Jest's configuration names a missing setup file, for every test file. It has no setup and no baseline. Existing files cannot be changed, and a written smoke test does not stand in for a project that does not build or run.",
   "dimensions": [
     "correctness",
     "contract",

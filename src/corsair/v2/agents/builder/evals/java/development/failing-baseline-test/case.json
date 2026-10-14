@@ -5,7 +5,7 @@
   "kind": "negative",
   "category": "failure-mode",
   "probes": "Setup succeeds but the project's only native test fails its assertion on this revision.",
-  "expected": "No recipe, or a recipe whose baseline is a smoke test it wrote; never the failing native test (TokenizerTest#splitsOnWhitespace).",
+  "expected": "Either a blocked refusal whose reason names the failing native test, or a recipe whose baseline is a smoke test it wrote; never the failing native test (TokenizerTest#splitsOnWhitespace).",
   "dimensions": [
     "correctness",
     "contract",

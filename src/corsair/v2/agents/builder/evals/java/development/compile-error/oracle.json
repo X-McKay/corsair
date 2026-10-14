@@ -1,5 +1,16 @@
 {
-  "outcome": "refused",
+  "outcome": "blocked",
+  "refusal": {
+    "kind": "blocked",
+    "cause": [
+      [
+        "lrucache",
+        "evicteldest",
+        "cannot find symbol",
+        "compil"
+      ]
+    ]
+  },
   "smoke_admissible": false,
   "required_setup": [],
   "baselines": [],
@@ -71,10 +82,10 @@
       }
     },
     {
-      "text": "No recipe: LruCache.java:[41,25] cannot find symbol evictEldest(); the project does not compile."
-    },
-    {
-      "text": "No recipe: LruCache.java:[41,25] cannot find symbol evictEldest(); the project does not compile."
+      "final": {
+        "blocked": "LruCache.java:[41,25] cannot find symbol evictEldest(); the project does not compile.",
+        "notes": ""
+      }
     }
   ]
 }

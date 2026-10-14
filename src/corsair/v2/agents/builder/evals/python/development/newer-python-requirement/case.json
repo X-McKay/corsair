@@ -5,7 +5,7 @@
   "kind": "refusal",
   "category": "failure-mode",
   "probes": "The README and documents.py require Python 3.13; the row is CPython 3.12.",
-  "expected": "No recipe: documents.py refuses to import on Python 3.12. Existing files cannot be changed, and a written smoke test does not stand in for a project that does not build or run.",
+  "expected": "A refusal of the unsupported runtime (the typed blocked answer) whose reason names the cause: documents.py refuses to import on Python 3.12. It has no setup and no baseline. Existing files cannot be changed, and a written smoke test does not stand in for a project that does not build or run.",
   "dimensions": [
     "correctness",
     "contract",

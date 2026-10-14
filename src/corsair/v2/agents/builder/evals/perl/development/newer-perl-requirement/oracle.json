@@ -1,5 +1,16 @@
 {
-  "outcome": "refused",
+  "outcome": "blocked",
+  "refusal": {
+    "kind": "unsupported",
+    "cause": [
+      [
+        "5.36"
+      ],
+      [
+        "5.26"
+      ]
+    ]
+  },
   "smoke_admissible": false,
   "required_setup": [],
   "baselines": [],
@@ -50,10 +61,10 @@
       }
     },
     {
-      "text": "No recipe: Perl v5.36.0 required: MIN_PERL_VERSION and `use v5.36` refuse the row's Perl 5.26.3."
-    },
-    {
-      "text": "No recipe: Perl v5.36.0 required: MIN_PERL_VERSION and `use v5.36` refuse the row's Perl 5.26.3."
+      "final": {
+        "blocked": "Perl v5.36.0 required: MIN_PERL_VERSION and `use v5.36` refuse the row's Perl 5.26.3.",
+        "notes": ""
+      }
     }
   ]
 }

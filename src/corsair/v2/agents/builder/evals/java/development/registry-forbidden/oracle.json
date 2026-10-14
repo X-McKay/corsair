@@ -1,5 +1,14 @@
 {
-  "outcome": "refused",
+  "outcome": "blocked",
+  "refusal": {
+    "kind": "blocked",
+    "cause": [
+      [
+        "403",
+        "forbidden"
+      ]
+    ]
+  },
   "smoke_admissible": false,
   "required_setup": [],
   "baselines": [
@@ -63,10 +72,10 @@
       }
     },
     {
-      "text": "No recipe: the declared dependency install failed (registry 403)."
-    },
-    {
-      "text": "No recipe: the declared dependency install failed (registry 403)."
+      "final": {
+        "blocked": "the declared dependency install failed (registry 403).",
+        "notes": ""
+      }
     }
   ]
 }

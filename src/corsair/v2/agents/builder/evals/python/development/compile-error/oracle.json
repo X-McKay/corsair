@@ -1,5 +1,14 @@
 {
-  "outcome": "refused",
+  "outcome": "blocked",
+  "refusal": {
+    "kind": "blocked",
+    "cause": [
+      [
+        "syntaxerror",
+        "syntax error"
+      ]
+    ]
+  },
   "smoke_admissible": false,
   "required_setup": [],
   "baselines": [],
@@ -98,10 +107,10 @@
       }
     },
     {
-      "text": "No recipe: documents.py line 10: SyntaxError: expected ':'; the declared compileall step and the test fail."
-    },
-    {
-      "text": "No recipe: documents.py line 10: SyntaxError: expected ':'; the declared compileall step and the test fail."
+      "final": {
+        "blocked": "documents.py line 10: SyntaxError: expected ':'; the declared compileall step and the test fail.",
+        "notes": ""
+      }
     }
   ]
 }

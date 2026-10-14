@@ -1,5 +1,6 @@
 {
   "outcome": "recipe",
+  "refusal": null,
   "smoke_admissible": false,
   "required_setup": [
     [
@@ -97,6 +98,8 @@
           "-m",
           "pip",
           "install",
+          "--target",
+          ".corsair-deps",
           "--require-hashes",
           "--only-binary",
           ":all:",
@@ -138,6 +141,8 @@
             "-m",
             "pip",
             "install",
+            "--target",
+            ".corsair-deps",
             "--require-hashes",
             "--only-binary",
             ":all:",

@@ -1,5 +1,16 @@
 {
-  "outcome": "refused",
+  "outcome": "blocked",
+  "refusal": {
+    "kind": "unsupported",
+    "cause": [
+      [
+        "21"
+      ],
+      [
+        "17"
+      ]
+    ]
+  },
   "smoke_admissible": false,
   "required_setup": [],
   "baselines": [],
@@ -56,10 +67,10 @@
       }
     },
     {
-      "text": "No recipe: release version 21 not supported: the POM requires Java 21 and the row provides Temurin 17."
-    },
-    {
-      "text": "No recipe: release version 21 not supported: the POM requires Java 21 and the row provides Temurin 17."
+      "final": {
+        "blocked": "release version 21 not supported: the POM requires Java 21 and the row provides Temurin 17.",
+        "notes": ""
+      }
     }
   ]
 }

@@ -1,5 +1,15 @@
 {
-  "outcome": "refused",
+  "outcome": "blocked",
+  "refusal": {
+    "kind": "blocked",
+    "cause": [
+      [
+        "junit-jupiter",
+        "junit-platform",
+        "discover"
+      ]
+    ]
+  },
   "smoke_admissible": false,
   "required_setup": [],
   "baselines": [],
@@ -60,10 +70,10 @@
       }
     },
     {
-      "text": "No recipe: TestEngine with ID 'junit-jupiter' failed to discover tests (the POM pins junit-platform-commons 1.8.2)."
-    },
-    {
-      "text": "No recipe: TestEngine with ID 'junit-jupiter' failed to discover tests (the POM pins junit-platform-commons 1.8.2)."
+      "final": {
+        "blocked": "TestEngine with ID 'junit-jupiter' failed to discover tests (the POM pins junit-platform-commons 1.8.2).",
+        "notes": ""
+      }
     }
   ]
 }

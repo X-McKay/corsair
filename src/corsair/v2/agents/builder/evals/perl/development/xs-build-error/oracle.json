@@ -1,5 +1,16 @@
 {
-  "outcome": "refused",
+  "outcome": "blocked",
+  "refusal": {
+    "kind": "blocked",
+    "cause": [
+      [
+        "xxh.xs",
+        "xxh3_state_t",
+        "xs build",
+        "xs compil"
+      ]
+    ]
+  },
   "smoke_admissible": false,
   "required_setup": [],
   "baselines": [],
@@ -76,10 +87,10 @@
       }
     },
     {
-      "text": "No recipe: make fails: XXH.xs:42:5 unknown type name 'XXH3_state_t'; the module needs the built object."
-    },
-    {
-      "text": "No recipe: make fails: XXH.xs:42:5 unknown type name 'XXH3_state_t'; the module needs the built object."
+      "final": {
+        "blocked": "make fails: XXH.xs:42:5 unknown type name 'XXH3_state_t'; the module needs the built object.",
+        "notes": ""
+      }
     }
   ]
 }

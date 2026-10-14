@@ -1,5 +1,17 @@
 {
-  "outcome": "refused",
+  "outcome": "blocked",
+  "refusal": {
+    "kind": "blocked",
+    "cause": [
+      [
+        "normalize.t",
+        "resolves dot segments"
+      ],
+      [
+        "fail"
+      ]
+    ]
+  },
   "smoke_admissible": true,
   "required_setup": [],
   "baselines": [],
@@ -59,10 +71,10 @@
       }
     },
     {
-      "text": "No recipe: the only test file, t/normalize.t, fails 'resolves dot segments' (got 'a/./b')."
-    },
-    {
-      "text": "No recipe: the only test file, t/normalize.t, fails 'resolves dot segments' (got 'a/./b')."
+      "final": {
+        "blocked": "the only test file, t/normalize.t, fails 'resolves dot segments' (got 'a/./b').",
+        "notes": ""
+      }
     }
   ]
 }
