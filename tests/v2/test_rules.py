@@ -219,6 +219,16 @@ def test_infra_on_the_fixed_revision_keeps_a_reproduced_finding():
                                                                 T.INFRA_ERROR)
 
 
+def test_a_run_on_another_tree_than_its_revision_counts_as_missing():
+    # The exploit PoV passed, but on an environment built from another tree than the case's vulnerable revision.
+    elsewhere = run("exploit", "passed").model_copy(update={"tree_sha256": "e" * 64})
+    here = run("control", "passed").model_copy(update={"tree_sha256": REV.tree_sha256})
+    verdict = decide(CASE, **full(runs=(here, elsewhere)))
+    assert (verdict.rule_id, verdict.label, verdict.terminal_reason) == ("R6", Label.INCONCLUSIVE, T.PROBE_NOT_RUN)
+    bound = decide(CASE, **full(runs=(here, elsewhere.model_copy(update={"tree_sha256": REV.tree_sha256}))))
+    assert (bound.rule_id, bound.label) == ("R4", Label.LIKELY_EXPLOITABLE)
+
+
 def test_duplicate_runs_and_reviews_are_refused():
     with pytest.raises(ValueError):
         decide(CASE, **full(runs=runs() + (run("exploit", "assertion_failed"),)))

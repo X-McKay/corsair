@@ -129,6 +129,7 @@ def test_probe_pair_end_to_end(environment, tmp_path):
     assert failed.facts.check_marker == "violated"
     assert failed.outcome is Outcome.ASSERTION_FAILED and failed.cleanup_confirmed
     assert failed.duration_s is not None and failed.output is not None and failed.patch_sha256 == patch.sha256
+    assert failed.tree_sha256 == environment.tree_sha256 and failed.image_digest.startswith("sha256:")
 
     passed = execute.run_probe(environment, RUNTIME, patch, "control", run_id=run_id, artifacts=tmp_path)
     assert passed.facts.exit_code == 0 and passed.facts.start_marker and passed.facts.end_marker

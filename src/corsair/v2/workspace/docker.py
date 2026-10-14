@@ -90,6 +90,19 @@ def docker(*args: str, input: bytes | None = None, timeout: float | None = CONTR
     return subprocess.run(["docker", *args], input=input, capture_output=True, timeout=timeout, check=False)
 
 
+def image_id(reference: str, *, container: bool = False) -> str | None:
+    """The local image id (``sha256:...``) of an image reference, or of the image a container was created from.
+    None when Docker cannot say: provenance stays unknown rather than failing the caller."""
+    args = ("inspect", "--format", "{{.Image}}", reference) if container else (
+        "image", "inspect", "--format", "{{.Id}}", reference)
+    try:
+        found = docker(*args, timeout=60)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    value = found.stdout.decode(errors="replace").strip()
+    return value if found.returncode == 0 and value.startswith("sha256:") else None
+
+
 def docker_available() -> bool:
     try:
         return docker("info", "--format", "{{.ServerVersion}}", timeout=30).returncode == 0

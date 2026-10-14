@@ -1,13 +1,16 @@
 """Run recorder: one directory per run holding every stage's input and output, usage and the verdict.
 
-Layout of ``<root>/<run_id>/``:
+Every file carries the versioned run-record schema ``corsair-v2-run/1`` (``SCHEMA``), documented field by field in
+``RUN_RECORD.md``. Layout of ``<root>/<run_id>/``:
 
-- ``run.json``: run id, mode and start time; ``case.json``: the Case as investigated.
+- ``run.json``: what produced the run (schema, ids, mode, host, UTC start and finish, code commit and dirty flag,
+  provider-config and matrix digests, the selected runtime row and its image id, the revision trees and the
+  environment images used); ``case.json``: the Case as investigated.
 - ``stages/<step>.json``: one file per stage call with its input, output, wall time and any error.
 - ``agents/<step>.messages.json``: the native PydanticAI message history of an agent call, when captured.
-- ``usage.json``: one ``AgentUsage`` per agent call, in order; ``timings.json``: per-stage wall time, in order.
+- ``usage.json``: one ``AgentUsage`` per agent call (with its step), in order; ``timings.json``: per-stage wall time.
 - ``grounding.json``: the advisory grounding brief, when Ground ran. Nothing downstream reads it.
-- ``verdict.json`` and ``summary.json`` (label, rule id, terminal reason, per-author review results and totals;
+- ``verdict.json`` and ``summary.json`` (outcome, per-author review results, per-agent aggregates and totals;
   unknown values are null).
 
 State lives in the files, not in the object, so a Temporal activity on any worker sharing the filesystem can reopen
@@ -15,9 +18,11 @@ the run directory and append to it. Steps run one at a time per run, so read-mod
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
-import time
+import socket
+import subprocess
 import uuid
 from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime
@@ -27,9 +32,11 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from .contracts import AgentUsage, Case, Verdict
+from .contracts import AgentUsage, Case, Environment, Revision, Runtime, Verdict
 
+SCHEMA = "corsair-v2-run/1"
 DEFAULT_ROOT = Path(".runs/v2/runs")
+CODE_ROOT = Path(__file__).resolve().parent
 _STEP = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,127}$")
 
 
@@ -92,11 +99,37 @@ class RunRecorder:
     def _append(self, name: str, item: Any) -> None:
         self._write(name, [*self._read(name, []), to_json(item)])
 
-    def begin(self, case: Case, *, mode: str) -> None:
-        """Idempotent: a retried begin keeps the first start time."""
-        run = self._read("run.json", None) or {"run_id": self.run_id, "mode": mode, "started_at": time.time()}
-        self._write("run.json", run)
+    def _update(self, name: str, **fields: Any) -> None:
+        self._write(name, {**self._read(name, {}), **fields})
+
+    def begin(self, case: Case, *, mode: str, provider_config: Path | None = None, matrix: Path | None = None
+              ) -> None:
+        """Write run.json. Idempotent: a retried begin keeps the first record and its start time."""
+        if self._read("run.json", None) is None:
+            commit, dirty = _git_state()
+            self._write("run.json", {
+                "schema": SCHEMA, "run_id": self.run_id, "case_id": case.case_id, "mode": mode,
+                "hostname": socket.gethostname(), "started_at": _now(), "finished_at": None,
+                "git_commit": commit, "git_dirty": dirty,
+                "provider_config_sha256": _file_sha256(provider_config),
+                "matrix_sha256": _file_sha256(matrix),
+                "runtime_row": None, "runtime_image": None, "runtime_image_id": None,
+                "revision": _revision(case.revision), "fixed_revision": _revision(case.fixed_revision),
+                "environments": {},
+            })
         self._write("case.json", case)
+
+    def runtime(self, runtime: Runtime, image_id: str | None) -> None:
+        """The selected matrix row, its image reference and the local image id it resolved to (None: unknown)."""
+        self._update("run.json", runtime_row=runtime.row_id, runtime_image=runtime.image, runtime_image_id=image_id)
+
+    def environment(self, revision: str, environment: Environment, image_id: str | None) -> None:
+        """A replayed environment probes may run on, keyed by revision; the last replay of a revision wins."""
+        environments = self._read("run.json", {}).get("environments") or {}
+        environments[revision] = {"image": environment.image, "image_id": image_id,
+                                  "tree_sha256": environment.tree_sha256, "recipe_sha256": environment.recipe_sha256,
+                                  "runtime_row": environment.runtime_row}
+        self._update("run.json", environments=environments)
 
     def stage(self, step: str, *, inputs: Mapping[str, Any], output: Any, wall_s: float | None,
               error: str | None = None) -> None:
@@ -120,18 +153,26 @@ class RunRecorder:
 
     def finish(self, verdict: Verdict) -> dict[str, Any]:
         self._write("verdict.json", verdict)
+        finished = _now()
+        self._update("run.json", finished_at=finished)
+        run = self._read("run.json", {})
+        rows = self._read("usage.json", [])
         usage = self.usage()
-        started = self._read("run.json", {}).get("started_at")
         inputs, outputs = _total(u.input_tokens for u in usage), _total(u.output_tokens for u in usage)
         summary = {
+            "schema": SCHEMA,
             "run_id": self.run_id,
             "case_id": verdict.case_id,
+            "mode": run.get("mode"),
             "label": verdict.label.value,
             "rule_id": verdict.rule_id,
             "terminal_reason": verdict.terminal_reason.value,
             "finding": verdict.finding,
             "fix": verdict.fix,
+            "outcome": _outcome(verdict),
             "review": _review(verdict),
+            "models": sorted({u.model for u in usage if u.model is not None}),
+            "agents": _agents(rows),
             "totals": {
                 "agent_calls": len(usage),
                 "requests": _total(u.requests for u in usage),
@@ -139,12 +180,91 @@ class RunRecorder:
                 "output_tokens": outputs,
                 "tokens": None if inputs is None or outputs is None else inputs + outputs,
                 "tool_calls": _total(u.tool_calls for u in usage),
+                "retries": _total(u.retries for u in usage),
                 "agent_wall_s": _total_float(u.wall_s for u in usage),
-                "wall_s": None if started is None else round(time.time() - started, 3),
+                "wall_s": _elapsed(run.get("started_at"), finished),
             },
         }
         self._write("summary.json", summary)
         return summary
+
+
+def _now() -> str:
+    return datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def _elapsed(started: Any, finished: str) -> float | None:
+    if not isinstance(started, str):
+        return None
+    try:
+        begin = datetime.fromisoformat(started.replace("Z", "+00:00"))
+        end = datetime.fromisoformat(finished.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return round((end - begin).total_seconds(), 3)
+
+
+def _file_sha256(path: Path | None) -> str | None:
+    if path is None or not Path(path).is_file():
+        return None
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def _revision(revision: Revision | None) -> dict[str, Any] | None:
+    return None if revision is None else {"tree_sha256": revision.tree_sha256, "commit": revision.commit}
+
+
+def _git_state(root: Path = CODE_ROOT) -> tuple[str | None, bool | None]:
+    """The commit of the checkout this code runs from and whether it has changes (untracked files included)."""
+    try:
+        head = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], capture_output=True, text=True,
+                              timeout=30, check=False)
+        if head.returncode != 0:
+            return None, None
+        status = subprocess.run(["git", "-C", str(root), "status", "--porcelain"], capture_output=True, text=True,
+                                timeout=30, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return None, None
+    return head.stdout.strip() or None, (bool(status.stdout.strip()) if status.returncode == 0 else None)
+
+
+def _outcome(verdict: Verdict) -> dict[str, Any]:
+    """The decision and the per-probe evidence it read, by revision then role."""
+    probes: dict[str, dict[str, Any]] = {}
+    for run in verdict.runs:
+        probes.setdefault(run.revision, {})[run.role] = {
+            "outcome": run.outcome.value, "facts": run.facts.model_dump(mode="json"),
+            "duration_s": run.duration_s, "patch_sha256": run.patch_sha256, "image_digest": run.image_digest,
+            "tree_sha256": run.tree_sha256, "cleanup_confirmed": run.cleanup_confirmed}
+    return {"label": verdict.label.value, "rule_id": verdict.rule_id,
+            "terminal_reason": verdict.terminal_reason.value, "finding": verdict.finding, "fix": verdict.fix,
+            "fix_reason": verdict.fix_reason.value if verdict.fix_reason is not None else None, "probes": probes}
+
+
+def _agents(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Per-agent aggregates over usage.json rows, in first-call order; unknown values make a sum unknown."""
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        grouped.setdefault(row["agent"], []).append(row)
+    out = {}
+    for agent, calls in grouped.items():
+        statuses: dict[str, int] = {}
+        for call in calls:
+            statuses[call.get("status", "ok")] = statuses.get(call.get("status", "ok"), 0) + 1
+        out[agent] = {
+            "calls": len(calls),
+            "steps": [call.get("step") for call in calls],
+            "models": sorted({call["model"] for call in calls if call.get("model")}),
+            "prompt_versions": sorted({call["prompt_version"] for call in calls if call.get("prompt_version")}),
+            "requests": _total(call.get("requests") for call in calls),
+            "input_tokens": _total(call.get("input_tokens") for call in calls),
+            "output_tokens": _total(call.get("output_tokens") for call in calls),
+            "tool_calls": _total(call.get("tool_calls") for call in calls),
+            "retries": _total(call.get("retries") for call in calls),
+            "wall_s": _total_float(call.get("wall_s") for call in calls),
+            "statuses": statuses,
+        }
+    return out
 
 
 def _review(verdict: Verdict) -> dict[str, Any]:

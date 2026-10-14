@@ -5,6 +5,7 @@
         [--provider-config config/v2/providers.local.json] [--mode direct|temporal] [--run-root DIR]
         [--matrix deploy/v2/runtime-matrix.yaml] [--temporal-address localhost:7233] [--workspace-slots N]
     corsair-v2 worker [--provider-config ...] [--matrix ...] [--temporal-address ...] [--workspace-slots N]
+    corsair-v2 runs compare <run_dir> [<run_dir> ...]
 
 Prints one progress line per stage, then the label, rule id, terminal reason and run directory. Only the
 verdict is printed: a manifest's labels and oracles are never read out.
@@ -36,6 +37,10 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--mode", choices=("direct", "temporal"), default="direct")
     run.add_argument("--run-root", type=Path, default=None, help="default: ./.runs/v2/runs")
     worker = commands.add_parser("worker", help="serve the three v2 task queues")
+    runs = commands.add_parser("runs", help="inspect recorded runs")
+    runs_commands = runs.add_subparsers(dest="runs_command", required=True)
+    compare = runs_commands.add_parser("compare", help="one line per run: outcome, cost and prompt versions")
+    compare.add_argument("run_dirs", type=Path, nargs="+")
     for command in (run, worker):
         command.add_argument("--provider-config", type=Path, default=DEFAULT_PROVIDERS)
         command.add_argument("--matrix", type=Path, default=DEFAULT_MATRIX)
@@ -66,11 +71,11 @@ async def _run(args) -> int:
     async with agent_models(config) as models:
         if args.mode == "direct":
             verdict = await run_case(case, stages=stages, models=models, matrix_path=args.matrix, record=record,
-                                     progress=_progress)
+                                     progress=_progress, provider_config=args.provider_config)
         else:
             from . import workflow
 
-            workflow.configure(stages, models, args.matrix, _progress)
+            workflow.configure(stages, models, args.matrix, _progress, args.provider_config)
             client = await workflow.connect(args.temporal_address)
             serving = asyncio.ensure_future(workflow.serve(client, workspace_slots=args.workspace_slots))
             try:
@@ -91,7 +96,7 @@ async def _worker(args) -> int:
     from . import workflow
 
     async with agent_models(load_provider_config(args.provider_config)) as models:
-        workflow.configure(default_stages(), models, args.matrix, _progress)
+        workflow.configure(default_stages(), models, args.matrix, _progress, args.provider_config)
         client = await workflow.connect(args.temporal_address)
         print(f"corsair-v2 worker: serving {workflow.MODEL_QUEUE}, {workflow.WORKSPACE_QUEUE}, "
               f"{workflow.CONTROL_QUEUE} on {args.temporal_address}", flush=True)
@@ -101,6 +106,11 @@ async def _worker(args) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(sys.argv[1:] if argv is None else argv)
+    if args.command == "runs":
+        from .runs import table
+
+        print(table(args.run_dirs))
+        return 0
     try:
         return asyncio.run(_run(args) if args.command == "run" else _worker(args))
     except KeyboardInterrupt:
