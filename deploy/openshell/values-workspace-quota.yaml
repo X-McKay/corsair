@@ -1,6 +1,0 @@
-# Overlay on values.yaml for SPEC-0036 (proposed, unqualified): sandboxes in the guarded namespace,
-# workspace claims on the quota class at the fixed operator size.
-server:
-  sandboxNamespace: openshell-sandboxes
-  workspaceStorageClass: corsair-workspace
-  workspaceDefaultStorageSize: 8Gi

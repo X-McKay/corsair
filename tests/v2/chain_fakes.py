@@ -121,8 +121,9 @@ class Fakes:
     async def exploit_probe(self, brief, runtime, model, **kwargs):
         return await self._probe("exploit", brief, runtime, model, **kwargs)
 
-    def diagnose(self, environment, runtime, patch, role):
-        self._log("diagnose", environment, runtime, patch, role)
+    def diagnose(self, environment, runtime, draft):
+        role = draft.role
+        self._log("diagnose", environment, runtime, draft, role)
         outcome = self.diagnose_outcomes.get(role, Outcome.PASSED)
         return outcome, f"{role} output: ImportError" if outcome in (Outcome.NOT_RUN, Outcome.ERRORED) else None
 
