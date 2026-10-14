@@ -18,13 +18,14 @@ def normalise(text: str) -> str:
 
 
 def haystack(context: GroundingContext) -> str:
-    """The issue's title, state and description, its comments, and each related issue's title, state and comments."""
+    """Everything the model was shown: the issue and each related issue (title, state, description) and comments."""
     parts: list[str] = []
     if context.issue is not None:
         parts += [context.issue.title, context.issue.state, context.issue.description]
     parts += [comment.text for comment in context.comments]
     for related in context.related:
-        parts += [related.issue.title, related.issue.state, *(comment.text for comment in related.comments)]
+        parts += [related.issue.title, related.issue.state, related.issue.description,
+                  *(comment.text for comment in related.comments)]
     return normalise("\n".join(parts))
 
 
