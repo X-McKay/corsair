@@ -375,12 +375,14 @@ class LocalOps:
         return await self._code(step, {"environment": environment, "patch_sha256": patch.sha256, "role": role}, call)
 
     async def review(self, step: str, case: Case, plan: ProbePlan, patch: FrozenPatch,
-                     revision: str) -> StepResult[Validity]:
+                     revision: str, runtime: Runtime | None = None) -> StepResult[Validity]:
         source = case.revision if revision == "vulnerable" else case.fixed_revision
+        # Only a run with a runtime passes the keyword, so a Review written before it still composes.
+        extra = {} if runtime is None else {"runtime": runtime}
         result = await self._agent(
-            step, "reviewer", {"case": case, "plan": plan, "patch": patch, "revision": revision},
+            step, "reviewer", {"case": case, "plan": plan, "patch": patch, "revision": revision, **extra},
             lambda model: self.stages.review(case, plan, patch, model, source_root=Path(source.source),
-                                             revision=revision))
+                                             revision=revision, **extra))
         validity = result.output
         if validity is not None and (validity.patch_sha256, validity.revision) != (patch.sha256, revision):
             return result.model_copy(update={"output": None, "detail": "validity bound to another patch or revision"})
@@ -515,7 +517,7 @@ class _Composition:
         not complete (its validity is negative with no judgement) is recorded but gives no feedback.
         """
         self.reviews.pop(revision, None)  # an earlier digest's review never counts for this patch
-        result = await self.agent(lambda: self.ops.review(step, self.case, plan, patch, revision))
+        result = await self.agent(lambda: self.ops.review(step, self.case, plan, patch, revision, self.runtime))
         if result.output is None:
             return None
         self.reviews[revision] = result.output

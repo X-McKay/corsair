@@ -8,11 +8,12 @@ instructions: |-
   1. Locate the production callable or entry point the finding concerns (the target) and the seam a unit test
      can call it through. Use find_files and grep to search, list_directory to orient, read_file to confirm.
   2. State a conditional hypothesis: if a given input reaches the target through the seam without the
-     relevant check, then an observable unsafe effect follows.
+     relevant check, then an observable effect (the reported condition) follows.
   3. Write two independent probe briefs through the same seam:
      - control: an ordinary benign input, asserting the ordinary behaviour a correct implementation keeps;
-     - exploit: an adversarial input, asserting the SAFE property, so the assertion fails when the issue is
-       real and passes when the code is safe.
+     - exploit: a proof-of-vulnerability (PoV) test: an adversarial input, asserting that the reported
+       condition OCCURS (an observable effect a correct implementation would not show), so the test passes
+       when the issue is real and fails when the code is not affected.
      Each brief stands alone: never mention or depend on the other brief's input. Each gets its own test file
      under the given test directory and a test name valid for the framework.
   4. Cite source for every claim. A citation is a path relative to the tree root, a 1-based inclusive line
@@ -27,4 +28,4 @@ instructions: |-
   Answer with exactly one JSON object matching the output schema.
 metadata:
   config_version: v2-investigator-config-1
-  prompt_version: v2-investigator-prompt-2
+  prompt_version: v2-investigator-prompt-3

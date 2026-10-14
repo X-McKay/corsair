@@ -11,8 +11,8 @@ from pydantic_ai.models.test import TestModel
 
 from corsair.v2.agents import reviewer
 from corsair.v2.agents.reviewer.review import ReviewDeps
-from corsair.v2.contracts import (Case, Citation, Finding, FrozenPatch, Outcome, ProbeBrief, ProbeDraft, ProbeFacts,
-                                  ProbePlan, ProbeRun, Revision)
+from corsair.v2.contracts import (Case, Citation, ExitClass, Finding, FrozenPatch, Outcome, ProbeBrief, ProbeDraft,
+                                  ProbeFacts, ProbePlan, ProbeRun, Revision, Runtime)
 
 pytestmark = pytest.mark.anyio
 
@@ -110,7 +110,7 @@ async def test_a_review_that_does_not_complete_is_negative(tree):
 
 async def test_review_never_receives_outcomes(tree):
     params = set(inspect.signature(reviewer.review).parameters)
-    assert params == {"case", "plan", "patch", "model", "source_root", "revision"}
+    assert params == {"case", "plan", "patch", "model", "source_root", "revision", "runtime"}
     assert set(ReviewDeps.model_fields) == {"source_root", "drafts"}
     seen = []
     model = answering({"control": judgement(), "exploit": judgement(citations=[
@@ -123,6 +123,26 @@ async def test_review_never_receives_outcomes(tree):
                      | {o.value for o in Outcome} | {"vulnerable", "fixed revision"})
     assert not [word for word in outcome_words if word in text]
     assert "3:   check safe(target('../x'))" in text and "function target(name)" in text
+
+
+async def test_review_offers_and_names_the_runs_framework_skill(tree):
+    """The Reviewer gets the run's framework skill as the Probers do, so it can judge marker placement by it."""
+    runtime = Runtime(row_id="row", image="img", framework="Test::More", skill="test-more",
+                      run_template=("prove", "{file}"), exit_codes={0: ExitClass.PASS}, evidence="image-only")
+    seen = []
+    good = {"control": judgement(), "exploit": judgement(citations=[
+        {"path": "tests/test_unsafe.src", "start_line": 3, "end_line": 3},
+        {"path": "lib/target.txt", "start_line": 2, "end_line": 2}])}
+    model = answering(good, seen=seen, calls=[("load_capability", {"id": "test-more"})])
+    validity, usage = await reviewer.review(CASE, PLAN, PATCH, model, source_root=tree, runtime=runtime)
+    assert usage.status == "ok" and validity.control.valid
+    assert "load the skill `test-more`" in str(seen[0][0]).lower()
+    loaded = " ".join(str(part.content) for message in seen[-1][0] for part in message.parts
+                      if type(part).__name__ == "LoadCapabilityReturnPart")
+    assert "is_passing" in loaded  # the framework's own sanctioned guarded end marker
+    missing = runtime.model_copy(update={"skill": "no-such-framework"})
+    validity, usage = await reviewer.review(CASE, PLAN, PATCH, answering(good), source_root=tree, runtime=missing)
+    assert usage.status == "ok" and validity.exploit.valid
 
 
 def test_factory_constructs_in_direct_and_durable_modes():

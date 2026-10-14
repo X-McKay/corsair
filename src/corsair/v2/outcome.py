@@ -17,25 +17,25 @@ from typing import Literal
 
 from .contracts import ExitClass, Outcome, ProbeFacts
 
-CHECK_VALUES = ("safe", "unsafe")
+CHECK_VALUES = ("holds", "violated")
 
 
 def classify(facts: ProbeFacts) -> Outcome:
     """Map one run's observed facts to its outcome; rows are read top to bottom, the first match wins.
 
-    | Exit class                                   | start | end | token | check  | Outcome              |
-    | -------------------------------------------- | ----- | --- | ----- | ------ | -------------------- |
-    | timed out, no exit code, or harness_error    | any   | any | any   | any    | ``infra``            |
-    | no_tests, or no ``start``                    | any   | any | any   | any    | ``not_run``          |
-    | pass                                         | yes   | yes | no    | safe   | ``passed``           |
-    | test_failed                                  | yes   | no  | yes   | unsafe | ``assertion_failed`` |
-    | test_failed                                  | yes   | no  | no    | absent | ``errored``          |
-    | anything else                                |       |     |       |        | ``anomalous``        |
+    | Exit class                                   | start | end | token | check    | Outcome              |
+    | -------------------------------------------- | ----- | --- | ----- | -------- | -------------------- |
+    | timed out, no exit code, or harness_error    | any   | any | any   | any      | ``infra``            |
+    | no_tests, or no ``start``                    | any   | any | any   | any      | ``not_run``          |
+    | pass                                         | yes   | yes | no    | holds    | ``passed``           |
+    | test_failed                                  | yes   | no  | yes   | violated | ``assertion_failed`` |
+    | test_failed                                  | yes   | no  | no    | absent   | ``errored``          |
+    | anything else                                |       |     |       |          | ``anomalous``        |
 
     Infrastructure is read first: with no exit code, a timeout or a harness error there is nothing trustworthy to
     read. ``errored`` means the test failed before reaching its assertion (no check written). ``anomalous`` covers,
-    for example, an unknown exit code, a pass without ``end`` or with the token or a check other than ``safe``, a
-    failure that left ``end`` behind, a token without an ``unsafe`` check, and an ``unsafe`` check without a token.
+    for example, an unknown exit code, a pass without ``end`` or with the token or a check other than ``holds``, a
+    failure that left ``end`` behind, a token without a ``violated`` check, and a ``violated`` check without a token.
     """
     exit_class = facts.exit_class or ExitClass.UNKNOWN
     if facts.timed_out or facts.exit_code is None or exit_class is ExitClass.HARNESS_ERROR:
@@ -43,10 +43,10 @@ def classify(facts: ProbeFacts) -> Outcome:
     if exit_class is ExitClass.NO_TESTS or not facts.start_marker:
         return Outcome.NOT_RUN
     if (exit_class is ExitClass.PASS and facts.end_marker and not facts.token_in_output
-            and facts.check_marker == "safe"):
+            and facts.check_marker == "holds"):
         return Outcome.PASSED
     if exit_class is ExitClass.TEST_FAILED and not facts.end_marker:
-        if facts.token_in_output and facts.check_marker == "unsafe":
+        if facts.token_in_output and facts.check_marker == "violated":
             return Outcome.ASSERTION_FAILED
         if not facts.token_in_output and facts.check_marker is None:
             return Outcome.ERRORED
@@ -60,9 +60,9 @@ def exit_class(exit_code: int | None, exit_codes: dict[int, ExitClass]) -> ExitC
     return exit_codes.get(exit_code, ExitClass.UNKNOWN)
 
 
-def read_check(content: bytes | str | None) -> Literal["safe", "unsafe"] | None:
-    """The check marker's value: its content with surrounding whitespace stripped, when that is exactly ``safe`` or
-    ``unsafe``. An absent file, undecodable bytes or any other content is None."""
+def read_check(content: bytes | str | None) -> Literal["holds", "violated"] | None:
+    """The check marker's value: its content with surrounding whitespace stripped, when that is exactly ``holds`` or
+    ``violated``. An absent file, undecodable bytes or any other content is None."""
     if content is None:
         return None
     if isinstance(content, bytes):

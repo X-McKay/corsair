@@ -10,8 +10,8 @@ It is run alone with `bundle exec ruby -Itest -Ilib <file> -v -n <name>` from th
 the project's own bundle; `require` production code from `lib/`.
 
 **Markers.** The environment variable `CORSAIR_MARKER_DIR` names a directory. The first statement of the method
-writes a file named `start` there. Immediately before the main assertion it writes `check`, containing `safe` if
-the asserted condition holds and `unsafe` if not, computed from the same variable the assertion checks. The last
+writes a file named `start` there. Immediately before the main assertion it writes `check`, containing `holds` if
+the asserted condition holds and `violated` if not, computed from the same variable the assertion checks. The last
 statement, after every assertion, writes `end`:
 
 ```ruby
@@ -22,7 +22,7 @@ class TargetTest < Minitest::Test
     File.write(File.join(ENV.fetch('CORSAIR_MARKER_DIR'), 'start'), '')
     result = Target.call(input)
     holds = property_holds?(result)
-    File.write(File.join(ENV.fetch('CORSAIR_MARKER_DIR'), 'check'), holds ? 'safe' : 'unsafe')
+    File.write(File.join(ENV.fetch('CORSAIR_MARKER_DIR'), 'check'), holds ? 'holds' : 'violated')
     assert holds, ENV.fetch('CORSAIR_TOKEN')
     File.write(File.join(ENV.fetch('CORSAIR_MARKER_DIR'), 'end'), '')
   end

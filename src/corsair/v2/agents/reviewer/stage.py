@@ -5,7 +5,7 @@ from pathlib import Path
 
 from pydantic_ai.models import Model
 
-from ...contracts import AgentUsage, Case, FrozenPatch, ProbePlan, Validity
+from ...contracts import AgentUsage, Case, FrozenPatch, ProbePlan, Runtime, Validity
 from ..common.usage import run_recorded
 from ..probing.agent import limits
 from ..probing.source import source_workspace
@@ -18,10 +18,14 @@ def review_deps(patch: FrozenPatch, source_root: Path) -> ReviewDeps:
 
 
 async def review(case: Case, plan: ProbePlan, patch: FrozenPatch, model: Model, *, source_root: Path,
-                 revision: str = "vulnerable") -> tuple[Validity, AgentUsage]:
-    """Judge both probes on ``revision``'s source; a review that does not complete is negative for both."""
-    agent = create_agent(model)
-    output, usage = await run_recorded(agent, NAME, render_prompt(case, plan, patch), model=model,
+                 revision: str = "vulnerable", runtime: Runtime | None = None) -> tuple[Validity, AgentUsage]:
+    """Judge both probes on ``revision``'s source; a review that does not complete is negative for both.
+
+    ``runtime`` gives the run's framework skill, offered as a native skill as the Probers get it; without it every
+    present framework skill is offered and none is named.
+    """
+    agent = create_agent(model, framework=runtime.skill if runtime is not None else None)
+    output, usage = await run_recorded(agent, NAME, render_prompt(case, plan, patch, runtime), model=model,
                                        deps=review_deps(patch, source_root), usage_limits=limits(SPEC),
                                        workspace=source_workspace(source_root))
     control, exploit = output if output is not None else (not_reviewed("control", usage.status),

@@ -179,7 +179,7 @@ async def test_packaged_skills_load_natively_and_a_missing_framework_skill_is_to
     _, usage = await exploit_prober.probe(brief("exploit"), RUNTIME, model, source_root=tree)
     loaded = " ".join(str(part.content) for message in seen[-1] for part in message.parts
                       if type(part).__name__ == "LoadCapabilityReturnPart")
-    assert "SAFE behaviour" in loaded and "CORSAIR_MARKER_DIR" in loaded and usage.status == "ok"
+    assert "proof-of-vulnerability" in loaded and "OCCURS" in loaded and "CORSAIR_MARKER_DIR" in loaded and usage.status == "ok"
     assert framework_skills("no-such-framework") == []
 
 

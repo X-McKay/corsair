@@ -11,8 +11,8 @@ production code by its relative path. `test.each` on the one test is allowed. An
 target.
 
 **Markers.** The environment variable `CORSAIR_MARKER_DIR` names a directory. The first statement of the test body
-writes a file named `start` there. Immediately before the main assertion it writes `check`, containing `safe` if
-the asserted condition holds and `unsafe` if not, computed from the same variable the assertion checks. The last
+writes a file named `start` there. Immediately before the main assertion it writes `check`, containing `holds` if
+the asserted condition holds and `violated` if not, computed from the same variable the assertion checks. The last
 statement, after every assertion, writes `end`:
 
 ```js
@@ -24,7 +24,7 @@ test('name', () => {
   fs.writeFileSync(path.join(process.env.CORSAIR_MARKER_DIR, 'start'), '');
   const result = target(input);
   const holds = propertyHolds(result);
-  fs.writeFileSync(path.join(process.env.CORSAIR_MARKER_DIR, 'check'), holds ? 'safe' : 'unsafe');
+  fs.writeFileSync(path.join(process.env.CORSAIR_MARKER_DIR, 'check'), holds ? 'holds' : 'violated');
   assert.ok(holds, process.env.CORSAIR_TOKEN);
   fs.writeFileSync(path.join(process.env.CORSAIR_MARKER_DIR, 'end'), '');
 });

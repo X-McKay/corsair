@@ -151,8 +151,8 @@ class Fakes:
         check = self.diagnose_outcomes.get(draft.role, "ok")
         return check, f"check: {check}\nhint: {draft.role} hint" if check != "ok" else None
 
-    async def review(self, case, plan, patch, model, *, source_root, revision="vulnerable"):
-        self._log("review", case, plan, patch, source_root=source_root, revision=revision)
+    async def review(self, case, plan, patch, model, *, source_root, revision="vulnerable", runtime=None):
+        self._log("review", case, plan, patch, source_root=source_root, revision=revision, runtime=runtime)
         if revision == "fixed" and "review" in self.fixed_raises:
             raise self.fixed_raises["review"]
         bound = patch if revision not in self.unbound else patch.model_copy(update={"sha256": "f" * 64})

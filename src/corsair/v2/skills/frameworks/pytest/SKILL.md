@@ -11,8 +11,8 @@ module path from the root and define any fixture you need in the same file. `@py
 function is allowed.
 
 **Markers.** The environment variable `CORSAIR_MARKER_DIR` names a directory. The first statement of the test body
-writes a file named `start` there. Immediately before the main assertion it writes `check`, containing `safe` if
-the asserted condition holds and `unsafe` if not, computed from the same variable the assertion checks. The last
+writes a file named `start` there. Immediately before the main assertion it writes `check`, containing `holds` if
+the asserted condition holds and `violated` if not, computed from the same variable the assertion checks. The last
 statement, after every assertion, writes `end`:
 
 ```python
@@ -23,7 +23,7 @@ def test_name():
     Path(os.environ["CORSAIR_MARKER_DIR"], "start").write_text("start")
     result = target(benign_or_adversarial_input)
     holds = property_holds(result)
-    Path(os.environ["CORSAIR_MARKER_DIR"], "check").write_text("safe" if holds else "unsafe")
+    Path(os.environ["CORSAIR_MARKER_DIR"], "check").write_text("holds" if holds else "violated")
     assert holds, os.environ["CORSAIR_TOKEN"]
     Path(os.environ["CORSAIR_MARKER_DIR"], "end").write_text("end")
 ```

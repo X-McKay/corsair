@@ -11,8 +11,8 @@ name is the file name without `.java`. It holds exactly one `@Test` method named
 dependencies the project's `pom.xml` already declares; the run is offline.
 
 **Markers.** The environment variable `CORSAIR_MARKER_DIR` names a directory. The first statement of the method
-writes a file named `start` there. Immediately before the main assertion it writes `check`, containing `safe` if
-the asserted condition holds and `unsafe` if not, computed from the same variable the assertion checks. The last
+writes a file named `start` there. Immediately before the main assertion it writes `check`, containing `holds` if
+the asserted condition holds and `violated` if not, computed from the same variable the assertion checks. The last
 statement, after every assertion, writes `end`:
 
 ```java
@@ -22,7 +22,7 @@ void name() throws Exception {
     Result result = target.call(input);
     boolean holds = propertyHolds(result);
     java.nio.file.Files.write(java.nio.file.Paths.get(System.getenv("CORSAIR_MARKER_DIR"), "check"),
-            (holds ? "safe" : "unsafe").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            (holds ? "holds" : "violated").getBytes(java.nio.charset.StandardCharsets.UTF_8));
     assertTrue(holds, System.getenv("CORSAIR_TOKEN"));
     java.nio.file.Files.write(java.nio.file.Paths.get(System.getenv("CORSAIR_MARKER_DIR"), "end"), new byte[0]);
 }

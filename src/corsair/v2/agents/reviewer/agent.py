@@ -23,15 +23,21 @@ SPEC = AgentSpec.from_file(Path(__file__).with_name("agent.yaml"))
 SKILLS = "agents/reviewer/skills"
 
 
-def create_agent(model: Model, *, durability: TemporalDurability[ReviewDeps] | None = None) -> Agent:
-    """One definition for direct and durable modes. Every present framework skill is offered; none is required."""
+def create_agent(model: Model, *, durability: TemporalDurability[ReviewDeps] | None = None,
+                 framework: str | None = None) -> Agent:
+    """One definition for direct and durable modes, offering the run's framework skill the way the Probers get it.
+
+    ``framework`` narrows the framework skills to the run's one (tolerating its absence); when None (a durable
+    worker built before any runtime is known) every present framework skill is offered and the prompt names the
+    one to load. The Reviewer judges marker placement by that skill's sanctioned pattern.
+    """
     if not isinstance(model, Model):
         raise TypeError("an explicit native Model instance is required")
     return Agent.from_spec(SPEC, model=model, deps_type=ReviewDeps, output_type=PromptedOutput(finalize_review),
                            capabilities=[
                                source_tools(),
                                Skills([SKILLS, PROTOCOL_SKILLS], workspace=skills_home()),
-                               *framework_skills(None),
+                               *framework_skills(framework),
                                tool_budget(),
             read_loop_guard(),
                                prompted_output(),

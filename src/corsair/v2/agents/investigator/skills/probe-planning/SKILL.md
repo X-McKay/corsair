@@ -17,9 +17,12 @@ Say which ones and what the double must record or return. Never double the targe
 ordinary result to assert (a return value, a written record, a response). It must stay true after a legitimate
 fix of the reported issue, so it must not assert anything about the security check itself.
 
-**Exploit brief.** An adversarial input that would trigger the reported condition, and the safe property to
-assert: the input is rejected, escaped, confined or has no effect on the doubled dependency. Phrase the
-property as what safe code guarantees; the test fails when the code is vulnerable.
+**Exploit brief.** The exploit probe is a proof-of-vulnerability (PoV) test. Give an adversarial input that would
+trigger the reported condition, and the observable condition to assert as occurring: for example the injected
+command reached the subprocess double, the resolved path is outside the base directory, the query sent to the
+database double carries the input as structure, the response holds the unescaped markup. Phrase the property as
+what happens when the issue is real; the test passes when the code is vulnerable and fails when it is not. The
+condition must be one a correct implementation would not show, so the assertion can fail.
 
 **Independence.** Write each brief as if the other did not exist: its own input, its own property, its own
 citations. Do not refer to "the other test" or reuse the other input.

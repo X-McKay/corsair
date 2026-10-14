@@ -3,7 +3,7 @@
 Each probe runs alone, exactly once, in a fresh offline container from the replayed Environment image, with only its
 own file written. Trusted code observes four things itself (D8): the exit code, sorted by the matrix row's exit-code
 map; the ``start`` and ``end`` marker files the test writes under ``$CORSAIR_MARKER_DIR``; the ``check`` marker it
-writes there immediately before its main assertion (``safe`` or ``unsafe``); and whether the per-run
+writes there immediately before its main assertion (``holds`` or ``violated``); and whether the per-run
 ``$CORSAIR_TOKEN`` (given to both roles) appears in the output. ``outcome.classify`` turns those facts into an
 Outcome. Nothing here knows a language: the run argv comes from the row's template, filled generically.
 """
