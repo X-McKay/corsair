@@ -1,7 +1,8 @@
 """Evidence assessment proposes; the deterministic disposition gates decide."""
+from pathlib import Path
 
 from pydantic_ai import Agent
-from ..spec import load_agent_spec, build_agent, factory_identity
+from ..agent_identity import factory_identity
 from pydantic_ai.capabilities import Capability, Instrumentation
 from pydantic_ai.durable_exec.temporal import TemporalDurability
 from pydantic_ai.models import Model
@@ -16,14 +17,13 @@ from .validation import finalize_assessment
 from ..budget import tool_budget
 from ..prompted_output import prompted_output
 
-_SPEC = load_agent_spec('assessment')
-CONFIG_VERSION = _SPEC.metadata.config_version
-MANIFEST_IDENTITY = factory_identity(_SPEC, __file__)
-SPEC_SHA256 = _SPEC.spec_sha256
-CAPABILITY_SELECTION_SHA256 = _SPEC.selection_sha256
+from .prompts import _SPEC
+CONFIG_VERSION = _SPEC.metadata['config_version']
+MANIFEST_IDENTITY = factory_identity(_SPEC, __file__, Path(__file__).with_name('agent.yaml'))
+SPEC_SHA256 = MANIFEST_IDENTITY['spec_sha256']
 
 # Re-exported for existing callers of corsair.agents.evidence_assessment.agent.
-__all__ = ["MANIFEST_IDENTITY", "SPEC_SHA256", "CAPABILITY_SELECTION_SHA256", "CONFIG_VERSION", "INSTRUCTIONS", "PROMPT_VERSION", "SKILL_BYTES", "SKILL_ID", "SKILL_SHA256", "SKILL_TEXT",
+__all__ = ["MANIFEST_IDENTITY", "SPEC_SHA256", "CONFIG_VERSION", "INSTRUCTIONS", "PROMPT_VERSION", "SKILL_BYTES", "SKILL_ID", "SKILL_SHA256", "SKILL_TEXT",
            "TOOLSET_SHA256", "assessment_prompt", "create_evidence_assessment_agent"]
 
 
@@ -32,13 +32,16 @@ def create_evidence_assessment_agent(
     durability: TemporalDurability[AssessmentDependencies] | None = None,
 ) -> Agent[AssessmentDependencies, EvidenceAssessment]:
     """Explicit model seam reusable by native durability; no configured provider fallback."""
-    return build_agent(_SPEC, model=model, deps_type=AssessmentDependencies,
+    if not isinstance(model, Model):
+        raise TypeError('an explicit native Model instance is required')
+    return Agent.from_spec(_SPEC, model=model, deps_type=AssessmentDependencies,
         output_type=finalize_assessment,
 
-        output_retries=output_retries, tool_retries=TOOL_RETRIES,
-        capability_registry={
-            SKILL_ID: lambda: Capability(id=SKILL_ID, instructions=SKILL_TEXT, toolsets=[evidence_tools()]),
-            'tool-budget': tool_budget,
-            'prompted-output': prompted_output,
-            'instrumentation': lambda: Instrumentation(settings=InstrumentationSettings(include_content=False, version=5)),
-        }, extra_capabilities=([durability] if durability is not None else ()))
+        retries={'tools': TOOL_RETRIES, 'output': output_retries},
+        capabilities=[
+            Capability(id=SKILL_ID, instructions=SKILL_TEXT, toolsets=[evidence_tools()]),
+            tool_budget(),
+            prompted_output(),
+            Instrumentation(settings=InstrumentationSettings(include_content=False, version=5)),
+            *([durability] if durability is not None else []),
+        ])

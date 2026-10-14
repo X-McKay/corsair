@@ -1,5 +1,6 @@
 """Planning instructions, skill and typed-input request rendering; no labels, discovery or external calls."""
-from ..spec import load_agent_spec
+from pathlib import Path
+from pydantic_ai.agent.spec import AgentSpec
 
 
 from .contracts import TestPlanningInput
@@ -8,9 +9,9 @@ from .skills import SKILL_ID, SKILL_SHA256, SKILL_TEXT
 # PROMPT_VERSION covers everything the model sees (instructions, skill, rendered user
 # prompt, tool and output schema text); CONFIG_VERSION in agent.py covers budgets,
 # instrumentation and provider composition.
-_SPEC = load_agent_spec('planning')
-PROMPT_VERSION = _SPEC.metadata.prompt_version
-INSTRUCTIONS = _SPEC.spec.instructions
+_SPEC = AgentSpec.from_file(Path(__file__).with_name('agent.yaml'))
+PROMPT_VERSION = _SPEC.metadata['prompt_version']
+INSTRUCTIONS = _SPEC.instructions
 
 __all__ = ["INSTRUCTIONS", "PROMPT_VERSION", "SKILL_ID", "SKILL_SHA256", "SKILL_TEXT", "planning_prompt"]
 

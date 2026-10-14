@@ -4,18 +4,18 @@ from hashlib import sha256
 import json
 from pathlib import Path
 
-from ..spec import load_agent_spec
+from pydantic_ai.agent.spec import AgentSpec
 from .contracts import EnvironmentInput
 from .frameworks import FRAMEWORKS
 
-PROMPT_VERSION = load_agent_spec('environment').metadata.prompt_version
+_SPEC = AgentSpec.from_file(Path(__file__).with_name('agent.yaml'))
+PROMPT_VERSION = _SPEC.metadata['prompt_version']
 LISTED_PATHS = 400  # Paths of the operator listing shown in the request; the rest are counted
 LISTED_CHARS = 24000  # Encoded size of the shown listing: one path may be 1,024 bytes and JSON escapes non-ASCII
 SKILL_ID = "prepare-environment"
 SKILL_TEXT = (Path(__file__).parent / "skills" / SKILL_ID / "SKILL.md").read_text(encoding="utf-8")
 SKILL_SHA256 = sha256(SKILL_TEXT.encode()).hexdigest()
-_ENVIRONMENT_SPEC = load_agent_spec('environment')
-INSTRUCTIONS = _ENVIRONMENT_SPEC.spec.instructions
+INSTRUCTIONS = _SPEC.instructions
 
 
 

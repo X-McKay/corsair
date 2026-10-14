@@ -1,5 +1,7 @@
 """Native factory for the independent ordinary-behavior specialist."""
-from corsair.agents.spec import load_agent_spec, build_agent, factory_identity
+from pathlib import Path
+from pydantic_ai import Agent
+from ..agent_identity import factory_identity
 from pydantic_ai.capabilities import Capability, Instrumentation
 from pydantic_ai.models import Model
 from pydantic_ai.durable_exec.temporal import TemporalDurability
@@ -13,22 +15,24 @@ from .prompts import COMMON_SKILL_ID, COMMON_SKILL_TEXT
 from .tools import TOOLSET_SHA256, specialist_tools
 from .prompts import PROMPT_VERSION, SKILL_SHA256
 from .validation import finalize_draft
-_SPEC = load_agent_spec('control_authoring')
-CONFIG_VERSION = _SPEC.metadata.config_version
-MANIFEST_IDENTITY = factory_identity(_SPEC, __file__)
-SPEC_SHA256 = _SPEC.spec_sha256
-CAPABILITY_SELECTION_SHA256 = _SPEC.selection_sha256
+from .prompts import _SPEC
+CONFIG_VERSION = _SPEC.metadata['config_version']
+MANIFEST_IDENTITY = factory_identity(_SPEC, __file__, Path(__file__).with_name('agent.yaml'))
+SPEC_SHA256 = MANIFEST_IDENTITY['spec_sha256']
 
 def create_control_agent(model, *, output_retries=1, durability: TemporalDurability[SpecialistDependencies] | None = None):
-    agent = build_agent(_SPEC, model=model, deps_type=SpecialistDependencies,
-        output_type=finalize_draft, output_retries=output_retries,
-        capability_registry={
-            CONTROL_SKILL_ID: lambda: Capability(id=CONTROL_SKILL_ID, instructions=CONTROL_SKILL_TEXT, toolsets=[specialist_tools()]),
-            COMMON_SKILL_ID: lambda: Capability(id=COMMON_SKILL_ID, instructions=COMMON_SKILL_TEXT),
-            'tool-budget': tool_budget,
-            'prompted-output': prompted_output,
-            'instrumentation': lambda: Instrumentation(settings=InstrumentationSettings(include_content=False, version=5)),
-        }, extra_capabilities=([durability] if durability is not None else ()))
+    if not isinstance(model, Model):
+        raise TypeError('an explicit native Model instance is required')
+    agent = Agent.from_spec(_SPEC, model=model, deps_type=SpecialistDependencies,
+        output_type=finalize_draft, retries={'tools': 0, 'output': output_retries},
+        capabilities=[
+            Capability(id=CONTROL_SKILL_ID, instructions=CONTROL_SKILL_TEXT, toolsets=[specialist_tools()]),
+            Capability(id=COMMON_SKILL_ID, instructions=COMMON_SKILL_TEXT),
+            tool_budget(),
+            prompted_output(),
+            Instrumentation(settings=InstrumentationSettings(include_content=False, version=5)),
+            *([durability] if durability is not None else []),
+        ])
     @agent.instructions
     def own_input(ctx):
         if not isinstance(ctx.deps.inputs, ControlInput):

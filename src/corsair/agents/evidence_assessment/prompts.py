@@ -2,19 +2,19 @@
 
 from hashlib import sha256
 from pathlib import Path
-from ..spec import load_agent_spec
+from pydantic_ai.agent.spec import AgentSpec
 
 from .contracts import AssessmentInput, ValidityInput
 
 # PROMPT_VERSION covers everything the model sees (instructions, skill, rendered prompt,
 # tool and output schema text); CONFIG_VERSION in agent.py covers retry budgets and instrumentation.
-_SPEC = load_agent_spec('assessment')
-PROMPT_VERSION = _SPEC.metadata.prompt_version
+_SPEC = AgentSpec.from_file(Path(__file__).with_name('agent.yaml'))
+PROMPT_VERSION = _SPEC.metadata['prompt_version']
 SKILL_ID = "assess-evidence"
 SKILL_BYTES = (Path(__file__).parent / "skills" / SKILL_ID / "SKILL.md").read_bytes()
 SKILL_TEXT = SKILL_BYTES.decode("utf-8")
 SKILL_SHA256 = sha256(SKILL_BYTES).hexdigest()
-INSTRUCTIONS = _SPEC.spec.instructions
+INSTRUCTIONS = _SPEC.instructions
 
 
 def assessment_prompt(inputs: AssessmentInput | ValidityInput) -> str:

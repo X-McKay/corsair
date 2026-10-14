@@ -15,11 +15,5 @@ instructions: |-
   adversarial regression.
   Use only read_source, write_test_file and the output contract. Execute nothing.
 metadata:
-  config_version: control-authoring-config-v2-native-spec
+  config_version: control-authoring-config-v2-native-direct-v2
   prompt_version: control-authoring-v2
-  capability_selection:
-  - control-probe
-  - native-probe-boundary
-  - tool-budget
-  - prompted-output
-  - instrumentation

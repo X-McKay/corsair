@@ -66,8 +66,8 @@ _MANIFESTS = {
     "exploit_authoring": exploit_authoring.MANIFEST_IDENTITY,
     "assessment": assessment.MANIFEST_IDENTITY,
 }
-VERSION_FIELDS += ("spec_sha256", "capability_selection_sha256", "factory_source_sha256", "shared_helper_source_sha256")
-VERSIONS = {stage: version + tuple(_MANIFESTS[stage][key] for key in VERSION_FIELDS[-4:])
+VERSION_FIELDS += ("spec_sha256", "factory_source_sha256", "shared_helper_source_sha256")
+VERSIONS = {stage: version + tuple(_MANIFESTS[stage][key] for key in VERSION_FIELDS[-3:])
             for stage, version in VERSIONS.items()}
 
 

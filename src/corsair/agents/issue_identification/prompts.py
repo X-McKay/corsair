@@ -1,6 +1,7 @@
 """Identification instructions, skills and typed-input request rendering for both source modes."""
 
-from ..spec import load_agent_spec
+from pathlib import Path
+from pydantic_ai.agent.spec import AgentSpec
 from ..issue_analysis.contracts import IssueAnalysisInput
 from ..source.repository import RepositoryLimits, SourceTree, list_tree
 from .contracts import RepositoryIssueInput
@@ -10,11 +11,13 @@ from .skills import (
 
 # PROMPT_VERSION covers everything the model sees; CONFIG_VERSION in agent.py covers budgets,
 # instrumentation and composition. Each source mode is versioned separately (SPEC-0038).
-PROMPT_VERSION = load_agent_spec('identification').metadata.prompt_version
-INSTRUCTIONS = load_agent_spec('identification').spec.instructions
+_SPEC = AgentSpec.from_file(Path(__file__).with_name('agent.yaml'))
+PROMPT_VERSION = _SPEC.metadata['prompt_version']
+INSTRUCTIONS = _SPEC.instructions
 
-REPOSITORY_PROMPT_VERSION = load_agent_spec('repository_identification').metadata.prompt_version
-REPOSITORY_INSTRUCTIONS = load_agent_spec('repository_identification').spec.instructions
+_REPOSITORY_SPEC = AgentSpec.from_file(Path(__file__).with_name('repository-agent.yaml'))
+REPOSITORY_PROMPT_VERSION = _REPOSITORY_SPEC.metadata['prompt_version']
+REPOSITORY_INSTRUCTIONS = _REPOSITORY_SPEC.instructions
 
 
 def identification_prompt(inputs: IssueAnalysisInput) -> str:

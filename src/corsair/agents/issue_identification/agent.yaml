@@ -6,10 +6,5 @@ instructions: |-
   Return a source location; trusted code preserves the original issue. Do not rewrite the report, predict behavior or issue a verdict.
   Use only read_source and the supplied structured output contract.
 metadata:
-  config_version: issue-identification-config-v6-native-spec
+  config_version: issue-identification-config-v6-native-direct-v2
   prompt_version: issue-identification-v3-grounding-3
-  capability_selection:
-  - identify-issue
-  - tool-budget
-  - prompted-output
-  - instrumentation
