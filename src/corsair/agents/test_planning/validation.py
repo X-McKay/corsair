@@ -6,6 +6,8 @@ import unicodedata
 from pydantic import ValidationError
 from pydantic_ai import ModelRetry, RunContext
 
+from corsair.ports.test_runner import format_test_id
+
 from ..source.contracts import SourceReference
 from .contracts import ReadyTestPlan, TestPlan, TestPlanDraft, UnsupportedTestPlan
 from .dependencies import PlanningDependencies
@@ -57,6 +59,16 @@ async def finalize_plan(ctx: RunContext[PlanningDependencies], plan: TestPlanDra
     symbol = target.symbol
     for name in ("control", "security"):
         spec = getattr(draft, name)
+        test_name = data[name].pop("test_name")
+        container = data[name].pop("test_container", None)
+        baseline = inputs.environment.baseline_test
+        if baseline is None:
+            raise ModelRetry("no executed baseline test identifies a native runner: return unsupported")
+        try:
+            data[name]["test_id"] = format_test_id(baseline.test_id, spec.test_path, test_name, container,
+                                                  baseline_path=baseline.path)
+        except ValueError as exc:
+            raise ModelRetry(f"{name} test identity: {exc}") from exc
         if not _symbol_occurs(symbol, spec.implementation_call):
             raise ModelRetry(f"the {name} implementation_call must name the identified target {symbol}")
         # Admit the identified source anchor, not merely any successfully read file.

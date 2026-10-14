@@ -32,7 +32,7 @@ RESULTS = REPOSITORY / ".runs" / "evals"
 # Top-level suite identity; the chain nests per-stage prompt/config/skill under "versions" and names its live stages.
 # toolset_sha256 digests the offered tool definitions (SPEC-0052); suites that do not report it leave it absent.
 IDENTITY = ("prompt_version", "config_version", "skill_sha256", "toolset_sha256", "versions", "live_stages", "composition", "model",
-            "dataset", "dataset_sha256", "mode", "runner", "execution", "budget")
+            "evaluator_version", "dataset", "dataset_sha256", "mode", "runner", "execution", "budget")
 
 
 @dataclass(frozen=True)
@@ -51,12 +51,12 @@ SUITES: dict[str, Suite] = {
     "identification": Suite("evals.issue_identification.evaluate", {"development": ()}, repeat=False),
     "planning": Suite("evals.test_planning.evaluate", {
         # heldout and heldout2 are retired (SPEC-0040); the suite refuses them, so they are not offered here.
-        "development": ("--cases", "development"), "heldout3": ("--cases", "heldout3"), "unit": ("--cases", "unit")}),
+        "development": ("--cases", "development"), "heldout3": ("--cases", "heldout3"), "unit": ("--cases", "unit"), "unit-v2": ("--cases", "unit-v2"), "unit-first": ("--cases", "unit-first")}),
     "authoring": Suite("evals.test_authoring.evaluate", {"development": (), "unit": ("--cases", "unit")},
                        note="runs answered by injected observations or the static host runner; tests are not executed"),
     "assessment": Suite("evals.evidence_assessment.evaluate", {
-        "development": ("--split", "development"), "held_out": ("--split", "held_out"), "unit": ()},
-        set_modules={"unit": "evals.evidence_assessment.unit_test"}),
+        "development": ("--split", "development"), "held_out": ("--split", "held_out"), "unit": (), "unit-transfer": ("--cases", "transfer")},
+        set_modules={"unit": "evals.evidence_assessment.unit_test", "unit-transfer": "evals.evidence_assessment.unit_test"}),
     "chain": Suite("evals.fixture_chain.evaluate", {"fixture": (), "jest": ("--cohort", "jest")},
                    live=("--live", "identification,planning,assessment"),
                    note="fixture: live authoring needs the sandbox, so authoring stays scripted on the host; cohorts "
@@ -116,7 +116,9 @@ def summarize(evidence: Path) -> dict:
         entry["attempts"] += 1
         entry.setdefault("task_failures", []).append(failure.get("error_message", "")[:300])
     attempts = sum(entry["attempts"] for entry in cases.values())
+    outcomes = json.loads((evidence / "outcomes.json").read_text()) if (evidence / "outcomes.json").exists() else None
     return {"identity": identity,
+            **({"semantic_outcomes": outcomes} if outcomes is not None else {}),
             "attempts": attempts, "clean_attempts": sum(entry["clean"] for entry in cases.values()),
             "task_failures": len(report["failures"]),
             "assertions": {key: {"passed": p, "total": t} for key, (p, t) in sorted(assertions.items())},
@@ -137,6 +139,10 @@ def compare(current: dict, reference: dict | None, reference_id: str | None) -> 
     lines = [f"# {current['agent']} {current['run']}", "",
              f"Clean attempts: {summary.get('clean_attempts', 0)}/{summary.get('attempts', 0)}"
              f" (task failures {summary.get('task_failures', 0)})", ""]
+    if "semantic_outcomes" in summary:
+        counts = summary["semantic_outcomes"]["outcomes"]
+        lines += ["Review outcomes: " + ", ".join(f"{name}={count}" for name, count in sorted(counts.items())),
+                  "Contract failures are not successful semantic rejections; evaluator defects are separate.", ""]
     if reference is None:
         return "\n".join(lines + ["No earlier run with this set and mode; nothing to compare.", ""])
     before = reference["summary"]

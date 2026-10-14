@@ -309,12 +309,28 @@ def unit_inputs():
             item('candidate-source', 'source', 'def query(input): return "SELECT ?", (input,)', 'candidate', 0, digest('candidate-source')))})
 
 
+def unit_probe(revision, role):
+    source = f'{revision}-source'
+    binding = observation('Resolve the actual query call to the captured production definition',
+                          (source, 1, 1), ('patch', 1, 1))
+    property_evidence = observation('Actual call, input/preconditions and assertion match the frozen reported property',
+                                   ('patch', 1, 1), ('test-plan', 1, 1), ('reported-condition', 1, 1))
+    return {'test_id': PLAN.control_test_id if role == 'control' else PLAN.security_test_id,
+        'production_binding': {'called_symbol': 'query', 'status': 'production',
+            'call_site': {'item_id': 'patch', 'start_line': 1, 'end_line': 1},
+            'definition_site': {'item_id': source, 'start_line': 1, 'end_line': 1}, 'evidence': binding},
+        'input_exercise': {'observed_input': 'alice' if role == 'control' else "alice' OR 1=1 --",
+            'status': 'benign' if role == 'control' else 'reported_adversarial',
+            'preconditions': 'established', 'evidence': property_evidence},
+        'assertion': {'asserted_property': 'expected benign rows' if role == 'control' else 'parameter binding',
+            'status': 'benign_behavior' if role == 'control' else 'security_property', 'evidence': property_evidence},
+        'dependencies': {'substitutions': ['RecordingDatabase records query/parameters unchanged and returns rows'],
+            'scope': 'dependencies_only', 'evidence': binding}}
+
+
 def unit_draft(**changes):
-    reviews = [{'revision': revision, 'source_linked': True, 'condition_exercised': True,
-                'assertions_relevant': True, 'dependency_scope_valid': True,
-                'rationale': observation('Real query construction is exercised with recording dependency; assertions check binding',
-                    (f'{revision}-source', 1, 1), ('patch', 1, 1), ('plan', 1, 1), ('test-plan', 1, 1), ('reported-condition', 1, 1))}
-               for revision in ('baseline', 'candidate')]
+    reviews = [{'revision': revision, 'control': unit_probe(revision, 'control'),
+                'exploit': unit_probe(revision, 'exploit')} for revision in ('baseline', 'candidate')]
     return draft(**JUNIT_ONLY, validity_reviews=reviews) | changes
 
 
@@ -360,7 +376,7 @@ def test_independent_unit_review_admits_without_database_witness():
         assert run_evidence.witness is None
         assert run_evidence.test_validity.observation_plan_sha256 == result.evidence.plan.review_digest
         assert run_evidence.test_validity.source_sha256 == run_evidence.source_sha256
-    assert result.validity_reviews[0].rationale.citations[0].quote.startswith('def query')
+    assert result.validity_reviews[0].control.production_binding.evidence.citations[0].quote.startswith('def query')
 
 
 def test_missing_unit_review_remains_inconclusive():
@@ -371,7 +387,8 @@ def test_missing_unit_review_remains_inconclusive():
 
 def test_unit_review_rejects_irrelevant_assertion_and_substituted_security_logic():
     output = unit_draft()
-    output['validity_reviews'][0] |= {'assertions_relevant': False, 'dependency_scope_valid': False}
+    output['validity_reviews'][0]['exploit']['assertion']['status'] = 'unrelated'
+    output['validity_reviews'][0]['exploit']['dependencies']['scope'] = 'security_logic_replaced'
     result = unit_assess(output)
     assert result.disposition.finding == 'inconclusive'
     assert 'test_validity_unsupported' in {lim.code for lim in result.gate_limitations}
@@ -381,14 +398,17 @@ def test_unit_review_rejects_irrelevant_assertion_and_substituted_security_logic
 def test_unit_review_requires_read_source_patch_and_plan_citations(missing):
     output = unit_draft()
     review = output['validity_reviews'][0]
-    review['rationale']['citations'] = [c for c in review['rationale']['citations'] if c['item_id'] != missing]
+    for role in ('control', 'exploit'):
+        for check in ('production_binding', 'input_exercise', 'assertion', 'dependencies'):
+            evidence = review[role][check]['evidence']
+            evidence['citations'] = [c for c in evidence['citations'] if c['item_id'] != missing]
     with pytest.raises(UnexpectedModelBehavior):
         unit_assess(output)
 
 
 def test_unit_review_cannot_cite_source_from_another_revision():
     output = unit_draft()
-    output['validity_reviews'][0]['rationale']['citations'][0]['item_id'] = 'candidate-source'
+    output['validity_reviews'][0]['control']['production_binding']['definition_site']['item_id'] = 'candidate-source'
     with pytest.raises(UnexpectedModelBehavior):
         unit_assess(output)
 
@@ -461,7 +481,7 @@ def test_truncated_semantic_evidence_cannot_support_affirmative_review(item_id):
         unit_assess(unit_draft(), data)
     output = unit_draft()
     for review in output['validity_reviews']:
-        review['assertions_relevant'] = False
+        review['exploit']['assertion']['status'] = 'unknown'
     assert unit_assess(output, data).disposition.finding == 'inconclusive'
 
 
@@ -528,3 +548,93 @@ def test_final_assessor_cannot_rewrite_validity_after_seeing_outcomes():
     with pytest.raises(UnexpectedModelBehavior, match='output retries'):
         agent.run_sync(assessment_prompt(data), deps=AssessmentDependencies(data),
                        usage_limits=UsageLimits(request_limit=20, tool_calls_limit=18))
+
+
+@pytest.mark.parametrize('role,check,status,flag', [
+    ('control', 'production_binding', 'unknown', 'source_linked'),
+    ('exploit', 'production_binding', 'copied', 'source_linked'),
+    ('exploit', 'production_binding', 'replaced', 'source_linked'),
+    ('control', 'input_exercise', 'different', 'condition_exercised'),
+    ('exploit', 'input_exercise', 'benign', 'condition_exercised'),
+    ('control', 'assertion', 'vacuous', 'assertions_relevant'),
+    ('exploit', 'assertion', 'unrelated', 'assertions_relevant'),
+    ('control', 'dependencies', 'entry_point_replaced', 'dependency_scope_valid'),
+    ('exploit', 'dependencies', 'security_logic_replaced', 'dependency_scope_valid'),
+])
+def test_structured_probe_failures_derive_unsupported_gate_validity(role, check, status, flag):
+    output = unit_draft()
+    changed = output['validity_reviews'][0][role][check]
+    changed['scope' if check == 'dependencies' else 'status'] = status
+    if check == 'production_binding':
+        changed['definition_site'] = (None if status == 'unknown' else
+            {'item_id': 'patch', 'start_line': 1, 'end_line': 1})
+    result = unit_assess(output)
+    assert not getattr(result.evidence.baseline[0].test_validity, flag)
+    assert result.disposition.finding == 'inconclusive'
+    assert 'test_validity_unsupported' in {lim.code for lim in result.gate_limitations}
+
+
+def test_production_binding_cannot_use_copied_patch_as_definition():
+    output = unit_draft()
+    output['validity_reviews'][0]['exploit']['production_binding']['definition_site']['item_id'] = 'patch'
+    with pytest.raises(UnexpectedModelBehavior):
+        unit_assess(output)
+
+
+def test_structured_review_requires_exact_control_and_exploit_test_ids():
+    output = unit_draft()
+    review = output['validity_reviews'][0]
+    review['control']['test_id'], review['exploit']['test_id'] = review['exploit']['test_id'], review['control']['test_id']
+    with pytest.raises(UnexpectedModelBehavior):
+        unit_assess(output)
+
+
+def test_model_cannot_submit_blanket_aggregate_validity_booleans():
+    output = unit_draft()
+    output['validity_reviews'][0]['source_linked'] = True
+    with pytest.raises(UnexpectedModelBehavior):
+        unit_assess(output)
+
+
+def test_saved_aggregate_review_is_readable_but_not_model_facing():
+    from corsair.agents.evidence_assessment.contracts import EvidenceAssessment, ProposedDispositionDraft
+    from pydantic import ValidationError
+    result = unit_assess(unit_draft())
+    saved = result.model_dump()
+    historical = {'revision': 'baseline', 'source_linked': True, 'condition_exercised': True,
+        'assertions_relevant': True, 'dependency_scope_valid': True,
+        'rationale': {'statement': 'Historical bounded review', 'citations': [
+            result.validity_reviews[0].control.production_binding.evidence.citations[0].model_dump()]}}
+    saved['validity_reviews'] = [historical]
+    restored = EvidenceAssessment.model_validate(saved)
+    assert restored.validity_reviews[0].source_linked
+    draft_data = unit_draft(validity_reviews=[historical])
+    with pytest.raises(ValidationError):
+        ProposedDispositionDraft.model_validate(draft_data)
+
+
+def test_semantic_review_reports_all_actionable_citation_errors_in_one_retry():
+    from pydantic_ai import capture_run_messages
+    from corsair.agents.evidence_assessment.contracts import ValidityInput
+    data = unit_inputs()
+    review_input = ValidityInput(scope=data.scope, plan=data.plan,
+        revision_sources={'baseline': digest('baseline-source'), 'candidate': digest('candidate-source')},
+        items=tuple(i for i in data.items if i.kind in ('source', 'patch', 'plan')))
+    output = unit_draft(execution='unknown', finding='inconclusive', fix='not_applicable',
+        application_observations=[], sandbox_observations=[],
+        interpretation=observation('Frozen tests reviewed before execution', ('plan', 1, 1)))
+    review = output['validity_reviews'][0]
+    review['control']['input_exercise']['evidence']['citations'] = [
+        {'item_id': 'patch', 'start_line': 1, 'end_line': 1}]
+    review['exploit']['production_binding']['call_site']['item_id'] = 'plan'
+    review['exploit']['dependencies']['scope'] = 'none'
+    agent = create_evidence_assessment_agent(scripted(output, reads=tuple(i.item_id for i in review_input.items)),
+                                            output_retries=1)
+    with capture_run_messages() as messages, pytest.raises(UnexpectedModelBehavior):
+        agent.run_sync(assessment_prompt(review_input), deps=AssessmentDependencies(review_input),
+                       usage_limits=UsageLimits(request_limit=20, tool_calls_limit=18))
+    from pydantic_ai.messages import RetryPromptPart
+    retries = [part.content for message in messages for part in message.parts if isinstance(part, RetryPromptPart)]
+    assert len(retries) == 1
+    assert all(fragment in retries[0] for fragment in (
+        'control input/preconditions', 'test-plan', 'reported-condition', 'exploit call_site', 'scope none'))

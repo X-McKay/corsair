@@ -103,6 +103,9 @@ def test_held_out_cases_match_manifest_and_stay_unnamed_in_records():
     for name, manifest in MANIFESTS.items():
         frozen = json.loads((EVALS / manifest).read_text())
         assert case_hashes(name) == frozen, f"held-out dataset {name} differs from {manifest}"
+        # Development/unit manifests freeze fixtures, but only held-out sets prohibit disclosure.
+        if not name.startswith("heldout"):
+            continue
         records = [path for kind in ("plans", "issues", "handoffs", "specs", "ideas")
                    for path in (ROOT / "docs/development" / kind).glob("*.md")]
         for path in records:

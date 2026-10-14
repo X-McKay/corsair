@@ -2,9 +2,9 @@
 id: PLAN-0093
 kind: plan
 title: Unit tests at application seams
-status: complete
+status: in_progress
 updated: 2026-10-13
-related: [SPEC-0078]
+related: [SPEC-0078, ISSUE-0009]
 ---
 
 # Unit tests at application seams
@@ -46,3 +46,32 @@ Final feedback validation: **2108 passed, 6 skipped, 12 inherited warnings** in 
 
 
 Agent skill/tool audit: [HANDOFF-0125](../handoffs/HANDOFF-0125-unit-skill-audit.md) corrects phase-specific evidence/citation guidance and explicitly uses typed harness assertion facts in planning/authoring. No additional tools or agents needed. Affected tests253passed; frozen legacy12/20/54 and unit2/2/7 scripted cases all clean. Skill metadata and diff checks pass. Live semantic qualification remains outstanding.
+
+
+Merge/live follow-up: user approved proceeding; PR #130 merged at df5c661 after green CI. Optional-witness rule accepted without a mandatory recorder follow-up. Six-suite live evaluation command was rejected before execution by automatic approval review pending explicit authorization for repository-derived prompts and fixture/source data to the configured external endpoint. No live runs or baseline promotion occurred. [HANDOFF-0126](../handoffs/HANDOFF-0126-merged-live-eval-admission.md) records exact source, discovered baselines and comparability limits. Offline implementation remains complete; live qualification is blocked on admission.
+
+
+Live admission resumed: user explicitly authorized llm.almckay.io/v1 as their self-hosted model. Six suites launched sequentially on RIG0 against exact merged source df5c661; no provider/budget changes or baseline promotion. Evidence root `.runs/pr130-live-merged/`. Results pending; earlier admission rejection retained as history.
+
+
+Initial live unit results (exact merge df5c661, current configured Qwen provider): planning0/4clean (3 native-ID contract failures; remaining accepted plan failed an exact adversarial marker despite a valid equivalent SQL tautology), authoring4/4clean under injected/static runner observations (generated tests not executed), assessment2/7clean. Assessment semantically approved copied and wrong-module targets in drafts blocked only by citation errors; a benign-input exploit case received all-true bound validity and passed the output contract, failing its semantic oracle. Campaign semantic qualification is blocked. Legacy suites continue unchanged; no baseline promotion or prompt correction during measurement.
+
+## Accepted follow-up: probe-level validity evidence
+
+User approved the live-evaluation design improvements. Work from merged df5c661 on codex/probe-validity-evidence. Preserve six-suite before measurements in the unchanged /tmp/corsair-pr130-live checkout and ignored .runs/pr130-live-merged. Implementation lanes: assessment contract/validation/skill and consumers; planning identity formatting at the runner port; versioned evaluator robustness and failure classification. Shared documentation and development/review skills carry the rule forward.
+
+- [x] Replace broad model validity flags with cited per-probe production binding, condition, assertion and dependency checks; derive revision flags and retain immutable binding.
+- [x] Simplify model-facing native identity fields and aggregate actionable review contract errors without weakening gates.
+- [x] Version evaluator corrections, preserve legacy scores, distinguish semantic false approvals from contract/evaluator failures.
+- [ ] Run affected offline/scripted checks, independent review and comparable live suites; retain unsuccessful attempts and no automatic baseline promotion.
+- [ ] Record results, qualification limits and handoff; publish follow-up under standing PR authorization.
+
+Baseline planning development completed 4/12 clean: five task/contract failures and three returned unit plans rejected by legacy witness expectations. This mixes contract failures with obsolete evaluator assumptions; do not describe it as a pure semantic regression. Unit results and admitted assessment false approval remain as recorded above. Campaign qualification stays blocked pending corrected live evidence.
+
+The live semantic blocker and its resolution criteria are tracked in [ISSUE-0009](../issues/ISSUE-0009-unit-review-semantic-validity.md). The user’s self-hosted endpoint authorization persists; no cost or usage approval is needed for proportionate live evaluation.
+
+Follow-up implementation review removed the remaining model-facing raw native-ID alternative: runner formatting is the only new draft path, while frozen scripted outputs are adapted outside production contracts. Assessment stays in the existing agent with four concrete checks per probe; no additional agent, universal parser, recorder or repair loop. Tool/skill audit clarified evidence inventory IDs, pagination boundaries and actionable read errors without expanding budgets or authority. Read-only historical reviews remain parseable; full quoted reviews are retained and oversized final-assessor views use explicit summaries without quotation bodies.
+
+Validation attempt retained: an overly broad bare pytest invocation included live-qualification tests, which refused missing explicit admission arguments; it was interrupted (1331passed,30skipped,33setup errors,1unrelated terminal-environment failure). The terminal fixture saw TERM=dumb/NO_COLOR=1. Use the Makefile offline selection with a normal terminal environment for final checks; no live runtime qualification is claimed. Initial process guard4passed1failed because it treated development manifests as held-out; corrected only the secrecy condition, preserving all manifest hash checks and historical records.
+
+Final offline implementation: 2,163 passed, 6 skipped, 12 warnings in 63.42 s using the Makefile offline selection with 4 workers, TERM=xterm-256color and NO_COLOR unset (`/tmp/corsair-probe-validity-offline-final.log`). The prior correct-selection run had 2,162 passed and 1 old-protocol replay failure; its fixture boundary was adapted without modifying the recorded response, then 18 focused checks passed and the full run passed. Independent review and skill/tool audit completed. Before authoring development is 3/20 clean with 5 task failures; it uses injected runner observations, not generated-test execution. Original assessment development remains running.

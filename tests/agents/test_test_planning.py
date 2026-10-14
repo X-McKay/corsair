@@ -18,6 +18,7 @@ from corsair.agents.test_planning import (
     UnsupportedTestPlanDraft, create_test_planning_agent, planning_prompt,
 )
 from corsair.agents.test_planning.skills import SKILL_TEXT
+from evals.test_planning.drafts import component_draft
 from evals.test_planning.evaluate import (
     DATASETS, MANIFESTS, RETIRED, EvaluationBudget, dataset, evaluate, passed, plan_checks,
 )
@@ -51,7 +52,7 @@ def responding(plan, *, reads=("documents.py", "test_existing.py"), offered=None
 
 
 def reference():
-    return json.loads(json.dumps(case().metadata.reference_plan))
+    return component_draft(case().metadata.reference_plan)
 
 
 def test_reference_plan_is_admitted_with_trusted_quotations_and_no_labels_in_prompt():
@@ -151,7 +152,7 @@ def edit(path, value):
 
 @pytest.mark.parametrize("plan", [
     reference() | {"regression": reference()["control"]},                                      # third test
-    edit(("security", "test_id"), "test_documents.py::test_benign_control"),                    # duplicate ids
+    edit(("security", "test_name"), "test_benign_control"),                    # duplicate ids
     edit(("security", "test_path"), "tests/test_elsewhere.py"),                                  # unapproved path
     edit(("discovery_command",), ["python", "-m", "pytest", "--collect-only", "-q", "-k", "control"]),  # altered tokens
     edit(("citations",), []),                                                                    # uncited
@@ -204,13 +205,16 @@ def test_contract_checks_environment_only_with_run_context_and_always_checks_ids
 def test_planned_ids_must_name_a_test_in_their_approved_file(path, other, native):
     environment = case().inputs.environment.model_copy(update={"approved_test_paths": (path, other)})
     inputs = case().inputs.model_copy(update={"environment": environment})
-    plan = reference()
+    plan = json.loads(json.dumps(case().metadata.reference_plan))
+    for refs in (plan["citations"], plan["control"]["source_references"], plan["security"]["source_references"]):
+        for ref in refs:
+            ref["quote"] = "Captured source"
     for name in ("control", "security"):
         plan[name].update(test_path=path, test_id=native(path, f"test_{name}"))
-    ReadyTestPlanDraft.model_validate(plan, context=inputs)
+    ReadyTestPlan.model_validate(plan, context=inputs)
     plan["security"]["test_id"] = native(other, "test_security")
     with pytest.raises(ValidationError, match="does not name a test in its test path"):
-        ReadyTestPlanDraft.model_validate(plan, context=inputs)
+        ReadyTestPlan.model_validate(plan, context=inputs)
 
 
 def test_previous_run_reads_do_not_authorize_citations():
@@ -314,7 +318,7 @@ def test_scratch_check_rejects_fixtures_outside_the_scratch_location():
     assert "../" in plan.security.input
 
 
-@pytest.mark.parametrize("name", sorted(set(MANIFESTS) - {"unit"}))
+@pytest.mark.parametrize("name", sorted(name for name in MANIFESTS if name.startswith("heldout")))
 def test_heldout_cases_stay_disjoint_and_retired_sets_cannot_run_again(tmp_path, name):
     heldout = dataset(name)
     assert len(heldout.cases) == 6 and {c.metadata.status for c in heldout.cases} == {"ready", "unsupported"}
@@ -441,3 +445,44 @@ def test_unit_observation_contract_refuses_incomplete_or_mixed_evidence(change):
         plan["security"]["observation"]["kind"] = "dependency_call"
     with pytest.raises(ValidationError):
         ReadyTestPlanDraft.model_validate(plan, context=case().inputs)
+
+
+def test_explicit_test_names_finalize_to_native_ids_without_new_output_fields():
+    draft = reference()
+    expected = {role: case().metadata.reference_plan[role]['test_id'] for role in ('control', 'security')}
+    output = run(create_test_planning_agent(responding(draft)), case().inputs).output
+    for role in ('control', 'security'):
+        assert getattr(output, role).test_id == expected[role]
+        assert 'test_name' not in getattr(output, role).model_dump()
+        assert 'test_container' not in getattr(output, role).model_dump()
+
+
+@pytest.mark.parametrize('change', [
+    {'test_name': None},
+    {'test_id': 'test_documents.py::test_control'},
+    {'test_id': None},
+])
+def test_draft_refuses_ambiguous_or_missing_native_identity(change):
+    draft = reference()
+    draft['control'].update(change)
+    with pytest.raises(ValidationError):
+        ReadyTestPlanDraft.model_validate(draft)
+
+
+def test_duplicate_explicit_names_are_refused_after_native_formatting():
+    draft = reference()
+    for role in ('control', 'security'):
+        draft[role]['test_name'] = 'test_same'
+    with pytest.raises(UnexpectedModelBehavior):
+        run(create_test_planning_agent(responding(draft), output_retries=0), case().inputs)
+
+
+def test_frozen_reference_conversion_preserves_original_and_excludes_native_id_from_model_schema():
+    from corsair.agents.test_planning.contracts import TestSpecificationDraft
+    frozen = json.loads(json.dumps(case().metadata.reference_plan))
+    original = json.loads(json.dumps(frozen))
+    converted = component_draft(frozen)
+    assert frozen == original
+    assert all('test_id' not in converted[role] for role in ('control', 'security'))
+    assert 'test_id' not in TestSpecificationDraft.model_json_schema()['properties']
+    assert all(converted[role]['test_name'] for role in ('control', 'security'))

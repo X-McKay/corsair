@@ -15,6 +15,7 @@ from evals.fixture_e2e.case import (
     scripted_identification,
 )
 from tests.agents.test_fixture_composition import stages, store
+from evals.test_planning.drafts import component_draft
 
 
 def unit_planner():
@@ -30,7 +31,7 @@ def unit_planner():
         done = sum(isinstance(p, ToolReturnPart) for m in messages for p in m.parts)
         if done < 2:
             return ModelResponse(parts=[ToolCallPart("read_source", {"path": ("documents.py", "test_existing.py")[done]})])
-        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {"plan": draft})])
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {"plan": component_draft(draft)})])
     return FunctionModel(respond)
 
 
@@ -51,15 +52,30 @@ def unit_assessor(seen, candidate=True, fix_applicable=True):
         def cite(item):
             return {"item_id": item["item"], "start_line": 1, "end_line": min(80, int(item["lines"]))}
         def reviews(revision):
-            selected = [i for i in items if i["kind"] in ("patch", "plan") or (i["kind"] == "source" and i["revision"] == revision)]
-            return {"revision": revision, "source_linked": True, "condition_exercised": True,
-                    "assertions_relevant": True, "dependency_scope_valid": True,
-                    "rationale": {"statement": "Frozen tests call the saved implementation and assert the reported property", "citations": [cite(i) for i in selected]}}
+            source = next(i for i in items if i['kind'] == 'source' and i['revision'] == revision)
+            patch = next(i for i in items if i['kind'] == 'patch')
+            plan = next(i for i in items if i['item'] == 'test-plan')
+            issue = next(i for i in items if i['item'] == 'reported-condition')
+            binding = {'statement': 'Actual read_document call resolves to the captured production module',
+                       'citations': [cite(patch), cite(source)]}
+            property_evidence = {'statement': 'Actual argument/preconditions and assertion match the reported property',
+                                 'citations': [cite(patch), cite(plan), cite(issue)]}
+            def probe(role):
+                return {'test_id': reference_plan()[role]['test_id'],
+                    'production_binding': {'called_symbol': 'read_document', 'status': 'production',
+                        'call_site': cite(patch), 'definition_site': cite(source), 'evidence': binding},
+                    'input_exercise': {'observed_input': 'note.txt' if role == 'control' else '../secret.txt',
+                        'status': 'benign' if role == 'control' else 'reported_adversarial',
+                        'preconditions': 'established', 'evidence': property_evidence},
+                    'assertion': {'asserted_property': 'Benign contents' if role == 'control' else 'ValueError rejection',
+                        'status': 'benign_behavior' if role == 'control' else 'security_property', 'evidence': property_evidence},
+                    'dependencies': {'substitutions': [], 'scope': 'none', 'evidence': binding}}
+            return {'revision': revision, 'control': probe('control'), 'exploit': probe('security')}
         receipts = [cite(i) for i in items if i["kind"] == "receipt"]
         return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, {
             "execution": "unknown" if pre_execution else "completed", "finding": "inconclusive" if pre_execution else "reproduced", "fix": "not_applicable" if pre_execution else (("verified" if candidate else "not_verified") if fix_applicable else "not_applicable"),
             "application_observations": [], "sandbox_observations": [],
-            "interpretation": {"statement": "Planned assertion fails on baseline and passes on candidate", "citations": [cite(items[0])] if pre_execution else receipts},
+            "interpretation": {"statement": "Frozen calls and assertions reviewed against captured source" if pre_execution else "Planned assertion fails on baseline and passes on candidate", "citations": [cite(items[0])] if pre_execution else receipts},
             "limitations": ["Only the reviewed component property is established"],
             "validity_reviews": [reviews(r) for r in (("baseline", "candidate") if candidate else ("baseline",))] if pre_execution else [],
         })])

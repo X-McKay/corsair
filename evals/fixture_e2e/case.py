@@ -106,7 +106,11 @@ def _reads_then(paths, output):
         if done < len(paths):
             return ModelResponse(parts=[ToolCallPart("read_source", {"path": paths[done], "start_line": 1},
                                                      tool_call_id=f"read-{done}")])
-        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, output(info))])
+        value = output(info)
+        if "plan" in value:
+            from evals.test_planning.drafts import component_draft
+            value = value | {"plan": component_draft(value["plan"])}
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, value)])
     return FunctionModel(respond)
 
 

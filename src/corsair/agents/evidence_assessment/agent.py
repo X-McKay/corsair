@@ -15,7 +15,7 @@ from .validation import finalize_assessment
 from ..budget import tool_budget
 from ..prompted_output import prompted_output
 
-CONFIG_VERSION = "evidence-assessment-config-v3"
+CONFIG_VERSION = "evidence-assessment-config-v4"
 
 # Re-exported for existing callers of corsair.agents.evidence_assessment.agent.
 __all__ = ["CONFIG_VERSION", "INSTRUCTIONS", "PROMPT_VERSION", "SKILL_BYTES", "SKILL_ID", "SKILL_SHA256", "SKILL_TEXT",

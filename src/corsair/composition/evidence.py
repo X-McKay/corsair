@@ -198,6 +198,44 @@ def review_items(plan: ObservationPlan, patch: TestPatch,
     return tuple(items)
 
 
+def _frozen_review_items(review: EvidenceAssessment) -> tuple[EvidenceItem, ...]:
+    """Keep ordinary reviews complete; larger reviews expose explicit quoted-content-free summaries.
+
+    The original quoted artifact remains in DirectRun.validity_review. Summaries retain
+    every probe finding, statement, citation coordinate and bound identity; only repeated
+    quotation bodies are omitted. Never silently truncate a validity decision.
+    """
+    content = review.model_dump_json()
+    if len(content) <= MAX_ITEM_CHARS:
+        return (_item('test-validity', 'test_validity', content),)
+
+    def without_quotes(value):
+        if isinstance(value, dict):
+            return {key: without_quotes(item) for key, item in value.items() if key != 'quote'}
+        if isinstance(value, list):
+            return [without_quotes(item) for item in value]
+        return value
+
+    items = []
+    for decision in review.validity_reviews:
+        bound = review.bound_validity.get(decision.revision)
+        summary = {
+            'representation': 'summary_without_quotation_bodies',
+            'full_artifact': 'DirectRun.validity_review retains the complete frozen quoted review',
+            'review': without_quotes(decision.model_dump(mode='json')),
+            'limitations': list(review.limitations),
+            'interpretation': without_quotes(review.interpretation.model_dump(mode='json')),
+            'bound_validity': bound.model_dump(mode='json') if bound is not None else None,
+        }
+        content = json.dumps(summary, separators=(',', ':'))
+        if len(content) > MAX_ITEM_CHARS:
+            raise ValueError(f'{decision.revision} validity summary exceeds the admitted evidence item budget')
+        items.append(_item(f'test-validity-{decision.revision}', 'test_validity', content))
+    if not items:
+        raise ValueError('frozen validity review exceeds the admitted evidence item budget')
+    return tuple(items)
+
+
 def evidence_items(plan: ObservationPlan, patch: TestPatch, environment: EnvironmentIdentity,
                    runs: dict[Revision, tuple[NativeTestRun, ...]],
                    admitted: frozenset[Revision] | set[Revision] = frozenset(),
@@ -208,7 +246,7 @@ def evidence_items(plan: ObservationPlan, patch: TestPatch, environment: Environ
     items = [_item('plan', 'plan', plan.model_dump_json(indent=2)),
              _item('environment', 'environment', environment.model_dump_json(indent=2))]
     if frozen_review is not None:
-        items.append(_item('test-validity', 'test_validity', frozen_review.model_dump_json(indent=2)))
+        items.extend(_frozen_review_items(frozen_review))
     if review_sources is not None:
         if test_plan is not None:
             items.append(_item('test-plan', 'plan', test_plan.model_dump_json(indent=2)))

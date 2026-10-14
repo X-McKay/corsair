@@ -33,3 +33,5 @@ Default to exactly two native unit tests around existing real application seams,
 - Use `corsair-handoff` before ending substantial work. Include concrete next actions and stop conditions. Commit/push only within the user's authorization; never publish raw run/state evidence.
 
 Examples: qualify the current platform gate; implement one sandbox adapter method; change one agent prompt and compare its isolated evaluations; investigate a native build failure without altering sandbox policy.
+
+For validity-review changes, require cited findings for each probe’s actual production binding, inputs/preconditions, asserted property and substituted dependencies. Derive overall validity from both probes. A copied target is invalid even if identical; a benign input is not an exploit because its test is named one. In evaluations, separate semantic false approvals from contract failures and evaluator defects, preserve old measurements when versioning corrections, and distinguish fixture runner responses from actual generated-test execution.

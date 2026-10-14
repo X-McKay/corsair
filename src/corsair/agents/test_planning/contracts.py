@@ -136,10 +136,9 @@ class PlannedObservation(Contract):
         return self
 
 
-class TestSpecification(Contract, Generic[Citation]):
+class _TestSpecification(Contract, Generic[Citation]):
     __test__ = False
 
-    test_id: Name = Field(description="Native test identifier the authored test must have")
     test_path: Path = Field(description="One of the approved test paths")
     fixture_setup: tuple[Fact, ...] = Field(min_length=1, max_length=8, description="Explicit preconditions and resources, created inside the scratch location")
     implementation_call: Fact = Field(description="The real implementation call, naming the identified target")
@@ -153,12 +152,27 @@ class TestSpecification(Contract, Generic[Citation]):
     _path = field_validator("test_path")(confined_path)
 
     @model_validator(mode="after")
-    def observation_required(self) -> "TestSpecification[Citation]":
+    def observation_required(self) -> "_TestSpecification[Citation]":
         if self.witness is None and self.observation is None:
             raise ValueError("a test without a witness requires a typed unit-test observation")
         if self.witness is not None and self.observation is not None:
             raise ValueError("choose a unit-test observation or a legacy witness for each test")
         return self
+
+
+class _NativeTestIdentity(Contract):
+    test_id: Name = Field(description="Native identifier formatted by the admitted runner")
+
+
+class TestSpecification(_TestSpecification[Citation], _NativeTestIdentity, Generic[Citation]):
+    # Native Pydantic base-field ordering keeps frozen final plans unchanged.
+    pass
+
+
+class TestSpecificationDraft(_TestSpecification[SourceReference]):
+    """Model supplies names; the runner owns serialized native identifiers."""
+    test_name: Name = Field(description="Plain function, method or subtest name; runner formats its native identifier")
+    test_container: Name | None = Field(default=None, description="Declaring class or suite when needed; omit for a top-level test")
 
 
 class SecurityExpectation(Contract):
@@ -185,7 +199,8 @@ class _ReadyPlan(Contract, Generic[Citation]):
 
     @model_validator(mode="after")
     def two_distinct_admitted_tests(self, info: ValidationInfo) -> "_ReadyPlan[Citation]":
-        if self.control.test_id == self.security.test_id:
+        if (getattr(self.control, "test_id", None) is not None
+                and self.control.test_id == self.security.test_id):
             raise ValueError("control and security tests need distinct test ids")
         if (self.control.witness is None) != (self.security.witness is None):
             raise ValueError("control and security must use the same observation mode")
@@ -198,7 +213,7 @@ class _ReadyPlan(Contract, Generic[Citation]):
                 if spec.test_path not in environment.approved_test_paths:
                     raise ValueError(f"test path {spec.test_path} is not an approved test path")
                 # The author writes each test into its planned file; an id naming another file cannot be run there.
-                if not names_test_in(spec.test_id, spec.test_path):
+                if getattr(spec, "test_id", None) is not None and not names_test_in(spec.test_id, spec.test_path):
                     raise ValueError(f"test id {spec.test_id} does not name a test in its test path {spec.test_path}")
             if self.discovery_command != environment.discovery_command:
                 raise ValueError("discovery command tokens must equal the supplied environment command")
@@ -245,7 +260,8 @@ class _UnsupportedPlan(Contract, Generic[Citation]):
 
 
 class ReadyTestPlanDraft(_ReadyPlan[SourceReference]):
-    pass
+    control: TestSpecificationDraft = Field(description="Benign control through the real implementation path")
+    security: TestSpecificationDraft = Field(description="Security regression for the reported concern")
 
 
 class UnsupportedTestPlanDraft(_UnsupportedPlan[SourceReference]):

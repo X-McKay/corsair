@@ -23,23 +23,62 @@ from corsair.inference.config import load_agent_config
 from corsair.inference.models import configured_model
 from evals.evidence_assessment.evaluate import EvaluationBudget, describe_model, record_count
 
-CASES = Path(__file__).with_name('unit_test_cases.json')
+EVALUATOR_VERSION = 'unit-validity-v2-structured-classification'
+CASES = Path(__file__).with_name('unit_test_cases_v2.json')
 FLAGS = ('source_linked', 'condition_exercised', 'assertions_relevant', 'dependency_scope_valid')
 
 
-def dataset():
-    return Dataset(name="unit-test-validity", cases=[Case(name=c['name'], inputs=ValidityInput.model_validate_json(json.dumps(c['inputs'])),
-        metadata=c['expected']) for c in json.loads(CASES.read_text())])
+def dataset(path=CASES):
+    raw = json.loads(path.read_text())
+    manifest = path.with_name(path.name.replace('cases', 'manifest'))
+    hashes = {case['name']: sha256(json.dumps(case, sort_keys=True).encode()).hexdigest() for case in raw}
+    if hashes != json.loads(manifest.read_text()):
+        raise ValueError('validity cases differ from their frozen manifest')
+    return Dataset(name="unit-test-validity-v2", cases=[Case(name=c['name'], inputs=ValidityInput.model_validate_json(json.dumps(c['inputs'])),
+        metadata={'expected': c['expected'], 'scripted_review': c['scripted_review']}) for c in raw])
+
+
+def review_classification(output, expected):
+    validity = output.bound_validity.get('baseline')
+    if validity is None:
+        return 'missing_review'
+    approved = all(getattr(validity, flag) for flag in FLAGS)
+    valid = all(expected.values())
+    if approved:
+        return 'correct_approval' if valid else 'dangerous_false_approval'
+    if valid:
+        return 'false_rejection'
+    return ('correct_rejection' if all(getattr(validity, flag) == value for flag, value in expected.items())
+            else 'rejection_wrong_reason')
+
+
+def outcome_summary(report):
+    from collections import Counter
+    counts = Counter()
+    for case in report.cases:
+        if case.evaluator_failures:
+            counts['evaluator_defect'] += 1
+        else:
+            label = case.labels.get('review_classification')
+            counts[label.value if label else 'evaluator_defect'] += 1
+    for failure in report.failures:
+        detail = failure.error_message.lower()
+        counts['contract_failure' if any(marker in detail for marker in
+            ('validationerror', 'maximum output retries', 'output validation')) else 'task_failure'] += 1
+    return {'evaluator_version': EVALUATOR_VERSION, 'attempts': len(report.cases) + len(report.failures),
+        'outcomes': dict(counts), 'report_evaluator_defects': len(report.report_evaluator_failures)}
+
 
 
 class ValidityScore(Evaluator):
     def evaluate(self, ctx):
-        reviews = {review.revision: review for review in ctx.output.validity_reviews}
-        review = reviews.get('baseline')
+        review = ctx.output.bound_validity.get('baseline')
+        expected = ctx.metadata['expected']
         return {'semantic_validity': review is not None and all(
-            getattr(review, flag) == ctx.metadata[flag] for flag in ctx.metadata),
+            getattr(review, flag) == expected[flag] for flag in expected),
             'outcome_blind_contract': ctx.output.evidence is None and ctx.output.gate_result is None,
-            'bound_review': 'baseline' in ctx.output.bound_validity}
+            'bound_review': 'baseline' in ctx.output.bound_validity,
+            'review_classification': review_classification(ctx.output, expected)}
 
 
 def scripted_model(inputs, expected):
@@ -58,14 +97,13 @@ def scripted_model(inputs, expected):
             'application_observations': [], 'sandbox_observations': [],
             'interpretation': {'statement': 'Reviewed frozen inputs before execution', 'citations': citations[:1]},
             'limitations': ['Scripted oracle replay measures plumbing, not semantic judgment'],
-            'validity_reviews': [{'revision': 'baseline', **dict.fromkeys(FLAGS, True), **expected,
-                'rationale': {'statement': 'Frozen semantic review case', 'citations': citations}}]})])
+            'validity_reviews': [expected['scripted_review']]})])
     return FunctionModel(respond)
 
 
-async def evaluate(destination, repeat=1, model=None):
+async def evaluate(destination, repeat=1, model=None, cases=CASES):
     destination.mkdir(parents=True, exist_ok=False)
-    corpus = dataset()
+    corpus = dataset(cases)
     corpus.evaluators.append(ValidityScore())
     offline = model is None
     budget = EvaluationBudget(repeat=repeat)
@@ -74,7 +112,8 @@ async def evaluate(destination, repeat=1, model=None):
         'model': describe_model(model or next(iter(selected.values()))),
         'prompt_version': PROMPT_VERSION, 'config_version': CONFIG_VERSION,
         'skill_sha256': SKILL_SHA256, 'toolset_sha256': TOOLSET_SHA256,
-        'dataset_sha256': sha256(CASES.read_bytes()).hexdigest(), 'budget': budget.model_dump(),
+        'evaluator_version': EVALUATOR_VERSION, 'dataset_file': cases.name,
+        'dataset_sha256': sha256(cases.read_bytes()).hexdigest(), 'budget': budget.model_dump(),
         'task_retries': 0, 'max_concurrency': 1}
     (destination / 'configuration.json').write_text(json.dumps(metadata, indent=2))
 
@@ -102,22 +141,25 @@ async def evaluate(destination, repeat=1, model=None):
                     record_count('observed_' + key, getattr(usage, key))
     report = await corpus.evaluate(task, repeat=repeat, max_concurrency=1, retry_task=None, progress=False)
     (destination / 'report.json').write_bytes(TypeAdapter(type(report)).dump_json(report, indent=2))
-    return not report.failures and all(not c.evaluator_failures and all(a.value for a in c.assertions.values())
+    (destination / 'outcomes.json').write_text(json.dumps(outcome_summary(report), indent=2))
+    return not report.failures and not report.report_evaluator_failures and all(not c.evaluator_failures and all(a.value for a in c.assertions.values())
                                       for c in report.cases)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--evidence', type=Path, required=True)
+    parser.add_argument('--cases', choices=('unit', 'transfer'), default='unit')
     parser.add_argument('--repeat', type=int, default=1)
     parser.add_argument('--provider-config', type=Path)
     args = parser.parse_args()
+    cases = CASES if args.cases == 'unit' else CASES.with_name('unit_transfer_cases_v2.json')
     async def run():
         if args.provider_config is None:
-            return await evaluate(args.evidence, args.repeat)
+            return await evaluate(args.evidence, args.repeat, cases=cases)
         config = load_agent_config(args.provider_config, 'assessment')
         async with configured_model(config) as model:
-            return await evaluate(args.evidence, args.repeat, model)
+            return await evaluate(args.evidence, args.repeat, model, cases=cases)
     raise SystemExit(0 if asyncio.run(run()) else 1)
 
 if __name__ == '__main__':

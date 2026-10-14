@@ -73,3 +73,24 @@ def test_unit_authoring_eval_accepts_native_dependency_mock(monkeypatch):
     agent = create_test_authoring_agent(scripted_model(inputs, oracle))
     result = agent.run_sync(authoring_prompt(inputs), deps=AuthoringDependencies(inputs, ScriptedRunner((ScriptedRun(status="discovered"),))))
     assert all(authoring_checks(inputs, result.output, oracle).values())
+
+
+@pytest.mark.parametrize('attack', ["alice' OR 2=2 --", "alice' OR '1'='1", 'account "alice\' OR \'x\'=\'x\' --"'])
+def test_versioned_plan_oracle_accepts_equivalent_reviewed_condition(attack):
+    from evals.test_planning.evaluate import plan_checks
+    case = planning_dataset('unit-v2').cases[0]
+    plan = authoring_dataset('unit').cases[0].inputs.inputs.plan
+    plan = plan.model_copy(update={'security': plan.security.model_copy(update={'input': attack})})
+    assert plan_checks(case.inputs, plan, case.metadata)['adversarial_input']
+    # Historical v1 criterion is preserved, never retroactively rescored as a success.
+    original = planning_dataset('unit').cases[0]
+    assert not plan_checks(original.inputs, plan, original.metadata)['adversarial_input']
+
+
+@pytest.mark.parametrize('input_text', ['ordinary alice', 'OR 1=2', "OR 'x'='y'", 'OR anything', 'Alice OR 1=1', "alice' OR 1=2 --", "alice' OR 'x'='y"])
+def test_versioned_condition_patterns_do_not_accept_arbitrary_text(input_text):
+    from evals.test_planning.evaluate import plan_checks
+    case = planning_dataset('unit-v2').cases[0]
+    plan = authoring_dataset('unit').cases[0].inputs.inputs.plan
+    plan = plan.model_copy(update={'security': plan.security.model_copy(update={'input': input_text})})
+    assert not plan_checks(case.inputs, plan, case.metadata)['adversarial_input']

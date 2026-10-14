@@ -129,14 +129,75 @@ class Observation(Contract, Generic[Citation]):
     citations: tuple[Citation, ...] = Field(min_length=1, max_length=8)
 
 
+class ProductionBinding(Contract, Generic[Citation]):
+    called_symbol: Fact = Field(description="Actual symbol invoked in the frozen probe, following imports, aliases and replacements")
+    status: Literal["production", "copied", "replaced", "unknown"]
+    call_site: Citation = Field(description="Exact frozen patch lines invoking the probe call")
+    definition_site: Citation | None = Field(description="Exact lines holding the actual called definition, after resolving imports/aliases/replacements; null when unresolved. A test-local copy is in a patch item, not source.")
+    evidence: Observation[Citation]
+
+
+class InputExercise(Contract, Generic[Citation]):
+    observed_input: Fact = Field(description="Actual argument/value reaching this probe's call, copied from the frozen test rather than inferred from the issue")
+    status: Literal["benign", "reported_adversarial", "different", "unknown"]
+    preconditions: Literal["established", "missing", "unknown"]
+    evidence: Observation[Citation]
+
+
+class AssertionProperty(Contract, Generic[Citation]):
+    asserted_property: Fact = Field(description="Property the actual assertion enforces, including any caught exception and pass condition")
+    status: Literal["benign_behavior", "security_property", "unrelated", "vacuous", "unknown"]
+    evidence: Observation[Citation]
+
+
+class DependencySubstitutions(Contract, Generic[Citation]):
+    substitutions: tuple[Fact, ...] = Field(max_length=8, description="Actual dependencies or entry points replaced, including replacement behavior; empty only when none are replaced or unresolved")
+    scope: Literal["none", "dependencies_only", "entry_point_replaced", "security_logic_replaced", "unknown"]
+    evidence: Observation[Citation]
+
+
+class ProbeValidity(Contract, Generic[Citation]):
+    test_id: Fact = Field(description="Exact native test id for this probe from the frozen plan")
+    production_binding: ProductionBinding[Citation]
+    input_exercise: InputExercise[Citation]
+    assertion: AssertionProperty[Citation]
+    dependencies: DependencySubstitutions[Citation]
+
+    @property
+    def observations(self) -> tuple[Observation[Citation], ...]:
+        return (self.production_binding.evidence, self.input_exercise.evidence,
+                self.assertion.evidence, self.dependencies.evidence)
+
+
 class ValidityReview(Contract, Generic[Citation]):
-    """Independent assessment of the frozen test property against one revision."""
+    """Evidence for each real probe; aggregate validity is derived by trusted code."""
     revision: Literal["baseline", "candidate"]
-    source_linked: bool = Field(description="Both control and exploit probes call the intended real source implementation")
-    condition_exercised: bool = Field(description="The control exercises benign input and the exploit exercises the reported adversarial input and preconditions")
-    assertions_relevant: bool = Field(description="Both probes make relevant non-vacuous assertions; the exploit asserts the required safe behavior")
-    dependency_scope_valid: bool
-    rationale: Observation[Citation]
+    control: ProbeValidity[Citation]
+    exploit: ProbeValidity[Citation]
+
+    @property
+    def observations(self) -> tuple[Observation[Citation], ...]:
+        return (*self.control.observations, *self.exploit.observations)
+
+    @property
+    def source_linked(self) -> bool:
+        return all(probe.production_binding.status == "production" for probe in (self.control, self.exploit))
+
+    @property
+    def condition_exercised(self) -> bool:
+        return (self.control.input_exercise.status == "benign"
+                and self.exploit.input_exercise.status == "reported_adversarial"
+                and all(probe.input_exercise.preconditions == "established" for probe in (self.control, self.exploit)))
+
+    @property
+    def assertions_relevant(self) -> bool:
+        return (self.control.assertion.status == "benign_behavior"
+                and self.exploit.assertion.status == "security_property")
+
+    @property
+    def dependency_scope_valid(self) -> bool:
+        return all(probe.dependencies.scope in ("none", "dependencies_only")
+                   for probe in (self.control, self.exploit))
 
 
 class _Proposal(Contract, Generic[Citation]):
@@ -154,8 +215,19 @@ class ProposedDispositionDraft(_Proposal[EvidenceReference]):
     """Model-facing proposal citing evidence line ranges; quotations are attached by trusted code."""
 
 
+class HistoricalValidityReview(Contract, Generic[Citation]):
+    """Read-only compatibility for saved pre-structured-review artifacts; never accepted from the model."""
+    revision: Literal["baseline", "candidate"]
+    source_linked: bool
+    condition_exercised: bool
+    assertions_relevant: bool
+    dependency_scope_valid: bool
+    rationale: Observation[Citation]
+
+
 class EvidenceAssessment(_Proposal[EvidenceExcerpt]):
     """Final stage output: the proposal, the gate's ruling and the disposition that stands."""
+    validity_reviews: tuple[ValidityReview[EvidenceExcerpt] | HistoricalValidityReview[EvidenceExcerpt], ...] = Field(default=(), max_length=2)
     bound_validity: dict[Literal["baseline", "candidate"], TestValidity] = Field(default_factory=dict, exclude_if=lambda value: not value)
     admission: Admission
     gate_limitations: tuple[Limitation, ...]

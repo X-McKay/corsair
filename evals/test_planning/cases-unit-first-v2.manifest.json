@@ -1,0 +1,8 @@
+{
+  "path_traversal_unguarded": "78e8dfc01ee8824fe9a55167a37b95ee7d868f7dc213c8404ee891687282df21",
+  "path_traversal_guarded": "a27a01c560846851edb2b316d3958e18a0c7b7ab68d05aea1dbfe063433d0adc",
+  "injection_in_saved_test": "809e764a8418d7b463d62804961fc8f4b09a8c7833d5ddc631281aa5250512f3",
+  "no_baseline_test": "e7ed70755244b50d417c6c598ed9b4dee786637a2dcb3138d2189a79a865ce2c",
+  "implementation_absent": "43e6e96d40d7cddec15e73d2893c827b886342c5142b99470b7d362979fb4605",
+  "native_dependency_observation": "46aa3be7abb3dd29b20dcdbebf476d02558a2229f78ff4bb4ea47e7d09b0cdd3"
+}
