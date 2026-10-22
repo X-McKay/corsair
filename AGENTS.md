@@ -1,28 +1,35 @@
-# Corsair development instructions
+# Corsair lite: development rules
 
-These instructions apply throughout this repository. Follow the user's current scope and existing authorization; this workflow does not introduce an extra approval gate.
+Shared by Codex and Claude Code. Follow the user's scope and authorization; these rules add no approval gate. The
+design is in [README.md](README.md) and [docs/design.md](docs/design.md); the pilot record is [docs/pilot.md](docs/pilot.md).
 
-## Start and finish a session
+## What the kernel guarantees, and what code may never weaken
 
-1. Read [README.md](README.md), [current work](docs/development/CURRENT.md), and the linked plan, issue, and latest handoff. Check `git status` and the branch before editing; preserve unrelated work.
-2. Use the [development skill](.claude/skills/corsair-development/SKILL.md). Read only the architecture/contracts and records relevant to the change. Verify recorded state against source and evidence; a handoff is context, not proof.
-3. Work on one bounded component at a time. Keep its implementation plan current, including blockers, decisions, commands and actual results. Continue independent authorized work when a dependency is blocked.
-4. Review using the [review skill](.claude/skills/corsair-review/SKILL.md). Run checks appropriate to the changed boundary; report failed or unrun checks explicitly.
-5. Before ending substantial work, use the [handoff skill](.claude/skills/corsair-handoff/SKILL.md), update `CURRENT.md`, and leave a self-contained result for the user.
+- A verdict comes only from `corsair.kernel`: deterministic gates over one probe with two payloads, run as two native
+  pytest test ids in fresh offline containers built by replaying the submitted build script. No model output is a
+  verdict; the blind auditor sees hypothesis and probe, never an outcome, and can only reject.
+- Polarity: `holds` means the probe's invariant held; `violated` means the probe's own assertion failed, i.e. the
+  reported condition occurred. `LIKELY_EXPLOITABLE` needs control `holds` and exploit `violated` on the vulnerable
+  revision with both runs executing the target lines. The fix is `verified` only when the fixed revision shows control
+  `holds` and exploit `holds`. Nothing else is decisive; `INCONCLUSIVE`, `UNABLE_TO_RUN` and `ERROR` are honest stops.
+- The producer's workspace is never evidence. Everything it did is replayed from the submission in containers it
+  never touched. Model-written code never runs on the host.
+- Labels and oracles (`oracle.json`) are evaluator-only and never reach a `Case`, a prompt or a tool result.
+- Containers: all capabilities dropped, no new privileges, no network except during build replay and in the
+  producer's working sandbox, resource limits, deterministic names and labels, cleanup confirmed against identity.
+  A held identity is never reused or removed by the attempt that found it.
 
-The [development guide](docs/development/README.md) defines locations, templates, status meanings and validation. The v2 architecture in [SPEC-0082](docs/development/specs/SPEC-0082-corsair-v2-architecture.md) is authoritative; work records reference it rather than copying it.
+## How to change it
 
-## Development principles
-
-- **Keep components small.** Each agent has one objective, typed inputs/outputs, restricted tools, and isolated evaluation. Introduce shared code only for a demonstrated second consumer. Create directories when their component is needed.
-- **Evaluate each agent in isolation on the host.** Every agent has a frozen eval set, one command (`make eval AGENT=<name>`, scripted or live with `PROVIDER_CONFIG`), a promoted baseline and comparable metrics, and its eval runs as plain Python without kind, OpenShell or containers: anything outside the process is a typed port answered by fixtures, recorded observations or a deterministic host double. Assess a prompt, skill, budget or contract change against that agent's baseline before composing it; cluster runs qualify, they do not replace the isolated loop. See the [development guide](docs/development/README.md#isolated-agent-evaluation).
-- **Use native capabilities first.** Prefer PydanticAI, Temporal, OpenShell, Pydantic Evals, supported providers and native SDKs. Do not build another scheduler, graph engine, tracing system, provider protocol, credential broker or generic repair framework. Record the upstream gap and concrete need before adding meaningful bespoke functionality.
-- **Keep ports narrow.** Domain contracts do not import vendor SDK objects. Configuration selects explicit adapters/providers; no silent fallback. Reuse the same agent factory/contracts in direct and durable modes and support isolated fixture/local/OpenShell execution as those modes are admitted.
-- **Qualify dependencies progressively.** Do not connect an unqualified component or count mocks, rendered YAML, installed resources or version strings as live qualification. A blocked host/CNI gate stays blocked until actual evidence resolves it. Planning and other independent work may continue.
-- **Default to native unit tests across languages, frameworks and CWEs.** Author and execute exactly two native probes on each investigated revision: the benign control probe and the exploit probe (a proof-of-vulnerability test that passes when it demonstrates the reported condition), both through the real application seam; the only exception is the one independent second exploit attempt that must also fail before a LIKELY_NOT_EXPLOITABLE verdict (SPEC-0082 D18). Require per-probe execution outcomes; discovery alone is insufficient. Observe inputs, outputs, specific exceptions, fixture state and controlled dependency interactions. Doubles may replace dependencies but must retain the production logic responsible for the property. Use integration scope only when that property requires it. Review source linkage, exercise of the reported condition and assertion relevance in a separate outcome-blind call before investigation execution; bind that review to frozen artifacts and prevent result assessment from rewriting it. Optional witnesses support these checks; missing low-level telemetry alone is not a blocker, and passing model-authored assertions alone do not establish semantic validity. Do not require new language-specific recorders.
-- **Preserve security scope.** Keep exactly two native issue-validation tests per attempt: benign control and proof-of-vulnerability; a case runs a second attempt (same control, new independent PoV) only before LIKELY_NOT_EXPLOITABLE, and each verdict is decided on one attempt's pair. Failed control, skipped discovery, unknown execution, or sandbox denial cannot prove an application fix. Keep labels/oracles outside agent-visible inputs.
-- **Retain attributable evidence.** Distinguish host/admission, gateway/transport, policy, dependency, build, test discovery, assertion, agent/provider and cleanup failures. Preserve upstream detail and uncertain command delivery; do not blindly retry possible side effects.
-- **Keep boundaries explicit.** Operator-owned policies, pins and budgets are not agent-editable. No workload credentials, arbitrary host access, TLS bypass or policy weakening to obtain a pass. Confirm cleanup against immutable identity; record unconfirmed cleanup.
-- **Measure changes.** Use native receipts, traces, usage and evaluation reports. Track observable latency, tool/model calls, tokens, retries and failures per agent and mode. Missing telemetry is unknown, not zero. Relevant evaluations include correctness, contract, trajectory, consistency, grounding, robustness, security, durability, efficiency and composition.
-- **Test proportionately.** Use the smallest meaningful checks for the changed behavior, then affected consumers. Shared contract/policy/runtime changes need broader checks. Do not add tests that merely mirror code or invent coverage claims. Preserve failed attempts and compare against frozen baselines.
-- **Keep durable context honest.** Separate proposed, accepted, implemented and qualified states. Update affected docs and records with the code. Never commit `.runs/`, `.state/`, credentials, unredacted secrets or raw private diagnostic exports. Publication follows user authorization; these instructions do not authorize deployments, issue closure or messaging others.
+- Keep it small. Every module has one job: `case`, `matrix`, `providers`, `sandbox`, `kernel`, `auditor`,
+  `producer`, `cli`. Add a module only to remove a responsibility from another. Languages are matrix rows and images,
+  not code paths, once the kernel supports their framework.
+- Skills in `src/corsair/skills/` are operator-owned guidance. A skill or prompt change is an agent behaviour change:
+  rerun `make eval` and compare the gate ledger and verdict accuracy before merging.
+- Checks: `make test-offline` for any change (scripted model and sandbox doubles); `make test` when the kernel,
+  sandbox or image changed (real containers); `make pilot` with the operator's provider config for agent changes.
+  Report each check as passed, failed, blocked or unrun. A passing double proves mechanics, never model quality.
+- Prefer PydanticAI, pytest, coverage.py and the Docker CLI as they are. Do not add a scheduler, graph engine, retry
+  framework, tracing system or a second sandbox abstraction. Record the upstream gap before any bespoke code.
+- Never commit `.runs/`, `.venv/`, credentials or raw private logs. Commit, push and publish only within the user's
+  authorization.

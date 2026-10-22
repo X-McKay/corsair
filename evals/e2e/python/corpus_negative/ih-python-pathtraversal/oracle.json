@@ -1,9 +1,0 @@
-{
-  "label": "LIKELY_NOT_EXPLOITABLE",
-  "disposition": {
-    "execution": "completed",
-    "finding": "not_reproduced",
-    "fix": "not_verified"
-  },
-  "why": "read_doc raises ValueError before opening a path outside data/; the probe observes the planned file's absence and the target's exit."
-}

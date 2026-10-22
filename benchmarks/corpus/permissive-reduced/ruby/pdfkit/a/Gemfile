@@ -1,4 +1,0 @@
-source "https://rubygems.org"
-
-# Minitest 5.15.0 is Ruby 3.1's bundled gem, already installed in the base image; nothing is fetched.
-gem "minitest", "5.15.0"

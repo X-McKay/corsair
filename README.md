@@ -1,65 +1,71 @@
-# Corsair
+# Corsair lite
 
-Corsair validates a reported security issue against an exact repository revision. Agents write exactly two native
-unit tests, a benign control probe and a security-regression (exploit) probe, against the real code; trusted code runs
-both in a sandbox and a fixed rule table labels the issue `LIKELY_EXPLOITABLE`, `LIKELY_NOT_EXPLOITABLE`,
-`INCONCLUSIVE`, `UNABLE_TO_RUN` or `ERROR`. No model runs after execution.
+Corsair validates a reported security issue against an exact source revision and, when one exists, its fix. This
+branch is the minimal redesign: a **deterministic verdict kernel**, one **producer** agent and one **outcome-blind
+auditor**, instead of a five-stage agent pipeline.
 
-This branch carries Corsair v2, a rebuild on native PydanticAI agents and skills, the PydanticAI workspace interface
-(Docker is the default; the explicitly selected OpenShell backend is implemented but not live-qualified) and
-Temporal durability. The v1 implementation remains on `main`.
-[src/corsair/README.md](src/corsair/README.md) describes the chain, its stages and the rules every module keeps.
+The producer explores the vulnerable tree in its own sandbox and submits one *differential probe*: a hypothesis
+(file, function, lines, mechanism), a build script, and a Python module defining `CONTROL_PAYLOAD`,
+`EXPLOIT_PAYLOAD` and `run_target(payload)`. The kernel then, in containers the producer never touched:
+
+1. checks the probe's structure (three symbols, one payload argument, no mocking libraries);
+2. replays the build script in a clean container with network, removes the network, seals the image;
+3. runs `run_target(CONTROL_PAYLOAD)` alone as a native pytest test under coverage: it must hold and execute the
+   hypothesis' target lines;
+4. runs `run_target(EXPLOIT_PAYLOAD)` alone: it must fail with the probe's own assertion (the invariant was
+   violated, so the reported condition occurred) and also execute the target lines;
+5. asks the auditor, which sees only the hypothesis and probe, whether the probe is a fair test;
+6. repeats steps 2 to 4 on the fixed revision to decide whether the fix is verified.
+
+Any failed gate goes back to the producer as the reason, and it may resubmit within an operator-owned budget. The
+label is `LIKELY_EXPLOITABLE` only when every gate passed; otherwise `INCONCLUSIVE`, `UNABLE_TO_RUN` or `ERROR`.
+One driver with two payloads makes "both probes exercise the same real seam" true by construction, and the kernel
+still produces two native test ids (`test_probe[control]`, `test_probe[exploit]`), a JUnit report and a coverage
+report per run.
 
 ## Commands
 
-Requirements: Linux, Python 3.12, `uv`; Docker for workspace, build and canary runs.
+Requirements: Linux, Python 3.12, `uv`, Docker.
 
 ```shell
-make test-v2                     # offline suite (alias: make test); no model, no cluster; Docker tests skip without Docker
-make test-config                 # fast configuration and shared developer-skill guards
-make eval AGENT=<agent> [SET=<set>] [PROVIDER_CONFIG=<providers.json>]   # one agent's isolated eval
-make eval-baseline AGENT=<agent> RUN=<run id>                             # promote a run as that agent's baseline
-make canary                      # classify each runtime-matrix row's passing and failing canary on its image
-make toolchain-images TOOLCHAINS=python   # build toolchain images and run their trusted controls
-uv run --locked corsair-v2 run --case <name> [--mode direct|temporal]     # one case through the chain
+make sync            # install
+make test-offline    # scripted model and sandbox doubles; no Docker, no model
+make test            # plus the kernel on real containers (builds images/python)
+make verify          # kernel only, on the reviewed fixture with the reference submission
+make investigate CASE=cases/path-traversal-fixture PROVIDER=config/providers.local.json
+make eval            # the pilot set against their oracles; writes .runs/lite/eval-<stamp>.json
+make cleanup         # remove every container this tool created
 ```
 
-The kind + OpenShell cluster for the v2 OpenShell backend (`make tools kind-up ... openshell-config qualify-openshell-v2`) is in the [OpenShell v2 runbook](docs/runbooks/openshell-v2.md).
-
-Stage logs go to stderr. Interactive terminals show an indeterminate Rich spinner and scrolling
-stage states; pipes remain append-only. The final text includes recorded per-agent tokens, requests,
-tool calls and agent seconds, with missing values shown as `unknown`. `NO_COLOR` and `--color never`
-disable color. Tool identities/durations and live token deltas remain a follow-on, not inferred metrics.
-
-```shell
-uv run --locked corsair-v2 run --case <name> --format json
-uv run --locked corsair-v2 runs compare <run_dir>... --agents
-uv run --locked corsair-v2 runs compare <run_dir>... --format json
-```
-
-JSON mode emits one versioned object on stdout and retains null telemetry. Direct cancellation
-records a lifecycle receipt without manufacturing a verdict; it is not proof of external command
-termination, cleanup, or resumability. An unfinished recorded run is `incomplete`, not presumed active.
-
-Evidence lands under `.runs/` and is never committed.
-
-To browse it, `make ui-install ui-build ui` serves a read-only UI on http://127.0.0.1:8765: run records with their
-verdict, probe outcomes, review and cost; every agent's eval runs against their reference; agents and baselines; the
-runtime matrix; and Temporal/OpenShell reachability. See the [UI runbook](docs/runbooks/local-ui.md).
+Every run writes `.runs/lite/<run id>/run.json` with each submission's gate, the probe runs (outcomes, exception
+types, covered lines, JUnit and log references), the verdict and the producer's usage. `oracle.json` files beside
+cases are evaluator-only and never reach the agents.
 
 ## Layout
 
 ```text
-src/corsair/           the chain: contracts, stages, intake, matrix selection, build, execute, rules, workflow, CLI
-  skills/frameworks/      per-framework guidance and canaries (the only place framework knowledge lives, with the matrix)
-  workspace/              sandbox port and explicit Docker/OpenShell backends (pydantic_ai.workspaces)
-deploy/v2/runtime-matrix.yaml   operator-owned runtime rows: image, framework, exit-code map
-deploy/qualification/toolchains/ toolchain image sources; tools/toolchain_images.py builds them
-config/v2/                provider configuration
-evals/                    frozen per-case eval data and sets, the corpus loader, and `make eval` (evals/run.py)
-benchmarks/               benchmark inventory and the imported infosec-harness corpus
-tools/                    canary runner and toolchain image builder
-tests/v2/                 offline tests
+src/corsair/
+  case.py        Case, Finding, Revision (tree digest), request loading; oracles kept separate
+  matrix.py      matrix.yaml rows: image + framework + detection hints
+  providers.py   operator model profiles (OpenAI-compatible endpoints), two agents, no fallback
+  sandbox/       the Sandboxes port and its Docker adapter (hardened containers, labels, environments)
+  kernel.py      gates, twin runs, verdict
+  auditor.py     the blind auditor agent
+  producer.py    the producer agent and its three tools
+  cli.py         verify / investigate / eval / cleanup
+  skills/        operator-owned Markdown the producer may read
+images/python/   the pilot runtime image
+matrix.yaml      the runtime matrix
+cases/           the reviewed fixture case with its reference submission
+evals/e2e/python Local Python corpus cases (input.json + evaluator-only oracle.json)
+benchmarks/      the fixture trees and the Python corpus they point at
+docs/            design.md (why and what), pilot.md (what was run and what happened)
 ```
 
-Development rules are in [AGENTS.md](AGENTS.md).
+## Scope and honesty
+
+The sandbox is Docker on the host (the image-only tier); the production sandbox is OpenShell behind the same port and
+is not part of this branch. The pilot image runs as root inside a hardened container. Only pytest is supported;
+other languages arrive as matrix rows plus driver templates. `LIKELY_NOT_EXPLOITABLE` is deliberately not emitted: a
+probe that fails to demonstrate a condition proves nothing about absence. Results in `docs/pilot.md` are from the
+operator's local model and are small-n.

@@ -1,0 +1,6 @@
+{
+  "expected_label": "LIKELY_EXPLOITABLE",
+  "expected_fix": "verified",
+  "forbidden_labels": [],
+  "note": "Evaluator-only. The reviewed fixture pair; the reference submission beside this file is the kernel-only control for the pilot."
+}

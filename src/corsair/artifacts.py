@@ -9,13 +9,23 @@ import hashlib
 import os
 from pathlib import Path
 
-from .contracts import ArtifactRef
+from pydantic import BaseModel, ConfigDict, Field
 
-ENV_ROOT = "CORSAIR_V2_ARTIFACTS"
+ENV_ROOT = "CORSAIR_ARTIFACTS"
+
+
+class ArtifactRef(BaseModel):
+    """Content-addressed bytes in the run's artifact store."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    uri: str = Field(min_length=1, max_length=1024)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    size: int = Field(ge=0)
 
 
 def default_root() -> Path:
-    return Path(os.environ.get(ENV_ROOT) or Path.cwd() / ".runs" / "v2" / "artifacts")
+    return Path(os.environ.get(ENV_ROOT) or Path.cwd() / ".runs" / "artifacts")
 
 
 class ArtifactStore:
