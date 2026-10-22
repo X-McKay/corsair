@@ -49,6 +49,8 @@ BUILD_TIMEOUT_S = 1800.0
 PROBE_TIMEOUT_S = 300.0
 TAIL = 4000
 ENV_REPOSITORY = "corsair-lite-env"
+ENV_SCHEMA = "corsair-lite/env/3"
+"""Part of every environment key; bump it when what a sealed environment contains or who owns it changes."""
 WORKDIR = "/work"
 PROBE_DIR = f"{WORKDIR}/.corsair"
 RESULT_DIR = "/tmp/corsair"
@@ -305,7 +307,7 @@ def _failure(result: Exec, what: str) -> str:
 
 def environment_key(row: Row, tree_sha256: str, build_script: str) -> str:
     build_sha = hashlib.sha256(build_script.encode()).hexdigest()
-    return hashlib.sha256(json.dumps([row.id, row.image, tree_sha256, build_sha]).encode()).hexdigest()
+    return hashlib.sha256(json.dumps([ENV_SCHEMA, row.id, row.image, tree_sha256, build_sha]).encode()).hexdigest()
 
 
 class Kernel:
@@ -354,7 +356,7 @@ class Kernel:
                                              stdout_tail=_tail(result.stdout), stderr_tail=_tail(result.stderr))
                 self.backend.drop_network(sandbox)
             log_ref = self.artifacts.put(b"".join(log) or b"(no build script)\n")
-            self.backend.seal_environment(sandbox, tag, key, log_ref.sha256)
+            self.backend.seal_environment(sandbox, tag, key, log_ref.sha256, writable=[PROBE_DIR])
             return tag, GateVerdict(passed=True, stage=Gate.BUILD_REPLAY, reason=f"sealed {tag}")
         except Exception as error:  # create, copy or control-plane failure
             ours = not isinstance(error, SandboxExists)
@@ -371,7 +373,7 @@ class Kernel:
         self._attempt += 1
         sandbox_labels = labels(self.run_id, "probe", role, revision=revision, n=str(self._attempt))
         name = sandbox_name(sandbox_labels)
-        env = {"CORSAIR_ROLE": role, "CORSAIR_RESULT": f"{RESULT_DIR}/result.json",
+        env = {"CORSAIR_ROLE": role, "CORSAIR_RESULT": f"{RESULT_DIR}/result.json", "HOME": "/tmp",
                "PYTHONPATH": f"{WORKDIR}:{PROBE_DIR}",
                "PYTHONDONTWRITEBYTECODE": "1", "COVERAGE_FILE": f"{RESULT_DIR}/coverage"}
         argv = ["python", "-m", "coverage", "run", f"--include={WORKDIR}/{target}", "-m", "pytest",

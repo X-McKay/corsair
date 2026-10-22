@@ -143,8 +143,11 @@ class Sandboxes(Protocol):
         was sealed from can no longer be opened (so replay rebuilds it)."""
         ...
 
-    def seal_environment(self, name: str, tag: str, key: str, log_sha256: str) -> None:
-        """Record the built sandbox ``name`` as the environment image ``tag``, labelled with its key and build log."""
+    def seal_environment(self, name: str, tag: str, key: str, log_sha256: str,
+                         writable: Sequence[str] = ()) -> None:
+        """Record the built sandbox ``name`` as the environment image ``tag``, labelled with its key and build log.
+        ``writable`` names the directories an unprivileged probe must be able to write; everything else in the
+        prepared tree stays read-only to it."""
         ...
 
     def open_environment(self, image: str, workdir: str, sandbox_labels: Mapping[str, str]) -> str:

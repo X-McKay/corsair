@@ -131,8 +131,9 @@ class FakeSandboxes:
     def find_environment(self, tag: str, key: str) -> str | None:
         return "log" if self.sealed.get(tag) == key else None
 
-    def seal_environment(self, name: str, tag: str, key: str, log_sha256: str) -> None:
+    def seal_environment(self, name: str, tag: str, key: str, log_sha256: str, writable=()) -> None:
         self.sealed[tag] = key
+        self.writable = list(writable)
 
     def open_environment(self, image: str, workdir: str, sandbox_labels: Mapping[str, str]) -> str:
         from corsair.sandbox.port import sandbox_name

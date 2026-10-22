@@ -81,3 +81,17 @@ async def test_an_import_error_in_the_probe_is_not_run_and_a_wrong_target_fails_
 def test_reference_submission_file_is_the_documented_shape():
     data = json.loads((CASE / "reference-submission.json").read_text())
     assert set(data) == {"hypothesis", "build_script", "probe"}
+
+
+@needs_image
+async def test_probes_run_unprivileged_and_cannot_edit_system_files(tmp_path):
+    backend = DockerSandboxes()
+    kernel = Kernel(backend, ROW, load_case(CASE), artifacts=ArtifactStore(tmp_path / "artifacts"),
+                    run_id=f"u{tmp_path.name[-8:]}".lower())
+    hosts_probe = REFERENCE.probe.replace(
+        "def run_target(payload: str) -> None:\n",
+        "def run_target(payload: str) -> None:\n    with open('/etc/hosts', 'a') as handle:\n        handle.write('127.0.0.1 docs.example.com\\n')\n")
+    evaluation = await kernel.evaluate(REFERENCE.model_copy(update={"probe": hosts_probe}))
+    assert evaluation.gate.stage is Gate.CONTROL_RUN
+    assert evaluation.runs[0].outcome is Outcome.ERRORED and evaluation.runs[0].exception_type == "PermissionError"
+    assert backend.labelled(kernel.run_id) == []

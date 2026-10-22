@@ -29,6 +29,10 @@ Rules the kernel enforces, so write to them:
 - No `unittest.mock`, `pytest_mock`, `responses`, `httpretty`. If a dependency must be controlled, pass a real
   object through the target's own parameters; never replace the function that owns the security property.
 - Imports: the repository root is `/work` and on `sys.path`. Import the target the way its own tests do.
+- The attacker controls only the payload. The probe runs unprivileged with no network: it cannot edit `/etc/hosts`,
+  change name resolution, rewrite the target's allowlists or settings, or stand in for an allowlisted host. A
+  check that neutralises the payload under that model is a result, not an obstacle: submit the strongest payload
+  and let the exploit gate say the invariant held.
 
 ## Invariant patterns by condition
 

@@ -414,7 +414,10 @@ class DockerSandboxes:
     provider = PROVIDER
     workdir = "/work"
 
-    def __init__(self) -> None:
+    def __init__(self, probe_user: str | None = "1000:1000") -> None:
+        """``probe_user`` is the unprivileged uid:gid every probe runs as; a sealed environment is handed over owned
+        by it. Build replay runs as the image's user (root in the pilot image) so dependencies can be installed."""
+        self.probe_user = probe_user
         self._owners: dict[str, tuple[int, int]] = {}  # uid, gid read once per created container
 
     @staticmethod
@@ -471,14 +474,25 @@ class DockerSandboxes:
         found = json.loads(cached.stdout) or {}
         return found.get(ENV_LOG_LABEL, "") if found.get(ENV_KEY_LABEL) == key else None
 
-    def seal_environment(self, name: str, tag: str, key: str, log_sha256: str) -> None:
+    def seal_environment(self, name: str, tag: str, key: str, log_sha256: str,
+                         writable: Sequence[str] = ()) -> None:
+        # Probes run unprivileged and the prepared tree stays read-only to them; only the directories the kernel
+        # names (its probe directory) and /tmp are writable. Capabilities are dropped, so this is a mode change by
+        # the owner, not a chown.
+        for path in writable:
+            made = exec_once(name, ["sh", "-c", 'mkdir -p "$1" && chmod 1777 "$1"', "sh", path], workdir="/", timeout=120)
+            if made.exit_code != 0:
+                raise WorkspaceError(f"cannot prepare writable {path}: {made.stderr.decode(errors='replace')[-500:]}")
         committed = docker("commit", "--change", f"LABEL {ENV_KEY_LABEL}={key} {ENV_LOG_LABEL}={log_sha256}", name,
                            tag, timeout=1800)
         if committed.returncode != 0:
             raise WorkspaceError(f"docker commit failed: {committed.stderr.decode(errors='replace')[-1000:]}")
 
     def open_environment(self, image: str, workdir: str, sandbox_labels: Mapping[str, str]) -> str:
-        return create(DockerConfig(image=image, workdir=workdir, network="none", labels=sandbox_labels), adopt=False)
+        name = create(DockerConfig(image=image, workdir=workdir, network="none", labels=sandbox_labels,
+                                   user=self.probe_user), adopt=False)
+        self._owners[name] = owner(name)
+        return name
 
     def agent_workspace(self, image: str, sandbox_labels: Mapping[str, str]) -> DockerWorkspace:
         return DockerWorkspace(DockerConfig(image=image, labels=sandbox_labels, network="bridge"))

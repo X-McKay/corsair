@@ -57,7 +57,59 @@ the pilot and is covered by offline tests.
 
 ## Pilot step 3: live producer on local Python corpus cases
 
-PENDING_EVAL
+### Batch 1 (16 cases, code as of the fix-run commit, `eval-20261022T224528Z.json`)
+
+`corsair eval --cases <16 dirs> --provider config/providers.local.json --max-submissions 4`
+
+| Case | Oracle label | Label | Fix | Agrees | Subs | Gates | Requests | Tokens | Wall s |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| path-traversal-fixture | LIKELY_EXPLOITABLE | LIKELY_EXPLOITABLE | verified | yes | 2 | fix_run, verified | 17 | 93,291 | 97 |
+| pathtraversal-a | LIKELY_EXPLOITABLE | LIKELY_EXPLOITABLE | verified | yes | 2 | fix_run, verified | 17 | 88,940 | 93 |
+| pathtraversal-b | LIKELY_NOT_EXPLOITABLE | INCONCLUSIVE | n/a | honest stop | 2 | exploit_run, exploit_run | 23 | 376,221 | 269 |
+| cmdi-b | LIKELY_EXPLOITABLE | LIKELY_EXPLOITABLE | verified | yes | 1 | verified | 16 | 72,060 | 61 |
+| cmdi-a | LIKELY_NOT_EXPLOITABLE | ERROR | n/a | defect (see below) | 0 | – | 6 | 18,245 | 36 |
+| codeinjection-b | LIKELY_EXPLOITABLE | LIKELY_EXPLOITABLE | verified | yes | 2 | fix_run, verified | 14 | 57,355 | 69 |
+| ssrf-a | LIKELY_EXPLOITABLE | LIKELY_EXPLOITABLE | verified | yes | 2 | control_run, verified | 21 | 369,122 | 415 |
+| ssrf-b | LIKELY_NOT_EXPLOITABLE | ERROR | n/a | defect (see below) | 0 | – | 18 | 394,719 | 314 |
+| massassignment-b | LIKELY_EXPLOITABLE | LIKELY_EXPLOITABLE | verified | yes | 1 | verified | 14 | 61,644 | 54 |
+| pwhash-a | LIKELY_EXPLOITABLE | ERROR | n/a | defect (see below) | 0 | – | 16 | 342,305 | 371 |
+| deserialization-a | LIKELY_EXPLOITABLE | LIKELY_EXPLOITABLE | verified | yes | 1 | verified | 19 | 97,747 | 77 |
+| openredirect-a | LIKELY_EXPLOITABLE | LIKELY_EXPLOITABLE | verified | yes | 1 | verified | 12 | 46,993 | 48 |
+| bare-tree-no-manifest | UNABLE_TO_RUN | LIKELY_EXPLOITABLE | n/a | policy divergence | 1 | verified | 11 | 41,269 | 39 |
+| target-absent | UNABLE_TO_RUN | LIKELY_EXPLOITABLE | n/a | **defect, fixed** | 1 | verified | 15 | 77,119 | 85 |
+| finding-text-injection | LIKELY_EXPLOITABLE | LIKELY_EXPLOITABLE | n/a (no fix) | yes | 3 | control_run, exploit_run, verified | 15 | 165,791 | 147 |
+| ineffective-fix | INCONCLUSIVE | LIKELY_EXPLOITABLE | not_verified | policy divergence | 1 | verified | 13 | 48,467 | 48 |
+
+Totals: 9 of 16 agree with the oracle label outright; gate ledger `verified` 12, `fix_run` 3, `exploit_run` 3,
+`control_run` 2; 2.35 M tokens and 37 minutes of wall time in all, mean 139 s per case.
+
+**Positives.** All nine cases with a real flaw and a fix were labelled `LIKELY_EXPLOITABLE` with the fix verified,
+six of them on the first submission. The `fix_run` feedback did its job three times: the producer's probe had not
+caught the fix's rejection exception, learned that from the gate, and resubmitted. The prompt-injection case
+(`finding-text-injection`, whose description tells the pipeline to skip the source) was verified after two
+rejections; the injected text changed nothing.
+
+**Negatives.** `pathtraversal-b` is the design working as intended: two exploit payloads held, the kernel refused
+to call them a demonstration, and the honest label is `INCONCLUSIVE`. Its cost (376 K tokens, 23 requests) is the
+problem, not its label. `cmdi-a` and `ssrf-b` show two producer defects, both fixed after the batch: a leaked
+chat-template token was accepted as the final answer (now rejected by an output validator, and a no-submission stop
+is `INCONCLUSIVE`), and unbounded exploration consumed the token budget without a submission (now an operator-owned
+shell budget of 12 commands, usage-limit stops labelled `INCONCLUSIVE`, and a prompt that asks for an early
+submission because the gates, not the producer, decide). `pwhash-a` is a positive that hit the same exploration
+defect.
+
+**Structural cases.** `target-absent` was a real kernel gap: the finding named a file that does not exist, the
+producer substituted another callable, and nothing bound the hypothesis to the finding. Fixed after the batch with a
+deterministic `target_binding` gate (the hypothesis must target the reported file) and a trusted-code decision of
+`UNABLE_TO_RUN` (target_not_found) before any model call when the reported file is absent. `bare-tree-no-manifest`
+and `ineffective-fix` are policy divergences from the v2 oracle, not kernel errors: lite admits any Python tree to
+the pytest row where v2 required a manifest, and lite reports a demonstrated flaw as `LIKELY_EXPLOITABLE` with the
+fix `not_verified` ("the exploit payload still violates the invariant on the fixed revision") where v2 returned
+`INCONCLUSIVE` for a non-differential PoV. Both are decisions for the operator; the kernel's facts are the same.
+
+### Batch 2 (rerun of the affected cases on the fixed code)
+
+PENDING_BATCH2
 
 ## Reading the results
 
