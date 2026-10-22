@@ -156,6 +156,14 @@ def _cleanup(args: argparse.Namespace) -> int:
     names = backend.labelled(args.run_id)
     unconfirmed = [name for name in names if not backend.remove(name)]
     print(f"removed {len(names) - len(unconfirmed)} container(s); unconfirmed: {unconfirmed}", file=sys.stderr)
+    if args.images:
+        from .sandbox.docker import docker
+        from .kernel import ENV_REPOSITORY
+        listed = docker("images", ENV_REPOSITORY, "--format", "{{.Repository}}:{{.Tag}}")
+        tags = sorted(set(listed.stdout.decode().split())) if listed.returncode == 0 else []
+        failed = [tag for tag in tags if docker("rmi", tag).returncode != 0]
+        print(f"removed {len(tags) - len(failed)} sealed environment image(s); failed: {failed}", file=sys.stderr)
+        unconfirmed += failed
     return 0 if not unconfirmed else 1
 
 
@@ -188,6 +196,7 @@ def main(argv: list[str] | None = None) -> int:
 
     clean = sub.add_parser("cleanup", help="remove every container this tool created (optionally one run)")
     clean.add_argument("--run-id")
+    clean.add_argument("--images", action="store_true", help="also remove the sealed corsair-lite-env images")
 
     args = parser.parse_args(argv)
     if args.command == "verify":

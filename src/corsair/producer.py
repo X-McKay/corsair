@@ -19,7 +19,7 @@ from pydantic_ai.messages import ModelResponse
 from pydantic_ai.models import Model
 
 from .case import Case
-from .kernel import Evaluation, Fix, Gate, GateVerdict, Kernel, Submission, Verdict, terminal_verdict
+from .kernel import Evaluation, Fix, Gate, GateVerdict, Kernel, Label, Submission, Verdict, terminal_verdict
 from .matrix import Row
 from .sandbox.port import Sandboxes, SandboxSpec, labels
 
@@ -98,6 +98,15 @@ def build_producer(model: Model, *, max_submissions: int = 4) -> Agent[ProducerD
             detail += f"\nstderr: {gate.stderr_tail}"
         detail += f"\nSubmissions left: {remaining}. Fix exactly this and call submit again."
         raise ModelRetry(detail)
+
+    @agent.output_validator
+    def final_text(ctx: RunContext[ProducerDeps], text: str) -> str:
+        """A final answer must be a sentence, not an empty string or a leaked chat-template token; without a
+        verified submission it must say what stopped the producer."""
+        cleaned = text.strip()
+        if not cleaned or "<|im_" in cleaned or "<|endoftext|>" in cleaned:
+            raise ModelRetry("Reply with one plain sentence: either call submit with a probe, or state why you stop.")
+        return cleaned
 
     @agent.tool
     def bash(ctx: RunContext[ProducerDeps], command: str) -> str:
@@ -189,9 +198,12 @@ async def investigate(case: Case, row: Row, *, model: Model, kernel: Kernel, bac
         verdict = deps.verdict
     elif deps.evaluations:
         verdict = terminal_verdict(deps.evaluations[-1].gate, len(deps.evaluations))
-    else:
+    elif error:
         verdict = terminal_verdict(GateVerdict(passed=False, stage=Gate.INFRA,
-                                               reason=f"producer made no submission: {error or 'no error recorded'}"), 0)
+                                               reason=f"producer made no submission: {error}"), 0)
+    else:
+        verdict = Verdict(label=Label.INCONCLUSIVE, rule="K3", fix=Fix.NOT_APPLICABLE,
+                          reason=f"the producer ended without a submission: {(final_text or '')[:1500]}")
     return ProducerRun(verdict=verdict, evaluations=tuple(deps.evaluations), requests=requests,
                        input_tokens=input_tokens, output_tokens=output_tokens, tool_calls=tool_calls,
                        bash_calls=deps.bash_calls,

@@ -149,3 +149,11 @@ async def test_budget_exhaustion_after_fix_run_keeps_the_verified_label_with_the
                             max_submissions=1)
     assert run.verdict.label is Label.LIKELY_EXPLOITABLE and run.verdict.fix.value == "not_verified"
     assert run.evaluations[0].gate.stage is Gate.FIX_RUN and run.error is None
+
+
+async def test_leaked_template_token_is_retried_and_no_submission_is_inconclusive_not_error(tmp_path):
+    fake = FakeSandboxes(dict(HAPPY))
+    model = scripted([[("bash", {"command": "ls"})], ["<|im_start|>user"], ["I could not build a probe that reaches the sink."]])
+    run = await investigate(load_case(CASE), ROW, model=model, kernel=make_kernel(fake, tmp_path), backend=fake)
+    assert run.verdict.label is Label.INCONCLUSIVE and "ended without a submission" in run.verdict.reason
+    assert "could not build" in run.verdict.reason and run.requests == 3 and run.error is None
