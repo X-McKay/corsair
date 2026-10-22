@@ -214,3 +214,13 @@ def test_submission_digest_is_stable_and_hypothesis_lines_are_sorted_unique():
     assert hypothesis.target_lines == (3, 9)
     with pytest.raises(ValueError):
         Hypothesis(target_file="/abs.py", target_symbol="f", target_lines=(1,), root_cause="x", expected_violation="y")
+
+
+async def test_fixed_exploit_raising_a_non_assertion_keeps_the_label_but_asks_for_a_fix_correction(tmp_path):
+    fake = FakeSandboxes({**HAPPY, ("fixed", "exploit"): Script("errored", "ValueError", "not in the subpath")})
+    evaluation = await kernel(fake, tmp_path, auditor=accept).evaluate(REFERENCE)
+    assert evaluation.gate.stage is Gate.FIX_RUN and not evaluation.gate.passed
+    assert "ValueError" in evaluation.gate.reason and "catch it inside run_target" in evaluation.gate.reason
+    assert evaluation.verdict is not None and evaluation.verdict.label is Label.LIKELY_EXPLOITABLE
+    assert evaluation.verdict.fix is Fix.NOT_VERIFIED
+    assert evaluation.submission == REFERENCE

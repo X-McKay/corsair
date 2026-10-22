@@ -117,3 +117,35 @@ async def test_auditor_returns_the_typed_result_and_sees_no_outcome():
     assert "Hypothesis" in prompt and REFERENCE.probe in prompt
     for word in ("passed", "failed", "holds", "violated"):
         assert word not in prompt.lower().replace("fails only", "")  # the auditor never learns an outcome
+
+
+async def test_fix_run_feedback_lets_the_producer_correct_the_probe_and_never_loses_the_label(tmp_path):
+    scenario = {**HAPPY, ("fixed", "exploit"): Script("errored", "ValueError", "not in the subpath")}
+    fake = FakeSandboxes(scenario)
+    calls = 0
+
+    def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return ModelResponse(parts=[ToolCallPart(tool_name="submit", args={"submission": REFERENCE.model_dump(mode="json")})])
+        if calls == 2:  # the retry prompt named fix_run; resubmit a probe that catches the rejection
+            fake.scenario[("fixed", "exploit")] = Script("holds")
+            fixed_probe = REFERENCE.probe.replace("except ValueError:", "except (ValueError, OSError):")
+            return ModelResponse(parts=[ToolCallPart(tool_name="submit", args={"submission": REFERENCE.model_dump(mode="json") | {"probe": fixed_probe}})])
+        return ModelResponse(parts=[TextPart("Verified with the fix.")])
+
+    run = await investigate(load_case(CASE), ROW, model=FunctionModel(respond), kernel=make_kernel(fake, tmp_path),
+                            backend=fake, max_submissions=3)
+    assert [e.gate.stage for e in run.evaluations] == [Gate.FIX_RUN, Gate.VERIFIED]
+    assert run.verdict.label is Label.LIKELY_EXPLOITABLE and run.verdict.fix.value == "verified"
+    assert run.error is None and run.requests == 3
+
+
+async def test_budget_exhaustion_after_fix_run_keeps_the_verified_label_with_the_fix_unverified(tmp_path):
+    fake = FakeSandboxes({**HAPPY, ("fixed", "exploit"): Script("errored", "ValueError", "rejected")})
+    model = scripted([[("submit", {"submission": REFERENCE.model_dump(mode="json")})], ["Keeping the result."]])
+    run = await investigate(load_case(CASE), ROW, model=model, kernel=make_kernel(fake, tmp_path), backend=fake,
+                            max_submissions=1)
+    assert run.verdict.label is Label.LIKELY_EXPLOITABLE and run.verdict.fix.value == "not_verified"
+    assert run.evaluations[0].gate.stage is Gate.FIX_RUN and run.error is None

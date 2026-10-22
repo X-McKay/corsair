@@ -36,6 +36,8 @@ def _record(run_dir: Path, case: Case, row: matrix.Row | None, verdict: Verdict,
               "verdict": verdict.model_dump(mode="json"), **extra}
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "run.json").write_text(json.dumps(record, indent=2) + "\n")
+    for index, evaluation in enumerate(evaluations, 1):
+        (run_dir / f"submission-{index}.json").write_text(evaluation.submission.model_dump_json(indent=2) + "\n")
     return record
 
 

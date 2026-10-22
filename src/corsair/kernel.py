@@ -98,6 +98,7 @@ class Gate(StrEnum):
     EXPLOIT_RUN = "exploit_run"
     EXPLOIT_COVERAGE = "exploit_coverage"
     BLIND_AUDIT = "blind_audit"
+    FIX_RUN = "fix_run"
     INFRA = "infra"
     VERIFIED = "verified"
 
@@ -165,8 +166,14 @@ class Verdict(Frozen):
 
 
 class Evaluation(Frozen):
-    """What one submission produced: the first failed gate, or ``verified`` with a verdict."""
+    """What one submission produced: the first failed gate, or ``verified`` with a verdict.
 
+    One gate can fail while a verdict exists: ``fix_run``. The vulnerable-revision gates passed, so the label stands,
+    but the exploit payload raised something other than the probe's assertion on the fixed revision, so the fix could
+    not be verified and the producer may correct the probe within its budget.
+    """
+
+    submission: Submission
     submission_sha256: str
     gate: GateVerdict
     verdict: Verdict | None = None
@@ -412,8 +419,8 @@ class Kernel:
         runs: list[ProbeRun] = []
 
         def done(gate: GateVerdict, verdict: Verdict | None = None) -> Evaluation:
-            return Evaluation(submission_sha256=submission.sha256, gate=gate, verdict=verdict, runs=tuple(runs),
-                              duration_s=time.monotonic() - started)
+            return Evaluation(submission=submission, submission_sha256=submission.sha256, gate=gate, verdict=verdict,
+                              runs=tuple(runs), duration_s=time.monotonic() - started)
 
         guard = ast_guard(submission.probe)
         if not guard.passed:
@@ -463,8 +470,18 @@ class Kernel:
                                         reason=f"outcome-blind audit rejected the probe: {audit.reason}"))
 
         fix, fix_reason = Fix.NOT_APPLICABLE, "the case has no fixed revision"
+        fix_gate: GateVerdict | None = None
         if self.case.fixed_revision is not None:
             fix, fix_reason = self._verify_fix(submission, runs)
+            fixed_exploit = runs[-1] if len(runs) == 4 and runs[-1].revision == "fixed" else None
+            if (fixed_exploit is not None and fixed_exploit.role == "exploit"
+                    and fixed_exploit.outcome is Outcome.ERRORED and fixed_exploit.exception_type != "AssertionError"):
+                fix_gate = GateVerdict(passed=False, stage=Gate.FIX_RUN,
+                                       reason=f"the vulnerable revision is verified, but on the fixed revision "
+                                              f"EXPLOIT_PAYLOAD raised {fixed_exploit.exception_type}: "
+                                              f"{(fixed_exploit.message or '')[:500]}. If that exception is how the "
+                                              "fix rejects the payload, catch it inside run_target and let the "
+                                              "invariant decide; the fix is not verified until the exploit run holds there")
         verdict = Verdict(label=Label.LIKELY_EXPLOITABLE, rule="K1",
                           reason="control held and the exploit payload violated the invariant on the vulnerable "
                                  "revision, both executing the target lines; the blind audit accepted the probe"
@@ -472,7 +489,7 @@ class Kernel:
                                                "vulnerable revision, both executing the target lines (no audit configured)",
                           fix=fix, fix_reason=fix_reason, submission_sha256=submission.sha256,
                           environment_image=image, runs=tuple(runs), audit=audit)
-        return done(GateVerdict(passed=True, stage=Gate.VERIFIED, reason="differential probe verified"), verdict)
+        return done(fix_gate or GateVerdict(passed=True, stage=Gate.VERIFIED, reason="differential probe verified"), verdict)
 
     def _verify_fix(self, submission: Submission, runs: list[ProbeRun]) -> tuple[Fix, str]:
         assert self.case.fixed_revision is not None

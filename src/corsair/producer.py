@@ -19,7 +19,7 @@ from pydantic_ai.messages import ModelResponse
 from pydantic_ai.models import Model
 
 from .case import Case
-from .kernel import Evaluation, Gate, GateVerdict, Kernel, Submission, Verdict, terminal_verdict
+from .kernel import Evaluation, Fix, Gate, GateVerdict, Kernel, Submission, Verdict, terminal_verdict
 from .matrix import Row
 from .sandbox.port import Sandboxes, SandboxSpec, labels
 
@@ -76,18 +76,21 @@ def build_producer(model: Model, *, max_submissions: int = 4) -> Agent[ProducerD
         """Submit the hypothesis, build_script and probe to the verdict kernel. Returns VERIFIED, or raises with the
         failed gate and reason so you can correct the probe and submit again."""
         deps = ctx.deps
-        if deps.verdict is not None:
+        if deps.verdict is not None and deps.verdict.fix is Fix.VERIFIED:
             return "VERIFIED already; stop and reply with one sentence."
         if len(deps.evaluations) >= deps.max_submissions:
             raise BudgetExhausted(f"{deps.max_submissions} submission(s) evaluated; none verified")
         evaluation = await deps.kernel.evaluate(submission)
         deps.evaluations.append(evaluation)
         gate = evaluation.gate
-        if evaluation.verdict is not None:
-            deps.verdict = evaluation.verdict
-            return (f"VERIFIED: {evaluation.verdict.reason}. Fix: {evaluation.verdict.fix} "
-                    f"({evaluation.verdict.fix_reason}). Reply with one sentence.")
         remaining = deps.max_submissions - len(deps.evaluations)
+        if evaluation.verdict is not None:
+            deps.verdict = evaluation.verdict  # the label stands; a later submission may only improve the fix check
+            if gate.passed or remaining <= 0:
+                return (f"VERIFIED: {evaluation.verdict.reason}. Fix: {evaluation.verdict.fix} "
+                        f"({evaluation.verdict.fix_reason}). Reply with one sentence.")
+            raise ModelRetry(f"[VERIFIED, BUT {gate.stage}]\nReason: {gate.reason}\nSubmissions left: {remaining}. "
+                             "Correct the probe and submit again, or reply with one sentence to keep this result.")
         detail = f"[KERNEL REJECTED AT {gate.stage}]\nReason: {gate.reason}"
         if gate.stdout_tail:
             detail += f"\nstdout: {gate.stdout_tail}"
