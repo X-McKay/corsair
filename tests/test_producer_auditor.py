@@ -157,3 +157,29 @@ async def test_leaked_template_token_is_retried_and_no_submission_is_inconclusiv
     run = await investigate(load_case(CASE), ROW, model=model, kernel=make_kernel(fake, tmp_path), backend=fake)
     assert run.verdict.label is Label.INCONCLUSIVE and "ended without a submission" in run.verdict.reason
     assert "could not build" in run.verdict.reason and run.requests == 3 and run.error is None
+
+
+async def test_shell_budget_is_operator_owned_and_a_token_budget_stop_is_inconclusive(tmp_path):
+    fake = FakeSandboxes(dict(HAPPY))
+    calls = 0
+
+    def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        nonlocal calls
+        calls += 1
+        if calls <= 3:
+            return ModelResponse(parts=[ToolCallPart(tool_name="bash", args={"command": f"ls {calls}"})])
+        return ModelResponse(parts=[TextPart("Stopping.")])
+
+    run = await investigate(load_case(CASE), ROW, model=FunctionModel(respond), kernel=make_kernel(fake, tmp_path),
+                            backend=fake, max_bash_calls=2)
+    assert run.bash_calls == 2  # the third call was answered with the budget message, not executed
+    executed = [argv for name, argv in fake.execs if argv[0] == "bash" and argv[1] == "-lc"]
+    assert len(executed) == 2
+
+    def explore_forever(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        return ModelResponse(parts=[ToolCallPart(tool_name="bash", args={"command": "ls"})])
+
+    run = await investigate(load_case(CASE), ROW, model=FunctionModel(explore_forever),
+                            kernel=make_kernel(fake, tmp_path), backend=fake, request_limit=2)
+    assert run.verdict.label is Label.INCONCLUSIVE and "budget ended the run" in run.verdict.reason
+    assert run.error and run.error.startswith("UsageLimitExceeded")
