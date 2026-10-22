@@ -239,3 +239,15 @@ async def test_hypothesis_must_target_the_reported_file_and_an_absent_target_is_
     unnamed = k.case.model_copy(update={"finding": k.case.finding.model_copy(update={"file_path": None})})
     assert target_binding(unnamed, REFERENCE.hypothesis).passed
     assert not target_binding(unnamed, other.hypothesis).passed  # other.py is not in the tree either
+
+
+async def test_symbol_and_lines_must_exist_in_the_target_file(tmp_path):
+    fake = FakeSandboxes(dict(HAPPY))
+    k = kernel(fake, tmp_path)
+    wrong_symbol = REFERENCE.model_copy(update={"hypothesis": REFERENCE.hypothesis.model_copy(update={"target_symbol": "rotate_logs"})})
+    evaluation = await k.evaluate(wrong_symbol)
+    assert evaluation.gate.stage is Gate.TARGET_BINDING and "does not appear" in evaluation.gate.reason
+    far = REFERENCE.model_copy(update={"hypothesis": REFERENCE.hypothesis.model_copy(update={"target_lines": (4, 400)})})
+    evaluation = await k.evaluate(far)
+    assert evaluation.gate.stage is Gate.TARGET_BINDING and "out of range" in evaluation.gate.reason
+    assert fake.creates == []

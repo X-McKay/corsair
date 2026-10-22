@@ -1,0 +1,12 @@
+{
+  "case_id": "corpus:481f0ac370cd7a08",
+  "finding": {
+    "title": "XML external entity expansion in loadTitle",
+    "description": "Untrusted xml argument reaches the CWE-611 sink in loadTitle.",
+    "file_path": "src/main/java/com/example/XmlLoader.java",
+    "start_line": 13,
+    "symbol": "loadTitle",
+    "cwe": "CWE-611"
+  },
+  "source": "../../../../../benchmarks/corpus/infosec-harness/java/xxe/a"
+}

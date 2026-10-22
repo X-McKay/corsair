@@ -19,20 +19,17 @@ Gates, in order; the first failure is returned to the producer as a ``GateVerdic
 Polarity: ``violated`` means the probe's safety invariant failed, i.e. the reported condition occurred. The fixed
 revision is run after the gates and never rejects a submission; it decides fix verification.
 
-The two payloads run as two native pytest test ids (``test_probe[control]``, ``test_probe[exploit]``) through one
-driver, so "exactly two native probes through the same seam" holds by construction. The runner records the native
-JUnit report, a coverage report for the target file and a small classification file; the kernel reads nothing else.
+The two payloads run as two native test ids through one kernel-owned driver, so "exactly two native probes through
+the same seam" holds by construction. The framework adapter (``corsair.frameworks``) owns the driver, the command
+and how the native report, coverage report and driver record are read; the kernel reads nothing else.
 """
 from __future__ import annotations
 
-import ast
 import hashlib
 import json
-import posixpath
 import shlex
 import time
 import uuid
-import xml.etree.ElementTree as ET
 from collections.abc import Awaitable, Callable
 from enum import StrEnum
 from pathlib import Path
@@ -54,8 +51,6 @@ ENV_SCHEMA = "corsair-lite/env/3"
 WORKDIR = "/work"
 PROBE_DIR = f"{WORKDIR}/.corsair"
 RESULT_DIR = "/tmp/corsair"
-BANNED_IMPORTS = ("unittest.mock", "mock", "pytest_mock", "responses", "httpretty", "requests_mock")
-REQUIRED_SYMBOLS = ("CONTROL_PAYLOAD", "EXPLOIT_PAYLOAD", "run_target")
 
 Role = Literal["control", "exploit"]
 RevisionName = Literal["vulnerable", "fixed"]
@@ -208,89 +203,33 @@ def target_binding(case: Case, hypothesis: Hypothesis) -> GateVerdict:
                            reason=f"the finding reports {reported}; the hypothesis targets {hypothesis.target_file}. "
                                   "Investigate the reported file; if the reported condition cannot occur there, stop "
                                   "and say so instead of substituting another target")
-    if not (Path(case.revision.source) / hypothesis.target_file).is_file():
+    target = Path(case.revision.source) / hypothesis.target_file
+    if not target.is_file():
         return GateVerdict(passed=False, stage=Gate.TARGET_BINDING,
                            reason=f"{hypothesis.target_file} does not exist in the vulnerable revision")
+    try:
+        text = target.read_text(errors="replace")
+    except OSError:
+        text = ""
+    symbol = hypothesis.target_symbol.split("(")[0].split(".")[-1].strip()
+    if symbol and symbol not in text:
+        return GateVerdict(passed=False, stage=Gate.TARGET_BINDING,
+                           reason=f"the symbol {hypothesis.target_symbol!r} does not appear in {hypothesis.target_file}; "
+                                  "name the function or method that actually holds the flaw in that file")
+    if max(hypothesis.target_lines) > text.count("\n") + 1:
+        return GateVerdict(passed=False, stage=Gate.TARGET_BINDING,
+                           reason=f"{hypothesis.target_file} has {text.count(chr(10)) + 1} lines; target_lines "
+                                  f"{list(hypothesis.target_lines)} are out of range")
     return GateVerdict(passed=True, stage=Gate.TARGET_BINDING, reason="hypothesis bound to the reported target")
 
 
-# --- gate 1: the structural guard ----------------------------------------------------------------------------------
+# --- gate 1: the structural guard is the framework adapter's; this name stays for the Python reference ---------
 
 
 def ast_guard(probe: str) -> GateVerdict:
-    try:
-        tree = ast.parse(probe)
-    except SyntaxError as error:
-        return GateVerdict(passed=False, stage=Gate.AST_GUARD, reason=f"probe does not parse: {error}")
-    defined: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.Import, ast.ImportFrom)):
-            names = [alias.name for alias in node.names]
-            module = getattr(node, "module", None) or ""
-            for banned in BANNED_IMPORTS:
-                if module == banned or module.startswith(banned + ".") or banned in names:
-                    return GateVerdict(passed=False, stage=Gate.AST_GUARD,
-                                       reason=f"probe imports a mocking library ({banned}); doubles may replace "
-                                              "dependencies only through the target's own seams, never patch them")
-        elif isinstance(node, ast.FunctionDef) and node.name == "run_target":
-            if len(node.args.args) != 1 or node.args.vararg or node.args.kwonlyargs:
-                return GateVerdict(passed=False, stage=Gate.AST_GUARD,
-                                   reason="run_target must take exactly one positional argument, the payload")
-            defined.add(node.name)
-        elif isinstance(node, (ast.Assign, ast.AnnAssign)):
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-            defined.update(t.id for t in targets if isinstance(t, ast.Name))
-    missing = [name for name in REQUIRED_SYMBOLS if name not in defined]
-    if missing:
-        return GateVerdict(passed=False, stage=Gate.AST_GUARD,
-                           reason=f"probe must define {', '.join(missing)} at module level")
-    return GateVerdict(passed=True, stage=Gate.AST_GUARD, reason="structural contract satisfied")
+    from .frameworks.pytest_ import ast_guard as python_guard
 
-
-# --- the in-container runner -----------------------------------------------------------------------------------------
-
-TEST_FILE = '''"""Kernel-owned driver: one native pytest test id per payload through the submitted run_target."""
-import json
-import os
-import sys
-import traceback
-
-import pytest
-
-for _path in ("/work/.corsair", "/work"):
-    if _path not in sys.path:
-        sys.path.insert(0, _path)
-import corsair_probe as probe  # noqa: E402
-
-ROLE = os.environ["CORSAIR_ROLE"]
-RESULT = os.environ["CORSAIR_RESULT"]
-PAYLOADS = {"control": probe.CONTROL_PAYLOAD, "exploit": probe.EXPLOIT_PAYLOAD}
-
-
-def _record(outcome, exc=None):
-    frames = traceback.extract_tb(exc.__traceback__) if exc is not None else []
-    deepest = frames[-1].filename if frames else ""
-    record = {"role": ROLE, "outcome": outcome, "exception_type": type(exc).__name__ if exc is not None else None,
-              "message": str(exc)[:2000] if exc is not None else None,
-              "raised_in_probe": deepest.endswith("corsair_probe.py")}
-    if outcome == "violated" and not record["raised_in_probe"]:
-        record["outcome"] = "errored"
-    with open(RESULT, "w") as handle:
-        json.dump(record, handle)
-
-
-@pytest.mark.parametrize("role", [ROLE])
-def test_probe(role):
-    try:
-        probe.run_target(PAYLOADS[role])
-    except AssertionError as exc:
-        _record("violated", exc)
-        raise
-    except BaseException as exc:
-        _record("errored", exc)
-        raise
-    _record("holds")
-'''
+    return python_guard(probe)
 
 
 def _tail(data: bytes) -> str:
@@ -323,8 +262,9 @@ class Kernel:
         self.build_timeout = build_timeout
         self.probe_timeout = probe_timeout
         self._attempt = 0
-        if row.framework != "pytest":
-            raise ValueError(f"the kernel supports pytest rows only; row {row.id} is {row.framework}")
+        from .frameworks import framework
+
+        self.framework = framework(row.framework)
 
     # -- gate 2: build replay -----------------------------------------------------------------------------------------
 
@@ -369,26 +309,22 @@ class Kernel:
     # -- gates 3 and 4: one payload, one fresh container ----------------------------------------------------------------
 
     def run_probe(self, image: str, submission: Submission, revision: RevisionName, role: Role) -> ProbeRun:
+        fw = self.framework
         target = submission.hypothesis.target_file
         self._attempt += 1
         sandbox_labels = labels(self.run_id, "probe", role, revision=revision, n=str(self._attempt))
         name = sandbox_name(sandbox_labels)
-        env = {"CORSAIR_ROLE": role, "CORSAIR_RESULT": f"{RESULT_DIR}/result.json", "HOME": "/tmp",
-               "PYTHONPATH": f"{WORKDIR}:{PROBE_DIR}",
-               "PYTHONDONTWRITEBYTECODE": "1", "COVERAGE_FILE": f"{RESULT_DIR}/coverage"}
-        argv = ["python", "-m", "coverage", "run", f"--include={WORKDIR}/{target}", "-m", "pytest",
-                "-p", "no:cacheprovider", "-c", "/dev/null", "--rootdir", WORKDIR, "--noconftest",
-                "--import-mode=importlib", "-q", f"--junitxml={RESULT_DIR}/junit.xml",
-                "-o", "junit_logging=all", "-o", "junit_log_passing_tests=true",
-                f"{PROBE_DIR}/test_corsair_probe.py"]
+        env = dict(fw.environment(role))
+        argv = fw.command(role, target)
         output = b""
         started = time.monotonic()
         duration: float | None = None
         ours = True
         try:
             self.backend.open_environment(image, WORKDIR, sandbox_labels)
-            self.backend.write_file(name, f"{PROBE_DIR}/corsair_probe.py", submission.probe.encode())
-            self.backend.write_file(name, f"{PROBE_DIR}/test_corsair_probe.py", TEST_FILE.encode())
+            self.backend.write_file(name, f"{PROBE_DIR}/{fw.probe_file}", submission.probe.encode())
+            for relative, data in fw.driver_files().items():
+                self.backend.write_file(name, f"{PROBE_DIR}/{relative}", data)
             made = self.backend.exec_once(name, ["mkdir", "-p", RESULT_DIR], workdir="/", timeout=60)
             if made.exit_code != 0:
                 raise RuntimeError(f"cannot create {RESULT_DIR}: {made.stderr.decode(errors='replace')}")
@@ -397,13 +333,13 @@ class Kernel:
             output = b"$ " + shlex.join(argv).encode() + b"\n--- stdout ---\n" + result.stdout + b"\n--- stderr ---\n" + result.stderr
             if result.timed_out or result.container_failed:
                 return self._infra(revision, role, result, output, duration, self.backend.remove(name) if ours else None)
-            self.backend.exec_once(name, ["python", "-m", "coverage", "json", "-o", f"{RESULT_DIR}/coverage.json"],
-                                   workdir=WORKDIR, env=env, timeout=120)
-            files = self.backend.copy_out(name, [f"{RESULT_DIR}/result.json", f"{RESULT_DIR}/junit.xml",
-                                                 f"{RESULT_DIR}/coverage.json"])
-            ours_removed = self.backend.remove(name)
+            after = getattr(fw, "after_command", lambda: None)()
+            if after:
+                self.backend.exec_once(name, after, workdir=WORKDIR, env=env, timeout=120)
+            files = self.backend.copy_out(name, fw.result_paths())
+            confirmed = self.backend.remove(name)
             ours = False
-            return self._classify(revision, role, result, output, duration, files, submission.hypothesis, ours_removed)
+            return self._classify(revision, role, result, output, duration, files, submission.hypothesis, confirmed)
         except Exception as error:
             ours = not isinstance(error, SandboxExists)
             output += f"\n[infra: {type(error).__name__}: {error}]\n".encode()
@@ -424,25 +360,13 @@ class Kernel:
 
     def _classify(self, revision: RevisionName, role: Role, result: Exec, output: bytes, duration: float,
                   files: dict[str, bytes | None], hypothesis: Hypothesis, confirmed: bool | None) -> ProbeRun:
-        junit_bytes = files.get(f"{RESULT_DIR}/junit.xml")
-        tests, native = _read_junit(junit_bytes)
-        record = files.get(f"{RESULT_DIR}/result.json")
-        covered_target, covered_lines = _read_coverage(files.get(f"{RESULT_DIR}/coverage.json"), hypothesis)
-        exception_type = message = None
-        if record is None or tests == 0:
-            outcome = Outcome.NOT_RUN
-            message = native or "the test never ran (collection or import error)"
-        else:
-            parsed = json.loads(record)
-            outcome = Outcome(parsed["outcome"])
-            exception_type, message = parsed.get("exception_type"), parsed.get("message")
-            # The kernel's record and the native report must agree: a holds record with a failing JUnit case (or
-            # the reverse) means something interfered with the run, which is not a decisive observation.
-            if (outcome is Outcome.HOLDS) != (native is None):
-                outcome, message = Outcome.ERRORED, f"native report disagrees with the driver record: {native}"
-        return ProbeRun(revision=revision, role=role, outcome=outcome, exception_type=exception_type, message=message,
-                        exit_code=result.exit_code, junit_tests=tests, covered_target=covered_target,
-                        covered_lines=covered_lines, duration_s=duration, output=self.artifacts.put(output),
+        read = self.framework.read(files, hypothesis)
+        junit_path = next((p for p in self.framework.result_paths() if p.endswith(".xml")), None)
+        junit_bytes = files.get(junit_path) if junit_path else None
+        return ProbeRun(revision=revision, role=role, outcome=read.outcome, exception_type=read.exception_type,
+                        message=read.message, exit_code=result.exit_code, junit_tests=read.junit_tests,
+                        covered_target=read.covered_target, covered_lines=read.covered_lines, duration_s=duration,
+                        output=self.artifacts.put(output),
                         junit=self.artifacts.put(junit_bytes) if junit_bytes else None, cleanup_confirmed=confirmed)
 
     # -- the whole evaluation -------------------------------------------------------------------------------------------
@@ -458,7 +382,7 @@ class Kernel:
         binding = target_binding(self.case, submission.hypothesis)
         if not binding.passed:
             return done(binding)
-        guard = ast_guard(submission.probe)
+        guard = self.framework.guard(submission.probe)
         if not guard.passed:
             return done(guard)
         image, built = self.build(self.case.revision, "vulnerable", submission.build_script)
@@ -560,43 +484,3 @@ def terminal_verdict(last: GateVerdict | None, attempts: int) -> Verdict:
         return Verdict(label=Label.UNABLE_TO_RUN, rule="K2", reason=last.reason, fix=Fix.NOT_APPLICABLE)
     reason = f"after {attempts} submission(s) the last one failed {last.stage}: {last.reason}"
     return Verdict(label=Label.INCONCLUSIVE, rule="K3", reason=reason[:2000], fix=Fix.NOT_APPLICABLE)
-
-
-# --- native report readers ----------------------------------------------------------------------------------------
-
-
-def _read_junit(data: bytes | None) -> tuple[int, str | None]:
-    """(number of test cases, the first failure or error text or None)."""
-    if not data:
-        return 0, None
-    try:
-        root = ET.fromstring(data)
-    except ET.ParseError:
-        return 0, "unreadable JUnit report"
-    cases = root.iter("testcase")
-    count, first = 0, None
-    for case in cases:
-        count += 1
-        for kind in ("failure", "error"):
-            node = case.find(kind)
-            if node is not None and first is None:
-                first = f"{kind}: {(node.get('message') or '')[:500]}"
-    if count == 0:
-        for node in root.iter("error"):
-            return 0, f"error: {(node.get('message') or node.text or '')[:500]}"
-    return count, first
-
-
-def _read_coverage(data: bytes | None, hypothesis: Hypothesis) -> tuple[bool | None, tuple[int, ...]]:
-    if not data:
-        return None, ()
-    try:
-        report = json.loads(data)
-    except json.JSONDecodeError:
-        return None, ()
-    target = hypothesis.target_file
-    for path, info in report.get("files", {}).items():
-        if posixpath.normpath(path).endswith(target):
-            executed = set(info.get("executed_lines", []))
-            return bool(executed), tuple(sorted(executed & set(hypothesis.target_lines)))
-    return False, ()

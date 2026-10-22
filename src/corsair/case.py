@@ -91,27 +91,81 @@ def revision(source: Path, commit: str | None = None) -> Revision:
     return Revision(source=str(source), commit=commit, tree_sha256=tree_sha256(source))
 
 
+class GitSource(BaseModel):
+    """A tree acquired from a git repository at an exact commit, without running the repository's hooks."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    url: str = Field(pattern=r"^https://[^\s]+$")
+    commit: str = Field(pattern=r"^[0-9a-f]{40}$")
+    subdir: str | None = Field(default=None, description="Investigate only this directory of the checkout")
+
+
 class _Request(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     case_id: str | None = None
     finding: Finding
-    source: str = Field(min_length=1)
+    source: str | GitSource = Field(description="A directory relative to this file, or a pinned git source")
     commit: str | None = None
-    fixed_source: str | None = None
+    fixed_source: str | GitSource | None = None
     fixed_commit: str | None = None
+
+
+SOURCES_ENV = "CORSAIR_SOURCES"
+
+
+def sources_root() -> Path:
+    return Path(os.environ.get(SOURCES_ENV) or Path.cwd() / ".runs" / "sources")
+
+
+def acquire(source: GitSource, root: Path | None = None) -> Path:
+    """Clone exactly one commit into a cache keyed by (url, commit), hooks disabled, and return the tree path.
+
+    The cache directory is content-addressed; a complete checkout carries a ``.corsair-complete`` marker, so an
+    interrupted clone is redone rather than trusted. ``.git`` stays beside the tree and is excluded from the digest.
+    """
+    import subprocess
+
+    key = hashlib.sha256(f"{source.url}\n{source.commit}".encode()).hexdigest()[:24]
+    target = (root or sources_root()) / key
+    marker = target / ".corsair-complete"
+    if not marker.is_file():
+        if target.exists():
+            import shutil
+            shutil.rmtree(target)
+        target.mkdir(parents=True)
+        git = ["git", "-c", "core.hooksPath=/dev/null", "-c", "protocol.file.allow=never", "-C", str(target)]
+        subprocess.run([*git, "init", "-q"], check=True, stdin=subprocess.DEVNULL)
+        subprocess.run([*git, "fetch", "-q", "--depth", "1", source.url, source.commit], check=True,
+                       stdin=subprocess.DEVNULL, timeout=900)
+        subprocess.run([*git, "-c", "advice.detachedHead=false", "checkout", "-q", source.commit], check=True,
+                       stdin=subprocess.DEVNULL)
+        marker.write_text(f"{source.url}\n{source.commit}\n")
+    tree = target / source.subdir if source.subdir else target
+    if not tree.is_dir() or not tree.resolve().is_relative_to(target.resolve()):
+        raise ValueError(f"subdir {source.subdir!r} is not a directory inside the checkout")
+    return tree
 
 
 def from_request(path: Path) -> Case:
     """A Case from a request file (``input.json``): ``finding`` and ``source`` are required; ``fixed_source``,
-    ``commit``, ``fixed_commit`` and ``case_id`` are optional; any other key (a label, an oracle) is refused."""
+    ``commit``, ``fixed_commit`` and ``case_id`` are optional; any other key (a label, an oracle) is refused.
+    A source is a directory relative to the file, or ``{"url": ..., "commit": ..., "subdir": ...}`` acquired by
+    ``acquire`` at that exact commit."""
     path = Path(path).resolve()
     raw = path.read_bytes()
     request = _Request.model_validate_json(raw)
     base = path.parent
-    fixed = revision(base / request.fixed_source, request.fixed_commit) if request.fixed_source else None
+
+    def resolve(spec: str | GitSource, commit: str | None) -> Revision:
+        if isinstance(spec, GitSource):
+            return revision(acquire(spec), spec.commit)
+        return revision(base / spec, commit)
+
+    fixed = resolve(request.fixed_source, request.fixed_commit) if request.fixed_source else None
     return Case(case_id=request.case_id or f"issue:{hashlib.sha256(raw).hexdigest()[:16]}", finding=request.finding,
-                revision=revision(base / request.source, request.commit), fixed_revision=fixed)
+                revision=resolve(request.source, request.commit), fixed_revision=fixed)
 
 
 def load_case(path: Path) -> Case:

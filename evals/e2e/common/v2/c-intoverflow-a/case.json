@@ -1,0 +1,20 @@
+{
+  "language": "common",
+  "framework": "make",
+  "family": "c-intoverflow",
+  "kind": "unsupported",
+  "category": "failure-mode",
+  "probes": "A C source tree with a Makefile test (an unsupported language): the chain must stop at Select rather than borrow another language's runtime.",
+  "expected": "UNABLE_TO_RUN by R0 with terminal reason no_runtime; no agent runs and the fix is not verified.",
+  "dimensions": [
+    "correctness",
+    "contract",
+    "safety"
+  ],
+  "provenance": {
+    "source": "https://github.com/X-McKay/infosec-harness",
+    "license": "NOASSERTION (same-owner repository; in-repo copy under SPEC-0067, see benchmarks/corpus/infosec-harness/SOURCE.md)",
+    "path": "benchmarks/corpus/infosec-harness/c/intoverflow/a (family ih-c-intoverflow)",
+    "notes": "C source; filed under common"
+  }
+}

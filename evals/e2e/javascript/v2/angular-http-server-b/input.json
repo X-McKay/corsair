@@ -1,0 +1,13 @@
+{
+  "case_id": "corpus:0fb208cdb483eef3",
+  "finding": {
+    "title": "Path traversal in static file request handler",
+    "description": "The static-file request handler maps the request URL to a file path under the server root and reads it; the URL path segment is carried into path.join without containment.",
+    "file_path": "src/server.js",
+    "start_line": 12,
+    "symbol": "resolveUrl",
+    "cwe": "CWE-22"
+  },
+  "source": "../../../../../benchmarks/corpus/permissive-reduced/javascript/angular-http-server/b",
+  "fixed_source": "../../../../../benchmarks/corpus/permissive-reduced/javascript/angular-http-server/a"
+}

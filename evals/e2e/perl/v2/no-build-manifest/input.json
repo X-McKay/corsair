@@ -1,0 +1,11 @@
+{
+  "finding": {
+    "title": "OS command injection in show",
+    "description": "`$name` reaches backticks in show.",
+    "file_path": "lib/Notes.pm",
+    "start_line": 6,
+    "symbol": "show",
+    "cwe": "CWE-78"
+  },
+  "source": "tree"
+}

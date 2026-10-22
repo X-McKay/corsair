@@ -1,0 +1,70 @@
+{
+  "expected_label": "LIKELY_NOT_EXPLOITABLE",
+  "acceptable_labels": [
+    "LIKELY_NOT_EXPLOITABLE"
+  ],
+  "forbidden_labels": [
+    "LIKELY_EXPLOITABLE"
+  ],
+  "expected_rule": "R5",
+  "expected_terminal_reason": "ok",
+  "expected_finding": "not_reproduced",
+  "expected_fix": "not_applicable",
+  "expected_runtime_row": "junit4-maven-temurin8",
+  "truth": {
+    "source": "manifest",
+    "manifest": "benchmarks/corpus/permissive-reduced/manifest.json",
+    "manifest_case": "java-spring-security-b",
+    "manifest_truth": {
+      "expected_verdict": "likely_not_exploitable",
+      "reachability": "neutralized",
+      "sink_file": "src/main/java/org/springframework/security/authentication/encoding/PlaintextPasswordEncoder.java",
+      "sink_line": 57,
+      "source": "presented raw password and stored encoded password",
+      "target_callable": "isPasswordValid"
+    }
+  },
+  "why": "Manifest truth likely_not_exploitable (reachability neutralized).",
+  "revision_tree_sha256": "042fd7788c595687778f1151960c9fe961727e8f06bfa63e31383f4908d13443",
+  "fixed_tree_sha256": null,
+  "replay": {
+    "plan": {
+      "status": "planned",
+      "citations": [
+        {
+          "path": "src/main/java/org/springframework/security/authentication/encoding/PlaintextPasswordEncoder.java",
+          "start_line": 57,
+          "end_line": 57,
+          "quote": "\t\tString pass1 = encPass + \"\";"
+        }
+      ]
+    },
+    "build": [
+      true
+    ],
+    "check": {
+      "control": "ok",
+      "exploit": "ok"
+    },
+    "review": {
+      "vulnerable": {
+        "control": true,
+        "exploit": true,
+        "citations": [
+          {
+            "path": "src/main/java/org/springframework/security/authentication/encoding/PlaintextPasswordEncoder.java",
+            "start_line": 57,
+            "end_line": 57,
+            "quote": "\t\tString pass1 = encPass + \"\";"
+          }
+        ]
+      }
+    },
+    "outcomes": {
+      "vulnerable": {
+        "control": "passed",
+        "exploit": "assertion_failed"
+      }
+    }
+  }
+}

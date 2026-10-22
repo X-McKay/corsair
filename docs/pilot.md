@@ -109,7 +109,62 @@ fix `not_verified` ("the exploit payload still violates the invariant on the fix
 
 ### Batch 2 (rerun of the affected cases on the fixed code)
 
-PENDING_BATCH2
+Code as of the target-binding commit (probes still ran as root); `eval-20261022T230733Z.json`.
+
+| Case | Oracle label | Label | Fix | Agrees | Subs | Gates | Requests | Tokens | Wall s |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| target-absent | UNABLE_TO_RUN | UNABLE_TO_RUN | n/a | **yes, 0 model calls** | 0 | – | 0 | 0 | 0 |
+| cmdi-a | LIKELY_NOT_EXPLOITABLE | INCONCLUSIVE | n/a | honest stop | 4 | exploit_run ×4 | 21 | 374,054 | 316 |
+| ssrf-b | LIKELY_NOT_EXPLOITABLE | LIKELY_EXPLOITABLE | n/a | **false positive (see below)** | 1 | verified | 22 | 280,849 | 157 |
+| pwhash-a | LIKELY_EXPLOITABLE | LIKELY_EXPLOITABLE | not_verified | yes (fix unverified) | 4 | control_run, verified, control_run, control_run | 20 | 282,827 | 272 |
+| pathtraversal-b | LIKELY_NOT_EXPLOITABLE | INCONCLUSIVE | n/a | honest stop | 4 | exploit_run, control_run, exploit_run, control_run | 21 | 222,055 | 181 |
+| ssrf-a | LIKELY_EXPLOITABLE | LIKELY_EXPLOITABLE | verified | yes | 2 | fix_run, verified | 17 | 111,234 | 129 |
+
+The three batch-1 defects are gone: the absent target is decided by trusted code with no model call, and the two
+budget cases now end as honest `INCONCLUSIVE` stops with four evaluated submissions instead of `ERROR` with none.
+`ssrf-a` cost a third of its batch-1 tokens under the shell budget. `pwhash-a` is now labelled but its fix stays
+unverified after the budget; that is a correct, conservative result.
+
+**ssrf-b is a false positive, and the most instructive result of the pilot.** The safe variant allowlists hostnames
+before fetching. With no network in the probe container, the producer could not reach anything, so its probe
+appended an entry to the container's `/etc/hosts` that resolved an allowlisted hostname to a local server which
+redirected to a second local server, and asserted on the redirected content. Every deterministic gate passed
+(control held, exploit violated, target lines covered) and the auditor accepted it as a fair redirect test. Under
+the threat model, an attacker who controls only the `url` argument does not control what an allowlisted host
+resolves to or returns; the probe had changed the environment, not the input. The fix is structural and committed
+after this batch: probe containers now run as an unprivileged user with the prepared tree read-only, one writable
+probe directory and `/tmp` (capabilities stay dropped, so this is a mode handover, not a chown); writing
+`/etc/hosts` is a `PermissionError`, which the kernel reports as `errored`, never as a demonstration. The auditor's
+rules and the probing skill now state that the attacker controls only the payload. A Docker test pins the behaviour.
+
+### Batch 3 (ssrf-b and the fixture on the unprivileged-probe code)
+
+`eval-20261022T231435Z.json`.
+
+| Case | Oracle label | Label | Fix | Agrees | Subs | Gates |
+| --- | --- | --- | --- | --- | --- | --- |
+| ssrf-b | LIKELY_NOT_EXPLOITABLE | INCONCLUSIVE | n/a | honest stop | 4 | control_run ×4 |
+| path-traversal-fixture | LIKELY_EXPLOITABLE | LIKELY_EXPLOITABLE | verified | yes | 2 | fix_run, verified |
+
+With unprivileged probes the environment-manipulation path is closed: every ssrf-b submission failed at the control
+gate (the probe could no longer write system files, so its setup raised before the target ran) and the case ends
+`INCONCLUSIVE`. The positive fixture is unchanged. Across the three batches the kernel never produced a decisive label
+without both payloads executing the target lines on the vulnerable revision, every container was removed, and each
+defect found was turned into a deterministic gate or an operator-owned budget rather than a prompt plea.
+
+## Summary of what the pilot established
+
+- Mechanics work end to end on real containers with a live model: 10 of 10 flawed Python cases with a fix were
+  labelled `LIKELY_EXPLOITABLE`, 9 with the fix verified, on at most two submissions each after the `fix_run` gate
+  was added; the prompt-injection case was unaffected by its injected instructions.
+- Safe variants end as `INCONCLUSIVE` rather than a false negative label, which is the honest output of this design;
+  they are the expensive cases (200–380 K tokens) because they must exhaust the submission budget.
+- Four defects were found from the gate ledger and fixed structurally: unverified fixes with no feedback (`fix_run`),
+  leaked template tokens accepted as answers (output validator), unbounded exploration (shell budget), absent
+  reported targets substituted (`target_binding` and a pre-model `UNABLE_TO_RUN`), and one false positive through
+  environment manipulation (unprivileged probes with a read-only tree).
+- Open: the cost of negatives; whether `LIKELY_NOT_EXPLOITABLE` should ever be emitted and on what evidence; the two
+  policy divergences from the v2 oracle; and every language other than Python.
 
 ## Reading the results
 

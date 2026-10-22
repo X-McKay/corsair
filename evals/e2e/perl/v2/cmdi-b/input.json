@@ -1,0 +1,13 @@
+{
+  "case_id": "corpus:5bd67da308600ba6",
+  "finding": {
+    "title": "OS command injection in run",
+    "description": "Untrusted arg argument reaches the CWE-78 sink in run.",
+    "file_path": "lib/Runner.pm",
+    "start_line": 6,
+    "symbol": "run",
+    "cwe": "CWE-78"
+  },
+  "source": "../../../../../benchmarks/corpus/infosec-harness/perl/cmdi/b",
+  "fixed_source": "../../../../../benchmarks/corpus/infosec-harness/perl/cmdi/a"
+}

@@ -32,7 +32,7 @@ class Row(BaseModel):
     language: str = Field(min_length=1, max_length=32, description="Reporting only")
     image: str = Field(min_length=1, max_length=512)
     image_source: str | None = Field(default=None, max_length=256)
-    framework: Literal["pytest"]
+    framework: str = Field(min_length=1, max_length=64, description="A registered adapter in corsair.frameworks")
     detect: tuple[Detect, ...] = Field(min_length=1)
     evidence: Literal["pilot", "image-only", "live"]
     note: str = Field(default="", max_length=2_000)

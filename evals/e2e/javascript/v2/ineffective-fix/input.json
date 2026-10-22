@@ -1,0 +1,12 @@
+{
+  "finding": {
+    "title": "OS command injection in countLines",
+    "description": "Untrusted path argument reaches the CWE-78 sink in countLines.",
+    "file_path": "src/cmd.js",
+    "start_line": 4,
+    "symbol": "countLines",
+    "cwe": "CWE-78"
+  },
+  "source": "../../../../../benchmarks/corpus/infosec-harness/javascript/cmdi/b",
+  "fixed_source": "fixed-tree"
+}

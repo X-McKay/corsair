@@ -78,3 +78,30 @@ def test_provider_config_maps_both_agents_and_keeps_vllm_settings():
         ProviderConfig(profiles=config.profiles, agents={"producer": "local"})
     with pytest.raises(ValueError):
         ModelProfile(base_url="http://insecure/v1", model_name="m")
+
+
+def test_git_source_request_schema_and_cache_key(tmp_path, monkeypatch):
+    from corsair.case import GitSource, _Request, acquire
+    request = _Request.model_validate({"finding": {"title": "t"}, "source": {"url": "https://example.invalid/r.git",
+                                                                            "commit": "0" * 40}})
+    assert isinstance(request.source, GitSource)
+    with pytest.raises(ValueError):
+        GitSource(url="git://example.invalid/r.git", commit="0" * 40)
+    with pytest.raises(ValueError):
+        GitSource(url="https://example.invalid/r.git", commit="abc")
+    # a completed local clone is reused without touching the network
+    local = tmp_path / "repo"
+    local.mkdir()
+    import subprocess
+    subprocess.run(["git", "-C", str(local), "init", "-q"], check=True)
+    (local / "a.py").write_text("x = 1\n")
+    subprocess.run(["git", "-C", str(local), "-c", "user.email=t@t", "-c", "user.name=t", "add", "a.py"], check=True)
+    subprocess.run(["git", "-C", str(local), "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "i"], check=True)
+    commit = subprocess.run(["git", "-C", str(local), "rev-parse", "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
+    source = GitSource(url="https://example.invalid/placeholder.git", commit=commit)
+    cache = tmp_path / "cache"
+    key_dir = cache / __import__("hashlib").sha256(f"{source.url}\n{source.commit}".encode()).hexdigest()[:24]
+    key_dir.mkdir(parents=True)
+    (key_dir / "a.py").write_text("x = 1\n")
+    (key_dir / ".corsair-complete").write_text("done")
+    assert acquire(source, cache) == key_dir

@@ -1,0 +1,8 @@
+{
+  "name": "reports",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {"test": "jest"},
+  "dependencies": {"ledger-store": "file:./vendor/ledger-store"},
+  "devDependencies": {"jest": "^29.7.0"}
+}
