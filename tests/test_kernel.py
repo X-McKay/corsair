@@ -10,7 +10,7 @@ from corsair import matrix
 from corsair.artifacts import ArtifactStore
 from corsair.case import load_case
 from corsair.kernel import (AuditResult, Fix, Gate, Hypothesis, Kernel, Label, Outcome, Submission, ast_guard,
-                            environment_key, terminal_verdict)
+                            environment_key, reported_target_present, target_binding, terminal_verdict)
 from tests.fakes import FakeSandboxes, Script
 
 pytestmark = pytest.mark.anyio
@@ -224,3 +224,18 @@ async def test_fixed_exploit_raising_a_non_assertion_keeps_the_label_but_asks_fo
     assert evaluation.verdict is not None and evaluation.verdict.label is Label.LIKELY_EXPLOITABLE
     assert evaluation.verdict.fix is Fix.NOT_VERIFIED
     assert evaluation.submission == REFERENCE
+
+
+async def test_hypothesis_must_target_the_reported_file_and_an_absent_target_is_decided_without_a_sandbox(tmp_path):
+    fake = FakeSandboxes(dict(HAPPY))
+    k = kernel(fake, tmp_path)
+    other = REFERENCE.model_copy(update={"hypothesis": REFERENCE.hypothesis.model_copy(update={"target_file": "other.py"})})
+    evaluation = await k.evaluate(other)
+    assert evaluation.gate.stage is Gate.TARGET_BINDING and "reports documents.py" in evaluation.gate.reason
+    assert fake.creates == [] and evaluation.runs == ()
+    assert reported_target_present(k.case) is None
+    missing = k.case.model_copy(update={"finding": k.case.finding.model_copy(update={"file_path": "maintenance/logs.py"})})
+    assert "does not exist" in (reported_target_present(missing) or "")
+    unnamed = k.case.model_copy(update={"finding": k.case.finding.model_copy(update={"file_path": None})})
+    assert target_binding(unnamed, REFERENCE.hypothesis).passed
+    assert not target_binding(unnamed, other.hypothesis).passed  # other.py is not in the tree either

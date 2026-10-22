@@ -91,6 +91,7 @@ class Submission(Frozen):
 
 
 class Gate(StrEnum):
+    TARGET_BINDING = "target_binding"
     AST_GUARD = "ast_guard"
     BUILD_REPLAY = "build_replay"
     CONTROL_RUN = "control_run"
@@ -179,6 +180,36 @@ class Evaluation(Frozen):
     verdict: Verdict | None = None
     runs: tuple[ProbeRun, ...] = ()
     duration_s: float
+
+
+# --- gate 0: the hypothesis is about the reported target -------------------------------------------------------------
+
+
+def reported_target_present(case: Case) -> str | None:
+    """None when the finding names no file or the file exists in the vulnerable tree; otherwise the reason the case
+    cannot be investigated at all. Decided by trusted code before any model call."""
+    path = case.finding.file_path
+    if path is None:
+        return None
+    if not (Path(case.revision.source) / path).is_file():
+        return f"the reported file {path} does not exist in the vulnerable revision"
+    return None
+
+
+def target_binding(case: Case, hypothesis: Hypothesis) -> GateVerdict:
+    """The hypothesis must be about the file the finding reports. A finding that names no file accepts any existing
+    file. The symbol is not checked structurally: a flaw may live in a helper the reported symbol calls, and the
+    blind auditor judges relevance; the file is the binding trusted code can enforce."""
+    reported = case.finding.file_path
+    if reported is not None and hypothesis.target_file != reported:
+        return GateVerdict(passed=False, stage=Gate.TARGET_BINDING,
+                           reason=f"the finding reports {reported}; the hypothesis targets {hypothesis.target_file}. "
+                                  "Investigate the reported file; if the reported condition cannot occur there, stop "
+                                  "and say so instead of substituting another target")
+    if not (Path(case.revision.source) / hypothesis.target_file).is_file():
+        return GateVerdict(passed=False, stage=Gate.TARGET_BINDING,
+                           reason=f"{hypothesis.target_file} does not exist in the vulnerable revision")
+    return GateVerdict(passed=True, stage=Gate.TARGET_BINDING, reason="hypothesis bound to the reported target")
 
 
 # --- gate 1: the structural guard ----------------------------------------------------------------------------------
@@ -422,6 +453,9 @@ class Kernel:
             return Evaluation(submission=submission, submission_sha256=submission.sha256, gate=gate, verdict=verdict,
                               runs=tuple(runs), duration_s=time.monotonic() - started)
 
+        binding = target_binding(self.case, submission.hypothesis)
+        if not binding.passed:
+            return done(binding)
         guard = ast_guard(submission.probe)
         if not guard.passed:
             return done(guard)

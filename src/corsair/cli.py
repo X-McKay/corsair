@@ -18,7 +18,7 @@ from . import matrix
 from .artifacts import ArtifactStore
 from .auditor import audit, build_auditor
 from .case import Case, load_case, load_oracle
-from .kernel import Evaluation, Fix, Kernel, Label, Submission, Verdict, terminal_verdict
+from .kernel import Evaluation, Fix, Kernel, Label, Submission, Verdict, reported_target_present, terminal_verdict
 from .producer import ProducerRun, investigate
 from .providers import agent_models, load_provider_config
 from .sandbox import sandboxes
@@ -86,6 +86,10 @@ async def _investigate_one(case: Case, args: argparse.Namespace, models: dict) -
     if row is None:
         verdict = Verdict(label=Label.UNABLE_TO_RUN, rule="K2", reason="no runtime row matches the tree", fix=Fix.NOT_APPLICABLE)
         return _record(run_dir, case, None, verdict, (), mode="investigate", extra={})
+    absent = reported_target_present(case)
+    if absent is not None:  # decided by trusted code; no model call, no sandbox
+        verdict = Verdict(label=Label.UNABLE_TO_RUN, rule="K2", reason=f"target_not_found: {absent}", fix=Fix.NOT_APPLICABLE)
+        return _record(run_dir, case, row, verdict, (), mode="investigate", extra={"requests": 0})
     store = ArtifactStore(run_dir / "artifacts")
     backend = sandboxes()
     auditor_agent = None if args.no_audit else build_auditor(models["auditor"])
