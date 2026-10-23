@@ -140,7 +140,12 @@ async def test_child_output_overflow_is_infra_and_cleans_up_without_postprocessi
 
     assert evaluation.gate.stage is Gate.INFRA and "output limit" in evaluation.gate.reason
     assert terminal_verdict(evaluation.gate, 1).label is Label.ERROR
-    assert evaluation.verdict is not None and evaluation.verdict.fix is Fix.NOT_VERIFIED
+    assert evaluation.verdict is not None
+    assert evaluation.verdict.label is Label.ERROR and evaluation.verdict.rule == "K0"
+    assert evaluation.verdict.fix is Fix.NOT_VERIFIED
+    assert evaluation.verdict.runs == evaluation.runs
+    assert evaluation.verdict.revisions[0].label is Label.ERROR
+    assert evaluation.verdict.revisions[0].rule == "K0"
     assert len(evaluation.runs) == 1
     run = evaluation.runs[0]
     assert run.result is RoleResult.INFRA and run.invariant_held is None

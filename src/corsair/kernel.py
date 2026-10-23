@@ -459,7 +459,10 @@ class Kernel:
 
         def done(gate: GateVerdict, verdict: Verdict | None = None) -> Evaluation:
             if verdict is None and runs:
-                disposition = self._inconclusive("vulnerable", gate.stage.name, gate.reason)
+                disposition = (RevisionDisposition(revision="vulnerable", label=Label.ERROR, rule="K0",
+                                                   reason_code=gate.stage.name, reason=gate.reason[:2000])
+                               if gate.stage is Gate.INFRA
+                               else self._inconclusive("vulnerable", gate.stage.name, gate.reason))
                 verdict = Verdict(label=disposition.label, rule=disposition.rule, reason=disposition.reason,
                                   fix=Fix.NOT_VERIFIED if self.case.fixed_revision else Fix.NOT_APPLICABLE,
                                   submission_sha256=submission.sha256, environment_image=image,

@@ -312,6 +312,12 @@ async def test_collection_failure_is_not_run_and_timeout_is_infra(tmp_path):
     evaluation = await kernel(timeout, tmp_path).evaluate(REFERENCE)
     assert evaluation.gate.stage is Gate.INFRA and evaluation.runs[-1].result is RoleResult.INFRA
     assert terminal_verdict(evaluation.gate, 1).label is Label.ERROR
+    assert evaluation.verdict is not None
+    assert evaluation.verdict.label is Label.ERROR and evaluation.verdict.rule == "K0"
+    assert evaluation.verdict.fix is Fix.NOT_VERIFIED
+    assert evaluation.verdict.runs == evaluation.runs
+    assert evaluation.verdict.revisions[0].label is Label.ERROR
+    assert evaluation.verdict.revisions[0].rule == "K0"
 
 
 async def test_native_report_and_driver_record_must_agree(tmp_path):
@@ -432,10 +438,14 @@ async def test_audit_rejection_blocks_negative_disposition(tmp_path):
     assert len(result.runs) == 2
 
 
-@pytest.mark.parametrize("exploit", [Script("errored", "ValueError", "bad"), Script("not_run"), Script("timeout")])
-async def test_exploit_error_never_becomes_negative(tmp_path, exploit):
+@pytest.mark.parametrize(("exploit", "label", "rule"), [
+    (Script("errored", "ValueError", "bad"), Label.INCONCLUSIVE, "K3"),
+    (Script("not_run"), Label.INCONCLUSIVE, "K3"),
+    (Script("timeout"), Label.ERROR, "K0"),
+])
+async def test_exploit_error_never_becomes_negative(tmp_path, exploit, label, rule):
     result = await kernel(FakeSandboxes({**HAPPY, ("vulnerable", "exploit"): exploit}), tmp_path).evaluate(REFERENCE)
-    assert result.verdict.label is Label.INCONCLUSIVE and result.verdict.rule == "K3"
+    assert result.verdict.label is label and result.verdict.rule == rule
     assert result.runs[-1].invariant_held is None
 
 
