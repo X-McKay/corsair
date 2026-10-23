@@ -4,9 +4,11 @@ probes to the kernel until one is verified or its budget is spent.
 Three tools: ``bash`` (a command in the working sandbox, which holds a copy of the vulnerable revision and may
 install dependencies), ``read_skill`` (operator-owned Markdown guidance) and ``submit`` (the kernel). A rejected
 submission comes back as ``ModelRetry`` carrying the failed gate, its reason and bounded output tails, so the model
-corrects what the kernel named. The number of submissions and the request and token budgets are operator-owned.
-Nothing the producer does in its workspace is evidence: the kernel replays the build and runs the probes in
-containers the producer never touched.
+corrects what the kernel named. A clean negative (K4) is rejected the same way, so the model may try another payload,
+until the operator-owned negative threshold is met: then the run stops early with LIKELY_NOT_EXPLOITABLE. The number
+of submissions, the negative threshold and the request and token budgets are operator-owned. Nothing the producer
+does in its workspace is evidence: the kernel replays the build and runs the probes in containers the producer never
+touched.
 """
 from __future__ import annotations
 
@@ -19,13 +21,16 @@ from pydantic_ai.messages import ModelResponse
 from pydantic_ai.models import Model
 
 from .case import Case
-from .kernel import Evaluation, Fix, Gate, GateVerdict, Kernel, Label, Submission, Verdict, terminal_verdict
+from .kernel import (Evaluation, Fix, Gate, GateVerdict, Kernel, Label, Submission, Verdict, negative_verdict,
+                     terminal_verdict)
 from .matrix import Row
 from .sandbox.port import Sandboxes, SandboxSpec, labels
 
 SKILLS_DIR = Path(__file__).resolve().parent / "skills"
 BASH_TIMEOUT_S = 180.0
 BASH_TAIL = 6000
+NEGATIVE_THRESHOLD = 2
+"""Operator-owned: distinct clean-negative submissions that end the run as LIKELY_NOT_EXPLOITABLE (K4)."""
 
 INSTRUCTIONS = """You are Corsair, a vulnerability verification engine. Your only deliverable is one differential
 probe that a deterministic kernel can verify in clean sandboxes.
@@ -58,6 +63,10 @@ class BudgetExhausted(Exception):
     """The operator-owned submission budget is spent; the run ends with the last gate's terminal verdict."""
 
 
+class NegativeThresholdReached(Exception):
+    """Enough distinct clean negatives were observed (K4): the run stops early instead of spending the budget."""
+
+
 @dataclass
 class ProducerDeps:
     kernel: Kernel
@@ -66,6 +75,7 @@ class ProducerDeps:
     skills_dir: Path = SKILLS_DIR
     max_submissions: int = 4
     max_bash_calls: int = 12
+    negative_threshold: int = NEGATIVE_THRESHOLD
     evaluations: list[Evaluation] = field(default_factory=list)
     verdict: Verdict | None = None
     bash_calls: int = 0
@@ -95,6 +105,8 @@ def build_producer(model: Model, *, max_submissions: int = 4) -> Agent[ProducerD
                         f"({evaluation.verdict.fix_reason}). Reply with one sentence.")
             raise ModelRetry(f"[VERIFIED, BUT {gate.stage}]\nReason: {gate.reason}\nSubmissions left: {remaining}. "
                              "Correct the probe and submit again, or reply with one sentence to keep this result.")
+        if negative_verdict(deps.evaluations, deps.negative_threshold) is not None:
+            raise NegativeThresholdReached(f"{deps.negative_threshold} distinct clean negative(s) observed")
         detail = f"[KERNEL REJECTED AT {gate.stage}]\nReason: {gate.reason}"
         if gate.stdout_tail:
             detail += f"\nstdout: {gate.stdout_tail}"
@@ -166,19 +178,25 @@ class ProducerRun:
     final_text: str | None
     error: str | None
     cleanup_confirmed: bool | None
+    early_stop: str | None = None
 
 
 async def investigate(case: Case, row: Row, *, model: Model, kernel: Kernel, backend: Sandboxes,
                       max_submissions: int = 4, max_bash_calls: int = 12, request_limit: int = 60,
-                      total_tokens_limit: int | None = 400_000, skills_dir: Path = SKILLS_DIR) -> ProducerRun:
-    """Create the working sandbox, run the producer, and decide the verdict from what the kernel verified."""
+                      total_tokens_limit: int | None = 400_000, skills_dir: Path = SKILLS_DIR,
+                      negative_threshold: int = NEGATIVE_THRESHOLD) -> ProducerRun:
+    """Create the working sandbox, run the producer, and decide the verdict from what the kernel observed."""
+    if negative_threshold < 1:
+        raise ValueError("the negative threshold is at least 1")
     started = time.monotonic()
     spec = SandboxSpec(image=row.image, workdir="/work", labels=labels(kernel.run_id, "work"), network="build")
     deps = ProducerDeps(kernel=kernel, backend=backend, work=spec.name, skills_dir=skills_dir,
-                        max_submissions=max_submissions, max_bash_calls=max_bash_calls)
+                        max_submissions=max_submissions, max_bash_calls=max_bash_calls,
+                        negative_threshold=negative_threshold)
     final_text = error = None
     result = None
     budget_stop = False
+    early_stop: str | None = None
     messages: list = []
     try:
         backend.create(spec)
@@ -190,6 +208,8 @@ async def investigate(case: Case, row: Row, *, model: Model, kernel: Kernel, bac
                                          usage_limits=UsageLimits(request_limit=request_limit,
                                                                   total_tokens_limit=total_tokens_limit))
             final_text = result.output
+        except NegativeThresholdReached:  # not a failure: the observations decide the label
+            early_stop = "negative_threshold"
         except (BudgetExhausted, UnexpectedModelBehavior, UsageLimitExceeded) as failure:  # budget, or misbehaviour
             error = f"{type(failure).__name__}: {failure}"[:2000]
             budget_stop = True
@@ -203,8 +223,11 @@ async def investigate(case: Case, row: Row, *, model: Model, kernel: Kernel, bac
     input_tokens = sum(r.usage.input_tokens or 0 for r in responses) if responses else None
     output_tokens = sum(r.usage.output_tokens or 0 for r in responses) if responses else None
     tool_calls = sum(len(r.tool_calls) for r in responses) if responses else None
-    if deps.verdict is not None:
+    negatives = negative_verdict(deps.evaluations, negative_threshold)
+    if deps.verdict is not None:  # LIKELY_EXPLOITABLE: it wins over any negatives and is never downgraded by the fix
         verdict = deps.verdict
+    elif negatives is not None:
+        verdict = negatives
     elif deps.evaluations:
         verdict = terminal_verdict(deps.evaluations[-1].gate, len(deps.evaluations))
     elif error and not budget_stop:  # provider or transport failure before any submission
@@ -220,4 +243,4 @@ async def investigate(case: Case, row: Row, *, model: Model, kernel: Kernel, bac
                        input_tokens=input_tokens, output_tokens=output_tokens, tool_calls=tool_calls,
                        bash_calls=deps.bash_calls,
                        duration_s=time.monotonic() - started, final_text=final_text, error=error,
-                       cleanup_confirmed=confirmed)
+                       cleanup_confirmed=confirmed, early_stop=early_stop)

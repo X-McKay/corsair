@@ -13,7 +13,8 @@ Gates, in order; the first failure is returned to the producer as a ``GateVerdic
    executes the hypothesis' target lines.
 4. ``exploit_run`` / ``exploit_coverage``: ``run_target(EXPLOIT_PAYLOAD)`` violates the probe's own invariant
    assertion on the vulnerable revision (an ``AssertionError`` raised from the probe, not from application code) and
-   executes the target lines.
+   executes the target lines. If it holds instead, with the target lines executed, the submission is a clean negative
+   observation once the blind auditor accepts it; the gate still fails so the producer tries another payload.
 5. ``blind_audit``: a stateless auditor that sees the hypothesis and probe only, never an outcome.
 
 Polarity: ``violated`` means the probe's safety invariant failed, i.e. the reported condition occurred. The fixed
@@ -30,7 +31,7 @@ import json
 import shlex
 import time
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from enum import StrEnum
 from pathlib import Path
 from typing import Literal
@@ -51,6 +52,8 @@ ENV_SCHEMA = "corsair-lite/env/3"
 WORKDIR = "/work"
 PROBE_DIR = f"{WORKDIR}/.corsair"
 RESULT_DIR = "/tmp/corsair"
+NOT_DEMONSTRATED = ("EXPLOIT_PAYLOAD did not violate the invariant on the vulnerable revision; the reported condition "
+                    "was not demonstrated")
 
 Role = Literal["control", "exploit"]
 RevisionName = Literal["vulnerable", "fixed"]
@@ -140,6 +143,7 @@ class AuditResult(Frozen):
 
 class Label(StrEnum):
     LIKELY_EXPLOITABLE = "LIKELY_EXPLOITABLE"
+    LIKELY_NOT_EXPLOITABLE = "LIKELY_NOT_EXPLOITABLE"
     INCONCLUSIVE = "INCONCLUSIVE"
     UNABLE_TO_RUN = "UNABLE_TO_RUN"
     ERROR = "ERROR"
@@ -177,6 +181,10 @@ class Evaluation(Frozen):
     verdict: Verdict | None = None
     runs: tuple[ProbeRun, ...] = ()
     duration_s: float
+    audit: AuditResult | None = None
+    clean_negative: bool = Field(default=False, description="Control and exploit both held on the vulnerable revision "
+                                                           "with the target lines executed, and the audit (if any) "
+                                                           "accepted: counts toward K4")
 
 
 # --- gate 0: the hypothesis is about the reported target -------------------------------------------------------------
@@ -375,9 +383,11 @@ class Kernel:
         started = time.monotonic()
         runs: list[ProbeRun] = []
 
-        def done(gate: GateVerdict, verdict: Verdict | None = None) -> Evaluation:
+        def done(gate: GateVerdict, verdict: Verdict | None = None, *, audit: AuditResult | None = None,
+                 clean_negative: bool = False) -> Evaluation:
             return Evaluation(submission=submission, submission_sha256=submission.sha256, gate=gate, verdict=verdict,
-                              runs=tuple(runs), duration_s=time.monotonic() - started)
+                              runs=tuple(runs), duration_s=time.monotonic() - started, audit=audit,
+                              clean_negative=clean_negative)
 
         binding = target_binding(self.case, submission.hypothesis)
         if not binding.passed:
@@ -409,9 +419,19 @@ class Kernel:
         if exploit.outcome is Outcome.INFRA:
             return done(GateVerdict(passed=False, stage=Gate.INFRA, reason=f"exploit run: {exploit.message}"))
         if exploit.outcome is Outcome.HOLDS:
+            if not exploit.covered_lines:
+                return done(GateVerdict(passed=False, stage=Gate.EXPLOIT_RUN,
+                                        reason=f"{NOT_DEMONSTRATED}; the target lines did not execute, so this is not "
+                                               "a clean negative"))
+            # Control held and both runs executed the target lines: a clean negative observation if the auditor accepts.
+            held_audit = await self.auditor(submission) if self.auditor is not None else None
+            if held_audit is not None and not held_audit.valid:
+                return done(GateVerdict(passed=False, stage=Gate.BLIND_AUDIT,
+                                        reason=f"outcome-blind audit rejected the probe: {held_audit.reason}"),
+                            audit=held_audit)
             return done(GateVerdict(passed=False, stage=Gate.EXPLOIT_RUN,
-                                    reason="EXPLOIT_PAYLOAD did not violate the invariant on the vulnerable revision; "
-                                           "the reported condition was not demonstrated"))
+                                    reason=f"{NOT_DEMONSTRATED}; recorded as a clean negative observation"),
+                        audit=held_audit, clean_negative=True)
         if exploit.outcome is not Outcome.VIOLATED:
             return done(GateVerdict(passed=False, stage=Gate.EXPLOIT_RUN,
                                     reason=f"EXPLOIT_PAYLOAD must fail the probe's own invariant assertion, but the run "
@@ -427,7 +447,7 @@ class Kernel:
             audit = await self.auditor(submission)
             if not audit.valid:
                 return done(GateVerdict(passed=False, stage=Gate.BLIND_AUDIT,
-                                        reason=f"outcome-blind audit rejected the probe: {audit.reason}"))
+                                        reason=f"outcome-blind audit rejected the probe: {audit.reason}"), audit=audit)
 
         fix, fix_reason = Fix.NOT_APPLICABLE, "the case has no fixed revision"
         fix_gate: GateVerdict | None = None
@@ -449,7 +469,8 @@ class Kernel:
                                                "vulnerable revision, both executing the target lines (no audit configured)",
                           fix=fix, fix_reason=fix_reason, submission_sha256=submission.sha256,
                           environment_image=image, runs=tuple(runs), audit=audit)
-        return done(fix_gate or GateVerdict(passed=True, stage=Gate.VERIFIED, reason="differential probe verified"), verdict)
+        return done(fix_gate or GateVerdict(passed=True, stage=Gate.VERIFIED, reason="differential probe verified"),
+                    verdict, audit=audit)
 
     def _verify_fix(self, submission: Submission, runs: list[ProbeRun]) -> tuple[Fix, str]:
         assert self.case.fixed_revision is not None
@@ -472,6 +493,29 @@ class Kernel:
     @staticmethod
     def _tails(run: ProbeRun) -> dict[str, str]:
         return {"stderr_tail": (run.message or "")[-TAIL:]}
+
+
+def negative_verdict(evaluations: Sequence[Evaluation], threshold: int) -> Verdict | None:
+    """K4: LIKELY_NOT_EXPLOITABLE once ``threshold`` distinct submissions were clean negatives, and no submission was
+    decisive. Distinct by submission digest, so resubmitting one probe counts once. A LIKELY_EXPLOITABLE evaluation
+    always wins over the negatives. The fix is not verified for a negative label (fix=not_applicable)."""
+    if threshold < 1:
+        raise ValueError("the negative threshold is at least 1")
+    if any(e.verdict is not None for e in evaluations):
+        return None
+    observed: dict[str, Evaluation] = {}
+    for evaluation in evaluations:
+        if evaluation.clean_negative:
+            observed.setdefault(evaluation.submission_sha256, evaluation)
+    if len(observed) < threshold:
+        return None
+    counted = tuple(observed.values())
+    return Verdict(label=Label.LIKELY_NOT_EXPLOITABLE, rule="K4", fix=Fix.NOT_APPLICABLE,
+                   fix_reason="fix verification is not run for a negative label",
+                   reason=f"{len(counted)} distinct submission(s) were clean negatives (threshold {threshold}): control "
+                          "held and EXPLOIT_PAYLOAD held on the vulnerable revision, both runs executing the target "
+                          "lines, and each probe passed the blind audit where one is configured",
+                   runs=tuple(run for e in counted for run in e.runs))
 
 
 def terminal_verdict(last: GateVerdict | None, attempts: int) -> Verdict:

@@ -1,7 +1,8 @@
 """The outcome-blind auditor: one stateless model call that sees the hypothesis and the probe, never a result.
 
-It is the only semantic judgement in the kernel and runs only after every deterministic gate passed, so it is called
-at most once per admitted submission. Its job is narrow: reject a probe whose driver branches on the payload, whose
+It is the only semantic judgement in the kernel. It runs once per submission, after the control and exploit gates on
+the vulnerable revision: either the exploit violated the invariant (a demonstration) or it held with the target lines
+executed (a clean negative, which the auditor must also accept before it counts toward K4). Its job is narrow: reject a probe whose driver branches on the payload, whose
 exploit payload merely violates the public signature, or whose assertion does not test the hypothesised property.
 """
 from __future__ import annotations

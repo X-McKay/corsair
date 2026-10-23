@@ -183,3 +183,62 @@ async def test_shell_budget_is_operator_owned_and_a_token_budget_stop_is_inconcl
                             kernel=make_kernel(fake, tmp_path), backend=fake, request_limit=2)
     assert run.verdict.label is Label.INCONCLUSIVE and "budget ended the run" in run.verdict.reason
     assert run.error and run.error.startswith("UsageLimitExceeded")
+
+
+def variant(n: int) -> dict:
+    """The reference submission with a distinct digest: a different trailing comment in the probe."""
+    return REFERENCE.model_dump(mode="json") | {"probe": REFERENCE.probe + f"\n# variant {n}\n"}
+
+
+async def test_negative_threshold_met_stops_the_producer_early_with_likely_not_exploitable(tmp_path):
+    fake = FakeSandboxes({**HAPPY, ("vulnerable", "exploit"): Script("holds")})
+    calls = 0
+
+    def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        nonlocal calls
+        calls += 1
+        return ModelResponse(parts=[ToolCallPart(tool_name="submit", args={"submission": variant(calls)})])
+
+    run = await investigate(load_case(CASE), ROW, model=FunctionModel(respond), kernel=make_kernel(fake, tmp_path),
+                            backend=fake, max_submissions=4)
+    assert run.verdict.label is Label.LIKELY_NOT_EXPLOITABLE and run.verdict.rule == "K4"
+    assert run.verdict.fix.value == "not_applicable"
+    assert all(e.clean_negative and e.gate.stage is Gate.EXPLOIT_RUN for e in run.evaluations)
+    assert len(run.evaluations) == 2 and calls == 2  # the remaining submission budget was not spent
+    assert run.early_stop == "negative_threshold" and run.error is None and run.requests == 2
+    assert len(fake.opened) == 4  # control and exploit on the vulnerable revision, twice; no fixed-revision runs
+    assert run.cleanup_confirmed is True
+
+
+async def test_below_the_threshold_an_exhausted_budget_stays_inconclusive(tmp_path):
+    fake = FakeSandboxes({**HAPPY, ("vulnerable", "exploit"): Script("holds")})
+    model = scripted([[("submit", {"submission": variant(1)})], ["Stopping."]])
+    run = await investigate(load_case(CASE), ROW, model=model, kernel=make_kernel(fake, tmp_path), backend=fake,
+                            max_submissions=1)
+    assert run.evaluations[0].clean_negative and run.early_stop is None
+    assert run.verdict.label is Label.INCONCLUSIVE and run.verdict.rule == "K3"
+    assert "exploit_run" in run.verdict.reason
+
+
+async def test_a_failing_fix_keeps_the_exploitable_label_and_later_negatives_neither_downgrade_nor_stop(tmp_path):
+    fake = FakeSandboxes({**HAPPY, ("fixed", "exploit"): Script("errored", "ValueError", "rejected")})
+    calls = 0
+
+    def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        nonlocal calls
+        calls += 1
+        if calls == 1:  # exploitable on the vulnerable revision; the fix is not verified (fix_run feedback)
+            return ModelResponse(parts=[ToolCallPart(tool_name="submit", args={"submission": REFERENCE.model_dump(mode="json")})])
+        if calls == 2:  # the vulnerable exploit now holds: clean negatives, which the exploitable verdict outranks
+            fake.scenario[("vulnerable", "exploit")] = Script("holds")
+            return ModelResponse(parts=[ToolCallPart(tool_name="submit", args={"submission": variant(2)})])
+        if calls == 3:
+            return ModelResponse(parts=[ToolCallPart(tool_name="submit", args={"submission": variant(3)})])
+        return ModelResponse(parts=[TextPart("Keeping the result.")])
+
+    run = await investigate(load_case(CASE), ROW, model=FunctionModel(respond), kernel=make_kernel(fake, tmp_path),
+                            backend=fake, max_submissions=4)
+    assert [e.gate.stage for e in run.evaluations] == [Gate.FIX_RUN, Gate.EXPLOIT_RUN, Gate.EXPLOIT_RUN]
+    assert run.verdict.label is Label.LIKELY_EXPLOITABLE and run.verdict.rule == "K1"
+    assert run.verdict.fix.value == "not_verified"
+    assert run.early_stop is None and run.error is None and calls == 4

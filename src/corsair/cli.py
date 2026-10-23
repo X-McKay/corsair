@@ -18,12 +18,22 @@ from . import matrix
 from .artifacts import ArtifactStore
 from .auditor import audit, build_auditor
 from .case import Case, load_case, load_oracle
-from .kernel import Evaluation, Fix, Kernel, Label, Submission, Verdict, reported_target_present, terminal_verdict
-from .producer import ProducerRun, investigate
+from .kernel import (Evaluation, Fix, Kernel, Label, Submission, Verdict, negative_verdict, reported_target_present,
+                     terminal_verdict)
+from .producer import NEGATIVE_THRESHOLD, ProducerRun, investigate
 from .providers import agent_models, load_provider_config
 from .sandbox import sandboxes
 
 RUNS = Path(".runs/lite")
+
+# v2 oracles whose expectation predates the lite contract. Lite's behaviour is the intended one here, so the case is
+# scored against the lite label (None: not scored) and the divergence is reported, not counted as a miss. See
+# docs/pilot.md. The oracle's forbidden labels do not apply to these cases.
+LITE_CONTRACT: dict[str, tuple[frozenset[str] | None, str]] = {
+    "ineffective-fix": (frozenset({"LIKELY_EXPLOITABLE"}),
+                        "a non-working fix keeps LIKELY_EXPLOITABLE with fix=not_verified; v2 expected INCONCLUSIVE"),
+    "bare-tree-no-manifest": (None, "Python trees with no manifest are accepted; v2 expected UNABLE_TO_RUN"),
+}
 
 
 def _record(run_dir: Path, case: Case, row: matrix.Row | None, verdict: Verdict, evaluations: tuple[Evaluation, ...],
@@ -71,12 +81,14 @@ async def _verify(args: argparse.Namespace) -> int:
     else:
         kernel = Kernel(backend, row, case, artifacts=store, run_id=run_id)
         evaluation = await kernel.evaluate(submission)
-    verdict = evaluation.verdict or terminal_verdict(evaluation.gate, 1)
+    verdict = (evaluation.verdict or negative_verdict([evaluation], args.negative_threshold)
+               or terminal_verdict(evaluation.gate, 1))
     record = _record(run_dir, case, row, verdict, (evaluation,), mode="verify",
-                     extra={"duration_s": time.monotonic() - started, "audit_configured": bool(args.provider)})
+                     extra={"duration_s": time.monotonic() - started, "audit_configured": bool(args.provider),
+                            "negative_threshold": args.negative_threshold})
     _print(record)
     print(json.dumps(record["verdict"], indent=2))
-    return 0 if evaluation.verdict is not None else 1
+    return 0 if verdict.label is Label.LIKELY_EXPLOITABLE else 1
 
 
 async def _investigate_one(case: Case, args: argparse.Namespace, models: dict) -> dict:
@@ -96,11 +108,13 @@ async def _investigate_one(case: Case, args: argparse.Namespace, models: dict) -
     kernel = Kernel(backend, row, case, artifacts=store, run_id=run_id,
                     auditor=None if auditor_agent is None else (lambda s: audit(auditor_agent, s)))
     run: ProducerRun = await investigate(case, row, model=models["producer"], kernel=kernel, backend=backend,
-                                         max_submissions=args.max_submissions, request_limit=args.request_limit)
+                                         max_submissions=args.max_submissions, request_limit=args.request_limit,
+                                         negative_threshold=args.negative_threshold)
     extra = {"duration_s": run.duration_s, "requests": run.requests, "input_tokens": run.input_tokens,
              "output_tokens": run.output_tokens, "tool_calls": run.tool_calls, "bash_calls": run.bash_calls,
              "final_text": run.final_text, "error": run.error, "work_cleanup_confirmed": run.cleanup_confirmed,
-             "audit_configured": auditor_agent is not None, "max_submissions": args.max_submissions}
+             "audit_configured": auditor_agent is not None, "max_submissions": args.max_submissions,
+             "negative_threshold": args.negative_threshold, "early_stop": run.early_stop}
     record = _record(run_dir, case, row, run.verdict, run.evaluations, mode="investigate", extra=extra)
     _print(record)
     return record
@@ -126,11 +140,11 @@ async def _eval(args: argparse.Namespace) -> int:
             record = await _investigate_one(case, args, models)
             expected = oracle.get("expected_label")
             label = record["verdict"]["label"]
+            correct, forbidden_hit, note = score(case_dir.name, oracle, label)
             rows.append({"case": str(case_dir), "case_id": case.case_id, "label": label, "fix": record["verdict"]["fix"],
                          "expected_label": expected, "expected_fix": oracle.get("expected_fix"),
-                         "correct": (label == expected) if expected else None,
-                         "forbidden_hit": label in (oracle.get("forbidden_labels") or []),
-                         "submissions": len(record["submissions"]),
+                         "correct": correct, "forbidden_hit": forbidden_hit, "policy_note": note,
+                         "submissions": len(record["submissions"]), "early_stop": record.get("early_stop"),
                          "gates": [s["gate"]["stage"] for s in record["submissions"]],
                          "requests": record.get("requests"), "input_tokens": record.get("input_tokens"),
                          "output_tokens": record.get("output_tokens"), "duration_s": record.get("duration_s"),
@@ -139,12 +153,29 @@ async def _eval(args: argparse.Namespace) -> int:
     summary = {"schema": "corsair-lite/eval/1", "cases": rows, "n": len(rows),
                "correct": sum(1 for r in scored if r["correct"]), "scored": len(scored),
                "forbidden_hits": sum(1 for r in rows if r["forbidden_hit"]),
-               "gate_ledger": _ledger(rows), "provider": str(args.provider), "max_submissions": args.max_submissions}
+               "policy_divergences": [{"case_id": r["case_id"], "label": r["label"], "note": r["policy_note"]}
+                                      for r in rows if r["policy_note"]],
+               "gate_ledger": _ledger(rows), "provider": str(args.provider), "max_submissions": args.max_submissions,
+               "negative_threshold": args.negative_threshold}
     out = Path(args.runs) / f"eval-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}.json"
     out.write_text(json.dumps(summary, indent=2) + "\n")
     print(json.dumps({k: v for k, v in summary.items() if k != "cases"}, indent=2))
     print(f"written {out}", file=sys.stderr)
     return 0 if summary["forbidden_hits"] == 0 else 1
+
+
+def score(name: str, oracle: dict, label: str) -> tuple[bool | None, bool, str | None]:
+    """(correct, forbidden hit, policy note) for one case. ``correct`` is None when the oracle accepts no label or the
+    case is not scored. An oracle's ``acceptable_labels`` (default: ``expected_label``) decide correctness, so a safe
+    case is correct with LIKELY_NOT_EXPLOITABLE; ``forbidden_labels`` are the labels that would be a false positive."""
+    expected = oracle.get("expected_label")
+    accepted = set(oracle.get("acceptable_labels") or ([expected] if expected else []))
+    forbidden = set(oracle.get("forbidden_labels") or [])
+    note = None
+    if name in LITE_CONTRACT:
+        lite_accepted, note = LITE_CONTRACT[name]
+        accepted, forbidden = set(lite_accepted or ()), set()
+    return (label in accepted) if accepted else None, label in forbidden, note
 
 
 def _ledger(rows: list[dict]) -> dict[str, int]:
@@ -171,6 +202,13 @@ def _cleanup(args: argparse.Namespace) -> int:
     return 0 if not unconfirmed else 1
 
 
+def _threshold(value: str) -> int:
+    number = int(value)
+    if number < 1:
+        raise argparse.ArgumentTypeError("the negative threshold is at least 1")
+    return number
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="corsair", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -181,6 +219,8 @@ def main(argv: list[str] | None = None) -> int:
     verify.add_argument("--provider", help="provider config; enables the blind auditor")
     verify.add_argument("--runs", default=str(RUNS))
     verify.add_argument("--run-id")
+    verify.add_argument("--negative-threshold", type=_threshold, default=NEGATIVE_THRESHOLD,
+                        help="distinct clean negatives that make LIKELY_NOT_EXPLOITABLE (operator-owned)")
 
     inv = sub.add_parser("investigate", help="run the producer against a case")
     inv.add_argument("--case", required=True)
@@ -188,6 +228,8 @@ def main(argv: list[str] | None = None) -> int:
     inv.add_argument("--max-submissions", type=int, default=4)
     inv.add_argument("--request-limit", type=int, default=60)
     inv.add_argument("--no-audit", action="store_true")
+    inv.add_argument("--negative-threshold", type=_threshold, default=NEGATIVE_THRESHOLD,
+                     help="distinct clean negatives that end the run as LIKELY_NOT_EXPLOITABLE (operator-owned)")
     inv.add_argument("--runs", default=str(RUNS))
 
     ev = sub.add_parser("eval", help="investigate several case directories and score them against oracle.json")
@@ -196,6 +238,8 @@ def main(argv: list[str] | None = None) -> int:
     ev.add_argument("--max-submissions", type=int, default=4)
     ev.add_argument("--request-limit", type=int, default=60)
     ev.add_argument("--no-audit", action="store_true")
+    ev.add_argument("--negative-threshold", type=_threshold, default=NEGATIVE_THRESHOLD,
+                    help="distinct clean negatives that end a run as LIKELY_NOT_EXPLOITABLE (operator-owned)")
     ev.add_argument("--runs", default=str(RUNS))
 
     clean = sub.add_parser("cleanup", help="remove every container this tool created (optionally one run)")

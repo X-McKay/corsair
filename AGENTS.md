@@ -10,8 +10,13 @@ design is in [README.md](README.md) and [docs/design.md](docs/design.md); the pi
   verdict; the blind auditor sees hypothesis and probe, never an outcome, and can only reject.
 - Polarity: `holds` means the probe's invariant held; `violated` means the probe's own assertion failed, i.e. the
   reported condition occurred. `LIKELY_EXPLOITABLE` needs control `holds` and exploit `violated` on the vulnerable
-  revision with both runs executing the target lines. The fix is `verified` only when the fixed revision shows control
-  `holds` and exploit `holds`. Nothing else is decisive; `INCONCLUSIVE`, `UNABLE_TO_RUN` and `ERROR` are honest stops.
+  revision with both runs executing the target lines. `LIKELY_NOT_EXPLOITABLE` (K4) needs, over one investigation, at
+  least `negative_threshold` distinct submissions (operator-owned, default 2, never agent-editable) that each passed the
+  structural guard, the build, control `holds`, exploit `holds` on the vulnerable revision with both runs executing the
+  target lines, and the blind audit where configured. Any `LIKELY_EXPLOITABLE` submission wins over negatives. The fix
+  is annotation only: it never changes a decisive label, and it is not run for `LIKELY_NOT_EXPLOITABLE`. A fix is
+  `verified` only when the fixed revision shows control `holds` and exploit `holds`. `INCONCLUSIVE`, `UNABLE_TO_RUN` and
+  `ERROR` are honest stops.
 - The producer's workspace is never evidence. Everything it did is replayed from the submission in containers it
   never touched. Model-written code never runs on the host.
 - Labels and oracles (`oracle.json`) are evaluator-only and never reach a `Case`, a prompt or a tool result.

@@ -10,7 +10,7 @@ from corsair import matrix
 from corsair.artifacts import ArtifactStore
 from corsair.case import load_case
 from corsair.kernel import (AuditResult, Fix, Gate, Hypothesis, Kernel, Label, Outcome, Submission, ast_guard,
-                            environment_key, reported_target_present, target_binding, terminal_verdict)
+                            environment_key, negative_verdict, reported_target_present, target_binding, terminal_verdict)
 from tests.fakes import FakeSandboxes, Script
 
 pytestmark = pytest.mark.anyio
@@ -251,3 +251,63 @@ async def test_symbol_and_lines_must_exist_in_the_target_file(tmp_path):
     evaluation = await k.evaluate(far)
     assert evaluation.gate.stage is Gate.TARGET_BINDING and "out of range" in evaluation.gate.reason
     assert fake.creates == []
+
+
+# --- clean negatives (K4) ------------------------------------------------------------------------------------------------
+
+NEGATIVE = {**HAPPY, ("vulnerable", "exploit"): Script("holds")}
+
+
+async def test_held_exploit_with_target_coverage_is_a_clean_negative_and_the_fix_is_not_run(tmp_path):
+    fake = FakeSandboxes(dict(NEGATIVE))
+    evaluation = await kernel(fake, tmp_path, auditor=accept).evaluate(REFERENCE)
+    assert evaluation.clean_negative and evaluation.verdict is None
+    assert evaluation.gate.stage is Gate.EXPLOIT_RUN and "clean negative" in evaluation.gate.reason
+    assert [(r.revision, r.role, r.outcome) for r in evaluation.runs] == [
+        ("vulnerable", "control", Outcome.HOLDS), ("vulnerable", "exploit", Outcome.HOLDS)]  # no fixed-revision runs
+    assert evaluation.audit is not None and evaluation.audit.valid
+    verdict = negative_verdict([evaluation], threshold=1)
+    assert verdict is not None and verdict.label is Label.LIKELY_NOT_EXPLOITABLE and verdict.rule == "K4"
+    assert verdict.fix is Fix.NOT_APPLICABLE and len(verdict.runs) == 2
+
+
+async def test_held_exploit_without_target_coverage_is_not_a_clean_negative(tmp_path):
+    fake = FakeSandboxes({**HAPPY, ("vulnerable", "exploit"): Script("holds", covered_lines=())})
+    evaluation = await kernel(fake, tmp_path).evaluate(REFERENCE)
+    assert not evaluation.clean_negative and evaluation.gate.stage is Gate.EXPLOIT_RUN
+    assert "did not execute" in evaluation.gate.reason
+    assert negative_verdict([evaluation], threshold=1) is None
+
+
+async def test_a_clean_negative_must_also_pass_the_blind_audit(tmp_path):
+    async def reject(submission: Submission) -> AuditResult:
+        return AuditResult(valid=False, reason="the exploit payload is outside the accepted type")
+
+    fake = FakeSandboxes(dict(NEGATIVE))
+    evaluation = await kernel(fake, tmp_path, auditor=reject).evaluate(REFERENCE)
+    assert not evaluation.clean_negative and evaluation.gate.stage is Gate.BLIND_AUDIT
+    assert negative_verdict([evaluation], threshold=1) is None
+
+
+async def test_negative_threshold_counts_distinct_submissions_and_an_exploitable_one_always_wins(tmp_path):
+    fake = FakeSandboxes(dict(NEGATIVE))
+    k = kernel(fake, tmp_path, auditor=accept)
+    first = await k.evaluate(REFERENCE)
+    again = await k.evaluate(REFERENCE)  # the same submission digest counts once
+    assert negative_verdict([first, again], threshold=2) is None
+    second = await k.evaluate(REFERENCE.model_copy(update={"probe": REFERENCE.probe + "\n# second\n"}))
+    verdict = negative_verdict([first, again, second], threshold=2)
+    assert verdict is not None and verdict.label is Label.LIKELY_NOT_EXPLOITABLE and "2 distinct" in verdict.reason
+    with pytest.raises(ValueError):
+        negative_verdict([first], threshold=0)
+    fake.scenario[("vulnerable", "exploit")] = Script("violated", "AssertionError", "outside content returned")
+    exploitable = await k.evaluate(REFERENCE)
+    assert exploitable.verdict is not None and exploitable.verdict.label is Label.LIKELY_EXPLOITABLE
+    assert negative_verdict([first, second, exploitable], threshold=2) is None
+
+
+async def test_failing_fix_keeps_the_exploitable_label_with_the_fix_not_verified(tmp_path):
+    fake = FakeSandboxes({**HAPPY, ("fixed", "control"): Script("errored", "ValueError", "fixed setup fails")})
+    evaluation = await kernel(fake, tmp_path, auditor=accept).evaluate(REFERENCE)
+    assert evaluation.verdict is not None and evaluation.verdict.label is Label.LIKELY_EXPLOITABLE
+    assert evaluation.verdict.fix is Fix.NOT_VERIFIED and evaluation.gate.passed

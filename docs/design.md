@@ -39,13 +39,28 @@ result; a disagreement is `errored`, never decisive.
 | Facts | Label | Fix |
 | --- | --- | --- |
 | vulnerable: control holds, exploit violated, both covered, audit valid | `LIKELY_EXPLOITABLE` (K1) | fixed: control holds and exploit holds → `verified`; else `not_verified` with the reason; no fixed revision → `not_applicable` |
+| over the investigation: no K1 submission and at least `negative_threshold` distinct clean negatives (K4 below) | `LIKELY_NOT_EXPLOITABLE` (K4) | `not_applicable`; the fixed revision is not run |
 | last gate was `build_replay` | `UNABLE_TO_RUN` (K2) | n/a |
 | last gate was `infra` (timeout, container failure, held identity) or no submission | `ERROR` (K0) | n/a |
 | budget exhausted at any other gate | `INCONCLUSIVE` (K3) with the last gate and reason | n/a |
 
-`LIKELY_NOT_EXPLOITABLE` is not emitted. A probe that did not demonstrate the condition is evidence about the probe,
-not about the code; a negative verdict needs independent attempts and a measured precision, which this pilot does not
-have.
+The fix never changes a decisive label. A LIKELY_EXPLOITABLE submission on the vulnerable revision stands whatever the
+fixed revision shows; a failing fix is `not_verified` with the reason and, within budget, the producer is asked to
+correct the probe.
+
+## Clean negatives (K4)
+
+A submission is a **clean negative** when, on the vulnerable revision, the structural guard and the build passed,
+control `holds` and exploit `holds`, both runs executed the target lines (missing or unknown coverage never counts),
+and the blind auditor accepted the probe when one is configured. The kernel still gates it as `exploit_run` with the
+reason "not demonstrated", so the producer tries another payload. Distinct submissions are counted by digest. When
+`negative_threshold` of them are observed and no submission is decisive, the run stops early with
+`LIKELY_NOT_EXPLOITABLE`. The threshold is operator-owned (`--negative-threshold`, default 2) and is not visible to the
+agent. A probe that holds but does not reach the target lines is not a negative: it says nothing about the code.
+
+This is an evidence rule, not a proof of absence. It is implemented and covered by offline tests with scripted doubles,
+but it has not been evaluated against a live model, so its precision is unmeasured. The previous design withheld the
+label for that reason, and that caution still applies to any claim beyond the pilot set.
 
 ## Boundaries kept from the earlier designs
 
