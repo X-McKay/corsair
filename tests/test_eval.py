@@ -201,6 +201,37 @@ async def test_three_fresh_reference_replays_publish_immutable_receipts_without_
 
 
 @pytest.mark.anyio
+async def test_reference_replay_uses_manifest_fixed_revision_target_lines(tmp_path):
+    from corsair.corpus import _region_sha256
+    from tests.fakes import Script
+    from tests.test_corpus import checked, read_manifest, write_manifest
+    from tests.test_kernel import HAPPY
+
+    root = qualification_fixture(tmp_path)
+    data = read_manifest(root)
+    data["cases"][0]["target"]["fixed_lines"] = [5]
+    data["cases"][0]["source_pair"]["fixed"]["affected_region_sha256"] = _region_sha256(
+        root / "cases/cs-1001/fixed/target.py", (5,))
+    write_manifest(root, data)
+    scenario = {
+        **HAPPY,
+        ("fixed", "control"): Script("holds", covered_lines=(5,)),
+        ("fixed", "exploit"): Script("holds", covered_lines=(5,)),
+    }
+
+    report = await verify_references(
+        root=root, manifest_path=root / "benchmarks/dataset/manifest.json",
+        eval_set="development", attempts=1, runs_root=root / ".runs/lite",
+        receipts_root=root / "benchmarks/dataset/receipts",
+        backend_factory=lambda: QualificationFake(scenario), corpus_validator=checked)
+
+    assert report.ok
+    receipt = json.loads((root / report.cases[0].attempts[0].path).read_text())
+    assert [(role["revision"], role["covered_lines"]) for role in receipt["roles"]] == [
+        ("vulnerable", [4]), ("vulnerable", [4]), ("fixed", [5]), ("fixed", [5])]
+
+
+@pytest.mark.anyio
 async def test_infrastructure_failure_blocks_admission_and_keeps_sanitized_evidence(tmp_path):
     from tests.fakes import Script
     from tests.test_kernel import HAPPY
@@ -283,12 +314,19 @@ async def test_reference_replay_hash_drift_fails_before_sandbox_construction(tmp
 
 @pytest.mark.anyio
 async def test_reference_kernel_boundary_receives_only_case_and_submission(tmp_path, monkeypatch):
+    from corsair.corpus import _region_sha256
     from corsair.case import Case
     from corsair.kernel import Submission
-    from tests.test_corpus import checked
+    from tests.fakes import Script
+    from tests.test_corpus import checked, read_manifest, write_manifest
     from tests.test_kernel import HAPPY
 
     root = qualification_fixture(tmp_path)
+    data = read_manifest(root)
+    data["cases"][0]["target"]["fixed_lines"] = [5]
+    data["cases"][0]["source_pair"]["fixed"]["affected_region_sha256"] = _region_sha256(
+        root / "cases/cs-1001/fixed/target.py", (5,))
+    write_manifest(root, data)
     real_kernel = benchmark_module.Kernel
     seen = []
 
@@ -297,14 +335,16 @@ async def test_reference_kernel_boundary_receives_only_case_and_submission(tmp_p
             assert isinstance(case, Case)
             serialized = json.dumps(case.model_dump(mode="json"))
             assert all(word not in serialized for word in
-                       ("expected_label", "oracle", "rights", "family_id", "review_receipt"))
+                       ("expected_label", "oracle", "rights", "family_id", "review_receipt", "fixed_lines"))
+            assert kwargs["fixed_target_lines"] == (5,)
             self.inner = real_kernel(backend, row, case, **kwargs)
             self.runtime_image_id = self.inner.runtime_image_id
 
         async def evaluate(self, submission):
             assert isinstance(submission, Submission)
             serialized = submission.model_dump_json()
-            assert all(word not in serialized for word in ("expected_label", "oracle", "rights", "family_id"))
+            assert all(word not in serialized for word in
+                       ("expected_label", "oracle", "rights", "family_id", "fixed_lines"))
             seen.append((self.inner.case, submission))
             return await self.inner.evaluate(submission)
 
@@ -313,7 +353,11 @@ async def test_reference_kernel_boundary_receives_only_case_and_submission(tmp_p
         root=root, manifest_path=root / "benchmarks/dataset/manifest.json",
         eval_set="development", attempts=1, runs_root=root / ".runs/lite",
         receipts_root=root / "benchmarks/dataset/receipts",
-        backend_factory=lambda: QualificationFake(dict(HAPPY)), corpus_validator=checked)
+        backend_factory=lambda: QualificationFake({
+            **HAPPY,
+            ("fixed", "control"): Script("holds", covered_lines=(5,)),
+            ("fixed", "exploit"): Script("holds", covered_lines=(5,)),
+        }), corpus_validator=checked)
     assert report.ok and len(seen) == 1
 
 

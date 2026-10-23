@@ -15,7 +15,7 @@ from pydantic import ValidationError
 from corsair import corpus as corpus_module, matrix
 from corsair.auditor import render as render_auditor
 from corsair.case import Case, GitSource, load_case, tree_sha256
-from corsair.corpus import (DatasetManifest, _cached_evidence, _patch_sha256, load_manifest,
+from corsair.corpus import (DatasetManifest, _cached_evidence, _patch_sha256, _region_sha256, load_manifest,
                             main as corpus_main, select_cases, validate_corpus)
 from corsair.kernel import Submission
 from corsair.matrix import select
@@ -157,12 +157,12 @@ def replay_record(case, *, run_id="qualification-1", attempt=1, outcome="complet
              "coverage": {"sha256": SHA_C, "size": 1}},
             {"revision": "fixed", "role": "control", "result": "PASS", "invariant_held": True,
              "exception_type": None, "exit_code": 0, "junit_tests": 1, "covered_target": True,
-             "covered_lines": list(case.target.lines), "cleanup_confirmed": True,
+             "covered_lines": list(case.target.lines_for("fixed")), "cleanup_confirmed": True,
              "output": {"sha256": SHA_A, "size": 1}, "junit": {"sha256": SHA_B, "size": 1},
              "coverage": {"sha256": SHA_C, "size": 1}},
             {"revision": "fixed", "role": "exploit", "result": "FAIL", "invariant_held": True,
              "exception_type": None, "exit_code": 1, "junit_tests": 1, "covered_target": True,
-             "covered_lines": list(case.target.lines), "cleanup_confirmed": True,
+             "covered_lines": list(case.target.lines_for("fixed")), "cleanup_confirmed": True,
              "output": {"sha256": SHA_A, "size": 1}, "junit": {"sha256": SHA_B, "size": 1},
              "coverage": {"sha256": SHA_C, "size": 1}},
         ] if outcome == "complete" else []),
@@ -210,6 +210,30 @@ def test_manifest_models_are_strict_frozen_and_load_the_empty_repository_manifes
     assert shipped.schema_version == "corsair-lite/dataset-manifest/1"
     assert shipped.cases == ()
     assert select_cases(shipped, "release") == ()
+
+
+def test_target_identity_can_declare_distinct_fixed_revision_lines():
+    case = dataset_case()
+    case["target"]["fixed_lines"] = [31, 29]
+
+    target = DatasetManifest.model_validate(manifest(case)).cases[0].target
+
+    assert target.lines == (10, 11)
+    assert target.fixed_lines == (29, 31)
+    assert target.lines_for("vulnerable") == (10, 11)
+    assert target.lines_for("fixed") == (29, 31)
+
+
+def test_corpus_validates_each_source_region_with_its_revision_lines(tmp_path):
+    root = corpus_fixture(tmp_path)
+    data = read_manifest(root)
+    case = data["cases"][0]
+    case["target"]["fixed_lines"] = [5]
+    case["source_pair"]["fixed"]["affected_region_sha256"] = _region_sha256(
+        root / "cases/cs-1001/fixed/target.py", (5,))
+    write_manifest(root, data)
+
+    assert checked(root).ok
 
 
 @pytest.mark.parametrize("redaction", [None, "best_effort", "private"])
@@ -409,6 +433,22 @@ def test_admission_requires_three_complete_replays_and_one_family_review():
                                   "attempt": attempt} for attempt in (1, 2, 3)),
     })
     assert case_revision_sha256(attached) == case_revision_sha256(direct)
+
+
+def test_admission_binds_receipt_coverage_to_each_revision_target_lines():
+    data = dataset_case(runtime="pytest-cpython312")
+    data["target"]["fixed_lines"] = [29, 31]
+    case = DatasetManifest.model_validate(manifest(data)).cases[0]
+    records = tuple(replay_record(case, attempt=attempt) for attempt in (1, 2, 3))
+    review = family_review(case)
+
+    assert admission_status(case, records, review, family_cases=(case,)).ready
+
+    wrong = tuple(record.model_copy(update={
+        "roles": tuple(role.model_copy(update={"covered_lines": case.target.lines})
+                       if role.revision == "fixed" else role for role in record.roles)
+    }) for record in records)
+    assert admission_status(case, wrong, review, family_cases=(case,)).code == "REPLAY_EXPECTATION_MISMATCH"
 
 
 def test_changed_oracle_invalidates_receipts():

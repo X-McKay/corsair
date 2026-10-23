@@ -210,7 +210,9 @@ Use Starlette fix `1797de464124b090f10cf570441e8292936d63e3`, cookie `38323bad3a
 
 - [ ] **Step 2: Author findings and probes independently**
 
-Exercise `StaticFiles.lookup_path`, `cookie.serialize`, `FilenameUtils` normalization and `Net::Netmask` parsing. Use exact target lines common to both payloads and avoid copied upstream regression code.
+Exercise `StaticFiles.lookup_path`, `cookie.serialize`, `FilenameUtils` normalization and `Net::Netmask` parsing.
+Use exact target lines for the same semantic seam in each revision (`target.lines` for vulnerable and optional
+`target.fixed_lines` after line-shifting fixes), and avoid copied upstream regression code.
 
 - [ ] **Step 3: Run build/runtime spikes, then three replays**
 

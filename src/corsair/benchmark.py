@@ -258,7 +258,7 @@ def _receipt_matches_case(case: DatasetCase, record: ReplayRecord) -> bool:
     if set(roles) != {("vulnerable", "control"), ("vulnerable", "exploit"),
                      ("fixed", "control"), ("fixed", "exploit")}:
         return False
-    return all(role.covered_lines == case.target.lines for role in roles.values())
+    return all(role.covered_lines == case.target.lines_for(role.revision) for role in roles.values())
 
 
 def receipt_bytes(record: Frozen) -> bytes:
@@ -493,7 +493,7 @@ def _replay_outcome(case: DatasetCase, evaluation: Evaluation, backend: Sandboxe
         return "failed", "ROLE_EVIDENCE_INCOMPLETE", cleanup
     for (revision, role), run in roles.items():
         if (run.junit_tests != 1 or run.exception_type is not None or run.covered_target is not True
-                or run.covered_lines != case.target.lines or run.cleanup_confirmed is not True):
+                or run.covered_lines != case.target.lines_for(revision) or run.cleanup_confirmed is not True):
             return "failed", "ROLE_EVIDENCE_INVALID", cleanup
         expected_held = role == "control" or revision == "fixed"
         expected_result = RoleResult.PASS if role == "control" or revision == "vulnerable" else RoleResult.FAIL
@@ -753,7 +753,8 @@ async def verify_references(*, root: Path, manifest_path: Path, eval_set: EvalSe
             started_at = now()
             backend = backend_factory()
             kernel = Kernel(backend, row, case, artifacts=ArtifactStore(Path(runs_root) / run_id / "artifacts"),
-                            auditor=_trusted_reference_audit, run_id=run_id)
+                            auditor=_trusted_reference_audit, run_id=run_id,
+                            fixed_target_lines=dataset_case.target.fixed_lines)
             if kernel.runtime_image_id is None or not re.fullmatch(_IMAGE_ID, kernel.runtime_image_id):
                 record = _infrastructure_record(
                     dataset_case=dataset_case, dataset_version=manifest.dataset_version,

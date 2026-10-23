@@ -14,6 +14,11 @@ the outcome-blind auditor request. Agent-visible `input.json` retains only the `
 source revisions. Upstream source is acquired by immutable HTTPS Git commit unless reviewed redistribution rights
 explicitly permit a snapshot.
 
+`target.lines` binds the submitted hypothesis and vulnerable revision. When a fix shifts the same semantic seam,
+`target.fixed_lines` records its fixed-revision line identity; omitting it keeps the original shared-line behavior.
+The fixed mapping stays in this evaluator-only manifest. Corpus region hashes, native coverage, replay receipts,
+and admission checks use the line tuple for their own revision.
+
 The `quarantine` split is never scored. A public repository is not license evidence, and missing, conflicting,
 noncommercial or `NOASSERTION` material remains quarantined until separately resolved.
 

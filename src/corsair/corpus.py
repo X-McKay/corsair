@@ -82,16 +82,22 @@ class TargetIdentity(Frozen):
     file: SafePath
     symbol: str = Field(min_length=1, max_length=256)
     lines: tuple[int, ...] = Field(min_length=1, max_length=64)
+    fixed_lines: tuple[int, ...] | None = Field(default=None, min_length=1, max_length=64)
 
-    @field_validator("lines")
+    @field_validator("lines", "fixed_lines")
     @classmethod
-    def _ordered_positive_lines(cls, lines: tuple[int, ...]) -> tuple[int, ...]:
+    def _ordered_positive_lines(cls, lines: tuple[int, ...] | None) -> tuple[int, ...] | None:
+        if lines is None:
+            return None
         if any(line < 1 for line in lines):
             raise ValueError("target lines are 1-based")
         unique = tuple(sorted(set(lines)))
         if len(unique) != len(lines):
             raise ValueError("target lines must be unique")
         return unique
+
+    def lines_for(self, revision: Literal["vulnerable", "fixed"]) -> tuple[int, ...]:
+        return self.fixed_lines if revision == "fixed" and self.fixed_lines is not None else self.lines
 
 
 class DispositionExpectation(Frozen):
@@ -897,7 +903,7 @@ def validate_corpus(root: Path, *, manifest_path: Path | None = None,
                 if _sha256(target) != declared.affected_file_sha256:
                     add("AFFECTED_FILE_HASH_MISMATCH", f"{revision_name} target hash differs", path=target,
                         case_ids=(case.case_id,))
-                region = _region_sha256(target, case.target.lines)
+                region = _region_sha256(target, case.target.lines_for(revision_name))
                 if region is None:
                     add("TARGET_LINE_OUT_OF_RANGE", f"{revision_name} target lines are out of range", path=target,
                         case_ids=(case.case_id,))
