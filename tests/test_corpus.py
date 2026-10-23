@@ -410,6 +410,16 @@ def issue_codes(report) -> set[str]:
     return {issue.code for issue in (*report.errors, *report.warnings)}
 
 
+def test_control_character_in_repository_root_becomes_one_path_escape_issue():
+    report = validate_corpus(Path("bad\0root"))
+
+    assert report.case_count == 0
+    assert report.family_count == 0
+    assert report.warnings == ()
+    assert len(report.errors) == 1
+    assert report.errors[0].code == "PATH_ESCAPE"
+
+
 @pytest.mark.parametrize("codepoint", [0x00, 0x01, 0x1f, 0x7f],
                          ids=["nul", "soh", "unit-separator", "del"])
 @pytest.mark.parametrize("location", [

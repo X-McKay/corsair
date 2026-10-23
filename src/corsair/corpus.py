@@ -654,7 +654,7 @@ def validate_corpus(root: Path, *, _evidence_resolver: EvidenceResolver | None =
     """Validate benchmark provenance and isolation offline, without refreshing source or evidence."""
     try:
         root = Path(root).resolve(strict=True)
-    except (OSError, RuntimeError) as error:
+    except (OSError, RuntimeError, ValueError) as error:
         issue = CorpusIssue(severity="error", code="PATH_ESCAPE", message=f"invalid repository root: {error}")
         return CorpusReport(errors=(issue,), case_count=0, family_count=0)
     errors: list[CorpusIssue] = []
