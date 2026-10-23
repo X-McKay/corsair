@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --gid 1000 corsair && useradd --uid 1000 --gid 1000 --create-home --shell /usr/sbin/nologin corsair \
-    && mkdir -p /work && ln -s /usr/bin/python3 /usr/local/bin/python
+    && mkdir -p /work && chown 1001:1001 /work && ln -s /usr/bin/python3 /usr/local/bin/python
 WORKDIR /work
-# Build as root; DockerSandboxes always opens offline probes as 1000:1000.
+# Docker builds replay as root. OpenShell SDK builds run as 1001:1001, so /work is pre-owned by that builder; both
+# retain a distinct uid-1000 offline probe so sealed source cannot be reopened by a probe.

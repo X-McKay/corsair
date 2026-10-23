@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --gid 1000 corsair && useradd --uid 1000 --gid 1000 --create-home --shell /usr/sbin/nologin corsair \
-    && mkdir -p /work
+    && mkdir -p /work && chown 1001:1001 /work
 WORKDIR /work
-# Build replay deliberately remains root so project dependency installation can
-# write standard locations. DockerSandboxes runs probe commands as uid 1000.
+# Docker build replay deliberately remains root; OpenShell SDK build replay is uid 1001 and therefore receives the
+# pre-owned /work root. DockerSandboxes and OpenShell both use a distinct uid-1000 offline probe after sealing.

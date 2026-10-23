@@ -295,6 +295,10 @@ class DockerSandboxes:
         self.probe_user = probe_user
         self._owners: dict[str, tuple[int, int]] = {}  # uid, gid read once per created container
 
+    @property
+    def cache_identity(self) -> str:
+        return f"docker:cap-drop=ALL:no-new-privileges:probe={self.probe_user}"
+
     @staticmethod
     def _config(spec: SandboxSpec) -> DockerConfig:
         return DockerConfig(
@@ -399,9 +403,16 @@ class DockerSandboxes:
         return found.get(ENV_LOG_LABEL, "") if found.get(ENV_KEY_LABEL) == key else None
 
     def seal_environment(
-        self, name: str, tag: str, key: str, log_sha256: str, writable: Sequence[str] = ()
+        self,
+        name: str,
+        tag: str,
+        key: str,
+        log_sha256: str,
+        writable: Sequence[str] = (),
+        *,
+        image_defaults: Sequence[str] = (),
     ) -> None:
-        # Probes use a different, unprivileged uid. Source and kernel support stay root-owned/read-only;
+        # Probes use a different, unprivileged uid. Source and kernel support stay builder-owned/read-only;
         # results go to /tmp. The probe cannot reopen files because it is not the source owner.
         if owner(name)[0] == int(self.probe_user.split(":")[0]):
             raise WorkspaceError(
@@ -434,6 +445,7 @@ class DockerSandboxes:
             "commit",
             "--change",
             f"LABEL {ENV_KEY_LABEL}={key} {ENV_LOG_LABEL}={log_sha256}",
+            *(argument for change in image_defaults for argument in ("--change", change)),
             name,
             tag,
             timeout=1800,

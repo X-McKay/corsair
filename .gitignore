@@ -12,3 +12,4 @@ __pycache__/
 .cache/
 .state/
 .worktrees/
+config/openshell-build-policy.local.yaml

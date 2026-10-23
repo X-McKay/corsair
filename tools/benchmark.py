@@ -2,7 +2,7 @@
 """Generate and optionally exercise the deterministic polyglot benchmark fixtures.
 
 Generation is the default and makes no pass or model-accuracy claim.  ``--run-kernel``
-replays the checked-in trusted reference submission in DockerSandboxes without an
+replays the checked-in trusted reference submission in the selected sandbox without an
 LLM or blind auditor.  ``--native-smoke`` is explicitly local trusted-fixture
 execution, *not* isolation and never evidence for a Corsair verdict.
 """
@@ -29,7 +29,7 @@ if __package__ in (None, ""):
 from benchmarks.polyglot import LANGUAGES, generate
 from corsair.adapters.artifacts.filesystem import ArtifactStore, write_json
 from corsair.adapters.frameworks import framework
-from corsair.adapters.sandbox.docker import DockerSandboxes
+from corsair.adapters.sandbox import sandboxes
 from corsair.application.cases import load_case
 from corsair.application.kernel import Kernel
 from corsair.domain.policy import terminal_verdict
@@ -160,7 +160,6 @@ async def _kernel_one(path: Path, root: Path, index: int, docker_problem: str | 
     provenance = _provenance(path)
     row: dict[str, Any] = {
         "case": str(path),
-        "mode": "docker-kernel-trusted-reference",
         "language": provenance["language"],
         "auditor": "not configured (no model call)",
     }
@@ -174,8 +173,10 @@ async def _kernel_one(path: Path, root: Path, index: int, docker_problem: str | 
         submission = Submission.model_validate_json(
             (path / "reference-submission.json").read_text(encoding="utf-8")
         )
+        backend = sandboxes()
+        row["mode"] = f"{backend.provider}-kernel-trusted-reference"
         kernel = Kernel(
-            DockerSandboxes(),
+            backend,
             selected,
             case,
             artifacts=ArtifactStore(root / "kernel-artifacts" / f"{index:04d}"),
@@ -265,7 +266,7 @@ def _run(args: argparse.Namespace) -> int:
         report["execution"] = "native-not-isolated trusted fixture smoke"
         rows = [_native_one(path) for path in selected]
     elif args.run_kernel:
-        report["execution"] = "DockerSandboxes trusted reference replay without auditor/model"
+        report["execution"] = f"{sandboxes().provider} trusted reference replay without auditor/model"
         rows = asyncio.run(_kernel_runs(selected, root, args.workers))
     if rows:
         report["results"] = rows
@@ -302,7 +303,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--run-kernel",
         action="store_true",
-        help="replay trusted reference submissions through DockerSandboxes",
+        help="replay trusted references through the CORSAIR_SANDBOX provider (default docker)",
     )
     parser.add_argument(
         "--native-smoke", action="store_true", help="run trusted local fixtures; explicitly not isolation"
@@ -313,7 +314,7 @@ def _parser() -> argparse.ArgumentParser:
         default=1,
         choices=range(1, 17),
         metavar="1..16",
-        help="maximum concurrent Docker evaluations; results retain stable input order",
+        help="maximum concurrent sandbox evaluations; results retain stable input order",
     )
     return parser
 

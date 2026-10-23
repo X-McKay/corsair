@@ -17,8 +17,8 @@ RUN npm ci --prefix /opt/corsair/node --ignore-scripts --no-audit --no-fund
 # The official Node image already provides node:node at 1000:1000. Retain the invariant if the base image changes.
 RUN (getent group 1000 >/dev/null || groupadd --gid 1000 corsair) \
     && (getent passwd 1000 >/dev/null || useradd --uid 1000 --gid 1000 --create-home --shell /usr/sbin/nologin corsair) \
-    && mkdir -p /work
+    && mkdir -p /work && chown 1001:1001 /work
 WORKDIR /work
-# Build replay remains root-owned so a uid-1000 probe cannot change modes on sealed source. DockerSandboxes opens
-# every probe explicitly as 1000:1000 after the root-owned tree has been frozen.
+# Docker replay remains root-owned so a uid-1000 probe cannot change modes on sealed source. OpenShell admits its
+# SDK build as 1001:1001 instead, so /work is pre-owned by that builder before source copy; probes stay distinct.
 USER root

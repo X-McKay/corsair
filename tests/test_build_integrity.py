@@ -109,3 +109,22 @@ async def test_revision_cannot_occupy_the_reserved_kernel_path(tmp_path, symlink
     result = await kernel.evaluate(REFERENCE)
     assert result.gate.stage is Gate.BUILD_REPLAY and "reserved" in result.gate.reason
     assert not backend.creates
+
+
+@pytest.mark.parametrize("policy", ["", None, 7])
+async def test_cache_policy_must_be_explicit_before_any_execution(tmp_path, policy):
+    backend = FakeSandboxes(dict(HAPPY))
+    backend.cache_identity = policy
+    kernel = Kernel(
+        backend, ROW, load_case(CASE), artifacts=ArtifactStore(tmp_path), framework=framework(ROW.framework)
+    )
+    result = await kernel.evaluate(REFERENCE)
+    assert result.gate.stage is Gate.INFRA and "cache policy" in result.gate.reason
+    assert not backend.creates and not backend.sealed
+
+
+def test_cache_is_bound_to_provider_and_reviewed_policy():
+    digest = load_case(CASE).revision.tree_sha256
+    base = environment_key(ROW, digest, "", sandbox_policy="docker:policy-a")
+    assert base != environment_key(ROW, digest, "", sandbox_policy="openshell:policy-a")
+    assert base != environment_key(ROW, digest, "", sandbox_policy="docker:policy-b")

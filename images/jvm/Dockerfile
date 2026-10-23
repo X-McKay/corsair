@@ -27,6 +27,7 @@ RUN curl --fail --location --proto '=https' --tlsv1.2 --retry 3 -o /tmp/jacoco.z
 
 RUN (getent group 1000 || groupadd --gid 1000 corsair) \
     && (getent passwd 1000 || useradd --uid 1000 --gid 1000 --create-home --shell /usr/sbin/nologin corsair) \
-    && mkdir -p /work && ln -s /usr/bin/python3 /usr/local/bin/python
+    && mkdir -p /work && chown 1001:1001 /work && ln -s /usr/bin/python3 /usr/local/bin/python
 WORKDIR /work
-# Build as root; DockerSandboxes always opens offline probes as 1000:1000.
+# Docker builds replay as root. OpenShell SDK builds run as 1001:1001, so /work is pre-owned by that builder; both
+# retain a distinct uid-1000 offline probe so sealed source cannot be reopened by a probe.

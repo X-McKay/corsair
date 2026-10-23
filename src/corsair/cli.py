@@ -20,7 +20,7 @@ from corsair.adapters.artifacts.filesystem import ArtifactStore, write_json
 from corsair.adapters.frameworks import framework
 from corsair.adapters.inference.openai import OpenAIInference
 from corsair.adapters.sandbox import sandboxes
-from corsair.adapters.scm.git import GitSCM
+from corsair.adapters.scm import source_control
 from corsair.agents.auditor.agent import audit, build_auditor
 from corsair.agents.producer.dependencies import NEGATIVE_THRESHOLD
 from corsair.agents.producer.types import ProducerRun
@@ -500,7 +500,7 @@ def main(
 
     args = parser.parse_args(argv)
     inference = inference or OpenAIInference()
-    scm = scm or GitSCM()
+    scm = scm or source_control()
     if args.command in ("seed", "optimize-skills"):
         return asyncio.run(_proposal(args, inference, scm))
     if args.command == "verify":

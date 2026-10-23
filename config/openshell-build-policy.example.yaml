@@ -1,0 +1,13 @@
+# Operator-reviewed OpenShell build egress; this file is not enabled automatically.
+# Replace the illustrative endpoint and binary with the exact services/programs your project needs.
+# Do not add model-provider credentials: model inference stays outside the workload.
+# Corsair supplies the fixed filesystem, non-root process and hard Landlock policy.
+version: 1
+network_policies:
+  project_artifacts:
+    name: project-artifacts
+    endpoints:
+      - host: registry.example
+        port: 443
+    binaries:
+      - path: /usr/bin/curl

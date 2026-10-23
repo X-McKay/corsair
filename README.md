@@ -1,10 +1,10 @@
 # Corsair
 
-Corsair checks a reported security finding against an exact source revision and, when supplied, its fix. Its architecture is deliberately small: **one producer, a deterministic verdict kernel, and one outcome-blind auditor**. PydanticAI owns the agent loop; pytest owns the shared probe driver; existing language tools own native coverage; Docker owns execution isolation.
+Corsair checks a reported security finding against an exact source revision and, when supplied, its fix. Its architecture is deliberately small: **one producer, a deterministic verdict kernel, and one outcome-blind auditor**. PydanticAI owns the agent loop; pytest owns the shared probe driver; existing language tools own native coverage; Docker or the explicitly selected OpenShell gateway owns execution isolation.
 
 The producer submits a hypothesis, a replayable `build_script`, and one Python module declaring `CONTROL_PAYLOAD`, `EXPLOIT_PAYLOAD`, and `run_target(payload)`. The same function exercises the real target for either input. For Java, Node, Perl, Ruby, and C++, it invokes native subprocesses; target coverage never comes from the Python wrapper.
 
-The kernel binds the reported file, checks probe structure, replays the build in a clean container, rejects changes to **any original source-tree entry**, and freezes the compiled source. Kernel support files are root-owned and read-only; source collisions at the reserved `.corsair` path are refused. Two fresh, unprivileged, **offline** containers then run control and exploit separately. The control must hold, the exploit must violate the probe's own security invariant, and **every claimed vulnerable-target line must execute in both**. Missing or ambiguous native evidence, an unrelated crash, and application assertions are not proof. Only then does the stateless auditor review the hypothesis and probe, without outcomes. Fixed-revision replay annotates the finding; it never changes the vulnerable-revision label.
+The kernel binds the reported file, checks probe structure, replays the build in a clean container, rejects changes to **any original source-tree entry**, and freezes the compiled source. Kernel support files are read-only and owned by a different identity from the probe; source collisions at the reserved `.corsair` path are refused. Two fresh, unprivileged, **offline** containers then run control and exploit separately. The control must hold, the exploit must violate the probe's own security invariant, and **every claimed vulnerable-target line must execute in both**. Missing or ambiguous native evidence, an unrelated crash, and application assertions are not proof. Only then does the stateless auditor review the hypothesis and probe, without outcomes. Fixed-revision replay annotates the finding; it never changes the vulnerable-revision label.
 
 ## Quick start
 
@@ -37,6 +37,12 @@ Full batches retain Docker snapshots and can consume substantial disk space. Pre
 | C++ | GCC gcov JSON | GCC, CMake, Make and Ninja; `--coverage -O0 -g` |
 
 The operator-owned [runtime matrix](matrix.yaml) selects the image and native collector. Build-system commands belong in the submitted build script and [producer skills](src/corsair/agents/producer/skills), not framework-specific kernel branches. Target extensions disambiguate mixed-language trees. Unsupported toolchain versions or layouts fail honestly; the matrix is not a claim that every project or framework has been validated.
+
+## Provider integrations
+
+Source requests explicitly select `source.provider`: `git` (default), `github` or `azure_devops`. GitHub uses PyGithub and existing `GITHUB_TOKEN`/`gh` authentication; Azure uses the official Azure DevOps SDK and `AZURE_DEVOPS_PAT`. Both acquire an exact commit through read-only provider APIs. See [source-control setup](docs/provider-scm.md). **Azure DevOps live validation is deferred by request**, not claimed as complete.
+
+`CORSAIR_SANDBOX=docker` is the default. Set `CORSAIR_SANDBOX=openshell` to use an existing OpenShell v0.1.5 **local Docker-backed gateway**, its official CLI, and registered TLS/OIDC configuration. Build commands and probes execute through the gateway SDK; trusted file/snapshot controls use only the verified local workload. Other compute drivers fail explicitly. Reviewed build egress is configured through `CORSAIR_OPENSHELL_BUILD_POLICY`; probes have no approved egress. See [provider setup, safety contract and validation](docs/provider-integrations.md). Provider tests do not require model inference.
 
 ## Run the agents
 
@@ -95,15 +101,21 @@ src/corsair/
 │   ├── framework.py
 │   └── verification.py
 ├── adapters/
-│   ├── sandbox/docker.py
+│   ├── sandbox/
+│   │   ├── docker.py
+│   │   └── openshell.py           # Governed local Docker-backed OpenShell gateway
 │   ├── inference/openai.py       # Native SDK model/client lifecycle
-│   ├── scm/git.py                # Pinned Git acquisition with hooks disabled
+│   ├── scm/
+│   │   ├── git.py                # Generic pinned Git; hooks disabled
+│   │   ├── github.py             # PyGithub commit/archive acquisition
+│   │   ├── azure_devops.py       # Official Azure SDK commit/archive acquisition
+│   │   └── archive.py            # Shared bounded extraction and atomic cache
 │   ├── artifacts/filesystem.py   # Content-addressed evidence and atomic JSON
 │   └── frameworks/               # Native coverage SDKs and shared pytest driver
 └── runtime/                      # Operator model settings and runtime matrix
 ```
 
-Start with `cli.py` to see composition, then `application/kernel.py` for the verification path. Follow an agent's `agent.py` to its private tools, instructions and skills. To change Docker or Git behavior, go directly to the matching adapter rather than looking through agent code.
+Start with `cli.py` to see composition, then `application/kernel.py` for the verification path. Follow an agent's `agent.py` to its private tools, instructions and skills. Integrations are always `adapters/<capability>/<provider>.py`; change GitHub, Azure DevOps or sandbox behavior there, not in agent code. Capability package initializers select implementations; the kernel never does.
 
 Dependencies point inward: concrete adapters implement ports; application services receive them explicitly; domain contracts know neither adapters nor agents. The kernel does not select Docker, a filesystem store or a coverage implementation. Agents use PydanticAI's existing `Model` interface, not another home-built model API. Architecture tests enforce these boundaries. Only genuinely shared resource validation is shared; the tool-free agents do not have empty `tools/` or `skills/` directories.
 
@@ -113,6 +125,6 @@ Dependencies point inward: concrete adapters implement ports; application servic
 
 The [polyglot benchmark guide](docs/polyglot-benchmarks.md) describes **55 twin cases per language**, 385 total, spanning 11 synthetic policy mechanisms and five payload variants. These are runtime/build/invariant regressions, **not 385 unique vulnerabilities or a measurement of model accuracy**. A separately sourced catalog contains 1,032 external candidates across the seven languages; those are leads, not executed Corsair cases. Real-framework evaluation requires authorized, reproducible imports with upstream versions, patches and license review.
 
-Docker is the implemented execution backend, not a production OpenShell deployment. Hardened containers reduce risk but are not a guarantee against container escapes. Probe structure checks and a blind auditor are not an adversarial proof system: native reports are not cryptographic execution attestations, and model-authored builds and probes still require review. Original source entries must stay unchanged, so projects that deliberately rewrite tracked source during builds need an explicit policy decision rather than a silent exception. C++ fatal sanitizer aborts may lose coverage and remain inconclusive; Java nonstandard source layouts need explicit support. Build replay can access the network, while probes cannot. No tool bypasses an unavailable runtime, coverage failure, or provider refusal.
+Docker and local Docker-backed OpenShell are implemented execution providers, not certification of a production deployment. Hardened containers reduce risk but are not a guarantee against container escapes. Probe structure checks and a blind auditor are not an adversarial proof system: native reports are not cryptographic execution attestations, and model-authored builds and probes still require review. Original source entries must stay unchanged, so projects that deliberately rewrite tracked source during builds need an explicit policy decision rather than a silent exception. C++ fatal sanitizer aborts may lose coverage and remain inconclusive; Java nonstandard source layouts need explicit support. Build replay can use its explicitly permitted network access, while probes cannot. No tool bypasses an unavailable runtime, coverage failure, or provider refusal.
 
 See the [architecture refactor](docs/architecture-refactor.md), [implementation contract](docs/spec-0090-implementation.md), [validation record](docs/validation.md), [original design](docs/design.md), and [earlier Python pilot](docs/pilot.md). This branch follows the agent-private layout and contract/evidence separation in `X-McKay/playbooks`; it is a review candidate, not a certification or merge approval.

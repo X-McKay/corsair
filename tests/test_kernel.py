@@ -246,7 +246,9 @@ async def test_held_sandbox_identity_is_never_reused_or_removed(tmp_path):
             "run1",
             "build",
             revision="vulnerable",
-            env=environment_key(ROW, k.case.revision.tree_sha256, "", "sha256:fake", "documents.py")[:16],
+            env=environment_key(
+                ROW, k.case.revision.tree_sha256, "", "sha256:fake", "documents.py", fake.cache_identity
+            )[:16],
         ),
     ).name
     fake.held.add(held)

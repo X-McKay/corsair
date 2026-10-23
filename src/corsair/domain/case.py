@@ -7,8 +7,9 @@ import os
 import stat
 from pathlib import Path
 from typing import Annotated, Literal
+from urllib.parse import urlsplit
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator
 
 CONTRACT_VERSION = "corsair-lite/1"
 
@@ -59,9 +60,34 @@ class GitSource(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    url: str = Field(pattern=r"^https://[^\s]+$")
+    provider: Literal["git", "github", "azure_devops"] = "git"
+    url: str = Field(min_length=1, max_length=2048)
     commit: str = Field(pattern=r"^[0-9a-f]{40}$")
     subdir: str | None = Field(default=None, description="Investigate only this directory of the checkout")
+
+    @field_validator("url")
+    @classmethod
+    def https_repository_url(cls, value: str) -> str:
+        if any(character.isspace() for character in value):
+            raise ValueError("repository URL must not contain whitespace")
+        try:
+            parsed = urlsplit(value)
+            port = parsed.port
+        except ValueError as error:
+            raise ValueError("repository URL has an invalid port") from error
+        if (
+            parsed.scheme != "https"
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+            or not parsed.path.startswith("/")
+            or port is not None
+            and not 1 <= port <= 65535
+        ):
+            raise ValueError("repository URL must be HTTPS without credentials, query, or fragment")
+        return value
 
 
 def tree_manifest(root: Path, *, directories: bool = False) -> list[tuple[str, str, str]]:

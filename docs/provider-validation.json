@@ -1,0 +1,117 @@
+{
+  "schema": "corsair/provider-validation/1",
+  "date": "2026-10-23",
+  "tests": {
+    "combined_non_model_suite": {
+      "passed": 278,
+      "scope": "offline, real Docker, five real OpenShell gateway checks, architecture and installed-wheel resources",
+      "duration_s": 143.3
+    },
+    "quality": "make check passed; uv lock --check passed; git diff --check passed"
+  },
+  "github": {
+    "provider": "github",
+    "operation": "read-only native PyGithub commit/archive acquisition",
+    "url": "https://github.com/X-McKay/playbooks",
+    "commit": "2b31000fbc8c9a788448b049d25809927c4d91f9",
+    "files": 269,
+    "tree_sha256": "04fd0333d4b7b874e4e5d33412f261c5a5a07c6607a8365cab68ab99dc2c14cb",
+    "cache_reuse_without_transport": true,
+    "azure_live_validation": "deferred by user"
+  },
+  "azure_devops": {
+    "implementation": "official native SDK",
+    "contract_tests": "passed",
+    "live_validation": "deferred at user request; no authenticated Azure service acquisition claimed"
+  },
+  "docker_language_smoke": [
+    {
+      "language": "python",
+      "status": "passed",
+      "gate": "verified",
+      "fix": "verified",
+      "tree_sha256": "521a0ffda037c4cc73f6de3db9d985c4f4d78bc61db4e53bca137b0f1e7a5cd9",
+      "submission_sha256": "e92e41e6ebda9eb51857a4e04ccbdb8d8372534e46bf0d5e581ceaaa91e50225",
+      "cleanup_confirmed": true
+    },
+    {
+      "language": "java",
+      "status": "passed",
+      "gate": "verified",
+      "fix": "verified",
+      "tree_sha256": "fba1b9907b52c4868f34bb93a0b524044432a1e18882c6547b4dd75160541be0",
+      "submission_sha256": "c18be9a6f16f15f523af99cc3f7ea29edf3ffeb6b1e30f0634ac7a649e8c85b0",
+      "cleanup_confirmed": true
+    },
+    {
+      "language": "javascript",
+      "status": "passed",
+      "gate": "verified",
+      "fix": "verified",
+      "tree_sha256": "85244cb9e9e3593b3ced0dd89b1edab528ecc8290fa9a1361ed6178696ba00b1",
+      "submission_sha256": "6ea9135fc61ccd61c69ac76314b9bc3af82e01320f14d0f95dbf28d86d63912b",
+      "cleanup_confirmed": true
+    },
+    {
+      "language": "typescript",
+      "status": "passed",
+      "gate": "verified",
+      "fix": "verified",
+      "tree_sha256": "d7aa2c81bcc611e8ffa3fb343d44fe9f38c15942f59e57de27e06f69d0c5c4f2",
+      "submission_sha256": "572d5265fe0336eef6da83616d87250c92a9194b7a60513bbafdb427ccb1d596",
+      "cleanup_confirmed": true
+    },
+    {
+      "language": "perl",
+      "status": "passed",
+      "gate": "verified",
+      "fix": "verified",
+      "tree_sha256": "ccfa8a6d366c7577ccb0d1c98f4ea7d00da27c209ed312567c23999c6b67f24e",
+      "submission_sha256": "5ef4e15124b11b34cf8b820b1c4acd9589f6959052f1f62a3912de753412a761",
+      "cleanup_confirmed": true
+    },
+    {
+      "language": "ruby",
+      "status": "passed",
+      "gate": "verified",
+      "fix": "verified",
+      "tree_sha256": "1890e4385ef9561b666371deec111332f7664469cf61dbeb6119d0b898fbb246",
+      "submission_sha256": "899c8d064fd092093a00bec484e101848410a5d99b57f7773e8c8efc500b2f1a",
+      "cleanup_confirmed": true
+    },
+    {
+      "language": "cpp",
+      "status": "passed",
+      "gate": "verified",
+      "fix": "verified",
+      "tree_sha256": "80ba1f223ddc0c558471108b09c6a225628c7c818d730903282a7deb7542aa8b",
+      "submission_sha256": "c11bbf7af3be68a0771f181a30dc39a740fa4e0d6cb139499506af4dab9ef9f0",
+      "cleanup_confirmed": true
+    }
+  ],
+  "openshell": {
+    "sdk_version": "0.1.5",
+    "compute": "local Docker only",
+    "real_integration_tests": 5,
+    "unit_tests": 18,
+    "python_twin": "verified vulnerable/fixed replay, native coverage and cleanup",
+    "javascript_twin": "initial trusted twin passed; no all-language support claim",
+    "security": "root refusal, offline network denial, sealed source write denial, foreign support-file refusal, no privileged cache re-preparation",
+    "language_limitations": "npm/Maven registry policy denied; Ruby control errored; GNU Make 4.3 recipe execution denied in Perl and C++ builds; failed attempts retained separately",
+    "upstream_make_issue": "https://github.com/NVIDIA/OpenShell/issues/4102",
+    "all_seven_language_pass_claim": false,
+    "fallback": "none"
+  },
+  "source_sha256": {
+    "pyproject.toml": "e605a046989ac620240c8e49e576f50ec7ba73bfca236a755c4f5a5f211e99ed",
+    "src/corsair/adapters/sandbox/docker.py": "831c4e9ac876961a578922237d89c00ac6d445b6cdde69e700e8579ffcc66835",
+    "src/corsair/adapters/sandbox/openshell.py": "e6afae66883338d17e45dacfb42cc9a588314691429108a3379da434919c7dfb",
+    "src/corsair/adapters/scm/__init__.py": "1434156a4951f6348529f7f809253ee40e2fcf2a588795a05bcbd094b7f34598",
+    "src/corsair/adapters/scm/archive.py": "3fb52c1ba6ab7aa3b6b7506fe1c2024070ff4131a445a7f32aa462988ca9429a",
+    "src/corsair/adapters/scm/azure_devops.py": "be9e462f9014258fc16b20dcbb0b81a7b8ce3b7621e8a6c9a2822f2fd8827ea5",
+    "src/corsair/adapters/scm/git.py": "8a6fe32725a0d6c153174663ce4190f6dd7fa2f848fa2e06c698d7efc1a8c861",
+    "src/corsair/adapters/scm/github.py": "78518cbdaf6d8be94ae2670fb0a7ac4e18f08a2362b8ef1fade1c88d15b80f39",
+    "src/corsair/application/kernel.py": "c5c417232a72cdfaae9da1e798b6d3c5ee0bb193fab71326c105bbbe6f2d643e",
+    "uv.lock": "ed1c10be4beb7f3e6600d5ac8c644981a07f68ee47b21a3ec049b5a42666370f"
+  }
+}

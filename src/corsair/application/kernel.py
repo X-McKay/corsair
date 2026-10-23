@@ -61,7 +61,7 @@ from corsair.runtime.matrix import Row
 BUILD_TIMEOUT_S = 1800.0
 PROBE_TIMEOUT_S = 300.0
 ENV_REPOSITORY = "corsair-lite-env"
-ENV_SCHEMA = "corsair-lite/env/5"
+ENV_SCHEMA = "corsair-lite/env/6"
 """Part of every environment key; bump it when what a sealed environment contains or who owns it changes."""
 WORKDIR = "/work"
 PROBE_DIR = f"{WORKDIR}/.corsair"
@@ -151,11 +151,20 @@ def environment_key(
     build_script: str,
     base_image: str | None = None,
     protected_target: str | None = None,
+    sandbox_policy: str | None = None,
 ) -> str:
     build_sha = hashlib.sha256(build_script.encode()).hexdigest()
     return hashlib.sha256(
         json.dumps(
-            [ENV_SCHEMA, row.model_dump(mode="json"), base_image, tree_sha256, build_sha, protected_target],
+            [
+                ENV_SCHEMA,
+                row.model_dump(mode="json"),
+                base_image,
+                tree_sha256,
+                build_sha,
+                protected_target,
+                sandbox_policy,
+            ],
             sort_keys=True,
         ).encode()
     ).hexdigest()
@@ -208,14 +217,26 @@ class Kernel:
                 stage=Gate.BUILD_REPLAY,
                 reason="source collides with the kernel-reserved .corsair support path",
             )
-        base_image = self.backend.resolve_image(self.row.image)
+        try:
+            base_image = self.backend.resolve_image(self.row.image)
+            policy = self.backend.cache_identity
+            if not isinstance(policy, str) or not policy.strip():
+                raise ValueError("sandbox cache policy must have an explicit identity")
+        except Exception as error:
+            return None, GateVerdict(
+                passed=False,
+                stage=Gate.INFRA,
+                reason=f"sandbox configuration: {type(error).__name__}: {error}"[:4000],
+            )
         if base_image is None:
             return None, GateVerdict(
                 passed=False,
                 stage=Gate.INFRA,
                 reason=f"runtime image {self.row.image} is unavailable; build its configured image first",
             )
-        key = environment_key(self.row, revision.tree_sha256, build_script, base_image, protected_target)
+        key = environment_key(
+            self.row, revision.tree_sha256, build_script, base_image, protected_target, policy
+        )
         tag = f"{ENV_REPOSITORY}:{key[:32]}"
         if self.backend.find_environment(tag, key) is not None:
             return tag, GateVerdict(

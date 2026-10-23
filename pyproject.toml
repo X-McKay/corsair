@@ -4,7 +4,11 @@ version = "0.1.0"
 description = "Corsair lite: a deterministic differential verdict kernel with one producer agent and one blind auditor"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "azure-devops==7.1.0b4",
+    "httpx==0.28.1",
+    "openshell==0.1.5",
     "pydantic-ai-slim[openai]==2.55.0",
+    "pygithub==2.10.0",
     "PyYAML==6.0.3",
 ]
 
@@ -43,6 +47,7 @@ pythonpath = ["src", "."]
 addopts = "--strict-markers"
 markers = [
     "docker: runs real containers against the local Docker daemon (skipped when Docker is unavailable)",
+    "openshell: runs against an explicitly configured real local OpenShell gateway",
     "live: calls the configured model endpoint (never run by default; make pilot)",
 ]
 

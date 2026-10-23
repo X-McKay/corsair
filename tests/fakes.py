@@ -56,6 +56,7 @@ class FakeSandboxes:
     copied_trees: list[tuple[str, Path]] = field(default_factory=list)
     provider = "fake"
     workdir = "/work"
+    cache_identity = "fake:reviewed-policy"
     _files: dict[str, dict[str, bytes]] = field(default_factory=dict)
     _env: dict[str, dict[str, str]] = field(default_factory=dict)
     _labels: dict[str, Mapping[str, str]] = field(default_factory=dict)

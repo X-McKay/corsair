@@ -13,8 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3 python3
 
 RUN (getent group 1000 >/dev/null || groupadd --gid 1000 corsair) \
     && (getent passwd 1000 >/dev/null || useradd --uid 1000 --gid 1000 --create-home --shell /usr/sbin/nologin corsair) \
-    && mkdir -p /work
+    && mkdir -p /work && chown 1001:1001 /work
 WORKDIR /work
-# Build replay remains root-owned so a uid-1000 probe cannot change modes on sealed source. DockerSandboxes opens
-# every probe explicitly as 1000:1000 after the root-owned tree has been frozen.
+# Docker replay remains root-owned so a uid-1000 probe cannot change modes on sealed source. OpenShell instead uses
+# SDK builder uid 1001, hence its pre-owned /work root; its offline probes remain explicitly uid 1000.
 USER root

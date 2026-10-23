@@ -92,13 +92,16 @@ class Sandboxes(Protocol):
 
     provider: str
     workdir: str
-    """The directory trusted code works in on this backend: writable by the command user under its own policy
-    (Docker ``/work``; OpenShell its native workdir ``/sandbox``). Replay records it in the Environment."""
+    """The runtime's project directory. Implemented backends use ``/work``; builders and probes have distinct users."""
+
+    @property
+    def cache_identity(self) -> str:
+        """Stable provider and reviewed security-policy identity, evaluated only when replay is requested."""
+        ...
 
     def create(self, spec: SandboxSpec) -> str:
-        """Create and start the sandbox named ``spec.name`` with ``spec.workdir`` existing and writable by the user
-        commands run as (Docker makes that user its owner; OpenShell's ``/sandbox`` is root-owned and writable under
-        ``include_workdir``). Raises ``SandboxExists`` when that name is already held."""
+        """Create a fresh builder/work sandbox with a writable project directory. Provider-safe native names may
+        differ, but the returned logical name remains ``spec.name``. A held identity raises ``SandboxExists``."""
         ...
 
     def copy_tree_in(self, name: str, source: Path, destination: str) -> None:
@@ -107,7 +110,7 @@ class Sandboxes(Protocol):
         ...
 
     def write_file(self, name: str, path: str, data: bytes) -> None:
-        """Inject trusted files as root-owned/read-only; submitted code cannot modify support files."""
+        """Inject trusted files owned by an identity distinct from the probe and freeze the reserved support path."""
         ...
 
     def source_unchanged(self, name: str, source: Path) -> bool:

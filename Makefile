@@ -10,7 +10,7 @@ WORKERS ?= 4
 BENCH_ROOT ?= .runs/polyglot
 LANGUAGE ?=
 
-.PHONY: sync check test test-offline test-docker image images benchmark benchmark-generate verify investigate eval eval-dev eval-heldout pilot cleanup
+.PHONY: sync check test test-offline test-docker test-openshell image images benchmark benchmark-generate verify investigate eval eval-dev eval-heldout pilot cleanup
 
 sync:
 	uv sync --locked
@@ -20,13 +20,16 @@ check:
 	uvx ruff==0.11.13 format --check src/corsair tests tools benchmarks/polyglot
 
 test: image
-	$(PYTHON) -m pytest -q -m "not live"
+	$(PYTHON) -m pytest -q -m "not live and not openshell"
 
 test-offline:
-	$(PYTHON) -m pytest -q -m "not docker and not live"
+	$(PYTHON) -m pytest -q -m "not docker and not live and not openshell"
 
 test-docker: image
 	$(PYTHON) -m pytest -q -m docker
+
+test-openshell:
+	$(PYTHON) -m pytest -q -m openshell
 
 image:
 	docker build -q -t corsair-lite-python:dev images/python
