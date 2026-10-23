@@ -102,6 +102,8 @@ class GitSource(BaseModel):
 
 
 class _Request(BaseModel):
+    """The complete agent-visible request. Evaluator truth and corpus metadata are forbidden as unknown fields."""
+
     model_config = ConfigDict(extra="forbid")
 
     case_id: str | None = None
