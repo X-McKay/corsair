@@ -1,0 +1,14 @@
+{
+  "schema": "corsair-lite/quarantine/1",
+  "entries": [
+    {
+      "path": "quarantine/legacy",
+      "reason_codes": [
+        "rights_unreviewed"
+      ],
+      "reviewer": "fixture-reviewer",
+      "reviewed_at": "2026-10-22",
+      "note": "Unqualified fixture material."
+    }
+  ]
+}

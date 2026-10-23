@@ -1,0 +1,15 @@
+{
+  "case_id": "cs-1001",
+  "finding": {
+    "title": "Unsafe path parsing",
+    "description": "A parent segment can escape the allowed prefix.",
+    "file_path": "target.py",
+    "start_line": 4,
+    "symbol": "parse",
+    "cwe": "CWE-22"
+  },
+  "source": "vulnerable",
+  "commit": "1111111111111111111111111111111111111111",
+  "fixed_source": "fixed",
+  "fixed_commit": "2222222222222222222222222222222222222222"
+}

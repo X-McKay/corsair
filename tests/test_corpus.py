@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from copy import deepcopy
 from pathlib import Path
 
@@ -10,13 +11,15 @@ from pydantic import ValidationError
 
 from corsair.auditor import render as render_auditor
 from corsair.case import Case, load_case
-from corsair.corpus import DatasetManifest, load_manifest, select_cases
+from corsair.corpus import (DatasetManifest, _patch_sha256, load_manifest, main as corpus_main, select_cases,
+                            validate_corpus)
 from corsair.kernel import Submission
 from corsair.matrix import select
 from corsair.producer import render_case
 
 
 ROOT = Path(__file__).resolve().parents[1]
+VALID_CORPUS = ROOT / "tests/fixtures/corpus/valid"
 SHA_A = "a" * 64
 SHA_B = "b" * 64
 SHA_C = "c" * 64
@@ -244,4 +247,275 @@ def test_oracle_fields_never_cross_agent_boundary(tmp_path):
     for payload in (producer_payload, auditor_payload):
         assert "EVALUATOR_SECRET_71b32" not in payload
         assert "cf-secret-family" not in payload
+
+
+def corpus_fixture(tmp_path: Path) -> Path:
+    root = tmp_path / "repo"
+    shutil.copytree(VALID_CORPUS, root)
+    return root
+
+
+def fixture_evidence(root: Path):
+    def resolve(url: str, revision: str) -> bytes | None:
+        path = root / "evidence" / url.rsplit("/", 1)[-1]
+        return path.read_bytes() if path.is_file() else None
+    return resolve
+
+
+def checked(root: Path):
+    return validate_corpus(root, _evidence_resolver=fixture_evidence(root))
+
+
+def read_manifest(root: Path) -> dict:
+    return json.loads((root / "benchmarks/dataset/manifest.json").read_text())
+
+
+def write_manifest(root: Path, data: dict) -> None:
+    (root / "benchmarks/dataset/manifest.json").write_text(json.dumps(data, indent=2) + "\n")
+
+
+def issue_codes(report) -> set[str]:
+    return {issue.code for issue in (*report.errors, *report.warnings)}
+
+
+def test_rights_require_revision_and_evidence_hash(tmp_path):
+    root = corpus_fixture(tmp_path)
+    assert checked(root).ok
+
+    data = read_manifest(root)
+    data["cases"][0]["rights"] = [r for r in data["cases"][0]["rights"] if r["layer"] != "advisory"]
+    write_manifest(root, data)
+    assert "RIGHTS_LAYER_MISSING" in issue_codes(checked(root))
+
+    root = corpus_fixture(tmp_path / "mutable")
+    data = read_manifest(root)
+    data["cases"][0]["rights"][0]["evidence_url"] = "https://fixture.invalid/evidence/main/source-v-LICENSE"
+    write_manifest(root, data)
+    assert "RIGHTS_MUTABLE_EVIDENCE" in issue_codes(checked(root))
+
+    root = corpus_fixture(tmp_path / "wrong-hash")
+    data = read_manifest(root)
+    data["cases"][0]["rights"][0]["evidence_sha256"] = "f" * 64
+    write_manifest(root, data)
+    assert "RIGHTS_EVIDENCE_HASH_MISMATCH" in issue_codes(checked(root))
+
+    root = corpus_fixture(tmp_path / "single-source")
+    data = read_manifest(root)
+    data["cases"][0]["rights"] = [r for r in data["cases"][0]["rights"]
+                                      if not (r["layer"] == "target_source" and r["evidence_revision"] == COMMIT_B)]
+    write_manifest(root, data)
+    assert "RIGHTS_SOURCE_REVISION_MISSING" in issue_codes(checked(root))
+
+    root = corpus_fixture(tmp_path / "review")
+    data = read_manifest(root)
+    data["cases"][0]["rights"][0]["reviewed_at"] = "2999-01-01"
+    data["cases"][0]["rights"][1]["reviewer"] = "TODO"
+    write_manifest(root, data)
+    assert {"RIGHTS_FUTURE_REVIEW", "RIGHTS_REVIEWER_MISSING"} <= issue_codes(checked(root))
+
+    root = corpus_fixture(tmp_path / "blank")
+    data = read_manifest(root)
+    data["cases"][0]["rights"][0]["license_expression"] = "   "
+    data["cases"][0]["rights"][1]["reviewer"] = "   "
+    write_manifest(root, data)
+    assert {"RIGHTS_PLACEHOLDER", "RIGHTS_REVIEWER_MISSING"} <= issue_codes(checked(root))
+
+    root = corpus_fixture(tmp_path / "notice")
+    data = read_manifest(root)
+    data["cases"][0]["rights"][0].pop("notice_requirements")
+    write_manifest(root, data)
+    assert "MANIFEST_INVALID" in issue_codes(checked(root))
+
+
+def test_finding_provenance_requires_an_immutable_revision_and_matching_hash(tmp_path):
+    root = corpus_fixture(tmp_path)
+    data = read_manifest(root)
+    data["cases"][0]["finding_provenance"]["source_url"] = \
+        "https://fixture.invalid/finding/main/finding.md"
+    write_manifest(root, data)
+    assert "PROVENANCE_MUTABLE_EVIDENCE" in issue_codes(checked(root))
+
+    root = corpus_fixture(tmp_path / "hash")
+    data = read_manifest(root)
+    data["cases"][0]["finding_provenance"]["sha256"] = "f" * 64
+    write_manifest(root, data)
+    assert "PROVENANCE_HASH_MISMATCH" in issue_codes(checked(root))
+
+
+@pytest.mark.parametrize(("field", "code"), [
+    ("aliases", "ALIAS_FAMILY_COLLISION"),
+    ("source_pair", "SOURCE_PAIR_FAMILY_COLLISION"),
+    ("patch_sha256", "PATCH_FAMILY_COLLISION"),
+    ("affected_region_sha256", "AFFECTED_REGION_FAMILY_COLLISION"),
+])
+def test_family_leakage_is_rejected(tmp_path, field, code):
+    root = corpus_fixture(tmp_path)
+    data = read_manifest(root)
+    first = data["cases"][0]
+    second = deepcopy(first)
+    second.update(case_id="cs-1002", family_id="cf-1002", aliases=["CVE-2026-2002"])
+    second["source_pair"]["vulnerable"]["repository"] = "https://fixture.invalid/other"
+    second["source_pair"]["fixed"]["repository"] = "https://fixture.invalid/other"
+    second["source_pair"]["patch_sha256"] = "d" * 64
+    second["source_pair"]["vulnerable"]["affected_region_sha256"] = "d" * 64
+    second["source_pair"]["fixed"]["affected_region_sha256"] = "e" * 64
+    if field == "aliases":
+        second["aliases"] = list(first["aliases"])
+    elif field == "source_pair":
+        second["source_pair"]["vulnerable"]["repository"] = first["source_pair"]["vulnerable"]["repository"]
+        second["source_pair"]["fixed"]["repository"] = first["source_pair"]["fixed"]["repository"]
+    elif field == "patch_sha256":
+        second["source_pair"]["patch_sha256"] = first["source_pair"]["patch_sha256"]
+    else:
+        second["source_pair"]["vulnerable"]["affected_region_sha256"] = \
+            first["source_pair"]["vulnerable"]["affected_region_sha256"]
+    data["cases"].append(second)
+    write_manifest(root, data)
+    report = checked(root)
+    assert code in issue_codes(report)
+    assert any(set(issue.case_ids) == {"cs-1001", "cs-1002"} for issue in report.errors if issue.code == code)
+
+
+def test_source_and_patch_hashes_are_verified(tmp_path):
+    root = corpus_fixture(tmp_path)
+    assert checked(root).ok
+    target = root / "cases/cs-1001/vulnerable/target.py"
+    target.write_text(target.read_text() + "# changed\n")
+    codes = issue_codes(checked(root))
+    assert {"SOURCE_TREE_HASH_MISMATCH", "AFFECTED_FILE_HASH_MISMATCH", "PATCH_HASH_MISMATCH"} <= codes
+
+    root = corpus_fixture(tmp_path / "patch")
+    data = read_manifest(root)
+    data["cases"][0]["source_pair"]["patch_sha256"] = "0" * 64
+    write_manifest(root, data)
+    assert "PATCH_HASH_MISMATCH" in issue_codes(checked(root))
+
+    left = root / "cases/cs-1001/vulnerable"
+    right = root / "cases/cs-1001/fixed"
+    before = _patch_sha256(left, right)
+    left.touch()
+    right.touch()
+    assert _patch_sha256(left, right) == before
+
+
+def test_local_sources_cannot_escape_the_case_directory(tmp_path):
+    root = corpus_fixture(tmp_path)
+    request_path = root / "cases/cs-1001/input.json"
+    request = json.loads(request_path.read_text())
+    request["source"] = "../../quarantine/legacy"
+    request_path.write_text(json.dumps(request, indent=2) + "\n")
+    data = read_manifest(root)
+    data["cases"][0]["artifacts"]["input_sha256"] = \
+        __import__("hashlib").sha256(request_path.read_bytes()).hexdigest()
+    write_manifest(root, data)
+    assert "PATH_ESCAPE" in issue_codes(checked(root))
+
+
+@pytest.mark.parametrize(("expression", "code"), [
+    ("NOASSERTION", "RIGHTS_NOASSERTION"),
+    ("NONE", "RIGHTS_NOASSERTION"),
+    ("TODO", "RIGHTS_PLACEHOLDER"),
+    ("CC-BY-NC-4.0", "RIGHTS_NONCOMMERCIAL"),
+])
+def test_noassertion_cannot_be_scored(tmp_path, expression, code):
+    root = corpus_fixture(tmp_path)
+    data = read_manifest(root)
+    data["cases"][0]["rights"][0]["license_expression"] = expression
+    write_manifest(root, data)
+    report = checked(root)
+    assert not report.ok and code in issue_codes(report)
+
+
+@pytest.mark.parametrize("location", ["case_id", "variant_id", "title", "description"])
+def test_case_names_do_not_encode_answers(tmp_path, location):
+    root = corpus_fixture(tmp_path)
+    data = read_manifest(root)
+    case = data["cases"][0]
+    if location == "case_id":
+        case["case_id"] = "cs-1001-fixed"
+    elif location == "variant_id":
+        case["variant_id"] = "exploitable"
+    else:
+        request = json.loads((root / "cases/cs-1001/input.json").read_text())
+        request["finding"][location] = "This is likely_exploitable"
+        (root / "cases/cs-1001/input.json").write_text(json.dumps(request, indent=2) + "\n")
+        case["artifacts"]["input_sha256"] = "0" * 64
+    write_manifest(root, data)
+    assert "ANSWER_BEARING_IDENTITY" in issue_codes(checked(root))
+
+
+def test_quarantine_is_never_selected(tmp_path):
+    root = corpus_fixture(tmp_path)
+    assert checked(root).ok
+    manifest_model = load_manifest(root / "benchmarks/dataset/manifest.json")
+    for eval_set in ("conformance", "development", "regression", "release", "holdout"):
+        assert all(case.case_id != "legacy" for case in select_cases(manifest_model, eval_set))
+
+    data = read_manifest(root)
+    data["cases"][0]["review_receipt"] = {
+        "path": "../../../quarantine/legacy/review.json", "sha256": "a" * 64,
+        "reviewer": "reviewer", "reviewed_at": "2026-10-22",
+    }
+    write_manifest(root, data)
+    assert not checked(root).ok
+
+
+def test_declared_artifact_hashes_and_reference_target_are_verified(tmp_path):
+    root = corpus_fixture(tmp_path)
+    (root / "cases/cs-1001/oracle.json").write_text("{}\n")
+    assert "ARTIFACT_HASH_MISMATCH" in issue_codes(checked(root))
+
+    root = corpus_fixture(tmp_path / "reference")
+    submission = json.loads((root / "cases/cs-1001/reference-submission.json").read_text())
+    submission["hypothesis"]["target_symbol"] = "another_symbol"
+    (root / "cases/cs-1001/reference-submission.json").write_text(json.dumps(submission, indent=2) + "\n")
+    data = read_manifest(root)
+    data["cases"][0]["artifacts"]["reference_submission_sha256"] = \
+        __import__("hashlib").sha256((root / "cases/cs-1001/reference-submission.json").read_bytes()).hexdigest()
+    write_manifest(root, data)
+    assert "REFERENCE_TARGET_MISMATCH" in issue_codes(checked(root))
+
+
+def test_rights_evidence_resolution_is_offline(tmp_path, monkeypatch):
+    root = corpus_fixture(tmp_path)
+    calls = []
+    monkeypatch.setattr("corsair.case.acquire", lambda *args, **kwargs: calls.append((args, kwargs)))
+    assert checked(root).ok and calls == []
+
+    data = read_manifest(root)
+    data["cases"][0]["rights"][0]["evidence_url"] = \
+        f"https://unsupported.invalid/{COMMIT_A}/LICENSE"
+    write_manifest(root, data)
+    report = validate_corpus(root)
+    assert "RIGHTS_EVIDENCE_UNAVAILABLE" in issue_codes(report) and calls == []
+
+    root = corpus_fixture(tmp_path / "missing-source")
+    request_path = root / "cases/cs-1001/input.json"
+    request = json.loads(request_path.read_text())
+    request["source"] = {"url": "https://fixture.invalid/project", "commit": COMMIT_A}
+    request["fixed_source"] = {"url": "https://fixture.invalid/project", "commit": COMMIT_B}
+    request.pop("commit")
+    request.pop("fixed_commit")
+    request_path.write_text(json.dumps(request, indent=2) + "\n")
+    data = read_manifest(root)
+    data["cases"][0]["artifacts"]["input_sha256"] = \
+        __import__("hashlib").sha256(request_path.read_bytes()).hexdigest()
+    write_manifest(root, data)
+    assert "SOURCE_NOT_ACQUIRED" in issue_codes(checked(root)) and calls == []
+
+
+def test_corpus_report_is_sorted_and_cli_exit_is_fail_closed(tmp_path, capsys):
+    root = corpus_fixture(tmp_path)
+    data = read_manifest(root)
+    data["cases"][0]["rights"] = []
+    write_manifest(root, data)
+    assert corpus_main([str(root)]) == 1
+    lines = [line for line in capsys.readouterr().out.splitlines() if line.startswith(("ERROR", "REVIEW"))]
+    assert lines == sorted(lines)
+
+
+def test_makefile_exposes_provider_free_corpus_check():
+    makefile = (ROOT / "Makefile").read_text()
+    assert "corpus-check:" in makefile
+    assert "$(PYTHON) -m corsair.corpus ." in makefile
 

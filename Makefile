@@ -7,7 +7,7 @@ MAX_SUBMISSIONS ?= 4
 REQUEST_LIMIT ?= 60
 DOCKER_BUILD_FLAGS ?=
 
-.PHONY: sync test test-offline test-docker image verify verify-scripts investigate eval historical-eval pilot cleanup
+.PHONY: sync test test-offline test-docker corpus-check image verify verify-scripts investigate eval historical-eval pilot cleanup
 
 sync:
 	uv sync --locked
@@ -20,6 +20,9 @@ test-offline:
 
 test-docker: image
 	$(PYTHON) -m pytest -q -m docker
+
+corpus-check:
+	$(PYTHON) -m corsair.corpus .
 
 image:
 	docker build $(DOCKER_BUILD_FLAGS) -q -t corsair-lite-python:dev images/python

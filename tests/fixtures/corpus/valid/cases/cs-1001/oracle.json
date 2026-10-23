@@ -1,0 +1,6 @@
+{
+  "dataset_version": "fixture/1",
+  "expected_label": "LIKELY_EXPLOITABLE",
+  "expected_fix": "verified",
+  "forbidden_labels": []
+}

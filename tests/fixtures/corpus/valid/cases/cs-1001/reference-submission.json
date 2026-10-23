@@ -1,0 +1,14 @@
+{
+  "contract_version": "corsair-lite/differential-probe/2",
+  "hypothesis": {
+    "target_file": "target.py",
+    "target_symbol": "parse",
+    "target_lines": [
+      4
+    ],
+    "root_cause": "Parent segments are returned without confinement.",
+    "expected_violation": "The returned path retains the parent segment."
+  },
+  "build_script": "",
+  "probe": "CONTROL_PAYLOAD = \"ok\"\nEXPLOIT_PAYLOAD = \"../x\"\ndef run_target(payload):\n    return not payload.startswith(\"../\")\n"
+}
