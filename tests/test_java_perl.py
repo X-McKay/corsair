@@ -223,6 +223,76 @@ async def test_perl_script_identical_decoy_cannot_supply_target_branch(tmp_path,
 
 
 @pytest.mark.docker
+@pytest.mark.anyio
+@pytest.mark.parametrize("copy_lifetime", ["build-persistent", "probe-deleted"])
+async def test_perl_script_outside_copy_cannot_supply_target_branch(tmp_path, copy_lifetime):
+    require_perl_image()
+    reference = perl_script_reference()
+    decoy = "/tmp/generated-runner.pl"
+    copied = ""
+    if copy_lifetime == "probe-deleted":
+        copied = """    open my $source, '<', '/work/bin/script-target.pl' or die 'cannot read source';
+    my $copy = do { local $/; <$source> };
+    close $source or die 'cannot close source';
+    _write('/tmp/generated-runner.pl', $copy);
+"""
+    helper = "    _launch('" + decoy + "', \"$base/allowed\", 'document', 'second');\n"
+    if copy_lifetime == "probe-deleted":
+        helper += "    unlink '" + decoy + "' or die 'cannot remove helper';\n"
+    probe = reference.probe.replace("$payload, 'second');", "$payload, 'first');")
+    probe = probe.replace("    return $content ne 'outside';", copied + helper + "    return $content ne 'outside';")
+    reference = reference.model_copy(update={"probe": probe,
+        "build_script": ("cp /work/bin/script-target.pl " + decoy + "\nchmod a+r " + decoy
+                         if copy_lifetime == "build-persistent" else ""),
+        "hypothesis": reference.hypothesis.model_copy(update={"target_lines": (10,)})})
+    case = load_case(PERL_SCRIPT).model_copy(update={"fixed_revision": None})
+    backend = DockerSandboxes()
+    store = ArtifactStore(tmp_path / "artifacts")
+    kernel = Kernel(backend, matrix.select(case), case, artifacts=store, auditor=accept)
+    result = await kernel.evaluate(reference)
+    assert result.gate.stage is Gate.CONTROL_COVERAGE, result
+    assert result.verdict.label is Label.INCONCLUSIVE
+    assert [run.invariant_held for run in result.runs] == [True, False]
+    for run in result.runs:
+        assert run.covered_target is True and run.covered_lines == () and run.cleanup_confirmed
+        assert run.result is RoleResult.PASS and run.junit_tests == 1
+        files = json.loads(store.get(run.coverage))["files"]
+        assert {5, 6, 8} <= set(files["/work/bin/script-target.pl"]["executed_lines"])
+        assert 10 not in files["/work/bin/script-target.pl"]["executed_lines"]
+    assert backend.labelled(kernel.run_id) == []
+
+
+@pytest.mark.docker
+@pytest.mark.parametrize("boundary", ["collector", "renderer"])
+@pytest.mark.parametrize("drift", ["version", "missing-digest"])
+def test_perl_script_identity_boundary_fails_closed_on_native_drift(boundary, drift):
+    require_perl_image()
+    adapter = framework("perl-tap")
+    backend = DockerSandboxes()
+    run_id = "perl-api-" + uuid4().hex[:12]
+    name = backend.create(SandboxSpec(image=PERL_IMAGE, labels=labels(run_id, "identity")))
+    try:
+        assert backend.exec_once(name, ["mkdir", "-p", "/work/.corsair", "/tmp/corsair"],
+                                 workdir="/", timeout=60).exit_code == 0
+        for filename, data in adapter.driver_files().items():
+            backend.write_file(name, "/work/.corsair/" + filename, data)
+        output = "/tmp/corsair/coverage.json"
+        backend.write_file(name, output, b"preserved-output")
+        mutation = ("$Devel::Cover::DB::Structure::VERSION = '1.45';" if drift == "version" else
+                    "undef &Devel::Cover::DB::Structure::digest;")
+        invoke = ("require '/work/.corsair/CorsairCoverage.pm';" if boundary == "collector" else
+            "@ARGV = ('/tmp/corsair/cover_db', '/tmp/corsair/coverage.json', 'target.pl'); "
+            "do '/work/.corsair/render_coverage.pl' or die $@ || $!;")
+        program = "require Devel::Cover::DB::Structure; " + mutation + invoke
+        result = backend.exec_once(name, ["perl", "-e", program], workdir="/work", timeout=60)
+        assert result.exit_code != 0 and b"unsupported Devel::Cover identity API" in result.stderr
+        assert backend.copy_out(name, [output])[output] == b"preserved-output"
+    finally:
+        assert backend.remove(name)
+    assert backend.labelled(run_id) == []
+
+
+@pytest.mark.docker
 @pytest.mark.parametrize("link_kind", ["symlink", "hardlink"])
 @pytest.mark.parametrize("alias_kind", ["raw-db", "sibling"])
 def test_perl_script_renderer_output_alias_preserves_evidence(link_kind, alias_kind):
@@ -410,9 +480,10 @@ def test_perl_script_renderer_unsets_image_defaults_and_does_not_collect(invalid
             backend.write_file(name, "/work/.corsair/" + filename, data)
         backend.write_file(name, "/work/target.pl", b"my $value = 42;\nprint $value;\n")
         env = dict(adapter.environment("control"))
-        # Renderer qualification seeds native data independently of primary startup configuration.
-        env.update(PERL5OPT="-MDevel::Cover", DEVEL_COVER_OPTIONS="-db,/tmp/corsair/cover_db,-silent,1,-coverage,statement")
-        seeded = backend.exec_once(name, ["perl", "/work/target.pl"], workdir="/work", env=env, timeout=60)
+        # Explicit trusted collector/shim seeding bypasses inherited primary startup.
+        env.update(PERL5OPT="", DEVEL_COVER_OPTIONS="-db,/tmp/corsair/cover_db,-silent,1,-coverage,statement")
+        seeded = backend.exec_once(name, ["perl", "-I/work/.corsair", "-MCorsairCoverage", "/work/target.pl"],
+                                   workdir="/work", env=env, timeout=60)
         assert seeded.exit_code == 0, seeded.stderr
         listing = ["sh", "-c", "find /tmp/corsair/cover_db/runs -mindepth 1 -maxdepth 1 -type d -printf '%f\\n' | sort"]
         before = backend.exec_once(name, listing, workdir="/", timeout=60).stdout.splitlines()

@@ -93,6 +93,65 @@ print (($result eq 'PASS' ? 'ok' : 'not ok') . " 1 - test_probe[$role]\n1..1\n")
 exit($result eq 'PASS' ? 0 : 1);
 '''
 
+COVERAGE_IDENTITY = r'''package CorsairCoverIdentity;
+use strict;
+use warnings;
+use Digest::MD5 ();
+use Digest::SHA ();
+use File::Spec ();
+
+my $installed;
+sub install {
+    return if $installed;
+    require Devel::Cover::DB;
+    require Devel::Cover::DB::Digests;
+    my $failure = 'unsupported Devel::Cover identity API';
+    die "$failure: Perl version\n" unless "$^V" eq 'v5.40.1';
+    # These native 1.44 boundaries canonicalize paths and consume source digests.
+    # Recharacterize vendor/API changes instead of silently accepting their data.
+    my %expected = (
+        'Devel::Cover' => '9e75f08a9875b6ab7be9c77f11e30e0ba277945d8ce753fa932874c5b891cde3',
+        'Devel::Cover::DB' => '8ffe96855e19f5174ac4e7e203f48c70dbccf97673653c348f9600354e83bc03',
+        'Devel::Cover::DB::Digests' => 'dd410a85aec2e775f47bedf81ec4aab8c3ccc57e85bad642a706bc58372c89fa',
+        'Devel::Cover::DB::Structure' => '90b8d1678f98c167602a73d0efe9f604e696bf0e5be6817decfc3a3a901eca50',
+    );
+    # Loading the collector in the renderer would run its XS-only CHECK hook.
+    my %sources = %INC;
+    unless ($sources{'Devel/Cover.pm'}) {
+        ($sources{'Devel/Cover.pm'} = $INC{'Devel/Cover/DB.pm'}) =~ s{/DB[.]pm\z}{.pm}
+            or die "$failure: collector source layout\n";
+    }
+    for my $package (sort keys %expected) {
+        no strict 'refs';
+        my $version = ${"${package}::VERSION"};
+        die "$failure: $package version\n" unless
+            ($package eq 'Devel::Cover' && !defined($version)) || (defined($version) && $version eq '1.44');
+        (my $module = "$package.pm") =~ s{::}{/}g;
+        open my $source, '<', $sources{$module} or die "$failure: $module unavailable\n";
+        binmode $source or die "$failure: $module unreadable\n";
+        my $actual = Digest::SHA->new(256)->addfile($source)->hexdigest;
+        close $source or die "$failure: $module close\n";
+        die "$failure: $module changed\n" unless $actual eq $expected{$package};
+    }
+    die "$failure: digest/canonical_file/cover methods\n" unless
+        defined(&Devel::Cover::DB::Structure::digest)
+        && defined(&Devel::Cover::DB::Digests::canonical_file) && defined(&Devel::Cover::DB::cover);
+    my $native_digest = \&Devel::Cover::DB::Structure::digest;
+    no warnings 'redefine';
+    *Devel::Cover::DB::Structure::digest = sub {
+        die "$failure: digest arguments\n" unless @_ == 2 && defined($_[1]) && !ref($_[1]);
+        my ($self, $file) = @_;
+        my $content = $native_digest->(@_);
+        return unless defined $content;
+        die "$failure: digest result\n" unless $content =~ /\A[0-9a-f]{32}\z/;
+        my $absolute = File::Spec->canonpath(File::Spec->rel2abs($file));
+        return Digest::MD5->new->add("Corsair path identity v1\0", $absolute, "\0", $content)->hexdigest;
+    };
+    $installed = 1;
+}
+1;
+'''
+
 COVERAGE_BOOTSTRAP = r'''package CorsairCoverage;
 use strict;
 use warnings;
@@ -100,6 +159,8 @@ BEGIN {
     # Repository lookup resumes for the application after trusted collector imports.
     local @INC = grep { !ref($_) && $_ ne '.' && $_ !~ m{^/work(?:/|$)} } @INC;
     require Devel::Cover;
+    require '/work/.corsair/CorsairCoverIdentity.pm';
+    CorsairCoverIdentity::install();
     Devel::Cover->import;
 }
 1;
@@ -128,6 +189,8 @@ COVERAGE_RENDERER = r'''use strict;
 use warnings;
 BEGIN {
     @INC = grep { !ref($_) && $_ ne '.' && $_ !~ m{^/work(?:/|$)} } @INC;
+    require '/work/.corsair/CorsairCoverIdentity.pm';
+    CorsairCoverIdentity::install();
 }
 use Devel::Cover::DB;
 use JSON::PP qw(encode_json);
@@ -152,7 +215,7 @@ sub unique_prepared_source {
     return 0 unless defined($relative) && length($relative)
         && $relative !~ m{\A/|(?:\A|/)\.\.(?:/|\z)|\0};
     my $target = File::Spec->canonpath("/work/$relative");
-    # Devel::Cover pools byte-identical files, including generated probe helpers.
+    # Retain conservative prepared-tree inspection beside native path identity.
     return eval {
         my %sources;
         my @pending = ('/work');
@@ -255,6 +318,7 @@ class PerlTap:
     def driver_files(self) -> dict[str, bytes]:
         return {"corsair_driver.t": DRIVER.encode(), "render_coverage.pl": COVERAGE_RENDERER.encode(),
                 "CorsairCoverage.pm": COVERAGE_BOOTSTRAP.encode(),
+                "CorsairCoverIdentity.pm": COVERAGE_IDENTITY.encode(),
                 "perl-coverage.sh": COVERAGE_LAUNCHER.encode()}
 
     def command(self, role: str, target_file: str) -> list[str]:
