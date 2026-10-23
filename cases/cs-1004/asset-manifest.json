@@ -104,13 +104,59 @@
       "revision": "da5fabaf31280ce087c43b256553947960b26753",
       "sha256": "4cabb00406b10ab960d3ebb5c14e5042cf54d2b970cc4047588aa28c703525fe",
       "license_expression": "Artistic-2.0"
+    },
+    {
+      "path": "evidence/Perl-5.12.3-Artistic",
+      "source_url": "https://raw.githubusercontent.com/Perl/perl5/c0247066c34077145eaa8f33eddcbb64fa3b0f8d/Artistic",
+      "revision": "c0247066c34077145eaa8f33eddcbb64fa3b0f8d",
+      "sha256": "b7fd9b73ea99602016a326e0b62e6646060d18febdd065ceca8bb482208c3d88",
+      "license_expression": "Artistic-1.0-Perl"
     }
   ],
   "qualification_blockers": [
     "dataset_manifest_entry_pending",
-    "source_license_expression_review_pending",
     "runtime_rights_pending",
     "perl_tap_replay_pending",
     "independent_review_pending"
-  ]
+  ],
+  "rights_review": {
+    "reviewer": "OpenAI Codex automated factual rights review",
+    "reviewed_at": "2026-10-23",
+    "review_kind": "automated_factual",
+    "human_legal_approval": false,
+    "scope": "Verbatim case source subsets and copied evidence; runtime, replay and admission excluded.",
+    "components": [
+      {
+        "name": "Net::Netmask",
+        "license_expression": "Artistic-1.0-Perl OR GPL-1.0-or-later",
+        "redistribution_mode": "vendored",
+        "covered_paths": [
+          "vulnerable/lib/Net/Netmask.pm",
+          "fixed/lib/Net/Netmask.pm",
+          "evidence/source-vulnerable-Netmask.pod",
+          "evidence/source-fixed-Netmask.pod",
+          "evidence/source-vulnerable-dist.ini",
+          "evidence/source-fixed-dist.ini"
+        ],
+        "license_evidence_paths": [
+          "evidence/Perl-5.12.3-Artistic"
+        ],
+        "notice_requirements": [
+          "Preserve all original copyright, author and grant notices and associated disclaimers; include the full elected evidence/Perl-5.12.3-Artistic text including its complete warranty disclaimer.",
+          "Keep the original alternative choice notice and immutable source/subset mapping with every covered copy; this is a verbatim extracted source subset, not a complete upstream distribution or a Corsair-authored module.",
+          "Do not imply holder endorsement or advertise the modules as the distributor's own; observe Artistic section 5 fee and aggregation terms (reasonable copying/support fees do not authorize charging for the package itself) and section 9 endorsement restrictions.",
+          "Future content modifications and executable/object distribution require separate Artistic section 3/4 assessment. Distribute source subsets with their applicable case evidence and manifest."
+        ],
+        "selected_license": "Artistic-1.0-Perl",
+        "source_subset": true
+      }
+    ],
+    "basis": [
+      "The module/POD/dist.ini grants offer the recorded alternatives; Artistic-1.0-Perl is the redistribution election for these verbatim extracted subsets, not a new grant from Perl owners to unrelated modules. No historical grant conflict was found.",
+      "Reference only: https://raw.githubusercontent.com/Perl/perl5/c0247066c34077145eaa8f33eddcbb64fa3b0f8d/README SHA-256 6125e4600439dfd0d84856372e76977dc1f1186afa1a2953ac539b0026ce76f0 offers GPL v1 or later or Artistic.",
+      "Reference only: https://raw.githubusercontent.com/Perl-Toolchain-Gang/Software-License/39bfa52fba253e3d7daa3e2a2c7f5e165e73bad4/lib/Software/License/Perl_5.pm SHA-256 1221bde5bb7633dfc4ccff029f6e5edc9284b77ab67911bb372f55a377902b56. Perl_5 is build metadata, not an SPDX identifier; full historical Artistic text maps to Artistic-1.0-Perl, not Artistic-2.0.",
+      "The supplemental Artistic origin is Perl/perl5, not the module repository/revision. Primary grant origins remain the module/POD evidence; supplemental terms cannot replace role-matching RightsOrigin records. CPANSA advisory terms remain a separate Artistic-2.0 layer.",
+      "Interpreter-supplied modules remain outside this closure; the recorded core_modules list is not a complete interpreter-module inventory."
+    ]
+  }
 }

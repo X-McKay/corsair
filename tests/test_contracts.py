@@ -73,11 +73,11 @@ def test_conformance_inputs_bind_both_revisions_to_foundation(case_id):
         ("cs-1001", "real_runtime_replay_pending", None),
         ("cs-1002", "node22_replay_pending", None),
         ("cs-1003", "java21_jacoco_replay_pending", None),
-        ("cs-1004", "perl_tap_replay_pending", "source_license_expression_review_pending"),
+        ("cs-1004", "perl_tap_replay_pending", None),
         ("cs-1005", "python_replay_pending", None),
         ("cs-1006", "node22_replay_pending", None),
-        ("cs-1007", "java21_jacoco_replay_pending", "bouncy_castle_license_ref_review_pending"),
-        ("cs-1008", "perl_tap_replay_pending", "perl_terms_license_expression_review_pending"),
+        ("cs-1007", "java21_jacoco_replay_pending", None),
+        ("cs-1008", "perl_tap_replay_pending", None),
     ],
 )
 def test_benchmark_assets_have_the_exact_scoped_apache_2_license(

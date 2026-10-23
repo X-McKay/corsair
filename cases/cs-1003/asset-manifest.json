@@ -83,14 +83,14 @@
       "source_url": "https://raw.githubusercontent.com/apache/commons-io/7791a851c4a303f47743b156007fb19c6ed8ed81/NOTICE.txt",
       "revision": "7791a851c4a303f47743b156007fb19c6ed8ed81",
       "sha256": "f738390135295a249c4fb7118469ff881ae0bd11401b410f7564a52b7e54c4d2",
-      "license_expression": "Apache-2.0-NOTICE"
+      "license_expression": "Apache-2.0"
     },
     {
       "path": "evidence/source-fixed-NOTICE.txt",
       "source_url": "https://raw.githubusercontent.com/apache/commons-io/2736b6fe0b3fa22ec8e2b4184897ecadb021fc78/NOTICE.txt",
       "revision": "2736b6fe0b3fa22ec8e2b4184897ecadb021fc78",
       "sha256": "f738390135295a249c4fb7118469ff881ae0bd11401b410f7564a52b7e54c4d2",
-      "license_expression": "Apache-2.0-NOTICE"
+      "license_expression": "Apache-2.0"
     },
     {
       "path": "evidence/GHSA-gwrp-pvrq-jmwv.json",
@@ -112,5 +112,41 @@
     "runtime_rights_pending",
     "java21_jacoco_replay_pending",
     "independent_review_pending"
-  ]
+  ],
+  "rights_review": {
+    "reviewer": "OpenAI Codex automated factual rights review",
+    "reviewed_at": "2026-10-23",
+    "review_kind": "automated_factual",
+    "human_legal_approval": false,
+    "scope": "Verbatim case source subsets and copied evidence; runtime, replay and admission excluded.",
+    "components": [
+      {
+        "name": "Apache Commons IO",
+        "license_expression": "Apache-2.0",
+        "redistribution_mode": "vendored",
+        "covered_paths": [
+          "vulnerable/src/main/java/org/apache/commons/io/FilenameUtils.java",
+          "vulnerable/src/main/java/org/apache/commons/io/IOCase.java",
+          "fixed/src/main/java/org/apache/commons/io/FilenameUtils.java",
+          "fixed/src/main/java/org/apache/commons/io/IOCase.java",
+          "evidence/source-vulnerable-LICENSE.txt",
+          "evidence/source-fixed-LICENSE.txt",
+          "evidence/source-vulnerable-NOTICE.txt",
+          "evidence/source-fixed-NOTICE.txt"
+        ],
+        "license_evidence_paths": [
+          "evidence/source-vulnerable-LICENSE.txt",
+          "evidence/source-fixed-LICENSE.txt",
+          "evidence/source-vulnerable-NOTICE.txt",
+          "evidence/source-fixed-NOTICE.txt"
+        ],
+        "notice_requirements": [
+          "Provide the Apache-2.0 license and retain applicable source copyright, patent, trademark and attribution notices.",
+          "Reproduce applicable historical NOTICE attribution from evidence/source-vulnerable-NOTICE.txt and evidence/source-fixed-NOTICE.txt under Apache-2.0 section 4(d) in the distributed case or an allowed readable location: Apache Commons IO, Copyright 2002\u20132017 The Apache Software Foundation (ASF).",
+          "Prominently identify future source modifications if any; accompany any separately exported source subtree with applicable licenses and notices."
+        ]
+      }
+    ],
+    "basis": "NOTICE is ancillary attribution evidence under the Apache-2.0 source license, not an independent license or SPDX identifier. Both pinned revision-local LICENSE and NOTICE files and all four source copies retain their reviewed bytes."
+  }
 }

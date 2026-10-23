@@ -81,14 +81,14 @@
       "source_url": "https://raw.githubusercontent.com/bcgit/bc-java/df521933f6e615306d552ed72f2d568f9728fc23/LICENSE.html",
       "revision": "df521933f6e615306d552ed72f2d568f9728fc23",
       "sha256": "07feba85e9808094dbe52877f28e399c08f7991ec2ce662d20fef666aabb6e66",
-      "license_expression": "LicenseRef-Bouncy-Castle-MIT-style"
+      "license_expression": "MIT"
     },
     {
       "path": "evidence/source-fixed-LICENSE.html",
       "source_url": "https://raw.githubusercontent.com/bcgit/bc-java/97578f9b7ed277e6ecb58834e85e3d18385a4219/LICENSE.html",
       "revision": "97578f9b7ed277e6ecb58834e85e3d18385a4219",
       "sha256": "07feba85e9808094dbe52877f28e399c08f7991ec2ce662d20fef666aabb6e66",
-      "license_expression": "LicenseRef-Bouncy-Castle-MIT-style"
+      "license_expression": "MIT"
     },
     {
       "path": "evidence/GHSA-73xv-w5gp-frxh.json",
@@ -107,9 +107,58 @@
   ],
   "qualification_blockers": [
     "dataset_manifest_entry_pending",
-    "bouncy_castle_license_ref_review_pending",
     "runtime_rights_pending",
     "java21_jacoco_replay_pending",
     "independent_review_pending"
-  ]
+  ],
+  "rights_review": {
+    "reviewer": "OpenAI Codex automated factual rights review",
+    "reviewed_at": "2026-10-23",
+    "review_kind": "automated_factual",
+    "human_legal_approval": false,
+    "scope": "Verbatim case source subsets and copied evidence; runtime, replay and admission excluded.",
+    "components": [
+      {
+        "name": "Bouncy Castle core source subset",
+        "license_expression": "MIT",
+        "redistribution_mode": "vendored",
+        "covered_paths": [
+          "vulnerable/crypto/DataLengthException.java",
+          "vulnerable/crypto/RuntimeCryptoException.java",
+          "vulnerable/crypto/generators/BCrypt.java",
+          "vulnerable/crypto/generators/OpenBSDBCrypt.java",
+          "vulnerable/util/Arrays.java",
+          "vulnerable/util/Objects.java",
+          "vulnerable/util/Pack.java",
+          "vulnerable/util/StringList.java",
+          "vulnerable/util/Strings.java",
+          "vulnerable/util/encoders/UTF8.java",
+          "fixed/crypto/DataLengthException.java",
+          "fixed/crypto/RuntimeCryptoException.java",
+          "fixed/crypto/generators/BCrypt.java",
+          "fixed/crypto/generators/OpenBSDBCrypt.java",
+          "fixed/util/Arrays.java",
+          "fixed/util/Objects.java",
+          "fixed/util/Pack.java",
+          "fixed/util/StringList.java",
+          "fixed/util/Strings.java",
+          "fixed/util/encoders/UTF8.java",
+          "evidence/source-vulnerable-LICENSE.html",
+          "evidence/source-fixed-LICENSE.html"
+        ],
+        "license_evidence_paths": [
+          "evidence/source-vulnerable-LICENSE.html",
+          "evidence/source-fixed-LICENSE.html"
+        ],
+        "notice_requirements": [
+          "Retain the complete historical copyright, permission notice and disclaimer with copies or substantial portions; preserve all existing source attributions.",
+          "Accompany exported source subtrees with the historical LICENSE.html evidence. No source release or separate NOTICE duty was found for this closure."
+        ]
+      }
+    ],
+    "basis": [
+      "The operative permission, condition and disclaimer match MIT after HTML/entity/whitespace normalization. Historical copyright is 2000\u20132020 The Legion of the Bouncy Castle Inc. This classification maps these exact historical bytes and the twenty-file core closure, not later upstream terms; advisory JSON/license remain CC-BY-4.0.",
+      "Text-classification reference only: https://raw.githubusercontent.com/spdx/license-list-data/v3.25.0/text/MIT.txt downloaded SHA-256 b85dcd3e453d05982552c52b5fc9e0bdd6d23c6f8e844b984a88af32570b0cc0. Normalized operative-text SHA-256 fe2a9817987f862eaced948f0468c7f51d2fedfc48c5c505b246a49a3870e9a5 is not the raw historical HTML evidence hash; this reference is not module license evidence."
+    ]
+  }
 }

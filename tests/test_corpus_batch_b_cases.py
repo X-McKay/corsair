@@ -123,6 +123,7 @@ CASES = {
         "target_lines": [423],
         "source_closure": ["File/Find/Rule.pm", "Number/Compare.pm", "Text/Glob.pm"],
         "evidence_hashes": {
+            "evidence/Perl-5.12.3-Artistic": "b7fd9b73ea99602016a326e0b62e6646060d18febdd065ceca8bb482208c3d88",
             "evidence/source-vulnerable-Rule.pm": "2e0abbacc15c6f15199477caf48afaee0a243af164b26ff9d07598859e4b9f5c",
             "evidence/source-fixed-Rule.pm": "d47958ec4174c1c2245085816c201a4ac1a2515a4f5cb70d61f057c74bae8014",
             "evidence/dependency-Number-Compare.pm": "624e30890c19bd56089bd8318235ca995bfab7d31bcf2a371e4ae3e6bd79c008",
@@ -206,3 +207,95 @@ def test_batch_b_truth_stays_evaluator_only_and_qualification_stays_pending(case
     assert provenance["qualification_status"] == "candidate"
     assert provenance["qualification_blockers"]
     assert "expected_label" not in case.model_dump_json()
+
+
+@pytest.mark.parametrize("case_id", ["cs-1007", "cs-1008"])
+def test_batch_b_reviewed_rights_packaging(case_id):
+    case_dir = ROOT / "cases" / case_id
+    assets = json.loads((case_dir / "asset-manifest.json").read_text())
+    evidence = {entry["path"]: entry for entry in assets["evidence"]}
+    assert "rights_review" in assets, "Packaged source rights need a durable factual review"
+    review = assets["rights_review"]
+    assert review["reviewer"] == "OpenAI Codex automated factual rights review"
+    assert review["reviewed_at"] == "2026-10-23"
+    assert review["review_kind"] == "automated_factual"
+    assert review["human_legal_approval"] is False
+    assert assets["qualification_status"] == "candidate"
+    assert set(assets["qualification_blockers"]) == {
+        "dataset_manifest_entry_pending", "runtime_rights_pending", "independent_review_pending",
+        "java21_jacoco_replay_pending" if case_id == "cs-1007" else "perl_tap_replay_pending",
+    }
+    oracle = json.loads((case_dir / "oracle.json").read_text())
+    assert oracle["qualification_status"] == "candidate"
+    assert oracle["expected_label"] == "LIKELY_EXPLOITABLE"
+    assert oracle["expected_fix"] == "verified"
+    components = {component["name"]: component for component in review["components"]}
+    assert len(components) == len(review["components"])
+    if case_id == "cs-1007":
+        assert set(components) == {"Bouncy Castle core source subset"}
+        component = components["Bouncy Castle core source subset"]
+        assert component["license_expression"] == "MIT"
+        paths = {"evidence/source-vulnerable-LICENSE.html", "evidence/source-fixed-LICENSE.html"}
+        assert set(component["license_evidence_paths"]) == paths
+        assert set(component["covered_paths"]) == paths | {
+            f"{role}/{path}" for role in ("vulnerable", "fixed") for path in BC_CLOSURE
+        }
+        for path in paths:
+            assert evidence[path]["license_expression"] == "MIT"
+            assert evidence[path]["sha256"] == "07feba85e9808094dbe52877f28e399c08f7991ec2ce662d20fef666aabb6e66"
+            assert hashlib.sha256((case_dir / path).read_bytes()).hexdigest() == evidence[path]["sha256"]
+        advisory_expression = "CC-BY-4.0"
+    else:
+        expected_coverage = {
+            "File::Find::Rule": {
+                "vulnerable/File/Find/Rule.pm", "fixed/File/Find/Rule.pm",
+                "evidence/source-vulnerable-Rule.pm", "evidence/source-fixed-Rule.pm",
+            },
+            "Number::Compare": {
+                "vulnerable/Number/Compare.pm", "fixed/Number/Compare.pm", "evidence/dependency-Number-Compare.pm",
+            },
+            "Text::Glob": {
+                "vulnerable/Text/Glob.pm", "fixed/Text/Glob.pm", "evidence/dependency-Text-Glob.pm",
+            },
+        }
+        assert set(components) == set(expected_coverage)
+        offered = "Artistic-1.0-Perl OR GPL-1.0-or-later"
+        license_path = "evidence/Perl-5.12.3-Artistic"
+        for name, paths in expected_coverage.items():
+            component = components[name]
+            assert set(component["covered_paths"]) == paths
+            assert component["license_expression"] == offered
+            assert component["selected_license"] == "Artistic-1.0-Perl"
+            assert component["source_subset"] is True
+            assert component["license_evidence_paths"] == [license_path]
+        for role in ("vulnerable", "fixed"):
+            raw = (case_dir / role / "File/Find/Rule.pm").read_bytes()
+            assert hashlib.sha256(raw).hexdigest() == evidence[f"evidence/source-{role}-Rule.pm"]["sha256"]
+            assert evidence[f"evidence/source-{role}-Rule.pm"]["source_url"].endswith("/lib/File/Find/Rule.pm")
+        for package in assets["dependency_lock"]["packages"]:
+            name = package["name"]
+            entry = evidence[f"evidence/dependency-{name.replace('::', '-')}.pm"]
+            assert entry["archive_sha256"] == package["archive_sha256"]
+            assert entry["archive_member"] == f"{name.replace('::', '-')}-{package['version']}/lib/{name.replace('::', '/')}.pm"
+            assert entry["sha256"] == package["module_sha256"]
+            for role in ("vulnerable", "fixed"):
+                assert hashlib.sha256((case_dir / role / (name.replace("::", "/") + ".pm")).read_bytes()).hexdigest() == entry["sha256"]
+        assert {entry["license_expression"] for path, entry in evidence.items()
+                if path.startswith(("evidence/source-", "evidence/dependency-"))} == {offered}
+        raw = (case_dir / license_path).read_bytes()
+        assert len(raw) == 6111
+        assert hashlib.sha256(raw).hexdigest() == "b7fd9b73ea99602016a326e0b62e6646060d18febdd065ceca8bb482208c3d88"
+        assert evidence[license_path] == {
+            "path": license_path,
+            "source_url": "https://raw.githubusercontent.com/Perl/perl5/c0247066c34077145eaa8f33eddcbb64fa3b0f8d/Artistic",
+            "revision": "c0247066c34077145eaa8f33eddcbb64fa3b0f8d",
+            "sha256": "b7fd9b73ea99602016a326e0b62e6646060d18febdd065ceca8bb482208c3d88",
+            "license_expression": "Artistic-1.0-Perl",
+        }
+        assert not (case_dir / license_path).is_symlink()
+        advisory_expression = "Artistic-2.0"
+    for component in components.values():
+        assert component["redistribution_mode"] == "vendored"
+        assert component["notice_requirements"]
+    assert {entry["license_expression"] for path, entry in evidence.items()
+            if "GHSA" in path or "CPANSA" in path or "advisory-LICENSE" in path} == {advisory_expression}

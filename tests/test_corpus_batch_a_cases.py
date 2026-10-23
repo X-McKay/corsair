@@ -93,6 +93,7 @@ CASES = {
         "fixed_lines": [398],
         "source_closure": ["lib/Net/Netmask.pm"],
         "license_hashes": {
+            "evidence/Perl-5.12.3-Artistic": "b7fd9b73ea99602016a326e0b62e6646060d18febdd065ceca8bb482208c3d88",
             "evidence/source-vulnerable-dist.ini": "8f2e592cae4612026e37eaa98500ee3f8991fa82ff34d7cd58d5e90b505e3937",
             "evidence/source-fixed-dist.ini": "195c7b3e4b52f32b1aadcfc46645d7330ed02b63ea09e83b4451924148356ed6",
             "evidence/source-vulnerable-Netmask.pod": "524dc16e913a8a9005eb65f2af461fd4359f3651b2db67c618ce8f06755f18ae",
@@ -152,3 +153,77 @@ def test_batch_a_oracles_are_evaluator_only_and_keep_qualification_pending(case_
     assert oracle["expected_fix"] == "verified"
     assert oracle["qualification_status"] == "candidate"
     assert "expected_label" not in case.model_dump_json()
+
+
+@pytest.mark.parametrize("case_id", ["cs-1003", "cs-1004"])
+def test_batch_a_reviewed_rights_packaging(case_id):
+    case_dir = ROOT / "cases" / case_id
+    assets = json.loads((case_dir / "asset-manifest.json").read_text())
+    evidence = {entry["path"]: entry for entry in assets["evidence"]}
+    assert "rights_review" in assets, "Packaged source rights need a durable factual review"
+    review = assets["rights_review"]
+    assert review["reviewer"] == "OpenAI Codex automated factual rights review"
+    assert review["reviewed_at"] == "2026-10-23"
+    assert review["review_kind"] == "automated_factual"
+    assert review["human_legal_approval"] is False
+    assert assets["qualification_status"] == "candidate"
+    assert set(assets["qualification_blockers"]) == {
+        "dataset_manifest_entry_pending", "runtime_rights_pending", "independent_review_pending",
+        "java21_jacoco_replay_pending" if case_id == "cs-1003" else "perl_tap_replay_pending",
+    }
+    oracle = json.loads((case_dir / "oracle.json").read_text())
+    assert oracle["qualification_status"] == "candidate"
+    assert oracle["expected_label"] == "LIKELY_EXPLOITABLE"
+    assert oracle["expected_fix"] == "verified"
+    assert len(review["components"]) == 1
+    component = review["components"][0]
+    assert component["redistribution_mode"] == "vendored"
+    assert component["notice_requirements"]
+    if case_id == "cs-1003":
+        assert component["name"] == "Apache Commons IO"
+        assert component["license_expression"] == "Apache-2.0"
+        licenses = set(CASES[case_id]["license_hashes"])
+        assert set(component["license_evidence_paths"]) == licenses
+        assert set(component["covered_paths"]) == licenses | {
+            f"{role}/{path}" for role in ("vulnerable", "fixed")
+            for path in CASES[case_id]["source_closure"]
+        }
+        for path in licenses:
+            assert evidence[path]["license_expression"] == "Apache-2.0"
+            assert evidence[path]["sha256"] == CASES[case_id]["license_hashes"][path]
+            if path.endswith("NOTICE.txt"):
+                duties = " ".join(component["notice_requirements"])
+                assert path in duties and "4(d)" in duties
+                assert hashlib.sha256((case_dir / path).read_bytes()).hexdigest() == (
+                    "f738390135295a249c4fb7118469ff881ae0bd11401b410f7564a52b7e54c4d2"
+                )
+        assert {entry["license_expression"] for path, entry in evidence.items()
+                if "GHSA" in path or "advisory-LICENSE" in path} == {"CC-BY-4.0"}
+    else:
+        offered = "Artistic-1.0-Perl OR GPL-1.0-or-later"
+        assert component["name"] == "Net::Netmask"
+        assert component["license_expression"] == offered
+        assert component["selected_license"] == "Artistic-1.0-Perl"
+        assert component["source_subset"] is True
+        assert set(component["covered_paths"]) == {
+            "vulnerable/lib/Net/Netmask.pm", "fixed/lib/Net/Netmask.pm",
+            "evidence/source-vulnerable-Netmask.pod", "evidence/source-fixed-Netmask.pod",
+            "evidence/source-vulnerable-dist.ini", "evidence/source-fixed-dist.ini",
+        }
+        assert {entry["license_expression"] for path, entry in evidence.items()
+                if path.startswith("evidence/source-")} == {offered}
+        license_path = "evidence/Perl-5.12.3-Artistic"
+        assert component["license_evidence_paths"] == [license_path]
+        raw = (case_dir / license_path).read_bytes()
+        assert len(raw) == 6111
+        assert hashlib.sha256(raw).hexdigest() == "b7fd9b73ea99602016a326e0b62e6646060d18febdd065ceca8bb482208c3d88"
+        assert evidence[license_path] == {
+            "path": license_path,
+            "source_url": "https://raw.githubusercontent.com/Perl/perl5/c0247066c34077145eaa8f33eddcbb64fa3b0f8d/Artistic",
+            "revision": "c0247066c34077145eaa8f33eddcbb64fa3b0f8d",
+            "sha256": "b7fd9b73ea99602016a326e0b62e6646060d18febdd065ceca8bb482208c3d88",
+            "license_expression": "Artistic-1.0-Perl",
+        }
+        assert not (case_dir / license_path).is_symlink()
+        assert {entry["license_expression"] for path, entry in evidence.items()
+                if "CPANSA" in path or "advisory-LICENSE" in path} == {"Artistic-2.0"}

@@ -18,5 +18,5 @@
   ],
   "provenance": "Finding independently derived from the pinned File::Find::Rule source pair and CPANSA-File-Find-Rule.",
   "retention": "Public upstream source and independently authored benchmark annotations; retain permanently.",
-  "note": "Evaluator-only candidate. Admission still requires a dataset manifest entry with committed snapshot bindings, pending rights decisions, real-runtime replay, and independent review."
+  "note": "Evaluator-only candidate. Admission still requires a dataset manifest entry with committed snapshot bindings, runtime rights, real-runtime replay, and independent review."
 }
