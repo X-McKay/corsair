@@ -1,0 +1,15 @@
+{
+  "case_id": "cs-1015",
+  "finding": {
+    "title": "Default interpolation resolves an owned local resource",
+    "description": "With the default lookup override absent, default interpolation resolves a URL expression referring only to one owned local temporary file instead of preserving that unresolved expression.",
+    "file_path": "src/main/java/org/apache/commons/text/lookup/StringLookupFactory.java",
+    "start_line": 447,
+    "symbol": "StringLookupFactory.addDefaultStringLookups",
+    "cwe": "CWE-200"
+  },
+  "source": "vulnerable",
+  "commit": "1c0340694871183baf6e55376dd85c260e810bb0",
+  "fixed_source": "fixed",
+  "fixed_commit": "b9b40b903e2d1f9935039803c9852439576780ea"
+}

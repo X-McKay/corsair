@@ -1,0 +1,48 @@
+{
+  "java_release": 8,
+  "compiled_sources": [
+    "src/main/java/org/apache/commons/text/Builder.java",
+    "src/main/java/org/apache/commons/text/StringSubstitutor.java",
+    "src/main/java/org/apache/commons/text/StringTokenizer.java",
+    "src/main/java/org/apache/commons/text/TextStringBuilder.java",
+    "src/main/java/org/apache/commons/text/lookup/AbstractStringLookup.java",
+    "src/main/java/org/apache/commons/text/lookup/BiFunctionStringLookup.java",
+    "src/main/java/org/apache/commons/text/lookup/BiStringLookup.java",
+    "src/main/java/org/apache/commons/text/lookup/ConstantStringLookup.java",
+    "src/main/java/org/apache/commons/text/lookup/DateStringLookup.java",
+    "src/main/java/org/apache/commons/text/lookup/DefaultStringLookup.java",
+    "src/main/java/org/apache/commons/text/lookup/DnsStringLookup.java",
+    "src/main/java/org/apache/commons/text/lookup/FileStringLookup.java",
+    "src/main/java/org/apache/commons/text/lookup/FunctionStringLookup.java",
+    "src/main/java/org/apache/commons/text/lookup/IllegalArgumentExceptions.java",
+    "src/main/java/org/apache/commons/text/lookup/InetAddressKeys.java",
+    "src/main/java/org/apache/commons/text/lookup/InterpolatorStringLookup.java",
+    "src/main/java/org/apache/commons/text/lookup/JavaPlatformStringLookup.java",
+    "src/main/java/org/apache/commons/text/lookup/LocalHostStringLookup.java",
+    "src/main/java/org/apache/commons/text/lookup/PropertiesStringLookup.java",
+    "src/main/java/org/apache/commons/text/lookup/ResourceBundleStringLookup.java",
+    "src/main/java/org/apache/commons/text/lookup/ScriptStringLookup.java",
+    "src/main/java/org/apache/commons/text/lookup/StringLookup.java",
+    "src/main/java/org/apache/commons/text/lookup/StringLookupFactory.java",
+    "src/main/java/org/apache/commons/text/lookup/UrlDecoderStringLookup.java",
+    "src/main/java/org/apache/commons/text/lookup/UrlEncoderStringLookup.java",
+    "src/main/java/org/apache/commons/text/lookup/UrlStringLookup.java",
+    "src/main/java/org/apache/commons/text/lookup/XmlStringLookup.java",
+    "src/main/java/org/apache/commons/text/matcher/AbstractStringMatcher.java",
+    "src/main/java/org/apache/commons/text/matcher/StringMatcher.java",
+    "src/main/java/org/apache/commons/text/matcher/StringMatcherFactory.java"
+  ],
+  "vulnerable_only_resource": {
+    "path": "src/main/resources/org/apache/commons/text/lookup/defaults.properties",
+    "sha256": "c16e5c1b25ac67939376656a18e00f1e03cc0a09030e975fc34d37af79484b8f"
+  },
+  "artifacts": [
+    {
+      "coordinate": "org.apache.commons:commons-lang3:3.12.0",
+      "jar_url": "https://repo.maven.apache.org/maven2/org/apache/commons/commons-lang3/3.12.0/commons-lang3-3.12.0.jar",
+      "jar_sha256": "d919d904486c037f8d193412da0c92e22a9fa24230b9d67a57855c5c31c7e94e",
+      "pom_url": "https://repo.maven.apache.org/maven2/org/apache/commons/commons-lang3/3.12.0/commons-lang3-3.12.0.pom",
+      "pom_sha256": "82d31f1dcc4583effd744e979165b16da64bf86bca623fc5d1b03ed94f45c85a"
+    }
+  ]
+}

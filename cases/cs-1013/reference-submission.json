@@ -1,0 +1,14 @@
+{
+  "contract_version": "corsair-lite/differential-probe/2",
+  "hypothesis": {
+    "target_file": "jwt/algorithms.py",
+    "target_symbol": "HMACAlgorithm.prepare_key",
+    "target_lines": [
+      193
+    ],
+    "root_cause": "The HMAC preparation format check omits the owned OpenSSH Ed25519 record format.",
+    "expected_violation": "the directly prepared owned asymmetric-key record is accepted as HMAC key bytes"
+  },
+  "build_script": "",
+  "probe": "import base64\nimport hashlib\nimport os\nimport struct\n\nfrom jwt.algorithms import HMACAlgorithm\nfrom jwt.exceptions import InvalidKeyError\n\nCONTROL_PAYLOAD = \"ordinary-hmac\"\nEXPLOIT_PAYLOAD = \"openssh-ed25519\"\n\n\ndef classify_owned_key(key):\n    if key.startswith(b\"corsair-owned-hmac-secret:\"):\n        if len(key) != len(b\"corsair-owned-hmac-secret:\") + 32:\n            raise ValueError(\"malformed owned HMAC bytes\")\n        return False\n    label, encoded, comment = key.split(b\" \", 2)\n    raw = base64.b64decode(encoded, validate=True)\n    first_length = struct.unpack(\">I\", raw[:4])[0]\n    first = raw[4:4 + first_length]\n    offset = 4 + first_length\n    second_length = struct.unpack(\">I\", raw[offset:offset + 4])[0]\n    second = raw[offset + 4:]\n    if not (label == first == b\"ssh-ed25519\" and second_length == len(second) == 32\n            and comment == b\"corsair-owned-key\"):\n        raise ValueError(\"malformed owned OpenSSH record\")\n    return True\n\n\ndef run_target(payload: str) -> bool:\n    if payload == \"ordinary-hmac\":\n        key = b\"corsair-owned-hmac-secret:\" + os.urandom(32)\n    elif payload == \"openssh-ed25519\":\n        key_type = b\"ssh-ed25519\"\n        field = os.urandom(32)\n        raw = struct.pack(\">I\", len(key_type)) + key_type + struct.pack(\">I\", len(field)) + field\n        key = key_type + b\" \" + base64.b64encode(raw) + b\" corsair-owned-key\"\n    else:\n        raise ValueError(\"invalid owned key fixture\")\n    asymmetric = classify_owned_key(key)\n    try:\n        prepared = HMACAlgorithm(hashlib.sha256).prepare_key(key)\n        if not isinstance(prepared, bytes) or prepared != key:\n            raise RuntimeError(\"unexpected prepared key\")\n        accepted = True\n    except InvalidKeyError:\n        accepted = False\n    return accepted != asymmetric\n"
+}

@@ -1,0 +1,202 @@
+{
+  "schema": "corsair-lite/case-assets/1",
+  "case_id": "cs-1014",
+  "family_id": "cf-1014",
+  "repository": "https://github.com/mde/ejs",
+  "qualification_status": "candidate",
+  "source_closure": [
+    "lib/ejs.js",
+    "lib/utils.js",
+    "package.json"
+  ],
+  "role_source_closure": {
+    "vulnerable": [
+      "lib/ejs.js",
+      "lib/utils.js",
+      "package.json"
+    ],
+    "fixed": [
+      "lib/ejs.js",
+      "lib/utils.js",
+      "package.json"
+    ]
+  },
+  "source_files": {
+    "vulnerable": {
+      "lib/ejs.js": {
+        "mode": "100755",
+        "sha256": "6dbc7b10c4c508fa978c4642bc2b9f3752f98d85c253ab622dda1e7c7758b7e1",
+        "bytes": 26680,
+        "blob": "aa6322e304ab6a9a63efeaaf301c792ade243d42"
+      },
+      "lib/utils.js": {
+        "mode": "100644",
+        "sha256": "3b51eea9f2db2db01189cc9be04833a50ac10ef4809f929e74de1b58763ec5f1",
+        "bytes": 4165,
+        "blob": "284de06624d7a7fb85e1034f9e218c472d717ab8"
+      },
+      "package.json": {
+        "mode": "100644",
+        "sha256": "694cf5ebe3db8252c12bdb5402dffc5c6d53a16b426c21c2bb583663b93dd500",
+        "bytes": 896,
+        "blob": "c2b036bead494246533e81248b92d2ea7151336c"
+      }
+    },
+    "fixed": {
+      "lib/ejs.js": {
+        "mode": "100755",
+        "sha256": "9ff1cb7fb0a7dbd822e04d35e50560a199926cc323b5aa11f1e89556d7b89814",
+        "bytes": 27481,
+        "blob": "65590eaed0d7fdf600b08fdc51e90083f5960595"
+      },
+      "lib/utils.js": {
+        "mode": "100644",
+        "sha256": "eaaf201b085645460dccbc754b024423c1d3b019d9fea8bd9c6b0b8e3785cd82",
+        "bytes": 4869,
+        "blob": "5aef7c82d783928724fc03b62b54ec5442c5dd1d"
+      },
+      "package.json": {
+        "mode": "100644",
+        "sha256": "8a5250eb30b83f0109c1de33949ecb163ed1bf7e383d3b58ed483d83d13aab12",
+        "bytes": 896,
+        "blob": "920b01cefcd9b30cb2f5df973183659d52f8c296"
+      }
+    }
+  },
+  "target": {
+    "file": "lib/ejs.js",
+    "symbol": "exports.render",
+    "lines": [
+      415
+    ],
+    "fixed_lines": [
+      417
+    ]
+  },
+  "upstream_source_pair": {
+    "relationship": "release-interval",
+    "patch_sha256": "b18883424e2d10c5af3b5acc2eb7b364b09f8a42b720a0fc09329bacc2a6bf0f",
+    "raw_diff_sha256": "0592af0314d23551796decf4f2389545eac2a5cd59fee92929491f03fa2e5428",
+    "raw_diff_bytes": 215075,
+    "vulnerable": {
+      "commit": "80bf3d7dcc20dffa38686a58b4e0ba70d5cac8a1",
+      "parents": [
+        "abaee2be937236b1b8da9a1f55096c17dda905fd"
+      ],
+      "git_tree": "3da16ae9ed3e20e392c0bc72c97bf1263cfbfe2c",
+      "commit_body_sha256": "32f85e2a697a0a62cedefde81bf3555357296cf3e041beedbf373b9495513047",
+      "archive_sha256": "15e16ca592f80fd48ec045904de0461b5c0d80ac36408cbdaf39fe58da73b175",
+      "archive_bytes": 82758,
+      "archive_url": "https://github.com/mde/ejs/archive/80bf3d7dcc20dffa38686a58b4e0ba70d5cac8a1.tar.gz",
+      "upstream_tree_sha256": "a4ff7a50471df4bbb14d4d35c4af676c8e52ed9446a00f4581c16db6d6876ef0"
+    },
+    "fixed": {
+      "commit": "820855ad75034e303be82c482c5eb8c6616da5c5",
+      "parents": [
+        "076dcb643c5aed2e10c2847639c98fd923b72854"
+      ],
+      "git_tree": "88eb9cefedf0c8768ed8eb7f16bd8c3e35899bb9",
+      "commit_body_sha256": "19124a14976f27d1a34e80221079971eba6958764833a87ecb1de0981f944c21",
+      "archive_sha256": "f762276dcd40d801e39ac4af76b18b46035d82dd376f85810380a682bf085fa1",
+      "archive_bytes": 121796,
+      "archive_url": "https://github.com/mde/ejs/archive/820855ad75034e303be82c482c5eb8c6616da5c5.tar.gz",
+      "upstream_tree_sha256": "05add5f15c662a2f2933a11b195069d67e913221bcd4de6116eeebc34882d050"
+    }
+  },
+  "vendored_source_pair": {
+    "patch_sha256": "24f234b16e3c5ab14f6692fa572fd9b05bcf8e48bbe07a14c0005da7f0e5591b",
+    "vulnerable": {
+      "tree_sha256": "61001690d9d0ed381083d940a590ca3dac65c3126d1743af9f97b5ace6ee55fa",
+      "region_sha256": "703838484fd86db6171711437c1adb9309c808d116ef987837e4d9da8db2d3ec"
+    },
+    "fixed": {
+      "tree_sha256": "9c6e511aa6a80500ad5dec86a6f8e7e2c789330dfcc8c6af0d08e659df2b4d18",
+      "region_sha256": "445ae8fa559547426b82636fa4273bfdddb12daf9873e8bfb1c279da82da90be"
+    }
+  },
+  "evidence": {
+    "evidence/source-vulnerable-LICENSE": {
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "bytes": 11358,
+      "mode": "100644",
+      "original_path": "LICENSE",
+      "revision": "80bf3d7dcc20dffa38686a58b4e0ba70d5cac8a1",
+      "source_url": "https://raw.githubusercontent.com/mde/ejs/80bf3d7dcc20dffa38686a58b4e0ba70d5cac8a1/LICENSE"
+    },
+    "evidence/source-fixed-LICENSE": {
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "bytes": 11358,
+      "mode": "100644",
+      "original_path": "LICENSE",
+      "revision": "820855ad75034e303be82c482c5eb8c6616da5c5",
+      "source_url": "https://raw.githubusercontent.com/mde/ejs/820855ad75034e303be82c482c5eb8c6616da5c5/LICENSE"
+    }
+  },
+  "qualification_blockers": [
+    "dataset_manifest_entry_pending",
+    "runtime_rights_pending",
+    "node22_replay_pending",
+    "independent_review_pending"
+  ],
+  "runtime_facts": {
+    "runtime_id": "node-test-node22",
+    "rights_status": "pending",
+    "preparation_image_id": "sha256:0c057726aa5f32ca5e8b6793c2f0d40dfe1f9492dded237d7c1e14bc0a5401e1",
+    "version": "Node v22.23.3",
+    "coverage": "native V8 ranges",
+    "dependency_scope": "Node built-ins only; no npm install or package scripts"
+  },
+  "rights_review": {
+    "reviewer": "OpenAI Codex automated factual rights preparation",
+    "reviewed_at": "2026-10-23",
+    "review_kind": "automated_factual",
+    "human_legal_approval": false,
+    "scope": "Byte-exact selected source subsets and copied evidence only; runtime rights, independent review, replay and admission remain pending.",
+    "components": [
+      {
+        "name": "Rendering source subset",
+        "license_expression": "Apache-2.0",
+        "redistribution_mode": "verbatim source subset with exact revision-local evidence",
+        "covered_paths": [
+          "vulnerable/lib/ejs.js",
+          "vulnerable/lib/utils.js",
+          "vulnerable/package.json",
+          "fixed/lib/ejs.js",
+          "fixed/lib/utils.js",
+          "fixed/package.json",
+          "evidence/source-vulnerable-LICENSE",
+          "evidence/source-fixed-LICENSE"
+        ],
+        "license_evidence_paths": [
+          "evidence/source-vulnerable-LICENSE",
+          "evidence/source-fixed-LICENSE"
+        ],
+        "notice_requirements": [
+          "Preserve complete Apache-2.0 terms and all source headers, including the literal Copyright 2112 Matthew Eernisse notice; no separate upstream NOTICE exists."
+        ]
+      }
+    ],
+    "basis": [
+      "Copied source/evidence SHA-256, byte length, Git mode, original path/blob, immutable revisions, archive identities and complete grant/notice bytes checked against reviewed preparation evidence. No case admission or legal conclusion."
+    ]
+  },
+  "preparation_limits": {
+    "source_packaging": "byte-exact selected subsets; no upstream tests, build systems, whole archives or generated source inventories copied",
+    "serialized_reference_replay": "pending; host PID exhaustion prevents fresh bounded runtime execution",
+    "preparation_probe_evidence": "Four 2x2 feasibility observations belong only to preparation reports; they are not serialized-reference or kernel receipts."
+  },
+  "topology": {
+    "ancestry_commits": 22,
+    "fixed_first_parent_commits": 12,
+    "merge_base": "80bf3d7dcc20dffa38686a58b4e0ba70d5cac8a1",
+    "intermediate_commits": [
+      "15ee698583c98dadc456639d6245580d17a24baf",
+      "be9a9bb397ed6f4f4e563eed4aa53700f30a837e",
+      "576283bb5db2f5b6d2c9f979163a84644f581697"
+    ],
+    "release_tags": [
+      "v3.1.6",
+      "v3.1.7"
+    ]
+  }
+}

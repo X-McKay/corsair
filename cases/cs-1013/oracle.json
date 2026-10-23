@@ -1,0 +1,20 @@
+{
+  "dataset_version": "batch-d-candidate/1",
+  "expected_label": "LIKELY_EXPLOITABLE",
+  "expected_fix": "verified",
+  "forbidden_labels": [],
+  "qualification_status": "candidate",
+  "case_name": "HMAC preparation accepts an owned asymmetric-key record",
+  "risk_tags": [
+    "hmac-key-format",
+    "asymmetric-key-format-rejection"
+  ],
+  "capability_tags": [
+    "pytest-cpython312",
+    "direct-call",
+    "differential-probe"
+  ],
+  "provenance": "Finding independently authored from the pinned source pair and narrow owned-state postcondition.",
+  "retention": "Public upstream source and independently authored benchmark annotations; retain permanently.",
+  "note": "Evaluator-only candidate; kernel evidence/admission remain pending. Admission still requires a dataset manifest entry with committed snapshot bindings, runtime rights, final serialized replay, and independent review."
+}

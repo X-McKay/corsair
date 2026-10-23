@@ -1,0 +1,15 @@
+{
+  "case_id": "cs-1014",
+  "finding": {
+    "title": "Rendering inherits an owned default compiler option",
+    "description": "Rendering with a null options argument inherits a process-local compiler option from the object prototype and changes an owned in-memory marker.",
+    "file_path": "lib/ejs.js",
+    "start_line": 415,
+    "symbol": "exports.render",
+    "cwe": "CWE-94"
+  },
+  "source": "vulnerable",
+  "commit": "80bf3d7dcc20dffa38686a58b4e0ba70d5cac8a1",
+  "fixed_source": "fixed",
+  "fixed_commit": "820855ad75034e303be82c482c5eb8c6616da5c5"
+}

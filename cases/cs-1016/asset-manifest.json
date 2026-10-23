@@ -1,0 +1,195 @@
+{
+  "schema": "corsair-lite/case-assets/1",
+  "case_id": "cs-1016",
+  "family_id": "cf-1016",
+  "repository": "https://github.com/nigelm/html-scrubber",
+  "qualification_status": "candidate",
+  "source_closure": [
+    "lib/HTML/Scrubber.pm"
+  ],
+  "role_source_closure": {
+    "vulnerable": [
+      "lib/HTML/Scrubber.pm"
+    ],
+    "fixed": [
+      "lib/HTML/Scrubber.pm"
+    ]
+  },
+  "source_files": {
+    "vulnerable": {
+      "lib/HTML/Scrubber.pm": {
+        "mode": "100644",
+        "sha256": "f3130a6f6a6374a505c0ec821fc5b5fc7678e8b5494598b87b89d924da66ffe9",
+        "bytes": 18833,
+        "blob": "83221526d0d255eeffced638c8b9b1db661aa8ce"
+      }
+    },
+    "fixed": {
+      "lib/HTML/Scrubber.pm": {
+        "mode": "100644",
+        "sha256": "3e237443689db3ec93df02aa85b8fa230c2fff15ec82a0b57ba96226f1d8b5cc",
+        "bytes": 18963,
+        "blob": "2a7b1732c6370f7939079c219c16bdbde1046cfd"
+      }
+    }
+  },
+  "target": {
+    "file": "lib/HTML/Scrubber.pm",
+    "symbol": "HTML::Scrubber::_scrub_str",
+    "lines": [
+      449
+    ],
+    "fixed_lines": [
+      452
+    ]
+  },
+  "upstream_source_pair": {
+    "relationship": "direct-parent-fix",
+    "patch_sha256": "ecd3c76418a16e5010127b5ebb9a6ee4fc7c0688255be4b36dfd0b00027fe0ba",
+    "raw_diff_sha256": "61ea402eba35671666625a86976332aa5184d110aeaf555cc54a2859e7bde77e",
+    "raw_diff_bytes": 1915,
+    "vulnerable": {
+      "commit": "2e6f767e1d5a21a6cd4afd75ca03917acf180720",
+      "parents": [
+        "8e43fd8534302ac9b1cabba544cda266920e7f01"
+      ],
+      "git_tree": "165c97a1330fe65c40bbab0adc347b8432f4f74d",
+      "commit_body_sha256": "042c5282dfad04cfe079526a4da0226afaaf75be8c01e2113bdd8f10b6df83d9",
+      "archive_sha256": "133bfff9f086bb02e5aa71217ae29125944a894b71d50ca3cd0df4312d1f0495",
+      "archive_bytes": 14348,
+      "archive_url": "https://codeload.github.com/nigelm/html-scrubber/tar.gz/2e6f767e1d5a21a6cd4afd75ca03917acf180720",
+      "upstream_tree_sha256": "414798762e56850323c3cd9c684ce5a76fb9bee94f7798fa8ce4ed7597cb09d0"
+    },
+    "fixed": {
+      "commit": "e1978cc37867e85c06a84a4651745235010cd6cd",
+      "parents": [
+        "2e6f767e1d5a21a6cd4afd75ca03917acf180720"
+      ],
+      "git_tree": "2f14f91122bce09a0e9da331287be2cfcb9c5b7d",
+      "commit_body_sha256": "59fc7501ccd668585dcd5e1ee60d38387b9e9d25bbadd465be508fdd99626725",
+      "archive_sha256": "6be15d79565412380ed111b6094f6ff0a7496c41439d24b39463e348c30c857d",
+      "archive_bytes": 14619,
+      "archive_url": "https://codeload.github.com/nigelm/html-scrubber/tar.gz/e1978cc37867e85c06a84a4651745235010cd6cd",
+      "upstream_tree_sha256": "90cb1e48167ca6b37ca1909b62343096fa534b2a471ee650c004f7af6c8156b0"
+    }
+  },
+  "vendored_source_pair": {
+    "patch_sha256": "5d10143c2b8ab2c152963bc82e388251fe751340e7ce83d5f655b1647961b7c4",
+    "vulnerable": {
+      "tree_sha256": "8576517f2556eb2502bf51a3c962cb4c1930acff57bc3fddaf6150b8deb8c9ae",
+      "region_sha256": "d1092eb3fd2b97f747cc8083a9f94d3102e11b60ebfb67418dfbff27d47b55a6"
+    },
+    "fixed": {
+      "tree_sha256": "5b9fa095859d0e1894b066f3d43d734888fa577432750dfba51f7bf5ede0b284",
+      "region_sha256": "9eb09b438f9c8cb01b48649b31aaaedd05bdf97695c3e2fa5fb79e3055458e22"
+    }
+  },
+  "evidence": {
+    "evidence/source-vulnerable-README.pod": {
+      "sha256": "45ead0ef98fa142d371945e7ca00d23d2ea49f34fce46019e8d45c3dbe224401",
+      "bytes": 11549,
+      "mode": "100644",
+      "original_path": "README.pod",
+      "revision": "2e6f767e1d5a21a6cd4afd75ca03917acf180720",
+      "source_url": "https://raw.githubusercontent.com/nigelm/html-scrubber/2e6f767e1d5a21a6cd4afd75ca03917acf180720/README.pod"
+    },
+    "evidence/source-vulnerable-dist.ini": {
+      "sha256": "59a5e9175456c98141a3fcaf12a7ea95fa71cc81dd59a2bd4764711670751351",
+      "bytes": 541,
+      "mode": "100644",
+      "original_path": "dist.ini",
+      "revision": "2e6f767e1d5a21a6cd4afd75ca03917acf180720",
+      "source_url": "https://raw.githubusercontent.com/nigelm/html-scrubber/2e6f767e1d5a21a6cd4afd75ca03917acf180720/dist.ini"
+    },
+    "evidence/source-fixed-README.pod": {
+      "sha256": "45ead0ef98fa142d371945e7ca00d23d2ea49f34fce46019e8d45c3dbe224401",
+      "bytes": 11549,
+      "mode": "100644",
+      "original_path": "README.pod",
+      "revision": "e1978cc37867e85c06a84a4651745235010cd6cd",
+      "source_url": "https://raw.githubusercontent.com/nigelm/html-scrubber/e1978cc37867e85c06a84a4651745235010cd6cd/README.pod"
+    },
+    "evidence/source-fixed-dist.ini": {
+      "sha256": "59a5e9175456c98141a3fcaf12a7ea95fa71cc81dd59a2bd4764711670751351",
+      "bytes": 541,
+      "mode": "100644",
+      "original_path": "dist.ini",
+      "revision": "e1978cc37867e85c06a84a4651745235010cd6cd",
+      "source_url": "https://raw.githubusercontent.com/nigelm/html-scrubber/e1978cc37867e85c06a84a4651745235010cd6cd/dist.ini"
+    },
+    "evidence/Perl-5.12.3-Artistic": {
+      "sha256": "b7fd9b73ea99602016a326e0b62e6646060d18febdd065ceca8bb482208c3d88",
+      "bytes": 6111,
+      "mode": "100644",
+      "original_path": "Artistic",
+      "revision": "c0247066c34077145eaa8f33eddcbb64fa3b0f8d",
+      "source_url": "https://raw.githubusercontent.com/Perl/perl5/c0247066c34077145eaa8f33eddcbb64fa3b0f8d/Artistic"
+    }
+  },
+  "qualification_blockers": [
+    "dataset_manifest_entry_pending",
+    "runtime_rights_pending",
+    "perl_tap_replay_pending",
+    "independent_review_pending"
+  ],
+  "runtime_facts": {
+    "runtime_id": "perl-tap-540",
+    "rights_status": "pending",
+    "preparation_image_id": "sha256:90a29df261025b1c1e0d001373e10393ccc9c14f00b7baa14dc19a88c1c6b37f",
+    "version": "Perl v5.40.1",
+    "coverage": "Devel::Cover 1.44 native statements",
+    "HTML::Parser": "3.83",
+    "HTML::Entities": "3.83",
+    "packages": [
+      "libhtml-parser-perl:amd64=3.83-2~deb13u1",
+      "libhtml-tagset-perl=3.24-1",
+      "liburi-perl=5.30-1",
+      "perl=5.40.1-6+deb13u1",
+      "perl-base=5.40.1-6+deb13u1",
+      "perl-modules-5.40=5.40.1-6+deb13u1",
+      "libperl5.40:amd64=5.40.1-6+deb13u1"
+    ]
+  },
+  "rights_review": {
+    "reviewer": "OpenAI Codex automated factual rights preparation",
+    "reviewed_at": "2026-10-23",
+    "review_kind": "automated_factual",
+    "human_legal_approval": false,
+    "scope": "Byte-exact selected source subsets and copied evidence only; runtime rights, independent review, replay and admission remain pending.",
+    "components": [
+      {
+        "name": "Incomplete source subset",
+        "license_expression": "Artistic-1.0-Perl OR GPL-1.0-or-later",
+        "redistribution_mode": "verbatim source subset with exact revision-local evidence",
+        "covered_paths": [
+          "vulnerable/lib/HTML/Scrubber.pm",
+          "fixed/lib/HTML/Scrubber.pm",
+          "evidence/source-vulnerable-README.pod",
+          "evidence/source-vulnerable-dist.ini",
+          "evidence/source-fixed-README.pod",
+          "evidence/source-fixed-dist.ini",
+          "evidence/Perl-5.12.3-Artistic"
+        ],
+        "license_evidence_paths": [
+          "evidence/source-vulnerable-README.pod",
+          "evidence/source-vulnerable-dist.ini",
+          "evidence/source-fixed-README.pod",
+          "evidence/source-fixed-dist.ini",
+          "evidence/Perl-5.12.3-Artistic"
+        ],
+        "notice_requirements": [
+          "Preserve revision-local README.pod and dist.ini grant, full Artistic terms, authorship and 2015 / 2003-2004 notices. Preserve the full alternative license expression and elect Artistic-1.0-Perl for both verbatim subsets."
+        ],
+        "license_election": "Artistic-1.0-Perl"
+      }
+    ],
+    "basis": [
+      "Copied source/evidence SHA-256, byte length, Git mode, original path/blob, immutable revisions, archive identities and complete grant/notice bytes checked against reviewed preparation evidence. No case admission or legal conclusion."
+    ]
+  },
+  "preparation_limits": {
+    "source_packaging": "byte-exact selected subsets; no upstream tests, build systems, whole archives or generated source inventories copied",
+    "serialized_reference_replay": "pending; host PID exhaustion prevents fresh bounded runtime execution",
+    "preparation_probe_evidence": "Four 2x2 feasibility observations belong only to preparation reports; they are not serialized-reference or kernel receipts."
+  }
+}

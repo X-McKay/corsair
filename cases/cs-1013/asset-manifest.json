@@ -1,0 +1,273 @@
+{
+  "schema": "corsair-lite/case-assets/1",
+  "case_id": "cs-1013",
+  "family_id": "cf-1013",
+  "repository": "https://github.com/jpadilla/pyjwt",
+  "qualification_status": "candidate",
+  "source_closure": [
+    "jwt/__init__.py",
+    "jwt/algorithms.py",
+    "jwt/api_jwk.py",
+    "jwt/api_jws.py",
+    "jwt/api_jwt.py",
+    "jwt/exceptions.py",
+    "jwt/jwks_client.py",
+    "jwt/utils.py"
+  ],
+  "role_source_closure": {
+    "vulnerable": [
+      "jwt/__init__.py",
+      "jwt/algorithms.py",
+      "jwt/api_jwk.py",
+      "jwt/api_jws.py",
+      "jwt/api_jwt.py",
+      "jwt/exceptions.py",
+      "jwt/jwks_client.py",
+      "jwt/utils.py"
+    ],
+    "fixed": [
+      "jwt/__init__.py",
+      "jwt/algorithms.py",
+      "jwt/api_jwk.py",
+      "jwt/api_jws.py",
+      "jwt/api_jwt.py",
+      "jwt/exceptions.py",
+      "jwt/jwks_client.py",
+      "jwt/utils.py"
+    ]
+  },
+  "source_files": {
+    "vulnerable": {
+      "jwt/__init__.py": {
+        "mode": "100644",
+        "sha256": "bdf72143bda227a09a230fedb315d20624ede3a3f761f4fbf0ddf7b77830403d",
+        "bytes": 1548,
+        "blob": "e692a842ae89ed6c0e0e8a9c6b91f112ee16e0a7"
+      },
+      "jwt/algorithms.py": {
+        "mode": "100644",
+        "sha256": "c9e8948582e58998172687e072784b757fe8ed67aa90c1eca8182b37702f1cb0",
+        "bytes": 22388,
+        "blob": "739df808f00e5bb3d2e9474117e99b05479be90e"
+      },
+      "jwt/api_jwk.py": {
+        "mode": "100644",
+        "sha256": "8d0481d646828b9060c1beccbb4bdf966a8e50261f358471c2d3d0599f444575",
+        "bytes": 3114,
+        "blob": "31250d57f21c8a17ad4c97a3e0c682723dcd5849"
+      },
+      "jwt/api_jws.py": {
+        "mode": "100644",
+        "sha256": "387145a5dec9e6b7f3a1a8ac4d0173ec2dda860323692ed3b4437dd868c4f013",
+        "bytes": 9186,
+        "blob": "cbf4f6f5b85dbfdff6f3831ef01d75fe5ffea127"
+      },
+      "jwt/api_jwt.py": {
+        "mode": "100644",
+        "sha256": "674f4e3e9db4cc1c8e56bb6c30c6db944e78a5f6f8e6d0e87bedd45c5e3c5574",
+        "bytes": 8025,
+        "blob": "7d2177bf535fa739d2efc3b10b44d375b155c5a0"
+      },
+      "jwt/exceptions.py": {
+        "mode": "100644",
+        "sha256": "ce9f76f03add47099fe0d615fb34ee6c791bd57a8f6a3d76b2de528bd2cb0cbb",
+        "bytes": 963,
+        "blob": "ee201add1aac9c778669ed2316286b0fbfa3c30b"
+      },
+      "jwt/jwks_client.py": {
+        "mode": "100644",
+        "sha256": "783fd67b3496035d8e2fa0659623b5959f59f08382613bb70be0f8671c85da5e",
+        "bytes": 1914,
+        "blob": "767b7179dbb6429a4cc1aa136b6731518115c152"
+      },
+      "jwt/utils.py": {
+        "mode": "100644",
+        "sha256": "2a08ff87e1bc8c5d0aa311b9de07bc2aa9479c4952788d525b0d081d529c2df2",
+        "bytes": 2471,
+        "blob": "9dde10cf8e539615c66af7740d8dfbae30052a37"
+      }
+    },
+    "fixed": {
+      "jwt/__init__.py": {
+        "mode": "100644",
+        "sha256": "b729d36979970b7c209019ed3323189a617d08bed66c4f8e84797730cbf5f064",
+        "bytes": 1548,
+        "blob": "6b3f8ab160108989240e6cda1a26f76cd9c300c2"
+      },
+      "jwt/algorithms.py": {
+        "mode": "100644",
+        "sha256": "e1cf03fe47b4379ca48ba8b4ef30b3893ef4df04957fb09489b424a803d3012f",
+        "bytes": 22392,
+        "blob": "46a1a532e75af58fd596c5e3124068206188c66b"
+      },
+      "jwt/api_jwk.py": {
+        "mode": "100644",
+        "sha256": "8d0481d646828b9060c1beccbb4bdf966a8e50261f358471c2d3d0599f444575",
+        "bytes": 3114,
+        "blob": "31250d57f21c8a17ad4c97a3e0c682723dcd5849"
+      },
+      "jwt/api_jws.py": {
+        "mode": "100644",
+        "sha256": "387145a5dec9e6b7f3a1a8ac4d0173ec2dda860323692ed3b4437dd868c4f013",
+        "bytes": 9186,
+        "blob": "cbf4f6f5b85dbfdff6f3831ef01d75fe5ffea127"
+      },
+      "jwt/api_jwt.py": {
+        "mode": "100644",
+        "sha256": "674f4e3e9db4cc1c8e56bb6c30c6db944e78a5f6f8e6d0e87bedd45c5e3c5574",
+        "bytes": 8025,
+        "blob": "7d2177bf535fa739d2efc3b10b44d375b155c5a0"
+      },
+      "jwt/exceptions.py": {
+        "mode": "100644",
+        "sha256": "ce9f76f03add47099fe0d615fb34ee6c791bd57a8f6a3d76b2de528bd2cb0cbb",
+        "bytes": 963,
+        "blob": "ee201add1aac9c778669ed2316286b0fbfa3c30b"
+      },
+      "jwt/jwks_client.py": {
+        "mode": "100644",
+        "sha256": "783fd67b3496035d8e2fa0659623b5959f59f08382613bb70be0f8671c85da5e",
+        "bytes": 1914,
+        "blob": "767b7179dbb6429a4cc1aa136b6731518115c152"
+      },
+      "jwt/utils.py": {
+        "mode": "100644",
+        "sha256": "d03019f4703a16b196dbc88a717a79eea1b2191f89630600060165f1be11cd27",
+        "bytes": 3993,
+        "blob": "8ab73b42d32f0e8f4f6b85756e8f0261aaf60418"
+      }
+    }
+  },
+  "target": {
+    "file": "jwt/algorithms.py",
+    "symbol": "HMACAlgorithm.prepare_key",
+    "lines": [
+      193
+    ],
+    "fixed_lines": [
+      188
+    ]
+  },
+  "upstream_source_pair": {
+    "relationship": "direct-parent-fix",
+    "patch_sha256": "02f37c4bcd98ab3b65dfa7e04d90bccfa22e546befd74acaa5efdc601fecf76c",
+    "raw_diff_sha256": "9a336c6dc98c4db4e6a407e4050f6a7241843c3fb7415c40d337c450f6a247dd",
+    "raw_diff_bytes": 11177,
+    "vulnerable": {
+      "commit": "24b29adfebcb4f057a3cef5aaf35653bc0c1c8cc",
+      "parents": [
+        "31f5acb8fb3ec6cdfe2b1b0a4a8f329b5f3ca67f"
+      ],
+      "git_tree": "e8496fb90c15e9f45bb89476ed70f8bd3abd72af",
+      "commit_body_sha256": "1e459d271c2a71d8a729f6ec6a44e96ebb7101eb55618e8fb05aeb899f5a6590",
+      "archive_sha256": "9ff6178cdd4837474e1dbc636fe76aa227cf66094e0d606f9c3c05e0d53b9117",
+      "archive_bytes": 62909,
+      "archive_url": "https://api.github.com/repos/jpadilla/pyjwt/tarball/24b29adfebcb4f057a3cef5aaf35653bc0c1c8cc",
+      "upstream_tree_sha256": "1c847cdd2e9efe7c9ce5b51988a97c4b54a7a648e213b648662bbf7ee0d6c892"
+    },
+    "fixed": {
+      "commit": "9c528670c455b8d948aff95ed50e22940d1ad3fc",
+      "parents": [
+        "24b29adfebcb4f057a3cef5aaf35653bc0c1c8cc"
+      ],
+      "git_tree": "235ecb85818e072ef5377f8e965ef50a41356336",
+      "commit_body_sha256": "c50b5009bb628bfcbed5a5878744683f3619e32a435587c3bac4af27f9480e01",
+      "archive_sha256": "35bec40fc98f0b90d9fb09bd78fce2a9c6129f3a7857b66633bebef464e57524",
+      "archive_bytes": 65393,
+      "archive_url": "https://api.github.com/repos/jpadilla/pyjwt/tarball/9c528670c455b8d948aff95ed50e22940d1ad3fc",
+      "upstream_tree_sha256": "9a25fef98eb0392b9a255318e0055ffc9c2efcbe4d87d2f441f75215d6c9c53d"
+    }
+  },
+  "vendored_source_pair": {
+    "patch_sha256": "c1ff6af4c8ddc77621fd2d496b9e2ec8e361e9ed512b7564408068446af142a5",
+    "vulnerable": {
+      "tree_sha256": "1ef00fa83c92e470effbe08fad06126dd90329b655ae45d6442a05bc60201332",
+      "region_sha256": "644a8f534b0a1afcaf86a8fc008deea1037a7e45798cb3e5555ef1ca92fa874b"
+    },
+    "fixed": {
+      "tree_sha256": "e7b196b7c513142e08832e1a39c010c0336e7e916f47904855ccdaff6ad62b54",
+      "region_sha256": "abf27f656677c79ba9c94fd8e34bd300ea4f7c6e8a6cb289ec4337a26f8bd47e"
+    }
+  },
+  "evidence": {
+    "evidence/source-vulnerable-LICENSE": {
+      "sha256": "797a7a20231d4c433e9f1911db1731d06b5828b98f499819a034f7c0f56f5ce5",
+      "bytes": 1085,
+      "mode": "100644",
+      "original_path": "LICENSE",
+      "revision": "24b29adfebcb4f057a3cef5aaf35653bc0c1c8cc",
+      "source_url": "https://raw.githubusercontent.com/jpadilla/pyjwt/24b29adfebcb4f057a3cef5aaf35653bc0c1c8cc/LICENSE"
+    },
+    "evidence/source-fixed-LICENSE": {
+      "sha256": "797a7a20231d4c433e9f1911db1731d06b5828b98f499819a034f7c0f56f5ce5",
+      "bytes": 1085,
+      "mode": "100644",
+      "original_path": "LICENSE",
+      "revision": "9c528670c455b8d948aff95ed50e22940d1ad3fc",
+      "source_url": "https://raw.githubusercontent.com/jpadilla/pyjwt/9c528670c455b8d948aff95ed50e22940d1ad3fc/LICENSE"
+    }
+  },
+  "qualification_blockers": [
+    "dataset_manifest_entry_pending",
+    "runtime_rights_pending",
+    "python_replay_pending",
+    "independent_review_pending"
+  ],
+  "runtime_facts": {
+    "runtime_id": "pytest-cpython312",
+    "rights_status": "pending",
+    "preparation_image_id": "sha256:43b0c43a93350375aa45a6ac664489826fce01599daae81dbc10127e4854110a",
+    "version": "Python 3.12.15",
+    "coverage": "coverage.py 7.13.4",
+    "dependency_scope": "stdlib-only HMAC path; no cryptography extra or package installation"
+  },
+  "rights_review": {
+    "reviewer": "OpenAI Codex automated factual rights preparation",
+    "reviewed_at": "2026-10-23",
+    "review_kind": "automated_factual",
+    "human_legal_approval": false,
+    "scope": "Byte-exact selected source subsets and copied evidence only; runtime rights, independent review, replay and admission remain pending.",
+    "components": [
+      {
+        "name": "HMAC source subset",
+        "license_expression": "MIT",
+        "redistribution_mode": "verbatim source subset with exact revision-local evidence",
+        "covered_paths": [
+          "vulnerable/jwt/__init__.py",
+          "vulnerable/jwt/algorithms.py",
+          "vulnerable/jwt/api_jwk.py",
+          "vulnerable/jwt/api_jws.py",
+          "vulnerable/jwt/api_jwt.py",
+          "vulnerable/jwt/exceptions.py",
+          "vulnerable/jwt/jwks_client.py",
+          "vulnerable/jwt/utils.py",
+          "fixed/jwt/__init__.py",
+          "fixed/jwt/algorithms.py",
+          "fixed/jwt/api_jwk.py",
+          "fixed/jwt/api_jws.py",
+          "fixed/jwt/api_jwt.py",
+          "fixed/jwt/exceptions.py",
+          "fixed/jwt/jwks_client.py",
+          "fixed/jwt/utils.py",
+          "evidence/source-vulnerable-LICENSE",
+          "evidence/source-fixed-LICENSE"
+        ],
+        "license_evidence_paths": [
+          "evidence/source-vulnerable-LICENSE",
+          "evidence/source-fixed-LICENSE"
+        ],
+        "notice_requirements": [
+          "Preserve the complete MIT permission/disclaimer text and José Padilla 2015-2022 copyright notice; no separate upstream NOTICE exists."
+        ]
+      }
+    ],
+    "basis": [
+      "Copied source/evidence SHA-256, byte length, Git mode, original path/blob, immutable revisions, archive identities and complete grant/notice bytes checked against reviewed preparation evidence. No case admission or legal conclusion."
+    ]
+  },
+  "preparation_limits": {
+    "source_packaging": "byte-exact selected subsets; no upstream tests, build systems, whole archives or generated source inventories copied",
+    "serialized_reference_replay": "pending; host PID exhaustion prevents fresh bounded runtime execution",
+    "preparation_probe_evidence": "Four 2x2 feasibility observations belong only to preparation reports; they are not serialized-reference or kernel receipts."
+  }
+}

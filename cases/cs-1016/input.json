@@ -1,0 +1,15 @@
+{
+  "case_id": "cs-1016",
+  "finding": {
+    "title": "Incomplete comment text reaches sanitizer output",
+    "description": "With comment preservation enabled, scrubbing authored incomplete comment text copies the incomplete comment to output instead of returning empty output.",
+    "file_path": "lib/HTML/Scrubber.pm",
+    "start_line": 449,
+    "symbol": "HTML::Scrubber::_scrub_str",
+    "cwe": "CWE-116"
+  },
+  "source": "vulnerable",
+  "commit": "2e6f767e1d5a21a6cd4afd75ca03917acf180720",
+  "fixed_source": "fixed",
+  "fixed_commit": "e1978cc37867e85c06a84a4651745235010cd6cd"
+}
