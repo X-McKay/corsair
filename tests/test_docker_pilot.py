@@ -90,7 +90,7 @@ async def test_an_import_error_in_the_probe_is_not_run_and_a_wrong_target_fails_
 
 def test_reference_submission_file_is_the_documented_shape():
     data = json.loads((CASE / "reference-submission.json").read_text())
-    assert set(data) == {"hypothesis", "build_script", "probe"}
+    assert set(data) == {"contract_version", "hypothesis", "build_script", "probe"}
 
 
 @needs_image

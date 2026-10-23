@@ -15,6 +15,8 @@ import time
 import uuid
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from . import matrix
 from .artifacts import ArtifactStore
 from .auditor import audit, build_auditor
@@ -62,7 +64,11 @@ async def _verify(args: argparse.Namespace) -> int:
         verdict = Verdict(label=Label.UNABLE_TO_RUN, rule="K2", reason="no runtime row matches the tree", fix=Fix.NOT_APPLICABLE)
         _print(_record(run_dir, case, None, verdict, (), mode="verify", extra={}))
         return 2
-    submission = Submission.model_validate_json(Path(args.submission).read_text())
+    try:
+        submission = Submission.model_validate_json(Path(args.submission).read_text())
+    except ValidationError as error:
+        print(f"invalid submission: {error}", file=sys.stderr)
+        return 2
     store = ArtifactStore(run_dir / "artifacts")
     backend = sandboxes()
     started = time.monotonic()
@@ -199,7 +205,8 @@ def main(argv: list[str] | None = None) -> int:
 
     verify = sub.add_parser("verify", help="run the kernel on a supplied submission (no producer)")
     verify.add_argument("--case", required=True, help="case directory with input.json, or a request file")
-    verify.add_argument("--submission", required=True, help="JSON file with hypothesis, build_script and probe")
+    verify.add_argument("--submission", required=True,
+                        help="v2 JSON file with contract_version, hypothesis, build_script and Boolean probe")
     verify.add_argument("--provider", help="provider config; enables the blind auditor")
     verify.add_argument("--runs", default=str(RUNS))
     verify.add_argument("--run-id")

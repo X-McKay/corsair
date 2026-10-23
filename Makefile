@@ -1,5 +1,6 @@
 PYTHON := uv run --locked python
 PROVIDER ?= config/providers.local.json
+AUDIT_PROVIDER ?=
 CASE ?= cases/path-traversal-fixture
 RUNS ?= .runs/lite
 MAX_SUBMISSIONS ?= 4
@@ -26,15 +27,15 @@ image:
 	docker build $(DOCKER_BUILD_FLAGS) -q -t corsair-lite-java:dev images/java21
 	docker build $(DOCKER_BUILD_FLAGS) -q -t corsair-lite-perl:dev images/perl
 
-# Kernel only: verify a human- or agent-written submission (no model unless PROVIDER adds the blind auditor).
+# Verify a v2 submission. Without AUDIT_PROVIDER, the evidence remains nondecisive and exits nonzero.
 verify: image
-	$(PYTHON) -m corsair.cli verify --case $(CASE) --submission $(CASE)/reference-submission.json --runs $(RUNS)
+	$(PYTHON) -m corsair.cli verify --case $(CASE) --submission $(CASE)/reference-submission.json --runs $(RUNS) $(if $(AUDIT_PROVIDER),--provider $(AUDIT_PROVIDER))
 
 investigate: image
 	$(PYTHON) -m corsair.cli investigate --case $(CASE) --provider $(PROVIDER) --max-submissions $(MAX_SUBMISSIONS) --request-limit $(REQUEST_LIMIT) --runs $(RUNS)
 
 # The release gate contains only cases reviewed for the lite verdict semantics. Historical cases remain exploratory
-# until their oracles are reviewed; this kernel intentionally does not emit LIKELY_NOT_EXPLOITABLE.
+# until their oracles and probes are reviewed against the Boolean v2 submission contract.
 RELEASE_CASES := cases/path-traversal-fixture cases/path-traversal-javascript cases/path-traversal-java cases/path-traversal-perl
 HISTORICAL_CASES := $(wildcard evals/e2e/python/v2/*-a) $(wildcard evals/e2e/python/v2/*-b)
 EVAL_CASES ?= $(RELEASE_CASES)

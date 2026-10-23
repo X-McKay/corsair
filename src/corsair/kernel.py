@@ -8,7 +8,8 @@ container from that image, on the vulnerable revision and, when the case has one
 The kernel binds the hypothesis to the reported target, guards the probe, and replays its build in a clean
 container. A clean control observation allows both payloads to run. Decisive dispositions require control PASS,
 complete target coverage for both runs, and an accepted outcome-blind audit. Exploit PASS yields K1
-LIKELY_EXPLOITABLE; a clean, invariant-held exploit FAIL yields K4 LIKELY_NOT_EXPLOITABLE. Invalid evidence
+LIKELY_EXPLOITABLE; a clean exploit FAIL yields K4 LIKELY_NOT_EXPLOITABLE, scoped to the finding, payload,
+exact revision and runtime. Invalid evidence
 is K3 INCONCLUSIVE. Application exceptions never establish a negative disposition.
 
 Each evaluated revision retains its own disposition. The top-level label mirrors the vulnerable/source revision;
@@ -34,7 +35,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from .artifacts import ArtifactRef, ArtifactStore
 from .case import Case, Frozen, Revision, SafePath
@@ -72,6 +73,8 @@ class Hypothesis(Frozen):
 
 
 class Submission(Frozen):
+    contract_version: Literal["corsair-lite/differential-probe/2"] = Field(
+        description="Required Boolean differential-probe contract version; stale submissions must be rewritten")
     hypothesis: Hypothesis
     build_script: str = Field(default="", max_length=16_000,
                               description="bash run once in a clean container with network, from the repository "
@@ -79,7 +82,16 @@ class Submission(Frozen):
     probe: str = Field(min_length=1, max_length=32_000,
                        description="One module in the selected runtime defining/exporting CONTROL_PAYLOAD, "
                                    "EXPLOIT_PAYLOAD and run_target(payload), expressing one security invariant "
-                                   "that fails only when the reported condition occurs")
+                                   "that returns Boolean true when preserved and false when the reported condition occurs")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _contract_version(cls, value):
+        if isinstance(value, dict) and value.get("contract_version") != "corsair-lite/differential-probe/2":
+            raise ValueError("contract_version must be 'corsair-lite/differential-probe/2'; rewrite the probe "
+                             "to return one payload-only Boolean invariant (true when preserved, false when the "
+                             "reported condition occurs). Stale assertion-based submissions are not translated.")
+        return value
 
     @property
     def sha256(self) -> str:

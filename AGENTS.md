@@ -6,12 +6,24 @@ design is in [README.md](README.md) and [docs/design.md](docs/design.md); the pi
 ## What the kernel guarantees, and what code may never weaken
 
 - A verdict comes only from `corsair.kernel`: deterministic gates over one probe with two payloads, run as two native
-  pytest test ids in fresh offline containers built by replaying the submitted build script. No model output is a
+  test ids in the selected runtime, in fresh offline containers built by replaying the submitted build script. No model output is a
   verdict; the blind auditor sees hypothesis and probe, never an outcome, and can only reject.
-- Polarity: `holds` means the probe's invariant held; `violated` means the probe's own assertion failed, i.e. the
-  reported condition occurred. `LIKELY_EXPLOITABLE` needs control `holds` and exploit `violated` on the vulnerable
-  revision with both runs executing the target lines. The fix is `verified` only when the fixed revision shows control
-  `holds` and exploit `holds`. Nothing else is decisive; `INCONCLUSIVE`, `UNABLE_TO_RUN` and `ERROR` are honest stops.
+- Submissions require `contract_version="corsair-lite/differential-probe/2"`; reject stale/missing versions before
+  sandbox creation. One payload-only Boolean invariant uses the same setup, target call and check for both roles;
+  it receives no role or expected answer. True means preserved and false means the reported condition occurred.
+  Control `PASS` means true; exploit `PASS` means false; exploit `FAIL` means clean true.
+- `LIKELY_EXPLOITABLE` requires both roles `PASS`. `LIKELY_NOT_EXPLOITABLE` requires control `PASS` and exploit
+  `FAIL`, and is scoped to the finding, payload, exact revision and runtime; it says nothing about other attacks.
+  Both decisive labels require accepted blind audit and exact target-line coverage from both runs. Exceptions,
+  invalid returns, missing reports, uncovered targets and infrastructure failures cannot establish a negative.
+- Each revision retains its own disposition; the top-level label describes the source revision. Fix `verified`
+  requires fixed control `PASS`, exploit `FAIL`, and the same decisive prerequisites. A removed fixed target file is
+  `INCONCLUSIVE/TARGET_REMOVED` with `not_verified`; no fixed revision is `not_applicable`.
+- Functions, methods, scripts, CLIs and Java main entry points use the same contract. Child-process execution
+  requires verified native target coverage; stdout or exit status alone cannot ground a disposition.
+- The producer stops on either decisive source label. Only a positive source with a correctable fixed-side probe
+  error may retry, preserving its source label. `verify` and `investigate` exit zero only for a decisive source label;
+  `INCONCLUSIVE`, `UNABLE_TO_RUN` and `ERROR` are nondecisive stops. Invalid submissions exit 2 before any sandbox.
 - The producer's workspace is never evidence. Everything it did is replayed from the submission in containers it
   never touched. Model-written code never runs on the host.
 - Labels and oracles (`oracle.json`) are evaluator-only and never reach a `Case`, a prompt or a tool result.

@@ -57,6 +57,31 @@ async def test_verify_exit_status_requires_a_decisive_label(tmp_path, monkeypatc
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize("version", [None, "corsair-lite/differential-probe/1"])
+async def test_verify_rejects_stale_submission_before_constructing_a_sandbox(tmp_path, monkeypatch, capsys, version):
+    data = json.loads((CASE / "reference-submission.json").read_text())
+    if version is None:
+        data.pop("contract_version", None)
+    else:
+        data["contract_version"] = version
+    path = tmp_path / "stale-submission.json"
+    path.write_text(json.dumps(data))
+
+    def forbidden_backend():
+        pytest.fail("stale submissions must be rejected before sandbox construction")
+
+    monkeypatch.setattr(cli, "sandboxes", forbidden_backend)
+    args = argparse.Namespace(case=str(CASE), submission=str(path), runs=str(tmp_path / "runs"),
+                              run_id="stale", provider=None)
+
+    assert await cli._verify(args) == 2
+    error = capsys.readouterr().err
+    assert "contract_version" in error and "corsair-lite/differential-probe/2" in error
+    assert "Boolean" in error
+    assert not (tmp_path / "runs").exists()
+
+
+@pytest.mark.anyio
 @pytest.mark.parametrize("label,exit_code", [
     ("LIKELY_EXPLOITABLE", 0),
     ("LIKELY_NOT_EXPLOITABLE", 0),

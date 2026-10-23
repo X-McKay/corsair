@@ -1,4 +1,5 @@
 {
+  "contract_version": "corsair-lite/differential-probe/2",
   "hypothesis": {
     "target_file": "Documents.pm",
     "target_symbol": "read_document",

@@ -16,6 +16,19 @@ the owner, purpose, non-goals, human-governed execution class, budgets, typed bo
 behavior, risk scenarios, records, cleanup and rollback. Runtime selection is an operator-owned, packaged matrix;
 unknown frameworks and ambiguous language selection fail closed.
 
+The current submission contract is `corsair-lite/differential-probe/2`: a required explicit version and one
+payload-only Boolean invariant, used unchanged across Python, JavaScript, Java and Perl. Missing or stale versions
+are rejected before sandbox construction. Control `PASS` means true; exploit `PASS` means false; exploit `FAIL`
+means clean true. `LIKELY_NOT_EXPLOITABLE` is scoped to the reported finding, submitted payload, exact revision and
+runtime, and makes no claim about other attacks. Both decisive source labels require accepted blind audit and exact
+target-line coverage in both roles. Exceptions, invalid returns, absent coverage and infrastructure errors remain
+nondecisive. Scripts, CLIs and Java main entry points require verified native child target coverage.
+
+Each revision retains its disposition. Fixed control `PASS` plus exploit `FAIL`, with decisive prerequisites,
+verifies the fix; target-file removal is `INCONCLUSIVE/TARGET_REMOVED` and leaves the fix `not_verified`. A source
+disposition remains observable independently of fix status. `verify` and `investigate` exit zero only for decisive
+source labels; kernel-only verification without a configured auditor remains nondecisive.
+
 ## Findings
 
 ### P1 — Docker is an image-only test boundary, not production isolation
@@ -47,9 +60,10 @@ unknown frameworks and ambiguous language selection fail closed.
 
 ### P1 — Changed agent behavior lacks current live-model evidence
 
-- **Evidence:** deterministic tests cover budgets, serialized submissions, typed output, denied skills, gate
+- **Evidence:** deterministic tests cover budgets, versioned submissions and pre-sandbox stale-version rejection,
+  typed output, denied skills, gate
   feedback and four reviewed runtime fixtures. Historical live results in [`docs/pilot.md`](pilot.md) predate the
-  four-runtime prompts and Java/Perl capabilities. A current live eval was not completed.
+  four-runtime prompts, Java/Perl capabilities and Boolean v2 probe contract. A current live eval was not completed.
 - **Observed behavior:** the release evaluator now requires exact label and fix agreement for every reviewed case,
   rejects forbidden labels and records model, provider, prompt, skill, policy, runtime and oracle hashes. It has no
   current multi-run measurements for task quality, latency, token use or cost.
@@ -83,7 +97,7 @@ unknown frameworks and ambiguous language selection fail closed.
 
 | Gate | Current evidence | Status |
 | --- | --- | --- |
-| Contract and construction | Strict Pydantic boundaries; packaged contract/matrix/skills; factory allowlists compared with the manifest | Pass |
+| Contract and construction | Strict Pydantic boundaries; required Boolean v2 submission version; stale-version rejection before sandbox construction; packaged contract/matrix/skills; factory allowlists compared with the manifest | Pass |
 | Deterministic contract/capability evals | `make test-offline`, including denied tools, budgets, malformed evidence, symlink escape and eval-gate regressions | Pass |
 | Four runtime mechanics | Reviewed vulnerable/fixed fixtures; fresh offline control/exploit containers; coverage.py, V8, JaCoCo and Devel::Cover | Pass |
 | Negative native behavior | Import/compile failures, application assertions, hidden JavaScript stacks, missing invariants, bracketed paths, ambiguous Java source identities and driver-binding tampering fail closed | Pass |
@@ -117,7 +131,9 @@ Before another readiness review:
 4. define retention, redaction, SLOs, monitoring and incident runbooks;
 5. rerun every deterministic and native hard gate on the final source and record the immutable release revision.
 
-Current deterministic snapshot on this review source: `make test-offline` passed 80 tests; `make test` passed all
-102 tests against rebuilt images; kernel-only verification returned `LIKELY_EXPLOITABLE` with `fix=verified` for all
-four reviewed reference submissions, with four cleaned-up runs and coverage artifacts per case. These results prove
-mechanics and deterministic policy. They do not replace the missing live-model or production-isolation evidence.
+The pre-v2 deterministic snapshot passed 80 offline and 102 complete-suite tests and used four reviewed reference
+submissions. Those historical kernel-only labels predate the mandatory accepted-audit gate and are not current
+contract evidence. The current deterministic suites cover Boolean role results, source/fixed dispositions,
+exception polarity, strict native reports, target coverage and stale-version rejection across all four runtimes.
+Passing deterministic checks proves mechanics and policy, while current live-model and production-isolation evidence
+remains required.

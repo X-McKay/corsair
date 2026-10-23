@@ -62,7 +62,7 @@ async def test_java_kernel_rejects_coverage_merged_across_module_source_roots(tm
                          '  static boolean check(String value) { return !value.equals("bad"); }\n}\n')
     case = Case(case_id="fixture:ambiguous-java-source", revision=revision(source), finding=Finding(
         title="reviewed Java target", file_path="safe/src/main/java/Documents.java", symbol="Documents.reviewed"))
-    submission = Submission(hypothesis=Hypothesis(
+    submission = Submission(contract_version="corsair-lite/differential-probe/2", hypothesis=Hypothesis(
         target_file="safe/src/main/java/Documents.java", target_symbol="Documents.reviewed", target_lines=(2,),
         root_cause="A helper accepts a bad value.", expected_violation="The helper returns false."),
         build_script=("mkdir -p /work/.corsair-java/classes\n"

@@ -23,6 +23,36 @@ def test_fixture_case_loads_with_both_revisions_and_keeps_the_oracle_out():
     assert "expected_label" not in case.model_dump_json()
 
 
+@pytest.mark.parametrize("language", ["fixture", "javascript", "java", "perl"])
+def test_v2_reference_submission_round_trips_without_changing_its_identity(language):
+    from corsair.kernel import Submission
+
+    data = json.loads((ROOT / f"cases/path-traversal-{language}/reference-submission.json").read_text())
+    data["contract_version"] = "corsair-lite/differential-probe/2"
+    submission = Submission.model_validate(data)
+    serialized = submission.model_dump_json()
+    restored = Submission.model_validate_json(serialized)
+
+    assert json.loads(serialized) == data
+    assert restored.model_dump_json() == serialized
+    assert restored.sha256 == submission.sha256
+
+
+@pytest.mark.parametrize("version", [None, "corsair-lite/differential-probe/1", "corsair-lite/differential-probe/3"])
+def test_stale_submission_version_has_actionable_validation(version):
+    from corsair.kernel import Submission
+
+    data = json.loads((CASE / "reference-submission.json").read_text())
+    if version is None:
+        data.pop("contract_version", None)
+    else:
+        data["contract_version"] = version
+
+    with pytest.raises(ValueError, match="corsair-lite/differential-probe/2") as error:
+        Submission.model_validate(data)
+    assert "Boolean" in str(error.value)
+
+
 def test_request_with_an_oracle_key_is_refused(tmp_path):
     (tmp_path / "src").mkdir()
     (tmp_path / "src/app.py").write_text("x = 1\n")
