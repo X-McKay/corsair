@@ -363,7 +363,7 @@ Use urllib3 `34be4a57e59eb7365bcc37d52e9f8271b5b8d0d3` to `accff72ecc2f6cf5a76d9
 
 - [ ] **Step 2: Author and spike the four independent probes**
 
-Exercise proxy-header removal, XML prototype safety, suppressed `class` introspection and `ExcelFmt` evaluation using owned sentinels. Confirm meaningful common target lines, restore prototype state in `finally`, and reject old-runtime or dependency behavior changes rather than patching source.
+Exercise proxy-header removal, XML prototype safety, suppressed `class` introspection and `ExcelFmt` evaluation using owned sentinels. Confirm a meaningful semantic seam with exact target lines recorded for each revision, restore prototype state in `finally`, and reject old-runtime or dependency behavior changes rather than patching source.
 
 - [ ] **Step 3: Replay, review and admit the batch**
 
