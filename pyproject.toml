@@ -18,8 +18,11 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "pip==25.1.1",
     "pytest==9.0.3",
     "pytest-xdist==3.8.0",
+    "setuptools==80.9.0",
+    "wheel==0.45.1",
 ]
 
 [tool.uv]
@@ -28,6 +31,7 @@ package = true
 [tool.uv.build-backend]
 # src/corsair is a namespace package (no __init__.py).
 namespace = true
+source-include = ["src/corsair/runtime-matrix.yaml", "src/corsair/skills/*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

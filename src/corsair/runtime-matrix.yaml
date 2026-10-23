@@ -1,0 +1,90 @@
+# Operator-owned policy. Framework names select native coverage, not project build commands.
+schema_version: corsair-lite/runtime-matrix/1
+rows:
+  - id: pytest-cpython312
+    language: python
+    image: corsair-lite-python:dev
+    image_source: images/python/Dockerfile
+    framework: pytest
+    detect:
+      - file: pyproject.toml
+      - file: setup.py
+      - file: setup.cfg
+      - file: requirements*.txt
+      - file: '**/*.py'
+    evidence: pilot
+    note: coverage.py; pip, uv, Poetry, setuptools and plain modules via submitted build.sh.
+  - id: java-jacoco
+    language: java
+    image: corsair-lite-java:dev
+    image_source: images/jvm/Dockerfile
+    framework: java
+    detect:
+      - file: pom.xml
+      - file: build.gradle
+      - file: build.gradle.kts
+      - file: '**/*.java'
+    evidence: pilot
+    note: JaCoCo agent/CLI; Maven, Gradle and javac layouts via submitted build.sh.
+  - id: typescript-node22
+    language: typescript
+    image: corsair-lite-node:dev
+    image_source: images/node/Dockerfile
+    framework: node
+    detect:
+      - file: tsconfig.json
+      - file: '**/*.ts'
+      - file: '**/*.tsx'
+    evidence: pilot
+    note: c8/V8 source maps; npm, Vite, tsc and tsx via submitted build.sh.
+  - id: javascript-node22
+    language: javascript
+    image: corsair-lite-node:dev
+    image_source: images/node/Dockerfile
+    framework: node
+    detect:
+      - file: package.json
+      - file: '**/*.js'
+      - file: '**/*.mjs'
+      - file: '**/*.cjs'
+    evidence: pilot
+    note: c8/V8; npm, Vite, CommonJS and ESM via submitted build.sh.
+  - id: perl-cover
+    language: perl
+    image: corsair-lite-perl:dev
+    image_source: images/perl/Dockerfile
+    framework: perl
+    detect:
+      - file: Makefile.PL
+      - file: Build.PL
+      - file: cpanfile
+      - file: '**/*.pl'
+      - file: '**/*.pm'
+    evidence: pilot
+    note: Devel::Cover; MakeMaker, Module::Build, prove and CPAN via submitted build.sh.
+  - id: ruby-simplecov
+    language: ruby
+    image: corsair-lite-ruby:dev
+    image_source: images/ruby/Dockerfile
+    framework: ruby
+    detect:
+      - file: Gemfile
+      - file: '*.gemspec'
+      - file: Rakefile
+      - file: '**/*.rb'
+    evidence: pilot
+    note: SimpleCov; Bundler, Rake, Rails and plain Ruby via submitted build.sh.
+  - id: cpp-gcov
+    language: cpp
+    image: corsair-lite-cpp:dev
+    image_source: images/cpp/Dockerfile
+    framework: cpp
+    detect:
+      - file: CMakeLists.txt
+      - file: meson.build
+      - file: '**/*.cpp'
+      - file: '**/*.cc'
+      - file: '**/*.cxx'
+      - file: '**/*.c'
+    evidence: pilot
+    note: GCC gcov JSON; CMake, Make, Ninja and Meson builds must enable --coverage; sanitizer evidence is a probe invariant.

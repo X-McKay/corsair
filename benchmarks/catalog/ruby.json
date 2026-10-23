@@ -1,0 +1,2237 @@
+{
+  "language": "ruby",
+  "sources": [
+    {
+      "name": "Ruby Advisory Database",
+      "url": "https://github.com/rubysec/ruby-advisory-db",
+      "license": "Contributor public-domain policy, with stated OSVDB-attributed-data exceptions; review LICENSE.txt before reuse",
+      "frameworks": [
+        "RubyGems libraries",
+        "CRuby",
+        "JRuby",
+        "mruby",
+        "TruffleRuby"
+      ],
+      "available_cases": "500 advisory YAML paths observed in the selected core-target inventory; this is not a total or runnable-case count",
+      "notes": "Primary concrete-ID source for this catalog. One YAML file is stored per advisory beneath gems/ or rubies/ and includes version ranges and references. Catalog candidates link to those exact paths."
+    },
+    {
+      "name": "GitHub Advisory Database / Global Security Advisories API",
+      "url": "https://github.com/github/advisory-database",
+      "license": "CC-BY-4.0",
+      "frameworks": [
+        "RubyGems ecosystem"
+      ],
+      "available_cases": "Live reviewed-advisory inventory filterable by ecosystem=rubygems; count intentionally not frozen",
+      "notes": "OSV-formatted records with affected version ranges, first patched versions when known, CWEs, references, and potentially fix-commit references. Re-query before choosing a case."
+    },
+    {
+      "name": "OSV.dev",
+      "url": "https://osv.dev/",
+      "license": "Apache-2.0 for osv.dev infrastructure; individual advisory provenance and reuse terms must be checked",
+      "frameworks": [
+        "RubyGems ecosystem"
+      ],
+      "available_cases": "Live package-version and commit-hash query service; count intentionally not frozen",
+      "notes": "Aggregates databases using the OSV format. Suitable for version/commit confirmation and dependency-environment filtering, not a claim that a candidate is runnable."
+    },
+    {
+      "name": "CVEfixes v1.0.8",
+      "url": "https://zenodo.org/records/4476563",
+      "license": "CC-BY-4.0",
+      "frameworks": [
+        "Multi-language open-source projects; Ruby subset must be queried"
+      ],
+      "available_cases": "12,107 fixing commits / 11,873 CVEs / 4,249 projects overall through 2024-07-23; Ruby partition not asserted",
+      "notes": "Patch-level relational dataset, 12.7 GB download. Use SQL filtering and independently check the language and upstream snapshot before importing any Ruby row."
+    },
+    {
+      "name": "Ruby on Rails upstream corpus",
+      "url": "https://github.com/rails/rails",
+      "license": "MIT",
+      "frameworks": [
+        "Rails",
+        "Action Pack",
+        "Active Record",
+        "Action View",
+        "Action Cable",
+        "Active Storage"
+      ],
+      "available_cases": "Project corpus only; no additional vulnerability-case count asserted",
+      "notes": "Large, modular MVC framework repository and appropriate upstream for many Ruby Advisory Database candidates."
+    },
+    {
+      "name": "Sinatra upstream corpus",
+      "url": "https://github.com/sinatra/sinatra",
+      "license": "MIT",
+      "frameworks": [
+        "Sinatra",
+        "Rack middleware"
+      ],
+      "available_cases": "Project corpus only; no additional vulnerability-case count asserted",
+      "notes": "Lightweight route/DSL framework with a Rack-based test model."
+    },
+    {
+      "name": "Hanami upstream corpus",
+      "url": "https://github.com/hanami/hanami",
+      "license": "MIT",
+      "frameworks": [
+        "Hanami",
+        "Hanami Router",
+        "Hanami Action",
+        "Hanami View",
+        "Hanami DB"
+      ],
+      "available_cases": "Project corpus only; no additional vulnerability-case count asserted",
+      "notes": "Full-stack framework assembled from smaller Rack-compatible components; includes unit and integration test commands."
+    },
+    {
+      "name": "Grape upstream corpus",
+      "url": "https://github.com/ruby-grape/grape",
+      "license": "MIT",
+      "frameworks": [
+        "Grape REST-like APIs"
+      ],
+      "available_cases": "Project corpus only; no additional vulnerability-case count asserted",
+      "notes": "API-framework corpus with an RSpec suite and SimpleCov configuration."
+    },
+    {
+      "name": "Roda upstream corpus",
+      "url": "https://github.com/jeremyevans/roda",
+      "license": "MIT",
+      "frameworks": [
+        "Roda routing tree toolkit"
+      ],
+      "available_cases": "Project corpus only; no additional vulnerability-case count asserted",
+      "notes": "Small Rack-oriented routing framework whose upstream suite uses minitest/spec."
+    },
+    {
+      "name": "Padrino upstream corpus",
+      "url": "https://github.com/padrino/padrino-framework",
+      "license": "MIT",
+      "frameworks": [
+        "Padrino",
+        "Sinatra-based full-stack applications"
+      ],
+      "available_cases": "Project corpus only; no additional vulnerability-case count asserted",
+      "notes": "Sinatra-derived full-stack framework with modular components."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "rubysec:gems/actionpack/CVE-2011-0446",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2011-0446.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2011-0449",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2011-0449.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2012-1099",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2012-1099.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2013-0156",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2013-0156.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2013-6414",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2013-6414.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2013-6415",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2013-6415.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2013-6416",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2013-6416.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2013-6417",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2013-6417.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2014-0130",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2014-0130.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2015-7576",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2015-7576.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2016-0751",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2016-0751.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2020-8164",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2020-8164.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2020-8166",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2020-8166.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2021-22881",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2021-22881.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2021-22885",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2021-22885.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2021-22902",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2021-22902.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2021-22903",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2021-22903.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2021-22904",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2021-22904.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2021-22942",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2021-22942.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2022-22577",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2022-22577.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2022-23633",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2022-23633.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2023-22792",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2023-22792.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2023-22795",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2023-22795.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2023-22797",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2023-22797.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2023-28362",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2023-28362.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2024-26142",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2024-26142.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2024-26143",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2024-26143.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2024-28103",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2024-28103.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2024-41128",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2024-41128.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionpack/CVE-2024-47887",
+      "project": "Action Pack (actionpack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionpack/CVE-2024-47887.yml",
+      "framework": "Rails / Action Pack",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/activerecord/CVE-2008-4094",
+      "project": "Active Record (activerecord gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/activerecord/CVE-2008-4094.yml",
+      "framework": "Rails / Active Record",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/activerecord/CVE-2010-3933",
+      "project": "Active Record (activerecord gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/activerecord/CVE-2010-3933.yml",
+      "framework": "Rails / Active Record",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/activerecord/CVE-2011-0448",
+      "project": "Active Record (activerecord gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/activerecord/CVE-2011-0448.yml",
+      "framework": "Rails / Active Record",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/activerecord/CVE-2011-2930",
+      "project": "Active Record (activerecord gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/activerecord/CVE-2011-2930.yml",
+      "framework": "Rails / Active Record",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/activerecord/CVE-2012-2660",
+      "project": "Active Record (activerecord gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/activerecord/CVE-2012-2660.yml",
+      "framework": "Rails / Active Record",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/activerecord/CVE-2012-2661",
+      "project": "Active Record (activerecord gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/activerecord/CVE-2012-2661.yml",
+      "framework": "Rails / Active Record",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/activerecord/CVE-2012-2695",
+      "project": "Active Record (activerecord gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/activerecord/CVE-2012-2695.yml",
+      "framework": "Rails / Active Record",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/activerecord/CVE-2012-6496",
+      "project": "Active Record (activerecord gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/activerecord/CVE-2012-6496.yml",
+      "framework": "Rails / Active Record",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/activerecord/CVE-2013-0155",
+      "project": "Active Record (activerecord gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/activerecord/CVE-2013-0155.yml",
+      "framework": "Rails / Active Record",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/activerecord/CVE-2013-0276",
+      "project": "Active Record (activerecord gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/activerecord/CVE-2013-0276.yml",
+      "framework": "Rails / Active Record",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/activerecord/CVE-2013-0277",
+      "project": "Active Record (activerecord gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/activerecord/CVE-2013-0277.yml",
+      "framework": "Rails / Active Record",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/activerecord/CVE-2013-1854",
+      "project": "Active Record (activerecord gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/activerecord/CVE-2013-1854.yml",
+      "framework": "Rails / Active Record",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/activerecord/CVE-2013-3221",
+      "project": "Active Record (activerecord gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/activerecord/CVE-2013-3221.yml",
+      "framework": "Rails / Active Record",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/activerecord/CVE-2014-0080",
+      "project": "Active Record (activerecord gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/activerecord/CVE-2014-0080.yml",
+      "framework": "Rails / Active Record",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/activerecord/CVE-2014-3482",
+      "project": "Active Record (activerecord gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/activerecord/CVE-2014-3482.yml",
+      "framework": "Rails / Active Record",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/activerecord/CVE-2014-3483",
+      "project": "Active Record (activerecord gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/activerecord/CVE-2014-3483.yml",
+      "framework": "Rails / Active Record",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/activerecord/CVE-2014-3514",
+      "project": "Active Record (activerecord gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/activerecord/CVE-2014-3514.yml",
+      "framework": "Rails / Active Record",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/activerecord/CVE-2015-7577",
+      "project": "Active Record (activerecord gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/activerecord/CVE-2015-7577.yml",
+      "framework": "Rails / Active Record",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/activerecord/CVE-2016-6317",
+      "project": "Active Record (activerecord gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/activerecord/CVE-2016-6317.yml",
+      "framework": "Rails / Active Record",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/activerecord/CVE-2021-22880",
+      "project": "Active Record (activerecord gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/activerecord/CVE-2021-22880.yml",
+      "framework": "Rails / Active Record",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/activerecord/CVE-2022-32224",
+      "project": "Active Record (activerecord gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/activerecord/CVE-2022-32224.yml",
+      "framework": "Rails / Active Record",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/activerecord/CVE-2022-44566",
+      "project": "Active Record (activerecord gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/activerecord/CVE-2022-44566.yml",
+      "framework": "Rails / Active Record",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/activerecord/CVE-2023-22794",
+      "project": "Active Record (activerecord gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/activerecord/CVE-2023-22794.yml",
+      "framework": "Rails / Active Record",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionview/CVE-2019-5418",
+      "project": "Action View (actionview gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionview/CVE-2019-5418.yml",
+      "framework": "Rails / Action View",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionview/CVE-2019-5419",
+      "project": "Action View (actionview gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionview/CVE-2019-5419.yml",
+      "framework": "Rails / Action View",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionview/CVE-2020-15169",
+      "project": "Action View (actionview gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionview/CVE-2020-15169.yml",
+      "framework": "Rails / Action View",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionview/CVE-2020-5267",
+      "project": "Action View (actionview gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionview/CVE-2020-5267.yml",
+      "framework": "Rails / Action View",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionview/CVE-2020-8163",
+      "project": "Action View (actionview gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionview/CVE-2020-8163.yml",
+      "framework": "Rails / Action View",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionview/CVE-2020-8167",
+      "project": "Action View (actionview gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionview/CVE-2020-8167.yml",
+      "framework": "Rails / Action View",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionview/CVE-2022-27777",
+      "project": "Action View (actionview gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionview/CVE-2022-27777.yml",
+      "framework": "Rails / Action View",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/actionview/CVE-2023-23913",
+      "project": "Action View (actionview gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/actionview/CVE-2023-23913.yml",
+      "framework": "Rails / Action View",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rack/CVE-2011-5036",
+      "project": "Rack (rack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rack/CVE-2011-5036.yml",
+      "framework": "Rack HTTP interface / middleware",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rack/CVE-2012-6109",
+      "project": "Rack (rack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rack/CVE-2012-6109.yml",
+      "framework": "Rack HTTP interface / middleware",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rack/CVE-2013-0183",
+      "project": "Rack (rack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rack/CVE-2013-0183.yml",
+      "framework": "Rack HTTP interface / middleware",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rack/CVE-2013-0184",
+      "project": "Rack (rack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rack/CVE-2013-0184.yml",
+      "framework": "Rack HTTP interface / middleware",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rack/CVE-2013-0262",
+      "project": "Rack (rack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rack/CVE-2013-0262.yml",
+      "framework": "Rack HTTP interface / middleware",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rack/CVE-2013-0263",
+      "project": "Rack (rack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rack/CVE-2013-0263.yml",
+      "framework": "Rack HTTP interface / middleware",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rack/CVE-2015-3225",
+      "project": "Rack (rack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rack/CVE-2015-3225.yml",
+      "framework": "Rack HTTP interface / middleware",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rack/CVE-2018-16470",
+      "project": "Rack (rack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rack/CVE-2018-16470.yml",
+      "framework": "Rack HTTP interface / middleware",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rack/CVE-2018-16471",
+      "project": "Rack (rack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rack/CVE-2018-16471.yml",
+      "framework": "Rack HTTP interface / middleware",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rack/CVE-2019-16782",
+      "project": "Rack (rack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rack/CVE-2019-16782.yml",
+      "framework": "Rack HTTP interface / middleware",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rack/CVE-2020-8161",
+      "project": "Rack (rack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rack/CVE-2020-8161.yml",
+      "framework": "Rack HTTP interface / middleware",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rack/CVE-2020-8184",
+      "project": "Rack (rack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rack/CVE-2020-8184.yml",
+      "framework": "Rack HTTP interface / middleware",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rack/CVE-2022-30122",
+      "project": "Rack (rack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rack/CVE-2022-30122.yml",
+      "framework": "Rack HTTP interface / middleware",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rack/CVE-2022-30123",
+      "project": "Rack (rack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rack/CVE-2022-30123.yml",
+      "framework": "Rack HTTP interface / middleware",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rack/CVE-2022-44570",
+      "project": "Rack (rack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rack/CVE-2022-44570.yml",
+      "framework": "Rack HTTP interface / middleware",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rack/CVE-2022-44571",
+      "project": "Rack (rack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rack/CVE-2022-44571.yml",
+      "framework": "Rack HTTP interface / middleware",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rack/CVE-2022-44572",
+      "project": "Rack (rack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rack/CVE-2022-44572.yml",
+      "framework": "Rack HTTP interface / middleware",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rack/CVE-2023-27530",
+      "project": "Rack (rack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rack/CVE-2023-27530.yml",
+      "framework": "Rack HTTP interface / middleware",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rack/CVE-2023-27539",
+      "project": "Rack (rack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rack/CVE-2023-27539.yml",
+      "framework": "Rack HTTP interface / middleware",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rack/CVE-2024-25126",
+      "project": "Rack (rack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rack/CVE-2024-25126.yml",
+      "framework": "Rack HTTP interface / middleware",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rack/CVE-2024-26141",
+      "project": "Rack (rack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rack/CVE-2024-26141.yml",
+      "framework": "Rack HTTP interface / middleware",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rack/CVE-2024-26146",
+      "project": "Rack (rack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rack/CVE-2024-26146.yml",
+      "framework": "Rack HTTP interface / middleware",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rack/CVE-2024-39316",
+      "project": "Rack (rack gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rack/CVE-2024-39316.yml",
+      "framework": "Rack HTTP interface / middleware",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2012-6685",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2012-6685.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2013-6460",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2013-6460.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2013-6461",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2013-6461.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2015-1819",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2015-1819.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2015-5312",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2015-5312.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2015-7499",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2015-7499.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2015-8806",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2015-8806.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2016-4658",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2016-4658.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2017-15412",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2017-15412.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2017-16932",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2017-16932.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2017-18258",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2017-18258.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2017-5029",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2017-5029.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2017-9050",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2017-9050.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2018-14404",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2018-14404.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2018-25032",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2018-25032.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2018-8048",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2018-8048.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2019-11068",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2019-11068.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2019-13117",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2019-13117.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2019-13118",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2019-13118.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2019-18197",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2019-18197.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2019-5477",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2019-5477.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2019-5815",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2019-5815.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2020-26247",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2020-26247.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2020-7595",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2020-7595.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2021-30560",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2021-30560.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2021-3517",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2021-3517.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2021-3518",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2021-3518.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2021-3537",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2021-3537.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2021-41098",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2021-41098.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2022-23437",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2022-23437.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2022-23476",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2022-23476.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2022-24836",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2022-24836.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2022-24839",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2022-24839.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/nokogiri/CVE-2022-29181",
+      "project": "Nokogiri (nokogiri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/nokogiri/CVE-2022-29181.yml",
+      "framework": "HTML/XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/loofah/CVE-2018-16468",
+      "project": "Loofah (loofah gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/loofah/CVE-2018-16468.yml",
+      "framework": "Rails HTML sanitization",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/loofah/CVE-2018-8048",
+      "project": "Loofah (loofah gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/loofah/CVE-2018-8048.yml",
+      "framework": "Rails HTML sanitization",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/loofah/CVE-2019-15587",
+      "project": "Loofah (loofah gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/loofah/CVE-2019-15587.yml",
+      "framework": "Rails HTML sanitization",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/loofah/CVE-2022-23514",
+      "project": "Loofah (loofah gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/loofah/CVE-2022-23514.yml",
+      "framework": "Rails HTML sanitization",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/loofah/CVE-2022-23515",
+      "project": "Loofah (loofah gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/loofah/CVE-2022-23515.yml",
+      "framework": "Rails HTML sanitization",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/loofah/CVE-2022-23516",
+      "project": "Loofah (loofah gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/loofah/CVE-2022-23516.yml",
+      "framework": "Rails HTML sanitization",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/sanitize/CVE-2018-3740",
+      "project": "Sanitize (sanitize gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/sanitize/CVE-2018-3740.yml",
+      "framework": "HTML sanitization",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/sanitize/CVE-2020-4054",
+      "project": "Sanitize (sanitize gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/sanitize/CVE-2020-4054.yml",
+      "framework": "HTML sanitization",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/sanitize/CVE-2023-23627",
+      "project": "Sanitize (sanitize gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/sanitize/CVE-2023-23627.yml",
+      "framework": "HTML sanitization",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/sanitize/CVE-2023-36823",
+      "project": "Sanitize (sanitize gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/sanitize/CVE-2023-36823.yml",
+      "framework": "HTML sanitization",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/devise/CVE-2013-0233",
+      "project": "Devise (devise gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/devise/CVE-2013-0233.yml",
+      "framework": "Rails authentication",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/devise/CVE-2015-8314",
+      "project": "Devise (devise gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/devise/CVE-2015-8314.yml",
+      "framework": "Rails authentication",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/devise/CVE-2019-16109",
+      "project": "Devise (devise gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/devise/CVE-2019-16109.yml",
+      "framework": "Rails authentication",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/devise/CVE-2019-5421",
+      "project": "Devise (devise gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/devise/CVE-2019-5421.yml",
+      "framework": "Rails authentication",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/omniauth/CVE-2015-9284",
+      "project": "OmniAuth (omniauth gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/omniauth/CVE-2015-9284.yml",
+      "framework": "Rack/Rails authentication",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/omniauth/CVE-2017-18076",
+      "project": "OmniAuth (omniauth gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/omniauth/CVE-2017-18076.yml",
+      "framework": "Rack/Rails authentication",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/omniauth/CVE-2020-36599",
+      "project": "OmniAuth (omniauth gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/omniauth/CVE-2020-36599.yml",
+      "framework": "Rack/Rails authentication",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/doorkeeper/CVE-2014-8144",
+      "project": "Doorkeeper (doorkeeper gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/doorkeeper/CVE-2014-8144.yml",
+      "framework": "OAuth provider",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/doorkeeper/CVE-2016-6582",
+      "project": "Doorkeeper (doorkeeper gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/doorkeeper/CVE-2016-6582.yml",
+      "framework": "OAuth provider",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/doorkeeper/CVE-2018-1000088",
+      "project": "Doorkeeper (doorkeeper gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/doorkeeper/CVE-2018-1000088.yml",
+      "framework": "OAuth provider",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/doorkeeper/CVE-2018-1000211",
+      "project": "Doorkeeper (doorkeeper gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/doorkeeper/CVE-2018-1000211.yml",
+      "framework": "OAuth provider",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/doorkeeper/CVE-2020-10187",
+      "project": "Doorkeeper (doorkeeper gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/doorkeeper/CVE-2020-10187.yml",
+      "framework": "OAuth provider",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/doorkeeper/CVE-2023-34246",
+      "project": "Doorkeeper (doorkeeper gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/doorkeeper/CVE-2023-34246.yml",
+      "framework": "OAuth provider",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/puma/CVE-2019-16770",
+      "project": "Puma (puma gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/puma/CVE-2019-16770.yml",
+      "framework": "Ruby/Rack web server",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/puma/CVE-2020-11076",
+      "project": "Puma (puma gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/puma/CVE-2020-11076.yml",
+      "framework": "Ruby/Rack web server",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/puma/CVE-2020-11077",
+      "project": "Puma (puma gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/puma/CVE-2020-11077.yml",
+      "framework": "Ruby/Rack web server",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/puma/CVE-2020-5247",
+      "project": "Puma (puma gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/puma/CVE-2020-5247.yml",
+      "framework": "Ruby/Rack web server",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/puma/CVE-2020-5249",
+      "project": "Puma (puma gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/puma/CVE-2020-5249.yml",
+      "framework": "Ruby/Rack web server",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/puma/CVE-2021-29509",
+      "project": "Puma (puma gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/puma/CVE-2021-29509.yml",
+      "framework": "Ruby/Rack web server",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/puma/CVE-2021-41136",
+      "project": "Puma (puma gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/puma/CVE-2021-41136.yml",
+      "framework": "Ruby/Rack web server",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/puma/CVE-2022-23634",
+      "project": "Puma (puma gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/puma/CVE-2022-23634.yml",
+      "framework": "Ruby/Rack web server",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/puma/CVE-2022-24790",
+      "project": "Puma (puma gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/puma/CVE-2022-24790.yml",
+      "framework": "Ruby/Rack web server",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/puma/CVE-2023-40175",
+      "project": "Puma (puma gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/puma/CVE-2023-40175.yml",
+      "framework": "Ruby/Rack web server",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/puma/CVE-2024-21647",
+      "project": "Puma (puma gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/puma/CVE-2024-21647.yml",
+      "framework": "Ruby/Rack web server",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/puma/CVE-2024-45614",
+      "project": "Puma (puma gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/puma/CVE-2024-45614.yml",
+      "framework": "Ruby/Rack web server",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/sinatra/CVE-2018-11627",
+      "project": "Sinatra (sinatra gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/sinatra/CVE-2018-11627.yml",
+      "framework": "Sinatra / Rack web application",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/sinatra/CVE-2018-7212",
+      "project": "Sinatra (sinatra gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/sinatra/CVE-2018-7212.yml",
+      "framework": "Sinatra / Rack web application",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/sinatra/CVE-2022-29970",
+      "project": "Sinatra (sinatra gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/sinatra/CVE-2022-29970.yml",
+      "framework": "Sinatra / Rack web application",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/sinatra/CVE-2022-45442",
+      "project": "Sinatra (sinatra gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/sinatra/CVE-2022-45442.yml",
+      "framework": "Sinatra / Rack web application",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/sinatra/CVE-2024-21510",
+      "project": "Sinatra (sinatra gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/sinatra/CVE-2024-21510.yml",
+      "framework": "Sinatra / Rack web application",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/sidekiq/CVE-2021-30151",
+      "project": "Sidekiq (sidekiq gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/sidekiq/CVE-2021-30151.yml",
+      "framework": "Background job processing",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/sidekiq/CVE-2022-23837",
+      "project": "Sidekiq (sidekiq gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/sidekiq/CVE-2022-23837.yml",
+      "framework": "Background job processing",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/sidekiq/CVE-2023-1892",
+      "project": "Sidekiq (sidekiq gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/sidekiq/CVE-2023-1892.yml",
+      "framework": "Background job processing",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/sidekiq/CVE-2023-26141",
+      "project": "Sidekiq (sidekiq gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/sidekiq/CVE-2023-26141.yml",
+      "framework": "Background job processing",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/sidekiq/CVE-2024-32887",
+      "project": "Sidekiq (sidekiq gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/sidekiq/CVE-2024-32887.yml",
+      "framework": "Background job processing",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/resque/CVE-2023-50724",
+      "project": "Resque (resque gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/resque/CVE-2023-50724.yml",
+      "framework": "Redis-backed background jobs",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/resque/CVE-2023-50725",
+      "project": "Resque (resque gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/resque/CVE-2023-50725.yml",
+      "framework": "Redis-backed background jobs",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/resque/CVE-2023-50727",
+      "project": "Resque (resque gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/resque/CVE-2023-50727.yml",
+      "framework": "Redis-backed background jobs",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/spree/CVE-2008-7310",
+      "project": "Spree (spree gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/spree/CVE-2008-7310.yml",
+      "framework": "Rails commerce",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/spree/CVE-2008-7311",
+      "project": "Spree (spree gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/spree/CVE-2008-7311.yml",
+      "framework": "Rails commerce",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/spree/CVE-2010-3978",
+      "project": "Spree (spree gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/spree/CVE-2010-3978.yml",
+      "framework": "Rails commerce",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/spree/CVE-2011-10019",
+      "project": "Spree (spree gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/spree/CVE-2011-10019.yml",
+      "framework": "Rails commerce",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/spree/CVE-2011-10026",
+      "project": "Spree (spree gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/spree/CVE-2011-10026.yml",
+      "framework": "Rails commerce",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/spree/CVE-2013-1656",
+      "project": "Spree (spree gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/spree/CVE-2013-1656.yml",
+      "framework": "Rails commerce",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/spree/CVE-2020-15269",
+      "project": "Spree (spree gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/spree/CVE-2020-15269.yml",
+      "framework": "Rails commerce",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/carrierwave/CVE-2021-21288",
+      "project": "CarrierWave (carrierwave gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/carrierwave/CVE-2021-21288.yml",
+      "framework": "Rails file upload",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/carrierwave/CVE-2021-21305",
+      "project": "CarrierWave (carrierwave gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/carrierwave/CVE-2021-21305.yml",
+      "framework": "Rails file upload",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/carrierwave/CVE-2023-49090",
+      "project": "CarrierWave (carrierwave gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/carrierwave/CVE-2023-49090.yml",
+      "framework": "Rails file upload",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/carrierwave/CVE-2024-29034",
+      "project": "CarrierWave (carrierwave gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/carrierwave/CVE-2024-29034.yml",
+      "framework": "Rails file upload",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/paperclip/CVE-2015-2963",
+      "project": "Paperclip (paperclip gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/paperclip/CVE-2015-2963.yml",
+      "framework": "Rails file attachment",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/paperclip/CVE-2017-0889",
+      "project": "Paperclip (paperclip gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/paperclip/CVE-2017-0889.yml",
+      "framework": "Rails file attachment",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/ruby/CVE-2017-10784",
+      "project": "Ruby / CRuby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/ruby/CVE-2017-10784.yml",
+      "framework": "Ruby language runtime / standard library",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/ruby/CVE-2017-14033",
+      "project": "Ruby / CRuby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/ruby/CVE-2017-14033.yml",
+      "framework": "Ruby language runtime / standard library",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/ruby/CVE-2018-16395",
+      "project": "Ruby / CRuby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/ruby/CVE-2018-16395.yml",
+      "framework": "Ruby language runtime / standard library",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/ruby/CVE-2019-15845",
+      "project": "Ruby / CRuby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/ruby/CVE-2019-15845.yml",
+      "framework": "Ruby language runtime / standard library",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/ruby/CVE-2020-10663",
+      "project": "Ruby / CRuby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/ruby/CVE-2020-10663.yml",
+      "framework": "Ruby language runtime / standard library",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/ruby/CVE-2021-31810",
+      "project": "Ruby / CRuby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/ruby/CVE-2021-31810.yml",
+      "framework": "Ruby language runtime / standard library",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/ruby/CVE-2022-28738",
+      "project": "Ruby / CRuby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/ruby/CVE-2022-28738.yml",
+      "framework": "Ruby language runtime / standard library",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/ruby/CVE-2022-28739",
+      "project": "Ruby / CRuby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/ruby/CVE-2022-28739.yml",
+      "framework": "Ruby language runtime / standard library",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/ruby/CVE-2024-27282",
+      "project": "Ruby / CRuby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/ruby/CVE-2024-27282.yml",
+      "framework": "Ruby language runtime / standard library",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/mruby/CVE-2017-0898",
+      "project": "mruby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/mruby/CVE-2017-0898.yml",
+      "framework": "Embedded Ruby runtime",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/mruby/CVE-2017-9527",
+      "project": "mruby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/mruby/CVE-2017-9527.yml",
+      "framework": "Embedded Ruby runtime",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/mruby/CVE-2018-10191",
+      "project": "mruby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/mruby/CVE-2018-10191.yml",
+      "framework": "Embedded Ruby runtime",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/mruby/CVE-2018-10199",
+      "project": "mruby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/mruby/CVE-2018-10199.yml",
+      "framework": "Embedded Ruby runtime",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/mruby/CVE-2018-11743",
+      "project": "mruby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/mruby/CVE-2018-11743.yml",
+      "framework": "Embedded Ruby runtime",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/mruby/CVE-2018-12247",
+      "project": "mruby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/mruby/CVE-2018-12247.yml",
+      "framework": "Embedded Ruby runtime",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/mruby/CVE-2018-12248",
+      "project": "mruby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/mruby/CVE-2018-12248.yml",
+      "framework": "Embedded Ruby runtime",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/mruby/CVE-2018-12249",
+      "project": "mruby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/mruby/CVE-2018-12249.yml",
+      "framework": "Embedded Ruby runtime",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/mruby/CVE-2018-14337",
+      "project": "mruby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/mruby/CVE-2018-14337.yml",
+      "framework": "Embedded Ruby runtime",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/mruby/CVE-2020-15866",
+      "project": "mruby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/mruby/CVE-2020-15866.yml",
+      "framework": "Embedded Ruby runtime",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/jruby/CVE-2010-1330",
+      "project": "JRuby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/jruby/CVE-2010-1330.yml",
+      "framework": "Ruby on the JVM",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/jruby/CVE-2011-4838",
+      "project": "JRuby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/jruby/CVE-2011-4838.yml",
+      "framework": "Ruby on the JVM",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/jruby/CVE-2012-5370",
+      "project": "JRuby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/jruby/CVE-2012-5370.yml",
+      "framework": "Ruby on the JVM",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/jruby/CVE-2017-17742",
+      "project": "JRuby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/jruby/CVE-2017-17742.yml",
+      "framework": "Ruby on the JVM",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/jruby/CVE-2018-8778",
+      "project": "JRuby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/jruby/CVE-2018-8778.yml",
+      "framework": "Ruby on the JVM",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/jruby/CVE-2019-16254",
+      "project": "JRuby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/jruby/CVE-2019-16254.yml",
+      "framework": "Ruby on the JVM",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/jruby/CVE-2021-31810",
+      "project": "JRuby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/jruby/CVE-2021-31810.yml",
+      "framework": "Ruby on the JVM",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:rubies/jruby/CVE-2022-25857",
+      "project": "JRuby implementation",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/rubies/jruby/CVE-2022-25857.yml",
+      "framework": "Ruby on the JVM",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rexml/CVE-2021-28965",
+      "project": "REXML (rexml gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rexml/CVE-2021-28965.yml",
+      "framework": "Ruby XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rexml/CVE-2024-35176",
+      "project": "REXML (rexml gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rexml/CVE-2024-35176.yml",
+      "framework": "Ruby XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rexml/CVE-2024-39908",
+      "project": "REXML (rexml gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rexml/CVE-2024-39908.yml",
+      "framework": "Ruby XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rexml/CVE-2024-41123",
+      "project": "REXML (rexml gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rexml/CVE-2024-41123.yml",
+      "framework": "Ruby XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rexml/CVE-2024-41946",
+      "project": "REXML (rexml gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rexml/CVE-2024-41946.yml",
+      "framework": "Ruby XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rexml/CVE-2024-43398",
+      "project": "REXML (rexml gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rexml/CVE-2024-43398.yml",
+      "framework": "Ruby XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rexml/CVE-2024-49761",
+      "project": "REXML (rexml gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rexml/CVE-2024-49761.yml",
+      "framework": "Ruby XML parser",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rubyzip/CVE-2017-5946",
+      "project": "rubyzip (rubyzip gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rubyzip/CVE-2017-5946.yml",
+      "framework": "Archive extraction / ZIP handling",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rubyzip/CVE-2018-1000544",
+      "project": "rubyzip (rubyzip gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rubyzip/CVE-2018-1000544.yml",
+      "framework": "Archive extraction / ZIP handling",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/rubyzip/CVE-2019-16892",
+      "project": "rubyzip (rubyzip gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/rubyzip/CVE-2019-16892.yml",
+      "framework": "Archive extraction / ZIP handling",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/uri/CVE-2023-28755",
+      "project": "URI (uri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/uri/CVE-2023-28755.yml",
+      "framework": "Ruby standard-library URI handling",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/uri/CVE-2023-36617",
+      "project": "URI (uri gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/uri/CVE-2023-36617.yml",
+      "framework": "Ruby standard-library URI handling",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/json/CVE-2013-0269",
+      "project": "JSON (json gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/json/CVE-2013-0269.yml",
+      "framework": "Ruby JSON parser/generator",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "rubysec:gems/json/CVE-2020-10663",
+      "project": "JSON (json gem)",
+      "url": "https://github.com/rubysec/ruby-advisory-db/blob/master/gems/json/CVE-2020-10663.yml",
+      "framework": "Ruby JSON parser/generator",
+      "kind": "advisory-backed vulnerability candidate",
+      "validation_status": "candidate",
+      "notes": "Exact Ruby Advisory Database inventory path. The advisory is a lead only: pin an affected release and dependency graph, locate upstream provenance, then reproduce a safe differential oracle. No clone, install, exploit, patch, or test outcome was executed for this catalog."
+    },
+    {
+      "id": "project:rails",
+      "project": "Ruby on Rails upstream",
+      "url": "https://github.com/rails/rails",
+      "framework": "Rails MVC and modular framework",
+      "kind": "project corpus candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Repository diversity lead only. This entry deliberately asserts no vulnerability, vulnerable revision, patch, or test outcome."
+    },
+    {
+      "id": "project:sinatra",
+      "project": "Sinatra upstream",
+      "url": "https://github.com/sinatra/sinatra",
+      "framework": "Sinatra / Rack DSL",
+      "kind": "project corpus candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Repository diversity lead only. This entry deliberately asserts no vulnerability, vulnerable revision, patch, or test outcome."
+    },
+    {
+      "id": "project:hanami",
+      "project": "Hanami upstream",
+      "url": "https://github.com/hanami/hanami",
+      "framework": "Hanami full-stack framework",
+      "kind": "project corpus candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Repository diversity lead only. This entry deliberately asserts no vulnerability, vulnerable revision, patch, or test outcome."
+    },
+    {
+      "id": "project:grape",
+      "project": "Grape upstream",
+      "url": "https://github.com/ruby-grape/grape",
+      "framework": "Grape REST-like API framework",
+      "kind": "project corpus candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Repository diversity lead only. This entry deliberately asserts no vulnerability, vulnerable revision, patch, or test outcome."
+    },
+    {
+      "id": "project:roda",
+      "project": "Roda upstream",
+      "url": "https://github.com/jeremyevans/roda",
+      "framework": "Roda routing-tree toolkit",
+      "kind": "project corpus candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Repository diversity lead only. This entry deliberately asserts no vulnerability, vulnerable revision, patch, or test outcome."
+    },
+    {
+      "id": "project:padrino",
+      "project": "Padrino upstream",
+      "url": "https://github.com/padrino/padrino-framework",
+      "framework": "Padrino Sinatra-based framework",
+      "kind": "project corpus candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Repository diversity lead only. This entry deliberately asserts no vulnerability, vulnerable revision, patch, or test outcome."
+    },
+    {
+      "id": "project:rack",
+      "project": "Rack upstream",
+      "url": "https://github.com/rack/rack",
+      "framework": "Rack HTTP interface / middleware",
+      "kind": "project corpus candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Repository diversity lead only. This entry deliberately asserts no vulnerability, vulnerable revision, patch, or test outcome."
+    },
+    {
+      "id": "project:puma",
+      "project": "Puma upstream",
+      "url": "https://github.com/puma/puma",
+      "framework": "Ruby/Rack web server",
+      "kind": "project corpus candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Repository diversity lead only. This entry deliberately asserts no vulnerability, vulnerable revision, patch, or test outcome."
+    },
+    {
+      "id": "project:sidekiq",
+      "project": "Sidekiq upstream",
+      "url": "https://github.com/sidekiq/sidekiq",
+      "framework": "Background jobs",
+      "kind": "project corpus candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Repository diversity lead only. This entry deliberately asserts no vulnerability, vulnerable revision, patch, or test outcome."
+    },
+    {
+      "id": "project:discourse",
+      "project": "Discourse upstream",
+      "url": "https://github.com/discourse/discourse",
+      "framework": "Rails community platform",
+      "kind": "project corpus candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Repository diversity lead only. This entry deliberately asserts no vulnerability, vulnerable revision, patch, or test outcome."
+    },
+    {
+      "id": "project:spree",
+      "project": "Spree upstream",
+      "url": "https://github.com/spree/spree",
+      "framework": "Rails commerce platform",
+      "kind": "project corpus candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Repository diversity lead only. This entry deliberately asserts no vulnerability, vulnerable revision, patch, or test outcome."
+    },
+    {
+      "id": "project:decidim",
+      "project": "Decidim upstream",
+      "url": "https://github.com/decidim/decidim",
+      "framework": "Rails participatory-democracy platform",
+      "kind": "project corpus candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Repository diversity lead only. This entry deliberately asserts no vulnerability, vulnerable revision, patch, or test outcome."
+    },
+    {
+      "id": "project:forem",
+      "project": "Forem upstream",
+      "url": "https://github.com/forem/forem",
+      "framework": "Rails publishing/community platform",
+      "kind": "project corpus candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Repository diversity lead only. This entry deliberately asserts no vulnerability, vulnerable revision, patch, or test outcome."
+    },
+    {
+      "id": "project:redmine",
+      "project": "Redmine upstream mirror",
+      "url": "https://github.com/redmine/redmine",
+      "framework": "Ruby project-management application",
+      "kind": "project corpus candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Repository diversity lead only. This entry deliberately asserts no vulnerability, vulnerable revision, patch, or test outcome."
+    },
+    {
+      "id": "project:chatwoot",
+      "project": "Chatwoot upstream",
+      "url": "https://github.com/chatwoot/chatwoot",
+      "framework": "Rails customer-support application",
+      "kind": "project corpus candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Repository diversity lead only. This entry deliberately asserts no vulnerability, vulnerable revision, patch, or test outcome."
+    }
+  ]
+}

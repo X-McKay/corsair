@@ -17,7 +17,7 @@ from collections import Counter
 from pathlib import Path
 
 from . import matrix
-from .artifacts import ArtifactStore
+from .artifacts import ArtifactStore, write_json
 from .auditor import audit, build_auditor
 from .case import Case, load_case, load_oracle
 from .kernel import (Evaluation, Fix, Kernel, Label, Submission, Verdict, negative_verdict, reported_target_present,
@@ -42,14 +42,25 @@ LITE_CONTRACT: dict[str, tuple[frozenset[str] | None, str]] = {
 
 def _record(run_dir: Path, case: Case, row: matrix.Row | None, verdict: Verdict, evaluations: tuple[Evaluation, ...],
             *, mode: str, extra: dict) -> dict:
+    from .auditor import INSTRUCTIONS as AUDIT_INSTRUCTIONS
+    from .producer import INSTRUCTIONS, SKILLS_DIR
+    manifest = {"schema": "corsair-lite/manifest/1", "contract": case.contract,
+                "runtime": row.model_dump(mode="json") if row else None,
+                "instructions": hashlib.sha256((INSTRUCTIONS + AUDIT_INSTRUCTIONS).encode()).hexdigest(),
+                "skills": {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(SKILLS_DIR.glob("*.md"))},
+                "models": extra.get("models"),
+                "limits": {key: extra.get(key) for key in ("max_submissions", "negative_threshold", "request_limit")},
+                "audit_configured": extra.get("audit_configured", False)}
+    manifest_sha256 = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
     record = {"schema": "corsair-lite/run/1", "run_id": run_dir.name, "mode": mode, "case_id": case.case_id,
               "tree_sha256": case.revision.tree_sha256,
               "fixed_tree_sha256": case.fixed_revision.tree_sha256 if case.fixed_revision else None,
               "runtime_row": row.id if row else None, "image": row.image if row else None,
               "submissions": [e.model_dump(mode="json") for e in evaluations],
-              "verdict": verdict.model_dump(mode="json"), **extra}
+              "verdict": verdict.model_dump(mode="json"), "manifest_sha256": manifest_sha256, **extra}
     run_dir.mkdir(parents=True, exist_ok=True)
-    (run_dir / "run.json").write_text(json.dumps(record, indent=2) + "\n")
+    write_json(run_dir / "manifest.json", manifest)
+    write_json(run_dir / "run.json", record)
     for index, evaluation in enumerate(evaluations, 1):
         (run_dir / f"submission-{index}.json").write_text(evaluation.submission.model_dump_json(indent=2) + "\n")
     return record
@@ -95,7 +106,7 @@ async def _verify(args: argparse.Namespace) -> int:
     return 0 if verdict.label is Label.LIKELY_EXPLOITABLE else 1
 
 
-async def _investigate_one(case: Case, args: argparse.Namespace, models: dict) -> dict:
+async def _investigate_one(case: Case, args: argparse.Namespace, models: dict, model_config: dict | None = None) -> dict:
     row = matrix.select(case)
     run_id = uuid.uuid4().hex[:12]
     run_dir = Path(args.runs) / run_id
@@ -111,15 +122,27 @@ async def _investigate_one(case: Case, args: argparse.Namespace, models: dict) -
     auditor_agent = None if args.no_audit else build_auditor(models["auditor"])
     kernel = Kernel(backend, row, case, artifacts=store, run_id=run_id,
                     auditor=None if auditor_agent is None else (lambda s: audit(auditor_agent, s)))
+    checkpoints: list[dict] = []
+
+    def checkpoint(evaluation: Evaluation) -> None:
+        checkpoints.append(evaluation.model_dump(mode="json"))
+        write_json(run_dir / "checkpoint.json", {"schema": "corsair-lite/checkpoint/1", "run_id": run_id,
+                                                "state": "running", "case_id": case.case_id,
+                                                "tree_sha256": case.revision.tree_sha256,
+                                                "submissions": checkpoints})
+
     run: ProducerRun = await investigate(case, row, model=models["producer"], kernel=kernel, backend=backend,
                                          max_submissions=args.max_submissions, request_limit=args.request_limit,
-                                         negative_threshold=args.negative_threshold)
+                                         negative_threshold=args.negative_threshold, checkpoint=checkpoint)
     extra = {"duration_s": run.duration_s, "requests": run.requests, "input_tokens": run.input_tokens,
              "output_tokens": run.output_tokens, "tool_calls": run.tool_calls, "bash_calls": run.bash_calls,
              "final_text": run.final_text, "error": run.error, "work_cleanup_confirmed": run.cleanup_confirmed,
              "audit_configured": auditor_agent is not None, "max_submissions": args.max_submissions,
-             "negative_threshold": args.negative_threshold, "early_stop": run.early_stop}
+             "negative_threshold": args.negative_threshold, "early_stop": run.early_stop,
+             "observations": list(run.observations), "request_limit": args.request_limit, "models": model_config}
     record = _record(run_dir, case, row, run.verdict, run.evaluations, mode="investigate", extra=extra)
+    write_json(run_dir / "checkpoint.json", {"schema": "corsair-lite/checkpoint/1", "run_id": run_id,
+                                            "state": "finished", "record": "run.json"})
     _print(record)
     return record
 
@@ -128,7 +151,7 @@ async def _investigate(args: argparse.Namespace) -> int:
     case = load_case(Path(args.case))
     config = load_provider_config(Path(args.provider))
     async with agent_models(config) as models:
-        record = await _investigate_one(case, args, models)
+        record = await _investigate_one(case, args, models, _models(config))
     print(json.dumps(record["verdict"], indent=2))
     return 0 if record["verdict"]["label"] == Label.LIKELY_EXPLOITABLE else 1
 
@@ -221,7 +244,7 @@ async def _eval(args: argparse.Namespace) -> int:
             oracle = load_oracle(case_dir) or {}
             expected = oracle.get("expected_label")
             for repeat in range(1, args.repeats + 1):
-                record = await _investigate_one(case, args, models)
+                record = await _investigate_one(case, args, models, _models(config))
                 label = record["verdict"]["label"]
                 correct, forbidden_hit, note = score(case_dir.name, oracle, label)
                 rows.append({"case": str(case_dir), "case_id": case.case_id, "repeat": repeat, "label": label,
@@ -243,7 +266,7 @@ async def _eval(args: argparse.Namespace) -> int:
                                       for r in rows if r["policy_note"]],
                "gate_ledger": _ledger(rows), "runs": rows}
     out = Path(args.runs) / f"eval-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}.json"
-    out.write_text(json.dumps(summary, indent=2) + "\n")
+    write_json(out, summary)
     print(json.dumps({k: v for k, v in summary.items() if k not in ("runs", "per_case")}, indent=2))
     print(f"written {out}", file=sys.stderr)
     return 0 if summary["metrics"]["forbidden_hits"] == 0 else 1
@@ -287,6 +310,36 @@ def _cleanup(args: argparse.Namespace) -> int:
     return 0 if not unconfirmed else 1
 
 
+async def _proposal(args: argparse.Namespace) -> int:
+    from .kernel import GateVerdict
+    from .producer import SKILLS_DIR
+    from .seed import optimize_skills_from_trace, propose_seed
+
+    config = load_provider_config(Path(args.provider))
+    async with agent_models(config, ["producer"]) as models:
+        if args.command == "seed":
+            from .case import SafePath
+            from pydantic import TypeAdapter
+            target = TypeAdapter(SafePath).validate_python(args.target)
+            case = load_case(Path(args.case))
+            root = Path(case.revision.source).resolve()
+            path = root / target
+            if path.is_symlink() or not path.resolve().is_relative_to(root) or not path.is_file():
+                raise ValueError("seed target must be a regular file inside the case revision")
+            if path.stat().st_size > 64_000:
+                raise ValueError("seed target exceeds 64 KB")
+            proposal = await propose_seed(models["producer"], target, path.read_text(), args.vulnerability_class)
+        else:
+            record = json.loads(Path(args.trace).read_text())
+            rejections = [GateVerdict.model_validate(s["gate"]) for s in record["submissions"] if not s["gate"]["passed"]]
+            proposal = await optimize_skills_from_trace(models["producer"], record["verdict"]["label"], rejections, SKILLS_DIR)
+    result = {"schema": "corsair-lite/proposal/1", "applied": False,
+              "proposal": proposal.model_dump(mode="json") if proposal is not None else None}
+    write_json(Path(args.output), result)
+    print(json.dumps(result, indent=2))
+    return 0
+
+
 def _threshold(value: str) -> int:
     number = int(value)
     if number < 1:
@@ -317,8 +370,8 @@ def main(argv: list[str] | None = None) -> int:
     inv = sub.add_parser("investigate", help="run the producer against a case")
     inv.add_argument("--case", required=True)
     inv.add_argument("--provider", required=True)
-    inv.add_argument("--max-submissions", type=int, default=4)
-    inv.add_argument("--request-limit", type=int, default=60)
+    inv.add_argument("--max-submissions", type=_threshold, default=4)
+    inv.add_argument("--request-limit", type=_threshold, default=60)
     inv.add_argument("--no-audit", action="store_true")
     inv.add_argument("--negative-threshold", type=_threshold, default=NEGATIVE_THRESHOLD,
                      help="distinct clean negatives that end the run as LIKELY_NOT_EXPLOITABLE (operator-owned)")
@@ -331,8 +384,8 @@ def main(argv: list[str] | None = None) -> int:
     ev.add_argument("--repeats", type=_repeats, default=1,
                     help="full investigations per case; repeats measure run-to-run agreement (default 1)")
     ev.add_argument("--provider", required=True)
-    ev.add_argument("--max-submissions", type=int, default=4)
-    ev.add_argument("--request-limit", type=int, default=60)
+    ev.add_argument("--max-submissions", type=_threshold, default=4)
+    ev.add_argument("--request-limit", type=_threshold, default=60)
     ev.add_argument("--no-audit", action="store_true")
     ev.add_argument("--negative-threshold", type=_threshold, default=NEGATIVE_THRESHOLD,
                     help="distinct clean negatives that end a run as LIKELY_NOT_EXPLOITABLE (operator-owned)")
@@ -342,7 +395,20 @@ def main(argv: list[str] | None = None) -> int:
     clean.add_argument("--run-id")
     clean.add_argument("--images", action="store_true", help="also remove the sealed corsair-lite-env images")
 
+    seed = sub.add_parser("seed", help="propose a synthetic bug diff; never modify the source tree")
+    seed.add_argument("--case", required=True)
+    seed.add_argument("--target", required=True)
+    seed.add_argument("--vulnerability-class", required=True)
+    seed.add_argument("--provider", required=True)
+    seed.add_argument("--output", required=True)
+    optimize = sub.add_parser("optimize-skills", help="propose a Markdown rule from successful run friction")
+    optimize.add_argument("--trace", required=True, help="run.json from a successful investigation")
+    optimize.add_argument("--provider", required=True)
+    optimize.add_argument("--output", required=True)
+
     args = parser.parse_args(argv)
+    if args.command in ("seed", "optimize-skills"):
+        return asyncio.run(_proposal(args))
     if args.command == "verify":
         return asyncio.run(_verify(args))
     if args.command == "investigate":

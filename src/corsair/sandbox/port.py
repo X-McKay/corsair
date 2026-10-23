@@ -107,7 +107,11 @@ class Sandboxes(Protocol):
         ...
 
     def write_file(self, name: str, path: str, data: bytes) -> None:
-        """Write one file as the sandbox user, creating its parents."""
+        """Inject trusted files as root-owned/read-only; submitted code cannot modify support files."""
+        ...
+
+    def source_unchanged(self, name: str, source: Path) -> bool:
+        """Every original entry retains its path, type, normalized executable mode and content; new outputs allowed."""
         ...
 
     def copy_out(self, name: str, paths: Sequence[str]) -> dict[str, bytes | None]:
@@ -115,7 +119,7 @@ class Sandboxes(Protocol):
         ...
 
     def exec_once(self, name: str, argv: Sequence[str], *, workdir: str, env: Mapping[str, str] | None = None,
-                  timeout: float | None = None) -> Exec:
+                  timeout: float | None = None, trusted: bool = False) -> Exec:
         ...
 
     def drop_network(self, name: str) -> None:

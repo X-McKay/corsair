@@ -1,0 +1,8 @@
+# C++ / CMake runtime
+
+- Image: Debian with GCC/gcov, G++, CMake, Ninja, Make, and Python `pytest==9.0.3` / `coverage==7.13.4`. The Python tools drive the one probe; they are **not** C++ coverage evidence.
+- The probe is one Python module defining `CONTROL_PAYLOAD`, `EXPLOIT_PAYLOAD`, and `run_target(payload)`. Invoke the compiled real executable with `subprocess.run`, make one payload-independent security assertion about its result, and do not add a replacement test binary.
+- Build with GCC coverage instrumentation at replay time. For CMake, a typical build script is `cmake -S . -B build -G Ninja -DCMAKE_CXX_FLAGS='-O0 -g --coverage' -DCMAKE_EXE_LINKER_FLAGS='--coverage' && cmake --build build`; for Make, pass `CXXFLAGS='-O0 -g --coverage' LDFLAGS='--coverage'` when the project honors them. Both compile and link must carry coverage support.
+- The kernel supplies `GCOV_PREFIX=/tmp/corsair/gcov` and `GCOV_PREFIX_STRIP=1`, so unprivileged probes never write `.gcda` files into the sealed build tree. Do not override or remove either variable. Inherit the subprocess environment.
+- Native evidence comes only from gcov JSON collected from every redirected `.gcda` paired with its matching `.gcno`. Set `target_file` to the exact repository-relative source path (normally a `.cpp` file) and choose executed lines in the reported function. Missing notes/data, malformed JSON, path mismatch, duplicate target records, or zero positive execution counts fail closed.
+- The target tree is read-only when the probe runs. Use temporary files under `/tmp` for fixtures; build artifacts must already exist before the offline probe starts.

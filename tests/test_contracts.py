@@ -57,7 +57,8 @@ def test_finding_paths_stay_inside_the_tree():
 
 def test_matrix_selects_the_python_row_for_the_fixture_and_none_for_an_unknown_tree(tmp_path):
     rows = matrix.load()
-    assert [row.id for row in rows] == ["pytest-cpython312"] and rows[0].framework == "pytest"
+    assert rows[0].id == "pytest-cpython312" and rows[0].framework == "pytest"
+    assert {row.language for row in rows} == {"python", "java", "javascript", "typescript", "perl", "ruby", "cpp"}
     case = load_case(CASE)
     assert matrix.select(case).id == "pytest-cpython312"
     (tmp_path / "x").mkdir()

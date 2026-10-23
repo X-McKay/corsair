@@ -1,0 +1,868 @@
+{
+  "language": "perl",
+  "sources": [
+    {
+      "name": "CPAN Security Advisory Database (CPANSA) export",
+      "url": "https://raw.githubusercontent.com/briandfoy/cpan-security-advisory/master/cpan-security-advisory.json",
+      "license": "Artistic-2.0",
+      "frameworks": [
+        "CPAN distributions",
+        "Mojolicious",
+        "Plack",
+        "Dancer",
+        "Catalyst",
+        "CGI"
+      ],
+      "available_cases": 1060,
+      "notes": "Current export inventory: 1060 distinct advisory IDs across 440 distributions (2052 distribution-level records). Primary Perl-specific seed source; records provide affected/fixed ranges and optional CVEs/references."
+    },
+    {
+      "name": "CPANSA per-distribution YAML records",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/tree/master/cpansa",
+      "license": "Artistic-2.0",
+      "frameworks": [
+        "CPAN distribution modules and applications"
+      ],
+      "available_cases": 1060,
+      "notes": "Human-reviewable source records underlying much of the export. Advisory candidates link to the matching dedicated YAML when retained under its distribution name; two link to the authoritative export because no matching dedicated YAML path was present."
+    },
+    {
+      "name": "CPAN::Audit / cpan-audit",
+      "url": "https://metacpan.org/dist/CPAN-Audit/view/script/cpan-audit",
+      "license": "Perl 5 terms",
+      "frameworks": [
+        "CPAN dependency trees",
+        "Carton",
+        "cpanfile"
+      ],
+      "available_cases": 0,
+      "notes": "Consumer and setup tool, not an independent corpus. It materializes the CPANSA knowledge base and can audit a distribution, installed tree, cpanfile, or cpanfile.snapshot."
+    },
+    {
+      "name": "CPAN Security Group CNA announcements",
+      "url": "https://security.metacpan.org/",
+      "license": "Not stated by the site",
+      "frameworks": [
+        "Perl core",
+        "CPAN"
+      ],
+      "available_cases": 0,
+      "notes": "Authoritative Perl/CPAN CNA coordination and announcement channel. Use to resolve or corroborate recent CPAN CVEs; no fixed, machine-counted snapshot was taken for this catalog."
+    },
+    {
+      "name": "CVE List V5",
+      "url": "https://github.com/CVEProject/cvelistV5",
+      "license": "CVE Program Terms of Use",
+      "frameworks": [
+        "cross-ecosystem CVE records"
+      ],
+      "available_cases": 0,
+      "notes": "Official CVE record archive for alias and reference reconciliation. It is not a Perl-filtered benchmark inventory, so no case count is claimed here."
+    },
+    {
+      "name": "NIST National Vulnerability Database CVE API",
+      "url": "https://nvd.nist.gov/developers/vulnerabilities",
+      "license": "NIST terms; check current use conditions",
+      "frameworks": [
+        "cross-ecosystem CVE records"
+      ],
+      "available_cases": 0,
+      "notes": "Supplementary CVE and change-history source. Older records may have less detail according to NVD; use to corroborate, not to infer a patch or runnable trigger."
+    },
+    {
+      "name": "GitHub Advisory Database",
+      "url": "https://github.com/github/advisory-database",
+      "license": "CC-BY-4.0",
+      "frameworks": [
+        "GitHub repositories",
+        "supported package ecosystems"
+      ],
+      "available_cases": 0,
+      "notes": "Supplemental GHSA/CVE reference source. Its documented supported ecosystem list does not include CPAN, so it must not be treated as a complete Perl corpus."
+    },
+    {
+      "name": "OSV.dev",
+      "url": "https://google.github.io/osv.dev/faq/",
+      "license": "Source-specific upstream data terms",
+      "frameworks": [
+        "cross-ecosystem OSV records"
+      ],
+      "available_cases": 0,
+      "notes": "Aggregator/API useful for aliases and affected-version enrichment. Correct data at the upstream database; no Perl/CPAN-specific case count is claimed."
+    },
+    {
+      "name": "Canonical public GitHub repository pool",
+      "url": "https://docs.github.com/en/rest/repos/repos#get-a-repository",
+      "license": "Repository-specific",
+      "frameworks": [
+        "core runtime",
+        "web frameworks",
+        "PSGI",
+        "identity",
+        "ticketing",
+        "library systems",
+        "mailing lists"
+      ],
+      "available_cases": 18,
+      "notes": "Eighteen canonical repositories were resolved with the GitHub repository API. These are diversity seeds only and are explicitly cataloged as project_candidate entries rather than vulnerabilities."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "CPANSA-Mojolicious-2022-03",
+      "project": "Mojolicious",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious.yml",
+      "framework": "Mojolicious",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2022-12-10; affected range: <9.31; fixed range: >=9.31; aliases: no CVE alias in record; 3 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-2021-02",
+      "project": "Mojolicious",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious.yml",
+      "framework": "Mojolicious",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2021-06-01; affected range: <9.19; fixed range: >=9.91; aliases: no CVE alias in record; 1 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-2021-01",
+      "project": "Mojolicious",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious.yml",
+      "framework": "Mojolicious",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2021-03-16; affected range: <9.11; fixed range: >=9.11; aliases: CVE-2021-47208; 2 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-2020-01",
+      "project": "Mojolicious",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious.yml",
+      "framework": "Mojolicious",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2020-11-10; affected range: >1.74,<8.65; fixed range: >=8.65; aliases: CVE-2020-36829; 1 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-2018-04",
+      "project": "Mojolicious",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious.yml",
+      "framework": "Mojolicious",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2018-08-09; affected range: >7.83,<7.92; fixed range: >=7.92; aliases: no CVE alias in record; 1 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-2018-03",
+      "project": "Mojolicious",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious.yml",
+      "framework": "Mojolicious",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2018-05-19; affected range: <7.80; fixed range: >=7.80; aliases: no CVE alias in record; 2 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-2018-02",
+      "project": "Mojolicious",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious.yml",
+      "framework": "Mojolicious",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2018-05-11; affected range: <7.78; fixed range: >=7.78; aliases: no CVE alias in record; 2 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-2018-01",
+      "project": "Mojolicious",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious.yml",
+      "framework": "Mojolicious",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2018-02-13; affected range: <7.66; fixed range: >=7.66; aliases: CVE-2018-25100; 3 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-2015-01",
+      "project": "Mojolicious",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious.yml",
+      "framework": "Mojolicious",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2015-02-02; affected range: <5.76; fixed range: >=5.76; aliases: no CVE alias in record; 2 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-2014-01",
+      "project": "Mojolicious",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious.yml",
+      "framework": "Mojolicious",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2014-10-07; affected range: <5.48; fixed range: >=5.48; aliases: no CVE alias in record; 1 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-2011-02",
+      "project": "Mojolicious",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious.yml",
+      "framework": "Mojolicious",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2011-04-05; affected range: <1.16; fixed range: >=1.16; aliases: CVE-2011-1589; 2 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-2011-01",
+      "project": "Mojolicious",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious.yml",
+      "framework": "Mojolicious",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2011-03-10; affected range: <1.12; fixed range: >=1.12; aliases: CVE-2011-1841; 6 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-2010-4803",
+      "project": "Mojolicious",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious.yml",
+      "framework": "Mojolicious",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2011-05-03; affected range: <0.999927; fixed range: >=0.999927; aliases: CVE-2010-4803; 3 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-2010-4802",
+      "project": "Mojolicious",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious.yml",
+      "framework": "Mojolicious",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2011-05-03; affected range: <0.999928; fixed range: >=0.999928; aliases: CVE-2010-4802; 5 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-2009-5074",
+      "project": "Mojolicious",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious.yml",
+      "framework": "Mojolicious",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2011-05-03; affected range: <0.991250; fixed range: >0.991250; aliases: CVE-2009-5074; 1 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-2024-58134",
+      "project": "Mojolicious",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious.yml",
+      "framework": "Mojolicious",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2025-05-03; affected range: >=0.999922; fixed range: not stated in record; aliases: CVE-2024-58134; 7 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-2024-58135",
+      "project": "Mojolicious",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious.yml",
+      "framework": "Mojolicious",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2025-05-03; affected range: >=7.28; fixed range: not stated in record; aliases: CVE-2024-58135; 7 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-2026-14803",
+      "project": "Mojolicious",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious.yml",
+      "framework": "Mojolicious",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2026-07-06; affected range: <9.47; fixed range: >=9.47; aliases: CVE-2026-14803; 3 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-2026-15747",
+      "project": "Mojolicious",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious.yml",
+      "framework": "Mojolicious",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2026-07-14; affected range: >4.59,<9.48; fixed range: >=9.48; aliases: CVE-2026-15747; 3 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-2026-68914",
+      "project": "Mojolicious",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious.yml",
+      "framework": "Mojolicious",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2026-09-18; affected range: <9.47; fixed range: >=9.47; aliases: CVE-2026-68914; 3 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-2026-77568",
+      "project": "Mojolicious",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious.yml",
+      "framework": "Mojolicious",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2026-09-18; affected range: <9.48; fixed range: >=9.48; aliases: CVE-2026-77568; 2 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Plack-2015-0202",
+      "project": "Plack",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Plack.yml",
+      "framework": "Plack / PSGI",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2015-02-02; affected range: <1.0034; fixed range: >=1.0034; aliases: no CVE alias in record; 0 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Plack-2014-0801",
+      "project": "Plack",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Plack.yml",
+      "framework": "Plack / PSGI",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2014-08-01; affected range: <1.0031; fixed range: >=1.0031; aliases: no CVE alias in record; 1 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Plack-2013-0131",
+      "project": "Plack",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Plack.yml",
+      "framework": "Plack / PSGI",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2013-01-31; affected range: <1.0016; fixed range: >=1.0016; aliases: no CVE alias in record; 0 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Plack-2026-7381",
+      "project": "Plack",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Plack.yml",
+      "framework": "Plack / PSGI",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2026-04-29; affected range: >0; fixed range: not stated in record; aliases: CVE-2026-7381; 3 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Dancer-2014-01",
+      "project": "Dancer",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Dancer.yml",
+      "framework": "Dancer",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2014-05-30; affected range: <1.3114; fixed range: >=1.3114; aliases: CVE-2012-5572; 2 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Dancer-2011-01",
+      "project": "Dancer",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Dancer.yml",
+      "framework": "Dancer",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2011-04-05; affected range: <1.3051; fixed range: >=1.3051; aliases: CVE-2011-1589; 2 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Dancer-2026-5080",
+      "project": "Dancer",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Dancer.yml",
+      "framework": "Dancer",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2026-04-30; affected range: >0; fixed range: not stated in record; aliases: CVE-2026-5080; 3 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Dancer2-2018-01",
+      "project": "Dancer2",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Dancer2.yml",
+      "framework": "Dancer2",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2018-01-30; affected range: <0.206000; fixed range: >=0.206000; aliases: no CVE alias in record; 3 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Dancer2-2026-13577",
+      "project": "Dancer2",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Dancer2.yml",
+      "framework": "Dancer2",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2026-07-20; affected range: <2.2.0; fixed range: >=2.2.0; aliases: CVE-2026-13577; 6 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Dancer2-2026-93712",
+      "project": "Dancer2",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Dancer2.yml",
+      "framework": "Dancer2",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2026-09-22; affected range: >=2.1.0,<2.2.0; fixed range: >=2.2.0; aliases: CVE-2026-93712; 4 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Dancer2-2026-93711",
+      "project": "Dancer2",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Dancer2.yml",
+      "framework": "Dancer2",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2026-09-22; affected range: <2.2.0; fixed range: >=2.2.0; aliases: CVE-2026-93711; 4 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Dancer2-2026-93710",
+      "project": "Dancer2",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Dancer2.yml",
+      "framework": "Dancer2",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2026-09-22; affected range: >=2.0.0,<2.2.0; fixed range: >=2.2.0; aliases: CVE-2026-93710; 4 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Dancer2-2026-93709",
+      "project": "Dancer2",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Dancer2.yml",
+      "framework": "Dancer2",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2026-09-22; affected range: <2.2.0; fixed range: >=2.2.0; aliases: CVE-2026-93709; 5 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-CGI-2012-5526",
+      "project": "CGI",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-CGI.yml",
+      "framework": "CGI",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2012-11-21; affected range: <3.63; fixed range: >=3.63; aliases: CVE-2012-5526; 14 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-CGI-2011-2766",
+      "project": "CGI",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-CGI.yml",
+      "framework": "CGI",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2011-11-08; affected range: <3.56; fixed range: >=3.56; aliases: CVE-2011-2766; 2 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-CGI-2010-02",
+      "project": "CGI",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-CGI.yml",
+      "framework": "CGI",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2010-11-08; affected range: <3.50; fixed range: >=3.50; aliases: no CVE alias in record; 0 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-CGI-2010-01",
+      "project": "CGI",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-CGI.yml",
+      "framework": "CGI",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2010-02-05; affected range: <3.49; fixed range: >=3.49; aliases: no CVE alias in record; 0 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-CGI-2010-4411",
+      "project": "CGI",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-CGI.yml",
+      "framework": "CGI",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2010-12-06; affected range: <3.50; fixed range: >=3.50; aliases: CVE-2010-4411; 15 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-CGI-2010-2761",
+      "project": "CGI",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-CGI.yml",
+      "framework": "CGI",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2010-12-06; affected range: <3.50; fixed range: >=3.50; aliases: CVE-2010-2761; 35 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Catalyst-Runtime-2013-01",
+      "project": "Catalyst-Runtime",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Catalyst-Runtime.yml",
+      "framework": "Catalyst",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2013-01-23; affected range: <5.90020; fixed range: >=5.90020; aliases: no CVE alias in record; 1 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Catalyst-Runtime-2005-01",
+      "project": "Catalyst-Runtime",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Catalyst-Runtime.yml",
+      "framework": "Catalyst",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2005-11-24; affected range: <5.58; fixed range: >=5.58; aliases: no CVE alias in record; 0 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Catalyst-Plugin-Authentication-2026-5091",
+      "project": "Catalyst-Plugin-Authentication",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Catalyst-Plugin-Authentication.yml",
+      "framework": "Catalyst",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2026-05-21; affected range: <=0.10024; fixed range: >=1.0026; aliases: CVE-2026-5091; 3 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Catalyst-Plugin-Authentication-2009-10007",
+      "project": "Catalyst-Plugin-Authentication",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Catalyst-Plugin-Authentication.yml",
+      "framework": "Catalyst",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2026-06-09; affected range: <0.10_027; fixed range: >=0.10_027; aliases: CVE-2009-10007; 5 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Catalyst-Plugin-Static-Simple-2017-01",
+      "project": "Catalyst-Plugin-Static-Simple",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Catalyst-Plugin-Static-Simple.yml",
+      "framework": "Catalyst",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2017-10-31; affected range: <0.34; fixed range: >=0.34; aliases: CVE-2017-16248; 2 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Catalyst-Plugin-Static-Simple-2026-15743",
+      "project": "Catalyst-Plugin-Static-Simple",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Catalyst-Plugin-Static-Simple.yml",
+      "framework": "Catalyst",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2026-08-20; affected range: >0; fixed range: not stated in record; aliases: CVE-2026-15743; 4 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Catalyst-Action-REST-2013-01",
+      "project": "Catalyst-Action-REST",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Catalyst-Action-REST.yml",
+      "framework": "Catalyst",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2013-09-03; affected range: <1.12; fixed range: >=1.12; aliases: no CVE alias in record; 1 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Catalyst-Authentication-Credential-HTTP-2025-40920",
+      "project": "Catalyst-Authentication-Credential-HTTP",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Catalyst-Authentication-Credential-HTTP.yml",
+      "framework": "Catalyst",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2025-08-11; affected range: <=1.018; fixed range: >=1.019; aliases: CVE-2025-40920; 5 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Catalyst-Authentication-Store-LDAP-2012-01",
+      "project": "Catalyst-Authentication-Store-LDAP",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Catalyst-Authentication-Store-LDAP.yml",
+      "framework": "Catalyst",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2012-12-11; affected range: <1.013; fixed range: >=1.013; aliases: no CVE alias in record; 1 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Catalyst-Controller-Combine-2010-01",
+      "project": "Catalyst-Controller-Combine",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Catalyst-Controller-Combine.yml",
+      "framework": "Catalyst",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2010-05-21; affected range: <0.12; fixed range: >=0.12; aliases: no CVE alias in record; 1 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Catalyst-Plugin-Session-2025-40924",
+      "project": "Catalyst-Plugin-Session",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Catalyst-Plugin-Session.yml",
+      "framework": "Catalyst",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2025-07-17; affected range: <0.44; fixed range: >=0.44; aliases: CVE-2025-40924; 3 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Catalyst-Plugin-Static-2005-01",
+      "project": "Catalyst-Plugin-Static",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Catalyst-Plugin-Static.yml",
+      "framework": "Catalyst",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2005-11-14; affected range: <0.10; fixed range: >=0.10; aliases: no CVE alias in record; 0 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Catalyst-Seal-2026-85491",
+      "project": "Catalyst-Seal",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Catalyst-Seal.yml",
+      "framework": "Catalyst",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2026-09-24; affected range: <0.03; fixed range: >=0.03; aliases: CVE-2026-85491; 4 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Catalyst-View-Wkhtmltopdf-2026-16766",
+      "project": "Catalyst-View-Wkhtmltopdf",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Catalyst-View-Wkhtmltopdf.yml",
+      "framework": "Catalyst",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2026-07-25; affected range: <0.6.1; fixed range: >=0.6.1; aliases: CVE-2026-16766; 4 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Template-Toolkit-2026-5090",
+      "project": "Template-Toolkit",
+      "url": "https://raw.githubusercontent.com/briandfoy/cpan-security-advisory/master/cpan-security-advisory.json",
+      "framework": "Template Toolkit",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2026-05-19; affected range: <3.103; fixed range: >=3.103; aliases: CVE-2026-5090; 3 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojo-JWT-2026-9537",
+      "project": "Mojo-JWT",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojo-JWT.yml",
+      "framework": "Mojolicious extension",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2026-07-17; affected range: <1.02; fixed range: >=1.02; aliases: CVE-2026-9537; 2 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-MojoMojo-2009-01",
+      "project": "MojoMojo",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-MojoMojo.yml",
+      "framework": "Mojolicious application",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2009-08-14; affected range: <0.999033; fixed range: >=0.999033; aliases: no CVE alias in record; 2 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-MojoX-Authentication-2026-86304",
+      "project": "MojoX-Authentication",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-MojoX-Authentication.yml",
+      "framework": "Mojolicious extension",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2026-09-06; affected range: <0.006; fixed range: >=0.006; aliases: CVE-2026-86304; 3 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-Plugin-CSRF-2025-40915",
+      "project": "Mojolicious-Plugin-CSRF",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious-Plugin-CSRF.yml",
+      "framework": "Mojolicious extension",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2025-06-11; affected range: ==1.03; fixed range: >=1.03; aliases: CVE-2025-40915; 2 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-Plugin-CaptchaPNG-2025-40916",
+      "project": "Mojolicious-Plugin-CaptchaPNG",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious-Plugin-CaptchaPNG.yml",
+      "framework": "Mojolicious extension",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2025-06-16; affected range: <1.06; fixed range: >=1.06; aliases: CVE-2025-40916; 4 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-Plugin-OAuth2-2014-01",
+      "project": "Mojolicious-Plugin-OAuth2",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious-Plugin-OAuth2.yml",
+      "framework": "Mojolicious extension",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2014-10-07; affected range: <1.3; fixed range: >=1.3; aliases: no CVE alias in record; 2 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-Plugin-SessionStore-2026-9692",
+      "project": "Mojolicious-Plugin-SessionStore",
+      "url": "https://raw.githubusercontent.com/briandfoy/cpan-security-advisory/master/cpan-security-advisory.json",
+      "framework": "Mojolicious extension",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2026-06-18; affected range: >0; fixed range: not stated in record; aliases: CVE-2026-9692; 4 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-Plugin-Statsd-2026-46740",
+      "project": "Mojolicious-Plugin-Statsd",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious-Plugin-Statsd.yml",
+      "framework": "Mojolicious extension",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2026-05-26; affected range: >=0.06; fixed range: not stated in record; aliases: CVE-2026-46740; 4 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojolicious-Plugin-Web-Auth-2026-9733",
+      "project": "Mojolicious-Plugin-Web-Auth",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojolicious-Plugin-Web-Auth-OAuth2.yml",
+      "framework": "Mojolicious extension",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2026-06-23; affected range: >0; fixed range: not stated in record; aliases: CVE-2026-9733; 4 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojo-DOM-Role-Analyzer-2024-38526",
+      "project": "Mojo-DOM-Role-Analyzer",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojo-DOM-Role-Analyzer.yml",
+      "framework": "Mojolicious extension",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2024-06-26; affected range: >=0.15; fixed range: not stated in record; aliases: CVE-2024-38526; 6 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "CPANSA-Mojo-DOM-Role-Analyzer-2024-38526-polyfill",
+      "project": "Mojo-DOM-Role-Analyzer",
+      "url": "https://github.com/briandfoy/cpan-security-advisory/blob/master/cpansa/CPANSA-Mojo-DOM-Role-Analyzer.yml",
+      "framework": "Mojolicious extension",
+      "kind": "advisory_inventory_candidate",
+      "validation_status": "candidate",
+      "notes": "CPANSA inventory record; reported 2024-06-26; affected range: >=0.15; fixed range: not stated in record; aliases: CVE-2024-38526; 6 listed reference(s). Candidate only: pin the source, establish a safe behavioral oracle, and independently verify vulnerable-versus-fixed behavior before use."
+    },
+    {
+      "id": "project:Perl/perl5",
+      "project": "Perl/perl5",
+      "url": "https://github.com/Perl/perl5",
+      "framework": "Perl core/runtime",
+      "kind": "project_candidate",
+      "validation_status": "candidate",
+      "notes": "Canonical public repository candidate, not a vulnerability assertion. Select a historical revision and a non-destructive local harness, then establish paired behavioral oracles before admitting a derived case."
+    },
+    {
+      "id": "project:mojolicious/mojo",
+      "project": "mojolicious/mojo",
+      "url": "https://github.com/mojolicious/mojo",
+      "framework": "Mojolicious",
+      "kind": "project_candidate",
+      "validation_status": "candidate",
+      "notes": "Canonical public repository candidate, not a vulnerability assertion. Select a historical revision and a non-destructive local harness, then establish paired behavioral oracles before admitting a derived case."
+    },
+    {
+      "id": "project:plack/Plack",
+      "project": "plack/Plack",
+      "url": "https://github.com/plack/Plack",
+      "framework": "Plack / PSGI",
+      "kind": "project_candidate",
+      "validation_status": "candidate",
+      "notes": "Canonical public repository candidate, not a vulnerability assertion. Select a historical revision and a non-destructive local harness, then establish paired behavioral oracles before admitting a derived case."
+    },
+    {
+      "id": "project:PerlDancer/Dancer2",
+      "project": "PerlDancer/Dancer2",
+      "url": "https://github.com/PerlDancer/Dancer2",
+      "framework": "Dancer2",
+      "kind": "project_candidate",
+      "validation_status": "candidate",
+      "notes": "Canonical public repository candidate, not a vulnerability assertion. Select a historical revision and a non-destructive local harness, then establish paired behavioral oracles before admitting a derived case."
+    },
+    {
+      "id": "project:perl-catalyst/catalyst-runtime",
+      "project": "perl-catalyst/catalyst-runtime",
+      "url": "https://github.com/perl-catalyst/catalyst-runtime",
+      "framework": "Catalyst",
+      "kind": "project_candidate",
+      "validation_status": "candidate",
+      "notes": "Canonical public repository candidate, not a vulnerability assertion. Select a historical revision and a non-destructive local harness, then establish paired behavioral oracles before admitting a derived case."
+    },
+    {
+      "id": "project:bestpractical/rt",
+      "project": "bestpractical/rt",
+      "url": "https://github.com/bestpractical/rt",
+      "framework": "Request Tracker",
+      "kind": "project_candidate",
+      "validation_status": "candidate",
+      "notes": "Canonical public repository candidate, not a vulnerability assertion. Select a historical revision and a non-destructive local harness, then establish paired behavioral oracles before admitting a derived case."
+    },
+    {
+      "id": "project:LemonLDAPNG/lemonldap-ng",
+      "project": "LemonLDAPNG/lemonldap-ng",
+      "url": "https://github.com/LemonLDAPNG/lemonldap-ng",
+      "framework": "LemonLDAP::NG",
+      "kind": "project_candidate",
+      "validation_status": "candidate",
+      "notes": "Canonical public repository candidate, not a vulnerability assertion. Select a historical revision and a non-destructive local harness, then establish paired behavioral oracles before admitting a derived case."
+    },
+    {
+      "id": "project:movabletype/movabletype",
+      "project": "movabletype/movabletype",
+      "url": "https://github.com/movabletype/movabletype",
+      "framework": "Movable Type",
+      "kind": "project_candidate",
+      "validation_status": "candidate",
+      "notes": "Canonical public repository candidate, not a vulnerability assertion. Select a historical revision and a non-destructive local harness, then establish paired behavioral oracles before admitting a derived case."
+    },
+    {
+      "id": "project:Koha-Community/Koha",
+      "project": "Koha-Community/Koha",
+      "url": "https://github.com/Koha-Community/Koha",
+      "framework": "Koha ILS",
+      "kind": "project_candidate",
+      "validation_status": "candidate",
+      "notes": "Canonical public repository candidate, not a vulnerability assertion. Select a historical revision and a non-destructive local harness, then establish paired behavioral oracles before admitting a derived case."
+    },
+    {
+      "id": "project:foswiki/distro",
+      "project": "foswiki/distro",
+      "url": "https://github.com/foswiki/distro",
+      "framework": "Foswiki",
+      "kind": "project_candidate",
+      "validation_status": "candidate",
+      "notes": "Canonical public repository candidate, not a vulnerability assertion. Select a historical revision and a non-destructive local harness, then establish paired behavioral oracles before admitting a derived case."
+    },
+    {
+      "id": "project:sympa-community/sympa",
+      "project": "sympa-community/sympa",
+      "url": "https://github.com/sympa-community/sympa",
+      "framework": "Sympa",
+      "kind": "project_candidate",
+      "validation_status": "candidate",
+      "notes": "Canonical public repository candidate, not a vulnerability assertion. Select a historical revision and a non-destructive local harness, then establish paired behavioral oracles before admitting a derived case."
+    },
+    {
+      "id": "project:metacpan/metacpan-web",
+      "project": "metacpan/metacpan-web",
+      "url": "https://github.com/metacpan/metacpan-web",
+      "framework": "MetaCPAN web application",
+      "kind": "project_candidate",
+      "validation_status": "candidate",
+      "notes": "Canonical public repository candidate, not a vulnerability assertion. Select a historical revision and a non-destructive local harness, then establish paired behavioral oracles before admitting a derived case."
+    },
+    {
+      "id": "project:miyagawa/Starlet",
+      "project": "miyagawa/Starlet",
+      "url": "https://github.com/miyagawa/Starlet",
+      "framework": "PSGI server",
+      "kind": "project_candidate",
+      "validation_status": "candidate",
+      "notes": "Canonical public repository candidate, not a vulnerability assertion. Select a historical revision and a non-destructive local harness, then establish paired behavioral oracles before admitting a derived case."
+    },
+    {
+      "id": "project:kazuho/p5-Server-Starter",
+      "project": "kazuho/p5-Server-Starter",
+      "url": "https://github.com/kazuho/p5-Server-Starter",
+      "framework": "prefork server runtime",
+      "kind": "project_candidate",
+      "validation_status": "candidate",
+      "notes": "Canonical public repository candidate, not a vulnerability assertion. Select a historical revision and a non-destructive local harness, then establish paired behavioral oracles before admitting a derived case."
+    },
+    {
+      "id": "project:libwww-perl/libwww-perl",
+      "project": "libwww-perl/libwww-perl",
+      "url": "https://github.com/libwww-perl/libwww-perl",
+      "framework": "LWP HTTP client",
+      "kind": "project_candidate",
+      "validation_status": "candidate",
+      "notes": "Canonical public repository candidate, not a vulnerability assertion. Select a historical revision and a non-destructive local harness, then establish paired behavioral oracles before admitting a derived case."
+    },
+    {
+      "id": "project:perl-ldap/perl-ldap",
+      "project": "perl-ldap/perl-ldap",
+      "url": "https://github.com/perl-ldap/perl-ldap",
+      "framework": "Net::LDAP",
+      "kind": "project_candidate",
+      "validation_status": "candidate",
+      "notes": "Canonical public repository candidate, not a vulnerability assertion. Select a historical revision and a non-destructive local harness, then establish paired behavioral oracles before admitting a derived case."
+    },
+    {
+      "id": "project:Perl-Critic/Perl-Critic",
+      "project": "Perl-Critic/Perl-Critic",
+      "url": "https://github.com/Perl-Critic/Perl-Critic",
+      "framework": "static-analysis tooling",
+      "kind": "project_candidate",
+      "validation_status": "candidate",
+      "notes": "Canonical public repository candidate, not a vulnerability assertion. Select a historical revision and a non-destructive local harness, then establish paired behavioral oracles before admitting a derived case."
+    },
+    {
+      "id": "project:perl-carton/carton",
+      "project": "perl-carton/carton",
+      "url": "https://github.com/perl-carton/carton",
+      "framework": "dependency tooling",
+      "kind": "project_candidate",
+      "validation_status": "candidate",
+      "notes": "Canonical public repository candidate, not a vulnerability assertion. Select a historical revision and a non-destructive local harness, then establish paired behavioral oracles before admitting a derived case."
+    }
+  ]
+}

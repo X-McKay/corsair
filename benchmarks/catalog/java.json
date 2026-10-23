@@ -1,0 +1,1841 @@
+{
+  "language": "java",
+  "sources": [
+    {
+      "name": "CWE-Bench-Java",
+      "url": "https://github.com/iris-sast/cwe-bench-java",
+      "license": "MIT (dataset repository; upstream projects have their own licenses)",
+      "frameworks": [
+        "Java OSS projects including Spark Java, WildFly, Eclipse Vert.x, Spring Cloud, Apache Camel, Apache NiFi, Apache RocketMQ"
+      ],
+      "available_cases": 120,
+      "notes": "Manually vetted CVE dataset. The inventory maps each project slug to a CVE, CWE, repository/tag, buggy commit, fixed commit(s), advisory, and build information. All 120 records are represented as unexecuted candidates here."
+    },
+    {
+      "name": "VJBench",
+      "url": "https://github.com/lin-tan/llm-vul",
+      "license": "NOASSERTION (repository metadata)",
+      "frameworks": [
+        "Netty",
+        "Jenkins",
+        "Vaadin Flow",
+        "Ratpack",
+        "Spark Java",
+        "Jooby",
+        "Apache Pulsar",
+        "Jackson"
+      ],
+      "available_cases": 42,
+      "notes": "The artifact describes 42 reproducible Java vulnerabilities and publishes the CSV inventory with project URL, ID, CVE, CWE, human patch, and CVE URL. All records are represented as unexecuted candidates here."
+    },
+    {
+      "name": "Vul4J",
+      "url": "https://github.com/tuhh-softsec/vul4j",
+      "license": "CC-BY-4.0 for dataset; GPL-3.0 for code",
+      "frameworks": [
+        "Apache Camel",
+        "Apache CXF",
+        "Apache Struts",
+        "Apache Tika",
+        "Jenkins",
+        "Spring ecosystem"
+      ],
+      "available_cases": 129,
+      "notes": "Real-world Java vulnerability dataset. Current README distinguishes 79 PoV-based entries and 50 SpotBugs-only entries; its CSV carries repository, patch and build/test command metadata. Kept as a source backlog rather than duplicate candidate entries in this first catalog."
+    },
+    {
+      "name": "OWASP Benchmark for Java",
+      "url": "https://github.com/OWASP-Benchmark/BenchmarkJava",
+      "license": "GPL-2.0",
+      "frameworks": [
+        "Java web application / Servlet ecosystem"
+      ],
+      "available_cases": 2740,
+      "notes": "Runnable deliberately vulnerable Java web benchmark. The expected-results manifest labels each test as a true or false vulnerability and CWE. Synthetic controlled source; not represented as real-CVE candidate entries."
+    },
+    {
+      "name": "NIST SARD Juliet Java 1.0",
+      "url": "https://samate.nist.gov/SARD/test-suites/24",
+      "license": "Public domain",
+      "frameworks": [
+        "Java language test suite"
+      ],
+      "available_cases": 14184,
+      "notes": "NIST lists 14,184 Java tests across 106 CWEs. Synthetic control corpus; it should not be presented as a set of real-world CVE cases."
+    },
+    {
+      "name": "VCC-Eval",
+      "url": "https://github.com/tuhh-softsec/VCC-Eval-A-Manually-Curated-Dataset-of-Vulnerability-Introducing-Commits-in-Java",
+      "license": "NOASSERTION (repository metadata)",
+      "frameworks": [
+        "Diverse Java OSS projects"
+      ],
+      "available_cases": 100,
+      "notes": "Manually curated vulnerability-introducing-commit data with CVE, CWE, repository, introducing and fixing commits, and affected lines. A rich provenance source, but no build harness is asserted here."
+    },
+    {
+      "name": "Spring Boot: spring-projects/spring-petclinic",
+      "url": "https://github.com/spring-projects/spring-petclinic",
+      "license": "Apache-2.0 (GitHub default-branch metadata; historical revisions may differ)",
+      "frameworks": [
+        "Spring Boot"
+      ],
+      "available_cases": 0,
+      "notes": "Public sample application selected for ecosystem breadth. No enumerated vulnerability case is claimed by this catalog; the associated candidate is a project candidate only."
+    },
+    {
+      "name": "Quarkus: quarkusio/quarkus-quickstarts",
+      "url": "https://github.com/quarkusio/quarkus-quickstarts",
+      "license": "Apache-2.0 (GitHub default-branch metadata; historical revisions may differ)",
+      "frameworks": [
+        "Quarkus"
+      ],
+      "available_cases": 0,
+      "notes": "Public quickstart applications selected for ecosystem breadth. No enumerated vulnerability case is claimed by this catalog; the associated candidate is a project candidate only."
+    },
+    {
+      "name": "Micronaut: micronaut-projects/micronaut-core",
+      "url": "https://github.com/micronaut-projects/micronaut-core",
+      "license": "Apache-2.0 (GitHub default-branch metadata; historical revisions may differ)",
+      "frameworks": [
+        "Micronaut"
+      ],
+      "available_cases": 0,
+      "notes": "Public framework source selected for ecosystem breadth. No enumerated vulnerability case is claimed by this catalog; the associated candidate is a project candidate only."
+    },
+    {
+      "name": "Dropwizard: dropwizard/dropwizard",
+      "url": "https://github.com/dropwizard/dropwizard",
+      "license": "Apache-2.0 (GitHub default-branch metadata; historical revisions may differ)",
+      "frameworks": [
+        "Dropwizard"
+      ],
+      "available_cases": 0,
+      "notes": "Public framework source/examples selected for ecosystem breadth. No enumerated vulnerability case is claimed by this catalog; the associated candidate is a project candidate only."
+    },
+    {
+      "name": "Javalin: javalin/javalin",
+      "url": "https://github.com/javalin/javalin",
+      "license": "Apache-2.0 (GitHub default-branch metadata; historical revisions may differ)",
+      "frameworks": [
+        "Javalin"
+      ],
+      "available_cases": 0,
+      "notes": "Public framework source/examples selected for ecosystem breadth. No enumerated vulnerability case is claimed by this catalog; the associated candidate is a project candidate only."
+    },
+    {
+      "name": "Eclipse Vert.x: eclipse-vertx/vert.x",
+      "url": "https://github.com/eclipse-vertx/vert.x",
+      "license": "NOASSERTION (GitHub default-branch metadata; historical revisions may differ)",
+      "frameworks": [
+        "Eclipse Vert.x"
+      ],
+      "available_cases": 0,
+      "notes": "Public framework source/examples selected for ecosystem breadth. No enumerated vulnerability case is claimed by this catalog; the associated candidate is a project candidate only."
+    },
+    {
+      "name": "Helidon: helidon-io/helidon",
+      "url": "https://github.com/helidon-io/helidon",
+      "license": "Apache-2.0 (GitHub default-branch metadata; historical revisions may differ)",
+      "frameworks": [
+        "Helidon"
+      ],
+      "available_cases": 0,
+      "notes": "Public framework source/examples selected for ecosystem breadth. No enumerated vulnerability case is claimed by this catalog; the associated candidate is a project candidate only."
+    },
+    {
+      "name": "Play Framework: playframework/playframework",
+      "url": "https://github.com/playframework/playframework",
+      "license": "Apache-2.0 (GitHub default-branch metadata; historical revisions may differ)",
+      "frameworks": [
+        "Play Framework"
+      ],
+      "available_cases": 0,
+      "notes": "Public framework source/examples selected for ecosystem breadth. No enumerated vulnerability case is claimed by this catalog; the associated candidate is a project candidate only."
+    },
+    {
+      "name": "Apache Camel: apache/camel",
+      "url": "https://github.com/apache/camel",
+      "license": "Apache-2.0 (GitHub default-branch metadata; historical revisions may differ)",
+      "frameworks": [
+        "Apache Camel"
+      ],
+      "available_cases": 0,
+      "notes": "Public integration framework selected for ecosystem breadth. No enumerated vulnerability case is claimed by this catalog; the associated candidate is a project candidate only."
+    },
+    {
+      "name": "Keycloak: keycloak/keycloak",
+      "url": "https://github.com/keycloak/keycloak",
+      "license": "Apache-2.0 (GitHub default-branch metadata; historical revisions may differ)",
+      "frameworks": [
+        "Keycloak"
+      ],
+      "available_cases": 0,
+      "notes": "Public identity platform selected for ecosystem breadth. No enumerated vulnerability case is claimed by this catalog; the associated candidate is a project candidate only."
+    },
+    {
+      "name": "Jenkins: jenkinsci/jenkins",
+      "url": "https://github.com/jenkinsci/jenkins",
+      "license": "MIT (GitHub default-branch metadata; historical revisions may differ)",
+      "frameworks": [
+        "Jenkins"
+      ],
+      "available_cases": 0,
+      "notes": "Public automation server selected for ecosystem breadth. No enumerated vulnerability case is claimed by this catalog; the associated candidate is a project candidate only."
+    },
+    {
+      "name": "gRPC Java: grpc/grpc-java",
+      "url": "https://github.com/grpc/grpc-java",
+      "license": "Apache-2.0 (GitHub default-branch metadata; historical revisions may differ)",
+      "frameworks": [
+        "gRPC Java"
+      ],
+      "available_cases": 0,
+      "notes": "Public RPC framework selected for ecosystem breadth. No enumerated vulnerability case is claimed by this catalog; the associated candidate is a project candidate only."
+    },
+    {
+      "name": "Apache Kafka: apache/kafka",
+      "url": "https://github.com/apache/kafka",
+      "license": "Apache-2.0 (GitHub default-branch metadata; historical revisions may differ)",
+      "frameworks": [
+        "Apache Kafka"
+      ],
+      "available_cases": 0,
+      "notes": "Public streaming platform selected for ecosystem breadth. No enumerated vulnerability case is claimed by this catalog; the associated candidate is a project candidate only."
+    },
+    {
+      "name": "Eclipse Jetty: eclipse-jetty/jetty.project",
+      "url": "https://github.com/eclipse-jetty/jetty.project",
+      "license": "NOASSERTION (metadata lookup unavailable) (GitHub default-branch metadata; historical revisions may differ)",
+      "frameworks": [
+        "Eclipse Jetty"
+      ],
+      "available_cases": 0,
+      "notes": "Public web server/servlet container selected for ecosystem breadth. No enumerated vulnerability case is claimed by this catalog; the associated candidate is a project candidate only."
+    },
+    {
+      "name": "Vaadin Flow: vaadin/flow",
+      "url": "https://github.com/vaadin/flow",
+      "license": "Apache-2.0 (GitHub default-branch metadata; historical revisions may differ)",
+      "frameworks": [
+        "Vaadin Flow"
+      ],
+      "available_cases": 0,
+      "notes": "Public web framework selected for ecosystem breadth. No enumerated vulnerability case is claimed by this catalog; the associated candidate is a project candidate only."
+    },
+    {
+      "name": "Spring Boot: WebGoat/WebGoat",
+      "url": "https://github.com/WebGoat/WebGoat",
+      "license": "NOASSERTION (GitHub default-branch metadata; historical revisions may differ)",
+      "frameworks": [
+        "Spring Boot"
+      ],
+      "available_cases": 0,
+      "notes": "Public deliberately insecure learning application selected for ecosystem breadth. No enumerated vulnerability case is claimed by this catalog; the associated candidate is a project candidate only."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "CWE-Bench-Java:DSpace__DSpace_CVE-2016-10726_4.4",
+      "project": "DSpace/DSpace",
+      "url": "https://github.com/DSpace/DSpace/tree/ca4c86b1baa4e0b07975b1da86a34a6e7170b3b7",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 1: CVE-2016-10726 (CWE-022); dataset tag 4.4; source identifies buggy commit ca4c86b1baa4e0b07975b1da86a34a6e7170b3b7 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:perwendel__spark_CVE-2018-9159_2.7.1",
+      "project": "perwendel/spark",
+      "url": "https://github.com/perwendel/spark/tree/5316c0d0f057daaf556c3907c20df975f7bf8a8a",
+      "framework": "Spark Java",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 2: CVE-2018-9159 (CWE-022); dataset tag 2.7.1; source identifies buggy commit 5316c0d0f057daaf556c3907c20df975f7bf8a8a and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:perwendel__spark_CVE-2016-9177_2.5.1",
+      "project": "perwendel/spark",
+      "url": "https://github.com/perwendel/spark/tree/ce57dfb949ed183405f75dee8cf3262b45c9b3b5",
+      "framework": "Spark Java",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 3: CVE-2016-9177 (CWE-022); dataset tag 2.5.1; source identifies buggy commit ce57dfb949ed183405f75dee8cf3262b45c9b3b5 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:wildfly__wildfly_CVE-2018-1047_11.0.0.Final",
+      "project": "wildfly/wildfly",
+      "url": "https://github.com/wildfly/wildfly/tree/4fd7bffaf2ee73201910684f2674aa1bced7fe81",
+      "framework": "WildFly",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 4: CVE-2018-1047 (CWE-022); dataset tag 11.0.0.Final; source identifies buggy commit 4fd7bffaf2ee73201910684f2674aa1bced7fe81 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:vert-x3__vertx-web_CVE-2018-12542_3.5.3.CR1",
+      "project": "vert-x3/vertx-web",
+      "url": "https://github.com/vert-x3/vertx-web/tree/3fe3873cc28b4d833c90f8989ff797a7b463da2c",
+      "framework": "Eclipse Vert.x",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 5: CVE-2018-12542 (CWE-022); dataset tag 3.5.3.CR1; source identifies buggy commit 3fe3873cc28b4d833c90f8989ff797a7b463da2c and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__camel_CVE-2018-8041_2.20.3",
+      "project": "apache/camel",
+      "url": "https://github.com/apache/camel/tree/32bfda73ddd1ea8576bcb53dac496af9e0825f1a",
+      "framework": "Apache Camel",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 6: CVE-2018-8041 (CWE-022); dataset tag 2.20.3; source identifies buggy commit 32bfda73ddd1ea8576bcb53dac496af9e0825f1a and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:dromara__hutool_CVE-2018-17297_4.1.11",
+      "project": "dromara/hutool",
+      "url": "https://github.com/dromara/hutool/tree/7687720c5125b29386d3bb9c7c2931da79664b73",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 7: CVE-2018-17297 (CWE-022); dataset tag 4.1.11; source identifies buggy commit 7687720c5125b29386d3bb9c7c2931da79664b73 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__tika_CVE-2018-11762_1.18",
+      "project": "apache/tika",
+      "url": "https://github.com/apache/tika/tree/38ff2a986af24ee255f1f91d654ea402f4016696",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 8: CVE-2018-11762 (CWE-022); dataset tag 1.18; source identifies buggy commit 38ff2a986af24ee255f1f91d654ea402f4016696 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:square__retrofit_CVE-2018-1000850_2.4.0",
+      "project": "square/retrofit",
+      "url": "https://github.com/square/retrofit/tree/7158698314daa138e993fac6a590ed19d78a8599",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 9: CVE-2018-1000850 (CWE-022); dataset tag 2.4.0; source identifies buggy commit 7158698314daa138e993fac6a590ed19d78a8599 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__jspwiki_CVE-2019-0225_2.11.0.M2",
+      "project": "apache/jspwiki",
+      "url": "https://github.com/apache/jspwiki/tree/d48bcef107a14dd07ecd830ab817b8df796082a4",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 10: CVE-2019-0225 (CWE-022); dataset tag 2.11.0.M2; source identifies buggy commit d48bcef107a14dd07ecd830ab817b8df796082a4 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__camel_CVE-2019-0194_2.21.4",
+      "project": "apache/camel",
+      "url": "https://github.com/apache/camel/tree/757bc836d1d9ed11d11de73c5dc72fc53617d6a0",
+      "framework": "Apache Camel",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 11: CVE-2019-0194 (CWE-022); dataset tag 2.21.4; source identifies buggy commit 757bc836d1d9ed11d11de73c5dc72fc53617d6a0 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:asf__tapestry-5_CVE-2019-0207_5.4.4",
+      "project": "apache/tapestry-5",
+      "url": "https://github.com/apache/tapestry-5/tree/d29cc6778eb0c75e45139274005bba1c4f58907f",
+      "framework": "Apache Tapestry",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 12: CVE-2019-0207 (CWE-022); dataset tag 5.4.4; source identifies buggy commit d29cc6778eb0c75e45139274005bba1c4f58907f and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:spring-cloud__spring-cloud-config_CVE-2020-5410_2.1.8.RELEASE",
+      "project": "spring-cloud/spring-cloud-config",
+      "url": "https://github.com/spring-cloud/spring-cloud-config/tree/91843a9ddc7489275b679568bfce1e4c37af71e1",
+      "framework": "Spring Cloud",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 13: CVE-2020-5410 (CWE-022); dataset tag 2.1.8.RELEASE; source identifies buggy commit 91843a9ddc7489275b679568bfce1e4c37af71e1 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:spring-cloud__spring-cloud-config_CVE-2020-5405_2.1.6.RELEASE",
+      "project": "spring-cloud/spring-cloud-config",
+      "url": "https://github.com/spring-cloud/spring-cloud-config/tree/24e7292e5930367396461354d3f9d8ba8b94771c",
+      "framework": "Spring Cloud",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 14: CVE-2020-5405 (CWE-022); dataset tag 2.1.6.RELEASE; source identifies buggy commit 24e7292e5930367396461354d3f9d8ba8b94771c and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__rocketmq_CVE-2019-17572_4.6.0",
+      "project": "apache/rocketmq",
+      "url": "https://github.com/apache/rocketmq/tree/d1b4e47c26576cf4fa543bbdd8c6f09643220bed",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 15: CVE-2019-17572 (CWE-022); dataset tag 4.6.0; source identifies buggy commit d1b4e47c26576cf4fa543bbdd8c6f09643220bed and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:joniles__mpxj_CVE-2020-35460_8.3.4",
+      "project": "joniles/mpxj",
+      "url": "https://github.com/joniles/mpxj/tree/87ea0ba33e901b87c95a18e3703ac51b59e2ee04",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 16: CVE-2020-35460 (CWE-022); dataset tag 8.3.4; source identifies buggy commit 87ea0ba33e901b87c95a18e3703ac51b59e2ee04 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__flink_CVE-2020-17519_1.11.2",
+      "project": "apache/flink",
+      "url": "https://github.com/apache/flink/tree/fe3613574f76201a8d55d572a639a4ce7e18a9db",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 17: CVE-2020-17519 (CWE-022); dataset tag 1.11.2; source identifies buggy commit fe3613574f76201a8d55d572a639a4ce7e18a9db and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:kubernetes-client__java_CVE-2020-8570_client-java-parent-9.0.1",
+      "project": "kubernetes-client/java",
+      "url": "https://github.com/kubernetes-client/java/tree/796c74f4244cacd90d99393640ccaad0c72f8893",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 18: CVE-2020-8570 (CWE-022); dataset tag client-java-parent-9.0.1; source identifies buggy commit 796c74f4244cacd90d99393640ccaad0c72f8893 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:asf__commons-io_CVE-2021-29425_2.6",
+      "project": "apache/commons-io",
+      "url": "https://github.com/apache/commons-io/tree/2ae025fe5c4a7d2046c53072b0898e37a079fe62",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 19: CVE-2021-29425 (CWE-022); dataset tag 2.6; source identifies buggy commit 2ae025fe5c4a7d2046c53072b0898e37a079fe62 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:asf__karaf_CVE-2022-22932_4.3.5",
+      "project": "apache/karaf",
+      "url": "https://github.com/apache/karaf/tree/d0439e5b0dde1c7e3ff0207c557aa701093acd25",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 20: CVE-2022-22932 (CWE-022); dataset tag 4.3.5; source identifies buggy commit d0439e5b0dde1c7e3ff0207c557aa701093acd25 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:asf__james-project_CVE-2022-22931_3.6.0",
+      "project": "apache/james-project",
+      "url": "https://github.com/apache/james-project/tree/34f9b0b52ab8c84378d3a34ac43a0fef5aa4e8fe",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 21: CVE-2022-22931 (CWE-022); dataset tag 3.6.0; source identifies buggy commit 34f9b0b52ab8c84378d3a34ac43a0fef5aa4e8fe and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:vert-x3__vertx-web_CVE-2019-17640_3.9.3",
+      "project": "vert-x3/vertx-web",
+      "url": "https://github.com/vert-x3/vertx-web/tree/2146b7240096e25b40bb1acc083fa7ec79330989",
+      "framework": "Eclipse Vert.x",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 22: CVE-2019-17640 (CWE-022); dataset tag 3.9.3; source identifies buggy commit 2146b7240096e25b40bb1acc083fa7ec79330989 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:ESAPI__esapi-java-legacy_CVE-2022-23457_2.2.3.1",
+      "project": "ESAPI/esapi-java-legacy",
+      "url": "https://github.com/ESAPI/esapi-java-legacy/tree/2e8694c6beb3bdbb2645b882eba72ce41bc63242",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 23: CVE-2022-23457 (CWE-022); dataset tag 2.2.3.1; source identifies buggy commit 2e8694c6beb3bdbb2645b882eba72ce41bc63242 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:xwiki__xwiki-commons_CVE-2022-24897_12.6.6",
+      "project": "xwiki/xwiki-commons",
+      "url": "https://github.com/xwiki/xwiki-commons/tree/4f33e1efd74016fa9eb31b3c2fcd01bc6becd551",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 24: CVE-2022-24897 (CWE-022); dataset tag 12.6.6; source identifies buggy commit 4f33e1efd74016fa9eb31b3c2fcd01bc6becd551 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:srikanth-lingala__zip4j_CVE-2018-1002202_1.3.2",
+      "project": "srikanth-lingala/zip4j",
+      "url": "https://github.com/iris-sast/zip4j/tree/d87ffa2d64ffb3a0a1cf0c7a69c7b19d7015bfde",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 25: CVE-2018-1002202 (CWE-022); dataset tag 1.3.2; source identifies buggy commit d87ffa2d64ffb3a0a1cf0c7a69c7b19d7015bfde and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:alibaba__one-java-agent_CVE-2022-25842_0.0.1",
+      "project": "alibaba/one-java-agent",
+      "url": "https://github.com/alibaba/one-java-agent/tree/b911af2bb779917c84a016350700745dc31c642a",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 26: CVE-2022-25842 (CWE-022); dataset tag 0.0.1; source identifies buggy commit b911af2bb779917c84a016350700745dc31c642a and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__myfaces_CVE-2011-4367_2.0.11",
+      "project": "apache/myfaces",
+      "url": "https://github.com/apache/myfaces/tree/bedac49daffc3cb792fa19884620af01ab5a01ab",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 27: CVE-2011-4367 (CWE-022); dataset tag 2.0.11; source identifies buggy commit bedac49daffc3cb792fa19884620af01ab5a01ab and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:undertow-io__undertow_CVE-2014-7816_1.0.16.Final",
+      "project": "undertow-io/undertow",
+      "url": "https://github.com/undertow-io/undertow/tree/4aa98c80fa9962235c94f8666c30793d0018f95d",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 28: CVE-2014-7816 (CWE-022); dataset tag 1.0.16.Final; source identifies buggy commit 4aa98c80fa9962235c94f8666c30793d0018f95d and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:jeremylong__DependencyCheck_CVE-2018-12036_3.1.2",
+      "project": "jeremylong/DependencyCheck",
+      "url": "https://github.com/jeremylong/DependencyCheck/tree/c3b5b3c0d7fe7283b4cd421149d6fb620476f67d",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 29: CVE-2018-12036 (CWE-022); dataset tag 3.1.2; source identifies buggy commit c3b5b3c0d7fe7283b4cd421149d6fb620476f67d and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:codehaus-plexus__plexus-archiver_CVE-2018-1002200_3.5",
+      "project": "codehaus-plexus/plexus-archiver",
+      "url": "https://github.com/codehaus-plexus/plexus-archiver/tree/b9f9a425865eb47fb3665b3144ee4ca11f402704",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 30: CVE-2018-1002200 (CWE-022); dataset tag 3.5; source identifies buggy commit b9f9a425865eb47fb3665b3144ee4ca11f402704 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:zeroturnaround__zt-zip_CVE-2018-1002201_1.12",
+      "project": "zeroturnaround/zt-zip",
+      "url": "https://github.com/zeroturnaround/zt-zip/tree/bd3f3d77f3709f901fd5180a493ef32e4dfebfa6",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 31: CVE-2018-1002201 (CWE-022); dataset tag 1.12; source identifies buggy commit bd3f3d77f3709f901fd5180a493ef32e4dfebfa6 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:whitesource__curekit_CVE-2022-23082_1.1.3",
+      "project": "whitesource/CureKit",
+      "url": "https://github.com/whitesource/CureKit/tree/7b275a67a5992165deb186b2b3f7764ddd062d26",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 32: CVE-2022-23082 (CWE-022); dataset tag 1.1.3; source identifies buggy commit 7b275a67a5992165deb186b2b3f7764ddd062d26 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:aws__aws-sdk-java_CVE-2022-31159_1.12.260",
+      "project": "aws/aws-sdk-java",
+      "url": "https://github.com/aws/aws-sdk-java/tree/5555d847a882d4c3094b00ac7cec21a16cf01a3e",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 33: CVE-2022-31159 (CWE-022); dataset tag 1.12.260; source identifies buggy commit 5555d847a882d4c3094b00ac7cec21a16cf01a3e and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:jlangch__venice_CVE-2022-36007_1.10.16",
+      "project": "jlangch/venice",
+      "url": "https://github.com/jlangch/venice/tree/9306c93686100a6bc52ad0c8cb617ed199b5f75c",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 34: CVE-2022-36007 (CWE-022); dataset tag 1.10.16; source identifies buggy commit 9306c93686100a6bc52ad0c8cb617ed199b5f75c and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:DSpace__DSpace_CVE-2022-31195_5.10",
+      "project": "DSpace/DSpace",
+      "url": "https://github.com/DSpace/DSpace/tree/eca7968be7d6b9f8f5f302c9fc09f8186ed4809e",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 35: CVE-2022-31195 (CWE-022); dataset tag 5.10; source identifies buggy commit eca7968be7d6b9f8f5f302c9fc09f8186ed4809e and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:payara__Payara_CVE-2022-37422_5.2022.2",
+      "project": "payara/Payara",
+      "url": "https://github.com/payara/Payara/tree/7680990e55c04d628f16a591f950a2b3a4dcb401",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 36: CVE-2022-37422 (CWE-022); dataset tag 5.2022.2; source identifies buggy commit 7680990e55c04d628f16a591f950a2b3a4dcb401 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:DSpace__DSpace_CVE-2022-31194_5.10",
+      "project": "DSpace/DSpace",
+      "url": "https://github.com/DSpace/DSpace/tree/eca7968be7d6b9f8f5f302c9fc09f8186ed4809e",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 37: CVE-2022-31194 (CWE-022); dataset tag 5.10; source identifies buggy commit eca7968be7d6b9f8f5f302c9fc09f8186ed4809e and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:diffplug__goomph_CVE-2022-26049_3.37.1",
+      "project": "diffplug/goomph",
+      "url": "https://github.com/diffplug/goomph/tree/fe2083196f0d0a75885aea402baaa972254173d5",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 38: CVE-2022-26049 (CWE-022); dataset tag 3.37.1; source identifies buggy commit fe2083196f0d0a75885aea402baaa972254173d5 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__dolphinscheduler_CVE-2022-26884_2.0.5",
+      "project": "apache/dolphinscheduler",
+      "url": "https://github.com/apache/dolphinscheduler/tree/f31328276c12821c21d1ce07e824bc74146c19b2",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 39: CVE-2022-26884 (CWE-022); dataset tag 2.0.5; source identifies buggy commit f31328276c12821c21d1ce07e824bc74146c19b2 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__dolphinscheduler_CVE-2022-34662_2.0.9",
+      "project": "apache/dolphinscheduler",
+      "url": "https://github.com/apache/dolphinscheduler/tree/23302054559410093573fb169336bafeb02db97f",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 40: CVE-2022-34662 (CWE-022); dataset tag 2.0.9; source identifies buggy commit 23302054559410093573fb169336bafeb02db97f and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:testng-team__testng_CVE-2022-4065_7.5",
+      "project": "cbeust/testng",
+      "url": "https://github.com/cbeust/testng/tree/d8adcef70a9e0b8fcef5eab92ca87a8d398cfb89",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 41: CVE-2022-4065 (CWE-022); dataset tag 7.5; source identifies buggy commit d8adcef70a9e0b8fcef5eab92ca87a8d398cfb89 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__uima-uimaj_CVE-2022-32287_3.3.0",
+      "project": "apache/uima-uimaj",
+      "url": "https://github.com/apache/uima-uimaj/tree/f1f557a415ae38e383bf050587a510211515c21d",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 42: CVE-2022-32287 (CWE-022); dataset tag 3.3.0; source identifies buggy commit f1f557a415ae38e383bf050587a510211515c21d and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:keycloak__keycloak_CVE-2022-3782_20.0.1",
+      "project": "keycloak/keycloak",
+      "url": "https://github.com/keycloak/keycloak/tree/cce8ee2b1ab7c925bfbb62d8f12a33e93d943040",
+      "framework": "Keycloak",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 43: CVE-2022-3782 (CWE-022); dataset tag 20.0.1; source identifies buggy commit cce8ee2b1ab7c925bfbb62d8f12a33e93d943040 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:eclipse-ee4j__glassfish_CVE-2022-2712_6.2.5",
+      "project": "eclipse-ee4j/glassfish",
+      "url": "https://github.com/eclipse-ee4j/glassfish/tree/0159b68b362c7f4be78d1fa75aeaf2ec0b997f1d",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 44: CVE-2022-2712 (CWE-022); dataset tag 6.2.5; source identifies buggy commit 0159b68b362c7f4be78d1fa75aeaf2ec0b997f1d and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:hapifhir__org.hl7.fhir.core_CVE-2023-24057_5.6.91",
+      "project": "hapifhir/org.hl7.fhir.core",
+      "url": "https://github.com/hapifhir/org.hl7.fhir.core/tree/7b22d0355b1b12448e50b9cbfe2a8ae63f2ee828",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 45: CVE-2023-24057 (CWE-022); dataset tag 5.6.91; source identifies buggy commit 7b22d0355b1b12448e50b9cbfe2a8ae63f2ee828 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:hapifhir__org.hl7.fhir.core_CVE-2023-28465_5.6.105",
+      "project": "hapifhir/org.hl7.fhir.core",
+      "url": "https://github.com/hapifhir/org.hl7.fhir.core/tree/0b8e2c39841b51def04e29d3b745602517602d5b",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 46: CVE-2023-28465 (CWE-022); dataset tag 5.6.105; source identifies buggy commit 0b8e2c39841b51def04e29d3b745602517602d5b and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:Graylog2__graylog2-server_CVE-2023-41044_5.1.2",
+      "project": "Graylog2/graylog2-server",
+      "url": "https://github.com/Graylog2/graylog2-server/tree/d970230b6f3ecb83e07dd43df56428d1421c40e9",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 47: CVE-2023-41044 (CWE-022); dataset tag 5.1.2; source identifies buggy commit d970230b6f3ecb83e07dd43df56428d1421c40e9 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__mina-sshd_CVE-2023-35887_2.9.2",
+      "project": "apache/mina-sshd",
+      "url": "https://github.com/apache/mina-sshd/tree/fbbbb7b6af7fdf1765f297a96dfec3f198f5fd7d",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 48: CVE-2023-35887 (CWE-022); dataset tag 2.9.2; source identifies buggy commit fbbbb7b6af7fdf1765f297a96dfec3f198f5fd7d and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__shiro_CVE-2023-34478_1.11.0",
+      "project": "apache/shiro",
+      "url": "https://github.com/apache/shiro/tree/adb56c885210eeca710b2df17f6b3aeda85e4f35",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 49: CVE-2023-34478 (CWE-022); dataset tag 1.11.0; source identifies buggy commit adb56c885210eeca710b2df17f6b3aeda85e4f35 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:codehaus-plexus__plexus-archiver_CVE-2023-37460_4.7.1",
+      "project": "codehaus-plexus/plexus-archiver",
+      "url": "https://github.com/codehaus-plexus/plexus-archiver/tree/e7cbadba1b5c78192677da95b355dd790f3a4535",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 50: CVE-2023-37460 (CWE-022); dataset tag 4.7.1; source identifies buggy commit e7cbadba1b5c78192677da95b355dd790f3a4535 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:codehaus-plexus__plexus-utils_CVE-2022-4244_3.0.23",
+      "project": "codehaus-plexus/plexus-utils",
+      "url": "https://github.com/codehaus-plexus/plexus-utils/tree/6176f91bb843eecddac857591ed20bda38e01470",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 51: CVE-2022-4244 (CWE-022); dataset tag 3.0.23; source identifies buggy commit 6176f91bb843eecddac857591ed20bda38e01470 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:yamcs__yamcs_CVE-2023-45278_5.8.6",
+      "project": "yamcs/yamcs",
+      "url": "https://github.com/yamcs/yamcs/tree/9443a67d2aeda20fb73f68c5d571b515d68c05e4",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 52: CVE-2023-45278 (CWE-022); dataset tag 5.8.6; source identifies buggy commit 9443a67d2aeda20fb73f68c5d571b515d68c05e4 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:yamcs__yamcs_CVE-2023-45277_5.8.6",
+      "project": "yamcs/yamcs",
+      "url": "https://github.com/yamcs/yamcs/tree/9443a67d2aeda20fb73f68c5d571b515d68c05e4",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 53: CVE-2023-45277 (CWE-022); dataset tag 5.8.6; source identifies buggy commit 9443a67d2aeda20fb73f68c5d571b515d68c05e4 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__shiro_CVE-2023-46749_1.12.0",
+      "project": "apache/shiro",
+      "url": "https://github.com/apache/shiro/tree/c8a294ab32b29a6e9d4b03bbaa6bae11c42daea1",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 54: CVE-2023-46749 (CWE-022); dataset tag 1.12.0; source identifies buggy commit c8a294ab32b29a6e9d4b03bbaa6bae11c42daea1 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__sling-org-apache-sling-servlets-resolver_CVE-2024-23673_2.10.0",
+      "project": "apache/sling-org-apache-sling-servlets-resolver",
+      "url": "https://github.com/apache/sling-org-apache-sling-servlets-resolver/tree/cb80c5e80144fcd9f6ac283ffb564f3b863cfbb2",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 55: CVE-2024-23673 (CWE-022); dataset tag 2.10.0; source identifies buggy commit cb80c5e80144fcd9f6ac283ffb564f3b863cfbb2 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:x-stream__xstream_CVE-2013-7285_1.4.6",
+      "project": "x-stream/xstream",
+      "url": "https://github.com/x-stream/xstream/tree/768c6e417a75e7732fc591bee844e5e81af56a7d",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 56: CVE-2013-7285 (CWE-078); dataset tag 1.4.6; source identifies buggy commit 768c6e417a75e7732fc591bee844e5e81af56a7d and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:x-stream__xstream_CVE-2020-26217_1.4.14-java7",
+      "project": "x-stream/xstream",
+      "url": "https://github.com/x-stream/xstream/tree/d03f6987b793fac71ab89a31d7aa633c366c5289",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 57: CVE-2020-26217 (CWE-078); dataset tag 1.4.14-java7; source identifies buggy commit d03f6987b793fac71ab89a31d7aa633c366c5289 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:x-stream__xstream_CVE-2021-21345_1.4.15",
+      "project": "x-stream/xstream",
+      "url": "https://github.com/x-stream/xstream/tree/f04bbec461f2c2a6f1e2cf41770f42c64aae24a4",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 58: CVE-2021-21345 (CWE-078); dataset tag 1.4.15; source identifies buggy commit f04bbec461f2c2a6f1e2cf41770f42c64aae24a4 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:jenkinsci__docker-commons-plugin_CVE-2022-20617_1.17",
+      "project": "jenkinsci/docker-commons-plugin",
+      "url": "https://github.com/jenkinsci/docker-commons-plugin/tree/2f0fda49452a7653c33de24220c908786f1aa405",
+      "framework": "Jenkins",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 59: CVE-2022-20617 (CWE-078); dataset tag 1.17; source identifies buggy commit 2f0fda49452a7653c33de24220c908786f1aa405 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:jenkinsci__workflow-cps-plugin_CVE-2022-25173_2646.v6ed3b5b01ff1",
+      "project": "jenkinsci/workflow-cps-plugin",
+      "url": "https://github.com/jenkinsci/workflow-cps-plugin/tree/6ed3b5b01ff16dc4f6f9f4b209dbc21394b13913",
+      "framework": "Jenkins",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 60: CVE-2022-25173 (CWE-078); dataset tag 2646.v6ed3b5b01ff1; source identifies buggy commit 6ed3b5b01ff16dc4f6f9f4b209dbc21394b13913 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:jenkinsci__workflow-cps-global-lib-plugin_CVE-2022-25174_544.vff04fa68714d",
+      "project": "jenkinsci/workflow-cps-global-lib-plugin",
+      "url": "https://github.com/jenkinsci/workflow-cps-global-lib-plugin/tree/ff04fa68714d2cc277e8a87512461bdf3a39e186",
+      "framework": "Jenkins",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 61: CVE-2022-25174 (CWE-078); dataset tag 544.vff04fa68714d; source identifies buggy commit ff04fa68714d2cc277e8a87512461bdf3a39e186 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:jenkinsci__workflow-multibranch-plugin_CVE-2022-25175_706.vd43c65dec013",
+      "project": "jenkinsci/workflow-multibranch-plugin",
+      "url": "https://github.com/jenkinsci/workflow-multibranch-plugin/tree/d43c65dec013812b084fecbb4a310d856eb6b89a",
+      "framework": "Jenkins",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 62: CVE-2022-25175 (CWE-078); dataset tag 706.vd43c65dec013; source identifies buggy commit d43c65dec013812b084fecbb4a310d856eb6b89a and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__activemq_CVE-2014-3576_5.10.1",
+      "project": "apache/activemq",
+      "url": "https://github.com/apache/activemq/tree/8938d14d434447193b02ba635606aa0fb7a80353",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 63: CVE-2014-3576 (CWE-078); dataset tag 5.10.1; source identifies buggy commit 8938d14d434447193b02ba635606aa0fb7a80353 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:codehaus-plexus__plexus-utils_CVE-2017-1000487_3.0.15",
+      "project": "codehaus-plexus/plexus-utils",
+      "url": "https://github.com/codehaus-plexus/plexus-utils/tree/3b271b43f9e5021b4232fc2ffdfb4e469c7f8685",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 64: CVE-2017-1000487 (CWE-078); dataset tag 3.0.15; source identifies buggy commit 3b271b43f9e5021b4232fc2ffdfb4e469c7f8685 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:jenkinsci__git-client-plugin_CVE-2019-10392_2.8.4",
+      "project": "jenkinsci/git-client-plugin",
+      "url": "https://github.com/jenkinsci/git-client-plugin/tree/72add81da4cbeabc95504ebdb9007d47ac1c2b0b",
+      "framework": "Jenkins",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 65: CVE-2019-10392 (CWE-078); dataset tag 2.8.4; source identifies buggy commit 72add81da4cbeabc95504ebdb9007d47ac1c2b0b and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:jenkinsci__perfecto-plugin_CVE-2020-2261_1.17",
+      "project": "jenkinsci/perfecto-plugin",
+      "url": "https://github.com/jenkinsci/perfecto-plugin/tree/adabcd9da98628e063bb91198e30ff39a34dc921",
+      "framework": "Jenkins",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 66: CVE-2020-2261 (CWE-078); dataset tag 1.17; source identifies buggy commit adabcd9da98628e063bb91198e30ff39a34dc921 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__nifi_CVE-2022-33140_1.16.2",
+      "project": "apache/nifi",
+      "url": "https://github.com/apache/nifi/tree/06f04958272dafc30ce357c4c4edcaf470050b52",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 67: CVE-2022-33140 (CWE-078); dataset tag 1.16.2; source identifies buggy commit 06f04958272dafc30ce357c4c4edcaf470050b52 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:jenkinsci__script-security-plugin_CVE-2023-24422_1228.vd93135a_2fb_25",
+      "project": "jenkinsci/script-security-plugin",
+      "url": "https://github.com/jenkinsci/script-security-plugin/tree/d93135a2fb250c04cc361b0bb1efd809bc63ad08",
+      "framework": "Jenkins",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 68: CVE-2023-24422 (CWE-078); dataset tag 1228.vd93135a_2fb_25; source identifies buggy commit d93135a2fb250c04cc361b0bb1efd809bc63ad08 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:nahsra__antisamy_CVE-2016-10006_1.5.3",
+      "project": "nahsra/antisamy",
+      "url": "https://github.com/nahsra/antisamy/tree/8bebe1eb2ec1ac23e34111e9d06024d7dab7fa25",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 69: CVE-2016-10006 (CWE-079); dataset tag 1.5.3; source identifies buggy commit 8bebe1eb2ec1ac23e34111e9d06024d7dab7fa25 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:nahsra__antisamy_CVE-2017-14735_1.5.6",
+      "project": "nahsra/antisamy",
+      "url": "https://github.com/nahsra/antisamy/tree/1369d4c904e1f021d3616580daf9e1d8e43e0ddb",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 70: CVE-2017-14735 (CWE-079); dataset tag 1.5.6; source identifies buggy commit 1369d4c904e1f021d3616580daf9e1d8e43e0ddb and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__jspwiki_CVE-2019-10077_2.11.0.M3",
+      "project": "apache/jspwiki",
+      "url": "https://github.com/apache/jspwiki/tree/2ea7973c1c7fdf2771a9743dbc8ecb27c9bb162d",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 71: CVE-2019-10077 (CWE-079); dataset tag 2.11.0.M3; source identifies buggy commit 2ea7973c1c7fdf2771a9743dbc8ecb27c9bb162d and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__jspwiki_CVE-2019-10076_2.11.0.M3",
+      "project": "apache/jspwiki",
+      "url": "https://github.com/apache/jspwiki/tree/2ea7973c1c7fdf2771a9743dbc8ecb27c9bb162d",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 72: CVE-2019-10076 (CWE-079); dataset tag 2.11.0.M3; source identifies buggy commit 2ea7973c1c7fdf2771a9743dbc8ecb27c9bb162d and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__jspwiki_CVE-2019-10078_2.11.0.M3",
+      "project": "apache/jspwiki",
+      "url": "https://github.com/apache/jspwiki/tree/2ea7973c1c7fdf2771a9743dbc8ecb27c9bb162d",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 73: CVE-2019-10078 (CWE-079); dataset tag 2.11.0.M3; source identifies buggy commit 2ea7973c1c7fdf2771a9743dbc8ecb27c9bb162d and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__jspwiki_CVE-2019-10089_2.11.0.M4",
+      "project": "apache/jspwiki",
+      "url": "https://github.com/apache/jspwiki/tree/6e1dc66adf3faa22e7f1f60189611a3d8ddb0726",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 74: CVE-2019-10089 (CWE-079); dataset tag 2.11.0.M4; source identifies buggy commit 6e1dc66adf3faa22e7f1f60189611a3d8ddb0726 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:hibernate__hibernate-validator_CVE-2019-10219_6.0.17.Final",
+      "project": "hibernate/hibernate-validator",
+      "url": "https://github.com/hibernate/hibernate-validator/tree/7694cff9ed6325006382390c9bb2d8e4f3efedb6",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 75: CVE-2019-10219 (CWE-079); dataset tag 6.0.17.Final; source identifies buggy commit 7694cff9ed6325006382390c9bb2d8e4f3efedb6 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:asf__cxf_CVE-2019-17573_3.2.11",
+      "project": "apache/cxf",
+      "url": "https://github.com/apache/cxf/tree/da2d27d97f9e9abd7d307e2224e5e0338b767ee2",
+      "framework": "Apache CXF",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 76: CVE-2019-17573 (CWE-079); dataset tag 3.2.11; source identifies buggy commit da2d27d97f9e9abd7d307e2224e5e0338b767ee2 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:xuxueli__xxl-job_CVE-2020-29204_2.2.0",
+      "project": "xuxueli/xxl-job",
+      "url": "https://github.com/xuxueli/xxl-job/tree/1874c4854f81d6af4a9471d3fe111cdbf713f336",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 77: CVE-2020-29204 (CWE-079); dataset tag 2.2.0; source identifies buggy commit 1874c4854f81d6af4a9471d3fe111cdbf713f336 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:OWASP__json-sanitizer_CVE-2020-13973_1.2.0",
+      "project": "OWASP/json-sanitizer",
+      "url": "https://github.com/OWASP/json-sanitizer/tree/bb41f80ad575cb90ea6535976d7c17accb4b4c87",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 78: CVE-2020-13973 (CWE-079); dataset tag 1.2.0; source identifies buggy commit bb41f80ad575cb90ea6535976d7c17accb4b4c87 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:eclipse__hawkbit_CVE-2020-27219_0.3.0M6",
+      "project": "eclipse/hawkbit",
+      "url": "https://github.com/eclipse/hawkbit/tree/f3659f01425ad0162f92fa73357f8c507058bcb2",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 79: CVE-2020-27219 (CWE-079); dataset tag 0.3.0M6; source identifies buggy commit f3659f01425ad0162f92fa73357f8c507058bcb2 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:alibaba__nacos_CVE-2021-44667_2.0.3",
+      "project": "alibaba/nacos",
+      "url": "https://github.com/alibaba/nacos/tree/5a4d433970be9b8402f57e65bffa497027f21e30",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 80: CVE-2021-44667 (CWE-079); dataset tag 2.0.3; source identifies buggy commit 5a4d433970be9b8402f57e65bffa497027f21e30 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:nahsra__antisamy_CVE-2022-28367_1.6.5",
+      "project": "nahsra/antisamy",
+      "url": "https://github.com/nahsra/antisamy/tree/b7c151112dd19928e700ee48639942fd1079d1e3",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 81: CVE-2022-28367 (CWE-079); dataset tag 1.6.5; source identifies buggy commit b7c151112dd19928e700ee48639942fd1079d1e3 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:ESAPI__esapi-java-legacy_CVE-2022-24891_2.2.3.1",
+      "project": "ESAPI/esapi-java-legacy",
+      "url": "https://github.com/ESAPI/esapi-java-legacy/tree/2e8694c6beb3bdbb2645b882eba72ce41bc63242",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 82: CVE-2022-24891 (CWE-079); dataset tag 2.2.3.1; source identifies buggy commit 2e8694c6beb3bdbb2645b882eba72ce41bc63242 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:nahsra__antisamy_CVE-2022-29577_1.6.6.1",
+      "project": "nahsra/antisamy",
+      "url": "https://github.com/nahsra/antisamy/tree/b6e76de85a07549f2c97941437dd73430d7287a8",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 83: CVE-2022-29577 (CWE-079); dataset tag 1.6.6.1; source identifies buggy commit b6e76de85a07549f2c97941437dd73430d7287a8 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:rhuss__jolokia_CVE-2018-1000129_1.4.0",
+      "project": "rhuss/jolokia",
+      "url": "https://github.com/rhuss/jolokia/tree/10727cab59a8fc2ae053bec6b2f26f48f1c4245c",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 84: CVE-2018-1000129 (CWE-079); dataset tag 1.4.0; source identifies buggy commit 10727cab59a8fc2ae053bec6b2f26f48f1c4245c and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:keycloak__keycloak_CVE-2014-3656_1.0.5.Final",
+      "project": "keycloak/keycloak",
+      "url": "https://github.com/keycloak/keycloak/tree/3b071b83aa0444749eba851fdbe0f2ed47932410",
+      "framework": "Keycloak",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 85: CVE-2014-3656 (CWE-079); dataset tag 1.0.5.Final; source identifies buggy commit 3b071b83aa0444749eba851fdbe0f2ed47932410 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:asf__cxf_CVE-2016-6812_3.0.11",
+      "project": "apache/cxf",
+      "url": "https://github.com/apache/cxf/tree/6c7df35913ce3fc6ec8f5dc6c6074b187f751aa6",
+      "framework": "Apache CXF",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 86: CVE-2016-6812 (CWE-079); dataset tag 3.0.11; source identifies buggy commit 6c7df35913ce3fc6ec8f5dc6c6074b187f751aa6 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__sling-org-apache-sling-xss_CVE-2016-5394_1.0.8",
+      "project": "apache/sling-org-apache-sling-xss",
+      "url": "https://github.com/apache/sling-org-apache-sling-xss/tree/e23ca68878dd6504066015601b6b76e8fe19b752",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 87: CVE-2016-5394 (CWE-079); dataset tag 1.0.8; source identifies buggy commit e23ca68878dd6504066015601b6b76e8fe19b752 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:DSpace__DSpace_CVE-2022-31192_5.10",
+      "project": "DSpace/DSpace",
+      "url": "https://github.com/DSpace/DSpace/tree/eca7968be7d6b9f8f5f302c9fc09f8186ed4809e",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 88: CVE-2022-31192 (CWE-079); dataset tag 5.10; source identifies buggy commit eca7968be7d6b9f8f5f302c9fc09f8186ed4809e and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:keycloak__keycloak_CVE-2022-4137_20.0.3",
+      "project": "keycloak/keycloak",
+      "url": "https://github.com/keycloak/keycloak/tree/02d113ab71de67817890b655ae792580a4fb8ee2",
+      "framework": "Keycloak",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 89: CVE-2022-4137 (CWE-079); dataset tag 20.0.3; source identifies buggy commit 02d113ab71de67817890b655ae792580a4fb8ee2 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:keycloak__keycloak_CVE-2022-1274_20.0.3",
+      "project": "keycloak/keycloak",
+      "url": "https://github.com/keycloak/keycloak/tree/02d113ab71de67817890b655ae792580a4fb8ee2",
+      "framework": "Keycloak",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 90: CVE-2022-1274 (CWE-079); dataset tag 20.0.3; source identifies buggy commit 02d113ab71de67817890b655ae792580a4fb8ee2 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:xwiki__xwiki-commons_CVE-2023-29201_14.5",
+      "project": "xwiki/xwiki-commons",
+      "url": "https://github.com/xwiki/xwiki-commons/tree/3780c8f6836c7d380f649562e9718a0868112945",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 91: CVE-2023-29201 (CWE-079); dataset tag 14.5; source identifies buggy commit 3780c8f6836c7d380f649562e9718a0868112945 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:xwiki__xwiki-commons_CVE-2023-29528_14.9-rc-1",
+      "project": "xwiki/xwiki-commons",
+      "url": "https://github.com/xwiki/xwiki-commons/tree/7796f76096a3e94b7a0a96bf12b3b026922e3573",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 92: CVE-2023-29528 (CWE-079); dataset tag 14.9-rc-1; source identifies buggy commit 7796f76096a3e94b7a0a96bf12b3b026922e3573 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:xwiki__xwiki-rendering_CVE-2023-32070_14.5",
+      "project": "xwiki/xwiki-rendering",
+      "url": "https://github.com/xwiki/xwiki-rendering/tree/0057b2db748674446ceeacf3a540d42b7295a524",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 93: CVE-2023-32070 (CWE-079); dataset tag 14.5; source identifies buggy commit 0057b2db748674446ceeacf3a540d42b7295a524 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:xwiki__xwiki-commons_CVE-2023-31126_14.10.3",
+      "project": "xwiki/xwiki-commons",
+      "url": "https://github.com/xwiki/xwiki-commons/tree/011dee864805aec0b24151f69f230a42e40087da",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 94: CVE-2023-31126 (CWE-079); dataset tag 14.10.3; source identifies buggy commit 011dee864805aec0b24151f69f230a42e40087da and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__jspwiki_CVE-2022-46907_2.11.3",
+      "project": "apache/jspwiki",
+      "url": "https://github.com/apache/jspwiki/tree/515dff39c66c43318056fa76a20117662d2a0e8d",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 95: CVE-2022-46907 (CWE-079); dataset tag 2.11.3; source identifies buggy commit 515dff39c66c43318056fa76a20117662d2a0e8d and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:keycloak__keycloak_CVE-2022-4361_21.1.1",
+      "project": "keycloak/keycloak",
+      "url": "https://github.com/keycloak/keycloak/tree/0ca0a5fa4459d97c4d769fec15b4ba99c3824314",
+      "framework": "Keycloak",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 96: CVE-2022-4361 (CWE-079); dataset tag 21.1.1; source identifies buggy commit 0ca0a5fa4459d97c4d769fec15b4ba99c3824314 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:xwiki__xwiki-commons_CVE-2023-36471_14.10.5",
+      "project": "xwiki/xwiki-commons",
+      "url": "https://github.com/xwiki/xwiki-commons/tree/8dfb9fcb4f456c70f82ea670ca0e2f3dee373ee4",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 97: CVE-2023-36471 (CWE-079); dataset tag 14.10.5; source identifies buggy commit 8dfb9fcb4f456c70f82ea670ca0e2f3dee373ee4 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:jstachio__jstachio_CVE-2023-33962_1.0.0",
+      "project": "jstachio/jstachio",
+      "url": "https://github.com/jstachio/jstachio/tree/9ce20009d6bf726086fc528fceb174933077bff4",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 98: CVE-2023-33962 (CWE-079); dataset tag 1.0.0; source identifies buggy commit 9ce20009d6bf726086fc528fceb174933077bff4 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:xwiki__xwiki-rendering_CVE-2023-37908_14.10.3",
+      "project": "xwiki/xwiki-rendering",
+      "url": "https://github.com/xwiki/xwiki-rendering/tree/0b0286c4caeab4cc1fdd617ec5bf0a91e6f46762",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 99: CVE-2023-37908 (CWE-079); dataset tag 14.10.3; source identifies buggy commit 0b0286c4caeab4cc1fdd617ec5bf0a91e6f46762 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:SpringSource__spring-security-oauth_CVE-2018-1260_2.3.2.RELEASE",
+      "project": "spring-attic/spring-security-oauth",
+      "url": "https://github.com/spring-attic/spring-security-oauth/tree/97e39dde7e88aae802be98de084a382886ca4255",
+      "framework": "Spring ecosystem",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 100: CVE-2018-1260 (CWE-094); dataset tag 2.3.2.RELEASE; source identifies buggy commit 97e39dde7e88aae802be98de084a382886ca4255 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__activemq_CVE-2019-0222_5.15.8",
+      "project": "apache/activemq",
+      "url": "https://github.com/apache/activemq/tree/bcad7e1f6a6dd078d87787a03b56560e995ef773",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 101: CVE-2019-0222 (CWE-094); dataset tag 5.15.8; source identifies buggy commit bcad7e1f6a6dd078d87787a03b56560e995ef773 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:jmrozanec__cron-utils_CVE-2021-41269_9.1.5",
+      "project": "jmrozanec/cron-utils",
+      "url": "https://github.com/jmrozanec/cron-utils/tree/34493c66edb490396202edad66c5f8cc5717d494",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 102: CVE-2021-41269 (CWE-094); dataset tag 9.1.5; source identifies buggy commit 34493c66edb490396202edad66c5f8cc5717d494 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__struts_CVE-2020-17530_2.5.25",
+      "project": "apache/struts",
+      "url": "https://github.com/apache/struts/tree/b3a9d82d5830ef9cd7811cfa3f86a373ae52fada",
+      "framework": "Apache Struts",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 103: CVE-2020-17530 (CWE-094); dataset tag 2.5.25; source identifies buggy commit b3a9d82d5830ef9cd7811cfa3f86a373ae52fada and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__activemq_CVE-2020-11998_5.15.12",
+      "project": "apache/activemq",
+      "url": "https://github.com/apache/activemq/tree/cebbd7fdea0633e6a0cbbef427f9b753949fa531",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 104: CVE-2020-11998 (CWE-094); dataset tag 5.15.12; source identifies buggy commit cebbd7fdea0633e6a0cbbef427f9b753949fa531 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:spring-projects__spring-framework_CVE-2022-22965_5.2.19.RELEASE",
+      "project": "spring-projects/spring-framework",
+      "url": "https://github.com/spring-projects/spring-framework/tree/925b07826067d57a8a057837a1b5973cb6fad186",
+      "framework": "Spring ecosystem",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 105: CVE-2022-22965 (CWE-094); dataset tag 5.2.19.RELEASE; source identifies buggy commit 925b07826067d57a8a057837a1b5973cb6fad186 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:spring-cloud__spring-cloud-gateway_CVE-2022-22947_3.0.6",
+      "project": "spring-cloud/spring-cloud-gateway",
+      "url": "https://github.com/spring-cloud/spring-cloud-gateway/tree/da0f9014bcc9131d8f15141be74011b89a01420f",
+      "framework": "Spring Cloud",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 106: CVE-2022-22947 (CWE-094); dataset tag 3.0.6; source identifies buggy commit da0f9014bcc9131d8f15141be74011b89a01420f and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__dubbo_CVE-2021-30180_2.7.9",
+      "project": "apache/dubbo",
+      "url": "https://github.com/apache/dubbo/tree/f0483b80a32e813a4393879744e30d0084c3eafd",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 107: CVE-2021-30180 (CWE-094); dataset tag 2.7.9; source identifies buggy commit f0483b80a32e813a4393879744e30d0084c3eafd and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__incubator-dubbo_CVE-2021-30181_2.6.8",
+      "project": "apache/dubbo",
+      "url": "https://github.com/apache/dubbo/tree/5a6a069986f3627f2d50720c50024df31a3dc38a",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 108: CVE-2021-30181 (CWE-094); dataset tag 2.6.8; source identifies buggy commit 5a6a069986f3627f2d50720c50024df31a3dc38a and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:spring-projects__spring-security_CVE-2011-2732_2.0.6.RELEASE",
+      "project": "spring-projects/spring-security",
+      "url": "https://github.com/spring-projects/spring-security/tree/beb0ec4ba95265a7e3481b3eb8d87f3b922733ae",
+      "framework": "Spring ecosystem",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 109: CVE-2011-2732 (CWE-094); dataset tag 2.0.6.RELEASE; source identifies buggy commit beb0ec4ba95265a7e3481b3eb8d87f3b922733ae and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:fabric8io__kubernetes-client_CVE-2021-4178_5.0.2",
+      "project": "fabric8io/kubernetes-client",
+      "url": "https://github.com/fabric8io/kubernetes-client/tree/1d1b3d404836871c4d0fc0a35dafe5d40369b519",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 110: CVE-2021-4178 (CWE-094); dataset tag 5.0.2; source identifies buggy commit 1d1b3d404836871c4d0fc0a35dafe5d40369b519 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:asf__commons-text_CVE-2022-42889_1.9",
+      "project": "apache/commons-text",
+      "url": "https://github.com/apache/commons-text/tree/cb85bed468e99d34b88d0c81fe20eb3b1615660e",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 111: CVE-2022-42889 (CWE-094); dataset tag 1.9; source identifies buggy commit cb85bed468e99d34b88d0c81fe20eb3b1615660e and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:ff4j__ff4j_CVE-2022-44262_1.8.13",
+      "project": "ff4j/ff4j",
+      "url": "https://github.com/ff4j/ff4j/tree/7c34409d320ed1c917c4ec4ac72a99661c4e446f",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 112: CVE-2022-44262 (CWE-094); dataset tag 1.8.13; source identifies buggy commit 7c34409d320ed1c917c4ec4ac72a99661c4e446f and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:codecentric__spring-boot-admin_CVE-2022-46166_2.6.9",
+      "project": "codecentric/spring-boot-admin",
+      "url": "https://github.com/codecentric/spring-boot-admin/tree/650db9e89d80f54b41ebd18f8c27389e8741516d",
+      "framework": "Spring ecosystem",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 113: CVE-2022-46166 (CWE-094); dataset tag 2.6.9; source identifies buggy commit 650db9e89d80f54b41ebd18f8c27389e8741516d and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:xerial__sqlite-jdbc_CVE-2023-32697_3.41.2.1",
+      "project": "xerial/sqlite-jdbc",
+      "url": "https://github.com/xerial/sqlite-jdbc/tree/a3322b2ae802b28624bcd4e2e20c55558e46cf99",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 114: CVE-2023-32697 (CWE-094); dataset tag 3.41.2.1; source identifies buggy commit a3322b2ae802b28624bcd4e2e20c55558e46cf99 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:asf__nifi_CVE-2023-34468_1.21.0",
+      "project": "apache/nifi",
+      "url": "https://github.com/apache/nifi/tree/892f822107da84ca0dcfefdb5c91c5bc11dc3dc1",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 115: CVE-2023-34468 (CWE-094); dataset tag 1.21.0; source identifies buggy commit 892f822107da84ca0dcfefdb5c91c5bc11dc3dc1 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__rocketmq_CVE-2023-37582_4.9.6",
+      "project": "apache/rocketmq",
+      "url": "https://github.com/apache/rocketmq/tree/db4ba459bec9392ac37647ff1a4d24d30466814d",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 116: CVE-2023-37582 (CWE-094); dataset tag 4.9.6; source identifies buggy commit db4ba459bec9392ac37647ff1a4d24d30466814d and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:asf__nifi_CVE-2023-36542_1.22.0",
+      "project": "apache/nifi",
+      "url": "https://github.com/apache/nifi/tree/71e3ea9f2c58d0cf2ce6824c388f2bd3e917dfc8",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 117: CVE-2023-36542 (CWE-094); dataset tag 1.22.0; source identifies buggy commit 71e3ea9f2c58d0cf2ce6824c388f2bd3e917dfc8 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__rocketmq_CVE-2023-33246_5.1.0",
+      "project": "apache/rocketmq",
+      "url": "https://github.com/apache/rocketmq/tree/b8e9334d2a1ed8868a3b15b63b8ef3198fcb81ce",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 118: CVE-2023-33246 (CWE-094); dataset tag 5.1.0; source identifies buggy commit b8e9334d2a1ed8868a3b15b63b8ef3198fcb81ce and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__dolphinscheduler_CVE-2023-51770_3.2.0",
+      "project": "apache/dolphinscheduler",
+      "url": "https://github.com/apache/dolphinscheduler/tree/f64b254809f21f811eaef780d489a43b490ca327",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 119: CVE-2023-51770 (CWE-094); dataset tag 3.2.0; source identifies buggy commit f64b254809f21f811eaef780d489a43b490ca327 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "CWE-Bench-Java:apache__dolphinscheduler_CVE-2023-49109_3.2.0",
+      "project": "apache/dolphinscheduler",
+      "url": "https://github.com/apache/dolphinscheduler/tree/f64b254809f21f811eaef780d489a43b490ca327",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "CWE-Bench-Java inventory row 120: CVE-2023-49109 (CWE-094); dataset tag 3.2.0; source identifies buggy commit f64b254809f21f811eaef780d489a43b490ca327 and fixed commit(s). Unexecuted by Corsair; checkout, dependency resolution, and differential replay remain required."
+    },
+    {
+      "id": "VJBench:Netty-1",
+      "project": "netty/netty",
+      "url": "https://github.com/netty/netty/commit/39cafcb05c99f2aa9fce7e6597664c9ed6a63a95",
+      "framework": "Netty",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2019-16869 (CWE-444); project https://github.com/netty/netty; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Netty-2",
+      "project": "netty/netty",
+      "url": "https://github.com/netty/netty/commit/a7c18d44b46e02dadfe3da225a06e5091f5f328e",
+      "framework": "Netty",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2019-20444 (CWE-444); project https://github.com/netty/netty; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Jenkins-1",
+      "project": "jenkinsci/jenkins",
+      "url": "https://github.com/jenkinsci/jenkins/commit/0f92cd08a19207de2cceb6a2f4e3e9f92fdc0899",
+      "framework": "Jenkins",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2017-2600 (CWE-200,CWE-325); project https://github.com/jenkinsci/jenkins; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Jenkins-2",
+      "project": "jenkinsci/jenkins",
+      "url": "https://github.com/jenkinsci/jenkins/commit/09cfbc9cd5c9df7c763bc976b7f5c51266b63719",
+      "framework": "Jenkins",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2017-2606 (CWE-200); project https://github.com/jenkinsci/jenkins; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Jenkins-3",
+      "project": "jenkinsci/jenkins",
+      "url": "https://github.com/jenkinsci/jenkins/commit/13905d8224899ba7332fe9af4e330ea96a2ae319",
+      "framework": "Jenkins",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2017-2609 (CWE-200); project https://github.com/jenkinsci/jenkins; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Jinjava-1",
+      "project": "HubSpot/jinjava",
+      "url": "https://github.com/HubSpot/jinjava/commit/c13927db0fb7bb3b567469f125be8000f8cbf601",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2018-18893 (unknown); project https://github.com/HubSpot/jinjava; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Halo-1",
+      "project": "halo-dev/halo",
+      "url": "https://github.com/halo-dev/halo/commit/d59877a9ce82b53ec27c7f012a5703280e2cfd4f",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2020-21522 (CWE-22); project https://github.com/halo-dev/halo; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Retrofit-1",
+      "project": "square/retrofit",
+      "url": "https://github.com/square/retrofit/commit/97057aaae42e54bfbee8acfa8af7dcf37e812342",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2018-1000844 (CWE-611); project https://github.com/square/retrofit; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Quartz-1",
+      "project": "quartz-scheduler/quartz",
+      "url": "https://github.com/quartz-scheduler/quartz/commit/c71ebec8ad17580a605d91acba6bc0a230144cc6",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2019-13990 (CWE-611); project https://github.com/quartz-scheduler/quartz; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Flow-1",
+      "project": "vaadin/flow",
+      "url": "https://github.com/vaadin/flow/commit/ca12a54",
+      "framework": "Vaadin Flow",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2021-33604 (CWE-172); project https://github.com/vaadin/flow; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Flow-2",
+      "project": "vaadin/flow",
+      "url": "https://github.com/vaadin/flow/commit/e4cf42f11ce79a309025611295ffafac252ed247",
+      "framework": "Vaadin Flow",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2021-31412 (CWE-668, CWE-1295); project https://github.com/vaadin/flow; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:BC-Java-1",
+      "project": "bcgit/bc-java",
+      "url": "https://github.com/bcgit/bc-java/commit/b0c3ce99d43d73a096268831d0d120ffc89eac7f",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2016-1000338 (CWE-347); project https://github.com/bcgit/bc-java; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Json-sanitizer-1",
+      "project": "OWASP/json-sanitizer",
+      "url": "https://github.com/OWASP/json-sanitizer/commit/f3512bab078af3f5c533dacc2d410add8c0c1124",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2020-13973 (CWE-79); project https://github.com/OWASP/json-sanitizer; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Ratpack-1",
+      "project": "ratpack/ratpack",
+      "url": "https://github.com/ratpack/ratpack/commit/efb910d38a96494256f36675ef0e5061097dd77d",
+      "framework": "Ratpack",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2019-17513 (CWE-74); project https://github.com/ratpack/ratpack; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Pulsar-1",
+      "project": "apache/pulsar",
+      "url": "https://github.com/apache/pulsar/commit/9bfb3dba7c13e8250e1002efdeb39eec56f7e2da",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2021-41571 (CWE-20); project https://github.com/apache/pulsar; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:TorpedoQuery-1",
+      "project": "xjodoin/torpedoquery",
+      "url": "https://github.com/xjodoin/torpedoquery/commit/3c20b874fba9cc2a78b9ace10208de1602b56c3f",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2019-11343 (NVD-CWE-noinfo); project https://github.com/xjodoin/torpedoquery; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Nmap4j-1",
+      "project": "narkisr/nmap4j",
+      "url": "https://github.com/narkisr/nmap4j/commit/06b58aa3345d2f977553685a026b93e61f0c491e",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2018-17228 (CWE-78); project https://github.com/narkisr/nmap4j; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Pac4j-1",
+      "project": "pac4j/pac4j",
+      "url": "https://github.com/pac4j/pac4j/commit/22b82ffd702a132d9f09da60362fc6264fc281ae",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2021-44878 (CWE-347); project https://github.com/pac4j/pac4j; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:JAI-EXT-1",
+      "project": "geosolutions-it/jai-ext",
+      "url": "https://github.com/geosolutions-it/jai-ext/commit/cb1d6565d38954676b0a366da4f965fef38da1cb",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2022-24816 (CWE-94); project https://github.com/geosolutions-it/jai-ext; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Jackson-Modules-1",
+      "project": "FasterXML/jackson-modules-java8",
+      "url": "https://github.com/FasterXML/jackson-modules-java8/commit/f29e03e21eb6ca0c11cda34cf511d245711a70ec",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2018-1000873 (CWE-20); project https://github.com/FasterXML/jackson-modules-java8; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Apollo-1",
+      "project": "ctripcorp/apollo",
+      "url": "https://github.com/apolloconfig/apollo/commit/6ff6ddd47f9be87ad77a6a169cc46996cc5d89dd",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2020-15170 (CWE-20; NVD-CWE-Other;); project https://github.com/ctripcorp/apollo; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Openfire-1",
+      "project": "igniterealtime/Openfire",
+      "url": "https://github.com/igniterealtime/Openfire/commit/e6a9db94f684056ced0d5e5a4291c89488fbeecc",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2019-18394 (CWE-918); project https://github.com/igniterealtime/Openfire; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Jooby-1",
+      "project": "jooby-project/jooby",
+      "url": "https://github.com/jooby-project/jooby/commit/27b4af283de1a2c2a6b0530039b46eef75ddf655",
+      "framework": "Jooby",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2019-15477 (CWE-79); project https://github.com/jooby-project/jooby; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Emissary-1",
+      "project": "NationalSecurityAgency/emissary",
+      "url": "https://github.com/NationalSecurityAgency/emissary/commit/40260b1ec1f76cc92361702cc14fa1e4388e19d7",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2021-32634 (CWE-502); project https://github.com/NationalSecurityAgency/emissary; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Spark-1",
+      "project": "perwendel/spark",
+      "url": "https://github.com/perwendel/spark/commit/efcb46c710e3f56805b9257a63d1306882f4faf9",
+      "framework": "Spark Java",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2016-9177 (CWE-22); project https://github.com/perwendel/spark; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Xwiki-commons-1",
+      "project": "xwiki/xwiki-commons",
+      "url": "https://github.com/xwiki/xwiki-commons/commit/947e8921ebd95462d5a7928f397dd1b64f77c7d5",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2022-24898 (CWE-611); project https://github.com/xwiki/xwiki-commons; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Elide-1",
+      "project": "yahoo/elide",
+      "url": "https://github.com/yahoo/elide/commit/7239e47eca00226550300e5e67cdabbf12145ef0",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2020-5289 (CWE-552; CWE-285); project https://github.com/yahoo/elide; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:GoCD-1",
+      "project": "gocd/gocd-ldap-authentication-plugin",
+      "url": "https://github.com/gocd/gocd-ldap-authentication-plugin/commit/87fa7dac5d899b3960ab48e151881da4793cfcc3",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2022-24832 (CWE-74); project https://github.com/gocd/gocd-ldap-authentication-plugin; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:BC-Java-2",
+      "project": "bcgit/bc-java",
+      "url": "https://github.com/bcgit/bc-java/commit/9385b0ebd277724b167fe1d1456e3c112112be1f",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2016-1000344 (CWE-310); project https://github.com/bcgit/bc-java; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Flow-3",
+      "project": "vaadin/flow",
+      "url": "https://github.com/vaadin/flow/commit/d58da92fb10d94217b720ec17b8dd0858ef726e7",
+      "framework": "Vaadin Flow",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2018-25007 (CWE-754); project https://github.com/vaadin/flow; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:XStream-1",
+      "project": "x-stream/xstream",
+      "url": "https://github.com/x-stream/xstream/commit/0fec095d534126931c99fd38e9c6d41f5c685c1a",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2020-26217 (CWE-78); project https://github.com/x-stream/xstream; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:XStream-2",
+      "project": "x-stream/xstream",
+      "url": "https://github.com/x-stream/xstream/commit/e8e88621ba1c85ac3b8620337dd672e0c0c3a846",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2021-43859 (CWE-400); project https://github.com/x-stream/xstream; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Jackson-databind-1",
+      "project": "FasterXML/jackson-databind",
+      "url": "https://github.com/FasterXML/jackson-databind/commit/ddfddfba6414adbecaff99684ef66eebd3a92e92",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2017-15095 (CWE-502;CWE-184); project https://github.com/FasterXML/jackson-databind; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Jackson-databind-2",
+      "project": "FasterXML/jackson-databind",
+      "url": "https://github.com/FasterXML/jackson-databind/commit/6799f8f10cc78e9af6d443ed6982d00a13f2e7d2",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2018-7489 (CWE-502;CWE-184); project https://github.com/FasterXML/jackson-databind; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Flow-4",
+      "project": "vaadin/flow",
+      "url": "https://github.com/vaadin/flow/commit/19fe3864f9d1567c5ac7a211189986ac093e781f",
+      "framework": "Vaadin Flow",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2020-36321 (CWE-22); project https://github.com/vaadin/flow; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Netty-3",
+      "project": "netty/netty",
+      "url": "https://github.com/netty/netty/commit/07aa6b5938a8b6ed7a6586e066400e2643897323",
+      "framework": "Netty",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2021-43797 (CWE-444); project https://github.com/netty/netty; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Lemminx-1",
+      "project": "eclipse/lemminx",
+      "url": "https://github.com/eclipse/lemminx/commit/48f23ab4dae19268027ede6c923d12e0b5e8d1fe",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2022-0673 (CWE-22); project https://github.com/eclipse/lemminx; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Jdom-1",
+      "project": "hunterhacker/jdom",
+      "url": "https://github.com/hunterhacker/jdom/commit/2a25ee409d09fb3eed75a4272ab8540c5261f960",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2021-33813 (CWE-611); project https://github.com/hunterhacker/jdom; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Lemminx-2",
+      "project": "eclipse/lemminx",
+      "url": "https://github.com/eclipse/lemminx/commit/b46cb1f283c70b85c22221b30a4aff62be495237",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2022-0671 (CWE-400;CWE-918); project https://github.com/eclipse/lemminx; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:Lemminx-3",
+      "project": "eclipse/lemminx",
+      "url": "https://github.com/eclipse/lemminx/commit/076b88052c2a63f60a98ef4b45e3e38c217b70ae",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2022-0672 (CWE-200); project https://github.com/eclipse/lemminx; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:TwelveMonkeys-1",
+      "project": "haraldk/TwelveMonkeys",
+      "url": "https://github.com/haraldk/TwelveMonkeys/commit/da4efe98bf09e1cce91b7633cb251958a200fc80",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2021-23792 (CWE-611); project https://github.com/haraldk/TwelveMonkeys; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "VJBench:CometD-1",
+      "project": "cometd/cometd",
+      "url": "https://github.com/cometd/cometd/commit/bb445a143fbf320f17c62e340455cd74acfb5929",
+      "framework": "Java library/application (framework not classified)",
+      "kind": "real-world CVE candidate",
+      "validation_status": "candidate",
+      "notes": "VJBench inventory: CVE-2022-24721 (CWE-863); project https://github.com/cometd/cometd; dataset human-patch URL is this record. VJBench describes the entry as reproducible, but it has not been executed or validated by Corsair."
+    },
+    {
+      "id": "project:spring-projects/spring-petclinic",
+      "project": "spring-projects/spring-petclinic",
+      "url": "https://github.com/spring-projects/spring-petclinic",
+      "framework": "Spring Boot",
+      "kind": "project candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Public sample application selected for framework/runtime coverage. This is not a claim of a vulnerability, CVE, patch, or test outcome; it is unexecuted by Corsair."
+    },
+    {
+      "id": "project:quarkusio/quarkus-quickstarts",
+      "project": "quarkusio/quarkus-quickstarts",
+      "url": "https://github.com/quarkusio/quarkus-quickstarts",
+      "framework": "Quarkus",
+      "kind": "project candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Public quickstart applications selected for framework/runtime coverage. This is not a claim of a vulnerability, CVE, patch, or test outcome; it is unexecuted by Corsair."
+    },
+    {
+      "id": "project:micronaut-projects/micronaut-core",
+      "project": "micronaut-projects/micronaut-core",
+      "url": "https://github.com/micronaut-projects/micronaut-core",
+      "framework": "Micronaut",
+      "kind": "project candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Public framework source selected for framework/runtime coverage. This is not a claim of a vulnerability, CVE, patch, or test outcome; it is unexecuted by Corsair."
+    },
+    {
+      "id": "project:dropwizard/dropwizard",
+      "project": "dropwizard/dropwizard",
+      "url": "https://github.com/dropwizard/dropwizard",
+      "framework": "Dropwizard",
+      "kind": "project candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Public framework source/examples selected for framework/runtime coverage. This is not a claim of a vulnerability, CVE, patch, or test outcome; it is unexecuted by Corsair."
+    },
+    {
+      "id": "project:javalin/javalin",
+      "project": "javalin/javalin",
+      "url": "https://github.com/javalin/javalin",
+      "framework": "Javalin",
+      "kind": "project candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Public framework source/examples selected for framework/runtime coverage. This is not a claim of a vulnerability, CVE, patch, or test outcome; it is unexecuted by Corsair."
+    },
+    {
+      "id": "project:eclipse-vertx/vert.x",
+      "project": "eclipse-vertx/vert.x",
+      "url": "https://github.com/eclipse-vertx/vert.x",
+      "framework": "Eclipse Vert.x",
+      "kind": "project candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Public framework source/examples selected for framework/runtime coverage. This is not a claim of a vulnerability, CVE, patch, or test outcome; it is unexecuted by Corsair."
+    },
+    {
+      "id": "project:helidon-io/helidon",
+      "project": "helidon-io/helidon",
+      "url": "https://github.com/helidon-io/helidon",
+      "framework": "Helidon",
+      "kind": "project candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Public framework source/examples selected for framework/runtime coverage. This is not a claim of a vulnerability, CVE, patch, or test outcome; it is unexecuted by Corsair."
+    },
+    {
+      "id": "project:playframework/playframework",
+      "project": "playframework/playframework",
+      "url": "https://github.com/playframework/playframework",
+      "framework": "Play Framework",
+      "kind": "project candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Public framework source/examples selected for framework/runtime coverage. This is not a claim of a vulnerability, CVE, patch, or test outcome; it is unexecuted by Corsair."
+    },
+    {
+      "id": "project:apache/camel",
+      "project": "apache/camel",
+      "url": "https://github.com/apache/camel",
+      "framework": "Apache Camel",
+      "kind": "project candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Public integration framework selected for framework/runtime coverage. This is not a claim of a vulnerability, CVE, patch, or test outcome; it is unexecuted by Corsair."
+    },
+    {
+      "id": "project:keycloak/keycloak",
+      "project": "keycloak/keycloak",
+      "url": "https://github.com/keycloak/keycloak",
+      "framework": "Keycloak",
+      "kind": "project candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Public identity platform selected for framework/runtime coverage. This is not a claim of a vulnerability, CVE, patch, or test outcome; it is unexecuted by Corsair."
+    },
+    {
+      "id": "project:jenkinsci/jenkins",
+      "project": "jenkinsci/jenkins",
+      "url": "https://github.com/jenkinsci/jenkins",
+      "framework": "Jenkins",
+      "kind": "project candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Public automation server selected for framework/runtime coverage. This is not a claim of a vulnerability, CVE, patch, or test outcome; it is unexecuted by Corsair."
+    },
+    {
+      "id": "project:grpc/grpc-java",
+      "project": "grpc/grpc-java",
+      "url": "https://github.com/grpc/grpc-java",
+      "framework": "gRPC Java",
+      "kind": "project candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Public RPC framework selected for framework/runtime coverage. This is not a claim of a vulnerability, CVE, patch, or test outcome; it is unexecuted by Corsair."
+    },
+    {
+      "id": "project:apache/kafka",
+      "project": "apache/kafka",
+      "url": "https://github.com/apache/kafka",
+      "framework": "Apache Kafka",
+      "kind": "project candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Public streaming platform selected for framework/runtime coverage. This is not a claim of a vulnerability, CVE, patch, or test outcome; it is unexecuted by Corsair."
+    },
+    {
+      "id": "project:eclipse-jetty/jetty.project",
+      "project": "eclipse-jetty/jetty.project",
+      "url": "https://github.com/eclipse-jetty/jetty.project",
+      "framework": "Eclipse Jetty",
+      "kind": "project candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Public web server/servlet container selected for framework/runtime coverage. This is not a claim of a vulnerability, CVE, patch, or test outcome; it is unexecuted by Corsair."
+    },
+    {
+      "id": "project:vaadin/flow",
+      "project": "vaadin/flow",
+      "url": "https://github.com/vaadin/flow",
+      "framework": "Vaadin Flow",
+      "kind": "project candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Public web framework selected for framework/runtime coverage. This is not a claim of a vulnerability, CVE, patch, or test outcome; it is unexecuted by Corsair."
+    },
+    {
+      "id": "project:WebGoat/WebGoat",
+      "project": "WebGoat/WebGoat",
+      "url": "https://github.com/WebGoat/WebGoat",
+      "framework": "Spring Boot",
+      "kind": "project candidate (not a vulnerability case)",
+      "validation_status": "candidate",
+      "notes": "Public deliberately insecure learning application selected for framework/runtime coverage. This is not a claim of a vulnerability, CVE, patch, or test outcome; it is unexecuted by Corsair."
+    }
+  ]
+}

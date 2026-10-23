@@ -1,0 +1,945 @@
+{
+  "language": "javascript",
+  "sources": [
+    {
+      "name": "SecBench.js",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60",
+      "license": "No repository license declared (GitHub API license is null)",
+      "frameworks": [
+        "Node.js",
+        "npm",
+        "Jest"
+      ],
+      "available_cases": 600,
+      "notes": "Publicly reported server-side JavaScript package vulnerabilities from advisory sources. README states exploit tests, metadata, source links, fixed-version/commit fields when available, and five vulnerability classes. The pinned commit inventory has 600 category package metadata files: 40 code injection, 101 command injection, 170 path traversal, 192 prototype pollution, 97 ReDoS."
+    },
+    {
+      "name": "OpenSSF CVE Benchmark",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark",
+      "license": "MIT",
+      "frameworks": [
+        "JavaScript",
+        "TypeScript",
+        "Node.js",
+        "ESLint",
+        "NodeJSScan",
+        "CodeQL"
+      ],
+      "available_cases": "200+ (218 stated in 2020 announcement)",
+      "notes": "Historical real CVEs with vulnerable and patched codebase analysis; strong differential-SAST source. This catalog does not list individual cases from it because its inventory was not harvested here."
+    },
+    {
+      "name": "x.js live Node.js benchmark",
+      "url": "https://arxiv.org/html/2610.18585",
+      "license": "CC-BY-4.0 for paper; benchmark artifact license/link not established from accessed paper",
+      "frameworks": [
+        "Node.js",
+        "npm",
+        "dynamic taint-style analysis"
+      ],
+      "available_cases": "1,159 validated exploits for 965 packages; built from 1,738 advisories through mid-2026",
+      "notes": "Paper reports code injection, command injection, prototype pollution and path traversal cases with source/sink locations, execution traces, and patch pairing when available. No public case inventory was harvested because the accessed primary paper did not provide one."
+    },
+    {
+      "name": "GitHub Advisory Database",
+      "url": "https://github.com/github/advisory-database",
+      "license": "CC-BY-4.0",
+      "frameworks": [
+        "npm",
+        "OSV"
+      ],
+      "available_cases": "Live npm advisory slice; filter/query required",
+      "notes": "Public individual OSV-format advisories with GHSA IDs, affected ranges, references and, where known, fix commits. Use as a refreshable selector, then pin the advisory file revision and target package release."
+    },
+    {
+      "name": "OSV.dev",
+      "url": "https://osv.dev/",
+      "license": "Varies by underlying data source; OSV format is open",
+      "frameworks": [
+        "npm",
+        "OSV API",
+        "OSV-Scanner"
+      ],
+      "available_cases": "Live aggregated npm inventory; query required",
+      "notes": "Aggregates OSV-format sources and supports package-version and commit queries. Use it for version-range pre-screening; retain original advisory provenance for a benchmark case."
+    },
+    {
+      "name": "PoCGen datasets",
+      "url": "https://github.com/sola-st/PoCGen",
+      "license": "MIT",
+      "frameworks": [
+        "Node.js",
+        "npm",
+        "Docker"
+      ],
+      "available_cases": "SecBench.js inventory plus a GHSA 2025\u20132026 input list; no independent total asserted here",
+      "notes": "A public research artifact that consumes advisory IDs and includes evaluation datasets. It is useful for harness/layout ideas, not independent confirmation of a candidate."
+    },
+    {
+      "name": "OWASP Juice Shop",
+      "url": "https://github.com/juice-shop/juice-shop",
+      "license": "MIT",
+      "frameworks": [
+        "Node.js",
+        "Express",
+        "Angular",
+        "TypeScript"
+      ],
+      "available_cases": "Intentionally vulnerable challenges; no static count asserted",
+      "notes": "Training/CTF application, not a historical vulnerability dataset. Listed only as an explicitly labelled project candidate."
+    },
+    {
+      "name": "OWASP NodeGoat",
+      "url": "https://github.com/owasp/nodegoat",
+      "license": "Apache-2.0",
+      "frameworks": [
+        "Node.js",
+        "MongoDB"
+      ],
+      "available_cases": "OWASP Top 10 training coverage; no static count asserted",
+      "notes": "Intentionally vulnerable training application. Listed only as an explicitly labelled project candidate."
+    },
+    {
+      "name": "Damn Vulnerable NodeJS Application",
+      "url": "https://github.com/appsecco/dvna",
+      "license": "MIT",
+      "frameworks": [
+        "Node.js",
+        "Express",
+        "Passport",
+        "Sequelize"
+      ],
+      "available_cases": "OWASP Top 10 training coverage; no static count asserted",
+      "notes": "Intentionally vulnerable training application with fixes branches. Listed only as an explicitly labelled project candidate."
+    },
+    {
+      "name": "Express",
+      "url": "https://github.com/expressjs/express",
+      "license": "MIT",
+      "frameworks": [
+        "Express",
+        "Node.js"
+      ],
+      "available_cases": 0,
+      "notes": "Framework-repository coverage source; not a vulnerability data source and no vulnerability is asserted."
+    },
+    {
+      "name": "Fastify",
+      "url": "https://github.com/fastify/fastify",
+      "license": "MIT",
+      "frameworks": [
+        "Fastify",
+        "Node.js"
+      ],
+      "available_cases": 0,
+      "notes": "Framework-repository coverage source; not a vulnerability data source and no vulnerability is asserted."
+    },
+    {
+      "name": "Koa",
+      "url": "https://github.com/koajs/koa",
+      "license": "MIT",
+      "frameworks": [
+        "Koa",
+        "Node.js"
+      ],
+      "available_cases": 0,
+      "notes": "Framework-repository coverage source; not a vulnerability data source and no vulnerability is asserted."
+    },
+    {
+      "name": "Nest",
+      "url": "https://github.com/nestjs/nest",
+      "license": "MIT",
+      "frameworks": [
+        "NestJS",
+        "TypeScript",
+        "JavaScript",
+        "Node.js"
+      ],
+      "available_cases": 0,
+      "notes": "Framework-repository coverage source; not a vulnerability data source and no vulnerability is asserted."
+    },
+    {
+      "name": "Next.js",
+      "url": "https://github.com/vercel/next.js",
+      "license": "MIT",
+      "frameworks": [
+        "Next.js",
+        "React",
+        "Node.js"
+      ],
+      "available_cases": 0,
+      "notes": "Framework-repository coverage source; not a vulnerability data source and no vulnerability is asserted."
+    },
+    {
+      "name": "Strapi",
+      "url": "https://github.com/strapi/strapi",
+      "license": "NOASSERTION in GitHub API; verify repository terms before reuse",
+      "frameworks": [
+        "Strapi",
+        "JavaScript",
+        "TypeScript",
+        "Node.js"
+      ],
+      "available_cases": 0,
+      "notes": "Framework-repository coverage source; not a vulnerability data source and no vulnerability is asserted."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "SECBENCHJS:code-injection/access-policy_3.1.0",
+      "project": "access-policy",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/code-injection/access-policy_3.1.0",
+      "framework": "Node.js/npm",
+      "kind": "code-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `code-injection/access-policy_3.1.0`; package `access-policy@3.1.0`; metadata id `CVE-2020-7674`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-ACCESSPOLICY-571490; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:code-injection/cd-messenger_2.7.24",
+      "project": "cd-messenger",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/code-injection/cd-messenger_2.7.24",
+      "framework": "Node.js/npm",
+      "kind": "code-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `code-injection/cd-messenger_2.7.24`; package `cd-messenger@2.7.24`; metadata id `CVE-2020-7675`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-CDMESSENGER-571493; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:code-injection/djv_2.0.0",
+      "project": "djv",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/code-injection/djv_2.0.0",
+      "framework": "Node.js/npm",
+      "kind": "code-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `code-injection/djv_2.0.0`; package `djv@2.0.0`; metadata id `CVE-2020-28464`; reported fixedVersion `2.1.4`; advisory reference: https://github.com/advisories/GHSA-4hv7-3q38-97m8; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:code-injection/hot-formula-parser_3.0.0",
+      "project": "hot-formula-parser",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/code-injection/hot-formula-parser_3.0.0",
+      "framework": "Node.js/npm",
+      "kind": "code-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `code-injection/hot-formula-parser_3.0.0`; package `hot-formula-parser@3.0.0`; metadata id `CVE-2020-6836`; reported fixedVersion `3.0.1`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-HOTFORMULAPARSER-541328; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:code-injection/is-my-json-valid_2.20.0",
+      "project": "is-my-json-valid",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/code-injection/is-my-json-valid_2.20.0",
+      "framework": "Node.js/npm",
+      "kind": "code-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `code-injection/is-my-json-valid_2.20.0`; package `is-my-json-valid@2.20.0`; metadata has no CVE id; reported fixedVersion `2.20.3`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-ISMYJSONVALID-597167; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:code-injection/js-yaml_3.13.0",
+      "project": "js-yaml",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/code-injection/js-yaml_3.13.0",
+      "framework": "Node.js/npm",
+      "kind": "code-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `code-injection/js-yaml_3.13.0`; package `js-yaml@3.13.0`; metadata has no CVE id; reported fixedVersion `3.13.1`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-JSYAML-174129; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:code-injection/jsen_0.6.6",
+      "project": "jsen",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/code-injection/jsen_0.6.6",
+      "framework": "Node.js/npm",
+      "kind": "code-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `code-injection/jsen_0.6.6`; package `jsen@0.6.6`; metadata id `CVE-2020-7777`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-JSEN-1014670; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:code-injection/json-ptr_2.0.0",
+      "project": "json-ptr",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/code-injection/json-ptr_2.0.0",
+      "framework": "Node.js/npm",
+      "kind": "code-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `code-injection/json-ptr_2.0.0`; package `json-ptr@2.0.0`; metadata id `CVE-2020-7766`; reported fixedVersion `2.0.0`; advisory reference: https://github.com/advisories/GHSA-x5r6-x823-9848; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:code-injection/kmc_1.2.2",
+      "project": "kmc",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/code-injection/kmc_1.2.2",
+      "framework": "Node.js/npm",
+      "kind": "code-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `code-injection/kmc_1.2.2`; package `kmc@1.2.2`; metadata has no CVE id; advisory reference: https://security.snyk.io/vuln/npm:kmc:20160407; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:code-injection/local-devices_2.0.0",
+      "project": "local-devices",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/code-injection/local-devices_2.0.0",
+      "framework": "Node.js/npm",
+      "kind": "code-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `code-injection/local-devices_2.0.0`; package `local-devices@2.0.0`; metadata has no CVE id; reported fixedVersion `3.0.0`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-LOCALDEVICES-459898; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:code-injection/m-log_0.0.1",
+      "project": "m-log",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/code-injection/m-log_0.0.1",
+      "framework": "Node.js/npm",
+      "kind": "code-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `code-injection/m-log_0.0.1`; package `m-log@0.0.1`; metadata has no CVE id; advisory reference: https://security.snyk.io/vuln/npm:m-log:20160408; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:code-injection/marsdb_0.6.11",
+      "project": "marsdb",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/code-injection/marsdb_0.6.11",
+      "framework": "Node.js/npm",
+      "kind": "code-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `code-injection/marsdb_0.6.11`; package `marsdb@0.6.11`; metadata has no CVE id; advisory reference: https://security.snyk.io/vuln/SNYK-JS-MARSDB-480405; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:code-injection/mathjs_3.10.3",
+      "project": "mathjs",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/code-injection/mathjs_3.10.3",
+      "framework": "Node.js/npm",
+      "kind": "code-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `code-injection/mathjs_3.10.3`; package `mathjs@3.10.3`; metadata has no CVE id; reported fixedVersion `3.11.5`; advisory reference: https://security.snyk.io/vuln/npm:mathjs:20170402; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:code-injection/mathjs_3.9.0",
+      "project": "mathjs",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/code-injection/mathjs_3.9.0",
+      "framework": "Node.js/npm",
+      "kind": "code-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `code-injection/mathjs_3.9.0`; package `mathjs@3.9.0`; metadata has no CVE id; reported fixedVersion `3.11.5`; advisory reference: https://security.snyk.io/vuln/npm:mathjs:20170402; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:code-injection/mixin-pro_0.6.0",
+      "project": "mixin-pro",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/code-injection/mixin-pro_0.6.0",
+      "framework": "Node.js/npm",
+      "kind": "code-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `code-injection/mixin-pro_0.6.0`; package `mixin-pro@0.6.0`; metadata has no CVE id; reported fixedVersion `0.6.7`; advisory reference: https://security.snyk.io/vuln/npm:mixin-pro:20160407; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:command-injection/aaptjs_1.3.1",
+      "project": "aaptjs",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/command-injection/aaptjs_1.3.1",
+      "framework": "Node.js/npm",
+      "kind": "command-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `command-injection/aaptjs_1.3.1`; package `aaptjs@1.3.1`; metadata id `CVE-2020-26707`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-AAPTJS-1769273; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:command-injection/adb-driver_0.1.8",
+      "project": "adb-driver",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/command-injection/adb-driver_0.1.8",
+      "framework": "Node.js/npm",
+      "kind": "command-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `command-injection/adb-driver_0.1.8`; package `adb-driver@0.1.8`; metadata id `CVE-2020-7636`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-ADBDRIVER-564430; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:command-injection/alfred-workflow-nodejs_2.0.1",
+      "project": "alfred-workflow-nodejs",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/command-injection/alfred-workflow-nodejs_2.0.1",
+      "framework": "Node.js/npm",
+      "kind": "command-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `command-injection/alfred-workflow-nodejs_2.0.1`; package `alfred-workflow-nodejs@2.0.1`; metadata id `CVE-2018-16462`; reported fixedVersion `2.0.1`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-ALFREDWORKFLOWNODEJS-608975; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:command-injection/apex-publish-static-files_2.0.0",
+      "project": "apex-publish-static-files",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/command-injection/apex-publish-static-files_2.0.0",
+      "framework": "Node.js/npm",
+      "kind": "command-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `command-injection/apex-publish-static-files_2.0.0`; package `apex-publish-static-files@2.0.0`; metadata id `CVE-2018-16462`; reported fixedVersion `2.0.1`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-APEXPUBLISHSTATICFILES-72552; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:command-injection/apiconnect-cli-plugins_6.0.2",
+      "project": "apiconnect-cli-plugins",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/command-injection/apiconnect-cli-plugins_6.0.2",
+      "framework": "Node.js/npm",
+      "kind": "command-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `command-injection/apiconnect-cli-plugins_6.0.2`; package `apiconnect-cli-plugins@6.0.2`; metadata id `CVE-2020-7633`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-APICONNECTCLIPLUGINS-564427; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:command-injection/arpping_2.0.0",
+      "project": "arpping",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/command-injection/arpping_2.0.0",
+      "framework": "Node.js/npm",
+      "kind": "command-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `command-injection/arpping_2.0.0`; package `arpping@2.0.0`; metadata has no CVE id; reported fixedVersion `3.0.0`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-ARPPING-1060047; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:command-injection/async-git_1.13.1",
+      "project": "async-git",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/command-injection/async-git_1.13.1",
+      "framework": "Node.js/npm",
+      "kind": "command-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `command-injection/async-git_1.13.1`; package `async-git@1.13.1`; metadata id `CVE-2020-28490`; reported fixedVersion `1.13.2`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-ASYNCGIT-1064877; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:command-injection/bestzip_2.1.6",
+      "project": "bestzip",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/command-injection/bestzip_2.1.6",
+      "framework": "Node.js/npm",
+      "kind": "command-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `command-injection/bestzip_2.1.6`; package `bestzip@2.1.6`; metadata id `CVE-2020-7730`; reported fixedVersion `2.1.7`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-BESTZIP-609371; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:command-injection/blamer_0.1.13",
+      "project": "blamer",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/command-injection/blamer_0.1.13",
+      "framework": "Node.js/npm",
+      "kind": "command-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `command-injection/blamer_0.1.13`; package `blamer@0.1.13`; metadata id `CVE-2019-10807`; reported fixedVersion `1.0.1`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-BLAMER-559541; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:command-injection/buns_1.1.6",
+      "project": "buns",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/command-injection/buns_1.1.6",
+      "framework": "Node.js/npm",
+      "kind": "command-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `command-injection/buns_1.1.6`; package `buns@1.1.6`; metadata id `CVE-2020-7794`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-BUNS-1050389; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:command-injection/clamscan_1.2.0",
+      "project": "clamscan",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/command-injection/clamscan_1.2.0",
+      "framework": "Node.js/npm",
+      "kind": "command-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `command-injection/clamscan_1.2.0`; package `clamscan@1.2.0`; metadata id `CVE-2020-7613`; reported fixedVersion `1.3.0`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-CLAMSCAN-564113; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:command-injection/codecov_3.6.4",
+      "project": "codecov",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/command-injection/codecov_3.6.4",
+      "framework": "Node.js/npm",
+      "kind": "command-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `command-injection/codecov_3.6.4`; package `codecov@3.6.4`; metadata id `CVE-2020-15123`; reported fixedVersion `3.7.1`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-CODECOV-585979; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:command-injection/command-exists_1.2.2",
+      "project": "command-exists",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/command-injection/command-exists_1.2.2",
+      "framework": "Node.js/npm",
+      "kind": "command-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `command-injection/command-exists_1.2.2`; package `command-exists@1.2.2`; metadata id `CVE-2019-10776`; reported fixedVersion `0.22.2`; advisory reference: https://security.snyk.io/vuln/npm:command-exists:20180512; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:command-injection/compass-compile_0.0.1",
+      "project": "compass-compile",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/command-injection/compass-compile_0.0.1",
+      "framework": "Node.js/npm",
+      "kind": "command-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `command-injection/compass-compile_0.0.1`; package `compass-compile@0.0.1`; metadata id `CVE-2020-7635`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-COMPASSCOMPILE-564429; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:command-injection/connection-tester_0.2.0",
+      "project": "connection-tester",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/command-injection/connection-tester_0.2.0",
+      "framework": "Node.js/npm",
+      "kind": "command-injection",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `command-injection/connection-tester_0.2.0`; package `connection-tester@0.2.0`; metadata id `CVE-2020-7781`; reported fixedVersion `0.2.1`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-CONNECTIONTESTER-1048337; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:path-traversal/11xiaoli_1.1.0",
+      "project": "11xiaoli",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/path-traversal/11xiaoli_1.1.0",
+      "framework": "Node.js/npm",
+      "kind": "path-traversal",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `path-traversal/11xiaoli_1.1.0`; package `11xiaoli@1.1.0`; metadata id `CVE-2017-16160`; advisory reference: https://security.snyk.io/vuln/npm:11xiaoli:20170509; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:path-traversal/22lixian_1.0.0",
+      "project": "22lixian",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/path-traversal/22lixian_1.0.0",
+      "framework": "Node.js/npm",
+      "kind": "path-traversal",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `path-traversal/22lixian_1.0.0`; package `22lixian@1.0.0`; metadata id `CVE-2017-16162`; advisory reference: https://security.snyk.io/vuln/npm:22lixian:20170511; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:path-traversal/@vivaxy-here_3.1.0",
+      "project": "@vivaxy/here",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/path-traversal/%40vivaxy-here_3.1.0",
+      "framework": "Node.js/npm",
+      "kind": "path-traversal",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `path-traversal/@vivaxy-here_3.1.0`; package `@vivaxy/here@3.1.0`; metadata has no CVE id; reported fixedVersion `3.2.2`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-VIVAXYHERE-455285; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:path-traversal/angular-http-server_1.0.0",
+      "project": "angular-http-server",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/path-traversal/angular-http-server_1.0.0",
+      "framework": "Node.js/npm",
+      "kind": "path-traversal",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `path-traversal/angular-http-server_1.0.0`; package `angular-http-server@1.0.0`; metadata has no CVE id; reported fixedVersion `1.4.4`; advisory reference: https://security.snyk.io/vuln/npm:angular-http-server:20180426; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:path-traversal/api-proxy_0.0.2",
+      "project": "api-proxy",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/path-traversal/api-proxy_0.0.2",
+      "framework": "Node.js/npm",
+      "kind": "path-traversal",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `path-traversal/api-proxy_0.0.2`; package `api-proxy@0.0.2`; metadata has no CVE id; advisory reference: https://security.snyk.io/vuln/npm:api-proxy:20180226; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:path-traversal/aso-server_0.4.3",
+      "project": "sleep",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/path-traversal/aso-server_0.4.3",
+      "framework": "Node.js/npm",
+      "kind": "path-traversal",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `path-traversal/aso-server_0.4.3`; package `sleep@^6.3.0`; metadata has no CVE id; advisory reference: https://security.snyk.io/vuln/npm:aso-server:20180226; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:path-traversal/asset-cache_0.0.6",
+      "project": "asset-cache",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/path-traversal/asset-cache_0.0.6",
+      "framework": "Node.js/npm",
+      "kind": "path-traversal",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `path-traversal/asset-cache_0.0.6`; package `asset-cache@0.0.6`; metadata has no CVE id; advisory reference: https://security.snyk.io/vuln/npm:asset-cache:20180226; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:path-traversal/atropa-ide_0.2.2-2",
+      "project": "atropa-ide",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/path-traversal/atropa-ide_0.2.2-2",
+      "framework": "Node.js/npm",
+      "kind": "path-traversal",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `path-traversal/atropa-ide_0.2.2-2`; package `atropa-ide@0.2.2-2`; metadata has no CVE id; advisory reference: https://security.snyk.io/vuln/npm:atropa-ide:20180226; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:path-traversal/augustine_0.2.3",
+      "project": "augustine",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/path-traversal/augustine_0.2.3",
+      "framework": "Node.js/npm",
+      "kind": "path-traversal",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `path-traversal/augustine_0.2.3`; package `augustine@0.2.3`; metadata id `CVE-2017-0930`; advisory reference: https://security.snyk.io/vuln/npm:augustine:20180123; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:path-traversal/basic-static_2.0.2",
+      "project": "basic-static",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/path-traversal/basic-static_2.0.2",
+      "framework": "Node.js/npm",
+      "kind": "path-traversal",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `path-traversal/basic-static_2.0.2`; package `basic-static@2.0.2`; metadata has no CVE id; advisory reference: https://security.snyk.io/vuln/npm:basic-static:20180226; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:path-traversal/bitty_0.1.0",
+      "project": "bitty",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/path-traversal/bitty_0.1.0",
+      "framework": "Node.js/npm",
+      "kind": "path-traversal",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `path-traversal/bitty_0.1.0`; package `bitty@0.1.0`; metadata id `CVE-2016-10561`; advisory reference: https://security.snyk.io/vuln/npm:bitty:20161014; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:path-traversal/caihong_1.0.0",
+      "project": "caihong",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/path-traversal/caihong_1.0.0",
+      "framework": "Node.js/npm",
+      "kind": "path-traversal",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `path-traversal/caihong_1.0.0`; package `caihong@1.0.0`; metadata has no CVE id; advisory reference: https://security.snyk.io/vuln/npm:caihong:20180226; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:path-traversal/canvas-designer_1.2.1",
+      "project": "canvas-designer",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/path-traversal/canvas-designer_1.2.1",
+      "framework": "Node.js/npm",
+      "kind": "path-traversal",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `path-traversal/canvas-designer_1.2.1`; package `canvas-designer@1.2.1`; metadata has no CVE id; advisory reference: https://security.snyk.io/vuln/npm:canvas-designer:20180226; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:path-traversal/caolilinode1_1.0.0",
+      "project": "caolilinode1",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/path-traversal/caolilinode1_1.0.0",
+      "framework": "Node.js/npm",
+      "kind": "path-traversal",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `path-traversal/caolilinode1_1.0.0`; package `caolilinode1@1.0.0`; metadata has no CVE id; advisory reference: https://security.snyk.io/vuln/npm:caolilinode1:20180226; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:path-traversal/caolilinode_1.0.0",
+      "project": "caolilinode",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/path-traversal/caolilinode_1.0.0",
+      "framework": "Node.js/npm",
+      "kind": "path-traversal",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `path-traversal/caolilinode_1.0.0`; package `caolilinode@1.0.0`; metadata id `CVE-2017-16159`; advisory reference: https://security.snyk.io/vuln/npm:caolilinode:20170617; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:prototype-pollution/101_1.0.0",
+      "project": "101",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/prototype-pollution/101_1.0.0",
+      "framework": "Node.js/npm",
+      "kind": "prototype-pollution",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `prototype-pollution/101_1.0.0`; package `101@1.0.0`; metadata id `CVE-2021-25943`; advisory reference: https://github.com/advisories/GHSA-cwcx-rxgc-cmw3; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:prototype-pollution/Proto_1.1.4",
+      "project": "Proto",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/prototype-pollution/Proto_1.1.4",
+      "framework": "Node.js/npm",
+      "kind": "prototype-pollution",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `prototype-pollution/Proto_1.1.4`; package `Proto@1.1.4`; metadata id `CVE-2021-23426`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-PROTO-1316301; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:prototype-pollution/Templ8_0.7.0",
+      "project": "Templ8",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/prototype-pollution/Templ8_0.7.0",
+      "framework": "Node.js/npm",
+      "kind": "prototype-pollution",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `prototype-pollution/Templ8_0.7.0`; package `Templ8@0.7.0`; metadata id `CVE-2020-7702`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-TEMPL8-598770; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:prototype-pollution/algoliasearch-helper_3.6.0",
+      "project": "algoliasearch-helper",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/prototype-pollution/algoliasearch-helper_3.6.0",
+      "framework": "Node.js/npm",
+      "kind": "prototype-pollution",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `prototype-pollution/algoliasearch-helper_3.6.0`; package `algoliasearch-helper@3.6.0`; metadata id `CVE-2021-23433`; reported fixedVersion `3.6.2`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-ALGOLIASEARCHHELPER-1570421; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:prototype-pollution/arr-flatten-unflatten_1.1.4",
+      "project": "arr-flatten-unflatten",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/prototype-pollution/arr-flatten-unflatten_1.1.4",
+      "framework": "Node.js/npm",
+      "kind": "prototype-pollution",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `prototype-pollution/arr-flatten-unflatten_1.1.4`; package `arr-flatten-unflatten@1.1.4`; metadata id `CVE-2020-7713`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-ARRFLATTENUNFLATTEN-598396; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:prototype-pollution/asciitable.js_1.0.2",
+      "project": "asciitable.js",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/prototype-pollution/asciitable.js_1.0.2",
+      "framework": "Node.js/npm",
+      "kind": "prototype-pollution",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `prototype-pollution/asciitable.js_1.0.2`; package `asciitable.js@1.0.2`; metadata id `CVE-2020-7771`; reported fixedVersion `1.0.3`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-ASCIITABLEJS-1039799; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:prototype-pollution/assign-deep_1.0.0",
+      "project": "assign-deep",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/prototype-pollution/assign-deep_1.0.0",
+      "framework": "Node.js/npm",
+      "kind": "prototype-pollution",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `prototype-pollution/assign-deep_1.0.0`; package `assign-deep@1.0.0`; metadata id `CVE-2019-10745`; reported fixedVersion `1.0.1`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-ASSIGNDEEP-450211; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:prototype-pollution/aurelia-path_1.1.7",
+      "project": "aurelia-path",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/prototype-pollution/aurelia-path_1.1.7",
+      "framework": "Node.js/npm",
+      "kind": "prototype-pollution",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `prototype-pollution/aurelia-path_1.1.7`; package `aurelia-path@1.1.0`; metadata id `CVE-2021-41097`; reported fixedVersion `1.1.7`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-AURELIAPATH-1292346; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:prototype-pollution/aws-sdk-shared-ini-file-loader_1.0.0-rc.8",
+      "project": "@aws-sdk/shared-ini-file-loader",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/prototype-pollution/aws-sdk-shared-ini-file-loader_1.0.0-rc.8",
+      "framework": "Node.js/npm",
+      "kind": "prototype-pollution",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `prototype-pollution/aws-sdk-shared-ini-file-loader_1.0.0-rc.8`; package `@aws-sdk/shared-ini-file-loader@1.0.0-rc.8`; metadata id `CVE-2020-28472`; reported fixedVersion `1.0.0-rc.9`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-AWSSDKSHAREDINIFILELOADER-1049304; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:prototype-pollution/bmoor_0.8.11",
+      "project": "bmoor",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/prototype-pollution/bmoor_0.8.11",
+      "framework": "Node.js/npm",
+      "kind": "prototype-pollution",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `prototype-pollution/bmoor_0.8.11`; package `bmoor@0.8.11`; metadata id `CVE-2020-7736`; reported fixedVersion `0.8.12`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-BMOOR-598664; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:prototype-pollution/bodymen_1.0.0",
+      "project": "bodymen",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/prototype-pollution/bodymen_1.0.0",
+      "framework": "Node.js/npm",
+      "kind": "prototype-pollution",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `prototype-pollution/bodymen_1.0.0`; package `bodymen@1.0.0`; metadata id `CVE-2019-10792`; reported fixedVersion `1.1.1`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-BODYMEN-548897; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:prototype-pollution/brikcss-merge_1.3.0",
+      "project": "@brikcss/merge",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/prototype-pollution/brikcss-merge_1.3.0",
+      "framework": "Node.js/npm",
+      "kind": "prototype-pollution",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `prototype-pollution/brikcss-merge_1.3.0`; package `@brikcss/merge@1.3.0`; metadata has no CVE id; advisory reference: https://security.snyk.io/vuln/SNYK-JS-BRIKCSSMERGE-1727594; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:prototype-pollution/cached-path-relative_1.0.1",
+      "project": "cached-path-relative",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/prototype-pollution/cached-path-relative_1.0.1",
+      "framework": "Node.js/npm",
+      "kind": "prototype-pollution",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `prototype-pollution/cached-path-relative_1.0.1`; package `cached-path-relative@1.0.1`; metadata id `CVE-2018-16472`; reported fixedVersion `1.0.2`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-CACHEDPATHRELATIVE-72573; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:prototype-pollution/changeset_0.1.0",
+      "project": "changeset",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/prototype-pollution/changeset_0.1.0",
+      "framework": "Node.js/npm",
+      "kind": "prototype-pollution",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `prototype-pollution/changeset_0.1.0`; package `changeset@0.1.0`; metadata id `CVE-2021-25915`; reported fixedVersion `0.2.6`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-CHANGESET-1083989; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:prototype-pollution/class-transformer_0.1.1",
+      "project": "class-transformer",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/prototype-pollution/class-transformer_0.1.1",
+      "framework": "Node.js/npm",
+      "kind": "prototype-pollution",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `prototype-pollution/class-transformer_0.1.1`; package `class-transformer@0.1.1`; metadata id `CVE-2020-7637`; reported fixedVersion `0.3.1`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-CLASSTRANSFORMER-564431; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:redos/ajv_5.2.2",
+      "project": "ajv",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/redos/ajv_5.2.2",
+      "framework": "Node.js/npm",
+      "kind": "redos",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `redos/ajv_5.2.2`; package `ajv@5.2.2`; metadata id `CVE-2020-15366`; reported fixedVersion `6.12.3`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-AJV-584908; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:redos/amqp-match_0.0.0",
+      "project": "amqp-match",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/redos/amqp-match_0.0.0",
+      "framework": "Node.js/npm",
+      "kind": "redos",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `redos/amqp-match_0.0.0`; package `amqp-match@0.0.0`; metadata has no CVE id; advisory reference: https://security.snyk.io/vuln/npm:amqp-match:20170515; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:redos/ansi-html_0.0.7",
+      "project": "ansi-html",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/redos/ansi-html_0.0.7",
+      "framework": "Node.js/npm",
+      "kind": "redos",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `redos/ansi-html_0.0.7`; package `ansi-html@0.0.7`; metadata id `CVE-2021-23424`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-ANSIHTML-1296849; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:redos/ansi-regex_4.1.0",
+      "project": "ansi-regex",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/redos/ansi-regex_4.1.0",
+      "framework": "Node.js/npm",
+      "kind": "redos",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `redos/ansi-regex_4.1.0`; package `ansi-regex@4.1.0`; metadata id `CVE-2021-3807`; reported fixedVersion `>=2.1.1 <3.0.1 >=4.0.0 <4.1.1 >=5.0.0 <5.0.1 >=6.0.0 <6.0.1`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-ANSIREGEX-1583908; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:redos/axios_0.21.0",
+      "project": "axios",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/redos/axios_0.21.0",
+      "framework": "Node.js/npm",
+      "kind": "redos",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `redos/axios_0.21.0`; package `axios@0.21.0`; metadata id `CVE-2021-3749`; reported fixedVersion `0.21.3`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-AXIOS-1579269; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:redos/brace-expansion_1.1.6",
+      "project": "brace-expansion",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/redos/brace-expansion_1.1.6",
+      "framework": "Node.js/npm",
+      "kind": "redos",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `redos/brace-expansion_1.1.6`; package `brace-expansion@1.1.6`; metadata id `CVE-2017-18077`; reported fixedVersion `1.1.7`; advisory reference: https://security.snyk.io/vuln/npm:brace-expansion:20170302; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:redos/browserslist_4.16.4",
+      "project": "browserslist",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/redos/browserslist_4.16.4",
+      "framework": "Node.js/npm",
+      "kind": "redos",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `redos/browserslist_4.16.4`; package `browserslist@4.16.4`; metadata id `CVE-2021-23364`; reported fixedVersion `4.16.5`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-BROWSERSLIST-1090194; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:redos/cejs_2.0.20170212",
+      "project": "cejs",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/redos/cejs_2.0.20170212",
+      "framework": "Node.js/npm",
+      "kind": "redos",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `redos/cejs_2.0.20170212`; package `cejs@2.0.20170212`; metadata has no CVE id; reported fixedVersion `2.0.20180219`; advisory reference: https://security.snyk.io/vuln/npm:cejs:20180217; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:redos/charset_1.0.0",
+      "project": "charset",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/redos/charset_1.0.0",
+      "framework": "Node.js/npm",
+      "kind": "redos",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `redos/charset_1.0.0`; package `charset@1.0.0`; metadata id `CVE-2017-16098`; reported fixedVersion `1.0.1`; advisory reference: https://security.snyk.io/vuln/npm:charset:20170908; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:redos/checkit_0.7.0",
+      "project": "checkit",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/redos/checkit_0.7.0",
+      "framework": "Node.js/npm",
+      "kind": "redos",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `redos/checkit_0.7.0`; package `checkit@0.7.0`; metadata has no CVE id; advisory reference: https://security.snyk.io/vuln/npm:checkit:20180226; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:redos/chrono-node_2.2.3",
+      "project": "chrono-node",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/redos/chrono-node_2.2.3",
+      "framework": "Node.js/npm",
+      "kind": "redos",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `redos/chrono-node_2.2.3`; package `chrono-node@2.2.3`; metadata id `CVE-2021-23371`; reported fixedVersion `2.2.4`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-CHRONONODE-1083228; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:redos/clean-css_4.1.10",
+      "project": "clean-css",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/redos/clean-css_4.1.10",
+      "framework": "Node.js/npm",
+      "kind": "redos",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `redos/clean-css_4.1.10`; package `clean-css@4.1.10`; metadata has no CVE id; reported fixedVersion `4.1.11`; advisory reference: https://security.snyk.io/vuln/npm:clean-css:20180306; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:redos/codemirror_5.58.0",
+      "project": "codemirror",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/redos/codemirror_5.58.0",
+      "framework": "Node.js/npm",
+      "kind": "redos",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `redos/codemirror_5.58.0`; package `codemirror@5.58.0`; metadata id `CVE-2020-7760`; reported fixedVersion `5.58.2`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-CODEMIRROR-1016937; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:redos/color-string_1.5.4",
+      "project": "color-string",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/redos/color-string_1.5.4",
+      "framework": "Node.js/npm",
+      "kind": "redos",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `redos/color-string_1.5.4`; package `color-string@1.5.4`; metadata id `CVE-2021-29060`; reported fixedVersion `1.5.5`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-COLORSTRING-1082939; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "SECBENCHJS:redos/colors-cli_1.0.25",
+      "project": "colors-cli",
+      "url": "https://github.com/cristianstaicu/SecBench.js/tree/5d362353550a8baa42bba34edd26e5fb86d41b60/redos/colors-cli_1.0.25",
+      "framework": "Node.js/npm",
+      "kind": "redos",
+      "validation_status": "candidate",
+      "notes": "SecBench.js inventory locator `redos/colors-cli_1.0.25`; package `colors-cli@1.0.25`; metadata has no CVE id; reported fixedVersion `1.0.28`; advisory reference: https://security.snyk.io/vuln/SNYK-JS-COLORSCLI-1584218; Unexecuted by Corsair; source-reported metadata only."
+    },
+    {
+      "id": "PROJECT:juice-shop/juice-shop",
+      "project": "OWASP Juice Shop",
+      "url": "https://github.com/juice-shop/juice-shop",
+      "framework": "Node.js / Express / Angular",
+      "kind": "intentionally_vulnerable_project_candidate",
+      "validation_status": "candidate",
+      "notes": "OWASP training/CTF application. Project coverage candidate only; no particular real-world vulnerability, revision, patch, or test result is asserted."
+    },
+    {
+      "id": "PROJECT:owasp/nodegoat",
+      "project": "OWASP NodeGoat",
+      "url": "https://github.com/owasp/nodegoat",
+      "framework": "Node.js / MongoDB",
+      "kind": "intentionally_vulnerable_project_candidate",
+      "validation_status": "candidate",
+      "notes": "OWASP Top Ten training application. Project coverage candidate only; no particular real-world vulnerability, revision, patch, or test result is asserted."
+    },
+    {
+      "id": "PROJECT:appsecco/dvna",
+      "project": "Damn Vulnerable NodeJS Application",
+      "url": "https://github.com/appsecco/dvna",
+      "framework": "Node.js / Express / Passport / Sequelize",
+      "kind": "intentionally_vulnerable_project_candidate",
+      "validation_status": "candidate",
+      "notes": "OWASP Top Ten training application with separate fixes branches. Project coverage candidate only; no particular real-world vulnerability, revision, patch, or test result is asserted."
+    },
+    {
+      "id": "PROJECT:expressjs/express",
+      "project": "Express",
+      "url": "https://github.com/expressjs/express",
+      "framework": "Express / Node.js",
+      "kind": "framework_project_candidate",
+      "validation_status": "candidate",
+      "notes": "Maintained framework repository selected for route and middleware realism. Not a vulnerability case; no defect is asserted."
+    },
+    {
+      "id": "PROJECT:fastify/fastify",
+      "project": "Fastify",
+      "url": "https://github.com/fastify/fastify",
+      "framework": "Fastify / Node.js",
+      "kind": "framework_project_candidate",
+      "validation_status": "candidate",
+      "notes": "Maintained framework repository selected for schema-driven server coverage. Not a vulnerability case; no defect is asserted."
+    },
+    {
+      "id": "PROJECT:koajs/koa",
+      "project": "Koa",
+      "url": "https://github.com/koajs/koa",
+      "framework": "Koa / Node.js",
+      "kind": "framework_project_candidate",
+      "validation_status": "candidate",
+      "notes": "Maintained async-middleware framework repository selected for coverage. Not a vulnerability case; no defect is asserted."
+    },
+    {
+      "id": "PROJECT:nestjs/nest",
+      "project": "Nest",
+      "url": "https://github.com/nestjs/nest",
+      "framework": "NestJS / TypeScript / Node.js",
+      "kind": "framework_project_candidate",
+      "validation_status": "candidate",
+      "notes": "Maintained DI/decorator server-framework repository selected for coverage. Not a vulnerability case; no defect is asserted."
+    },
+    {
+      "id": "PROJECT:vercel/next.js",
+      "project": "Next.js",
+      "url": "https://github.com/vercel/next.js",
+      "framework": "Next.js / React / Node.js",
+      "kind": "framework_project_candidate",
+      "validation_status": "candidate",
+      "notes": "Maintained full-stack React framework repository selected for SSR and route-handler coverage. Not a vulnerability case; no defect is asserted."
+    },
+    {
+      "id": "PROJECT:strapi/strapi",
+      "project": "Strapi",
+      "url": "https://github.com/strapi/strapi",
+      "framework": "Strapi / JavaScript / TypeScript / Node.js",
+      "kind": "framework_project_candidate",
+      "validation_status": "candidate",
+      "notes": "Maintained headless-CMS repository selected for REST, GraphQL and plugin-style application coverage. Not a vulnerability case; no defect is asserted."
+    }
+  ]
+}

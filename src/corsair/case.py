@@ -61,7 +61,7 @@ class Case(Frozen):
     fixed_revision: Revision | None = None
 
 
-def tree_sha256(root: Path) -> str:
+def tree_manifest(root: Path, *, directories: bool = False) -> list[tuple[str, str, str]]:
     root = Path(root)
     if not root.is_dir():
         raise ValueError(f"revision source is not a directory: {root}")
@@ -69,7 +69,7 @@ def tree_sha256(root: Path) -> str:
     for directory, dirnames, filenames in os.walk(root):
         dirnames[:] = sorted(name for name in dirnames if name != ".git")
         here = Path(directory)
-        for name in [d for d in dirnames if (here / d).is_symlink()] + filenames:
+        for name in [d for d in dirnames if directories or (here / d).is_symlink()] + filenames:
             path = here / name
             info = path.lstat()
             if stat.S_ISLNK(info.st_mode):
@@ -77,11 +77,17 @@ def tree_sha256(root: Path) -> str:
             elif stat.S_ISREG(info.st_mode):
                 mode = "100755" if info.st_mode & 0o111 else "100644"
                 content = path.read_bytes()
+            elif directories and stat.S_ISDIR(info.st_mode):
+                mode, content = "040000", b""
             else:
                 continue
             entries.append((path.relative_to(root).as_posix(), mode, hashlib.sha256(content).hexdigest()))
+    return sorted(entries)
+
+
+def tree_sha256(root: Path) -> str:
     digest = hashlib.sha256()
-    for relative, mode, content in sorted(entries):
+    for relative, mode, content in tree_manifest(root):
         digest.update(f"{relative}\0{mode}\0{content}\n".encode())
     return digest.hexdigest()
 

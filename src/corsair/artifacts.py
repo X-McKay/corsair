@@ -6,7 +6,9 @@ same bytes are stored once and a reference can be checked against its content at
 from __future__ import annotations
 
 import hashlib
+import json
 import os
+import tempfile
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -62,3 +64,18 @@ class ArtifactStore:
 
 def put(data: bytes, root: Path | str | None = None) -> ArtifactRef:
     return ArtifactStore(root).put(data)
+
+
+def write_json(path: Path, value: object) -> None:
+    """Publish a complete checkpoint atomically; a reader never observes partial JSON."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent, delete=False) as stream:
+        temporary = Path(stream.name)
+        try:
+            json.dump(value, stream, indent=2)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+            temporary.replace(path)
+        finally:
+            temporary.unlink(missing_ok=True)

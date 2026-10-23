@@ -123,7 +123,8 @@ def test_repeats_run_each_case_n_times_and_write_the_aggregate(tmp_path, monkeyp
         expected_by_id[load_case(case_dir).case_id] = load_oracle(case_dir)["expected_label"]
     calls = []
 
-    async def scripted(case, args, models):
+    async def scripted(case, args, models, model_config):
+        assert model_config["producer"]["model_name"] == "model-under-test"
         calls.append(case.case_id)
         repeat = calls.count(case.case_id)
         label = "INCONCLUSIVE" if repeat == 3 else expected_by_id[case.case_id]

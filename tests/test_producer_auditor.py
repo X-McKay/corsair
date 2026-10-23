@@ -14,7 +14,7 @@ from corsair import matrix
 from corsair.artifacts import ArtifactStore
 from corsair.auditor import audit, build_auditor, render
 from corsair.case import load_case
-from corsair.kernel import Gate, Kernel, Label, Submission
+from corsair.kernel import Gate, Kernel, Label
 from corsair.producer import SKILLS_DIR, investigate, render_case
 from tests.fakes import FakeSandboxes, Script
 from tests.test_kernel import CASE, HAPPY, REFERENCE
@@ -103,7 +103,7 @@ def test_render_case_carries_the_finding_but_no_oracle():
 
 def test_skills_exist_and_name_the_contract():
     names = sorted(p.stem for p in SKILLS_DIR.glob("*.md"))
-    assert names == ["build-recipes", "differential-probing", "python-pytest"]
+    assert {"build-recipes", "differential-probing", "python-pytest", "runtime-selection", "sanitizers"} <= set(names)
     text = (SKILLS_DIR / "differential-probing.md").read_text()
     for symbol in ("CONTROL_PAYLOAD", "EXPLOIT_PAYLOAD", "run_target"):
         assert symbol in text

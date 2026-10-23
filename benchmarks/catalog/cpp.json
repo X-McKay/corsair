@@ -1,0 +1,884 @@
+{
+  "language": "cpp",
+  "sources": [
+    {
+      "name": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/test-suites/112",
+      "license": "CC0-1.0 / U.S. public domain (per NIST suite record)",
+      "frameworks": [
+        "synthetic C/C++ CWE test programs",
+        "paired good/bad flows"
+      ],
+      "available_cases": 64099,
+      "notes": "NIST lists 64,099 C/C++ test cases across 118 CWEs. The official ZIP is the authoritative source-file inventory. Catalog candidates use exact .cpp archive paths; they are synthetic CWE examples, not CVEs or verified Corsair outcomes."
+    },
+    {
+      "name": "Big-Vul (MSR 2020)",
+      "url": "https://github.com/ZeoVan/MSR_20_Code_vulnerability_CSV_Dataset",
+      "license": "MIT",
+      "frameworks": [
+        "C/C++ security-fix commits",
+        "function before/after pairs",
+        "CVE/CWE metadata"
+      ],
+      "available_cases": 3754,
+      "notes": "Primary dataset CSV connects CVE IDs, CWE IDs, repository commit IDs, changed files and pre/post-fix versions; published inventory has 3,754 vulnerabilities from 348 GitHub projects across 91 types. Re-resolve revisions and build dependencies before using any record."
+    },
+    {
+      "name": "CVEfixes",
+      "url": "https://github.com/secureIT-project/CVEfixes",
+      "license": "Code: MIT; data: CC-BY-4.0",
+      "frameworks": [
+        "multi-language CVE fix database",
+        "commit/file/method records",
+        "NVD-linked metadata"
+      ],
+      "available_cases": 11873,
+      "notes": "Release v1.0.8 reports 11,873 CVEs, 12,107 fixing commits, 4,249 projects, 272 CWEs, and pre/post source at file and function granularity through 2024-07-23. C/C++ must be selected from language/file fields; this number is dataset-wide."
+    },
+    {
+      "name": "DiverseVul",
+      "url": "https://github.com/wagner-group/diversevul",
+      "license": "Dataset license not stated in the primary repository; paper preprint is CC-BY-4.0",
+      "frameworks": [
+        "C/C++ vulnerable/non-vulnerable functions",
+        "security-fix commits",
+        "repository and commit metadata"
+      ],
+      "available_cases": 18945,
+      "notes": "The paper reports 18,945 vulnerable functions, 330,492 non-vulnerable functions, 7,514 commits, and 150 CWEs. Repository metadata exposes 7,512 commit/repository URLs and notes that three commit URLs are missing. Treat source labels as candidate labels, not ground truth."
+    },
+    {
+      "name": "Magma",
+      "url": "https://github.com/HexHive/magma/tree/v1.2",
+      "license": "No top-level license file found in the reviewed v1.2 repository tree; check Magma and each upstream target before redistribution",
+      "frameworks": [
+        "ground-truth fuzzing benchmark",
+        "front-ported real bugs",
+        "source-level reach/trigger canaries",
+        "Docker target drivers"
+      ],
+      "available_cases": 118,
+      "notes": "Published Magma reports 118 front-ported bugs; the current documentation exposes nine target libraries and bug patch directories. It distinguishes buggy-code reached from fault condition triggered. Neither state is asserted for this catalog's target candidates."
+    },
+    {
+      "name": "FuzzBench",
+      "url": "https://github.com/google/fuzzbench",
+      "license": "Apache-2.0",
+      "frameworks": [
+        "real-world fuzz targets",
+        "coverage-guided fuzzer benchmarking",
+        "OSS-Fuzz-compatible project drivers"
+      ],
+      "available_cases": 29,
+      "notes": "The reviewed benchmarks directory contained 29 named benchmark configurations after excluding its integration script. They are project/driver candidates, not vulnerability labels; FuzzBench says it can use any OSS-Fuzz project as a benchmark."
+    },
+    {
+      "name": "OSS-Fuzz",
+      "url": "https://github.com/google/oss-fuzz",
+      "license": "Apache-2.0",
+      "frameworks": [
+        "continuous C/C++ fuzzing",
+        "libFuzzer/AFL++/Honggfuzz/Centipede",
+        "sanitizer-assisted crash detection",
+        "per-project build recipes"
+      ],
+      "available_cases": 1000,
+      "notes": "The project reported support for 1,000 projects and more than 13,000 vulnerabilities and 50,000 bugs as of May 2025. Those totals do not imply that every issue, reproducer, revision, or target is public and runnable; use public project configuration and disclosed issue artifacts only."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "juliet-1.3:C/testcases/CWE789_Uncontrolled_Mem_Alloc/s01/CWE789_Uncontrolled_Mem_Alloc__new_char_connect_socket_01.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE789 Uncontrolled Mem Alloc",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE484_Omitted_Break_Statement_in_Switch/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE484 Omitted Break Statement in Switch",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE194_Unexpected_Sign_Extension/s01/CWE194_Unexpected_Sign_Extension__fgets_memmove_73b.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE194 Unexpected Sign Extension",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE563_Unused_Variable/CWE563_Unused_Variable__unused_init_variable_int64_t_72b.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE563 Unused Variable",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE588_Attempt_to_Access_Child_of_Non_Structure_Pointer/CWE588_Attempt_to_Access_Child_of_Non_Structure_Pointer__class_01.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE588 Attempt to Access Child of Non Structure Pointer",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE78_OS_Command_Injection/s03/CWE78_OS_Command_Injection__char_file_popen_73a.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE78 OS Command Injection",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE390_Error_Without_Action/CWE390_Error_Without_Action__empty_catch_01.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE390 Error Without Action",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE364_Signal_Handler_Race_Condition/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE364 Signal Handler Race Condition",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE226_Sensitive_Information_Uncleared_Before_Release/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE226 Sensitive Information Uncleared Before Release",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE188_Reliance_on_Data_Memory_Layout/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE188 Reliance on Data Memory Layout",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE127_Buffer_Underread/s03/CWE127_Buffer_Underread__new_wchar_t_ncpy_01.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE127 Buffer Underread",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE775_Missing_Release_of_File_Descriptor_or_Handle/CWE775_Missing_Release_of_File_Descriptor_or_Handle__open_no_close_83_bad.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE775 Missing Release of File Descriptor or Handle",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE780_Use_of_RSA_Algorithm_Without_OAEP/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE780 Use of RSA Algorithm Without OAEP",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE667_Improper_Locking/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE667 Improper Locking",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE843_Type_Confusion/CWE843_Type_Confusion__short_81_bad.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE843 Type Confusion",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE587_Assignment_of_Fixed_Address_to_Pointer/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE587 Assignment of Fixed Address to Pointer",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE480_Use_of_Incorrect_Operator/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE480 Use of Incorrect Operator",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE259_Hard_Coded_Password/CWE259_Hard_Coded_Password__w32_wchar_t_82_goodG2B.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE259 Hard Coded Password",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE762_Mismatched_Memory_Management_Routines/s03/CWE762_Mismatched_Memory_Management_Routines__delete_int_malloc_01.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE762 Mismatched Memory Management Routines",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE400_Resource_Exhaustion/s01/CWE400_Resource_Exhaustion__fscanf_sleep_72a.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE400 Resource Exhaustion",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE223_Omission_of_Security_Relevant_Information/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE223 Omission of Security Relevant Information",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE284_Improper_Access_Control/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE284 Improper Access Control",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE252_Unchecked_Return_Value/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE252 Unchecked Return Value",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE247_Reliance_on_DNS_Lookups_in_Security_Decision/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE247 Reliance on DNS Lookups in Security Decision",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE620_Unverified_Password_Change/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE620 Unverified Password Change",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE479_Signal_Handler_Use_of_Non_Reentrant_Function/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE479 Signal Handler Use of Non Reentrant Function",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE535_Info_Exposure_Shell_Error/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE535 Info Exposure Shell Error",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE176_Improper_Handling_of_Unicode_Encoding/CWE176_Improper_Handling_of_Unicode_Encoding__w32_81_goodB2G.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE176 Improper Handling of Unicode Encoding",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE676_Use_of_Potentially_Dangerous_Function/CWE676_Use_of_Potentially_Dangerous_Function__basic_01.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE676 Use of Potentially Dangerous Function",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE459_Incomplete_Cleanup/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE459 Incomplete Cleanup",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE377_Insecure_Temporary_File/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE377 Insecure Temporary File",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE690_NULL_Deref_From_Return/s01/CWE690_NULL_Deref_From_Return__long_malloc_83a.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE690 NULL Deref From Return",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE590_Free_Memory_Not_on_Heap/s03/CWE590_Free_Memory_Not_on_Heap__delete_struct_static_01.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE590 Free Memory Not on Heap",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE191_Integer_Underflow/s03/CWE191_Integer_Underflow__int_rand_multiply_74a.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE191 Integer Underflow",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE325_Missing_Required_Cryptographic_Step/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE325 Missing Required Cryptographic Step",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE190_Integer_Overflow/s03/CWE190_Integer_Overflow__int_fgets_multiply_81_bad.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE190 Integer Overflow",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE835_Infinite_Loop/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE835 Infinite Loop",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE615_Info_Exposure_by_Comment/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE615 Info Exposure by Comment",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE672_Operation_on_Resource_After_Expiration_or_Release/CWE672_Operation_on_Resource_After_Expiration_or_Release__list_int_01.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE672 Operation on Resource After Expiration or Release",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE440_Expected_Behavior_Violation/CWE440_Expected_Behavior_Violation__exception_01.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE440 Expected Behavior Violation",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE681_Incorrect_Conversion_Between_Numeric_Types/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE681 Incorrect Conversion Between Numeric Types",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE561_Dead_Code/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE561 Dead Code",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE122_Heap_Based_Buffer_Overflow/s03/CWE122_Heap_Based_Buffer_Overflow__cpp_CWE805_class_memmove_01.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE122 Heap Based Buffer Overflow",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE482_Comparing_Instead_of_Assigning/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE482 Comparing Instead of Assigning",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE123_Write_What_Where_Condition/CWE123_Write_What_Where_Condition__connect_socket_73a.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE123 Write What Where Condition",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE481_Assigning_Instead_of_Comparing/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE481 Assigning Instead of Comparing",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE244_Heap_Inspection/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE244 Heap Inspection",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE426_Untrusted_Search_Path/CWE426_Untrusted_Search_Path__wchar_t_popen_82_bad.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE426 Untrusted Search Path",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE468_Incorrect_Pointer_Scaling/CWE468_Incorrect_Pointer_Scaling__class_01.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE468 Incorrect Pointer Scaling",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "juliet-1.3:C/testcases/CWE475_Undefined_Behavior_for_Input_to_API/main.cpp",
+      "project": "NIST SARD Juliet C/C++ 1.3",
+      "url": "https://samate.nist.gov/SARD/downloads/test-suites/2017-10-01-juliet-test-suite-for-c-cplusplus-v1-3.zip",
+      "framework": "CWE475 Undefined Behavior for Input to API",
+      "kind": "synthetic-source-path",
+      "validation_status": "candidate",
+      "notes": "Exact .cpp path in the official Juliet 1.3 archive. Synthetic CWE source candidate only; it has not been extracted, built, run, or differentially verified for Corsair."
+    },
+    {
+      "id": "magma-v1.2:libpng",
+      "project": "Magma / libpng",
+      "url": "https://github.com/HexHive/magma/tree/v1.2/targets/libpng",
+      "framework": "Magma ground-truth fuzzing target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Target-level backlog entry, not a claim about a particular bug or reproducer. Inspect configrc and patches/bugs, pin dependencies, then build and reproduce under an authorized harness."
+    },
+    {
+      "id": "magma-v1.2:libsndfile",
+      "project": "Magma / libsndfile",
+      "url": "https://github.com/HexHive/magma/tree/v1.2/targets/libsndfile",
+      "framework": "Magma ground-truth fuzzing target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Target-level backlog entry, not a claim about a particular bug or reproducer. Inspect configrc and patches/bugs, pin dependencies, then build and reproduce under an authorized harness."
+    },
+    {
+      "id": "magma-v1.2:libtiff",
+      "project": "Magma / libtiff",
+      "url": "https://github.com/HexHive/magma/tree/v1.2/targets/libtiff",
+      "framework": "Magma ground-truth fuzzing target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Target-level backlog entry, not a claim about a particular bug or reproducer. Inspect configrc and patches/bugs, pin dependencies, then build and reproduce under an authorized harness."
+    },
+    {
+      "id": "magma-v1.2:libxml2",
+      "project": "Magma / libxml2",
+      "url": "https://github.com/HexHive/magma/tree/v1.2/targets/libxml2",
+      "framework": "Magma ground-truth fuzzing target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Target-level backlog entry, not a claim about a particular bug or reproducer. Inspect configrc and patches/bugs, pin dependencies, then build and reproduce under an authorized harness."
+    },
+    {
+      "id": "magma-v1.2:lua",
+      "project": "Magma / lua",
+      "url": "https://github.com/HexHive/magma/tree/v1.2/targets/lua",
+      "framework": "Magma ground-truth fuzzing target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Target-level backlog entry, not a claim about a particular bug or reproducer. Inspect configrc and patches/bugs, pin dependencies, then build and reproduce under an authorized harness."
+    },
+    {
+      "id": "magma-v1.2:poppler",
+      "project": "Magma / poppler",
+      "url": "https://github.com/HexHive/magma/tree/v1.2/targets/poppler",
+      "framework": "Magma ground-truth fuzzing target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Target-level backlog entry, not a claim about a particular bug or reproducer. Inspect configrc and patches/bugs, pin dependencies, then build and reproduce under an authorized harness."
+    },
+    {
+      "id": "magma-v1.2:openssl",
+      "project": "Magma / openssl",
+      "url": "https://github.com/HexHive/magma/tree/v1.2/targets/openssl",
+      "framework": "Magma ground-truth fuzzing target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Target-level backlog entry, not a claim about a particular bug or reproducer. Inspect configrc and patches/bugs, pin dependencies, then build and reproduce under an authorized harness."
+    },
+    {
+      "id": "magma-v1.2:sqlite3",
+      "project": "Magma / sqlite3",
+      "url": "https://github.com/HexHive/magma/tree/v1.2/targets/sqlite3",
+      "framework": "Magma ground-truth fuzzing target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Target-level backlog entry, not a claim about a particular bug or reproducer. Inspect configrc and patches/bugs, pin dependencies, then build and reproduce under an authorized harness."
+    },
+    {
+      "id": "magma-v1.2:php",
+      "project": "Magma / php",
+      "url": "https://github.com/HexHive/magma/tree/v1.2/targets/php",
+      "framework": "Magma ground-truth fuzzing target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Target-level backlog entry, not a claim about a particular bug or reproducer. Inspect configrc and patches/bugs, pin dependencies, then build and reproduce under an authorized harness."
+    },
+    {
+      "id": "fuzzbench:bloaty_fuzz_target",
+      "project": "FuzzBench / bloaty_fuzz_target",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/bloaty_fuzz_target",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:bloaty_fuzz_target_52948c",
+      "project": "FuzzBench / bloaty_fuzz_target_52948c",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/bloaty_fuzz_target_52948c",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:curl_curl_fuzzer_http",
+      "project": "FuzzBench / curl_curl_fuzzer_http",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/curl_curl_fuzzer_http",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:freetype2_ftfuzzer",
+      "project": "FuzzBench / freetype2_ftfuzzer",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/freetype2_ftfuzzer",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:harfbuzz_hb-shape-fuzzer",
+      "project": "FuzzBench / harfbuzz_hb-shape-fuzzer",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/harfbuzz_hb-shape-fuzzer",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:harfbuzz_hb-shape-fuzzer_17863b",
+      "project": "FuzzBench / harfbuzz_hb-shape-fuzzer_17863b",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/harfbuzz_hb-shape-fuzzer_17863b",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:jsoncpp_jsoncpp_fuzzer",
+      "project": "FuzzBench / jsoncpp_jsoncpp_fuzzer",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/jsoncpp_jsoncpp_fuzzer",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:lcms_cms_transform_fuzzer",
+      "project": "FuzzBench / lcms_cms_transform_fuzzer",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/lcms_cms_transform_fuzzer",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:libjpeg-turbo_libjpeg_turbo_fuzzer",
+      "project": "FuzzBench / libjpeg-turbo_libjpeg_turbo_fuzzer",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/libjpeg-turbo_libjpeg_turbo_fuzzer",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:libpcap_fuzz_both",
+      "project": "FuzzBench / libpcap_fuzz_both",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/libpcap_fuzz_both",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:libpng_libpng_read_fuzzer",
+      "project": "FuzzBench / libpng_libpng_read_fuzzer",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/libpng_libpng_read_fuzzer",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:libxml2_xml",
+      "project": "FuzzBench / libxml2_xml",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/libxml2_xml",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:libxml2_xml_e85b9b",
+      "project": "FuzzBench / libxml2_xml_e85b9b",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/libxml2_xml_e85b9b",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:libxslt_xpath",
+      "project": "FuzzBench / libxslt_xpath",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/libxslt_xpath",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:mbedtls_fuzz_dtlsclient",
+      "project": "FuzzBench / mbedtls_fuzz_dtlsclient",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/mbedtls_fuzz_dtlsclient",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:mbedtls_fuzz_dtlsclient_7c6b0e",
+      "project": "FuzzBench / mbedtls_fuzz_dtlsclient_7c6b0e",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/mbedtls_fuzz_dtlsclient_7c6b0e",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:mruby_mruby_fuzzer_8c8bbd",
+      "project": "FuzzBench / mruby_mruby_fuzzer_8c8bbd",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/mruby_mruby_fuzzer_8c8bbd",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:openh264_decoder_fuzzer",
+      "project": "FuzzBench / openh264_decoder_fuzzer",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/openh264_decoder_fuzzer",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:openssl_x509",
+      "project": "FuzzBench / openssl_x509",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/openssl_x509",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:openthread_ot-ip6-send-fuzzer",
+      "project": "FuzzBench / openthread_ot-ip6-send-fuzzer",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/openthread_ot-ip6-send-fuzzer",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:php_php-fuzz-parser_0dbedb",
+      "project": "FuzzBench / php_php-fuzz-parser_0dbedb",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/php_php-fuzz-parser_0dbedb",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:proj4_proj_crs_to_crs_fuzzer",
+      "project": "FuzzBench / proj4_proj_crs_to_crs_fuzzer",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/proj4_proj_crs_to_crs_fuzzer",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:re2_fuzzer",
+      "project": "FuzzBench / re2_fuzzer",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/re2_fuzzer",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:sqlite3_ossfuzz",
+      "project": "FuzzBench / sqlite3_ossfuzz",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/sqlite3_ossfuzz",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:stb_stbi_read_fuzzer",
+      "project": "FuzzBench / stb_stbi_read_fuzzer",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/stb_stbi_read_fuzzer",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:systemd_fuzz-link-parser",
+      "project": "FuzzBench / systemd_fuzz-link-parser",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/systemd_fuzz-link-parser",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:vorbis_decode_fuzzer",
+      "project": "FuzzBench / vorbis_decode_fuzzer",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/vorbis_decode_fuzzer",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:woff2_convert_woff2ttf_fuzzer",
+      "project": "FuzzBench / woff2_convert_woff2ttf_fuzzer",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/woff2_convert_woff2ttf_fuzzer",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    },
+    {
+      "id": "fuzzbench:zlib_zlib_uncompress_fuzzer",
+      "project": "FuzzBench / zlib_zlib_uncompress_fuzzer",
+      "url": "https://github.com/google/fuzzbench/tree/master/benchmarks/zlib_zlib_uncompress_fuzzer",
+      "framework": "FuzzBench real-world fuzz target",
+      "kind": "project-target",
+      "validation_status": "candidate",
+      "notes": "Repository benchmark configuration, not a vulnerability case or an assertion that it builds, fuzzes, crashes, or differentially verifies under Corsair."
+    }
+  ]
+}

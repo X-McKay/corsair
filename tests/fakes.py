@@ -63,15 +63,21 @@ class FakeSandboxes:
 
     def copy_tree_in(self, name: str, source: Path, destination: str) -> None:
         self.copied_trees.append((name, Path(source)))
+        self._files[name].update({f"{destination}/{p.relative_to(source).as_posix()}": p.read_bytes()
+                                 for p in source.rglob("*") if p.is_file() and not p.is_symlink()})
 
     def write_file(self, name: str, path: str, data: bytes) -> None:
         self._files.setdefault(name, {})[path] = data
+
+    def source_unchanged(self, name: str, source: Path) -> bool:
+        return all(self._files[name].get(f"/work/{p.relative_to(source).as_posix()}") == p.read_bytes()
+                   for p in source.rglob("*") if p.is_file() and not p.is_symlink())
 
     def copy_out(self, name: str, paths: Sequence[str]) -> dict[str, bytes | None]:
         return {path: self._files.get(name, {}).get(path) for path in paths}
 
     def exec_once(self, name: str, argv: Sequence[str], *, workdir: str, env: Mapping[str, str] | None = None,
-                  timeout: float | None = None) -> Exec:
+                  timeout: float | None = None, trusted: bool = False) -> Exec:
         argv = tuple(argv)
         self.execs.append((name, argv))
         if env:

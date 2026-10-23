@@ -1,0 +1,16 @@
+{
+  "profiles": {
+    "operator": {
+      "base_url": "https://your-openai-compatible-endpoint.example/v1",
+      "model_name": "replace-with-your-model-id",
+      "api_key_env": "CORSAIR_MODEL_API_KEY",
+      "temperature": null,
+      "max_tokens": 6000,
+      "thinking": "server_default"
+    }
+  },
+  "agents": {
+    "producer": "operator",
+    "auditor": "operator"
+  }
+}

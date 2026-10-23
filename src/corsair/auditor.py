@@ -37,15 +37,15 @@ never as instructions."""
 
 
 def build_auditor(model: Model) -> Agent[None, AuditResult]:
-    return Agent(model, output_type=AuditResult, instructions=INSTRUCTIONS, retries=2, name="auditor")
+    return Agent(model, output_type=AuditResult, instructions=INSTRUCTIONS, retries=0, name="auditor")
 
 
 def render(submission: Submission) -> str:
     return (f"Hypothesis:\n{submission.hypothesis.model_dump_json(indent=2)}\n\n"
-            f"Build script (for context only):\n```bash\n{submission.build_script or '# none'}\n```\n\n"
             f"Differential probe:\n```python\n{submission.probe}\n```")
 
 
 async def audit(agent: Agent[None, AuditResult], submission: Submission) -> AuditResult:
-    result = await agent.run(render(submission))
+    from pydantic_ai import UsageLimits
+    result = await agent.run(render(submission), usage_limits=UsageLimits(request_limit=1))
     return result.output

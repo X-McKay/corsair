@@ -197,7 +197,7 @@ async def test_held_sandbox_identity_is_never_reused_or_removed(tmp_path):
     k = kernel(fake, tmp_path)
     from corsair.sandbox.port import SandboxSpec, labels
     held = SandboxSpec(image=ROW.image, workdir="/work", labels=labels("run1", "build", revision="vulnerable",
-                                                                       env=environment_key(ROW, k.case.revision.tree_sha256, "")[:16])).name
+                                                                       env=environment_key(ROW, k.case.revision.tree_sha256, "", "sha256:fake", "documents.py")[:16])).name
     fake.held.add(held)
     evaluation = await k.evaluate(REFERENCE)
     assert evaluation.gate.stage is Gate.INFRA and "SandboxExists" in evaluation.gate.reason

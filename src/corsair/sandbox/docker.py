@@ -27,7 +27,7 @@ from pydantic_ai.workspaces import (CommandResult, SupportsCommands, WorkspaceBa
                                     WorkspaceUnavailableError)
 from pydantic_ai.workspaces.protocol import validate_timeout
 
-from .port import LABEL, RUN_LABEL, Exec, SandboxExists, SandboxSpec, labels, sandbox_name
+from .port import LABEL, RUN_LABEL, Exec, SandboxExists, SandboxSpec, sandbox_name
 
 
 PROVIDER = "docker"
@@ -54,7 +54,7 @@ class DockerConfig:
     pids: int | None = 1024
     workdir: str = "/work"
     user: str | None = None
-    """None keeps the image's own user (the corsair-* toolchain images run as 10001:10001)."""
+    """None keeps the image's build user; sealed probes are explicitly run as 1000:1000."""
     env: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -205,8 +205,11 @@ def copy_tree_in(name: str, source: Path, destination: str, uid: int, gid: int,
 
 
 def write_file(name: str, path: str, data: bytes) -> None:
-    """Write one file as the container user, creating its parents, so it stays theirs."""
-    result = docker("exec", "-i", "-w", "/", name, "sh", "-c", 'mkdir -p "$(dirname "$1")" && cat > "$1"', "sh", path,
+    """Inject a root-owned read-only file at the trusted control-plane boundary."""
+    script = ('parent=$(dirname "$1"); mkdir -p "$parent"; chmod u+w "$parent"; '
+              'rm -f "$1"; cat > "$1"; chmod 444 "$1"; '
+              'case "$parent" in /work/.corsair|/work/.corsair/*) chmod 555 "$parent";; esac')
+    result = docker("exec", "--user", "0:0", "-i", "-w", "/", name, "sh", "-ec", script, "sh", path,
                     input=data)
     if result.returncode != 0:
         raise WorkspaceError(f"cannot write {path}: {result.stderr.decode(errors='replace')[-2000:]}")
@@ -229,12 +232,13 @@ def copy_out(name: str, paths: Sequence[str]) -> dict[str, bytes | None]:
 
 
 def exec_once(name: str, argv: Sequence[str], *, workdir: str, env: Mapping[str, str] | None = None,
-              timeout: float | None = None) -> Exec:
+              timeout: float | None = None, trusted: bool = False) -> Exec:
     """Run ``argv`` once, never retried. On timeout the docker client is killed; the caller removes the container,
     which kills whatever the command left running."""
     environment = [arg for key, value in (env or {}).items() for arg in ("-e", f"{key}={value}")]
     try:
-        result = subprocess.run(["docker", "exec", "-w", workdir, *environment, name, *argv], stdin=DEVNULL,
+        user = ["--user", "0:0"] if trusted else []
+        result = subprocess.run(["docker", "exec", *user, "-w", workdir, *environment, name, *argv], stdin=DEVNULL,
                                 capture_output=True, timeout=timeout, check=False)
     except subprocess.TimeoutExpired as error:
         return Exec(None, error.stdout or b"", error.stderr or b"", timed_out=True)
@@ -414,9 +418,12 @@ class DockerSandboxes:
     provider = PROVIDER
     workdir = "/work"
 
-    def __init__(self, probe_user: str | None = "1000:1000") -> None:
-        """``probe_user`` is the unprivileged uid:gid every probe runs as; a sealed environment is handed over owned
-        by it. Build replay runs as the image's user (root in the pilot image) so dependencies can be installed."""
+    def __init__(self, probe_user: str = "1000:1000") -> None:
+        """``probe_user`` is the unprivileged uid:gid every probe runs as. Frozen source retains the root build
+        owner's identity; only /tmp and the kernel's probe directory are writable by probes."""
+        identity = probe_user.split(":") if isinstance(probe_user, str) else []
+        if len(identity) != 2 or not all(part.isdigit() for part in identity) or int(identity[0]) == 0:
+            raise ValueError("probe_user must be a non-root numeric uid:gid")
         self.probe_user = probe_user
         self._owners: dict[str, tuple[int, int]] = {}  # uid, gid read once per created container
 
@@ -438,12 +445,35 @@ class DockerSandboxes:
     def write_file(self, name: str, path: str, data: bytes) -> None:
         write_file(name, path, data)
 
+    def source_unchanged(self, name: str, source: Path) -> bool:
+        from ..case import tree_manifest
+        support = exec_once(name, ["sh", "-c", "test ! -L /work/.corsair && { test ! -e /work/.corsair || test -d /work/.corsair; }"],
+                            workdir="/", trusted=True, timeout=30)
+        if support.exit_code != 0:
+            return False
+        expected = tree_manifest(source, directories=True)
+        manifest = f"/work/.corsair/source-{uuid.uuid4().hex}.json"
+        write_file(name, manifest, json.dumps(expected).encode())
+        code = ("import hashlib,json,os,stat,sys; from pathlib import Path; "
+                "root=Path('/work'); expected=json.loads(Path(sys.argv[1]).read_text()); "
+                "actual=[]\n"
+                "for relative,_,_ in expected:\n"
+                " p=root/relative; s=p.lstat(); mode=s.st_mode\n"
+                " if stat.S_ISLNK(mode): kind,data='120000',os.readlink(p).encode()\n"
+                " elif stat.S_ISREG(mode): kind,data=('100755' if mode & 0o111 else '100644'),p.read_bytes()\n"
+                " elif stat.S_ISDIR(mode): kind,data='040000',b''\n"
+                " else: raise ValueError('unsupported original source type')\n"
+                " actual.append([relative,kind,hashlib.sha256(data).hexdigest()])\n"
+                "assert actual==expected, 'original source changed'\n")
+        result = exec_once(name, ["python", "-c", code, manifest], workdir="/", trusted=True, timeout=120)
+        return result.exit_code == 0
+
     def copy_out(self, name: str, paths: Sequence[str]) -> dict[str, bytes | None]:
         return copy_out(name, paths)
 
     def exec_once(self, name: str, argv: Sequence[str], *, workdir: str, env: Mapping[str, str] | None = None,
-                  timeout: float | None = None) -> Exec:
-        return exec_once(name, argv, workdir=workdir, env=env, timeout=timeout)
+                  timeout: float | None = None, trusted: bool = False) -> Exec:
+        return exec_once(name, argv, workdir=workdir, env=env, timeout=timeout, trusted=trusted)
 
     def drop_network(self, name: str) -> None:
         detached = docker("network", "disconnect", "--force", "bridge", name)
@@ -476,13 +506,24 @@ class DockerSandboxes:
 
     def seal_environment(self, name: str, tag: str, key: str, log_sha256: str,
                          writable: Sequence[str] = ()) -> None:
-        # Probes run unprivileged and the prepared tree stays read-only to them; only the directories the kernel
-        # names (its probe directory) and /tmp are writable. Capabilities are dropped, so this is a mode change by
-        # the owner, not a chown.
+        # Probes run as a different, unprivileged uid. Source stays root-owned/read-only; only the kernel's probe
+        # directory and /tmp are writable. Changing mode is sufficient because the probe is not the source owner.
+        if owner(name)[0] == int(self.probe_user.split(":")[0]):
+            raise WorkspaceError("build owner and probe uid must differ; otherwise a probe could reopen frozen source")
+        frozen = exec_once(name, ["chmod", "-R", "a-w", "/work"], workdir="/", timeout=120)
+        if frozen.exit_code != 0:
+            raise WorkspaceError(f"cannot freeze compiled source: {frozen.stderr.decode(errors='replace')[-500:]}")
         for path in writable:
-            made = exec_once(name, ["sh", "-c", 'mkdir -p "$1" && chmod 1777 "$1"', "sh", path], workdir="/", timeout=120)
+            # The root remains owner-writable until the kernel's reserved probe directory exists.
+            opened = exec_once(name, ["chmod", "u+w", "/work"], workdir="/", timeout=120)
+            if opened.exit_code != 0:
+                raise WorkspaceError("cannot prepare the probe directory")
+            made = exec_once(name, ["sh", "-c", 'test ! -L "$1" && mkdir -p "$1" && chmod 555 "$1"', "sh", path], workdir="/", timeout=120)
             if made.exit_code != 0:
                 raise WorkspaceError(f"cannot prepare writable {path}: {made.stderr.decode(errors='replace')[-500:]}")
+        closed = exec_once(name, ["chmod", "a-w", "/work"], workdir="/", timeout=120)
+        if closed.exit_code != 0:
+            raise WorkspaceError("cannot freeze the source root")
         committed = docker("commit", "--change", f"LABEL {ENV_KEY_LABEL}={key} {ENV_LOG_LABEL}={log_sha256}", name,
                            tag, timeout=1800)
         if committed.returncode != 0:
@@ -496,3 +537,15 @@ class DockerSandboxes:
 
     def agent_workspace(self, image: str, sandbox_labels: Mapping[str, str]) -> DockerWorkspace:
         return DockerWorkspace(DockerConfig(image=image, labels=sandbox_labels, network="bridge"))
+
+    def workspace_state(self, name: str) -> dict[str, tuple[str, str]] | None:
+        """Bounded size/mtime inventory for observability, not security evidence or a content digest."""
+        script = ("find /work -type d \\( -name .git -o -name node_modules -o -name .venv \\) -prune -o "
+                  "-type f -printf '%P\\0%s\\0%T@\\0' | head -c 1048576")
+        result = self.exec_once(name, ["sh", "-c", script], workdir="/", timeout=30)
+        if result.exit_code != 0 or len(result.stdout) >= 1048576:
+            return None
+        parts = result.stdout.decode(errors="replace").split("\0")[:-1]
+        if len(parts) % 3:
+            return None
+        return {parts[i]: (parts[i + 1], parts[i + 2]) for i in range(0, len(parts), 3)}

@@ -25,7 +25,12 @@ Rules the kernel enforces, so write to them:
   `FileNotFoundError` or an exception from inside the application is `errored`, not a demonstration. Catch
   expected exceptions from the target when the invariant is about what happens afterwards (for example "the
   outside file was not opened"), and let the invariant decide.
-- Both runs must execute the target lines. Coverage is measured on the target file only.
+- Both runs must execute every requested target line, not merely one line or a similarly named file.
+- Use ordinary inputs of the accepted public type; never tag an input as control/exploit or attach an expected
+  outcome to it. Compute the same security invariant from actual target behavior and input properties.
+- For foreign languages, call the native target with subprocess argument lists and inherited environment.
+  A subprocess setup failure must raise a non-assertion error; a crash is proof only when a specific relevant
+  diagnostic is the invariant and native target coverage is present. Do not assert merely on nonzero exits.
 - No `unittest.mock`, `pytest_mock`, `responses`, `httpretty`. If a dependency must be controlled, pass a real
   object through the target's own parameters; never replace the function that owns the security property.
 - Imports: the repository root is `/work` and on `sys.path`. Import the target the way its own tests do.
@@ -58,3 +63,4 @@ assertion observes on exploit, in one sentence.
 Bash, run once in a clean container from the repository root with network, before the network is removed. Use
 `pip install -e .` or `pip install -r requirements.txt` only when the probe needs the package importable or its
 dependencies present. Leave it empty for a plain module tree. Never fetch or run code the probe does not need.
+Use the matching runtime-selection and language build guide for Maven, Gradle, Vite, Bundler, CPAN or CMake.

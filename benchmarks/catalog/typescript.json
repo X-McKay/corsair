@@ -1,0 +1,2263 @@
+{
+  "language": "TypeScript",
+  "sources": [
+    {
+      "name": "OpenSSF CVE Benchmark",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark",
+      "license": "MIT",
+      "frameworks": [
+        "JavaScript and TypeScript",
+        "Node.js/npm; case-level frameworks vary"
+      ],
+      "available_cases": 223,
+      "notes": "Current public main-branch inventory inspected for this catalog has 223 CVE JSON manifests. Each records an upstream repository and pre-patch/post-patch commits; screen the source language and reproduce in isolation before promoting any entry."
+    },
+    {
+      "name": "SecBench.js",
+      "url": "https://github.com/cristianstaicu/SecBench.js",
+      "license": "No repository SPDX license declared; obtain/verify reuse permission before copying benchmark files.",
+      "frameworks": [
+        "Server-side JavaScript/npm",
+        "prototype pollution",
+        "ReDoS",
+        "command injection",
+        "path traversal",
+        "arbitrary code injection"
+      ],
+      "available_cases": 600,
+      "notes": "Public repository documents 600 reported npm vulnerabilities with test payloads and per-case package metadata. Its JavaScript focus makes it a pattern and runtime-oracle source for TypeScript adaptations, not evidence that an adaptation is valid."
+    },
+    {
+      "name": "GitHub Advisory Database",
+      "url": "https://github.com/github/advisory-database",
+      "license": "CC-BY-4.0",
+      "frameworks": [
+        "npm packages",
+        "JavaScript/TypeScript supply chain"
+      ],
+      "available_cases": "Living npm advisory corpus; no fixed count asserted in this catalog.",
+      "notes": "GitHub-reviewed advisory records are published in OSV format and carry GHSA IDs, affected package/version data, and references when available. Select only advisory records with a repository and review the provenance and affected range before case construction."
+    },
+    {
+      "name": "CVEfixes",
+      "url": "https://github.com/secureIT-project/CVEfixes",
+      "license": "Dataset CC-BY-4.0; collection source MIT",
+      "frameworks": [
+        "Multi-language open-source projects",
+        "filter for Node.js/TypeScript repositories"
+      ],
+      "available_cases": "12,107 fixing commits; 11,873 CVEs; 4,249 projects (v1.0.8, all languages)",
+      "notes": "Relational data covers repository, commit, file, and function levels. It is a broad discovery source rather than a TypeScript-labelled benchmark; filter and independently resolve upstream revisions."
+    },
+    {
+      "name": "TS-VulBench",
+      "url": "https://ieee-dataport.org/documents/ts-vulbench-typescript-vulnerability-benchmark-dataset-static-application-security",
+      "license": "Not stated on the public landing page; dataset download requires IEEE DataPort subscription.",
+      "frameworks": [
+        "TypeScript SAST patterns",
+        "injection",
+        "XSS",
+        "path traversal",
+        "SSRF",
+        "prototype pollution",
+        "TLS/crypto"
+      ],
+      "available_cases": 100,
+      "notes": "Landing page describes 100 independently constructed TypeScript files with one intentionally introduced weakness each. No sample IDs are recorded because the public page gates the archive; do not treat it as locally available."
+    },
+    {
+      "name": "SecJS",
+      "url": "https://github.com/SecJS-Vuln-Benchmark/SecJS-Benchmark",
+      "license": "Apache-2.0 for framework code; upstream snapshots retain their own licenses.",
+      "frameworks": [
+        "JavaScript CVE collection",
+        "full-project vulnerable/fixed pairs",
+        "LLM security evaluation"
+      ],
+      "available_cases": "No packaged ArenaJS dataset currently committed.",
+      "notes": "Public artifact provides a collection/construction pipeline and an evaluation harness, but explicitly does not ship the generated dataset files. Treat as a reproducible-discovery pipeline, not an immediately reusable case set."
+    },
+    {
+      "name": "CVE List V5",
+      "url": "https://github.com/CVEProject/cvelistV5",
+      "license": "CVE Program Terms of Use",
+      "frameworks": [
+        "Official CVE records",
+        "cross-reference for npm/TypeScript candidates"
+      ],
+      "available_cases": "Live official CVE catalogue; no TypeScript-specific count asserted.",
+      "notes": "Use as the official CVE-record cross-reference. Consumers must inspect both the CNA and CVE Program containers when present, then resolve the upstream source and patch separately."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "CVE-2016-1000229",
+      "project": "linxiaowu66/swagger-ui",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2016-1000229.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2016-10735",
+      "project": "twbs/bootstrap",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2016-10735.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-0931",
+      "project": "guardian/html-janitor",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-0931.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-1000006",
+      "project": "plotly/plotly.js",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-1000006.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116, CWE-020. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-1000219",
+      "project": "KyleRoss/windows-cpu",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-1000219.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-1000427",
+      "project": "markedjs/marked",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-1000427.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-020. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-1001004",
+      "project": "josdejong/typed-function",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-1001004.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-094, CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-10910",
+      "project": "mqttjs/MQTT.js",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-10910.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-770. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-15010",
+      "project": "salesforce/tough-cookie",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-15010.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16003",
+      "project": "felixrieseberg/windows-build-tools",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16003.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-829. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16006",
+      "project": "jonschlinkert/remarkable",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16006.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-020. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16011",
+      "project": "jquery/jquery",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16011.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-79. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16014",
+      "project": "http-party/node-http-proxy",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16014.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16018",
+      "project": "restify/node-restify",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16018.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16023",
+      "project": "sindresorhus/decamelize",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16023.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16026",
+      "project": "request/request",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16026.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-770. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16028",
+      "project": "jonschlinkert/randomatic",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16028.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-338. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16029",
+      "project": "henrytseng/hostr",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16029.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022, CWE-023, CWE-036, CWE-073, CWE-099. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16030",
+      "project": "3rd-Eden/useragent",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16030.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16031",
+      "project": "socketio/socket.io",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16031.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-338. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16034",
+      "project": "soyuka/pidusage",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16034.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16042",
+      "project": "tj/node-growl",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16042.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16043",
+      "project": "erming/shout",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16043.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16082",
+      "project": "brianc/node-postgres",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16082.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-116, CWE-020. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16083",
+      "project": "sandy98/node-simple-router",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16083.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022, CWE-023, CWE-036, CWE-073, CWE-099. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16084",
+      "project": "KoryNunn/list-n-stream",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16084.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022, CWE-023, CWE-036, CWE-073, CWE-099. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16087",
+      "project": "vvakame/fs-git",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16087.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16098",
+      "project": "node-modules/charset",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16098.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16100",
+      "project": "skoranga/node-dns-sync",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16100.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16107",
+      "project": "Eeems/PooledWebSocket",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16107.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022, CWE-023, CWE-036, CWE-073, CWE-099. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16114",
+      "project": "markedjs/marked",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16114.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16117",
+      "project": "Trott/node-slug",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16117.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16118",
+      "project": "jshttp/forwarded",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16118.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16119",
+      "project": "jshttp/fresh",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16119.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16136",
+      "project": "expressjs/method-override",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16136.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16137",
+      "project": "visionmedia/debug",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16137.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16138",
+      "project": "broofa/node-mime",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16138.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16224",
+      "project": "isaacs/st",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16224.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-601. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16226",
+      "project": "browserify/static-eval",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16226.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-20, CWE-94. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-16877",
+      "project": "zeit/next.js",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-16877.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022, CWE-023, CWE-036, CWE-073, CWE-099. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-17461",
+      "project": "markedjs/marked",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-17461.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-18077",
+      "project": "juliangruber/brace-expansion",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-18077.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-18214",
+      "project": "moment/moment",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-18214.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-18352",
+      "project": "GoogleChrome/rendertron",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-18352.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-18353",
+      "project": "GoogleChrome/rendertron",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-18353.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-18354",
+      "project": "GoogleChrome/rendertron",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-18354.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-918. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-18355",
+      "project": "GoogleChrome/rendertron",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-18355.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-200. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-18635",
+      "project": "novnc/noVNC",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-18635.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2017-5954",
+      "project": "commenthol/serialize-to-js",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2017-5954.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-094, CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-1000086",
+      "project": "nprapps/pym.js",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-1000086.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116, CWE-601. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-1000096",
+      "project": "brianleroux/tiny-json-http",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-1000096.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: no CWE listed. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-1000620",
+      "project": "hapijs/cryptiles",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-1000620.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-327. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-1002203",
+      "project": "ZJONSSON/node-unzipper",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-1002203.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-1002204",
+      "project": "cthackers/adm-zip",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-1002204.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-11093",
+      "project": "ckeditor/ckeditor5-link",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-11093.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-11615",
+      "project": "moscajs/mosca",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-11615.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-116, CWE-020. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-11798",
+      "project": "apache/thrift",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-11798.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022, CWE-023, CWE-036, CWE-073, CWE-099. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-13797",
+      "project": "scravy/node-macaddress",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-13797.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-13863",
+      "project": "mongodb/js-bson",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-13863.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-14040",
+      "project": "twbs/bootstrap",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-14040.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-14041",
+      "project": "twbs/bootstrap",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-14041.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-14042",
+      "project": "twbs/bootstrap",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-14042.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-14380",
+      "project": "Graylog2/graylog2-server",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-14380.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-16460",
+      "project": "UmbraEngineering/ps",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-16460.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-16461",
+      "project": "jas-/node-libnmap",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-16461.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-16462",
+      "project": "vincentmorneau/apex-publish-static-files",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-16462.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-16472",
+      "project": "ashaffer/cached-path-relative",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-16472.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-250, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-16478",
+      "project": "tikonen/blog",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-16478.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022, CWE-023, CWE-036, CWE-073, CWE-099. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-16479",
+      "project": "prahladyeri/http-live-simulator",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-16479.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022, CWE-023, CWE-036, CWE-073, CWE-099. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-16480",
+      "project": "tnantoka/public",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-16480.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-16484",
+      "project": "nunnly/m-server",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-16484.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-16485",
+      "project": "nunnly/m-server",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-16485.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022, CWE-023, CWE-036, CWE-073, CWE-099. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-16487",
+      "project": "lodash/lodash",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-16487.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-079, CWE-094, CWE-400, CWE-915. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-16489",
+      "project": "angus-c/just",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-16489.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-079, CWE-094, CWE-400, CWE-915. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-16490",
+      "project": "aheckmann/mpath",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-16490.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-079, CWE-094, CWE-400, CWE-915. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-16491",
+      "project": "dreamerslab/node.extend",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-16491.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-079, CWE-094, CWE-400, CWE-915. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-16492",
+      "project": "justmoon/node-extend",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-16492.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-079, CWE-094, CWE-400, CWE-915. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-18282",
+      "project": "zeit/next.js",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-18282.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-094, CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-19048",
+      "project": "mycolorway/simditor",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-19048.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-20164",
+      "project": "ua-parser/uap-core",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-20164.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-20676",
+      "project": "twbs/bootstrap",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-20676.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-20677",
+      "project": "twbs/bootstrap",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-20677.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-20801",
+      "project": "highcharts/highcharts",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-20801.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-20834",
+      "project": "npm/node-tar",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-20834.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-20835",
+      "project": "mafintosh/tar-fs",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-20835.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-21036",
+      "project": "balderdashy/sails-hook-sockets",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-21036.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3712",
+      "project": "zeit/serve",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3712.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022, CWE-023, CWE-036, CWE-073, CWE-099. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3713",
+      "project": "simonh1000/angular-http-server",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3713.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022, CWE-023, CWE-036, CWE-073, CWE-099. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3718",
+      "project": "zeit/serve",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3718.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022, CWE-023, CWE-036, CWE-073, CWE-099. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3719",
+      "project": "jonschlinkert/mixin-deep",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3719.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-079, CWE-094, CWE-400, CWE-915. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3721",
+      "project": "lodash/lodash",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3721.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-079, CWE-094, CWE-400, CWE-915. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3722",
+      "project": "jonschlinkert/merge-deep",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3722.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-079, CWE-094, CWE-400, CWE-915. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3725",
+      "project": "herber/hekto",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3725.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022, CWE-023, CWE-036, CWE-073, CWE-099. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3726",
+      "project": "omphalos/crud-file-server",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3726.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3728",
+      "project": "hapijs/hoek",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3728.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-079, CWE-094, CWE-400, CWE-915. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3731",
+      "project": "tnantoka/public",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3731.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022, CWE-023, CWE-036, CWE-073, CWE-099. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3732",
+      "project": "pillarjs/resolve-path",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3732.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-22. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3733",
+      "project": "omphalos/crud-file-server",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3733.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022, CWE-023, CWE-036, CWE-073, CWE-099. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3736",
+      "project": "TooTallNate/node-https-proxy-agent",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3736.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-770. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3737",
+      "project": "joyent/node-sshpk",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3737.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3738",
+      "project": "protobufjs/protobuf.js",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3738.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3743",
+      "project": "herber/hekto",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3743.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-601. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3746",
+      "project": "fagbokforlaget/pdfinfojs",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3746.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3747",
+      "project": "tnantoka/public",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3747.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3750",
+      "project": "unclechu/node-deep-extend",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3750.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-079, CWE-094, CWE-400, CWE-915. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3752",
+      "project": "schnittstabil/merge-options",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3752.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-079, CWE-094, CWE-400, CWE-915. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3757",
+      "project": "roest01/node-pdf-image",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3757.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3770",
+      "project": "alanshaw/markdown-pdf",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3770.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-94. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3772",
+      "project": "vvo/node-whereis",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3772.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3783",
+      "project": "JasonEtco/flintcms",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3783.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-089. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-3786",
+      "project": "eggjs/egg-scripts",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-3786.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-6184",
+      "project": "zeit/next.js",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-6184.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022, CWE-023, CWE-036, CWE-073, CWE-099. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-6333",
+      "project": "facebookarchive/nuclide",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-6333.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-601. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-6341",
+      "project": "facebook/react",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-6341.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-79. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-6342",
+      "project": "facebook/create-react-app",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-6342.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-7560",
+      "project": "myshenin/aws-lambda-multipart-parser",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-7560.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-7651",
+      "project": "npm/ssri",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-7651.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2018-8035",
+      "project": "apache/uima-ducc",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2018-8035.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-10061",
+      "project": "peterbraden/node-opencv",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-10061.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-10090",
+      "project": "apache/jspwiki",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-10090.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-1010091",
+      "project": "tinymce/tinymce",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-1010091.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-116, CWE-020. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-1010266",
+      "project": "lodash/lodash",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-1010266.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-1020012",
+      "project": "parse-community/parse-server",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-1020012.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-444. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-10742",
+      "project": "axios/axios",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-10742.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-404. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-10744",
+      "project": "lodash/lodash",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-10744.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-094, CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-10745",
+      "project": "jonschlinkert/assign-deep",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-10745.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-079, CWE-094, CWE-400, CWE-915. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-10746",
+      "project": "jonschlinkert/mixin-deep",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-10746.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-079, CWE-094, CWE-400, CWE-915. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-10747",
+      "project": "jonschlinkert/set-value",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-10747.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-079, CWE-094, CWE-400, CWE-915. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-10750",
+      "project": "alexindigo/deeply",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-10750.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-079, CWE-094, CWE-400, CWE-915. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-10757",
+      "project": "knex/knex",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-10757.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-10758",
+      "project": "mongo-express/mongo-express",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-10758.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-094, CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-10759",
+      "project": "commenthol/safer-eval",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-10759.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-94. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-10761",
+      "project": "patriksimek/vm2",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-10761.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-74, CWE-94. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-10765",
+      "project": "ioBroker/ioBroker.admin",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-10765.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022, CWE-023, CWE-036, CWE-073, CWE-099. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-10767",
+      "project": "ioBroker/ioBroker.js-controller",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-10767.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022, CWE-023, CWE-036, CWE-073, CWE-099. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-10771",
+      "project": "ioBroker/ioBroker.web",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-10771.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-10775",
+      "project": "jfhbrook/node-ecstatic",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-10775.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-10776",
+      "project": "kellyselden/git-diff-apply",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-10776.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-10777",
+      "project": "awspilot/cli-lambda-deploy",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-10777.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-10778",
+      "project": "guybedford/devcert",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-10778.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-10781",
+      "project": "Atinux/schema-inspector",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-10781.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-668. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-10785",
+      "project": "dojo/dojox",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-10785.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-116, CWE-020. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-11358",
+      "project": "jquery/jquery",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-11358.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-079, CWE-094, CWE-400, CWE-915. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-12041",
+      "project": "probablyup/markdown-to-jsx",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-12041.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-399. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-12043",
+      "project": "jonschlinkert/remarkable",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-12043.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-79. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-12313",
+      "project": "dollarshaveclub/shave",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-12313.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-13127",
+      "project": "jgraph/mxgraph",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-13127.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-13173",
+      "project": "npm/fstream",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-13173.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-13506",
+      "project": "Rich-Harris/devalue",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-13506.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-094, CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-14772",
+      "project": "verdaccio/verdaccio",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-14772.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-14862",
+      "project": "knockout/knockout",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-14862.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-15478",
+      "project": "jameswlane/status-board",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-15478.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-15479",
+      "project": "jameswlane/status-board",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-15479.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-15482",
+      "project": "SLMNBJ/selectize-plugin-a11y",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-15482.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-15532",
+      "project": "gchq/CyberChef",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-15532.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-15657",
+      "project": "mysticatea/eslint-utils",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-15657.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-94. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-15658",
+      "project": "voxpelli/node-connect-pg-simple",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-15658.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-089. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-15782",
+      "project": "webtorrent/webtorrent",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-15782.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-16763",
+      "project": "mpetroff/pannellum",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-16763.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-020. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-16769",
+      "project": "yahoo/serialize-javascript",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-16769.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-79. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-17495",
+      "project": "swagger-api/swagger-ui",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-17495.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-79. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-17592",
+      "project": "adaltas/node-csv-parse",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-17592.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-18350",
+      "project": "ant-design/ant-design-pro",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-18350.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116, CWE-601. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-18818",
+      "project": "strapi/strapi",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-18818.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-089. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-18954",
+      "project": "NetEase/pomelo",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-18954.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-754. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-19507",
+      "project": "manvel-khnkoyan/jpv",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-19507.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-807, CWE-290. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-20149",
+      "project": "jonschlinkert/kind-of",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-20149.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-668, CWE-20. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-20174",
+      "project": "auth0/lock",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-20174.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-5413",
+      "project": "expressjs/morgan",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-5413.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-094, CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-5414",
+      "project": "tiaanduplessis/kill-port",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-5414.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-5423",
+      "project": "prahladyeri/http-live-simulator",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-5423.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-116, CWE-020. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-5444",
+      "project": "ChristoPy/serve-here.js",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-5444.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022, CWE-023, CWE-036, CWE-073, CWE-099. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-5479",
+      "project": "larvit/larvitbase-api",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-5479.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022, CWE-023, CWE-036, CWE-073, CWE-099. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-5483",
+      "project": "senecajs/seneca",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-5483.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-312, CWE-315, CWE-359. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-5484",
+      "project": "bower/bower",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-5484.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-8331",
+      "project": "twbs/bootstrap",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-8331.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-8903",
+      "project": "totaljs/framework",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-8903.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-116, CWE-020. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2019-9844",
+      "project": "Khan/simple-markdown",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2019-9844.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-020. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-11021",
+      "project": "actions/http-client",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-11021.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-200. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-11022",
+      "project": "jquery/jquery",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-11022.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-11059",
+      "project": "ipfs/aegir",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-11059.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-312, CWE-315, CWE-359. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-11079",
+      "project": "skoranga/node-dns-sync",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-11079.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-12265",
+      "project": "kevva/decompress",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-12265.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-14000",
+      "project": "LLK/scratch-vm",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-14000.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116, CWE-601. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-15092",
+      "project": "NUKnightLab/TimelineJS3",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-15092.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-15095",
+      "project": "npm/cli",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-15095.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-312, CWE-315, CWE-359. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-15119",
+      "project": "auth0/lock",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-15119.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-15123",
+      "project": "codecov/codecov-node",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-15123.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-15135",
+      "project": "Neztore/save-server",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-15135.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-352. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-15138",
+      "project": "PrismJS/prism",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-15138.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-15152",
+      "project": "autovance/ftp-srv",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-15152.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-918. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-15156",
+      "project": "psychobunny/nodebb-plugin-blog-comments",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-15156.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-352. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-15256",
+      "project": "mariocasciaro/object-path",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-15256.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-079, CWE-094, CWE-400, CWE-915. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-26226",
+      "project": "semantic-release/semantic-release",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-26226.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-26256",
+      "project": "C2FO/fast-csv",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-26256.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-27666",
+      "project": "strapi/strapi",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-27666.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-4051",
+      "project": "dojo/dijit",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-4051.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-4059",
+      "project": "mikaelbr/mversion",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-4059.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-4066",
+      "project": "erelsgl/limdu",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-4066.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-5251",
+      "project": "parse-community/parse-server",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-5251.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-089. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-5258",
+      "project": "dojo/dojo",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-5258.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-079, CWE-094, CWE-400, CWE-915. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-6836",
+      "project": "handsontable/formula-parser",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-6836.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-094, CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-7638",
+      "project": "davideicardi/confinit",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-7638.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-079, CWE-094, CWE-400, CWE-915. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-7656",
+      "project": "jquery/jquery",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-7656.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-116, CWE-020. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-7660",
+      "project": "yahoo/serialize-javascript",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-7660.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-502. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-7662",
+      "project": "faye/websocket-extensions-node",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-7662.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-730, CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-7676",
+      "project": "angular/angular.js",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-7676.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-7699",
+      "project": "richardgirges/express-fileupload",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-7699.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-079, CWE-094, CWE-400, CWE-915. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-7720",
+      "project": "digitalbazaar/forge",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-7720.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-079, CWE-094, CWE-400, CWE-915. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-7750",
+      "project": "LLK/scratch-svg-renderer",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-7750.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-079, CWE-116. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-7752",
+      "project": "sebhildebrandt/systeminformation",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-7752.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-7763",
+      "project": "pofider/phantom-html-to-pdf",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-7763.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-022, CWE-023, CWE-036, CWE-073, CWE-099. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-8116",
+      "project": "sindresorhus/dot-prop",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-8116.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-079, CWE-094, CWE-400, CWE-915. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-8135",
+      "project": "transloadit/uppy",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-8135.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-601. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-8149",
+      "project": "zamotany/logkitty",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-8149.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-088. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-8192",
+      "project": "fastify/fastify",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-8192.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-770. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-8203",
+      "project": "lodash/lodash",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-8203.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-078, CWE-079, CWE-094, CWE-400, CWE-915. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-8205",
+      "project": "transloadit/uppy",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-8205.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-918. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-8244",
+      "project": "rvagg/bl",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-8244.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-125, CWE-126. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2020-9038",
+      "project": "laurent22/joplin",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2020-9038.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-020. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2021-23344",
+      "project": "totaljs/framework",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2021-23344.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-94. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2021-23364",
+      "project": "browserslist/browserslist",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2021-23364.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-400. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "CVE-2021-31712",
+      "project": "jpuri/react-draft-wysiwyg",
+      "url": "https://github.com/ossf-cve-benchmark/ossf-cve-benchmark/blob/main/CVEs/CVE-2021-31712.json",
+      "framework": "OpenSSF JavaScript/TypeScript CVE inventory; framework and TypeScript eligibility pending screen",
+      "kind": "real-world-CVE-pair-inventory",
+      "validation_status": "candidate",
+      "notes": "OpenSSF manifest labels: CWE-79. It records upstream repository plus pre/post-patch metadata. Corsair has not checked out, executed, or validated this candidate; TypeScript source presence and a safe differential oracle remain to be established."
+    },
+    {
+      "id": "project:vercel/next.js",
+      "project": "vercel/next.js",
+      "url": "https://github.com/vercel/next.js",
+      "framework": "Next.js full-stack React framework",
+      "kind": "project-candidate",
+      "validation_status": "candidate",
+      "notes": "Project-only expansion seed, not a vulnerability claim. No revision, advisory, patch, exploit, or outcome has been selected or executed. Pair an exact OSV/GHSA/CVE record and an upstream revision before creating a Corsair case."
+    },
+    {
+      "id": "project:nestjs/nest",
+      "project": "nestjs/nest",
+      "url": "https://github.com/nestjs/nest",
+      "framework": "Nest server-side application framework",
+      "kind": "project-candidate",
+      "validation_status": "candidate",
+      "notes": "Project-only expansion seed, not a vulnerability claim. No revision, advisory, patch, exploit, or outcome has been selected or executed. Pair an exact OSV/GHSA/CVE record and an upstream revision before creating a Corsair case."
+    },
+    {
+      "id": "project:fastify/fastify",
+      "project": "fastify/fastify",
+      "url": "https://github.com/fastify/fastify",
+      "framework": "Fastify Node.js web framework with TypeScript support",
+      "kind": "project-candidate",
+      "validation_status": "candidate",
+      "notes": "Project-only expansion seed, not a vulnerability claim. No revision, advisory, patch, exploit, or outcome has been selected or executed. Pair an exact OSV/GHSA/CVE record and an upstream revision before creating a Corsair case."
+    },
+    {
+      "id": "project:honojs/hono",
+      "project": "honojs/hono",
+      "url": "https://github.com/honojs/hono",
+      "framework": "Hono multi-runtime Web-standards framework",
+      "kind": "project-candidate",
+      "validation_status": "candidate",
+      "notes": "Project-only expansion seed, not a vulnerability claim. No revision, advisory, patch, exploit, or outcome has been selected or executed. Pair an exact OSV/GHSA/CVE record and an upstream revision before creating a Corsair case."
+    },
+    {
+      "id": "project:nuxt/nuxt",
+      "project": "nuxt/nuxt",
+      "url": "https://github.com/nuxt/nuxt",
+      "framework": "Nuxt full-stack Vue framework",
+      "kind": "project-candidate",
+      "validation_status": "candidate",
+      "notes": "Project-only expansion seed, not a vulnerability claim. No revision, advisory, patch, exploit, or outcome has been selected or executed. Pair an exact OSV/GHSA/CVE record and an upstream revision before creating a Corsair case."
+    },
+    {
+      "id": "project:angular/angular",
+      "project": "angular/angular",
+      "url": "https://github.com/angular/angular",
+      "framework": "Angular web application platform",
+      "kind": "project-candidate",
+      "validation_status": "candidate",
+      "notes": "Project-only expansion seed, not a vulnerability claim. No revision, advisory, patch, exploit, or outcome has been selected or executed. Pair an exact OSV/GHSA/CVE record and an upstream revision before creating a Corsair case."
+    },
+    {
+      "id": "project:sveltejs/kit",
+      "project": "sveltejs/kit",
+      "url": "https://github.com/sveltejs/kit",
+      "framework": "SvelteKit application framework",
+      "kind": "project-candidate",
+      "validation_status": "candidate",
+      "notes": "Project-only expansion seed, not a vulnerability claim. No revision, advisory, patch, exploit, or outcome has been selected or executed. Pair an exact OSV/GHSA/CVE record and an upstream revision before creating a Corsair case."
+    },
+    {
+      "id": "project:remix-run/remix",
+      "project": "remix-run/remix",
+      "url": "https://github.com/remix-run/remix",
+      "framework": "Remix full-stack web framework",
+      "kind": "project-candidate",
+      "validation_status": "candidate",
+      "notes": "Project-only expansion seed, not a vulnerability claim. No revision, advisory, patch, exploit, or outcome has been selected or executed. Pair an exact OSV/GHSA/CVE record and an upstream revision before creating a Corsair case."
+    },
+    {
+      "id": "project:trpc/trpc",
+      "project": "trpc/trpc",
+      "url": "https://github.com/trpc/trpc",
+      "framework": "tRPC end-to-end typesafe API framework",
+      "kind": "project-candidate",
+      "validation_status": "candidate",
+      "notes": "Project-only expansion seed, not a vulnerability claim. No revision, advisory, patch, exploit, or outcome has been selected or executed. Pair an exact OSV/GHSA/CVE record and an upstream revision before creating a Corsair case."
+    },
+    {
+      "id": "project:prisma/orm",
+      "project": "prisma/orm",
+      "url": "https://github.com/prisma/orm",
+      "framework": "Prisma TypeScript ORM",
+      "kind": "project-candidate",
+      "validation_status": "candidate",
+      "notes": "Project-only expansion seed, not a vulnerability claim. No revision, advisory, patch, exploit, or outcome has been selected or executed. Pair an exact OSV/GHSA/CVE record and an upstream revision before creating a Corsair case."
+    },
+    {
+      "id": "project:typeorm/typeorm",
+      "project": "typeorm/typeorm",
+      "url": "https://github.com/typeorm/typeorm",
+      "framework": "TypeORM TypeScript and JavaScript ORM",
+      "kind": "project-candidate",
+      "validation_status": "candidate",
+      "notes": "Project-only expansion seed, not a vulnerability claim. No revision, advisory, patch, exploit, or outcome has been selected or executed. Pair an exact OSV/GHSA/CVE record and an upstream revision before creating a Corsair case."
+    },
+    {
+      "id": "project:socketio/socket.io",
+      "project": "socketio/socket.io",
+      "url": "https://github.com/socketio/socket.io",
+      "framework": "Socket.IO real-time communication framework",
+      "kind": "project-candidate",
+      "validation_status": "candidate",
+      "notes": "Project-only expansion seed, not a vulnerability claim. No revision, advisory, patch, exploit, or outcome has been selected or executed. Pair an exact OSV/GHSA/CVE record and an upstream revision before creating a Corsair case."
+    },
+    {
+      "id": "project:microsoft/playwright",
+      "project": "microsoft/playwright",
+      "url": "https://github.com/microsoft/playwright",
+      "framework": "Playwright browser automation and test framework",
+      "kind": "project-candidate",
+      "validation_status": "candidate",
+      "notes": "Project-only expansion seed, not a vulnerability claim. No revision, advisory, patch, exploit, or outcome has been selected or executed. Pair an exact OSV/GHSA/CVE record and an upstream revision before creating a Corsair case."
+    },
+    {
+      "id": "project:microsoft/vscode",
+      "project": "microsoft/vscode",
+      "url": "https://github.com/microsoft/vscode",
+      "framework": "VS Code TypeScript application platform",
+      "kind": "project-candidate",
+      "validation_status": "candidate",
+      "notes": "Project-only expansion seed, not a vulnerability claim. No revision, advisory, patch, exploit, or outcome has been selected or executed. Pair an exact OSV/GHSA/CVE record and an upstream revision before creating a Corsair case."
+    },
+    {
+      "id": "project:tauri-apps/tauri",
+      "project": "tauri-apps/tauri",
+      "url": "https://github.com/tauri-apps/tauri",
+      "framework": "Tauri desktop application framework with TypeScript frontend surface",
+      "kind": "project-candidate",
+      "validation_status": "candidate",
+      "notes": "Project-only expansion seed, not a vulnerability claim. No revision, advisory, patch, exploit, or outcome has been selected or executed. Pair an exact OSV/GHSA/CVE record and an upstream revision before creating a Corsair case."
+    },
+    {
+      "id": "project:elysiajs/elysia",
+      "project": "elysiajs/elysia",
+      "url": "https://github.com/elysiajs/elysia",
+      "framework": "Elysia TypeScript Bun framework",
+      "kind": "project-candidate",
+      "validation_status": "candidate",
+      "notes": "Project-only expansion seed, not a vulnerability claim. No revision, advisory, patch, exploit, or outcome has been selected or executed. Pair an exact OSV/GHSA/CVE record and an upstream revision before creating a Corsair case."
+    },
+    {
+      "id": "project:t3-oss/create-t3-app",
+      "project": "t3-oss/create-t3-app",
+      "url": "https://github.com/t3-oss/create-t3-app",
+      "framework": "create-t3-app TypeScript full-stack starter",
+      "kind": "project-candidate",
+      "validation_status": "candidate",
+      "notes": "Project-only expansion seed, not a vulnerability claim. No revision, advisory, patch, exploit, or outcome has been selected or executed. Pair an exact OSV/GHSA/CVE record and an upstream revision before creating a Corsair case."
+    },
+    {
+      "id": "project:redwoodjs/graphql",
+      "project": "redwoodjs/graphql",
+      "url": "https://github.com/redwoodjs/graphql",
+      "framework": "Redwood GraphQL/TypeScript framework package",
+      "kind": "project-candidate",
+      "validation_status": "candidate",
+      "notes": "Project-only expansion seed, not a vulnerability claim. No revision, advisory, patch, exploit, or outcome has been selected or executed. Pair an exact OSV/GHSA/CVE record and an upstream revision before creating a Corsair case."
+    }
+  ]
+}

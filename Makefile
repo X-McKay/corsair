@@ -6,8 +6,11 @@ MAX_SUBMISSIONS ?= 4
 REPEATS ?= 1
 DEV_SET ?= evals/e2e/sets/python-v2-dev.json
 HELDOUT_SET ?= evals/e2e/sets/python-v2-heldout.json
+WORKERS ?= 4
+BENCH_ROOT ?= .runs/polyglot
+LANGUAGE ?=
 
-.PHONY: sync test test-offline test-docker image verify investigate eval eval-dev eval-heldout pilot cleanup
+.PHONY: sync test test-offline test-docker image images benchmark benchmark-generate verify investigate eval eval-dev eval-heldout pilot cleanup
 
 sync:
 	uv sync --locked
@@ -23,6 +26,19 @@ test-docker: image
 
 image:
 	docker build -q -t corsair-lite-python:dev images/python
+
+images: image
+	docker build -q -t corsair-lite-node:dev images/node
+	docker build -q -t corsair-lite-java:dev images/jvm
+	docker build -q -t corsair-lite-perl:dev images/perl
+	docker build -q -t corsair-lite-ruby:dev images/ruby
+	docker build -q -t corsair-lite-cpp:dev images/cpp
+
+benchmark-generate:
+	$(PYTHON) tools/benchmark.py --root $(BENCH_ROOT) $(if $(LANGUAGE),--language $(LANGUAGE)) --generate-only --output $(BENCH_ROOT)/generated.json
+
+benchmark:
+	$(PYTHON) tools/benchmark.py --root $(BENCH_ROOT) $(if $(LANGUAGE),--language $(LANGUAGE)) --run-kernel --workers $(WORKERS) --output $(BENCH_ROOT)/report.json
 
 # Kernel only: verify a human- or agent-written submission (no model unless PROVIDER adds the blind auditor).
 verify: image

@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from .case import Case
 
 SCHEMA = "corsair-lite/runtime-matrix/1"
-DEFAULT_MATRIX = Path(__file__).resolve().parents[2] / "matrix.yaml"
+DEFAULT_MATRIX = Path(__file__).with_name("runtime-matrix.yaml")
 
 
 class Detect(BaseModel):
@@ -76,7 +76,16 @@ def select(case: Case, matrix: Path = DEFAULT_MATRIX) -> Row | None:
     root = Path(case.revision.source)
     if not root.is_dir():
         return None
-    for row in load(matrix):
+    suffix = Path(case.finding.file_path or "").suffix.lower()
+    languages = {".py": "python", ".java": "java", ".js": "javascript", ".mjs": "javascript",
+                 ".cjs": "javascript", ".jsx": "javascript", ".ts": "typescript", ".tsx": "typescript",
+                 ".pl": "perl", ".pm": "perl", ".rb": "ruby", ".cpp": "cpp", ".cc": "cpp",
+                 ".cxx": "cpp", ".c": "cpp", ".hpp": "cpp", ".h": "cpp"}
+    target_language = languages.get(suffix)
+    rows = load(matrix)
+    for row in rows:
+        if target_language is not None and row.language != target_language:
+            continue
         if detects(row, root):
             return row
     return None

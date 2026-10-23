@@ -1,0 +1,1175 @@
+{
+  "language": "python",
+  "sources": [
+    {
+      "name": "Vul4Py",
+      "url": "https://github.com/tabudz/vul4py",
+      "license": "No repository license file or SPDX license was stated in the GitHub metadata reviewed; seek permission/terms before redistributing benchmark contents.",
+      "frameworks": [
+        "Python packages and applications; includes web, protocol, serialization, crypto, CLI, and ML-adjacent projects"
+      ],
+      "available_cases": 100,
+      "notes": "The public README describes 100 Python entries, comprising 92 CVE and 8 GHSA IDs. dataset/vul4py.csv provides vuln_id, repo_url, and fix_commit for 100 rows; upstream states each ships vulnerable/fixed revisions plus baseline and exploit tests. The 100 concrete IDs below were transcribed from that inventory, but are only Corsair candidates."
+    },
+    {
+      "name": "CVEfixes v1.0.8",
+      "url": "https://zenodo.org/records/4476563",
+      "license": "CC-BY-4.0 for dataset; collection code is MIT. Upstream project source licenses remain separate.",
+      "frameworks": [
+        "Multi-language open-source repositories; filter relational data to Python changed files/methods and public git histories"
+      ],
+      "available_cases": 11873,
+      "notes": "Published total is 11,873 CVEs, 12,107 fixing commits, 4,249 projects, and 272 CWEs through 2024-07-23. The reported total is not a Python-only count; obtain the 12.7-GB SQL release and apply a Python/source-file and reproducibility filter."
+    },
+    {
+      "name": "MoreFixes v1",
+      "url": "https://zenodo.org/records/11199120",
+      "license": "CC-BY-4.0 dataset record; the Zenodo record also identifies Apache-2.0 and MIT components. Mined repositories have their own licenses.",
+      "frameworks": [
+        "Multi-language GitHub repositories; filter patches/metadata to Python projects and executable revisions"
+      ],
+      "available_cases": 26617,
+      "notes": "Published total is 26,617 CVEs from 6,945 GitHub projects and 31,883 fixing commits through 2024-01-24. It offers a PostgreSQL dump and separate patch archive. This is not a Python-only count and does not itself establish that a local harness reproduces any case."
+    },
+    {
+      "name": "PyPA Advisory Database",
+      "url": "https://github.com/pypa/advisory-database",
+      "license": "CC-BY-4.0",
+      "frameworks": [
+        "PyPI packages"
+      ],
+      "available_cases": "Dynamic repository inventory; no snapshot count recorded here.",
+      "notes": "Public Python-package advisory inventory. Use IDs, affected ranges, and references to select candidates, then independently locate an authorized upstream revision and reproduce a differential oracle."
+    },
+    {
+      "name": "GitHub Advisory Database / Global Security Advisories",
+      "url": "https://docs.github.com/en/rest/security-advisories/global-advisories",
+      "license": "CC-BY-4.0 for github/advisory-database repository; API advisory metadata should be used subject to GitHub terms.",
+      "frameworks": [
+        "pip ecosystem, queryable through ecosystem=pip"
+      ],
+      "available_cases": "Dynamic API inventory; no snapshot count recorded here.",
+      "notes": "The documented API exposes GHSA and optional CVE IDs, package ecosystem/name, affected ranges, first patched version, references, and CWEs. It is an authoritative selection feed, not an execution oracle or a guarantee that an upstream fixing commit is available."
+    },
+    {
+      "name": "OSV.dev",
+      "url": "https://google.github.io/osv.dev/",
+      "license": "Aggregated entries retain source-specific provenance and licensing; consult each entry/source.",
+      "frameworks": [
+        "PyPI plus other OpenSSF Vulnerability Format adopters"
+      ],
+      "available_cases": "Dynamic aggregated inventory; no snapshot count recorded here.",
+      "notes": "OSV aggregates databases adopting the OpenSSF Vulnerability format and supports version- or commit-hash queries. Use it to cross-reference IDs and affected versions, not as proof that a benchmark case executes locally."
+    },
+    {
+      "name": "OWASP Benchmark for Python v0.1",
+      "url": "https://github.com/OWASP-Benchmark/BenchmarkPython",
+      "license": "GPL-3.0",
+      "frameworks": [
+        "Runnable Python web application for SAST, DAST, and IAST"
+      ],
+      "available_cases": "No stable published count in the preliminary v0.1 README.",
+      "notes": "Intentionally vulnerable test suite, useful for scanner and harness integration. It is explicitly not a source of real historical CVE/GHSA candidate cases in this catalog."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "CVE-2017-16615",
+      "project": "thanethomson/MLAlchemy",
+      "url": "https://github.com/thanethomson/MLAlchemy/commit/bc795757febdcce430d89f9d08f75c32d6989d3c",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2017-16618",
+      "project": "tadashi-aikawa/owlmixin",
+      "url": "https://github.com/tadashi-aikawa/owlmixin/commit/5d0575303f6df869a515ced4285f24ba721e0d4e",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2018-7753",
+      "project": "mozilla/bleach",
+      "url": "https://github.com/mozilla/bleach/commit/c5df5789ec3471a31311f42c2d19fc2cf21b35ef",
+      "framework": "HTML sanitization library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2019-1010017",
+      "project": "savon-noir/python-libnmap",
+      "url": "https://github.com/savon-noir/python-libnmap/commit/71b707758851e4b622f87d9a73266e06f60aeab4",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2019-10800",
+      "project": "codecov/codecov-python",
+      "url": "https://github.com/codecov/codecov-python/commit/2a80aa434f74feb31242b6f213b75ce63ae97902",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2020-6802",
+      "project": "mozilla/bleach",
+      "url": "https://github.com/mozilla/bleach/commit/f77e0f6392177a06e46a49abd61a4d9f035e57fd",
+      "framework": "HTML sanitization library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2021-23980",
+      "project": "mozilla/bleach",
+      "url": "https://github.com/mozilla/bleach/commit/79b7a3c5e56a09d1d323a5006afa59b56162eb13",
+      "framework": "HTML sanitization library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2021-28363",
+      "project": "urllib3/urllib3",
+      "url": "https://github.com/urllib3/urllib3/commit/8d65ea1ecf6e2cdc27d42124e587c1b83a3118b0",
+      "framework": "HTTP client library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2021-32839",
+      "project": "andialbrecht/sqlparse",
+      "url": "https://github.com/andialbrecht/sqlparse/commit/8238a9e450ed1524e40cb3a8b0b3c00606903aeb",
+      "framework": "SQL parsing library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2022-24065",
+      "project": "cookiecutter/cookiecutter",
+      "url": "https://github.com/cookiecutter/cookiecutter/commit/fdffddb31fd2b46344dfa317531ff155e7999f77",
+      "framework": "project-template generator",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2022-24439",
+      "project": "gitpython-developers/GitPython",
+      "url": "https://github.com/gitpython-developers/GitPython/commit/2625ed9fc074091c531c27ffcba7902771130261",
+      "framework": "Git integration library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2022-2888",
+      "project": "octoprint/octoprint",
+      "url": "https://github.com/octoprint/octoprint/commit/40e6217ac1a85cc5ed592873ae49db01d3005da4",
+      "framework": "3D-printing web application",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2022-29217",
+      "project": "jpadilla/pyjwt",
+      "url": "https://github.com/jpadilla/pyjwt/commit/9c528670c455b8d948aff95ed50e22940d1ad3fc",
+      "framework": "JWT authentication library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2022-3102",
+      "project": "latchset/jwcrypto",
+      "url": "https://github.com/latchset/jwcrypto/commit/f4e912f83cb578e2cd47f8a9398bf15f680bf558",
+      "framework": "JOSE cryptography library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2023-23934",
+      "project": "pallets/werkzeug",
+      "url": "https://github.com/pallets/werkzeug/commit/cf275f42acad1b5950c50ffe8ef58fe62cdce028",
+      "framework": "WSGI web utility library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2023-25577",
+      "project": "pallets/werkzeug",
+      "url": "https://github.com/pallets/werkzeug/commit/517cac5a804e8c4dc4ed038bb20dacd038e7a9f1",
+      "framework": "WSGI web utility library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2023-26145",
+      "project": "dgilland/pydash",
+      "url": "https://github.com/dgilland/pydash/commit/6ff0831ad285fff937cafd2a853f20cc9ae92021",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2023-26302",
+      "project": "executablebooks/markdown-it-py",
+      "url": "https://github.com/executablebooks/markdown-it-py/commit/53ca3e9c2b9e9b295f6abf7f4ad2730a9b70f68c",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2023-29483",
+      "project": "rthalley/dnspython",
+      "url": "https://github.com/rthalley/dnspython/commit/0ea5ad0a4583e1f519b9bcc67cfac381230d9cf2",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2023-30608",
+      "project": "andialbrecht/sqlparse",
+      "url": "https://github.com/andialbrecht/sqlparse/commit/c457abd5f097dd13fb21543381e7cfafe7d31cfb",
+      "framework": "SQL parsing library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2023-32303",
+      "project": "planetlabs/planet-client-python",
+      "url": "https://github.com/planetlabs/planet-client-python/commit/d71415a83119c5e89d7b80d5f940d162376ee3b7",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2023-32309",
+      "project": "facelessuser/pymdown-extensions",
+      "url": "https://github.com/facelessuser/pymdown-extensions/commit/b7bb4878d6017c03c8dc97c42d8d3bb6ee81db9d",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2023-32681",
+      "project": "psf/requests",
+      "url": "https://github.com/psf/requests/commit/74ea7cf7a6a27a4eeb2ae24e162bcc942a6706d5",
+      "framework": "HTTP client library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2023-34457",
+      "project": "MechanicalSoup/MechanicalSoup",
+      "url": "https://github.com/MechanicalSoup/MechanicalSoup/commit/d57c4a269bba3b9a0c5bfa20292955b849006d9e",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2023-36830",
+      "project": "sqlfluff/sqlfluff",
+      "url": "https://github.com/sqlfluff/sqlfluff/commit/6cdc38d76bedab4801b035c04d3c2b3aea17de86",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2023-37271",
+      "project": "zopefoundation/RestrictedPython",
+      "url": "https://github.com/zopefoundation/RestrictedPython/commit/c8eca66ae49081f0016d2e1f094c3d72095ef531",
+      "framework": "restricted-execution library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2023-41039",
+      "project": "zopefoundation/RestrictedPython",
+      "url": "https://github.com/zopefoundation/RestrictedPython/commit/4134aedcff17c977da7717693ed89ce56d54c120",
+      "framework": "restricted-execution library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2023-41040",
+      "project": "gitpython-developers/GitPython",
+      "url": "https://github.com/gitpython-developers/GitPython/commit/74e55ee4544867e1bd976b7df5a45869ee397b0b",
+      "framework": "Git integration library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2023-46446",
+      "project": "ronf/asyncssh",
+      "url": "https://github.com/ronf/asyncssh/commit/83e43f5ea3470a8617fc388c72b062c7136efd7e",
+      "framework": "SSH library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2023-47163",
+      "project": "remarshal-project/remarshal",
+      "url": "https://github.com/remarshal-project/remarshal/commit/fd6ac799a02f533c3fc243b49cdd6d21aa7ee494",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2023-6681",
+      "project": "latchset/jwcrypto",
+      "url": "https://github.com/latchset/jwcrypto/commit/d2655d370586cb830e49acfb450f87598da60be8",
+      "framework": "JOSE cryptography library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-22190",
+      "project": "gitpython-developers/GitPython",
+      "url": "https://github.com/gitpython-developers/GitPython/commit/ef3192cc414f2fd9978908454f6fd95243784c7f",
+      "framework": "Git integration library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-22195",
+      "project": "pallets/jinja",
+      "url": "https://github.com/pallets/jinja/commit/716795349a41d4983a9a4771f7d883c96ea17be7",
+      "framework": "template engine",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-27454",
+      "project": "ijl/orjson",
+      "url": "https://github.com/ijl/orjson/commit/b0e4d2c06ce06c6e63981bf0276e4b7c74e5845e",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-28102",
+      "project": "latchset/jwcrypto",
+      "url": "https://github.com/latchset/jwcrypto/commit/90477a3b6e73da69740e00b8161f53fea19b831f",
+      "framework": "JOSE cryptography library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-29033",
+      "project": "jupyterhub/oauthenticator",
+      "url": "https://github.com/jupyterhub/oauthenticator/commit/5246b09675501b09fb6ed64022099b7644812f60",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-32977",
+      "project": "OctoPrint/OctoPrint",
+      "url": "https://github.com/OctoPrint/OctoPrint/commit/5afbec8d23508edc25b0f1bdef1620580136add4",
+      "framework": "3D-printing web application",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-34061",
+      "project": "dgtlmoon/changedetection.io",
+      "url": "https://github.com/dgtlmoon/changedetection.io/commit/c0f000b1d1ce03733460805dbbedde445fe2c762",
+      "framework": "web application",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-34064",
+      "project": "pallets/jinja",
+      "url": "https://github.com/pallets/jinja/commit/0668239dc6b44ef38e7a6c9f91f312fd4ca581cb",
+      "framework": "template engine",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-34078",
+      "project": "matthiask/html-sanitizer",
+      "url": "https://github.com/matthiask/html-sanitizer/commit/48db42fc5143d0140c32d929c46b802f96913550",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-35195",
+      "project": "psf/requests",
+      "url": "https://github.com/psf/requests/commit/a58d7f2ffb4d00b46dca2d70a3932a0b37e22fac",
+      "framework": "HTTP client library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-37891",
+      "project": "urllib3/urllib3",
+      "url": "https://github.com/urllib3/urllib3/commit/40b6d1605814dd1db0a46e202d6e56f2e4c9a468",
+      "framework": "HTTP client library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-42353",
+      "project": "Pylons/webob",
+      "url": "https://github.com/Pylons/webob/commit/f689bcf4f0a1f64f1735b1d5069aef5be6974b5b",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-4340",
+      "project": "andialbrecht/sqlparse",
+      "url": "https://github.com/andialbrecht/sqlparse/commit/b4a39d9850969b4e1d6940d32094ee0b42a2cf03",
+      "framework": "SQL parsing library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-47164",
+      "project": "gradio-app/gradio",
+      "url": "https://github.com/gradio-app/gradio/commit/08b51590163b306fd874f543f6fcaf23ac7d2646",
+      "framework": "ML web UI framework",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-47532",
+      "project": "zopefoundation/RestrictedPython",
+      "url": "https://github.com/zopefoundation/RestrictedPython/commit/d701cc36cccac36b21fa200f1f2d1945a9a215e6",
+      "framework": "restricted-execution library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-47874",
+      "project": "encode/starlette",
+      "url": "https://github.com/encode/starlette/commit/fd038f3070c302bff17ef7d173dbb0b007617733",
+      "framework": "ASGI web framework",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-4941",
+      "project": "gradio-app/gradio",
+      "url": "https://github.com/gradio-app/gradio/commit/ee1e2942e0a1ae84a08a05464e41c8108a03fa9c",
+      "framework": "ML web UI framework",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-49768",
+      "project": "Pylons/waitress",
+      "url": "https://github.com/Pylons/waitress/commit/e4359018537af376cf24bd13616d861e2fb76f65",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-51998",
+      "project": "dgtlmoon/changedetection.io",
+      "url": "https://github.com/dgtlmoon/changedetection.io/commit/49bc982c697169c98b79698889fb9d26f6b3317f",
+      "framework": "web application",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-52303",
+      "project": "aio-libs/aiohttp",
+      "url": "https://github.com/aio-libs/aiohttp/commit/bc15db61615079d1b6327ba42c682f758fa96936",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-52804",
+      "project": "tornadoweb/tornado",
+      "url": "https://github.com/tornadoweb/tornado/commit/d5ba4a1695fbf7c6a3e54313262639b198291533",
+      "framework": "asynchronous web framework",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-53848",
+      "project": "python-jsonschema/check-jsonschema",
+      "url": "https://github.com/python-jsonschema/check-jsonschema/commit/c52714b85e6725b1b24516fbdedacb333b939152",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-53861",
+      "project": "jpadilla/pyjwt",
+      "url": "https://github.com/jpadilla/pyjwt/commit/33022c25525c1020869c71ce2a4109e44ae4ced1",
+      "framework": "JWT authentication library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-53865",
+      "project": "zhmcclient/python-zhmcclient",
+      "url": "https://github.com/zhmcclient/python-zhmcclient/commit/ad32781e782d0f604c6da4680fce48e4cc1f4433",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-53981",
+      "project": "Kludex/python-multipart",
+      "url": "https://github.com/Kludex/python-multipart/commit/c4fe4d3cebc08c660e57dd709af1ffa7059b3177",
+      "framework": "multipart parsing library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-55655",
+      "project": "sigstore/sigstore-python",
+      "url": "https://github.com/sigstore/sigstore-python/commit/300b502ae99ebfaace124f1f4e422a6a669369cf",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-56201",
+      "project": "pallets/jinja",
+      "url": "https://github.com/pallets/jinja/commit/767b23617628419ae3709ccfb02f9602ae9fe51f",
+      "framework": "template engine",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-56326",
+      "project": "pallets/jinja",
+      "url": "https://github.com/pallets/jinja/commit/48b0687e05a5466a91cd5812d604fa37ad0943b4",
+      "framework": "template engine",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-6844",
+      "project": "corydolphin/flask-cors",
+      "url": "https://github.com/corydolphin/flask-cors/commit/35d875319621bd129a38b2b823abf4a2f6cda536",
+      "framework": "Flask extension",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-6866",
+      "project": "corydolphin/flask-cors",
+      "url": "https://github.com/corydolphin/flask-cors/commit/eb39516a3c96b90d0ae5f51293972395ec3ef358",
+      "framework": "Flask extension",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2024-9701",
+      "project": "kedro-org/kedro",
+      "url": "https://github.com/kedro-org/kedro/commit/66e5e074b2789469550370f370c8b486f638d975",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-10157",
+      "project": "mmaitre314/picklescan",
+      "url": "https://github.com/mmaitre314/picklescan/commit/28a7b4ef753466572bda3313737116eeb9b4e5c5",
+      "framework": "serialization-security library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-1716",
+      "project": "mmaitre314/picklescan",
+      "url": "https://github.com/mmaitre314/picklescan/commit/78ce704227c51f070c0c5fb4b466d92c62a7aa3d",
+      "framework": "serialization-security library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-1944",
+      "project": "mmaitre314/picklescan",
+      "url": "https://github.com/mmaitre314/picklescan/commit/e58e45e0d9e091159c1554f9b04828bbb40b9781",
+      "framework": "serialization-security library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-22153",
+      "project": "zopefoundation/RestrictedPython",
+      "url": "https://github.com/zopefoundation/RestrictedPython/commit/48a92c5bb617a647cffd0dadd4d5cfe626bcdb2f",
+      "framework": "restricted-execution library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-24359",
+      "project": "lmfit/asteval",
+      "url": "https://github.com/lmfit/asteval/commit/45bb47533f7abb5479618ae7f6a809215700dcb2",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-27516",
+      "project": "pallets/jinja",
+      "url": "https://github.com/pallets/jinja/commit/90457bbf33b8662926ae65cdde4c4c32e756e403",
+      "framework": "template engine",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-43859",
+      "project": "python-hyper/h11",
+      "url": "https://github.com/python-hyper/h11/commit/114803a29ce50116dc47951c690ad4892b1a36ed",
+      "framework": "HTTP/1.1 protocol library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-46656",
+      "project": "matthewwithanm/python-markdownify",
+      "url": "https://github.com/matthewwithanm/python-markdownify/commit/959561879693bf4a576f99c6733b50b01186aa08",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-47287",
+      "project": "tornadoweb/tornado",
+      "url": "https://github.com/tornadoweb/tornado/commit/b39b892bf78fe8fea01dd45199aa88307e7162f3",
+      "framework": "asynchronous web framework",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-48383",
+      "project": "codingjoe/django-select2",
+      "url": "https://github.com/codingjoe/django-select2/commit/e5f41e6edba004d35f94915ff5e2559f44853412",
+      "framework": "Django extension",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-48994",
+      "project": "XML-Security/signxml",
+      "url": "https://github.com/XML-Security/signxml/commit/e3c0c2b82a3329a65d917830657649c98b8c7600",
+      "framework": "XML signature library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-50181",
+      "project": "urllib3/urllib3",
+      "url": "https://github.com/urllib3/urllib3/commit/f05b1329126d5be6de501f9d1e3e36738bc08857",
+      "framework": "HTTP client library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-5120",
+      "project": "huggingface/smolagents",
+      "url": "https://github.com/huggingface/smolagents/commit/33a942e62b6fbf6a35d41f1c735bda2d64c163d0",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-53365",
+      "project": "modelcontextprotocol/python-sdk",
+      "url": "https://github.com/modelcontextprotocol/python-sdk/commit/7b420656de48cfdb90b39eb582e60b6d55c2f891",
+      "framework": "protocol SDK",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-53366",
+      "project": "modelcontextprotocol/python-sdk",
+      "url": "https://github.com/modelcontextprotocol/python-sdk/commit/29c69e6a47d0104d0afcea6ac35e7ab02fde809a",
+      "framework": "protocol SDK",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-54121",
+      "project": "encode/starlette",
+      "url": "https://github.com/encode/starlette/commit/9f7ec2eb512fcc3fe90b43cb9dd9e1d08696bec1",
+      "framework": "ASGI web framework",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-54413",
+      "project": "skops-dev/skops",
+      "url": "https://github.com/skops-dev/skops/commit/0aeca055509dfb48c1506870aabdd9e247adf603",
+      "framework": "ML model serialization library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-54886",
+      "project": "skops-dev/skops",
+      "url": "https://github.com/skops-dev/skops/commit/29d61ea8a92f2bde6830e8f32cc72a1a87211cda",
+      "framework": "ML model serialization library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-57804",
+      "project": "python-hyper/h2",
+      "url": "https://github.com/python-hyper/h2/commit/035e9899f95e3709af098f578bfc3cd302298e3a",
+      "framework": "HTTP/2 protocol library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-58180",
+      "project": "OctoPrint/OctoPrint",
+      "url": "https://github.com/OctoPrint/OctoPrint/commit/be4201ef58d9a7c03593252398c16eada90a258b",
+      "framework": "3D-printing web application",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-58367",
+      "project": "dgilland/pydash",
+      "url": "https://github.com/dgilland/pydash/commit/2015f0a4bcdbc3a5b27652e38fe97b3ee13ac15f",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-58438",
+      "project": "jjjake/internetarchive",
+      "url": "https://github.com/jjjake/internetarchive/commit/cba2d459e10a9489fb35caeba0b03e80f5f5d7c2",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-59420",
+      "project": "authlib/authlib",
+      "url": "https://github.com/authlib/authlib/commit/6b1813e4392eb7c168c276099ff7783b176479df",
+      "framework": "authentication and OAuth library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-59940",
+      "project": "mondeja/mkdocs-include-markdown-plugin",
+      "url": "https://github.com/mondeja/mkdocs-include-markdown-plugin/commit/7466d67aa0de8ffbc427204ad2475fed07678915",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-6176",
+      "project": "google/brotli",
+      "url": "https://github.com/google/brotli/commit/67d78bc41db1a0d03f2e763497748f2f69946627",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-61765",
+      "project": "miguelgrinberg/python-socketio",
+      "url": "https://github.com/miguelgrinberg/python-socketio/commit/53f6be094257ed81476b0e212c8cddd6d06ca39a",
+      "framework": "Socket.IO server library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-61920",
+      "project": "authlib/authlib",
+      "url": "https://github.com/authlib/authlib/commit/867e3f87b072347a1ae9cf6983cc8bbf88447e5e",
+      "framework": "authentication and OAuth library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-62708",
+      "project": "py-pdf/pypdf",
+      "url": "https://github.com/py-pdf/pypdf/commit/e51d07807ffcdaf18077b9486dadb3dc05b368da",
+      "framework": "PDF library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-62727",
+      "project": "Kludex/starlette",
+      "url": "https://github.com/Kludex/starlette/commit/4ea6e22b489ec388d6004cfbca52dd5b147127c5",
+      "framework": "ASGI web framework",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "CVE-2025-62800",
+      "project": "jlowin/fastmcp",
+      "url": "https://github.com/jlowin/fastmcp/commit/2a20f54617a37213ed83894a8c2f0ac38a2e83a3",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "GHSA-3gf5-cxq9-w223",
+      "project": "mmaitre314/picklescan",
+      "url": "https://github.com/mmaitre314/picklescan/commit/1931c2d04eaca8d20597705ff39cab78ba364e4b",
+      "framework": "serialization-security library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "GHSA-3vg9-h568-4w9m",
+      "project": "mmaitre314/picklescan",
+      "url": "https://github.com/mmaitre314/picklescan/commit/aecd11be98702caa9ba9b12189d91ad596a36114",
+      "framework": "serialization-security library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "GHSA-4r9r-ch6f-vxmx",
+      "project": "mmaitre314/picklescan",
+      "url": "https://github.com/mmaitre314/picklescan/commit/7f994d62084fe43f1cffdef2f9bae6923344ef53",
+      "framework": "serialization-security library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "GHSA-753j-mpmx-qq6g",
+      "project": "tornadoweb/tornado",
+      "url": "https://github.com/tornadoweb/tornado/commit/d65f6e71a77f53a1ff0a0dc55704be13f04eb572",
+      "framework": "asynchronous web framework",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "GHSA-9gvj-pp9x-gcfr",
+      "project": "mmaitre314/picklescan",
+      "url": "https://github.com/mmaitre314/picklescan/commit/58983e1c20973ac42f2df7ff15d7c8cd32f9b688",
+      "framework": "serialization-security library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "GHSA-hfmc-7525-mj55",
+      "project": "ronf/asyncssh",
+      "url": "https://github.com/ronf/asyncssh/commit/0bc73254f41acb140187e0c89606311f88de5b7b",
+      "framework": "SSH library",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "GHSA-vhmj-5q9r-mm9g",
+      "project": "eduMFA/eduMFA",
+      "url": "https://github.com/eduMFA/eduMFA/commit/ad9d18be31e8a6f536c646dc037d945de33fac60",
+      "framework": "Python ecosystem package; domain not independently classified",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "GHSA-w235-7p84-xx57",
+      "project": "tornadoweb/tornado",
+      "url": "https://github.com/tornadoweb/tornado/commit/7786f09f84c9f3f2012c4cf3878417cb9f053669",
+      "framework": "asynchronous web framework",
+      "kind": "real_vulnerability_dataset_candidate",
+      "validation_status": "candidate",
+      "notes": "Vul4Py canonical inventory maps this identifier to this upstream fixing commit. Candidate for authorized Corsair differential verification only; it was not cloned, built, executed, or independently confirmed in this research."
+    },
+    {
+      "id": "project:django/django",
+      "project": "django/django",
+      "url": "https://github.com/django/django",
+      "framework": "Django web framework",
+      "kind": "project_candidate_not_vulnerability_case",
+      "validation_status": "candidate",
+      "notes": "Public upstream project candidate for future framework-diverse, authorized harness design. This is not an identified vulnerability case and no vulnerability, patch, exploit, or test outcome is claimed."
+    },
+    {
+      "id": "project:pallets/flask",
+      "project": "pallets/flask",
+      "url": "https://github.com/pallets/flask",
+      "framework": "Flask WSGI web framework",
+      "kind": "project_candidate_not_vulnerability_case",
+      "validation_status": "candidate",
+      "notes": "Public upstream project candidate for future framework-diverse, authorized harness design. This is not an identified vulnerability case and no vulnerability, patch, exploit, or test outcome is claimed."
+    },
+    {
+      "id": "project:fastapi/fastapi",
+      "project": "fastapi/fastapi",
+      "url": "https://github.com/fastapi/fastapi",
+      "framework": "FastAPI ASGI web framework",
+      "kind": "project_candidate_not_vulnerability_case",
+      "validation_status": "candidate",
+      "notes": "Public upstream project candidate for future framework-diverse, authorized harness design. This is not an identified vulnerability case and no vulnerability, patch, exploit, or test outcome is claimed."
+    },
+    {
+      "id": "project:Kludex/starlette",
+      "project": "Kludex/starlette",
+      "url": "https://github.com/Kludex/starlette",
+      "framework": "Starlette ASGI web framework",
+      "kind": "project_candidate_not_vulnerability_case",
+      "validation_status": "candidate",
+      "notes": "Public upstream project candidate for future framework-diverse, authorized harness design. This is not an identified vulnerability case and no vulnerability, patch, exploit, or test outcome is claimed."
+    },
+    {
+      "id": "project:sanic-org/sanic",
+      "project": "sanic-org/sanic",
+      "url": "https://github.com/sanic-org/sanic",
+      "framework": "Sanic asynchronous web framework",
+      "kind": "project_candidate_not_vulnerability_case",
+      "validation_status": "candidate",
+      "notes": "Public upstream project candidate for future framework-diverse, authorized harness design. This is not an identified vulnerability case and no vulnerability, patch, exploit, or test outcome is claimed."
+    },
+    {
+      "id": "project:aio-libs/aiohttp",
+      "project": "aio-libs/aiohttp",
+      "url": "https://github.com/aio-libs/aiohttp",
+      "framework": "aiohttp asynchronous HTTP client/server framework",
+      "kind": "project_candidate_not_vulnerability_case",
+      "validation_status": "candidate",
+      "notes": "Public upstream project candidate for future framework-diverse, authorized harness design. This is not an identified vulnerability case and no vulnerability, patch, exploit, or test outcome is claimed."
+    },
+    {
+      "id": "project:Pylons/pyramid",
+      "project": "Pylons/pyramid",
+      "url": "https://github.com/Pylons/pyramid",
+      "framework": "Pyramid web framework",
+      "kind": "project_candidate_not_vulnerability_case",
+      "validation_status": "candidate",
+      "notes": "Public upstream project candidate for future framework-diverse, authorized harness design. This is not an identified vulnerability case and no vulnerability, patch, exploit, or test outcome is claimed."
+    },
+    {
+      "id": "project:tornadoweb/tornado",
+      "project": "tornadoweb/tornado",
+      "url": "https://github.com/tornadoweb/tornado",
+      "framework": "Tornado asynchronous web framework",
+      "kind": "project_candidate_not_vulnerability_case",
+      "validation_status": "candidate",
+      "notes": "Public upstream project candidate for future framework-diverse, authorized harness design. This is not an identified vulnerability case and no vulnerability, patch, exploit, or test outcome is claimed."
+    },
+    {
+      "id": "project:falconry/falcon",
+      "project": "falconry/falcon",
+      "url": "https://github.com/falconry/falcon",
+      "framework": "Falcon API and microservices framework",
+      "kind": "project_candidate_not_vulnerability_case",
+      "validation_status": "candidate",
+      "notes": "Public upstream project candidate for future framework-diverse, authorized harness design. This is not an identified vulnerability case and no vulnerability, patch, exploit, or test outcome is claimed."
+    },
+    {
+      "id": "project:bottlepy/bottle",
+      "project": "bottlepy/bottle",
+      "url": "https://github.com/bottlepy/bottle",
+      "framework": "Bottle micro web framework",
+      "kind": "project_candidate_not_vulnerability_case",
+      "validation_status": "candidate",
+      "notes": "Public upstream project candidate for future framework-diverse, authorized harness design. This is not an identified vulnerability case and no vulnerability, patch, exploit, or test outcome is claimed."
+    },
+    {
+      "id": "project:cherrypy/cherrypy",
+      "project": "cherrypy/cherrypy",
+      "url": "https://github.com/cherrypy/cherrypy",
+      "framework": "CherryPy HTTP framework",
+      "kind": "project_candidate_not_vulnerability_case",
+      "validation_status": "candidate",
+      "notes": "Public upstream project candidate for future framework-diverse, authorized harness design. This is not an identified vulnerability case and no vulnerability, patch, exploit, or test outcome is claimed."
+    },
+    {
+      "id": "project:webpy/webpy",
+      "project": "webpy/webpy",
+      "url": "https://github.com/webpy/webpy",
+      "framework": "web.py web framework",
+      "kind": "project_candidate_not_vulnerability_case",
+      "validation_status": "candidate",
+      "notes": "Public upstream project candidate for future framework-diverse, authorized harness design. This is not an identified vulnerability case and no vulnerability, patch, exploit, or test outcome is claimed."
+    },
+    {
+      "id": "project:twisted/twisted",
+      "project": "twisted/twisted",
+      "url": "https://github.com/twisted/twisted",
+      "framework": "Twisted event-driven networking framework",
+      "kind": "project_candidate_not_vulnerability_case",
+      "validation_status": "candidate",
+      "notes": "Public upstream project candidate for future framework-diverse, authorized harness design. This is not an identified vulnerability case and no vulnerability, patch, exploit, or test outcome is claimed."
+    },
+    {
+      "id": "project:celery/celery",
+      "project": "celery/celery",
+      "url": "https://github.com/celery/celery",
+      "framework": "Celery distributed task framework",
+      "kind": "project_candidate_not_vulnerability_case",
+      "validation_status": "candidate",
+      "notes": "Public upstream project candidate for future framework-diverse, authorized harness design. This is not an identified vulnerability case and no vulnerability, patch, exploit, or test outcome is claimed."
+    },
+    {
+      "id": "project:sqlalchemy/sqlalchemy",
+      "project": "sqlalchemy/sqlalchemy",
+      "url": "https://github.com/sqlalchemy/sqlalchemy",
+      "framework": "SQLAlchemy database toolkit",
+      "kind": "project_candidate_not_vulnerability_case",
+      "validation_status": "candidate",
+      "notes": "Public upstream project candidate for future framework-diverse, authorized harness design. This is not an identified vulnerability case and no vulnerability, patch, exploit, or test outcome is claimed."
+    },
+    {
+      "id": "project:encode/django-rest-framework",
+      "project": "encode/django-rest-framework",
+      "url": "https://github.com/encode/django-rest-framework",
+      "framework": "Django REST Framework",
+      "kind": "project_candidate_not_vulnerability_case",
+      "validation_status": "candidate",
+      "notes": "Public upstream project candidate for future framework-diverse, authorized harness design. This is not an identified vulnerability case and no vulnerability, patch, exploit, or test outcome is claimed."
+    },
+    {
+      "id": "project:pallets/jinja",
+      "project": "pallets/jinja",
+      "url": "https://github.com/pallets/jinja",
+      "framework": "Jinja template engine",
+      "kind": "project_candidate_not_vulnerability_case",
+      "validation_status": "candidate",
+      "notes": "Public upstream project candidate for future framework-diverse, authorized harness design. This is not an identified vulnerability case and no vulnerability, patch, exploit, or test outcome is claimed."
+    },
+    {
+      "id": "project:psf/requests",
+      "project": "psf/requests",
+      "url": "https://github.com/psf/requests",
+      "framework": "Requests HTTP client",
+      "kind": "project_candidate_not_vulnerability_case",
+      "validation_status": "candidate",
+      "notes": "Public upstream project candidate for future framework-diverse, authorized harness design. This is not an identified vulnerability case and no vulnerability, patch, exploit, or test outcome is claimed."
+    },
+    {
+      "id": "project:pydantic/pydantic",
+      "project": "pydantic/pydantic",
+      "url": "https://github.com/pydantic/pydantic",
+      "framework": "Pydantic data-validation framework",
+      "kind": "project_candidate_not_vulnerability_case",
+      "validation_status": "candidate",
+      "notes": "Public upstream project candidate for future framework-diverse, authorized harness design. This is not an identified vulnerability case and no vulnerability, patch, exploit, or test outcome is claimed."
+    },
+    {
+      "id": "project:scrapy/scrapy",
+      "project": "scrapy/scrapy",
+      "url": "https://github.com/scrapy/scrapy",
+      "framework": "Scrapy web-crawling framework",
+      "kind": "project_candidate_not_vulnerability_case",
+      "validation_status": "candidate",
+      "notes": "Public upstream project candidate for future framework-diverse, authorized harness design. This is not an identified vulnerability case and no vulnerability, patch, exploit, or test outcome is claimed."
+    },
+    {
+      "id": "project:dask/dask",
+      "project": "dask/dask",
+      "url": "https://github.com/dask/dask",
+      "framework": "Dask parallel-computing framework",
+      "kind": "project_candidate_not_vulnerability_case",
+      "validation_status": "candidate",
+      "notes": "Public upstream project candidate for future framework-diverse, authorized harness design. This is not an identified vulnerability case and no vulnerability, patch, exploit, or test outcome is claimed."
+    },
+    {
+      "id": "project:pandas-dev/pandas",
+      "project": "pandas-dev/pandas",
+      "url": "https://github.com/pandas-dev/pandas",
+      "framework": "pandas data-analysis library",
+      "kind": "project_candidate_not_vulnerability_case",
+      "validation_status": "candidate",
+      "notes": "Public upstream project candidate for future framework-diverse, authorized harness design. This is not an identified vulnerability case and no vulnerability, patch, exploit, or test outcome is claimed."
+    }
+  ]
+}
