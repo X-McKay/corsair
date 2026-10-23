@@ -14,12 +14,12 @@ This design makes the invariants structural instead:
 | --- | --- |
 | Both probes exercise the same real seam | One `run_target(payload)`; the kernel calls it twice |
 | The control proves the environment and the seam | Control must hold **and** execute the hypothesis' target lines (coverage) |
-| The exploit exercises the reported condition | Exploit must fail with the probe's own assertion **and** execute the target lines; crashes elsewhere are `errored` |
+| The exploit exercises the reported condition | Exploit must violate the trusted invariant check **and** execute the target lines; application exceptions are `errored` |
 | No mocked target | Structural ban on mocking imports; the auditor rejects doubles that own the property |
 | Validity judged without outcomes | A stateless auditor sees hypothesis and probe only, after the deterministic gates |
 | Reproducible build | The submitted build script is replayed in a clean container; the producer's workspace is never evidence |
 | Attributable failure | A fixed, ordered gate list; every rejection names its gate and reason |
-| Two native probes per revision | Two pytest test ids through one driver; JUnit and coverage reports per run |
+| Two native probes per revision | Two runtime-native executions through one adapter; one test id, JUnit and coverage report per run |
 
 Independent evaluation of each objective survives without separate agents: each gate is a labelled, countable event.
 `ast_guard` measures contract adherence, `build_replay` environment work, `control_*` seam location and grounding,
@@ -28,11 +28,15 @@ skill file per objective is the unit of improvement.
 
 ## Polarity
 
-`holds`: `run_target` returned, the invariant held. `violated`: the probe's own `assert` failed, i.e. the reported
-condition occurred. On the vulnerable revision the exploit must be `violated`; on the fixed revision it must be
-`holds`. This is the security-regression form (the test fails on vulnerable code). The classification is made by the
-kernel's driver from the exception type and the frame it was raised in, cross-checked against the native JUnit
-result; a disagreement is `errored`, never decisive.
+`holds`: the invariant held. `violated`: the trusted invariant check failed, i.e. the reported condition occurred.
+On the vulnerable revision the exploit must be `violated`; on the fixed revision it must be `holds`. This is the
+security-regression form (the native test fails on vulnerable code). Python probes express a violation by raising
+their own `AssertionError`; the driver verifies the deepest traceback frame belongs to the probe. JavaScript, Java
+and Perl probes return a boolean and the kernel-owned driver asserts it, so an application cannot disguise its
+exception as a violation. Every exception thrown by these probes or their application code is `errored`. Every
+adapter cross-checks its driver record against JUnit-shaped test evidence; disagreement or malformed evidence is
+`errored`, never decisive. Coverage comes from coverage.py, V8, JaCoCo or Devel::Cover and is normalized before the
+same exact-target and target-line gates run.
 
 ## Verdict
 

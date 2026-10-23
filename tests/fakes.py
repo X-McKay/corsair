@@ -30,8 +30,8 @@ class Script:
     exception_type: str | None = None
     message: str | None = None
     covered_lines: tuple[int, ...] = (4,)
-    covered_target: bool = True
-    raised_in_probe: bool = True
+    covered_target: bool | None = True
+    invariant_failed: bool = True
     junit_disagrees: bool = False
 
 
@@ -99,8 +99,8 @@ class FakeSandboxes:
             files[f"{RESULT_DIR}/junit.xml"] = JUNIT_ERROR.encode()
             return Exec(2, b"", b"ImportError while importing test module\n")
         record = {"role": role, "outcome": script.outcome, "exception_type": script.exception_type,
-                  "message": script.message, "raised_in_probe": script.raised_in_probe}
-        if script.outcome == "violated" and not script.raised_in_probe:
+                  "message": script.message, "invariant_failed": script.invariant_failed}
+        if script.outcome == "violated" and not script.invariant_failed:
             record["outcome"] = "errored"
         files[f"{RESULT_DIR}/result.json"] = json.dumps(record).encode()
         failed = record["outcome"] != "holds"
@@ -109,7 +109,8 @@ class FakeSandboxes:
         junit = JUNIT_PASS if not failed else JUNIT_FAIL
         files[f"{RESULT_DIR}/junit.xml"] = junit.format(role=role, message=script.message or "failed").encode()
         coverage = {"files": {"/work/documents.py": {"executed_lines": list(script.covered_lines)}}} if script.covered_target else {"files": {}}
-        files[f"{RESULT_DIR}/coverage.json"] = json.dumps(coverage).encode()
+        if script.covered_target is not None:
+            files[f"{RESULT_DIR}/coverage.json"] = json.dumps(coverage).encode()
         return Exec(1 if failed else 0, b"1 passed\n" if not failed else b"1 failed\n", b"")
 
     def drop_network(self, name: str) -> None:

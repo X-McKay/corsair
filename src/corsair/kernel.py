@@ -11,9 +11,10 @@ Gates, in order; the first failure is returned to the producer as a ``GateVerdic
 2. ``build_replay``: the build script succeeds in a clean container (network only during this step).
 3. ``control_run`` / ``control_coverage``: ``run_target(CONTROL_PAYLOAD)`` holds on the vulnerable revision and
    executes the hypothesis' target lines.
-4. ``exploit_run`` / ``exploit_coverage``: ``run_target(EXPLOIT_PAYLOAD)`` violates the probe's own invariant
-   assertion on the vulnerable revision (an ``AssertionError`` raised from the probe, not from application code) and
-   executes the target lines.
+4. ``exploit_run`` / ``exploit_coverage``: ``run_target(EXPLOIT_PAYLOAD)`` violates the security invariant on the
+   vulnerable revision and executes the target lines. Python probes raise their own ``AssertionError``; JavaScript,
+   Java and Perl probes return a false value and the kernel-owned driver performs the assertion. Application
+   exceptions are errors.
 5. ``blind_audit``: a stateless auditor that sees the hypothesis and probe only, never an outcome.
 
 Polarity: ``violated`` means the probe's safety invariant failed, i.e. the reported condition occurred. The fixed
@@ -46,7 +47,7 @@ BUILD_TIMEOUT_S = 1800.0
 PROBE_TIMEOUT_S = 300.0
 TAIL = 4000
 ENV_REPOSITORY = "corsair-lite-env"
-ENV_SCHEMA = "corsair-lite/env/3"
+ENV_SCHEMA = "corsair-lite/env/4"
 """Part of every environment key; bump it when what a sealed environment contains or who owns it changes."""
 WORKDIR = "/work"
 PROBE_DIR = f"{WORKDIR}/.corsair"
@@ -62,7 +63,7 @@ class Hypothesis(Frozen):
     target_lines: tuple[int, ...] = Field(min_length=1, max_length=64, description="Lines that both payloads must execute")
     root_cause: str = Field(min_length=1, max_length=2_000, description="The mechanism of the bug, one or two sentences")
     expected_violation: str = Field(min_length=1, max_length=1_000,
-                                    description="What the invariant assertion observes when EXPLOIT_PAYLOAD runs")
+                                    description="What the invariant observes when EXPLOIT_PAYLOAD runs")
 
     @field_validator("target_lines")
     @classmethod
@@ -78,9 +79,9 @@ class Submission(Frozen):
                               description="bash run once in a clean container with network, from the repository "
                                           "root; empty when the project needs nothing installed")
     probe: str = Field(min_length=1, max_length=32_000,
-                       description="One Python module defining CONTROL_PAYLOAD, EXPLOIT_PAYLOAD and "
-                                   "run_target(payload) -> None, whose invariant assertion fails only when the "
-                                   "reported condition occurs")
+                       description="One module in the selected runtime defining/exporting CONTROL_PAYLOAD, "
+                                   "EXPLOIT_PAYLOAD and run_target(payload), expressing one security invariant "
+                                   "that fails only when the reported condition occurs")
 
     @property
     def sha256(self) -> str:
@@ -111,8 +112,8 @@ class GateVerdict(Frozen):
 
 class Outcome(StrEnum):
     HOLDS = "holds"          # run_target returned: the invariant held
-    VIOLATED = "violated"    # the probe's own assertion failed: the reported condition occurred
-    ERRORED = "errored"      # another exception, or an assertion raised by application code
+    VIOLATED = "violated"    # the trusted invariant check failed: the reported condition occurred
+    ERRORED = "errored"      # an application/probe exception, including an application assertion
     NOT_RUN = "not_run"      # the test never ran (import or collection error, no test found)
     INFRA = "infra"          # timeout, container failure or unreadable results
 
@@ -130,6 +131,7 @@ class ProbeRun(Frozen):
     duration_s: float | None = None
     output: ArtifactRef | None = None
     junit: ArtifactRef | None = None
+    coverage: ArtifactRef | None = None
     cleanup_confirmed: bool | None = None
 
 
@@ -167,8 +169,8 @@ class Evaluation(Frozen):
     """What one submission produced: the first failed gate, or ``verified`` with a verdict.
 
     One gate can fail while a verdict exists: ``fix_run``. The vulnerable-revision gates passed, so the label stands,
-    but the exploit payload raised something other than the probe's assertion on the fixed revision, so the fix could
-    not be verified and the producer may correct the probe within its budget.
+    but the exploit payload raised an exception on the fixed revision, so the fix could not be verified and the
+    producer may correct the probe within its budget.
     """
 
     submission: Submission
@@ -182,14 +184,23 @@ class Evaluation(Frozen):
 # --- gate 0: the hypothesis is about the reported target -------------------------------------------------------------
 
 
+def _contained_file(source: str, path: str) -> Path | None:
+    root = Path(source).resolve()
+    candidate = root / path
+    try:
+        return candidate if candidate.resolve().is_relative_to(root) and candidate.is_file() else None
+    except (OSError, RuntimeError):
+        return None
+
+
 def reported_target_present(case: Case) -> str | None:
     """None when the finding names no file or the file exists in the vulnerable tree; otherwise the reason the case
     cannot be investigated at all. Decided by trusted code before any model call."""
     path = case.finding.file_path
     if path is None:
         return None
-    if not (Path(case.revision.source) / path).is_file():
-        return f"the reported file {path} does not exist in the vulnerable revision"
+    if _contained_file(case.revision.source, path) is None:
+        return f"the reported file {path} does not exist inside the vulnerable revision"
     return None
 
 
@@ -203,8 +214,8 @@ def target_binding(case: Case, hypothesis: Hypothesis) -> GateVerdict:
                            reason=f"the finding reports {reported}; the hypothesis targets {hypothesis.target_file}. "
                                   "Investigate the reported file; if the reported condition cannot occur there, stop "
                                   "and say so instead of substituting another target")
-    target = Path(case.revision.source) / hypothesis.target_file
-    if not target.is_file():
+    target = _contained_file(case.revision.source, hypothesis.target_file)
+    if target is None:
         return GateVerdict(passed=False, stage=Gate.TARGET_BINDING,
                            reason=f"{hypothesis.target_file} does not exist in the vulnerable revision")
     try:
@@ -239,14 +250,17 @@ def _tail(data: bytes) -> str:
 def _failure(result: Exec, what: str) -> str:
     if result.timed_out:
         return f"{what} timed out"
+    if result.output_limited:
+        return f"{what} exceeded the output limit"
     if result.container_failed:
         return f"{what}: container failed"
     return f"{what} exited {result.exit_code}"
 
 
-def environment_key(row: Row, tree_sha256: str, build_script: str) -> str:
+def environment_key(row: Row, tree_sha256: str, build_script: str, *, runtime_image_id: str | None = None) -> str:
     build_sha = hashlib.sha256(build_script.encode()).hexdigest()
-    return hashlib.sha256(json.dumps([ENV_SCHEMA, row.id, row.image, tree_sha256, build_sha]).encode()).hexdigest()
+    return hashlib.sha256(json.dumps([ENV_SCHEMA, row.id, row.framework, row.image, runtime_image_id,
+                                      tree_sha256, build_sha]).encode()).hexdigest()
 
 
 class Kernel:
@@ -265,16 +279,17 @@ class Kernel:
         from .frameworks import framework
 
         self.framework = framework(row.framework)
+        self.runtime_image_id = backend.resolve_image(row.image)
 
     # -- gate 2: build replay -----------------------------------------------------------------------------------------
 
     def build(self, revision: Revision, name: RevisionName, build_script: str) -> tuple[str | None, GateVerdict]:
         """Replay the build script in a clean container and seal the result as an image; cached by exact key."""
-        key = environment_key(self.row, revision.tree_sha256, build_script)
+        key = environment_key(self.row, revision.tree_sha256, build_script, runtime_image_id=self.runtime_image_id)
         tag = f"{ENV_REPOSITORY}:{key[:32]}"
         if self.backend.find_environment(tag, key) is not None:
             return tag, GateVerdict(passed=True, stage=Gate.BUILD_REPLAY, reason=f"environment cache hit {tag}")
-        spec = SandboxSpec(image=self.row.image, workdir=WORKDIR,
+        spec = SandboxSpec(image=self.runtime_image_id or self.row.image, workdir=WORKDIR,
                            labels=labels(self.run_id, "build", revision=name, env=key[:16]),
                            network="build" if build_script.strip() else "none")
         log: list[bytes] = []
@@ -288,6 +303,12 @@ class Kernel:
                 result = self.backend.exec_once(sandbox, ["bash", f"{PROBE_DIR}/build.sh"], workdir=WORKDIR,
                                                 timeout=self.build_timeout)
                 log.append(b"$ bash build.sh\n" + result.stdout + result.stderr)
+                if result.timed_out or result.output_limited or result.container_failed:
+                    ref = self.artifacts.put(b"".join(log))
+                    return None, GateVerdict(passed=False, stage=Gate.INFRA,
+                                             reason=f"{_failure(result, 'build_script')} in a clean container "
+                                                    f"({name} revision); log {ref.sha256[:12]}",
+                                             stdout_tail=_tail(result.stdout), stderr_tail=_tail(result.stderr))
                 if result.exit_code != 0:
                     ref = self.artifacts.put(b"".join(log))
                     return None, GateVerdict(passed=False, stage=Gate.BUILD_REPLAY,
@@ -331,9 +352,9 @@ class Kernel:
             result = self.backend.exec_once(name, argv, workdir=WORKDIR, env=env, timeout=self.probe_timeout)
             duration = time.monotonic() - started
             output = b"$ " + shlex.join(argv).encode() + b"\n--- stdout ---\n" + result.stdout + b"\n--- stderr ---\n" + result.stderr
-            if result.timed_out or result.container_failed:
+            if result.timed_out or result.output_limited or result.container_failed:
                 return self._infra(revision, role, result, output, duration, self.backend.remove(name) if ours else None)
-            after = getattr(fw, "after_command", lambda: None)()
+            after = fw.after_command()
             if after:
                 self.backend.exec_once(name, after, workdir=WORKDIR, env=env, timeout=120)
             files = self.backend.copy_out(name, fw.result_paths())
@@ -355,19 +376,30 @@ class Kernel:
     def _infra(self, revision: RevisionName, role: Role, result: Exec, output: bytes, duration: float | None,
                confirmed: bool | None) -> ProbeRun:
         return ProbeRun(revision=revision, role=role, outcome=Outcome.INFRA, exit_code=result.exit_code,
-                        message="timed out" if result.timed_out else "container failed", junit_tests=0,
+                        message=("timed out" if result.timed_out else "output limit exceeded"
+                                 if result.output_limited else "container failed"), junit_tests=0,
                         duration_s=duration, output=self.artifacts.put(output), cleanup_confirmed=confirmed)
 
     def _classify(self, revision: RevisionName, role: Role, result: Exec, output: bytes, duration: float,
                   files: dict[str, bytes | None], hypothesis: Hypothesis, confirmed: bool | None) -> ProbeRun:
-        read = self.framework.read(files, hypothesis)
+        revision_source = self.case.revision if revision == "vulnerable" else self.case.fixed_revision
+        assert revision_source is not None
+        read = self.framework.read(files, hypothesis, role, Path(revision_source.source))
+        expected_exit = 0 if read.outcome is Outcome.HOLDS else 1
+        outcome, message = read.outcome, read.message
+        if outcome in (Outcome.HOLDS, Outcome.VIOLATED) and result.exit_code != expected_exit:
+            outcome, message = Outcome.ERRORED, "process exit code disagrees with the native evidence"
         junit_path = next((p for p in self.framework.result_paths() if p.endswith(".xml")), None)
         junit_bytes = files.get(junit_path) if junit_path else None
-        return ProbeRun(revision=revision, role=role, outcome=read.outcome, exception_type=read.exception_type,
-                        message=read.message, exit_code=result.exit_code, junit_tests=read.junit_tests,
+        coverage_path = next((path for path in self.framework.result_paths()
+                              if path.endswith(("coverage.json", "jacoco.xml"))), None)
+        coverage_bytes = files.get(coverage_path) if coverage_path else None
+        return ProbeRun(revision=revision, role=role, outcome=outcome, exception_type=read.exception_type,
+                        message=message, exit_code=result.exit_code, junit_tests=read.junit_tests,
                         covered_target=read.covered_target, covered_lines=read.covered_lines, duration_s=duration,
                         output=self.artifacts.put(output),
-                        junit=self.artifacts.put(junit_bytes) if junit_bytes else None, cleanup_confirmed=confirmed)
+                        junit=self.artifacts.put(junit_bytes) if junit_bytes else None,
+                        coverage=self.artifacts.put(coverage_bytes) if coverage_bytes else None, cleanup_confirmed=confirmed)
 
     # -- the whole evaluation -------------------------------------------------------------------------------------------
 
@@ -398,7 +430,7 @@ class Kernel:
                                     reason=f"CONTROL_PAYLOAD must hold on the vulnerable revision but was "
                                            f"{control.outcome}: {control.exception_type or ''} {control.message or ''}".strip(),
                                     **self._tails(control)))
-        if not control.covered_lines:
+        if not set(submission.hypothesis.target_lines).issubset(control.covered_lines):
             return done(GateVerdict(passed=False, stage=Gate.CONTROL_COVERAGE,
                                     reason=f"CONTROL_PAYLOAD held but did not execute {submission.hypothesis.target_file} "
                                            f"lines {list(submission.hypothesis.target_lines)}"
@@ -414,10 +446,10 @@ class Kernel:
                                            "the reported condition was not demonstrated"))
         if exploit.outcome is not Outcome.VIOLATED:
             return done(GateVerdict(passed=False, stage=Gate.EXPLOIT_RUN,
-                                    reason=f"EXPLOIT_PAYLOAD must fail the probe's own invariant assertion, but the run "
+                                    reason=f"EXPLOIT_PAYLOAD must violate the trusted invariant check, but the run "
                                            f"was {exploit.outcome}: {exploit.exception_type or ''} {exploit.message or ''}".strip(),
                                     **self._tails(exploit)))
-        if not exploit.covered_lines:
+        if not set(submission.hypothesis.target_lines).issubset(exploit.covered_lines):
             return done(GateVerdict(passed=False, stage=Gate.EXPLOIT_COVERAGE,
                                     reason=f"EXPLOIT_PAYLOAD failed before executing {submission.hypothesis.target_file} "
                                            f"lines {list(submission.hypothesis.target_lines)}"))
@@ -435,7 +467,7 @@ class Kernel:
             fix, fix_reason = self._verify_fix(submission, runs)
             fixed_exploit = runs[-1] if len(runs) == 4 and runs[-1].revision == "fixed" else None
             if (fixed_exploit is not None and fixed_exploit.role == "exploit"
-                    and fixed_exploit.outcome is Outcome.ERRORED and fixed_exploit.exception_type != "AssertionError"):
+                    and fixed_exploit.outcome is Outcome.ERRORED):
                 fix_gate = GateVerdict(passed=False, stage=Gate.FIX_RUN,
                                        reason=f"the vulnerable revision is verified, but on the fixed revision "
                                               f"EXPLOIT_PAYLOAD raised {fixed_exploit.exception_type}: "
@@ -461,9 +493,11 @@ class Kernel:
         runs += [control, exploit]
         if control.outcome is not Outcome.HOLDS:
             return Fix.NOT_VERIFIED, f"control did not hold on the fixed revision ({control.outcome}: {control.message})"
+        if control.covered_target is not True:
+            return Fix.NOT_VERIFIED, "control held on the fixed revision but target execution was not demonstrated"
         if exploit.outcome is Outcome.HOLDS:
-            if exploit.covered_target is False:
-                return Fix.NOT_VERIFIED, "the invariant held on the fixed revision but the target file never executed"
+            if exploit.covered_target is not True:
+                return Fix.NOT_VERIFIED, "the invariant held on the fixed revision but target execution was not demonstrated"
             return Fix.VERIFIED, "control held and the exploit payload no longer violates the invariant on the fixed revision"
         if exploit.outcome is Outcome.VIOLATED:
             return Fix.NOT_VERIFIED, "the exploit payload still violates the invariant on the fixed revision"

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import sys
 import time
@@ -28,10 +29,14 @@ RUNS = Path(".runs/lite")
 
 def _record(run_dir: Path, case: Case, row: matrix.Row | None, verdict: Verdict, evaluations: tuple[Evaluation, ...],
             *, mode: str, extra: dict) -> dict:
-    record = {"schema": "corsair-lite/run/1", "run_id": run_dir.name, "mode": mode, "case_id": case.case_id,
+    package = Path(__file__).parent
+    versions = {path.relative_to(package).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in sorted(package.rglob("*")) if path.is_file() and path.suffix in (".py", ".md", ".yaml")}
+    record = {"schema": "corsair-lite/run/2", "run_id": run_dir.name, "mode": mode, "case_id": case.case_id,
               "tree_sha256": case.revision.tree_sha256,
               "fixed_tree_sha256": case.fixed_revision.tree_sha256 if case.fixed_revision else None,
               "runtime_row": row.id if row else None, "image": row.image if row else None,
+              "runtime": row.model_dump(mode="json") if row else None, "implementation_sha256": versions,
               "submissions": [e.model_dump(mode="json") for e in evaluations],
               "verdict": verdict.model_dump(mode="json"), **extra}
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -73,7 +78,8 @@ async def _verify(args: argparse.Namespace) -> int:
         evaluation = await kernel.evaluate(submission)
     verdict = evaluation.verdict or terminal_verdict(evaluation.gate, 1)
     record = _record(run_dir, case, row, verdict, (evaluation,), mode="verify",
-                     extra={"duration_s": time.monotonic() - started, "audit_configured": bool(args.provider)})
+                     extra={"duration_s": time.monotonic() - started, "audit_configured": bool(args.provider),
+                            "runtime_image_id": kernel.runtime_image_id})
     _print(record)
     print(json.dumps(record["verdict"], indent=2))
     return 0 if evaluation.verdict is not None else 1
@@ -100,7 +106,9 @@ async def _investigate_one(case: Case, args: argparse.Namespace, models: dict) -
     extra = {"duration_s": run.duration_s, "requests": run.requests, "input_tokens": run.input_tokens,
              "output_tokens": run.output_tokens, "tool_calls": run.tool_calls, "bash_calls": run.bash_calls,
              "final_text": run.final_text, "error": run.error, "work_cleanup_confirmed": run.cleanup_confirmed,
-             "audit_configured": auditor_agent is not None, "max_submissions": args.max_submissions}
+             "audit_configured": auditor_agent is not None, "max_submissions": args.max_submissions,
+             "runtime_image_id": kernel.runtime_image_id,
+             "models": {name: model.model_name for name, model in models.items()}}
     record = _record(run_dir, case, row, run.verdict, run.evaluations, mode="investigate", extra=extra)
     _print(record)
     return record
@@ -126,9 +134,19 @@ async def _eval(args: argparse.Namespace) -> int:
             record = await _investigate_one(case, args, models)
             expected = oracle.get("expected_label")
             label = record["verdict"]["label"]
+            expected_fix = oracle.get("expected_fix")
+            oracle_path = case_dir / "oracle.json"
+            label_correct = label == expected if expected else None
+            fix_correct = record["verdict"]["fix"] == expected_fix if expected_fix else None
+            checks = [check for check in (label_correct, fix_correct) if check is not None]
             rows.append({"case": str(case_dir), "case_id": case.case_id, "label": label, "fix": record["verdict"]["fix"],
+                         "runtime_row": record.get("runtime_row"),
+                         "dataset_version": oracle.get("dataset_version"),
+                         "oracle_sha256": hashlib.sha256(oracle_path.read_bytes()).hexdigest()
+                         if oracle_path.is_file() else None,
                          "expected_label": expected, "expected_fix": oracle.get("expected_fix"),
-                         "correct": (label == expected) if expected else None,
+                         "label_correct": label_correct, "fix_correct": fix_correct,
+                         "correct": all(checks) if checks else None,
                          "forbidden_hit": label in (oracle.get("forbidden_labels") or []),
                          "submissions": len(record["submissions"]),
                          "gates": [s["gate"]["stage"] for s in record["submissions"]],
@@ -136,15 +154,19 @@ async def _eval(args: argparse.Namespace) -> int:
                          "output_tokens": record.get("output_tokens"), "duration_s": record.get("duration_s"),
                          "run_id": record["run_id"]})
     scored = [r for r in rows if r["correct"] is not None]
-    summary = {"schema": "corsair-lite/eval/1", "cases": rows, "n": len(rows),
+    summary = {"schema": "corsair-lite/eval/2", "cases": rows, "n": len(rows),
                "correct": sum(1 for r in scored if r["correct"]), "scored": len(scored),
                "forbidden_hits": sum(1 for r in rows if r["forbidden_hit"]),
                "gate_ledger": _ledger(rows), "provider": str(args.provider), "max_submissions": args.max_submissions}
+    summary["passed"] = bool(rows) and len(scored) == len(rows) and all(r["correct"] for r in scored) and summary["forbidden_hits"] == 0
+    provider_path = Path(args.provider)
+    summary["provider_sha256"] = hashlib.sha256(provider_path.read_bytes()).hexdigest() if provider_path.is_file() else None
     out = Path(args.runs) / f"eval-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(summary, indent=2) + "\n")
     print(json.dumps({k: v for k, v in summary.items() if k != "cases"}, indent=2))
     print(f"written {out}", file=sys.stderr)
-    return 0 if summary["forbidden_hits"] == 0 else 1
+    return 0 if summary["passed"] else 1
 
 
 def _ledger(rows: list[dict]) -> dict[str, int]:

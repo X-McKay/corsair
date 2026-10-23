@@ -84,6 +84,7 @@ class Exec:
     stderr: bytes
     timed_out: bool = False
     container_failed: bool = False
+    output_limited: bool = False
 
 
 @runtime_checkable

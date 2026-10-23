@@ -1,0 +1,66 @@
+# Operator-owned runtime matrix. One row per (image, framework). The kernel runs a submission's probe under the
+# selected row's image; adding a language is a row plus an image source, once the kernel supports its framework.
+#
+# evidence: pilot       built locally from image_source; exercised by the pilot, not qualified
+#           image-only  trusted control and one real case passed under plain Docker
+#           live        passed the kind/OpenShell gate on the final source
+schema_version: corsair-lite/runtime-matrix/1
+rows:
+  - id: pytest-cpython312
+    language: python
+    image: corsair-lite-python:dev
+    image_source: images/python/Dockerfile
+    framework: pytest
+    detect:
+      - file: "pyproject.toml"
+      - file: "setup.py"
+      - file: "setup.cfg"
+      - file: "requirements*.txt"
+      - file: "**/*.py"
+    evidence: pilot
+    note: >
+      python:3.12-slim with pytest 9.0.3 and coverage 7.13.4; runs as root inside a hardened container
+      during build; probes run as 1000:1000, offline with capabilities dropped. Pilot only.
+  - id: node-test-node22
+    language: javascript
+    image: corsair-lite-javascript:dev
+    image_source: images/javascript/Dockerfile
+    framework: node-test
+    detect:
+      - file: "package.json"
+      - file: "**/*.js"
+      - file: "**/*.cjs"
+      - file: "**/*.mjs"
+    evidence: pilot
+    note: >
+      Digest-pinned Node 22.23.3; built-in node:test JUnit and V8 line coverage. CommonJS probes may load
+      CommonJS or ESM targets. No Jest or transpiler required; TypeScript is not supported. Pilot only.
+  - id: javac-java21
+    language: java
+    image: corsair-lite-java:dev
+    image_source: images/java21/Dockerfile
+    framework: javac-java
+    detect:
+      - file: "pom.xml"
+      - file: "build.gradle"
+      - file: "build.gradle.kts"
+      - file: "**/*.java"
+    evidence: pilot
+    note: >
+      Digest-pinned Java 21 JDK with pinned JaCoCo 0.8.14. The build script places target classes in
+      /work/.corsair-java/classes and optional jars in /work/.corsair-java/lib. Pilot only.
+  - id: perl-tap-540
+    language: perl
+    image: corsair-lite-perl:dev
+    image_source: images/perl/Dockerfile
+    framework: perl-tap
+    detect:
+      - file: "Makefile.PL"
+      - file: "Build.PL"
+      - file: "cpanfile"
+      - file: "**/*.pm"
+      - file: "**/*.pl"
+    evidence: pilot
+    note: >
+      Digest-pinned Debian with Perl 5.40, native TAP output and Devel::Cover 1.44 statement evidence.
+      Modules under the repository root are available through PERL5LIB. Pilot only.

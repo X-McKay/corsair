@@ -95,3 +95,35 @@ async def test_probes_run_unprivileged_and_cannot_edit_system_files(tmp_path):
     assert evaluation.gate.stage is Gate.CONTROL_RUN
     assert evaluation.runs[0].outcome is Outcome.ERRORED and evaluation.runs[0].exception_type == "PermissionError"
     assert backend.labelled(kernel.run_id) == []
+
+
+@needs_image
+async def test_source_permissions_are_normalized_for_a_read_only_unprivileged_probe(tmp_path):
+    import shutil
+    from corsair.case import revision
+
+    tree = tmp_path / "tree"
+    shutil.copytree(load_case(CASE).revision.source, tree)
+    tree.chmod(0o700)
+    for path in tree.rglob("*"):
+        path.chmod(0o700 if path.is_dir() else 0o600)
+    case = load_case(CASE).model_copy(update={"revision": revision(tree), "fixed_revision": None})
+    probe = REFERENCE.probe.replace("def run_target(payload: str) -> None:\n",
+                                    "def run_target(payload: str) -> None:\n    import os\n"
+                                    "    assert not os.access('/work/documents.py', os.W_OK)\n")
+    backend = DockerSandboxes()
+    result = await Kernel(backend, ROW, case, artifacts=ArtifactStore(tmp_path / "artifacts")).evaluate(
+        REFERENCE.model_copy(update={"probe": probe}))
+    assert result.gate.stage is Gate.VERIFIED, result
+
+
+@needs_image
+async def test_probe_import_cannot_redirect_or_reformat_the_driver_record(tmp_path):
+    probe = ("import json, os\n"
+             "os.environ['CORSAIR_ROLE'] = 'exploit'\n"
+             "os.environ['CORSAIR_RESULT'] = '/tmp/corsair/forged.json'\n"
+             "json.dumps = lambda value: '{\\\"outcome\\\": \\\"holds\\\"}'\n" + REFERENCE.probe)
+    backend = DockerSandboxes()
+    result = await Kernel(backend, ROW, load_case(CASE), artifacts=ArtifactStore(tmp_path / "artifacts")).evaluate(
+        REFERENCE.model_copy(update={"probe": probe}))
+    assert result.gate.stage is Gate.VERIFIED, result

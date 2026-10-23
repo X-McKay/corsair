@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
@@ -28,6 +29,8 @@ class ProbeResult:
 class Framework(Protocol):
     name: str
     language: str
+    target_suffixes: tuple[str, ...]
+    guidance: str
     probe_file: str
     """The file name, inside ``PROBE_DIR``, the submitted probe source is written to."""
 
@@ -49,11 +52,17 @@ class Framework(Protocol):
     def environment(self, role: str) -> Mapping[str, str]:
         ...
 
+    def after_command(self) -> list[str] | None:
+        """Optional coverage rendering after the native test process exits."""
+        ...
+
     def result_paths(self) -> list[str]:
         """Files to copy out after the run, under ``RESULT_DIR``."""
         ...
 
-    def read(self, files: Mapping[str, bytes | None], hypothesis: "Hypothesis") -> ProbeResult:
+    def read(self, files: Mapping[str, bytes | None], hypothesis: "Hypothesis", role: str,
+             source: Path) -> ProbeResult:
         """Classify the run from the collected files. A missing driver record or an empty native report is
-        ``not_run``; a driver record that disagrees with the native report is ``errored``."""
+        ``not_run``; a driver record that disagrees with the native report is ``errored``. ``source`` is the
+        trusted host revision used to disambiguate native coverage formats that omit source roots."""
         ...

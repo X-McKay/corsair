@@ -1,6 +1,13 @@
 {
+  "dataset_version": "corsair-lite/1",
+  "case_name": "Python path traversal with reviewed fix",
+  "created": "2026-10-23",
   "expected_label": "LIKELY_EXPLOITABLE",
   "expected_fix": "verified",
   "forbidden_labels": [],
-  "note": "Evaluator-only. The reviewed fixture pair; the reference submission beside this file is the kernel-only control for the pilot."
+  "risk_tags": ["untrusted-code-execution", "path-traversal"],
+  "capability_tags": ["python", "pytest", "differential-probe"],
+  "provenance": "Reviewed local synthetic fixture pair with no external dependencies.",
+  "retention": "Public synthetic fixture; retain in version control.",
+  "note": "Evaluator-only. The reference submission beside this file is the kernel-only control for the pilot."
 }

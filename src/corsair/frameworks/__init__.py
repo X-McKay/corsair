@@ -10,6 +10,8 @@ explicit; nothing is discovered.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from .base import Framework, ProbeResult
 
 __all__ = ("FRAMEWORKS", "Framework", "ProbeResult", "framework")
@@ -29,6 +31,27 @@ def _pytest() -> Framework:
     return Pytest()
 
 
-FRAMEWORKS: dict[str, "callable[[], Framework]"] = {
+def _node_test() -> Framework:
+    from .node_test import NodeTest
+
+    return NodeTest()
+
+
+def _javac_java() -> Framework:
+    from .javac_java import JavacJava
+
+    return JavacJava()
+
+
+def _perl_tap() -> Framework:
+    from .perl_tap import PerlTap
+
+    return PerlTap()
+
+
+FRAMEWORKS: dict[str, Callable[[], Framework]] = {
     "pytest": _pytest,
+    "node-test": _node_test,
+    "javac-java": _javac_java,
+    "perl-tap": _perl_tap,
 }

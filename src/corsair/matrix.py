@@ -13,9 +13,10 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
 from .case import Case
+from .frameworks import framework
 
 SCHEMA = "corsair-lite/runtime-matrix/1"
-DEFAULT_MATRIX = Path(__file__).resolve().parents[2] / "matrix.yaml"
+DEFAULT_MATRIX = Path(__file__).with_name("matrix.yaml")
 
 
 class Detect(BaseModel):
@@ -50,12 +51,18 @@ def load(path: Path = DEFAULT_MATRIX) -> tuple[Row, ...]:
     ids = [row.id for row in matrix.rows]
     if len(ids) != len(set(ids)):
         raise ValueError(f"duplicate matrix row ids in {path}")
+    for row in matrix.rows:
+        adapter = framework(row.framework)
+        if adapter.language != row.language:
+            raise ValueError(f"matrix row {row.id}: adapter {row.framework} runs {adapter.language}, not {row.language}")
     return matrix.rows
 
 
 def _matches(root: Path, hint: Detect) -> bool:
     for candidate in sorted(root.glob(hint.file)):
         if not candidate.is_file() or candidate.is_symlink():
+            continue
+        if not candidate.resolve().is_relative_to(root.resolve()):
             continue
         if hint.contains is None:
             return True
@@ -72,11 +79,15 @@ def detects(row: Row, root: Path) -> bool:
 
 
 def select(case: Case, matrix: Path = DEFAULT_MATRIX) -> Row | None:
-    """The first row whose hints match the vulnerable tree, or None (no runtime: the case is UNABLE_TO_RUN)."""
+    """Match the reported target's language first. An unnamed, ambiguous polyglot tree has no default runtime."""
     root = Path(case.revision.source)
     if not root.is_dir():
         return None
-    for row in load(matrix):
-        if detects(row, root):
-            return row
-    return None
+    rows = load(matrix)
+    target = case.finding.file_path
+    if target is not None:
+        rows = tuple(row for row in rows if Path(target).suffix in framework(row.framework).target_suffixes)
+    matched = [row for row in rows if detects(row, root)]
+    if len({row.language for row in matched}) > 1:
+        return None
+    return matched[0] if matched else None

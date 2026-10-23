@@ -1,0 +1,114 @@
+# Reviewed specification; native PydanticAI tool registration is the runtime authority.
+# tests/test_contracts.py checks these allowlists against the factories.
+schema: corsair-lite/agent-contracts/1
+version: 1
+identity:
+  name: corsair-lite
+  version: 1
+  owner: repository operator
+  status: pilot
+purpose: Verify a reported security condition and its proposed fix against exact source revisions.
+users: Security engineers investigating supplied repositories and findings.
+non_goals: [automated remediation, deployment, absence proofs, production sandbox assurance]
+execution:
+  class: human-governed
+  rationale: An operator explicitly starts each local run, chooses the case and provider, and owns its reversible containers, images and records.
+  authorization: Invocation authorizes model calls, dependency downloads and local sandbox execution for the named case only.
+  time_budget: Per request 300s, shell 180s, build 1800s, probe 300s; bounded by request, shell and submission counts.
+  recovery: No automatic replay after a process crash; start a new run with a new identity.
+  side_effects: Local containers, sealed images, dependency downloads and private run artifacts.
+  external_writes: No external action tool; model calls and build/workspace egress can disclose supplied source and remain pilot-only.
+risk:
+  governance_tier: high
+  inherent_tier: high
+  rationale: Untrusted repository and model-written shell/code execute inside containers.
+  residual: Unqualified Docker isolation; reviewed fixture mechanics do not establish production safety.
+  assessment: docs/readiness.md
+  launch_decision: no-go for production; operator-supervised pilot only
+  data: Supplied source, findings, model transcripts, native reports and logs may be confidential.
+  scenarios:
+    - {id: R1, name: container escape or host impact, decision: production blocker}
+    - {id: R2, name: source disclosure through model or build egress, decision: explicit operator trust required}
+    - {id: R3, name: false positive from malformed or spoofed evidence, decision: deterministic hard gate}
+    - {id: R4, name: resource exhaustion from process output, decision: 32 MiB streaming cap and infrastructure failure}
+agents:
+  producer:
+    factory: corsair.producer.build_producer
+    instructions_version: implementation_sha256:producer.py
+    input: corsair.case.Case plus operator-owned corsair.matrix.Row; evaluator oracles excluded
+    dependencies: corsair.producer.ProducerDeps
+    output: corsair.kernel.Submission through submit; final text is never a verdict
+    tools: [bash, read_skill, submit]
+    skills: [differential-probing, python-pytest, javascript-node-test, java-javac, perl-tap, build-recipes]
+    denied: [host execution, provider selection, runtime selection, oracle access, verdict assignment]
+    budgets: {submissions: 4, shell_calls: 12, requests: 60, total_tokens: 400000}
+    budget_authority: Operator arguments; the model cannot extend a budget.
+    failures: Gate feedback within budget; then INCONCLUSIVE, UNABLE_TO_RUN or ERROR from the kernel.
+  auditor:
+    factory: corsair.auditor.build_auditor
+    instructions_version: implementation_sha256:auditor.py
+    input: Hypothesis, build script and probe; no outcomes, coverage, oracle or producer transcript
+    dependencies: Explicit model only
+    output: corsair.kernel.AuditResult
+    tools: []
+    skills: []
+    authority: May reject an otherwise admissible probe; cannot grant a verdict or repair a probe.
+    retries: 2 schema/output retries through PydanticAI; no provider fallback
+capabilities:
+  bash:
+    consumer: producer
+    owner: repository operator
+    input: Bounded command string from the model
+    output: Exit status and bounded stdout/stderr tails (6000 characters each)
+    dependencies: One run-labelled working sandbox containing the vulnerable revision
+    credentials: None injected by Corsair
+    authorization: The operator-authorized case and run identity; no cross-run sandbox access
+    side_effect: write_reversible within the working sandbox; build network enabled
+    idempotency: Non-idempotent; never retried automatically and every call consumes the shell budget
+    timeout_s: 180
+    retry: Never retried automatically; repeated model commands consume the same shell budget.
+    failures: Timeout, container loss and nonzero exit are returned as bounded data.
+    redaction: None; records are private and may contain supplied source.
+    trace: run id, call count, exit status and usage totals
+  read_skill:
+    consumer: producer
+    owner: repository operator
+    input: An exact allowlisted skill name
+    output: Operator-owned SKILL.md or available names
+    dependencies: Packaged skills directory; no credentials
+    authorization: Exact SKILL_NAMES allowlist; unknown names fail closed
+    side_effect: read
+    idempotency: Idempotent
+    retry: Idempotent local read; no repository-provided skill discovery
+    failures: Missing packaged file becomes a recorded producer error.
+    redaction: None required for operator-owned public guidance.
+    trace: Skill file hash is stored in implementation_sha256.
+  submit:
+    consumer: producer
+    owner: repository operator
+    input: corsair.kernel.Submission
+    output: Verified kernel result or bounded failed-gate feedback
+    dependencies: Selected runtime row, immutable source digests, sandbox backend and artifact store; no credentials
+    authorization: Current run and case only; runtime and verdict authority remain kernel-owned
+    side_effect: write_reversible local containers, sealed environments and artifacts
+    idempotency: Non-idempotent evaluation; serialized calls consume one submission budget entry, and held identities are never adopted
+    timeout_s: {build: 1800, probe: 300}
+    retry: Each submission consumes the operator's submission budget; uncertain identities are never adopted.
+    failures: Typed gate verdict, timeout/infra outcome, or bounded model retry feedback.
+    redaction: Output tails are bounded; raw private artifacts remain in the local run directory.
+    trace: run id, submission hash, tree hashes, runtime image id, gate ledger and artifact hashes
+evaluation:
+  deterministic: make test-offline; make test; reviewed Python, JavaScript, Java and Perl fixtures
+  stochastic: make eval and make pilot with operator provider configuration
+  hard_gates: Every native evidence invariant passes; no forbidden labels; every supplied label/fix expectation matches.
+  target: 100% exact label and fix agreement on every reviewed release case; zero forbidden labels.
+  historical: make historical-eval is exploratory until its oracles use lite verdict semantics.
+  release: No production claim without repeated live model evaluation and production sandbox qualification.
+operations:
+  records: .runs/lite/<run_id>/run.json plus content-addressed logs, native JUnit and coverage
+  privacy: Operator-controlled local storage; source, payloads and tool tails may be sensitive; never commit raw runs.
+  cleanup: corsair cleanup --run-id ID; --images also removes cached sealed environments
+  rollback: Stop new investigations; restore the reviewed source revision; clean this tool's labelled resources.
+  escalation: Stop the run on held identity, unconfirmed cleanup, infrastructure error or hard-gate failure; repository operator investigates.
+  incident_owner: Repository operator
+  service_slo: None; pilot only. Record duration, requests, tokens, tool calls, submissions and cleanup per run.

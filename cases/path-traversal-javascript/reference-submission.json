@@ -1,0 +1,13 @@
+{
+  "hypothesis": {
+    "target_file": "documents.cjs",
+    "target_symbol": "read_document",
+    "target_lines": [
+      4
+    ],
+    "root_cause": "The filename is resolved without confining it to the document root.",
+    "expected_violation": "The outside sentinel content is returned."
+  },
+  "build_script": "",
+  "probe": "const fs = require('node:fs');\nconst os = require('node:os');\nconst path = require('node:path');\nconst CONTROL_PAYLOAD = 'document.txt';\nconst EXPLOIT_PAYLOAD = '../outside.txt';\nasync function run_target(payload) {\n  const { read_document } = require('/work/documents.cjs');\n  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'corsair-'));\n  try {\n    const root = path.join(base, 'documents');\n    fs.mkdirSync(root);\n    fs.writeFileSync(path.join(root, 'document.txt'), 'inside');\n    fs.writeFileSync(path.join(base, 'outside.txt'), 'outside');\n    let content;\n    try { content = read_document(root, payload); }\n    catch (error) { if (error.message !== 'outside root') throw error; }\n    return content !== 'outside';\n  } finally { fs.rmSync(base, { recursive: true, force: true }); }\n}\nmodule.exports = { CONTROL_PAYLOAD, EXPLOIT_PAYLOAD, run_target };\n"
+}

@@ -10,9 +10,12 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import posixpath
+import selectors
 import subprocess
 import tarfile
+import time
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -40,6 +43,7 @@ DRAIN_GRACE_S = 5.0
 # Records the command's pid (a session leader under docker exec) so a timeout or cancellation can kill its whole
 # process group inside the container; killing the docker client alone leaves the process running.
 _WRAPPER = 'echo $$ > "$1" 2>/dev/null; shift; exec "$@"'
+_KILL_SCRIPT = 'pid=$(cat "$1" 2>/dev/null) && { kill -9 "-$pid" || kill -9 "$pid"; } 2>/dev/null; rm -f "$1"'
 
 
 @dataclass(frozen=True)
@@ -213,34 +217,95 @@ def write_file(name: str, path: str, data: bytes) -> None:
 
 
 def copy_out(name: str, paths: Sequence[str]) -> dict[str, bytes | None]:
-    """Read declared regular files out of the container; a missing or non-regular path maps to None."""
+    """Read bounded, declared regular files; a missing, symlink or non-regular path maps to None."""
     found: dict[str, bytes | None] = {}
     for path in paths:
-        result = docker("cp", f"{name}:{path}", "-")
-        data = None
-        if result.returncode == 0:
-            with tarfile.open(fileobj=io.BytesIO(result.stdout)) as archive:
-                member = archive.next()
-                if member is not None and member.isfile():
-                    extracted = archive.extractfile(member)
-                    data = extracted.read() if extracted else None
-        found[path] = data
+        script = ('[ -f "$1" ] && [ ! -L "$1" ] || exit 44; '
+                  'exec head -c "$2" -- "$1"')
+        result = _bounded_process(["docker", "exec", "-i", "-w", "/", name, "sh", "-c", script,
+                                   "sh", path, str(MAX_OUTPUT_BYTES + 1)], timeout=CONTROL_TIMEOUT_S)
+        if result.output_limited:
+            raise WorkspaceError(f"evidence file {path} exceeded the {MAX_OUTPUT_BYTES}-byte limit")
+        if result.timed_out:
+            raise WorkspaceError(f"reading evidence file {path} timed out")
+        if result.exit_code == 44:
+            found[path] = None
+        elif result.exit_code != 0:
+            raise WorkspaceError(f"cannot read evidence file {path}: {result.stderr.decode(errors='replace')[-500:]}")
+        else:
+            found[path] = result.stdout
     return found
 
 
 def exec_once(name: str, argv: Sequence[str], *, workdir: str, env: Mapping[str, str] | None = None,
               timeout: float | None = None) -> Exec:
-    """Run ``argv`` once, never retried. On timeout the docker client is killed; the caller removes the container,
-    which kills whatever the command left running."""
+    """Run ``argv`` once with bounded output, never retried.
+
+    On timeout or output overflow, kill the command's process group inside the container as well as the local
+    docker client. The caller still removes the container to establish the cleanup fact.
+    """
     environment = [arg for key, value in (env or {}).items() for arg in ("-e", f"{key}={value}")]
-    try:
-        result = subprocess.run(["docker", "exec", "-w", workdir, *environment, name, *argv], stdin=DEVNULL,
-                                capture_output=True, timeout=timeout, check=False)
-    except subprocess.TimeoutExpired as error:
-        return Exec(None, error.stdout or b"", error.stderr or b"", timed_out=True)
-    if result.returncode != 0 and not running(name):
+    pidfile = f"/tmp/.corsair-exec-{uuid.uuid4().hex}"
+    result = _bounded_process(["docker", "exec", "-w", workdir, *environment, name,
+                               "sh", "-c", _WRAPPER, "sh", pidfile, *argv], timeout=timeout)
+    if result.timed_out or result.output_limited:
+        docker("exec", "-w", "/", name, "sh", "-c", _KILL_SCRIPT, "sh", pidfile, timeout=30)
+        return result
+    if result.exit_code != 0 and not running(name):
         return Exec(None, result.stdout, result.stderr, container_failed=True)
-    return Exec(result.returncode, result.stdout, result.stderr)
+    return result
+
+
+def _bounded_process(argv: Sequence[str], *, timeout: float | None, limit: int = MAX_OUTPUT_BYTES) -> Exec:
+    """Capture both streams up to one combined byte limit without buffering an untrusted command unboundedly."""
+    process = subprocess.Popen(argv, stdin=DEVNULL, stdout=PIPE, stderr=PIPE)
+    assert process.stdout is not None and process.stderr is not None
+    selector = selectors.DefaultSelector()
+    buffers = {process.stdout: bytearray(), process.stderr: bytearray()}
+    for stream in buffers:
+        os.set_blocking(stream.fileno(), False)
+        selector.register(stream, selectors.EVENT_READ)
+    deadline = None if timeout is None else time.monotonic() + timeout
+    timed_out = overflowed = False
+    try:
+        while selector.get_map():
+            remaining = None if deadline is None else deadline - time.monotonic()
+            if remaining is not None and remaining <= 0:
+                timed_out = True
+                break
+            events = selector.select(remaining)
+            if not events:
+                timed_out = True
+                break
+            for key, _ in events:
+                stream = key.fileobj
+                chunk = os.read(stream.fileno(), 64 * 1024)
+                if not chunk:
+                    selector.unregister(stream)
+                    continue
+                available = limit - sum(len(buffer) for buffer in buffers.values())
+                buffers[stream].extend(chunk[:max(available, 0)])
+                if len(chunk) > available:
+                    overflowed = True
+                    break
+            if overflowed:
+                break
+        if timed_out or overflowed:
+            process.kill()
+        try:
+            remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
+            process.wait(timeout=remaining)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            process.kill()
+            process.wait()
+    finally:
+        selector.close()
+        process.stdout.close()
+        process.stderr.close()
+    return Exec(None if timed_out or overflowed else process.returncode,
+                bytes(buffers[process.stdout]), bytes(buffers[process.stderr]),
+                timed_out=timed_out, output_limited=overflowed)
 
 
 def remove(name: str) -> bool:
@@ -373,10 +438,9 @@ class DockerWorkspace(WorkspaceBackend, SupportsCommands):
     @staticmethod
     async def _kill(name: str, pidfile: str, process: anyio.abc.Process) -> None:
         """Best effort: kill the command's process group in the container, then the local docker client."""
-        script = 'pid=$(cat "$1" 2>/dev/null) && { kill -9 "-$pid" || kill -9 "$pid"; } 2>/dev/null; rm -f "$1"'
         with anyio.move_on_after(30):
-            await anyio.to_thread.run_sync(lambda: docker("exec", "-w", "/", name, "sh", "-c", script, "sh", pidfile,
-                                                          timeout=30))
+            await anyio.to_thread.run_sync(lambda: docker("exec", "-w", "/", name, "sh", "-c", _KILL_SCRIPT,
+                                                          "sh", pidfile, timeout=30))
         if process.returncode is None:
             process.kill()
         with anyio.move_on_after(DRAIN_GRACE_S):
@@ -480,9 +544,19 @@ class DockerSandboxes:
         # names (its probe directory) and /tmp are writable. Capabilities are dropped, so this is a mode change by
         # the owner, not a chown.
         for path in writable:
-            made = exec_once(name, ["sh", "-c", 'mkdir -p "$1" && chmod 1777 "$1"', "sh", path], workdir="/", timeout=120)
+            made = exec_once(name, ["mkdir", "-p", path], workdir="/", timeout=120)
             if made.exit_code != 0:
                 raise WorkspaceError(f"cannot prepare writable {path}: {made.stderr.decode(errors='replace')[-500:]}")
+        # Host umasks are not runtime policy. Make source readable and remove write bits without following links.
+        for kind, mode in (("d", "a+rx,a-w"), ("f", "a+r,a-w")):
+            normalized = exec_once(name, ["find", "/work", "-type", kind, "-exec", "chmod", mode, "{}", "+"],
+                                   workdir="/", timeout=120)
+            if normalized.exit_code != 0:
+                raise WorkspaceError(f"cannot seal source permissions: {normalized.stderr.decode(errors='replace')[-500:]}")
+        for path in writable:
+            made = exec_once(name, ["chmod", "1777", path], workdir="/", timeout=120)
+            if made.exit_code != 0:
+                raise WorkspaceError(f"cannot make {path} writable: {made.stderr.decode(errors='replace')[-500:]}")
         committed = docker("commit", "--change", f"LABEL {ENV_KEY_LABEL}={key} {ENV_LOG_LABEL}={log_sha256}", name,
                            tag, timeout=1800)
         if committed.returncode != 0:

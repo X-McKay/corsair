@@ -1,3 +1,8 @@
+---
+name: python-pytest
+description: Write and troubleshoot Python probes under pytest and coverage.py. Use when the runtime is python / pytest.
+---
+
 # Python / pytest runtime
 
 - Image: Python 3.12 with `pytest` and `coverage` installed; nothing else until your build script installs it.

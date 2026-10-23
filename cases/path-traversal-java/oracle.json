@@ -1,0 +1,12 @@
+{
+  "dataset_version": "corsair-lite/1",
+  "case_name": "Java path traversal with reviewed fix",
+  "created": "2026-10-23",
+  "expected_label": "LIKELY_EXPLOITABLE",
+  "expected_fix": "verified",
+  "forbidden_labels": [],
+  "risk_tags": ["untrusted-code-execution", "path-traversal"],
+  "capability_tags": ["java", "javac-java", "differential-probe"],
+  "provenance": "Reviewed local synthetic fixture pair with no external dependencies.",
+  "retention": "Public synthetic fixture; retain in version control."
+}

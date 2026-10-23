@@ -102,9 +102,14 @@ def test_render_case_carries_the_finding_but_no_oracle():
 
 
 def test_skills_exist_and_name_the_contract():
-    names = sorted(p.stem for p in SKILLS_DIR.glob("*.md"))
-    assert names == ["build-recipes", "differential-probing", "python-pytest"]
-    text = (SKILLS_DIR / "differential-probing.md").read_text()
+    import yaml
+    names = sorted(p.parent.name for p in SKILLS_DIR.glob("*/SKILL.md"))
+    assert names == ["build-recipes", "differential-probing", "java-javac", "javascript-node-test", "perl-tap", "python-pytest"]
+    for name in names:
+        text = (SKILLS_DIR / name / "SKILL.md").read_text()
+        metadata = yaml.safe_load(text.split("---")[1])
+        assert metadata["name"] == name and metadata["description"]
+    text = (SKILLS_DIR / "differential-probing/SKILL.md").read_text()
     for symbol in ("CONTROL_PAYLOAD", "EXPLOIT_PAYLOAD", "run_target"):
         assert symbol in text
 
@@ -183,3 +188,31 @@ async def test_shell_budget_is_operator_owned_and_a_token_budget_stop_is_inconcl
                             kernel=make_kernel(fake, tmp_path), backend=fake, request_limit=2)
     assert run.verdict.label is Label.INCONCLUSIVE and "budget ended the run" in run.verdict.reason
     assert run.error and run.error.startswith("UsageLimitExceeded")
+
+
+async def test_producer_never_removes_a_held_working_sandbox(tmp_path):
+    from corsair.sandbox.port import SandboxSpec, labels
+
+    fake = FakeSandboxes(dict(HAPPY))
+    held = SandboxSpec(image=ROW.image, labels=labels("prod1", "work")).name
+    fake.held.add(held)
+    run = await investigate(load_case(CASE), ROW, model=scripted([]), kernel=make_kernel(fake, tmp_path), backend=fake)
+    assert run.verdict.label is Label.ERROR
+    assert held not in fake.removed and run.cleanup_confirmed is None
+
+
+async def test_parallel_submission_calls_cannot_exceed_the_operator_budget(tmp_path):
+    import anyio
+    from corsair.kernel import AuditResult
+
+    async def auditor(submission):
+        await anyio.sleep(0)
+        return AuditResult(valid=True, reason="fair probe")
+
+    fake = FakeSandboxes(dict(HAPPY))
+    k = make_kernel(fake, tmp_path)
+    k.auditor = auditor
+    call = ("submit", {"submission": REFERENCE.model_dump(mode="json")})
+    run = await investigate(load_case(CASE), ROW, model=scripted([[call, call], ["Verified."]]),
+                            kernel=k, backend=fake, max_submissions=1)
+    assert len(run.evaluations) == 1 and run.verdict.label is Label.LIKELY_EXPLOITABLE

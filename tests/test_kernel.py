@@ -116,6 +116,21 @@ async def test_failed_build_returns_the_tail_and_runs_nothing(tmp_path):
     assert terminal_verdict(evaluation.gate, 1).label is Label.UNABLE_TO_RUN
 
 
+async def test_build_output_overflow_is_infrastructure_not_a_build_diagnosis(tmp_path):
+    from corsair.sandbox.port import Exec
+
+    class NoisyBuild(FakeSandboxes):
+        def exec_once(self, name, argv, *, workdir, env=None, timeout=None):
+            if argv[0] == "bash" and argv[-1].endswith("build.sh"):
+                return Exec(None, b"x" * 20, b"", output_limited=True)
+            return super().exec_once(name, argv, workdir=workdir, env=env, timeout=timeout)
+
+    evaluation = await kernel(NoisyBuild(dict(HAPPY)), tmp_path).evaluate(
+        REFERENCE.model_copy(update={"build_script": "pip install x"}))
+    assert evaluation.gate.stage is Gate.INFRA and "output limit" in evaluation.gate.reason
+    assert terminal_verdict(evaluation.gate, 1).label is Label.ERROR
+
+
 async def test_control_must_hold_before_the_exploit_runs(tmp_path):
     fake = FakeSandboxes({**HAPPY, ("vulnerable", "control"): Script("errored", "FileNotFoundError", "no such file")})
     evaluation = await kernel(fake, tmp_path).evaluate(REFERENCE)
@@ -141,7 +156,7 @@ async def test_exploit_crash_or_application_assertion_is_errored_not_violated(tm
     crash = FakeSandboxes({**HAPPY, ("vulnerable", "exploit"): Script("errored", "TypeError", "bad arg")})
     evaluation = await kernel(crash, tmp_path).evaluate(REFERENCE)
     assert evaluation.gate.stage is Gate.EXPLOIT_RUN and "TypeError" in evaluation.gate.reason
-    app_assert = FakeSandboxes({**HAPPY, ("vulnerable", "exploit"): Script("violated", "AssertionError", "app", raised_in_probe=False)})
+    app_assert = FakeSandboxes({**HAPPY, ("vulnerable", "exploit"): Script("violated", "AssertionError", "app", invariant_failed=False)})
     evaluation = await kernel(app_assert, tmp_path).evaluate(REFERENCE)
     assert evaluation.gate.stage is Gate.EXPLOIT_RUN and evaluation.runs[-1].outcome is Outcome.ERRORED
 
@@ -197,7 +212,8 @@ async def test_held_sandbox_identity_is_never_reused_or_removed(tmp_path):
     k = kernel(fake, tmp_path)
     from corsair.sandbox.port import SandboxSpec, labels
     held = SandboxSpec(image=ROW.image, workdir="/work", labels=labels("run1", "build", revision="vulnerable",
-                                                                       env=environment_key(ROW, k.case.revision.tree_sha256, "")[:16])).name
+                                                                       env=environment_key(ROW, k.case.revision.tree_sha256, "",
+                                                                                           runtime_image_id=k.runtime_image_id)[:16])).name
     fake.held.add(held)
     evaluation = await k.evaluate(REFERENCE)
     assert evaluation.gate.stage is Gate.INFRA and "SandboxExists" in evaluation.gate.reason
@@ -214,6 +230,13 @@ def test_submission_digest_is_stable_and_hypothesis_lines_are_sorted_unique():
     assert hypothesis.target_lines == (3, 9)
     with pytest.raises(ValueError):
         Hypothesis(target_file="/abs.py", target_symbol="f", target_lines=(1,), root_cause="x", expected_violation="y")
+
+
+def test_environment_cache_binds_the_framework_and_resolved_runtime_image():
+    tree = load_case(CASE).revision.tree_sha256
+    assert environment_key(ROW, tree, "") != environment_key(ROW.model_copy(update={"framework": "node-test"}), tree, "")
+    assert environment_key(ROW, tree, "", runtime_image_id="sha256:first") != environment_key(
+        ROW, tree, "", runtime_image_id="sha256:second")
 
 
 async def test_fixed_exploit_raising_a_non_assertion_keeps_the_label_but_asks_for_a_fix_correction(tmp_path):

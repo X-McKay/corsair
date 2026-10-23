@@ -1,0 +1,11 @@
+{
+  "hypothesis": {
+    "target_file": "Documents.pm",
+    "target_symbol": "read_document",
+    "target_lines": [8],
+    "root_cause": "The filename is joined without confining it to the document root.",
+    "expected_violation": "The outside sentinel content is returned."
+  },
+  "build_script": "",
+  "probe": "package CorsairProbe;\nuse strict;\nuse warnings;\nuse File::Path qw(make_path);\nuse File::Spec;\nuse File::Temp qw(tempdir);\nuse lib '/work';\nuse Documents;\n\nour $CONTROL_PAYLOAD = 'document.txt';\nour $EXPLOIT_PAYLOAD = '../outside.txt';\n\nsub run_target {\n    my ($payload) = @_;\n    my $base = tempdir('corsair-XXXXXX', TMPDIR => 1, CLEANUP => 1);\n    my $root = File::Spec->catdir($base, 'documents');\n    make_path($root);\n    _write(File::Spec->catfile($root, 'document.txt'), 'inside');\n    _write(File::Spec->catfile($base, 'outside.txt'), 'outside');\n    my $content;\n    eval { $content = Documents::read_document($root, $payload); 1 }\n        or do { die $@ unless $@ =~ /outside root/; };\n    return $content ne 'outside';\n}\n\nsub _write {\n    my ($path, $content) = @_;\n    open my $handle, '>', $path or die \"cannot write fixture: $!\";\n    print {$handle} $content;\n    close $handle;\n}\n\n1;\n"
+}

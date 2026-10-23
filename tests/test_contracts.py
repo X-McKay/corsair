@@ -57,7 +57,7 @@ def test_finding_paths_stay_inside_the_tree():
 
 def test_matrix_selects_the_python_row_for_the_fixture_and_none_for_an_unknown_tree(tmp_path):
     rows = matrix.load()
-    assert [row.id for row in rows] == ["pytest-cpython312"] and rows[0].framework == "pytest"
+    assert {row.framework for row in rows} == {"pytest", "node-test", "javac-java", "perl-tap"}
     case = load_case(CASE)
     assert matrix.select(case).id == "pytest-cpython312"
     (tmp_path / "x").mkdir()
@@ -105,3 +105,39 @@ def test_git_source_request_schema_and_cache_key(tmp_path, monkeypatch):
     (key_dir / "a.py").write_text("x = 1\n")
     (key_dir / ".corsair-complete").write_text("done")
     assert acquire(source, cache) == key_dir
+
+
+def test_runtime_selection_uses_the_reported_file_in_a_polyglot_tree(tmp_path):
+    from corsair.case import revision
+
+    (tmp_path / "tools.py").write_text("pass\n")
+    (tmp_path / "documents.cjs").write_text("module.exports = {};\n")
+    case = Case(case_id="polyglot", finding=Finding(title="t", file_path="documents.cjs"), revision=revision(tmp_path))
+    assert matrix.select(case).framework == "node-test"
+    java = case.model_copy(update={"finding": Finding(title="t", file_path="Main.java")})
+    assert matrix.select(java) is None
+
+
+def test_matrix_rejects_an_unknown_adapter_before_any_model_or_container(tmp_path):
+    path = tmp_path / "matrix.yaml"
+    path.write_text((ROOT / "matrix.yaml").read_text().replace("framework: pytest", "framework: missing"))
+    with pytest.raises(ValueError, match="adapter"):
+        matrix.load(path)
+
+
+def test_default_runtime_matrix_is_shipped_with_the_python_package():
+    assert matrix.DEFAULT_MATRIX == Path(matrix.__file__).with_name("matrix.yaml")
+    assert matrix.DEFAULT_MATRIX.is_file()
+
+
+def test_agent_manifest_matches_the_factories_capability_allowlists():
+    import yaml
+    from pydantic_ai.models.test import TestModel
+    from corsair.auditor import build_auditor
+    from corsair.producer import SKILL_NAMES, build_producer
+
+    spec = yaml.safe_load((ROOT / "src/corsair/agent-contracts.yaml").read_text())
+    producer, auditor = build_producer(TestModel()), build_auditor(TestModel())
+    assert set(producer._function_toolset.tools) == set(spec["agents"]["producer"]["tools"])
+    assert set(auditor._function_toolset.tools) == set(spec["agents"]["auditor"]["tools"]) == set()
+    assert set(SKILL_NAMES) == set(spec["agents"]["producer"]["skills"])

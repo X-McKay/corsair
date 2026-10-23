@@ -1,9 +1,18 @@
+---
+name: differential-probing
+description: Design a differential vulnerability probe with two payloads and one invariant. Read before submitting any probe to the kernel.
+---
+
 # Differential probing
 
 One probe module, two payloads, one invariant. The kernel verifies it; you cannot argue with the kernel, only fix
 the probe.
 
 ## Contract
+
+Read the selected runtime skill for syntax, imports and dependency setup. Python, JavaScript, Java and Perl all
+implement the same security contract; the kernel supplies the native driver. Python expresses failure with its own
+assertion. The other runtimes return the invariant as a boolean and let the driver assert it.
 
 ```python
 CONTROL_PAYLOAD = ...   # a benign input the target must handle correctly
@@ -21,14 +30,18 @@ Rules the kernel enforces, so write to them:
   `CONTROL_PAYLOAD` or `EXPLOIT_PAYLOAD`, never branch on which one you got.
 - The control run must pass **and** execute the hypothesis' `target_lines`. If it does not reach them, your
   hypothesis names the wrong lines or your fixture bypasses the target.
-- The exploit run must fail with **your** `assert` (an `AssertionError` raised in the probe). A `TypeError`,
-  `FileNotFoundError` or an exception from inside the application is `errored`, not a demonstration. Catch
+- The exploit run must violate the invariant. In Python, this means **your** `assert` raises `AssertionError` in
+  the probe. In JavaScript and Java, `run_target` returns `false`; Perl returns a false scalar. A true value means
+  the invariant held. A `TypeError`,
+  `FileNotFoundError`, or any exception from inside the application is `errored`, not a demonstration. Catch
   expected exceptions from the target when the invariant is about what happens afterwards (for example "the
   outside file was not opened"), and let the invariant decide.
-- Both runs must execute the target lines. Coverage is measured on the target file only.
-- No `unittest.mock`, `pytest_mock`, `responses`, `httpretty`. If a dependency must be controlled, pass a real
-  object through the target's own parameters; never replace the function that owns the security property.
-- Imports: the repository root is `/work` and on `sys.path`. Import the target the way its own tests do.
+- Both vulnerable runs must execute every declared target line. Both fixed runs must execute the target file;
+  line numbers may shift in a fix. Missing coverage cannot verify a fix.
+- No mocking or runtime-replacement library named by the selected runtime skill. If a dependency must be
+  controlled, pass a real object through the target's own parameters; never replace the function that owns the
+  security property.
+- The repository root is `/work`. Load the target the way its own tests do, following the selected runtime skill.
 - The attacker controls only the payload. The probe runs unprivileged with no network: it cannot edit `/etc/hosts`,
   change name resolution, rewrite the target's allowlists or settings, or stand in for an allowlisted host. A
   check that neutralises the payload under that model is a result, not an obstacle: submit the strongest payload
@@ -55,6 +68,6 @@ assertion observes on exploit, in one sentence.
 
 ## Build script
 
-Bash, run once in a clean container from the repository root with network, before the network is removed. Use
-`pip install -e .` or `pip install -r requirements.txt` only when the probe needs the package importable or its
-dependencies present. Leave it empty for a plain module tree. Never fetch or run code the probe does not need.
+Bash, run once in a clean container from the repository root with network, before the network is removed. Follow
+the selected runtime skill and `build-recipes`; leave it empty for a plain module tree. Never fetch or run code the
+probe does not need.

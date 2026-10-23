@@ -1,0 +1,13 @@
+{
+  "case_id": "fixture:path-traversal-java",
+  "finding": {
+    "title": "Path traversal in Documents.readDocument",
+    "description": "An unconfined caller-supplied name can read a file outside the document root.",
+    "file_path": "Documents.java",
+    "start_line": 7,
+    "symbol": "Documents.readDocument",
+    "cwe": "CWE-22"
+  },
+  "source": "vulnerable",
+  "fixed_source": "fixed"
+}
