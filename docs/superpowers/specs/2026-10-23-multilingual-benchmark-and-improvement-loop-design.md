@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-23
 
-**Status:** Architecture approved in discussion; written specification awaiting review
+**Status:** Approved for implementation planning
 
 **Baseline:** `improve/duo-playbook` at `ae4b5f23`
 
