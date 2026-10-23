@@ -23,7 +23,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 from pydantic import Field, ValidationError, field_validator, model_validator
 
-from .case import Frozen, GitSource, SafePath, _Request, tree_sha256
+from .case import Frozen, GitSource, SafePath, _Request, _has_ascii_control, tree_sha256
 from .kernel import Fix, Label, Submission
 
 DATASET_SCHEMA = "corsair-lite/dataset-manifest/1"
@@ -47,8 +47,9 @@ MANDATORY_QUARANTINE = {
 
 
 def _https(value: str) -> str:
-    if not value.startswith("https://") or any(character.isspace() for character in value):
-        raise ValueError("an HTTPS URL is required")
+    if (_has_ascii_control(value) or not value.startswith("https://")
+            or any(character.isspace() for character in value)):
+        raise ValueError("an HTTPS URL without ASCII control characters is required")
     return value
 
 
@@ -332,6 +333,8 @@ def _region_sha256(path: Path, lines: tuple[int, ...]) -> str | None:
 
 def _normal_repository(value: str) -> str | None:
     """Return one conservative HTTPS repository identity, or ``None`` for an adorned/invalid URL."""
+    if _has_ascii_control(value):
+        return None
     try:
         parsed = urlsplit(value)
         port = parsed.port
@@ -491,7 +494,12 @@ def _license_tokens(expression: str) -> tuple[str, ...]:
 
 def _git_url_variants(url: str) -> tuple[str, ...]:
     """Return equivalent repository spellings while preserving every other URL component."""
-    parsed = urlsplit(url)
+    if _has_ascii_control(url):
+        return ()
+    try:
+        parsed = urlsplit(url)
+    except ValueError:
+        return ()
     path = parsed.path.rstrip("/")
     repository_path = path[:-4] if path.endswith(".git") else path
     paths = (repository_path, f"{repository_path}/", f"{repository_path}.git", f"{repository_path}.git/")
@@ -507,7 +515,7 @@ def _offline_git_source(root: Path, source: GitSource) -> Path | None:
     cache_root = Path(os.environ.get("CORSAIR_SOURCES") or root / ".runs/sources")
     try:
         cache_boundary = cache_root.resolve(strict=True)
-    except (OSError, RuntimeError):
+    except (OSError, RuntimeError, ValueError):
         return None
     for candidate_url in _git_url_variants(source.url):
         key = hashlib.sha256(f"{candidate_url}\n{source.commit}".encode()).hexdigest()[:24]
@@ -523,21 +531,21 @@ def _offline_git_source(root: Path, source: GitSource) -> Path | None:
             tree = (boundary / source.subdir).resolve(strict=True) if source.subdir else boundary
             if tree.is_dir() and tree.is_relative_to(boundary):
                 return tree
-        except (OSError, RuntimeError):
+        except (OSError, RuntimeError, ValueError):
             continue
     return None
 
 
 def _local_source(root: Path, case_dir: Path, value: str) -> Path | None:
     relative = Path(value)
-    if (not value or relative.is_absolute() or "\0" in value or relative.as_posix() != value
+    if (not value or _has_ascii_control(value) or relative.is_absolute() or relative.as_posix() != value
             or ".." in relative.parts
             or any((case_dir.joinpath(*relative.parts[:index])).is_symlink()
                    for index in range(1, len(relative.parts) + 1))):
         return None
     try:
         candidate = (case_dir / relative).resolve(strict=True)
-    except (OSError, RuntimeError):
+    except (OSError, RuntimeError, ValueError):
         return None
     return (candidate if candidate.is_dir() and candidate != case_dir and candidate.is_relative_to(case_dir)
             and candidate.is_relative_to(root) else None)
@@ -547,7 +555,7 @@ def _regular_file(path: Path, boundary: Path) -> bool:
     try:
         return (path.resolve(strict=True).is_relative_to(boundary) and path.is_file() and not path.is_symlink()
                 and stat.S_ISREG(path.stat().st_mode))
-    except (OSError, RuntimeError):
+    except (OSError, RuntimeError, ValueError):
         return False
 
 
@@ -559,7 +567,7 @@ def _aliases_file_in_tree(path: Path, root: Path) -> bool:
             for filename in sorted(filenames):
                 if os.path.samefile(path, Path(directory) / filename):
                     return True
-    except OSError:
+    except (OSError, ValueError):
         return True
     return False
 
@@ -568,7 +576,12 @@ EvidenceResolver = Callable[[str, str], bytes | None]
 
 
 def _immutable_evidence_url(url: str, revision: str) -> bool:
-    parsed = urlsplit(url)
+    if _has_ascii_control(url):
+        return False
+    try:
+        parsed = urlsplit(url)
+    except ValueError:
+        return False
     marker = revision.removeprefix("sha256:")
     segments = [part for part in parsed.path.split("/") if part]
     return not (parsed.username or parsed.password or parsed.query or parsed.fragment or marker not in segments
@@ -577,7 +590,12 @@ def _immutable_evidence_url(url: str, revision: str) -> bool:
 
 def _evidence_location(url: str, revision: str) -> tuple[str, str] | None:
     """Extract the repository identity and file from a supported immutable evidence URL."""
-    parsed = urlsplit(url)
+    if _has_ascii_control(url):
+        return None
+    try:
+        parsed = urlsplit(url)
+    except ValueError:
+        return None
     parts = [part for part in parsed.path.split("/") if part]
     raw_revision = revision.removeprefix("sha256:")
     if revision.startswith("sha256:"):

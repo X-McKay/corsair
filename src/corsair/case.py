@@ -20,9 +20,36 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 CONTRACT_VERSION = "corsair-lite/1"
 
 
+def _has_ascii_control(value: str) -> bool:
+    """Whether ``value`` contains a C0 control character or DEL."""
+    return any(ord(character) < 0x20 or ord(character) == 0x7f for character in value)
+
+
+def _without_ascii_controls(value: str) -> str:
+    if _has_ascii_control(value):
+        raise ValueError("ASCII control characters are not allowed")
+    return value
+
+
+ControlFreeString = Annotated[str, AfterValidator(_without_ascii_controls)]
+
+
+def _https_url(value: str) -> str:
+    if _has_ascii_control(value):
+        raise ValueError("ASCII control characters are not allowed in HTTPS URLs")
+    if not value.startswith("https://") or any(character.isspace() for character in value):
+        raise ValueError("an HTTPS URL is required")
+    return value
+
+
+HttpsUrl = Annotated[str, AfterValidator(_https_url)]
+
+
 def _safe_path(value: str) -> str:
-    """A relative path inside the tree: no leading slash, no ``..`` segment, no NUL."""
-    if not value or len(value) > 512 or value.startswith("/") or "\0" in value:
+    """A relative path inside the tree with no ASCII controls or traversal segments."""
+    if _has_ascii_control(value):
+        raise ValueError("ASCII control characters are not allowed in paths")
+    if not value or len(value) > 512 or value.startswith("/"):
         raise ValueError("a relative path of at most 512 characters is required")
     if any(part in ("", "..") for part in value.split("/")):
         raise ValueError("path must not contain empty or '..' segments")
@@ -48,7 +75,7 @@ class Finding(Frozen):
 
 
 class Revision(Frozen):
-    source: str = Field(min_length=1, max_length=1024, description="Host path of the tree")
+    source: ControlFreeString = Field(min_length=1, max_length=1024, description="Host path of the tree")
     commit: str | None = Field(default=None, pattern=r"^[0-9a-f]{40}$")
     tree_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
@@ -96,9 +123,9 @@ class GitSource(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    url: str = Field(pattern=r"^https://[^\s]+$")
+    url: HttpsUrl
     commit: str = Field(pattern=r"^[0-9a-f]{40}$")
-    subdir: str | None = Field(default=None, description="Investigate only this directory of the checkout")
+    subdir: SafePath | None = Field(default=None, description="Investigate only this directory of the checkout")
 
 
 class _Request(BaseModel):
@@ -108,9 +135,10 @@ class _Request(BaseModel):
 
     case_id: str | None = None
     finding: Finding
-    source: str | GitSource = Field(description="A directory relative to this file, or a pinned git source")
+    source: ControlFreeString | GitSource = Field(
+        description="A directory relative to this file, or a pinned git source")
     commit: str | None = None
-    fixed_source: str | GitSource | None = None
+    fixed_source: ControlFreeString | GitSource | None = None
     fixed_commit: str | None = None
 
 
@@ -186,10 +214,10 @@ def from_request(path: Path) -> Case:
         if isinstance(spec, GitSource):
             return revision(acquire(spec), spec.commit)
         relative = Path(spec)
-        invalid_syntax = not spec or relative.is_absolute() or "\0" in spec
+        invalid_syntax = not spec or relative.is_absolute() or _has_ascii_control(spec)
         try:
             candidate = (base / relative).resolve(strict=True) if not invalid_syntax else None
-        except (OSError, RuntimeError):
+        except (OSError, RuntimeError, ValueError):
             candidate = None
         ordinary = (candidate is not None and ".." not in relative.parts and candidate != base
                     and candidate.is_relative_to(base))

@@ -13,7 +13,7 @@ from pydantic import ValidationError
 
 from corsair import corpus as corpus_module
 from corsair.auditor import render as render_auditor
-from corsair.case import Case, load_case, tree_sha256
+from corsair.case import Case, GitSource, load_case, tree_sha256
 from corsair.corpus import (DatasetManifest, _cached_evidence, _patch_sha256, load_manifest,
                             main as corpus_main, select_cases, validate_corpus)
 from corsair.kernel import Submission
@@ -188,6 +188,76 @@ def test_manifest_rejects_movable_revisions_and_invalid_hashes(path, value):
         DatasetManifest.model_validate(manifest(case))
 
 
+@pytest.mark.parametrize("url_field", ["source", "evidence", "provenance"])
+def test_manifest_json_rejects_every_ascii_control_in_https_urls(url_field):
+    for codepoint in (*range(0x20), 0x7f):
+        case = dataset_case()
+        hostile = f"https://example.invalid/owner/{chr(codepoint)}project"
+        if url_field == "source":
+            case["source_pair"]["vulnerable"]["repository"] = hostile
+        elif url_field == "evidence":
+            case["rights"][0]["evidence_url"] = hostile
+        else:
+            case["finding_provenance"]["source_url"] = hostile
+        encoded = json.dumps(manifest(case))
+        with pytest.raises(ValidationError, match="HTTPS URL"):
+            DatasetManifest.model_validate_json(encoded)
+
+
+@pytest.mark.parametrize("path_field", ["target", "harness", "receipt"])
+def test_manifest_json_rejects_every_ascii_control_in_paths(path_field):
+    for codepoint in (*range(0x20), 0x7f):
+        case = dataset_case()
+        hostile = f"path{chr(codepoint)}name.py"
+        if path_field == "target":
+            case["target"]["file"] = hostile
+        elif path_field == "harness":
+            case["artifacts"].update(harness_path=hostile, harness_sha256=SHA_A)
+        else:
+            case["review_receipt"] = {
+                "path": hostile,
+                "sha256": SHA_A,
+                "reviewer": "reviewer",
+                "reviewed_at": "2026-10-23",
+            }
+        with pytest.raises(ValidationError, match="control"):
+            DatasetManifest.model_validate_json(json.dumps(manifest(case)))
+
+
+def test_request_json_rejects_every_ascii_control_in_source_urls_and_paths():
+    commit = "1" * 40
+    for codepoint in (*range(0x20), 0x7f):
+        control = chr(codepoint)
+        with pytest.raises(ValidationError, match="control"):
+            corpus_module._Request.model_validate_json(json.dumps({
+                "finding": {"title": "t"},
+                "source": f"source{control}path",
+            }))
+        with pytest.raises(ValidationError, match="control"):
+            GitSource.model_validate_json(json.dumps({
+                "url": f"https://example.invalid/{control}project",
+                "commit": commit,
+            }))
+        with pytest.raises(ValidationError, match="control"):
+            GitSource.model_validate_json(json.dumps({
+                "url": "https://example.invalid/project",
+                "commit": commit,
+                "subdir": f"source{control}path",
+            }))
+
+
+def test_repository_and_evidence_normalizers_reject_controls_even_when_both_inputs_are_invalid():
+    for codepoint in (*range(0x20), 0x7f):
+        control = chr(codepoint)
+        repository = f"https://example.invalid/owner/{control}project"
+        evidence = f"https://example.invalid/owner/project/blob/{COMMIT_A}/path{control}LICENSE"
+        assert corpus_module._normal_repository(repository) is None
+        assert not corpus_module._same_repository(repository, repository)
+        assert corpus_module._git_url_variants(repository) == ()
+        assert not corpus_module._immutable_evidence_url(evidence, COMMIT_A)
+        assert corpus_module._evidence_location(evidence, COMMIT_A) is None
+
+
 @pytest.mark.parametrize(("split", "status"), [
     ("quarantine", "candidate"),
     ("development", "quarantined"),
@@ -338,6 +408,54 @@ def set_local_revision_commit(root: Path, revision: str, commit: str) -> None:
 
 def issue_codes(report) -> set[str]:
     return {issue.code for issue in (*report.errors, *report.warnings)}
+
+
+@pytest.mark.parametrize("codepoint", [0x00, 0x01, 0x1f, 0x7f],
+                         ids=["nul", "soh", "unit-separator", "del"])
+@pytest.mark.parametrize("location", [
+    "source_repository", "evidence_url", "provenance_url", "target_path",
+    "request_source_path", "request_source_url", "request_subdir",
+])
+def test_control_characters_become_deterministic_corpus_issues(tmp_path, location, codepoint):
+    root = corpus_fixture(tmp_path)
+    control = chr(codepoint)
+    expected = "MANIFEST_INVALID"
+    if location.startswith("request_"):
+        request = json.loads((root / "cases/cs-1001/input.json").read_text())
+        if location == "request_source_path":
+            request["source"] = f"vulnerable{control}alias"
+        else:
+            source = {
+                "url": "https://fixture.invalid/owner/project",
+                "commit": request["commit"],
+            }
+            if location == "request_source_url":
+                source["url"] = f"https://fixture.invalid/owner/{control}project"
+            else:
+                source["subdir"] = f"source{control}path"
+            request["source"] = source
+        write_request(root, request)
+        expected = "ARTIFACT_MISSING"
+    else:
+        data = read_manifest(root)
+        case = data["cases"][0]
+        if location == "source_repository":
+            case["source_pair"]["vulnerable"]["repository"] = \
+                f"https://fixture.invalid/owner/{control}project"
+        elif location == "evidence_url":
+            record = case["rights"][0]
+            record["evidence_url"] = record["evidence_url"].replace(
+                "source-v-LICENSE", f"source-v-{control}LICENSE")
+        elif location == "provenance_url":
+            provenance = case["finding_provenance"]
+            provenance["source_url"] = provenance["source_url"].replace(
+                "finding.md", f"finding{control}.md")
+        else:
+            case["target"]["file"] = f"target{control}.py"
+        write_manifest(root, data)
+
+    report = checked(root)
+    assert expected in issue_codes(report)
 
 
 def test_rights_require_revision_and_evidence_hash(tmp_path):
