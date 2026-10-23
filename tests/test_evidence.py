@@ -90,3 +90,17 @@ def test_reported_target_cannot_resolve_outside_the_source_tree(tmp_path):
     case = Case(case_id="link", finding=Finding(title="t", file_path="documents.py"), revision=revision(tree))
     assert reported_target_present(case) is not None
     assert not target_binding(case, REFERENCE.hypothesis).passed
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("revision", ["vulnerable", "fixed"])
+@pytest.mark.parametrize("outcome", ["holds", "violated"])
+async def test_decisive_exploit_requires_every_target_line_on_each_revision(tmp_path, revision, outcome):
+    from corsair.kernel import Label
+
+    fake = FakeSandboxes({**HAPPY, (revision, "exploit"): Script(outcome, "AssertionError" if outcome == "violated" else None, covered_lines=())})
+    result = await kernel(fake, tmp_path).evaluate(REFERENCE)
+    disposition = next(item for item in result.verdict.revisions if item.revision == revision)
+    assert disposition.label is Label.INCONCLUSIVE and disposition.rule == "K3"
+    if revision == "fixed":
+        assert result.verdict.fix is Fix.NOT_VERIFIED

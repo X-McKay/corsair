@@ -94,7 +94,9 @@ def build_producer(model: Model, *, max_submissions: int = 4) -> Agent[ProducerD
         deps.evaluations.append(evaluation)
         gate = evaluation.gate
         remaining = deps.max_submissions - len(deps.evaluations)
-        if evaluation.verdict is not None:
+        if (evaluation.verdict is not None
+                and evaluation.verdict.label in (Label.LIKELY_EXPLOITABLE, Label.LIKELY_NOT_EXPLOITABLE)
+                and evaluation.verdict.rule in ("K1", "K4")):
             deps.verdict = evaluation.verdict  # the label stands; a later submission may only improve the fix check
             if gate.passed or remaining <= 0:
                 return (f"VERIFIED: {evaluation.verdict.reason}. Fix: {evaluation.verdict.fix} "

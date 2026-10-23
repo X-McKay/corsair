@@ -5,20 +5,18 @@ A submission is a hypothesis, a build script and one probe module that defines `
 build script in a clean container, seals the result as an image, and runs each payload alone in a fresh offline
 container from that image, on the vulnerable revision and, when the case has one, the fixed revision.
 
-Gates, in order; the first failure is returned to the producer as a ``GateVerdict``:
+The kernel binds the hypothesis to the reported target, guards the probe, and replays its build in a clean
+container. A clean control observation allows both payloads to run. Decisive dispositions require control PASS,
+complete target coverage for both runs, and an accepted outcome-blind audit. Exploit PASS yields K1
+LIKELY_EXPLOITABLE; a clean, invariant-held exploit FAIL yields K4 LIKELY_NOT_EXPLOITABLE. Invalid evidence
+is K3 INCONCLUSIVE. Application exceptions never establish a negative disposition.
 
-1. ``ast_guard``: the probe parses, defines the three symbols and imports no mocking library.
-2. ``build_replay``: the build script succeeds in a clean container (network only during this step).
-3. ``control_run`` / ``control_coverage``: ``run_target(CONTROL_PAYLOAD)`` holds on the vulnerable revision and
-   executes the hypothesis' target lines.
-4. ``exploit_run`` / ``exploit_coverage``: ``run_target(EXPLOIT_PAYLOAD)`` violates the security invariant on the
-   vulnerable revision and executes the target lines. Python probes raise their own ``AssertionError``; JavaScript,
-   Java and Perl probes return a false value and the kernel-owned driver performs the assertion. Application
-   exceptions are errors.
-5. ``blind_audit``: a stateless auditor that sees the hypothesis and probe only, never an outcome.
+Each evaluated revision retains its own disposition. The top-level label mirrors the vulnerable/source revision;
+a fixed revision verifies the fix only when it independently earns the negative disposition. A removed fixed
+target remains INCONCLUSIVE/TARGET_REMOVED and does not verify the fix.
 
-Polarity: ``violated`` means the probe's safety invariant failed, i.e. the reported condition occurred. The fixed
-revision is run after the gates and never rejects a submission; it decides fix verification.
+The adapters temporarily report ``Outcome`` invariant observations while their drivers migrate to the boolean
+contract. Public role results express whether each payload met its role's expectation.
 
 The two payloads run as two native test ids through one kernel-owned driver, so "exactly two native probes through
 the same seam" holds by construction. The framework adapter (``corsair.frameworks``) owns the driver, the command
@@ -118,10 +116,34 @@ class Outcome(StrEnum):
     INFRA = "infra"          # timeout, container failure or unreadable results
 
 
+class RoleResult(StrEnum):
+    PASS = "PASS"
+    FAIL = "FAIL"
+    ERROR = "ERROR"
+    NOT_RUN = "NOT_RUN"
+    INFRA = "INFRA"
+
+
+def role_result(role: Role, outcome: Outcome) -> RoleResult:
+    """Translate the transitional adapter observation into the role's expectation."""
+    if outcome is Outcome.HOLDS:
+        return RoleResult.PASS if role == "control" else RoleResult.FAIL
+    if outcome is Outcome.VIOLATED:
+        return RoleResult.FAIL if role == "control" else RoleResult.PASS
+    return {Outcome.ERRORED: RoleResult.ERROR, Outcome.NOT_RUN: RoleResult.NOT_RUN,
+            Outcome.INFRA: RoleResult.INFRA}[outcome]
+
+
+def _invariant_held(outcome: Outcome) -> bool | None:
+    return True if outcome is Outcome.HOLDS else False if outcome is Outcome.VIOLATED else None
+
+
 class ProbeRun(Frozen):
     revision: RevisionName
     role: Role
-    outcome: Outcome
+    outcome: Outcome  # Transitional adapter observation; removed from public records in the adapter migration.
+    result: RoleResult
+    invariant_held: bool | None
     exception_type: str | None = None
     message: str | None = Field(default=None, max_length=2_000)
     exit_code: int | None
@@ -142,6 +164,7 @@ class AuditResult(Frozen):
 
 class Label(StrEnum):
     LIKELY_EXPLOITABLE = "LIKELY_EXPLOITABLE"
+    LIKELY_NOT_EXPLOITABLE = "LIKELY_NOT_EXPLOITABLE"
     INCONCLUSIVE = "INCONCLUSIVE"
     UNABLE_TO_RUN = "UNABLE_TO_RUN"
     ERROR = "ERROR"
@@ -151,6 +174,14 @@ class Fix(StrEnum):
     VERIFIED = "verified"
     NOT_VERIFIED = "not_verified"
     NOT_APPLICABLE = "not_applicable"
+
+
+class RevisionDisposition(Frozen):
+    revision: RevisionName
+    label: Label
+    rule: str
+    reason_code: str
+    reason: str
 
 
 class Verdict(Frozen):
@@ -163,14 +194,14 @@ class Verdict(Frozen):
     environment_image: str | None = None
     runs: tuple[ProbeRun, ...] = ()
     audit: AuditResult | None = None
+    revisions: tuple[RevisionDisposition, ...] = ()
 
 
 class Evaluation(Frozen):
-    """What one submission produced: the first failed gate, or ``verified`` with a verdict.
+    """One submission's evidence and disposition, with the first failed gate when evidence is invalid.
 
-    One gate can fail while a verdict exists: ``fix_run``. The vulnerable-revision gates passed, so the label stands,
-    but the exploit payload raised an exception on the fixed revision, so the fix could not be verified and the
-    producer may correct the probe within its budget.
+    A verdict may be inconclusive when a gate fails. A ``fix_run`` failure preserves the source disposition while
+    reporting an exception that prevents fix verification.
     """
 
     submission: Submission
@@ -366,7 +397,8 @@ class Kernel:
             output += f"\n[infra: {type(error).__name__}: {error}]\n".encode()
             confirmed = self.backend.remove(name) if ours else None
             ours = False
-            return ProbeRun(revision=revision, role=role, outcome=Outcome.INFRA, exception_type=type(error).__name__,
+            return ProbeRun(revision=revision, role=role, outcome=Outcome.INFRA,
+                            result=RoleResult.INFRA, invariant_held=None, exception_type=type(error).__name__,
                             message=str(error)[:2000], exit_code=None, junit_tests=0, duration_s=duration,
                             output=self.artifacts.put(output), cleanup_confirmed=confirmed)
         finally:
@@ -375,7 +407,8 @@ class Kernel:
 
     def _infra(self, revision: RevisionName, role: Role, result: Exec, output: bytes, duration: float | None,
                confirmed: bool | None) -> ProbeRun:
-        return ProbeRun(revision=revision, role=role, outcome=Outcome.INFRA, exit_code=result.exit_code,
+        return ProbeRun(revision=revision, role=role, outcome=Outcome.INFRA,
+                        result=RoleResult.INFRA, invariant_held=None, exit_code=result.exit_code,
                         message=("timed out" if result.timed_out else "output limit exceeded"
                                  if result.output_limited else "container failed"), junit_tests=0,
                         duration_s=duration, output=self.artifacts.put(output), cleanup_confirmed=confirmed)
@@ -394,8 +427,9 @@ class Kernel:
         coverage_path = next((path for path in self.framework.result_paths()
                               if path.endswith(("coverage.json", "jacoco.xml"))), None)
         coverage_bytes = files.get(coverage_path) if coverage_path else None
-        return ProbeRun(revision=revision, role=role, outcome=outcome, exception_type=read.exception_type,
-                        message=message, exit_code=result.exit_code, junit_tests=read.junit_tests,
+        return ProbeRun(revision=revision, role=role, outcome=outcome,
+                        result=role_result(role, outcome), invariant_held=_invariant_held(outcome),
+                        exception_type=read.exception_type, message=message, exit_code=result.exit_code, junit_tests=read.junit_tests,
                         covered_target=read.covered_target, covered_lines=read.covered_lines, duration_s=duration,
                         output=self.artifacts.put(output),
                         junit=self.artifacts.put(junit_bytes) if junit_bytes else None,
@@ -406,8 +440,17 @@ class Kernel:
     async def evaluate(self, submission: Submission) -> Evaluation:
         started = time.monotonic()
         runs: list[ProbeRun] = []
+        dispositions: list[RevisionDisposition] = []
+        image: str | None = None
+        audit: AuditResult | None = None
 
         def done(gate: GateVerdict, verdict: Verdict | None = None) -> Evaluation:
+            if verdict is None and runs:
+                disposition = self._inconclusive("vulnerable", gate.stage.name, gate.reason)
+                verdict = Verdict(label=disposition.label, rule=disposition.rule, reason=disposition.reason,
+                                  fix=Fix.NOT_VERIFIED if self.case.fixed_revision else Fix.NOT_APPLICABLE,
+                                  submission_sha256=submission.sha256, environment_image=image,
+                                  runs=tuple(runs), audit=audit, revisions=(disposition,))
             return Evaluation(submission=submission, submission_sha256=submission.sha256, gate=gate, verdict=verdict,
                               runs=tuple(runs), duration_s=time.monotonic() - started)
 
@@ -421,87 +464,104 @@ class Kernel:
         if image is None:
             return done(built)
 
-        control = self.run_probe(image, submission, "vulnerable", "control")
-        runs.append(control)
-        if control.outcome is Outcome.INFRA:
-            return done(GateVerdict(passed=False, stage=Gate.INFRA, reason=f"control run: {control.message}"))
-        if control.outcome is not Outcome.HOLDS:
-            return done(GateVerdict(passed=False, stage=Gate.CONTROL_RUN,
-                                    reason=f"CONTROL_PAYLOAD must hold on the vulnerable revision but was "
-                                           f"{control.outcome}: {control.exception_type or ''} {control.message or ''}".strip(),
-                                    **self._tails(control)))
-        if not set(submission.hypothesis.target_lines).issubset(control.covered_lines):
-            return done(GateVerdict(passed=False, stage=Gate.CONTROL_COVERAGE,
-                                    reason=f"CONTROL_PAYLOAD held but did not execute {submission.hypothesis.target_file} "
-                                           f"lines {list(submission.hypothesis.target_lines)}"
-                                           + ("" if control.covered_target else " (the file never ran)")))
-
-        exploit = self.run_probe(image, submission, "vulnerable", "exploit")
-        runs.append(exploit)
-        if exploit.outcome is Outcome.INFRA:
-            return done(GateVerdict(passed=False, stage=Gate.INFRA, reason=f"exploit run: {exploit.message}"))
-        if exploit.outcome is Outcome.HOLDS:
-            return done(GateVerdict(passed=False, stage=Gate.EXPLOIT_RUN,
-                                    reason="EXPLOIT_PAYLOAD did not violate the invariant on the vulnerable revision; "
-                                           "the reported condition was not demonstrated"))
-        if exploit.outcome is not Outcome.VIOLATED:
-            return done(GateVerdict(passed=False, stage=Gate.EXPLOIT_RUN,
-                                    reason=f"EXPLOIT_PAYLOAD must violate the trusted invariant check, but the run "
-                                           f"was {exploit.outcome}: {exploit.exception_type or ''} {exploit.message or ''}".strip(),
-                                    **self._tails(exploit)))
-        if not set(submission.hypothesis.target_lines).issubset(exploit.covered_lines):
-            return done(GateVerdict(passed=False, stage=Gate.EXPLOIT_COVERAGE,
-                                    reason=f"EXPLOIT_PAYLOAD failed before executing {submission.hypothesis.target_file} "
-                                           f"lines {list(submission.hypothesis.target_lines)}"))
-
-        audit: AuditResult | None = None
-        if self.auditor is not None:
-            audit = await self.auditor(submission)
-            if not audit.valid:
-                return done(GateVerdict(passed=False, stage=Gate.BLIND_AUDIT,
-                                        reason=f"outcome-blind audit rejected the probe: {audit.reason}"))
+        control, exploit = self._run_revision(image, submission, "vulnerable", runs)
+        failed = self._evidence_gate(submission.hypothesis, control, exploit)
+        if failed is not None:
+            return done(failed)
+        if self.auditor is None:
+            return done(GateVerdict(passed=False, stage=Gate.BLIND_AUDIT,
+                                    reason="an accepted outcome-blind audit is required; no auditor configured"))
+        audit = await self.auditor(submission)
+        if not audit.valid:
+            return done(GateVerdict(passed=False, stage=Gate.BLIND_AUDIT,
+                                    reason=f"outcome-blind audit rejected the probe: {audit.reason}"))
+        assert exploit is not None
+        source = self._decide("vulnerable", exploit)
+        dispositions.append(source)
 
         fix, fix_reason = Fix.NOT_APPLICABLE, "the case has no fixed revision"
         fix_gate: GateVerdict | None = None
         if self.case.fixed_revision is not None:
-            fix, fix_reason = self._verify_fix(submission, runs)
-            fixed_exploit = runs[-1] if len(runs) == 4 and runs[-1].revision == "fixed" else None
-            if (fixed_exploit is not None and fixed_exploit.role == "exploit"
-                    and fixed_exploit.outcome is Outcome.ERRORED):
+            fixed, fix, fix_reason = self._verify_fix(submission, runs)
+            dispositions.append(fixed)
+            fixed_exploit = runs[-1] if runs[-1].revision == "fixed" and runs[-1].role == "exploit" else None
+            if fixed_exploit is not None and fixed_exploit.result is RoleResult.ERROR:
                 fix_gate = GateVerdict(passed=False, stage=Gate.FIX_RUN,
-                                       reason=f"the vulnerable revision is verified, but on the fixed revision "
+                                       reason=f"the source disposition stands, but on the fixed revision "
                                               f"EXPLOIT_PAYLOAD raised {fixed_exploit.exception_type}: "
                                               f"{(fixed_exploit.message or '')[:500]}. If that exception is how the "
                                               "fix rejects the payload, catch it inside run_target and let the "
                                               "invariant decide; the fix is not verified until the exploit run holds there")
-        verdict = Verdict(label=Label.LIKELY_EXPLOITABLE, rule="K1",
-                          reason="control held and the exploit payload violated the invariant on the vulnerable "
-                                 "revision, both executing the target lines; the blind audit accepted the probe"
-                                 if audit else "control held and the exploit payload violated the invariant on the "
-                                               "vulnerable revision, both executing the target lines (no audit configured)",
+        verdict = Verdict(label=source.label, rule=source.rule, reason=source.reason,
                           fix=fix, fix_reason=fix_reason, submission_sha256=submission.sha256,
-                          environment_image=image, runs=tuple(runs), audit=audit)
-        return done(fix_gate or GateVerdict(passed=True, stage=Gate.VERIFIED, reason="differential probe verified"), verdict)
+                          environment_image=image, runs=tuple(runs), audit=audit, revisions=tuple(dispositions))
+        return done(fix_gate or GateVerdict(passed=True, stage=Gate.VERIFIED,
+                                           reason="audited probe disposition verified"), verdict)
 
-    def _verify_fix(self, submission: Submission, runs: list[ProbeRun]) -> tuple[Fix, str]:
+    def _run_revision(self, image: str, submission: Submission, revision: RevisionName,
+                      runs: list[ProbeRun]) -> tuple[ProbeRun, ProbeRun | None]:
+        control = self.run_probe(image, submission, revision, "control")
+        runs.append(control)
+        exploit = None
+        if control.result in (RoleResult.PASS, RoleResult.FAIL):
+            exploit = self.run_probe(image, submission, revision, "exploit")
+            runs.append(exploit)
+        return control, exploit
+
+    @staticmethod
+    def _evidence_gate(hypothesis: Hypothesis, control: ProbeRun, exploit: ProbeRun | None) -> GateVerdict | None:
+        for run, run_gate, coverage_gate in [(control, Gate.CONTROL_RUN, Gate.CONTROL_COVERAGE),
+                                             (exploit, Gate.EXPLOIT_RUN, Gate.EXPLOIT_COVERAGE)]:
+            if run is None:
+                continue
+            if run.result is RoleResult.INFRA:
+                return GateVerdict(passed=False, stage=Gate.INFRA, reason=f"{run.role} run: {run.message}")
+            if run.result not in (RoleResult.PASS, RoleResult.FAIL) or (
+                    run.role == "control" and run.result is RoleResult.FAIL):
+                return GateVerdict(passed=False, stage=run_gate,
+                                   reason=f"{run.role} run was {run.result}: {run.exception_type or ''} {run.message or ''}".strip(),
+                                   **Kernel._tails(run))
+            if run.covered_target is not True or not set(hypothesis.target_lines).issubset(run.covered_lines):
+                return GateVerdict(passed=False, stage=coverage_gate,
+                                   reason=f"{run.role} did not execute {hypothesis.target_file} "
+                                          f"lines {list(hypothesis.target_lines)}")
+        return None
+
+    @staticmethod
+    def _inconclusive(revision: RevisionName, code: str, reason: str) -> RevisionDisposition:
+        return RevisionDisposition(revision=revision, label=Label.INCONCLUSIVE, rule="K3",
+                                   reason_code=code, reason=reason[:2000])
+
+    @staticmethod
+    def _decide(revision: RevisionName, exploit: ProbeRun) -> RevisionDisposition:
+        """Called only after both clean runs, exact coverage and the blind audit have passed."""
+        positive = exploit.result is RoleResult.PASS
+        return RevisionDisposition(revision=revision,
+                                   label=Label.LIKELY_EXPLOITABLE if positive else Label.LIKELY_NOT_EXPLOITABLE,
+                                   rule="K1" if positive else "K4",
+                                   reason_code="INVARIANT_VIOLATED" if positive else "INVARIANT_HELD",
+                                   reason=f"control passed and exploit {'passed' if positive else 'failed'} on the "
+                                          f"{revision} revision, with clean invariant evidence, exact target coverage "
+                                          "and an accepted outcome-blind audit")
+
+    def _verify_fix(self, submission: Submission, runs: list[ProbeRun]) -> tuple[RevisionDisposition, Fix, str]:
         assert self.case.fixed_revision is not None
+        if _contained_file(self.case.fixed_revision.source, submission.hypothesis.target_file) is None:
+            reason = f"target {submission.hypothesis.target_file} was removed from the fixed revision"
+            return self._inconclusive("fixed", "TARGET_REMOVED", reason), Fix.NOT_VERIFIED, reason
         image, built = self.build(self.case.fixed_revision, "fixed", submission.build_script)
         if image is None:
-            return Fix.NOT_VERIFIED, f"fixed revision did not build: {built.reason}"
-        control = self.run_probe(image, submission, "fixed", "control")
-        exploit = self.run_probe(image, submission, "fixed", "exploit")
-        runs += [control, exploit]
-        if control.outcome is not Outcome.HOLDS:
-            return Fix.NOT_VERIFIED, f"control did not hold on the fixed revision ({control.outcome}: {control.message})"
-        if control.covered_target is not True:
-            return Fix.NOT_VERIFIED, "control held on the fixed revision but target execution was not demonstrated"
-        if exploit.outcome is Outcome.HOLDS:
-            if exploit.covered_target is not True:
-                return Fix.NOT_VERIFIED, "the invariant held on the fixed revision but target execution was not demonstrated"
-            return Fix.VERIFIED, "control held and the exploit payload no longer violates the invariant on the fixed revision"
-        if exploit.outcome is Outcome.VIOLATED:
-            return Fix.NOT_VERIFIED, "the exploit payload still violates the invariant on the fixed revision"
-        return Fix.NOT_VERIFIED, f"exploit run on the fixed revision was {exploit.outcome}: {exploit.message}"
+            reason = f"fixed revision did not build: {built.reason}"
+            return self._inconclusive("fixed", "BUILD_FAILED", reason), Fix.NOT_VERIFIED, reason
+        control, exploit = self._run_revision(image, submission, "fixed", runs)
+        failed = self._evidence_gate(submission.hypothesis, control, exploit)
+        if failed is not None:
+            return self._inconclusive("fixed", failed.stage.name, failed.reason), Fix.NOT_VERIFIED, failed.reason
+        assert exploit is not None
+        disposition = self._decide("fixed", exploit)
+        if disposition.label is Label.LIKELY_NOT_EXPLOITABLE:
+            return disposition, Fix.VERIFIED, "control held and the exploit payload no longer violates the invariant on the fixed revision"
+        return disposition, Fix.NOT_VERIFIED, "the exploit payload still violates the invariant on the fixed revision"
 
     @staticmethod
     def _tails(run: ProbeRun) -> dict[str, str]:

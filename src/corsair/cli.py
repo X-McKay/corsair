@@ -82,7 +82,7 @@ async def _verify(args: argparse.Namespace) -> int:
                             "runtime_image_id": kernel.runtime_image_id})
     _print(record)
     print(json.dumps(record["verdict"], indent=2))
-    return 0 if evaluation.verdict is not None else 1
+    return 0 if verdict.label in (Label.LIKELY_EXPLOITABLE, Label.LIKELY_NOT_EXPLOITABLE) else 1
 
 
 async def _investigate_one(case: Case, args: argparse.Namespace, models: dict) -> dict:
@@ -120,7 +120,7 @@ async def _investigate(args: argparse.Namespace) -> int:
     async with agent_models(config) as models:
         record = await _investigate_one(case, args, models)
     print(json.dumps(record["verdict"], indent=2))
-    return 0 if record["verdict"]["label"] == Label.LIKELY_EXPLOITABLE else 1
+    return 0 if record["verdict"]["label"] in (Label.LIKELY_EXPLOITABLE, Label.LIKELY_NOT_EXPLOITABLE) else 1
 
 
 async def _eval(args: argparse.Namespace) -> int:

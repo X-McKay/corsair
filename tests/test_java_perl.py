@@ -12,6 +12,7 @@ from corsair.frameworks.javac_java import _jacoco_coverage
 from corsair.kernel import Fix, Gate, Hypothesis, Kernel, Label, Outcome, Submission
 from corsair.sandbox import DockerSandboxes
 from corsair.sandbox.docker import docker, docker_available
+from tests.test_kernel import accept
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -74,10 +75,13 @@ async def test_java_kernel_rejects_coverage_merged_across_module_source_roots(tm
     backend = DockerSandboxes()
 
     result = await Kernel(backend, matrix.select(case), case,
-                          artifacts=ArtifactStore(tmp_path / "artifacts")).evaluate(submission)
+                          artifacts=ArtifactStore(tmp_path / "artifacts"), auditor=accept).evaluate(submission)
 
     assert result.gate.stage is Gate.CONTROL_COVERAGE, result
-    assert result.runs[0].covered_target is None and result.verdict is None
+    assert result.runs[0].covered_target is None
+    assert result.verdict.label is Label.INCONCLUSIVE and result.verdict.rule == "K3"
+    assert result.verdict.revisions[0].reason_code == "CONTROL_COVERAGE"
+    assert result.verdict.reason == "control did not execute safe/src/main/java/Documents.java lines [2]"
     assert backend.labelled() == []
 
 
@@ -108,7 +112,7 @@ async def test_reference_submission_is_verified_in_native_runtime(tmp_path, lang
     submission = Submission.model_validate_json((case_dir / "reference-submission.json").read_text())
     backend = DockerSandboxes()
     store = ArtifactStore(tmp_path / "artifacts")
-    result = await Kernel(backend, matrix.select(case), case, artifacts=store).evaluate(submission)
+    result = await Kernel(backend, matrix.select(case), case, artifacts=store, auditor=accept).evaluate(submission)
     assert result.gate.stage is Gate.VERIFIED, result
     assert result.verdict is not None
     assert result.verdict.label is Label.LIKELY_EXPLOITABLE and result.verdict.fix is Fix.VERIFIED
@@ -143,7 +147,7 @@ async def test_probe_or_application_assertions_are_errors_in_boolean_runtimes(tm
             "return $content ne 'outside';",
             "die \"application assertion\\n\" if $content eq 'outside';\n    return 1;")
     backend = DockerSandboxes()
-    result = await Kernel(backend, matrix.select(case), case, artifacts=ArtifactStore(tmp_path / "artifacts")).evaluate(
+    result = await Kernel(backend, matrix.select(case), case, artifacts=ArtifactStore(tmp_path / "artifacts"), auditor=accept).evaluate(
         submission.model_copy(update={"probe": probe}))
     assert result.gate.stage is Gate.EXPLOIT_RUN, result
     assert result.runs[-1].outcome is Outcome.ERRORED

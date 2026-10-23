@@ -18,7 +18,7 @@ from corsair.case import load_case
 from corsair.kernel import Gate, Kernel, Label, Submission
 from corsair.producer import SKILLS_DIR, investigate, render_case
 from tests.fakes import FakeSandboxes, Script
-from tests.test_kernel import CASE, HAPPY, REFERENCE
+from tests.test_kernel import CASE, HAPPY, REFERENCE, accept
 
 pytestmark = pytest.mark.anyio
 
@@ -38,7 +38,7 @@ def scripted(responses: list[list[tuple[str, dict] | str]]) -> FunctionModel:
 
 
 def make_kernel(fake: FakeSandboxes, tmp_path: Path) -> Kernel:
-    return Kernel(fake, ROW, load_case(CASE), artifacts=ArtifactStore(tmp_path / "artifacts"), run_id="prod1")
+    return Kernel(fake, ROW, load_case(CASE), artifacts=ArtifactStore(tmp_path / "artifacts"), auditor=accept, run_id="prod1")
 
 
 async def test_function_model_agent_run_completes():
@@ -72,7 +72,7 @@ async def test_producer_explores_submits_and_stops_when_verified(tmp_path):
 
 
 async def test_rejections_return_the_gate_and_the_budget_ends_the_run_inconclusive(tmp_path):
-    fake = FakeSandboxes({**HAPPY, ("vulnerable", "exploit"): Script("holds")})
+    fake = FakeSandboxes({**HAPPY, ("vulnerable", "exploit"): Script("errored", "ValueError", "bad payload")})
     seen_prompts: list[str] = []
 
     def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
@@ -91,7 +91,7 @@ async def test_rejections_return_the_gate_and_the_budget_ends_the_run_inconclusi
     assert "exploit_run" in run.verdict.reason
     assert run.error and run.error.startswith("BudgetExhausted")
     assert run.requests == 3  # two evaluated submissions, then the budget ends the third
-    assert len(seen_prompts) == 2 and "not demonstrated" in seen_prompts[0] and "Submissions left: 1" in seen_prompts[0]
+    assert len(seen_prompts) == 2 and "ValueError" in seen_prompts[0] and "Submissions left: 1" in seen_prompts[0]
 
 
 async def test_a_submission_rejected_by_the_guard_never_touches_a_sandbox(tmp_path):
@@ -226,3 +226,30 @@ async def test_parallel_submission_calls_cannot_exceed_the_operator_budget(tmp_p
     run = await investigate(load_case(CASE), ROW, model=scripted([[call, call], ["Verified."]]),
                             kernel=k, backend=fake, max_submissions=1)
     assert len(run.evaluations) == 1 and run.verdict.label is Label.LIKELY_EXPLOITABLE
+
+
+async def test_producer_accepts_a_clean_audited_negative_disposition(tmp_path):
+    fake = FakeSandboxes({**HAPPY, ("vulnerable", "exploit"): Script("holds")})
+    model = scripted([[("submit", {"submission": REFERENCE.model_dump(mode="json")})],
+                      ["The audited probe found the invariant held."]])
+    run = await investigate(load_case(CASE), ROW, model=model, kernel=make_kernel(fake, tmp_path), backend=fake)
+    assert run.verdict.label is Label.LIKELY_NOT_EXPLOITABLE and run.verdict.rule == "K4"
+    assert len(run.evaluations) == 1 and run.evaluations[0].gate.passed
+    assert run.error is None
+
+
+async def test_inconclusive_submission_is_reported_as_rejected_at_last_attempt(tmp_path):
+    fake = FakeSandboxes({**HAPPY, ("vulnerable", "exploit"): Script("errored", "ValueError", "bad payload")})
+    replies = []
+
+    def respond(messages, info):
+        if len(messages) == 1:
+            return ModelResponse(parts=[ToolCallPart(tool_name="submit", args={"submission": REFERENCE.model_dump(mode="json")})])
+        replies.extend(str(getattr(part, "content", "")) for part in messages[-1].parts)
+        return ModelResponse(parts=[TextPart("The probe raised an error.")])
+
+    run = await investigate(load_case(CASE), ROW, model=FunctionModel(respond), kernel=make_kernel(fake, tmp_path),
+                            backend=fake, max_submissions=1)
+    assert run.verdict.label is Label.INCONCLUSIVE
+    assert any("KERNEL REJECTED AT exploit_run" in reply for reply in replies)
+    assert not any("VERIFIED:" in reply for reply in replies)

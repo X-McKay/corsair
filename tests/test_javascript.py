@@ -10,6 +10,7 @@ from corsair.frameworks import framework
 from corsair.kernel import Fix, Gate, Kernel, Label, Outcome, Submission
 from corsair.sandbox import DockerSandboxes
 from corsair.sandbox.docker import docker, docker_available
+from tests.test_kernel import accept
 
 ROOT = Path(__file__).resolve().parents[1]
 CASE = ROOT / "cases/path-traversal-javascript"
@@ -36,7 +37,7 @@ needs_image = pytest.mark.skipif(not (docker_available() and docker("image", "in
 @pytest.mark.parametrize("mode,expected", [
     ("commonjs", Gate.VERIFIED), ("esm", Gate.VERIFIED), ("bracket-path", Gate.VERIFIED),
     ("driver-tampering", Gate.VERIFIED),
-    ("benign", Gate.EXPLOIT_RUN), ("import-error", Gate.CONTROL_RUN),
+    ("benign", Gate.VERIFIED), ("import-error", Gate.CONTROL_RUN),
     ("application-assertion", Gate.EXPLOIT_RUN), ("syntax-error", Gate.CONTROL_RUN),
     ("hidden-application-frame", Gate.EXPLOIT_RUN), ("missing-invariant", Gate.CONTROL_RUN),
 ])
@@ -90,12 +91,17 @@ async def test_native_node_outcomes(tmp_path, mode, expected):
     submission = submission.model_copy(update={"probe": probe})
     backend = DockerSandboxes()
     store = ArtifactStore(tmp_path / "artifacts")
-    kernel = Kernel(backend, matrix.select(case), case, artifacts=store)
+    kernel = Kernel(backend, matrix.select(case), case, artifacts=store, auditor=accept)
     result = await kernel.evaluate(submission)
     assert result.gate.stage is expected, result
     if expected is Gate.VERIFIED:
-        assert result.verdict.label is Label.LIKELY_EXPLOITABLE and result.verdict.fix is Fix.VERIFIED
-        assert [run.outcome for run in result.runs] == [Outcome.HOLDS, Outcome.VIOLATED, Outcome.HOLDS, Outcome.HOLDS]
+        assert result.verdict.fix is Fix.VERIFIED
+        if mode == "benign":
+            assert result.verdict.label is Label.LIKELY_NOT_EXPLOITABLE and result.verdict.rule == "K4"
+            assert [run.outcome for run in result.runs] == [Outcome.HOLDS] * 4
+        else:
+            assert result.verdict.label is Label.LIKELY_EXPLOITABLE and result.verdict.rule == "K1"
+            assert [run.outcome for run in result.runs] == [Outcome.HOLDS, Outcome.VIOLATED, Outcome.HOLDS, Outcome.HOLDS]
         for run in result.runs:
             assert run.junit_tests == 1 and run.coverage is not None and run.cleanup_confirmed
             assert f"test_probe[{run.role}]" in store.get(run.junit).decode()

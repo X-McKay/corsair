@@ -9,8 +9,9 @@ import pytest
 from corsair import matrix
 from corsair.artifacts import ArtifactStore
 from corsair.case import load_case
-from corsair.kernel import (AuditResult, Fix, Gate, Hypothesis, Kernel, Label, Outcome, Submission, ast_guard,
-                            environment_key, reported_target_present, target_binding, terminal_verdict)
+from corsair.kernel import (AuditResult, Fix, Gate, Hypothesis, Kernel, Label, Outcome, RevisionDisposition,
+                            RoleResult, Submission, ast_guard, environment_key, reported_target_present,
+                            role_result, target_binding, terminal_verdict)
 from tests.fakes import FakeSandboxes, Script
 
 pytestmark = pytest.mark.anyio
@@ -26,13 +27,13 @@ HAPPY = {("vulnerable", "control"): Script("holds"),
          ("fixed", "exploit"): Script("holds")}
 
 
-def kernel(fake: FakeSandboxes, tmp_path: Path, *, auditor=None, case_path: Path = CASE) -> Kernel:
-    case = load_case(case_path)
-    return Kernel(fake, ROW, case, artifacts=ArtifactStore(tmp_path / "artifacts"), auditor=auditor, run_id="run1")
-
-
 async def accept(submission: Submission) -> AuditResult:
     return AuditResult(valid=True, reason="fair differential test")
+
+
+def kernel(fake: FakeSandboxes, tmp_path: Path, *, auditor=accept, case_path: Path = CASE) -> Kernel:
+    case = load_case(case_path)
+    return Kernel(fake, ROW, case, artifacts=ArtifactStore(tmp_path / "artifacts"), auditor=auditor, run_id="run1")
 
 
 # --- gate 1 -------------------------------------------------------------------------------------------------------
@@ -145,11 +146,15 @@ async def test_control_that_never_reaches_the_target_lines_is_rejected(tmp_path)
     assert evaluation.gate.stage is Gate.CONTROL_COVERAGE and "lines [4]" in evaluation.gate.reason
 
 
-async def test_exploit_that_holds_is_not_a_demonstration(tmp_path):
+async def test_control_pass_exploit_fail_is_likely_not_exploitable(tmp_path):
     fake = FakeSandboxes({**HAPPY, ("vulnerable", "exploit"): Script("holds")})
     evaluation = await kernel(fake, tmp_path).evaluate(REFERENCE)
-    assert evaluation.gate.stage is Gate.EXPLOIT_RUN and "not demonstrated" in evaluation.gate.reason
-    assert evaluation.verdict is None
+    assert evaluation.gate.passed
+    assert evaluation.verdict.label is Label.LIKELY_NOT_EXPLOITABLE
+    assert evaluation.verdict.rule == "K4"
+    assert evaluation.verdict.revisions[0].label is Label.LIKELY_NOT_EXPLOITABLE
+    assert evaluation.runs[1].result is RoleResult.FAIL
+    assert evaluation.runs[1].invariant_held is True
 
 
 async def test_exploit_crash_or_application_assertion_is_errored_not_violated(tmp_path):
@@ -174,7 +179,8 @@ async def test_blind_audit_rejection_blocks_the_verdict_after_the_deterministic_
     fake = FakeSandboxes(dict(HAPPY))
     evaluation = await kernel(fake, tmp_path, auditor=reject).evaluate(REFERENCE)
     assert evaluation.gate.stage is Gate.BLIND_AUDIT and "branches" in evaluation.gate.reason
-    assert evaluation.verdict is None and len(evaluation.runs) == 2  # the fixed revision never ran
+    assert evaluation.verdict.label is Label.INCONCLUSIVE and evaluation.verdict.rule == "K3"
+    assert len(evaluation.runs) == 2  # the fixed revision never ran
 
 
 async def test_fix_not_verified_when_the_exploit_still_violates_on_the_fixed_revision(tmp_path):
@@ -274,3 +280,87 @@ async def test_symbol_and_lines_must_exist_in_the_target_file(tmp_path):
     evaluation = await k.evaluate(far)
     assert evaluation.gate.stage is Gate.TARGET_BINDING and "out of range" in evaluation.gate.reason
     assert fake.creates == []
+
+
+@pytest.mark.parametrize(("role", "outcome", "expected"), [
+    ("control", Outcome.HOLDS, "PASS"),
+    ("control", Outcome.VIOLATED, "FAIL"),
+    ("exploit", Outcome.VIOLATED, "PASS"),
+    ("exploit", Outcome.HOLDS, "FAIL"),
+    *[(role, outcome, expected) for role in ("control", "exploit") for outcome, expected in
+      [(Outcome.ERRORED, "ERROR"), (Outcome.NOT_RUN, "NOT_RUN"), (Outcome.INFRA, "INFRA")]],
+])
+def test_role_result_maps_invariant_observation_to_role_expectation(role, outcome, expected):
+    assert role_result(role, outcome).value == expected
+
+
+async def test_both_roles_pass_is_likely_exploitable(tmp_path):
+    result = await kernel(FakeSandboxes(dict(HAPPY)), tmp_path).evaluate(REFERENCE)
+    assert result.verdict.label is Label.LIKELY_EXPLOITABLE
+    assert result.verdict.rule == "K1"
+    assert isinstance(result.verdict.revisions[0], RevisionDisposition)
+    assert [run.result for run in result.runs[:2]] == [RoleResult.PASS, RoleResult.PASS]
+    assert [run.invariant_held for run in result.runs[:2]] == [True, False]
+
+
+async def test_control_false_is_inconclusive(tmp_path):
+    fake = FakeSandboxes({**HAPPY, ("vulnerable", "control"): Script("violated", "AssertionError", "control false")})
+    result = await kernel(fake, tmp_path).evaluate(REFERENCE)
+    assert result.verdict.label is Label.INCONCLUSIVE and result.verdict.rule == "K3"
+    assert [run.role for run in result.runs] == ["control", "exploit"]
+    assert result.runs[0].result is RoleResult.FAIL
+
+
+async def test_audit_rejection_blocks_negative_disposition(tmp_path):
+    async def reject(submission):
+        assert submission == REFERENCE  # no outcomes enter the blind auditor
+        return AuditResult(valid=False, reason="unfair invariant")
+
+    fake = FakeSandboxes({**HAPPY, ("vulnerable", "exploit"): Script("holds")})
+    result = await kernel(fake, tmp_path, auditor=reject).evaluate(REFERENCE)
+    assert result.gate.stage is Gate.BLIND_AUDIT
+    assert result.verdict.label is Label.INCONCLUSIVE and result.verdict.rule == "K3"
+    assert len(result.runs) == 2
+
+
+@pytest.mark.parametrize("exploit", [Script("errored", "ValueError", "bad"), Script("not_run"), Script("timeout")])
+async def test_exploit_error_never_becomes_negative(tmp_path, exploit):
+    result = await kernel(FakeSandboxes({**HAPPY, ("vulnerable", "exploit"): exploit}), tmp_path).evaluate(REFERENCE)
+    assert result.verdict.label is Label.INCONCLUSIVE and result.verdict.rule == "K3"
+    assert result.runs[-1].invariant_held is None
+
+
+@pytest.mark.parametrize("outcome", ["holds", "violated"])
+async def test_no_auditor_blocks_both_decisive_labels(tmp_path, outcome):
+    fake = FakeSandboxes({**HAPPY, ("vulnerable", "exploit"): Script(outcome, "AssertionError" if outcome == "violated" else None)})
+    result = await kernel(fake, tmp_path, auditor=None).evaluate(REFERENCE)
+    assert result.verdict.label is Label.INCONCLUSIVE and result.verdict.rule == "K3"
+    assert result.gate.stage is Gate.BLIND_AUDIT
+
+
+async def test_secure_fixed_revision_has_negative_disposition_and_verified_fix(tmp_path):
+    result = await kernel(FakeSandboxes(dict(HAPPY)), tmp_path).evaluate(REFERENCE)
+    vulnerable, fixed = result.verdict.revisions
+    assert vulnerable.revision == "vulnerable" and vulnerable.label is Label.LIKELY_EXPLOITABLE
+    assert fixed.revision == "fixed" and fixed.label is Label.LIKELY_NOT_EXPLOITABLE and fixed.rule == "K4"
+    assert result.verdict.label is vulnerable.label
+    assert result.verdict.fix is Fix.VERIFIED
+
+
+async def test_removed_fixed_target_is_accepted_but_not_verified(tmp_path):
+    from corsair.case import revision
+
+    fixed_tree = tmp_path / "removed-target"
+    fixed_tree.mkdir()
+    (fixed_tree / "README").write_text("target removed\n")
+    fake = FakeSandboxes(dict(HAPPY))
+    k = kernel(fake, tmp_path)
+    k.case = k.case.model_copy(update={"fixed_revision": revision(fixed_tree)})
+    result = await k.evaluate(REFERENCE)
+    assert result.gate.passed
+    assert result.verdict.label is Label.LIKELY_EXPLOITABLE
+    assert result.verdict.fix is Fix.NOT_VERIFIED
+    fixed = result.verdict.revisions[1]
+    assert fixed.label is Label.INCONCLUSIVE and fixed.rule == "K3"
+    assert fixed.reason_code == "TARGET_REMOVED"
+    assert len(fake.creates) == 1 and len(result.runs) == 2
