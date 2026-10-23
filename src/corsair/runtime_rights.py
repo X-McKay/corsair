@@ -112,8 +112,10 @@ _ARCHIVE_FILES = "LC_ALL=C sort -zu | " + _TAR_FILES
 
 
 def _license_command(*sources: str) -> str:
+    # Enumerate links themselves: following them here would silently omit
+    # dangling or nonregular targets before archive/fact validation can reject them.
     discovery = " && ".join((_COPYRIGHT_FILES,
-                              "find -L /usr/share/common-licenses -maxdepth 1 -type f -print0",
+                              r"find /usr/share/common-licenses -maxdepth 1 \( -type f -o -type l \) -print0",
                               *sources))
     # POSIX sh reports only the last pipeline stage. Keep the binary archive on
     # fd 3 and collect every stage's status on fd 4, without files or pipefail.

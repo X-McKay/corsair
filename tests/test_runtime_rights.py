@@ -721,7 +721,7 @@ def test_phase_a_node_path_program_counts_a_dangling_link_as_present(tmp_path):
     assert b'launcher:npm=absent\n' in result.stdout
 
 
-@pytest.mark.parametrize('failure', ['common-loop', 'extra-source'])
+@pytest.mark.parametrize('failure', ['common-loop', 'common-dangling', 'extra-source'])
 def test_phase_a_license_command_propagates_discovery_failure(tmp_path, failure):
     import subprocess
     docs = tmp_path / 'doc'
@@ -730,8 +730,8 @@ def test_phase_a_license_command_propagates_discovery_failure(tmp_path, failure)
     common.mkdir()
     (docs / 'base/copyright').write_bytes(b'base terms')
     (common / 'GPL').write_bytes(b'common terms')
-    if failure == 'common-loop':
-        (common / 'loop').symlink_to('loop')
+    if failure in ('common-loop', 'common-dangling'):
+        (common / 'loop').symlink_to('loop' if failure == 'common-loop' else 'missing')
         command = rights._license_command()
     else:
         # A later successful source must not erase the earlier failed source.
@@ -774,3 +774,22 @@ def test_phase_a_license_command_propagates_archive_stage_failure(tmp_path, stag
     # Shell functions fail a real pipeline stage without changing the generated command.
     result = subprocess.run(('/bin/sh', '-c', f'{stage}() {{ return 7; }}; ' + command), capture_output=True)
     assert result.returncode != 0, f'{stage} failure was masked'
+
+
+def test_phase_a_license_command_does_not_omit_symlinks_to_directories(tmp_path):
+    import subprocess
+    docs = tmp_path / 'doc'
+    common = tmp_path / 'common'
+    target = tmp_path / 'outside'
+    docs.mkdir()
+    common.mkdir()
+    target.mkdir()
+    (target / 'LICENSE').write_bytes(b'terms')
+    (common / 'directory-alias').symlink_to(target, target_is_directory=True)
+    command = rights._license_command().replace('/usr/share/doc', str(docs)).replace('/usr/share/common-licenses', str(common))
+    result = subprocess.run(('/bin/sh', '-c', command), capture_output=True)
+    # Discovery must retain the link so nonregular resolution is rejected, not
+    # silently produce a valid empty evidence archive.
+    if result.returncode == 0:
+        with pytest.raises(ValueError, match='nonregular'):
+            evidence_files_from_tar(result.stdout)
