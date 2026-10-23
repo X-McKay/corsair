@@ -4,12 +4,14 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+import subprocess
 from copy import deepcopy
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
+from corsair import corpus as corpus_module
 from corsair.auditor import render as render_auditor
 from corsair.case import Case, load_case, tree_sha256
 from corsair.corpus import (DatasetManifest, _cached_evidence, _patch_sha256, load_manifest,
@@ -253,7 +255,40 @@ def test_oracle_fields_never_cross_agent_boundary(tmp_path):
 def corpus_fixture(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
     shutil.copytree(VALID_CORPUS, root)
+    _test_git(root, "init", "-q", "-b", "main")
+    _test_git(root, "config", "user.name", "Corpus fixture")
+    _test_git(root, "config", "user.email", "corpus-fixture@example.invalid")
+    _test_git(root, "remote", "add", "origin", "https://fixture.invalid/owner/project.git/")
+    _test_git(root, "add", ".")
+    _test_git(root, "commit", "-q", "-m", "vulnerable source fixture")
+    vulnerable_commit = _test_git(root, "rev-parse", "HEAD")
+    (root / ".fixture-second-commit").write_text("fixed revision\n")
+    _test_git(root, "add", ".fixture-second-commit")
+    _test_git(root, "commit", "-q", "-m", "fixed source fixture")
+    fixed_commit = _test_git(root, "rev-parse", "HEAD")
+
+    request_path = root / "cases/cs-1001/input.json"
+    request = json.loads(request_path.read_text())
+    request.update(commit=vulnerable_commit, fixed_commit=fixed_commit)
+    request_path.write_text(json.dumps(request, indent=2) + "\n")
+
+    data = read_manifest(root)
+    case = data["cases"][0]
+    case["source_pair"]["vulnerable"]["commit"] = vulnerable_commit
+    case["source_pair"]["fixed"]["commit"] = fixed_commit
+    target_rights = [record for record in case["rights"] if record["layer"] == "target_source"]
+    for record, commit in zip(target_rights, (vulnerable_commit, fixed_commit), strict=True):
+        record["evidence_revision"] = commit
+        record["evidence_url"] = record["evidence_url"].replace(COMMIT_A, commit).replace(COMMIT_B, commit)
+    case["artifacts"]["input_sha256"] = hashlib.sha256(request_path.read_bytes()).hexdigest()
+    write_manifest(root, data)
     return root
+
+
+def _test_git(root: Path, *arguments: str) -> str:
+    result = subprocess.run(["git", "-C", str(root), *arguments], check=True,
+                            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return result.stdout.decode().strip()
 
 
 def fixture_evidence(root: Path):
@@ -273,6 +308,32 @@ def read_manifest(root: Path) -> dict:
 
 def write_manifest(root: Path, data: dict) -> None:
     (root / "benchmarks/dataset/manifest.json").write_text(json.dumps(data, indent=2) + "\n")
+
+
+def write_request(root: Path, request: dict) -> None:
+    path = root / "cases/cs-1001/input.json"
+    path.write_text(json.dumps(request, indent=2) + "\n")
+    data = read_manifest(root)
+    data["cases"][0]["artifacts"]["input_sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+    write_manifest(root, data)
+
+
+def set_local_revision_commit(root: Path, revision: str, commit: str) -> None:
+    request_path = root / "cases/cs-1001/input.json"
+    request = json.loads(request_path.read_text())
+    request_field = "commit" if revision == "vulnerable" else "fixed_commit"
+    request[request_field] = commit
+    request_path.write_text(json.dumps(request, indent=2) + "\n")
+    data = read_manifest(root)
+    declared = data["cases"][0]["source_pair"][revision]
+    old_commit = declared["commit"]
+    declared["commit"] = commit
+    for record in data["cases"][0]["rights"]:
+        if record["layer"] == "target_source" and record["evidence_revision"] == old_commit:
+            record["evidence_revision"] = commit
+            record["evidence_url"] = record["evidence_url"].replace(old_commit, commit)
+    data["cases"][0]["artifacts"]["input_sha256"] = hashlib.sha256(request_path.read_bytes()).hexdigest()
+    write_manifest(root, data)
 
 
 def issue_codes(report) -> set[str]:
@@ -302,8 +363,10 @@ def test_rights_require_revision_and_evidence_hash(tmp_path):
 
     root = corpus_fixture(tmp_path / "single-source")
     data = read_manifest(root)
+    fixed_commit = data["cases"][0]["source_pair"]["fixed"]["commit"]
     data["cases"][0]["rights"] = [r for r in data["cases"][0]["rights"]
-                                      if not (r["layer"] == "target_source" and r["evidence_revision"] == COMMIT_B)]
+                                      if not (r["layer"] == "target_source"
+                                              and r["evidence_revision"] == fixed_commit)]
     write_manifest(root, data)
     assert "RIGHTS_SOURCE_REVISION_MISSING" in issue_codes(checked(root))
 
@@ -433,6 +496,97 @@ def test_local_sources_require_both_declared_commits(tmp_path, commit_field, val
     assert "SOURCE_IDENTITY_MISMATCH" in issue_codes(checked(root))
 
 
+def test_local_source_bytes_must_match_the_declared_git_commit(tmp_path):
+    root = corpus_fixture(tmp_path)
+    vulnerable = root / "cases/cs-1001/vulnerable"
+    (vulnerable / "fabricated.py").write_text("FABRICATED = True\n")
+    data = read_manifest(root)
+    data["cases"][0]["source_pair"]["vulnerable"]["tree_sha256"] = tree_sha256(vulnerable)
+    data["cases"][0]["source_pair"]["patch_sha256"] = _patch_sha256(
+        vulnerable, root / "cases/cs-1001/fixed")
+    write_manifest(root, data)
+
+    assert "LOCAL_SOURCE_COMMIT_MISMATCH" in issue_codes(checked(root))
+
+
+def test_local_source_requires_the_declared_path_at_the_commit(tmp_path):
+    root = corpus_fixture(tmp_path)
+    current_only = root / "cases/cs-1001/current-only"
+    shutil.copytree(root / "cases/cs-1001/vulnerable", current_only)
+    request = json.loads((root / "cases/cs-1001/input.json").read_text())
+    request["source"] = "current-only"
+    write_request(root, request)
+
+    assert "LOCAL_SOURCE_COMMIT_PATH_MISSING" in issue_codes(checked(root))
+
+
+def test_local_source_rejects_a_symlink_alias(tmp_path):
+    root = corpus_fixture(tmp_path)
+    (root / "cases/cs-1001/alias").symlink_to("vulnerable", target_is_directory=True)
+    request = json.loads((root / "cases/cs-1001/input.json").read_text())
+    request["source"] = "alias"
+    write_request(root, request)
+
+    assert "PATH_ESCAPE" in issue_codes(checked(root))
+
+
+@pytest.mark.parametrize("alias", ["./vulnerable", "vulnerable/", "vulnerable//", "vulnerable/."])
+def test_local_source_rejects_noncanonical_lexical_aliases(tmp_path, alias):
+    root = corpus_fixture(tmp_path)
+    request = json.loads((root / "cases/cs-1001/input.json").read_text())
+    request["source"] = alias
+    write_request(root, request)
+
+    assert "PATH_ESCAPE" in issue_codes(checked(root))
+
+
+def test_local_source_requires_a_real_containing_git_worktree(tmp_path):
+    root = corpus_fixture(tmp_path)
+    shutil.rmtree(root / ".git")
+
+    assert "LOCAL_SOURCE_GIT_UNAVAILABLE" in issue_codes(checked(root))
+
+
+def test_local_source_requires_a_matching_normalized_origin(tmp_path):
+    root = corpus_fixture(tmp_path)
+    assert checked(root).ok  # ``.git/`` and slash variants normalize to the declared identity.
+    _test_git(root, "remote", "set-url", "origin", "https://fixture.invalid/unrelated/project.git")
+
+    assert "LOCAL_SOURCE_REPOSITORY_MISMATCH" in issue_codes(checked(root))
+
+
+def test_local_source_requires_the_declared_commit_object_offline(tmp_path):
+    root = corpus_fixture(tmp_path)
+    set_local_revision_commit(root, "vulnerable", "3" * 40)
+
+    assert "LOCAL_SOURCE_COMMIT_UNAVAILABLE" in issue_codes(checked(root))
+
+
+def test_local_source_rejects_a_submodule_in_the_declared_tree(tmp_path):
+    root = corpus_fixture(tmp_path)
+    head = _test_git(root, "rev-parse", "HEAD")
+    _test_git(root, "update-index", "--add", "--cacheinfo", "160000", head,
+              "cases/cs-1001/vulnerable/vendor")
+    _test_git(root, "commit", "-q", "-m", "add unsupported gitlink")
+    set_local_revision_commit(root, "vulnerable", _test_git(root, "rev-parse", "HEAD"))
+
+    assert "LOCAL_SOURCE_TREE_UNSUPPORTED" in issue_codes(checked(root))
+
+
+def test_local_source_rejects_a_non_tree_at_the_declared_path(tmp_path):
+    root = corpus_fixture(tmp_path)
+    source_path = "cases/cs-1001/vulnerable"
+    _test_git(root, "rm", "-q", "--cached", "-r", "--", source_path)
+    replacement = root / "replacement-source"
+    replacement.write_text("a source directory cannot be replaced by a blob\n")
+    blob = _test_git(root, "hash-object", "-w", str(replacement))
+    _test_git(root, "update-index", "--add", "--cacheinfo", "100644", blob, source_path)
+    _test_git(root, "commit", "-q", "-m", "replace source tree with blob")
+    set_local_revision_commit(root, "vulnerable", _test_git(root, "rev-parse", "HEAD"))
+
+    assert "LOCAL_SOURCE_TREE_UNSUPPORTED" in issue_codes(checked(root))
+
+
 def test_local_snapshots_require_vendored_revision_rights(tmp_path):
     root = corpus_fixture(tmp_path)
     data = read_manifest(root)
@@ -446,10 +600,11 @@ def test_local_snapshots_require_vendored_revision_rights(tmp_path):
 def test_local_source_rights_cannot_be_substituted_from_an_unrelated_repository(tmp_path):
     root = corpus_fixture(tmp_path)
     data = read_manifest(root)
+    vulnerable_commit = data["cases"][0]["source_pair"]["vulnerable"]["commit"]
     acquisition_only = deepcopy(data["cases"][0]["rights"][0])
     acquisition_only["redistribution_mode"] = "acquisition_recipe"
     data["cases"][0]["rights"][0]["evidence_url"] = \
-        f"https://fixture.invalid/unrelated/project/blob/{COMMIT_A}/source-v-LICENSE"
+        f"https://fixture.invalid/unrelated/project/blob/{vulnerable_commit}/source-v-LICENSE"
     data["cases"][0]["rights"].append(acquisition_only)
     write_manifest(root, data)
     assert "RIGHTS_SOURCE_REPOSITORY_MISMATCH" in issue_codes(checked(root))
@@ -661,7 +816,8 @@ def test_declared_harness_is_case_relative_nonaliasing_and_hash_verified(tmp_pat
     assert "HARNESS_ALIAS" in issue_codes(checked(root))
 
 
-@pytest.mark.parametrize("content", [b"\xff\xfe\xfd", b"x" * (256 * 1024 + 1)])
+@pytest.mark.parametrize("content", [b"\xff\xfe\xfd", b"x" * (256 * 1024 + 1)],
+                         ids=["invalid-utf8", "oversized"])
 def test_similarity_input_is_bounded_and_decode_failures_become_deterministic_issues(tmp_path, content):
     root = corpus_fixture(tmp_path)
     (root / "cases/cs-1001/vulnerable/target.py").write_bytes(content)
@@ -695,6 +851,54 @@ def test_rights_evidence_resolution_is_offline(tmp_path, monkeypatch):
         __import__("hashlib").sha256(request_path.read_bytes()).hexdigest()
     write_manifest(root, data)
     assert "SOURCE_NOT_ACQUIRED" in issue_codes(checked(root)) and calls == []
+
+
+def test_validation_git_commands_disable_lazy_fetch_and_prompts(tmp_path, monkeypatch):
+    captured = {}
+
+    def run(command, **options):
+        captured.update(command=command, options=options)
+        return subprocess.CompletedProcess(command, 1, b"", b"missing")
+
+    monkeypatch.setattr(subprocess, "run", run)
+    corpus_module._run_git(tmp_path, "cat-file", "-e", "1" * 40)
+
+    environment = captured["options"]["env"]
+    assert environment["GIT_NO_LAZY_FETCH"] == "1"
+    assert environment["GIT_TERMINAL_PROMPT"] == "0"
+    assert environment["GCM_INTERACTIVE"] == "never"
+    assert environment["GIT_ASKPASS"] == "/bin/false"
+    assert environment["SSH_ASKPASS"] == "/bin/false"
+    assert captured["options"]["stdin"] is subprocess.DEVNULL
+
+
+def test_promisor_checkout_with_a_missing_blob_fails_without_fetching(tmp_path, monkeypatch):
+    upstream = tmp_path / "upstream"
+    upstream.mkdir()
+    _test_git(upstream, "init", "-q", "-b", "main")
+    _test_git(upstream, "config", "user.name", "Promisor fixture")
+    _test_git(upstream, "config", "user.email", "promisor@example.invalid")
+    (upstream / "payload.txt").write_text("blob omitted from the partial clone\n")
+    _test_git(upstream, "add", "payload.txt")
+    _test_git(upstream, "commit", "-q", "-m", "payload")
+    _test_git(upstream, "config", "uploadpack.allowFilter", "true")
+    commit = _test_git(upstream, "rev-parse", "HEAD")
+
+    checkout = tmp_path / "partial"
+    subprocess.run(["git", "clone", "-q", "--filter=blob:none", "--no-checkout",
+                    upstream.as_uri(), str(checkout)], check=True, stdin=subprocess.DEVNULL,
+                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    assert _test_git(checkout, "config", "--get", "remote.origin.promisor") == "true"
+    upstream.rename(tmp_path / "unavailable-upstream")
+    trace = tmp_path / "git-trace.json"
+    monkeypatch.setenv("GIT_TRACE2_EVENT", str(trace))
+
+    result = corpus_module._run_git(checkout, "show", f"{commit}:payload.txt")
+
+    assert result.returncode != 0
+    trace_text = trace.read_text()
+    assert '"fetch"' not in trace_text
+    assert "git-upload-pack" not in trace_text
 
 
 @pytest.mark.parametrize("repository", [

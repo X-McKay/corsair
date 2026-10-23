@@ -17,7 +17,7 @@ import sys
 from collections import Counter, defaultdict
 from collections.abc import Callable
 from datetime import date
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Literal
 from urllib.parse import urlsplit, urlunsplit
 
@@ -338,6 +338,113 @@ def _normal_repository(value: str) -> str:
     return urlunsplit((parsed.scheme.lower(), parsed.netloc.lower(), path, "", ""))
 
 
+def _run_git(root: Path, *arguments: str) -> subprocess.CompletedProcess[bytes]:
+    """Run a read-only Git command without lazy object acquisition or an interactive prompt."""
+    environment = os.environ.copy()
+    for name in ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
+                 "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CEILING_DIRECTORIES"):
+        environment.pop(name, None)
+    environment.update({
+        "GIT_NO_LAZY_FETCH": "1",
+        "GIT_TERMINAL_PROMPT": "0",
+        "GCM_INTERACTIVE": "never",
+        "GIT_ASKPASS": "/bin/false",
+        "SSH_ASKPASS": "/bin/false",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_NO_REPLACE_OBJECTS": "1",
+        "GIT_OPTIONAL_LOCKS": "0",
+    })
+    return subprocess.run(["git", "-C", str(root), *arguments], env=environment, stdin=subprocess.DEVNULL,
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+
+
+class _GitTreeError(ValueError):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
+def _git_tree_sha256(source_root: Path, declared: SourceRevision) -> str:
+    """Hash the declared source subtree directly from locally available Git objects."""
+    top_level_result = _run_git(source_root, "rev-parse", "--show-toplevel")
+    inside_result = _run_git(source_root, "rev-parse", "--is-inside-work-tree")
+    if (top_level_result.returncode != 0 or inside_result.returncode != 0
+            or inside_result.stdout.strip() != b"true"):
+        raise _GitTreeError("LOCAL_SOURCE_GIT_UNAVAILABLE",
+                            "local source is not inside a readable Git worktree")
+    try:
+        top_level = Path(top_level_result.stdout.decode("utf-8").strip()).resolve(strict=True)
+        relative_source = source_root.relative_to(top_level).as_posix()
+    except (OSError, RuntimeError, UnicodeDecodeError, ValueError) as error:
+        raise _GitTreeError("LOCAL_SOURCE_GIT_UNAVAILABLE",
+                            "local source cannot be tied to its containing Git worktree") from error
+    if not relative_source or relative_source == ".":
+        raise _GitTreeError("LOCAL_SOURCE_TREE_UNSUPPORTED",
+                            "the repository root cannot be used as a local source snapshot")
+
+    origin_result = _run_git(top_level, "config", "--get-all", "remote.origin.url")
+    try:
+        origins = [line for line in origin_result.stdout.decode("utf-8").splitlines() if line]
+    except UnicodeDecodeError as error:
+        raise _GitTreeError("LOCAL_SOURCE_REPOSITORY_MISMATCH",
+                            "the Git origin is not a valid repository identity") from error
+    if (origin_result.returncode != 0 or not origins
+            or any(_normal_repository(origin) != _normal_repository(declared.repository) for origin in origins)):
+        raise _GitTreeError("LOCAL_SOURCE_REPOSITORY_MISMATCH",
+                            "the containing Git worktree origin differs from the declared repository")
+
+    commit_result = _run_git(top_level, "cat-file", "-e", f"{declared.commit}^{{commit}}")
+    if commit_result.returncode != 0:
+        raise _GitTreeError("LOCAL_SOURCE_COMMIT_UNAVAILABLE",
+                            "the declared commit object is unavailable offline")
+
+    treeish = f"{declared.commit}:{relative_source}"
+    type_result = _run_git(top_level, "cat-file", "-t", treeish)
+    if type_result.returncode != 0:
+        raise _GitTreeError("LOCAL_SOURCE_COMMIT_PATH_MISSING",
+                            "the local source path is absent from the declared commit")
+    if type_result.stdout.strip() != b"tree":
+        raise _GitTreeError("LOCAL_SOURCE_TREE_UNSUPPORTED",
+                            "the local source path is not a tree at the declared commit")
+
+    listing = _run_git(top_level, "ls-tree", "-r", "-z", treeish)
+    if listing.returncode != 0:
+        raise _GitTreeError("LOCAL_SOURCE_COMMIT_PATH_MISSING",
+                            "the declared source tree cannot be read offline")
+    entries: list[tuple[str, str, str]] = []
+    seen: set[str] = set()
+    for raw_entry in listing.stdout.split(b"\0"):
+        if not raw_entry:
+            continue
+        try:
+            header, raw_path = raw_entry.split(b"\t", 1)
+            mode_bytes, kind, object_id = header.split(b" ", 2)
+            mode = mode_bytes.decode("ascii")
+            relative = raw_path.decode("utf-8")
+            oid = object_id.decode("ascii")
+        except (UnicodeDecodeError, ValueError) as error:
+            raise _GitTreeError("LOCAL_SOURCE_TREE_UNSUPPORTED",
+                                "the declared source tree has an invalid entry") from error
+        path = PurePosixPath(relative)
+        if (kind != b"blob" or mode not in {"100644", "100755", "120000"}
+                or path.is_absolute() or not path.parts or any(part in {"", ".", ".."} for part in path.parts)
+                or relative in seen):
+            raise _GitTreeError("LOCAL_SOURCE_TREE_UNSUPPORTED",
+                                "the declared source tree contains a non-blob, unsupported mode or unsafe path")
+        seen.add(relative)
+        blob = _run_git(top_level, "cat-file", "blob", oid)
+        if blob.returncode != 0:
+            raise _GitTreeError("LOCAL_SOURCE_COMMIT_UNAVAILABLE",
+                                "a declared source blob is unavailable offline")
+        entries.append((relative, mode, hashlib.sha256(blob.stdout).hexdigest()))
+
+    digest = hashlib.sha256()
+    for relative, mode, content in sorted(entries):
+        digest.update(f"{relative}\0{mode}\0{content}\n".encode())
+    return digest.hexdigest()
+
+
 def _inside(path: Path, root: Path) -> bool:
     return path == root or path.is_relative_to(root)
 
@@ -403,7 +510,10 @@ def _offline_git_source(root: Path, source: GitSource) -> Path | None:
 
 def _local_source(root: Path, case_dir: Path, value: str) -> Path | None:
     relative = Path(value)
-    if not value or relative.is_absolute() or "\0" in value:
+    if (not value or relative.is_absolute() or "\0" in value or relative.as_posix() != value
+            or ".." in relative.parts
+            or any((case_dir.joinpath(*relative.parts[:index])).is_symlink()
+                   for index in range(1, len(relative.parts) + 1))):
         return None
     try:
         candidate = (case_dir / relative).resolve(strict=True)
@@ -480,8 +590,7 @@ def _cached_evidence(root: Path, url: str, revision: str) -> bytes | None:
     repository_url, evidence_path = location
     corsair = _normal_repository("https://github.com/X-McKay/corsair")
     if _normal_repository(repository_url) == corsair:
-        result = subprocess.run(["git", "-C", str(root), "show", f"{raw_revision}:{evidence_path}"],
-                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False)
+        result = _run_git(root, "show", f"{raw_revision}:{evidence_path}")
         return result.stdout if result.returncode == 0 else None
     source = GitSource(url=repository_url, commit=raw_revision)
     checkout = _offline_git_source(root, source)
@@ -716,9 +825,22 @@ def validate_corpus(root: Path, *, _evidence_resolver: EvidenceResolver | None =
                 except (OSError, RuntimeError):
                     add("HARNESS_ALIAS", "harness/source nonaliasing could not be verified", path=harness_path,
                         case_ids=(case.case_id,))
-            for revision_name, source_root, declared in (("vulnerable", vulnerable, case.source_pair.vulnerable),
-                                                          ("fixed", fixed, case.source_pair.fixed)):
-                if tree_sha256(source_root) != declared.tree_sha256:
+            for index, (revision_name, source_root, declared) in enumerate((
+                    ("vulnerable", vulnerable, case.source_pair.vulnerable),
+                    ("fixed", fixed, case.source_pair.fixed))):
+                actual_tree_sha256 = tree_sha256(source_root)
+                if local_revisions[index]:
+                    try:
+                        committed_tree_sha256 = _git_tree_sha256(source_root, declared)
+                    except _GitTreeError as error:
+                        add(error.code, str(error), path=source_root, case_ids=(case.case_id,))
+                    else:
+                        if (committed_tree_sha256 != actual_tree_sha256
+                                or committed_tree_sha256 != declared.tree_sha256):
+                            add("LOCAL_SOURCE_COMMIT_MISMATCH",
+                                f"{revision_name} local bytes do not match the declared commit tree",
+                                path=source_root, case_ids=(case.case_id,))
+                if actual_tree_sha256 != declared.tree_sha256:
                     add("SOURCE_TREE_HASH_MISMATCH", f"{revision_name} tree hash differs", path=source_root,
                         case_ids=(case.case_id,))
                 target = source_root / case.target.file

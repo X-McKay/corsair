@@ -252,19 +252,14 @@ cases/<opaque-case-id>/
   input.json
   oracle.json
   reference-submission.json
+  vulnerable/             # only for a permitted commit-bound local snapshot
+  fixed/                  # only for a permitted commit-bound local snapshot
 ```
 
 Pinned HTTPS Git commits are the default acquisition method. When a minimal source snapshot is required and
-redistribution is permitted, it uses:
-
-```text
-benchmarks/corpus/upstream/<language>/<family>/
-  vulnerable/
-  fixed/
-  provenance.json
-  LICENSE
-  NOTICE              # when required
-```
+redistribution is permitted, each snapshot is a strict non-symlink descendant of its case directory. Its provenance,
+license and notice evidence remains evaluator-owned manifest data and immutable evidence rather than agent-visible
+case input.
 
 Upstream files remain byte-for-byte intact wherever possible. Reductions or compatibility changes must be separated
 from upstream code, record before/after hashes and preserve a reviewable transformation. Generated adapters and
@@ -272,9 +267,18 @@ Corsair-authored scaffolding are identified as such.
 
 Every request declares both source commit fields and they must equal the manifest revisions. A local snapshot also
 requires `vendored` target-source rights evidence for each revision, tied to the declared repository, plus exact
-tree, target-file, target-region and patch hashes. This binds reduced snapshots to their asserted origin without
-requiring a copied Git object database. An optional harness is one regular case-relative file declared by a paired
-path and SHA-256; it may not alias a core artifact or source snapshot.
+tree, target-file, target-region and patch hashes. Local snapshots cross a commit barrier before qualification: each
+snapshot must be inside a real Git worktree whose normalized `origin` matches the declared repository, the declared
+commit object must be available locally, and the snapshot path must be a tree at that commit. The validator hashes the
+committed blobs, executable modes and symlink targets at `<commit>:<source-path>` and requires that digest to
+match both the working snapshot and the manifest tree hash. Missing objects, paths, non-blob entries, gitlinks,
+symlink aliases and uncommitted or fabricated substitutions fail closed. All object inspection disables Git lazy
+fetch and interactive credential prompts; validation never repairs missing evidence by fetching it.
+
+Real upstream cases use pinned `GitSource` acquisition recipes by default. A local snapshot can qualify only when
+its exact bytes are already committed in the declared repository and the corresponding objects are present for
+offline validation. An optional harness is one regular case-relative file declared by a paired path and SHA-256; it
+may not alias a core artifact or source snapshot.
 
 ### Rights model
 
@@ -367,8 +371,10 @@ make eval EVAL_SET=conformance|development|regression|release ATTEMPTS=<n> PROVI
 make compare-evals BASELINE_RUN=<run-id> CANDIDATE_RUN=<run-id>
 ```
 
-`corpus-check` is deterministic and validates schemas, identifiers, source references, hashes, rights evidence,
-expectations, split isolation, framework/language coverage, evaluator-only boundaries and review receipts.
+`corpus-check` is deterministic and validates schemas, identifiers, source references, commit-bound local trees,
+hashes, rights evidence, expectations, split isolation, framework/language coverage, evaluator-only boundaries and
+review receipts. Git object reads are offline-only: an incomplete partial clone is a validation failure, never a
+reason to contact its promisor remote.
 
 `benchmark-verify` executes trusted reference submissions. Admission requires three clean replays. Normal pull
 requests can run one conformance replay; corpus, kernel, adapter, image or sandbox changes run the complete affected
