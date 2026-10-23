@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 from collections.abc import Mapping
 from pathlib import Path
 
-from .base import PROBE_DIR, RESULT_DIR, ProbeResult
+from .base import PROBE_DIR, RESULT_DIR, PostCommand, ProbeResult
 from .reports import read_probe
 
 DRIVER = r'''import java.nio.charset.StandardCharsets;
@@ -92,22 +92,36 @@ public final class CorsairDriver {
 '''
 
 RUNNER = r'''#!/bin/sh
-set -u
+set -eu
 classes=/work/.corsair-java/classes
 classpath="/work/.corsair:${classes}:/work/.corsair-java/lib/*"
 if [ ! -d "$classes" ]; then
   echo "build_script must compile target classes into $classes" >&2
   exit 2
 fi
-rm -f /tmp/corsair/jacoco.exec /tmp/corsair/jacoco.xml
-javac -cp "$classpath" -d /work/.corsair /work/.corsair/CorsairProbe.java /work/.corsair/CorsairDriver.java || exit $?
-java -javaagent:/opt/corsair/jacoco-agent.jar=destfile=/tmp/corsair/jacoco.exec -cp "$classpath" CorsairDriver
-status=$?
-if [ -f /tmp/corsair/jacoco.exec ]; then
-  java -jar /opt/corsair/jacoco-cli.jar report /tmp/corsair/jacoco.exec \
-    --classfiles "$classes" --sourcefiles /work --xml /tmp/corsair/jacoco.xml >&2 || exit 2
+raw=/tmp/corsair/jacoco.exec
+if [ -L /tmp/corsair ] || [ -L "$raw" ] || { [ -e "$raw" ] && { [ ! -f "$raw" ] || [ ! -w "$raw" ]; }; }; then
+  echo "unsafe or unwritable JaCoCo raw destination" >&2
+  exit 2
 fi
-exit "$status"
+# A sealed build can contain genuine old data. Reset before javac's JVM starts, without unlinking siblings.
+if ! : > "$raw"; then
+  echo "cannot reset JaCoCo raw destination" >&2
+  exit 2
+fi
+javac -cp "$classpath" -d /work/.corsair /work/.corsair/CorsairProbe.java /work/.corsair/CorsairDriver.java || exit $?
+exec java -cp "$classpath" CorsairDriver
+'''
+
+RENDERER = r'''#!/bin/sh
+set -eu
+raw=/tmp/corsair/jacoco.exec
+if [ -L /tmp/corsair ] || [ -L "$raw" ] || [ ! -f "$raw" ] || [ ! -r "$raw" ] || [ ! -w "$raw" ]; then
+  echo "missing or unsafe JaCoCo raw input" >&2
+  exit 2
+fi
+exec java -jar /opt/corsair/jacoco-cli.jar report "$raw" \
+  --classfiles /work/.corsair-java/classes --sourcefiles /work --xml /tmp/corsair/jacoco.xml
 '''
 
 
@@ -281,17 +295,23 @@ class JavacJava:
         return GateVerdict(passed=not missing and banned is None, stage=Gate.AST_GUARD, reason=reason)
 
     def driver_files(self) -> dict[str, bytes]:
-        return {"CorsairDriver.java": DRIVER.encode(), "run-java.sh": RUNNER.encode()}
+        return {"CorsairDriver.java": DRIVER.encode(), "run-java.sh": RUNNER.encode(),
+                "render-java.sh": RENDERER.encode()}
 
     def command(self, role: str, target_file: str) -> list[str]:
         return ["sh", f"{PROBE_DIR}/run-java.sh"]
 
-    def post_command(self, role: str, target_file: str) -> None:
-        return None
+    def post_command(self, role: str, target_file: str) -> PostCommand:
+        environment = dict(self.environment(role))
+        environment.pop("JAVA_TOOL_OPTIONS")
+        # Omission from docker exec's environment does not clear an image-level setting.
+        return PostCommand(("env", "-u", "JAVA_TOOL_OPTIONS", "sh", f"{PROBE_DIR}/render-java.sh"), environment)
 
     def environment(self, role: str) -> Mapping[str, str]:
         return {"CORSAIR_ROLE": role, "CORSAIR_RESULT": f"{RESULT_DIR}/result.json",
-                "CORSAIR_JUNIT": f"{RESULT_DIR}/junit.xml", "HOME": "/tmp"}
+                "CORSAIR_JUNIT": f"{RESULT_DIR}/junit.xml", "HOME": "/tmp",
+                "JAVA_TOOL_OPTIONS": "-javaagent:/opt/corsair/jacoco-agent.jar="
+                                     f"destfile={RESULT_DIR}/jacoco.exec,append=true,dumponexit=true"}
 
     def result_paths(self) -> list[str]:
         return [f"{RESULT_DIR}/result.json", f"{RESULT_DIR}/junit.xml", f"{RESULT_DIR}/jacoco.xml"]

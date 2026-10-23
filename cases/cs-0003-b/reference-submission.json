@@ -1,0 +1,15 @@
+{
+  "contract_version": "corsair-lite/differential-probe/2",
+  "hypothesis": {
+    "target_file": "src/ScriptTarget.java",
+    "target_symbol": "fixture.ScriptTarget.main",
+    "target_lines": [
+      8,
+      9
+    ],
+    "root_cause": "The main entry point resolves an untrusted document path without confining it to the allowed directory.",
+    "expected_violation": "The content of a file outside the allowed directory is returned."
+  },
+  "build_script": "mkdir -p /work/.corsair-java/classes\njavac -g -d /work/.corsair-java/classes /work/src/ScriptTarget.java",
+  "probe": "// SPDX-License-Identifier: Apache-2.0\nimport java.nio.charset.StandardCharsets;\nimport java.nio.file.Files;\nimport java.nio.file.Path;\nimport java.util.Comparator;\nimport java.util.concurrent.TimeUnit;\n\npublic final class CorsairProbe {\n    public static final String CONTROL_PAYLOAD = \"document.txt\";\n    public static final String EXPLOIT_PAYLOAD = \"../outside.txt\";\n    public static boolean runTarget(String payload) throws Exception {\n        Path base = Files.createTempDirectory(\"corsair-java-main-\");\n        try {\n            Files.createDirectory(base.resolve(\"allowed\"));\n            Files.writeString(base.resolve(\"allowed/document.txt\"), \"benign-document\");\n            Files.writeString(base.resolve(\"outside.txt\"), \"OUTSIDE-SENTINEL\");\n            ProcessBuilder child = new ProcessBuilder(\"java\", \"-cp\", \"/work/.corsair-java/classes\",\n                \"fixture.ScriptTarget\", payload).directory(base.toFile());\n            child.redirectError(ProcessBuilder.Redirect.INHERIT);\n            Process process = child.start();\n            if (!process.waitFor(5, TimeUnit.SECONDS)) {\n                process.destroyForcibly().waitFor();\n                throw new IllegalStateException(\"child timed out\");\n            }\n            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);\n            if (process.exitValue() != 0) throw new IllegalStateException(\"child failed\");\n            if (!output.equals(\"benign-document\") && !output.equals(\"OUTSIDE-SENTINEL\") && !output.equals(\"REFUSED\")) {\n                throw new IllegalStateException(\"invalid child output\");\n            }\n            return !output.equals(\"OUTSIDE-SENTINEL\");\n        } finally {\n            try (var paths = Files.walk(base)) {\n                for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) Files.delete(path);\n            }\n        }\n    }\n}\n"
+}

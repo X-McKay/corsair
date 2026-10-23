@@ -1,0 +1,13 @@
+{
+  "case_id": "cs-0003-b",
+  "finding": {
+    "title": "Path traversal in a Java main entry point",
+    "description": "The main entry point reads a caller-selected document without confining its path to the allowed directory.",
+    "file_path": "src/ScriptTarget.java",
+    "start_line": 8,
+    "symbol": "fixture.ScriptTarget.main",
+    "cwe": "CWE-22"
+  },
+  "source": "vulnerable",
+  "fixed_source": "fixed"
+}
