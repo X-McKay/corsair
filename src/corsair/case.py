@@ -115,10 +115,31 @@ class _Request(BaseModel):
 
 
 SOURCES_ENV = "CORSAIR_SOURCES"
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
 def sources_root() -> Path:
     return Path(os.environ.get(SOURCES_ENV) or Path.cwd() / ".runs" / "sources")
+
+
+def _legacy_corpus_source(request_path: Path, candidate: Path, relative: Path) -> bool:
+    """Allow old evaluator fixtures to point only from ``evals/e2e`` into ``benchmarks/corpus``.
+
+    This compatibility path is deliberately tied to a real repository checkout. Installed packages and arbitrary
+    requests cannot gain parent traversal merely by reproducing these directory names elsewhere.
+    """
+    if ".." not in relative.parts:
+        return False
+    try:
+        repository = REPOSITORY_ROOT.resolve(strict=True)
+        historical = (repository / "evals/e2e").resolve(strict=True)
+        corpus = (repository / "benchmarks/corpus").resolve(strict=True)
+    except (OSError, RuntimeError):
+        return False
+    if (not historical.is_dir() or not corpus.is_dir() or historical == repository or corpus == repository
+            or not historical.is_relative_to(repository) or not corpus.is_relative_to(repository)):
+        return False
+    return request_path.is_relative_to(historical) and candidate != corpus and candidate.is_relative_to(corpus)
 
 
 def acquire(source: GitSource, root: Path | None = None) -> Path:
@@ -153,8 +174,9 @@ def acquire(source: GitSource, root: Path | None = None) -> Path:
 def from_request(path: Path) -> Case:
     """A Case from a request file (``input.json``): ``finding`` and ``source`` are required; ``fixed_source``,
     ``commit``, ``fixed_commit`` and ``case_id`` are optional; any other key (a label, an oracle) is refused.
-    A local source must be a real strict descendant directory of the request's case directory. A pinned
-    ``{"url": ..., "commit": ..., "subdir": ...}`` source is acquired by ``acquire`` at that exact commit."""
+    A local source must be a real strict descendant directory of the request's case directory. Legacy request
+    files inside this repository's ``evals/e2e`` tree may point only into its real ``benchmarks/corpus`` tree.
+    A pinned ``{"url": ..., "commit": ..., "subdir": ...}`` source is acquired at that exact commit."""
     path = Path(path).resolve()
     raw = path.read_bytes()
     request = _Request.model_validate_json(raw)
@@ -164,13 +186,15 @@ def from_request(path: Path) -> Case:
         if isinstance(spec, GitSource):
             return revision(acquire(spec), spec.commit)
         relative = Path(spec)
-        invalid_syntax = (not spec or relative.is_absolute() or ".." in relative.parts or "\0" in spec)
+        invalid_syntax = not spec or relative.is_absolute() or "\0" in spec
         try:
             candidate = (base / relative).resolve(strict=True) if not invalid_syntax else None
         except (OSError, RuntimeError):
             candidate = None
-        if (candidate is None or candidate == base or not candidate.is_relative_to(base)
-                or not candidate.is_dir()):
+        ordinary = (candidate is not None and ".." not in relative.parts and candidate != base
+                    and candidate.is_relative_to(base))
+        legacy = candidate is not None and _legacy_corpus_source(path, candidate, relative)
+        if candidate is None or not candidate.is_dir() or not (ordinary or legacy):
             raise ValueError("a local source must be a real strict descendant directory of the case directory")
         return revision(candidate, commit)
 

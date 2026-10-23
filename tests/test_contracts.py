@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,19 @@ from corsair.providers import ModelProfile, ProviderConfig, load_provider_config
 
 ROOT = Path(__file__).resolve().parents[1]
 CASE = ROOT / "cases/path-traversal-fixture"
+
+
+def _historical_parent_inputs():
+    paths = []
+    for path in sorted((ROOT / "evals/e2e").rglob("input.json")):
+        raw = json.loads(path.read_text())
+        specs = [raw.get(field) for field in ("source", "fixed_source")]
+        if any(isinstance(spec, str) and ".." in Path(spec).parts for spec in specs):
+            paths.append(path)
+    return tuple(paths)
+
+
+HISTORICAL_PARENT_INPUTS = _historical_parent_inputs()
 
 
 def test_fixture_case_loads_with_both_revisions_and_keeps_the_oracle_out():
@@ -109,6 +123,69 @@ def test_local_request_accepts_real_nested_source_directories(tmp_path):
 
     assert Path(case.revision.source) == (case_dir / "trees/vulnerable").resolve()
     assert Path(case.fixed_revision.source) == (case_dir / "trees/fixed").resolve()
+
+
+@pytest.mark.parametrize("request_path", HISTORICAL_PARENT_INPUTS,
+                         ids=lambda path: str(path.relative_to(ROOT / "evals/e2e")))
+def test_every_repository_historical_parent_source_is_confined_to_the_legacy_corridor(request_path):
+    raw = json.loads(request_path.read_text())
+    corpus_root = (ROOT / "benchmarks/corpus").resolve()
+    parent_specs = [(field, spec) for field in ("source", "fixed_source")
+                    if isinstance((spec := raw.get(field)), str) and ".." in Path(spec).parts]
+    resolved = [(field, (request_path.parent / spec).resolve()) for field, spec in parent_specs]
+    assert all(candidate.is_relative_to(corpus_root) for _, candidate in resolved)
+    if all(candidate.is_dir() for _, candidate in resolved):
+        case = from_request(request_path)
+        revisions = {"source": case.revision, "fixed_source": case.fixed_revision}
+        assert all(Path(revisions[field].source).is_relative_to(corpus_root) for field, _ in resolved)
+    else:
+        with pytest.raises(ValueError, match="strict descendant"):
+            from_request(request_path)
+
+
+def test_historical_parent_source_inventory_covers_the_ninety_four_legacy_cases():
+    assert len(HISTORICAL_PARENT_INPUTS) == 94
+
+
+def test_legacy_parent_corridor_is_limited_to_historical_requests_and_corpus(tmp_path, monkeypatch):
+    import corsair.case as case_module
+
+    repository = tmp_path / "repository"
+    historical = repository / "evals/e2e/history"
+    ordinary = repository / "cases/ordinary"
+    corpus_source = repository / "benchmarks/corpus/source"
+    evaluator_sibling = repository / "evals/e2e/oracle-store"
+    outside_corpus = repository / "private-source"
+    for directory in (historical, ordinary, corpus_source, evaluator_sibling, outside_corpus):
+        directory.mkdir(parents=True, exist_ok=True)
+    for directory in (corpus_source, evaluator_sibling, outside_corpus):
+        (directory / "app.py").write_text("x = 1\n")
+    monkeypatch.setattr(case_module, "REPOSITORY_ROOT", repository.resolve())
+
+    def request(case_dir, source):
+        path = case_dir / "input.json"
+        path.write_text(json.dumps({"finding": {"title": "t"}, "source": source}))
+        return path
+
+    to_corpus = os.path.relpath(corpus_source, historical)
+    loaded = from_request(request(historical, to_corpus))
+    assert Path(loaded.revision.source) == corpus_source.resolve()
+
+    to_corpus_root = os.path.relpath(repository / "benchmarks/corpus", historical)
+    with pytest.raises(ValueError, match="strict descendant"):
+        from_request(request(historical, to_corpus_root))
+
+    ordinary_to_corpus = os.path.relpath(corpus_source, ordinary)
+    with pytest.raises(ValueError, match="strict descendant"):
+        from_request(request(ordinary, ordinary_to_corpus))
+
+    historical_to_private = os.path.relpath(outside_corpus, historical)
+    with pytest.raises(ValueError, match="strict descendant"):
+        from_request(request(historical, historical_to_private))
+
+    historical_to_evaluator = os.path.relpath(evaluator_sibling, historical)
+    with pytest.raises(ValueError, match="strict descendant"):
+        from_request(request(historical, historical_to_evaluator))
 
 
 def test_tree_digest_ignores_umask_and_git_but_sees_content_and_mode(tmp_path):
