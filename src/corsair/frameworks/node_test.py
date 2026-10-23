@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from .base import PROBE_DIR, RESULT_DIR, WORKDIR, ProbeResult
+from .base import PROBE_DIR, RESULT_DIR, PostCommand, ProbeResult
 from .reports import read_probe
 
 DRIVER = r'''const { strictEqual } = require('node:assert');
@@ -50,18 +50,85 @@ test(`test_probe[${role}]`, async () => {
 });
 '''
 
-# node:test owns coverage measurement. Convert its native line counts into the shared report schema.
-COVERAGE_REPORTER = r'''module.exports = async function* (source) {
-  for await (const event of source) {
-    if (event.type === 'test:coverage') {
-      const files = {};
-      for (const file of event.data.summary.files) {
-        files[file.path] = { executed_lines: file.lines.filter(line => line.count > 0).map(line => line.line) };
+COVERAGE_RENDERER = r'''const fs = require('node:fs');
+const path = require('node:path');
+const { fileURLToPath } = require('node:url');
+const [rawDirectory, output] = process.argv.slice(2);
+if (!fs.lstatSync(rawDirectory).isDirectory()) throw new Error('raw V8 coverage root must be a real directory');
+const files = new Map();
+
+function* rawFiles(directory) {
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const filename = path.join(directory, entry.name);
+    if (entry.isDirectory()) yield* rawFiles(filename);
+    else if (entry.isFile() && entry.name.endsWith('.json')) yield filename;
+  }
+}
+
+function executedLines(script, source) {
+  // V8 offsets and JavaScript string indices both count UTF-16 code units.
+  const starts = [0];
+  for (let i = 0; i < source.length; i++) if (source[i] === '\n') starts.push(i + 1);
+  const events = new Map();
+  for (const fn of script.functions) {
+    for (const range of fn.ranges) {
+      for (const [offset, begin] of [[range.startOffset, true], [range.endOffset, false]]) {
+        if (!events.has(offset)) events.set(offset, []);
+        events.get(offset).push({ range, begin });
       }
-      yield JSON.stringify({ files });
     }
   }
-};
+  const offsets = [...events.keys()].sort((a, b) => a - b);
+  const active = new Set();
+  const lines = new Set();
+  let line = 0;
+  for (let i = 0; i + 1 < offsets.length; i++) {
+    const start = offsets[i];
+    const end = offsets[i + 1];
+    for (const { range, begin } of events.get(start)) {
+      if (begin) active.add(range);
+      else active.delete(range);
+    }
+    // A narrower unexecuted function/block overrides its enclosing positive range.
+    let innermost;
+    for (const range of active) {
+      const width = range.endOffset - range.startOffset;
+      const previousWidth = innermost && innermost.endOffset - innermost.startOffset;
+      if (!innermost || width < previousWidth || (width === previousWidth && range.count < innermost.count)) {
+        innermost = range;
+      }
+    }
+    if (!innermost || innermost.count <= 0) continue;
+    while (line + 1 < starts.length && starts[line + 1] <= start) line++;
+    for (let j = line; j < starts.length && starts[j] < end; j++) {
+      const first = Math.max(start, starts[j]);
+      const last = Math.min(end, starts[j + 1] ?? source.length);
+      if (source.slice(first, last).trim()) lines.add(j + 1);
+    }
+  }
+  return lines;
+}
+
+let reports = 0;
+for (const rawFile of rawFiles(rawDirectory)) {
+  reports++;
+  for (const script of JSON.parse(fs.readFileSync(rawFile, 'utf8')).result) {
+    let filename;
+    if (script.url.startsWith('file:')) filename = fileURLToPath(script.url);
+    else if (path.isAbsolute(script.url)) filename = script.url;
+    else continue;
+    filename = path.resolve(filename);
+    if (!filename.startsWith('/work/') || filename.startsWith('/work/.corsair/')) continue;
+    const source = fs.readFileSync(filename, 'utf8');
+    if (!files.has(filename)) files.set(filename, new Set());
+    for (const line of executedLines(script, source)) files.get(filename).add(line);
+  }
+}
+if (!reports) throw new Error('no raw V8 coverage reports were produced');
+fs.writeFileSync(output, JSON.stringify({ files: Object.fromEntries(
+  [...files].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([filename, lines]) =>
+    [filename, { executed_lines: [...lines].sort((a, b) => a - b) }])
+) }));
 '''
 
 
@@ -82,17 +149,21 @@ class NodeTest:
                                   "symbol preflight passed; native parsing and export validation run in the container")
 
     def driver_files(self) -> dict[str, bytes]:
-        return {"test_corsair_probe.cjs": DRIVER.encode(), "coverage-reporter.cjs": COVERAGE_REPORTER.encode()}
+        return {"test_corsair_probe.cjs": DRIVER.encode(), "render-v8-coverage.cjs": COVERAGE_RENDERER.encode()}
 
     def command(self, role: str, target_file: str) -> list[str]:
-        # Node's include option is a glob. Measure /work and let read_probe match the literal target path.
-        return ["node", "--test", "--experimental-test-coverage", f"--test-coverage-include={WORKDIR}/**",
+        # Reset only raw V8 data before Node starts collecting; preserve reports and unrelated artifacts.
+        raw = f"{RESULT_DIR}/v8"
+        reset = f'[ ! -L {raw} ] && mkdir -p {raw} && find {raw} -mindepth 1 -delete && exec "$@"'
+        return ["sh", "-c", reset, "corsair-node", "node", "--test",
                 "--test-reporter=junit", f"--test-reporter-destination={RESULT_DIR}/junit.xml",
-                f"--test-reporter={PROBE_DIR}/coverage-reporter.cjs",
-                f"--test-reporter-destination={RESULT_DIR}/coverage.json", f"{PROBE_DIR}/test_corsair_probe.cjs"]
+                f"{PROBE_DIR}/test_corsair_probe.cjs"]
 
-    def post_command(self, role: str, target_file: str) -> None:
-        return None
+    def post_command(self, role: str, target_file: str) -> PostCommand:
+        environment = dict(self.environment(role))
+        environment.pop("NODE_V8_COVERAGE", None)
+        return PostCommand(("node", f"{PROBE_DIR}/render-v8-coverage.cjs", f"{RESULT_DIR}/v8",
+                            f"{RESULT_DIR}/coverage.json"), environment)
 
     def environment(self, role: str) -> Mapping[str, str]:
         return {"CORSAIR_ROLE": role, "CORSAIR_RESULT": f"{RESULT_DIR}/result.json", "HOME": "/tmp",

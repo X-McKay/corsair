@@ -1,4 +1,5 @@
 """Native JavaScript outcomes through the same kernel and Docker boundary as Python."""
+import json
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -6,7 +7,7 @@ import pytest
 
 from corsair import matrix
 from corsair.artifacts import ArtifactStore
-from corsair.case import load_case
+from corsair.case import Finding, load_case, revision
 from corsair.frameworks import framework
 from corsair.kernel import Fix, Gate, Kernel, Label, RoleResult, Submission
 from corsair.sandbox import DockerSandboxes
@@ -15,6 +16,7 @@ from tests.test_kernel import accept
 
 ROOT = Path(__file__).resolve().parents[1]
 CASE = ROOT / "cases/path-traversal-javascript"
+SCRIPT_CASE = ROOT / "cases/cs-0002-b"
 IMAGE = "corsair-lite-javascript:dev"
 
 
@@ -26,6 +28,17 @@ def test_javascript_adapter_is_explicit_and_shares_the_evidence_contract():
     reference = Submission.model_validate_json((CASE / "reference-submission.json").read_text())
     assert adapter.guard(reference.probe).passed
     assert matrix.select(load_case(CASE)).framework == "node-test"
+
+
+def test_javascript_post_processing_cannot_instrument_itself():
+    adapter = framework("node-test")
+    primary = dict(adapter.environment("control"))
+    post = adapter.post_command("control", "cli-target.cjs")
+    assert post is not None
+    assert primary["NODE_V8_COVERAGE"] == "/tmp/corsair/v8"
+    assert "NODE_V8_COVERAGE" not in post.environment
+    assert post.environment["NODE_OPTIONS"] == ""
+    assert dict(adapter.environment("control")) == primary
 
 
 needs_image = pytest.mark.skipif(not (docker_available() and docker("image", "inspect", IMAGE).returncode == 0),
@@ -123,4 +136,199 @@ async def test_native_node_outcomes(tmp_path, mode, expected):
         assert result.runs[-1].invariant_held is None
         if mode.endswith("invariant"):
             assert result.runs[-1].exception_type == "TypeError"
+    assert backend.labelled(kernel.run_id) == []
+
+
+@pytest.mark.docker
+@pytest.mark.anyio
+@needs_image
+@pytest.mark.parametrize("target_file,absolute_url", [
+    ("cli-target.cjs", False), ("source space/cli-target[slug].cjs", False),
+    ("source space/cli-target[slug].cjs", True),
+], ids=["cli", "literal-path", "absolute-script-url"])
+async def test_node_script_collects_exact_child_lines_and_verifies_fix(tmp_path, target_file, absolute_url):
+    reference = Submission.model_validate_json((SCRIPT_CASE / "reference-submission.json").read_text())
+    case = load_case(SCRIPT_CASE)
+    # Identical basenames from separate children must retain their distinct literal paths.
+    decoy_file = "other/" + Path(target_file).name
+    trees = {}
+    for name in ("vulnerable", "fixed"):
+        tree = tmp_path / name
+        for filename in (target_file, decoy_file):
+            target = tree / filename
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text((SCRIPT_CASE / name / "cli-target.cjs").read_text())
+        trees[name] = revision(tree)
+    case = case.model_copy(update={"revision": trees["vulnerable"], "fixed_revision": trees["fixed"],
+                                   "finding": Finding(title="CLI traversal", file_path=target_file)})
+    probe = reference.probe.replace("    const output = execFileSync(\n",
+                                    "    execFileSync(process.execPath, ['/work/" + decoy_file + "', payload],\n"
+                                    "                 { cwd: base, encoding: 'utf8', timeout: 5000 });\n"
+                                    "    execFileSync(process.execPath, ['/work/cli-target.cjs', 'document.txt'],\n"
+                                    "                 { cwd: base, encoding: 'utf8', timeout: 5000 });\n"
+                                    "    const output = execFileSync(\n")
+    probe = probe.replace("/work/cli-target.cjs", "/work/" + target_file)
+    if absolute_url:
+        # Preserve genuine current child ranges in an alternate JSON filename and equivalent absolute URL form.
+        probe = probe.replace("    return JSON.parse(output)",
+            "    const { fileURLToPath } = require('node:url');\n"
+            "    const rawDirectory = process.env.NODE_V8_COVERAGE;\n"
+            "    for (const name of fs.readdirSync(rawDirectory).filter(name => name.endsWith('.json'))) {\n"
+            "      const raw = JSON.parse(fs.readFileSync(path.join(rawDirectory, name), 'utf8'));\n"
+            "      if (!raw.result.some(script => script.url.startsWith('file:') &&\n"
+            "          fileURLToPath(script.url) === '/work/" + target_file + "')) continue;\n"
+            "      for (const script of raw.result) {\n"
+            "        if (script.url.startsWith('file:')) script.url = fileURLToPath(script.url);\n"
+            "      }\n"
+            "      fs.writeFileSync(path.join(rawDirectory, 'raw-' + name), JSON.stringify(raw));\n"
+            "      fs.unlinkSync(path.join(rawDirectory, name));\n"
+            "    }\n"
+            "    return JSON.parse(output)")
+    reference = reference.model_copy(update={"probe": probe, "hypothesis": reference.hypothesis.model_copy(
+        update={"target_file": target_file})})
+    backend = DockerSandboxes()
+    store = ArtifactStore(tmp_path / "artifacts")
+    kernel = Kernel(backend, matrix.select(case), case, artifacts=store, auditor=accept)
+    result = await kernel.evaluate(reference)
+    assert result.gate.stage is Gate.VERIFIED, result
+    assert result.verdict.label is Label.LIKELY_EXPLOITABLE and result.verdict.fix is Fix.VERIFIED
+    assert result.verdict.revisions[1].label is Label.LIKELY_NOT_EXPLOITABLE
+    assert [(run.revision, run.role, run.result) for run in result.runs] == [
+        ("vulnerable", "control", RoleResult.PASS), ("vulnerable", "exploit", RoleResult.PASS),
+        ("fixed", "control", RoleResult.PASS), ("fixed", "exploit", RoleResult.FAIL),
+    ]
+    assert [run.invariant_held for run in result.runs] == [True, False, True, True]
+    for run in result.runs:
+        assert run.covered_target is True and run.covered_lines == (6, 7)
+        assert run.junit_tests == 1 and run.cleanup_confirmed is True
+        assert run.exception_type is None
+        report = json.loads(store.get(run.coverage))
+        assert {"/work/" + target_file, "/work/" + decoy_file} <= report["files"].keys()
+        for filename in (target_file, decoy_file):
+            lines = report["files"]["/work/" + filename]["executed_lines"]
+            assert 6 in lines and 7 in lines
+            # The surrounding script's positive range must not cover an uncalled function body.
+            assert (12 if run.revision == "vulnerable" else 16) not in lines
+        if run.revision == "fixed" and run.role == "exploit":
+            # Two children take opposite branches in the same target: neither report alone contains this union.
+            assert {8, 9, 11, 12} <= set(report["files"]["/work/" + target_file]["executed_lines"])
+        assert not any(path.startswith("/work/.corsair/") for path in report["files"])
+        native_case = next(ET.fromstring(store.get(run.junit)).iter("testcase"))
+        assert native_case.get("name") == f"test_probe[{run.role}]"
+        assert (native_case.find("failure") is None) == (run.result is RoleResult.PASS)
+        assert native_case.find("error") is None
+    assert backend.labelled(kernel.run_id) == []
+
+
+@pytest.mark.docker
+@pytest.mark.anyio
+@needs_image
+async def test_node_script_same_basename_cannot_satisfy_exact_target(tmp_path):
+    reference = Submission.model_validate_json((SCRIPT_CASE / "reference-submission.json").read_text())
+    tree = tmp_path / "tree"
+    for filename in ("source space/cli-target[slug].cjs", "other/cli-target[slug].cjs"):
+        target = tree / filename
+        target.parent.mkdir(parents=True)
+        target.write_text((SCRIPT_CASE / "vulnerable/cli-target.cjs").read_text())
+    case = load_case(SCRIPT_CASE).model_copy(update={"revision": revision(tree), "fixed_revision": None,
+        "finding": Finding(title="CLI traversal", file_path="source space/cli-target[slug].cjs")})
+    reference = reference.model_copy(update={
+        "probe": reference.probe.replace("/work/cli-target.cjs", "/work/other/cli-target[slug].cjs"),
+        "hypothesis": reference.hypothesis.model_copy(update={"target_file": "source space/cli-target[slug].cjs"})})
+    backend = DockerSandboxes()
+    store = ArtifactStore(tmp_path / "artifacts")
+    kernel = Kernel(backend, matrix.select(case), case, artifacts=store, auditor=accept)
+    result = await kernel.evaluate(reference)
+    assert result.gate.stage is Gate.CONTROL_COVERAGE, result
+    assert result.verdict.label is Label.INCONCLUSIVE
+    assert [run.invariant_held for run in result.runs] == [True, False]
+    for run in result.runs:
+        assert run.covered_target is False and run.covered_lines == ()
+        assert run.result is RoleResult.PASS and run.junit_tests == 1 and run.cleanup_confirmed
+        report = json.loads(store.get(run.coverage))
+        assert 6 in report["files"]["/work/other/cli-target[slug].cjs"]["executed_lines"]
+        assert "/work/source space/cli-target[slug].cjs" not in report["files"]
+    assert backend.labelled(kernel.run_id) == []
+
+
+@pytest.mark.docker
+@pytest.mark.anyio
+@needs_image
+@pytest.mark.parametrize("seed_raw,linked_root", [(False, False), (True, False), (True, True)],
+                         ids=["clean", "seeded-raw", "linked-raw"])
+async def test_node_script_without_child_coverage_is_inconclusive(tmp_path, seed_raw, linked_root):
+    reference = Submission.model_validate_json((SCRIPT_CASE / "reference-submission.json").read_text())
+    probe = reference.probe.replace("{ cwd: base, encoding: 'utf8', timeout: 5000 },",
+                                    "{ cwd: base, encoding: 'utf8', timeout: 5000, env: {} },")
+    # Node copies this variable into explicit whitelisted environments unless the parent drops it too.
+    probe = probe.replace("    const output = execFileSync(\n",
+                          "    delete process.env.NODE_V8_COVERAGE;\n"
+                          "    const output = execFileSync(\n")
+    if seed_raw:
+        # A genuine build-time child report must not establish coverage for this role's uninstrumented child.
+        build_script = """node <<'JS'
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
+const results = '/tmp/corsair';
+fs.mkdirSync(results, { recursive: true, mode: 0o777 });
+const base = fs.mkdtempSync(path.join(os.tmpdir(), 'corsair-seed-'));
+try {
+  fs.mkdirSync(path.join(base, 'allowed'));
+  fs.writeFileSync(path.join(base, 'allowed/document.txt'), 'seed-document');
+  const output = execFileSync(process.execPath, ['/work/cli-target.cjs', 'document.txt'], {
+    cwd: base, encoding: 'utf8', env: { NODE_V8_COVERAGE: results + '/v8' },
+  });
+  if (JSON.parse(output) !== 'seed-document') throw new Error('seed CLI did not run');
+  const reports = fs.readdirSync(results + '/v8').filter(name => name.endsWith('.json'));
+  if (!reports.some(name => JSON.parse(fs.readFileSync(results + '/v8/' + name)).result.some(
+      script => script.url === 'file:///work/cli-target.cjs'))) throw new Error('missing genuine seed report');
+  fs.chmodSync(results + '/v8', 0o777);
+  for (const name of reports) fs.chmodSync(results + '/v8/' + name, 0o666);
+  for (const name of ['result.json', 'junit.xml', 'coverage.json', 'keep.txt']) {
+    fs.writeFileSync(results + '/' + name, 'prepared-marker', { mode: 0o666 });
+    fs.chmodSync(results + '/' + name, 0o666);
+  }
+} finally { fs.rmSync(base, { recursive: true, force: true }); }
+JS
+"""
+        if linked_root:
+            build_script = build_script.replace("  for (const name of ['result.json', 'junit.xml'",
+                "  fs.renameSync(results + '/v8', results + '/saved-v8');\n"
+                "  fs.symlinkSync('saved-v8', results + '/v8', 'dir');\n"
+                "  for (const name of ['result.json', 'junit.xml'")
+        probe = probe.replace("function run_target(payload) {\n",
+                              "function run_target(payload) {\n"
+                              "  for (const name of ['result.json', 'coverage.json', 'keep.txt']) {\n"
+                              "    if (fs.readFileSync('/tmp/corsair/' + name, 'utf8') !== 'prepared-marker') {\n"
+                              "      throw new Error('unrelated prepared artifact was removed');\n"
+                              "    }\n"
+                              "  }\n")
+        reference = reference.model_copy(update={"build_script": build_script})
+    case = load_case(SCRIPT_CASE)
+    backend = DockerSandboxes()
+    store = ArtifactStore(tmp_path / "artifacts")
+    kernel = Kernel(backend, matrix.select(case), case, artifacts=store, auditor=accept)
+    result = await kernel.evaluate(reference.model_copy(update={"probe": probe}))
+    if linked_root:
+        # A linked raw root must fail closed rather than retain and attribute its old target report.
+        assert result.gate.stage is Gate.CONTROL_RUN, result
+        assert result.verdict.label is Label.INCONCLUSIVE
+        assert len(result.runs) == 1 and result.runs[0].result is RoleResult.ERROR
+        assert result.runs[0].invariant_held is None and result.runs[0].covered_lines == ()
+        assert result.runs[0].covered_target is None
+        assert result.runs[0].cleanup_confirmed is True
+        assert backend.labelled(kernel.run_id) == []
+        return
+    assert result.gate.stage is Gate.CONTROL_COVERAGE, result
+    assert result.verdict.label is Label.INCONCLUSIVE
+    assert [run.result for run in result.runs] == [RoleResult.PASS, RoleResult.PASS]
+    assert [run.invariant_held for run in result.runs] == [True, False]
+    for run in result.runs:
+        assert run.covered_target is False and run.covered_lines == ()
+        assert run.junit_tests == 1 and run.cleanup_confirmed is True
+        report = json.loads(store.get(run.coverage))
+        target = report["files"].get("/work/cli-target.cjs")
+        assert target is None or target["executed_lines"] == []
     assert backend.labelled(kernel.run_id) == []

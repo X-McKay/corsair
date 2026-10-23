@@ -1,0 +1,13 @@
+{
+  "case_id": "cs-0002-b",
+  "finding": {
+    "title": "Path traversal in a Node CLI",
+    "description": "The CLI reads a caller-selected document without confining its path to the allowed directory.",
+    "file_path": "cli-target.cjs",
+    "start_line": 6,
+    "symbol": "main",
+    "cwe": "CWE-22"
+  },
+  "source": "vulnerable",
+  "fixed_source": "fixed"
+}

