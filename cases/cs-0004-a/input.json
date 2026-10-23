@@ -9,5 +9,7 @@
     "cwe": "CWE-22"
   },
   "source": "vulnerable",
-  "fixed_source": "fixed"
+  "commit": "3c5e608b3544472b8e9c9d3bacc1fe2de4c24f34",
+  "fixed_source": "fixed",
+  "fixed_commit": "3c5e608b3544472b8e9c9d3bacc1fe2de4c24f34"
 }

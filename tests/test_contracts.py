@@ -51,6 +51,22 @@ def test_direct_conformance_cases_use_opaque_directory_and_case_ids():
     assert all(not (ROOT / "cases" / name).exists() for name in LEGACY_DIRECT_CASES)
 
 
+@pytest.mark.parametrize("case_id", [
+    "cs-0001-a", "cs-0001-b", "cs-0002-a", "cs-0002-b",
+    "cs-0003-a", "cs-0003-b", "cs-0004-a", "cs-0004-b",
+])
+def test_conformance_inputs_bind_both_revisions_to_foundation(case_id):
+    foundation = "3c5e608b3544472b8e9c9d3bacc1fe2de4c24f34"
+    case_dir = ROOT / "cases" / case_id
+    request = json.loads((case_dir / "input.json").read_text())
+    assert (request.get("commit"), request.get("fixed_commit")) == (foundation, foundation)
+
+    case = load_case(case_dir)
+    assert case.fixed_revision is not None
+    assert (case.revision.commit, case.fixed_revision.commit) == (foundation, foundation)
+    assert case.revision.tree_sha256 != case.fixed_revision.tree_sha256
+
+
 @pytest.mark.parametrize(
     "case_id,replay_blocker,rights_blocker",
     [
