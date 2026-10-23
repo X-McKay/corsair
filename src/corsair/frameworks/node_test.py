@@ -65,6 +65,38 @@ function* rawFiles(directory) {
   }
 }
 
+function invalid(reason) {
+  throw new Error(`invalid V8 coverage: ${reason}`);
+}
+
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function validateReport(report) {
+  if (!isRecord(report) || !Array.isArray(report.result)) invalid('expected a report with a result array');
+  for (const script of report.result) {
+    if (!isRecord(script) || typeof script.url !== 'string' || !Array.isArray(script.functions)) {
+      invalid('expected a script URL and functions array');
+    }
+    for (const fn of script.functions) {
+      if (!isRecord(fn) || typeof fn.functionName !== 'string' || typeof fn.isBlockCoverage !== 'boolean' ||
+          !Array.isArray(fn.ranges)) invalid('expected function metadata and a ranges array');
+      for (const range of fn.ranges) {
+        // Number.isInteger rejects strings, null, booleans, NaN and infinity without coercion.
+        if (!isRecord(range) || !Number.isInteger(range.count) || range.count < 0) {
+          invalid('range count must be a finite nonnegative integer');
+        }
+        if (!Number.isInteger(range.startOffset) || !Number.isInteger(range.endOffset) ||
+            range.startOffset < 0 || range.startOffset >= range.endOffset) {
+          invalid('range offsets must be nonnegative ordered integers');
+        }
+      }
+    }
+  }
+  return report.result;
+}
+
 function executedLines(script, source) {
   // V8 offsets and JavaScript string indices both count UTF-16 code units.
   const starts = [0];
@@ -72,6 +104,7 @@ function executedLines(script, source) {
   const events = new Map();
   for (const fn of script.functions) {
     for (const range of fn.ranges) {
+      if (range.endOffset > source.length) invalid('range exceeds its source length');
       for (const [offset, begin] of [[range.startOffset, true], [range.endOffset, false]]) {
         if (!events.has(offset)) events.set(offset, []);
         events.get(offset).push({ range, begin });
@@ -112,7 +145,8 @@ function executedLines(script, source) {
 let reports = 0;
 for (const rawFile of rawFiles(rawDirectory)) {
   reports++;
-  for (const script of JSON.parse(fs.readFileSync(rawFile, 'utf8')).result) {
+  // Reject malformed records even when their URL will be excluded. Only included /work sources are read.
+  for (const script of validateReport(JSON.parse(fs.readFileSync(rawFile, 'utf8')))) {
     let filename;
     if (script.url.startsWith('file:')) filename = fileURLToPath(script.url);
     else if (path.isAbsolute(script.url)) filename = script.url;

@@ -2,6 +2,7 @@
 import json
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 
@@ -12,6 +13,7 @@ from corsair.frameworks import framework
 from corsair.kernel import Fix, Gate, Kernel, Label, RoleResult, Submission
 from corsair.sandbox import DockerSandboxes
 from corsair.sandbox.docker import docker, docker_available
+from corsair.sandbox.port import SandboxSpec, labels
 from tests.test_kernel import accept
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -136,6 +138,142 @@ async def test_native_node_outcomes(tmp_path, mode, expected):
         assert result.runs[-1].invariant_held is None
         if mode.endswith("invariant"):
             assert result.runs[-1].exception_type == "TypeError"
+    assert backend.labelled(kernel.run_id) == []
+
+
+def _v8_report(ranges, *, url="file:///work/target.cjs"):
+    return {"result": [{"url": url, "functions": [
+        {"functionName": "", "isBlockCoverage": True, "ranges": ranges},
+    ]}]}
+
+
+@pytest.fixture(scope="module")
+def node_renderer_sandbox():
+    adapter = framework("node-test")
+    backend = DockerSandboxes()
+    run_id = "renderer-" + uuid4().hex[:12]
+    name = backend.create(SandboxSpec(image=IMAGE, labels=labels(run_id, "renderer")))
+    try:
+        made = backend.exec_once(name, ["mkdir", "-p", "/work/.corsair", "/tmp/corsair/v8"],
+                                 workdir="/", timeout=60)
+        assert made.exit_code == 0
+        for filename in ("target.cjs", "unrelated.cjs"):
+            backend.write_file(name, "/work/" + filename, b"void 1;\nvoid 2;\n")
+        backend.write_file(name, "/work/.corsair/render-v8-coverage.cjs",
+                           adapter.driver_files()["render-v8-coverage.cjs"])
+        yield backend, name, adapter.post_command("control", "target.cjs")
+    finally:
+        assert backend.remove(name)
+        assert backend.labelled(run_id) == []
+
+
+@pytest.mark.docker
+@needs_image
+@pytest.mark.parametrize("raw", [
+    pytest.param("null", id="null-report"),
+    pytest.param("[]", id="array-report"),
+    pytest.param("{}", id="missing-result"),
+    pytest.param('{"result":{}}', id="object-result"),
+    pytest.param('{"result":[null]}', id="null-script"),
+    pytest.param('{"result":[{"url":1,"functions":[]}]}', id="nonstring-url"),
+    pytest.param('{"result":[{"url":"file:///work/target.cjs","functions":{}}]}', id="object-functions"),
+    pytest.param('{"result":[{"url":"file:///work/target.cjs","functions":[null]}]}', id="null-function"),
+    pytest.param('{"result":[{"url":"file:///work/target.cjs","functions":[{"ranges":[]}]}]}',
+                 id="missing-function-metadata"),
+    pytest.param('{"result":[{"url":"file:///work/target.cjs","functions":'
+                 '[{"functionName":"","isBlockCoverage":true,"ranges":{}}]}]}', id="object-ranges"),
+    *[pytest.param(json.dumps(_v8_report([bad_range])), id=name) for name, bad_range in [
+        ("absent-count", {"startOffset": 0, "endOffset": 16}),
+        ("string-count", {"startOffset": 0, "endOffset": 16, "count": "1"}),
+        ("nan-like-count", {"startOffset": 0, "endOffset": 16, "count": "NaN"}),
+        ("null-count", {"startOffset": 0, "endOffset": 16, "count": None}),
+        ("boolean-count", {"startOffset": 0, "endOffset": 16, "count": True}),
+        ("fractional-count", {"startOffset": 0, "endOffset": 16, "count": 0.5}),
+        ("negative-count", {"startOffset": 0, "endOffset": 16, "count": -1}),
+        ("fractional-start", {"startOffset": 0.5, "endOffset": 16, "count": 1}),
+        ("fractional-end", {"startOffset": 0, "endOffset": 15.5, "count": 1}),
+        ("negative-start", {"startOffset": -1, "endOffset": 16, "count": 1}),
+        ("reversed-range", {"startOffset": 16, "endOffset": 0, "count": 1}),
+        ("empty-range", {"startOffset": 8, "endOffset": 8, "count": 1}),
+        ("past-source-end", {"startOffset": 0, "endOffset": 17, "count": 1}),
+        ("string-start", {"startOffset": "0", "endOffset": 16, "count": 1}),
+        ("missing-end", {"startOffset": 0, "count": 1}),
+        ("null-range", None),
+    ]],
+    pytest.param(json.dumps(_v8_report([{"startOffset": 0, "endOffset": 16, "count": "overflow"}]))
+                 .replace('"overflow"', '1e309'), id="infinite-count"),
+    *[pytest.param(json.dumps({"result": [
+        *_v8_report([{"startOffset": 0, "endOffset": 16, "count": 1}])["result"],
+        *_v8_report([{"startOffset": 0, "endOffset": 16}], url=url)["result"],
+    ]}), id=name) for name, url in [
+        ("malformed-unrelated-work-file", "file:///work/unrelated.cjs"),
+        ("malformed-outside-work", "file:///outside/absent.cjs"),
+        ("malformed-nonfile-script", "node:internal/example"),
+    ]],
+])
+def test_node_renderer_rejects_malformed_raw_reports(node_renderer_sandbox, raw):
+    # Invalid metadata must abort the entire post-command, even beside an otherwise positive target.
+    backend, name, post = node_renderer_sandbox
+    backend.write_file(name, "/tmp/corsair/v8/current.json", raw.encode())
+    backend.write_file(name, "/tmp/corsair/coverage.json", b"unrendered-marker")
+    result = backend.exec_once(name, post.argv, workdir="/work", env=post.environment, timeout=60)
+    assert result.exit_code != 0, raw
+    assert not result.timed_out and not result.output_limited and not result.container_failed
+    assert backend.copy_out(name, ["/tmp/corsair/coverage.json"])["/tmp/corsair/coverage.json"] == b"unrendered-marker"
+
+
+@pytest.mark.docker
+@needs_image
+@pytest.mark.parametrize("raw,expected", [
+    pytest.param(_v8_report([{"startOffset": 0, "endOffset": 16, "count": 1}]), [1, 2], id="positive"),
+    pytest.param(_v8_report([{"startOffset": 0, "endOffset": 16, "count": 0}]), [], id="zero"),
+    pytest.param(_v8_report([{"startOffset": 0, "endOffset": 16, "count": 1},
+                            {"startOffset": 8, "endOffset": 16, "count": 0}]), [1], id="nested-zero"),
+    pytest.param({"result": [
+        *_v8_report([{"startOffset": 0, "endOffset": 16, "count": 1}])["result"],
+        *_v8_report([{"startOffset": 0, "endOffset": 16, "count": 0}],
+                    url="file:///outside/absent.cjs")["result"],
+    ]}, [1, 2], id="valid-outside-work-is-excluded"),
+])
+def test_node_renderer_preserves_valid_ranges(node_renderer_sandbox, raw, expected):
+    backend, name, post = node_renderer_sandbox
+    backend.write_file(name, "/tmp/corsair/v8/current.json", json.dumps(raw).encode())
+    result = backend.exec_once(name, post.argv, workdir="/work", env=post.environment, timeout=60)
+    assert result.exit_code == 0, result.stderr.decode()
+    report = json.loads(backend.copy_out(name, ["/tmp/corsair/coverage.json"])["/tmp/corsair/coverage.json"])
+    assert report == {"files": {"/work/target.cjs": {"executed_lines": expected}}}
+
+
+@pytest.mark.docker
+@pytest.mark.anyio
+@needs_image
+async def test_node_script_malformed_child_report_is_evidence_error(tmp_path):
+    reference = Submission.model_validate_json((SCRIPT_CASE / "reference-submission.json").read_text())
+    probe = reference.probe.replace("{ cwd: base, encoding: 'utf8', timeout: 5000 },",
+                                    "{ cwd: base, encoding: 'utf8', timeout: 5000, env: {} },")
+    probe = probe.replace("    const output = execFileSync(\n",
+                          "    delete process.env.NODE_V8_COVERAGE;\n"
+                          "    const output = execFileSync(\n")
+    probe = probe.replace("    return JSON.parse(output)",
+        "    fs.writeFileSync('/tmp/corsair/v8/malformed.json', JSON.stringify({ result: [{\n"
+        "      url: 'file:///work/cli-target.cjs', functions: [{\n"
+        "        functionName: '', isBlockCoverage: true, ranges: [{\n"
+        "          startOffset: 0, endOffset: fs.readFileSync('/work/cli-target.cjs', 'utf8').length,\n"
+        "        }],\n"
+        "      }],\n"
+        "    }] }));\n"
+        "    return JSON.parse(output)")
+    case = load_case(SCRIPT_CASE)
+    backend = DockerSandboxes()
+    store = ArtifactStore(tmp_path / "artifacts")
+    kernel = Kernel(backend, matrix.select(case), case, artifacts=store, auditor=accept)
+    result = await kernel.evaluate(reference.model_copy(update={"probe": probe}))
+    assert result.gate.stage is Gate.CONTROL_RUN, result
+    assert result.verdict.label is Label.INCONCLUSIVE
+    assert len(result.runs) == 1 and result.runs[0].result is RoleResult.ERROR
+    assert result.runs[0].covered_lines == () and result.runs[0].coverage is None
+    assert result.runs[0].cleanup_confirmed is True
+    assert "coverage post-processing exited 1" in result.runs[0].message
     assert backend.labelled(kernel.run_id) == []
 
 
