@@ -196,6 +196,26 @@ async def test_verified_submission_runs_both_payloads_on_both_revisions_and_veri
     assert all(spec.network == "none" for spec in fake.creates)  # empty build script: no network at all
 
 
+async def test_fixed_revision_uses_its_trusted_target_lines_without_changing_the_hypothesis(tmp_path):
+    scenario = {
+        **HAPPY,
+        ("fixed", "control"): Script("holds", covered_lines=(7,)),
+        ("fixed", "exploit"): Script("holds", covered_lines=(7,)),
+    }
+    fake = FakeSandboxes(scenario)
+    case = load_case(CASE)
+    evaluator = Kernel(fake, ROW, case, artifacts=ArtifactStore(tmp_path / "artifacts"), auditor=accept,
+                       fixed_target_lines=(7,))
+
+    evaluation = await evaluator.evaluate(REFERENCE)
+
+    assert evaluation.gate.stage is Gate.VERIFIED
+    assert evaluation.verdict is not None and evaluation.verdict.fix is Fix.VERIFIED
+    assert [(run.revision, run.covered_lines) for run in evaluation.runs] == [
+        ("vulnerable", (4,)), ("vulnerable", (4,)), ("fixed", (7,)), ("fixed", (7,))]
+    assert evaluation.submission.hypothesis.target_lines == (4,)
+
+
 async def test_build_script_gets_network_only_during_the_build_and_is_cached_by_exact_key(tmp_path):
     fake = FakeSandboxes(dict(HAPPY))
     with_build = REFERENCE.model_copy(update={"build_script": "pip install -e ."})

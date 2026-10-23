@@ -56,6 +56,17 @@ Role = Literal["control", "exploit"]
 RevisionName = Literal["vulnerable", "fixed"]
 
 
+def _normalized_target_lines(lines: tuple[int, ...]) -> tuple[int, ...]:
+    if any(line < 1 for line in lines):
+        raise ValueError("target lines are 1-based")
+    normalized = tuple(sorted(set(lines)))
+    if not normalized:
+        raise ValueError("at least one target line is required")
+    if len(normalized) > 64:
+        raise ValueError("at most 64 target lines are allowed")
+    return normalized
+
+
 class Hypothesis(Frozen):
     target_file: SafePath = Field(description="Path of the vulnerable source file, relative to the repository root")
     target_symbol: str = Field(min_length=1, max_length=256, description="Function or method holding the flaw")
@@ -67,9 +78,7 @@ class Hypothesis(Frozen):
     @field_validator("target_lines")
     @classmethod
     def _positive(cls, lines: tuple[int, ...]) -> tuple[int, ...]:
-        if any(line < 1 for line in lines):
-            raise ValueError("target lines are 1-based")
-        return tuple(sorted(set(lines)))
+        return _normalized_target_lines(lines)
 
 
 class Submission(Frozen):
@@ -293,7 +302,8 @@ def environment_key(row: Row, tree_sha256: str, build_script: str, *, runtime_im
 class Kernel:
     def __init__(self, backend: Sandboxes, row: Row, case: Case, *, artifacts: ArtifactStore,
                  auditor: Callable[[Submission], Awaitable[AuditResult]] | None = None, run_id: str | None = None,
-                 build_timeout: float = BUILD_TIMEOUT_S, probe_timeout: float = PROBE_TIMEOUT_S):
+                 build_timeout: float = BUILD_TIMEOUT_S, probe_timeout: float = PROBE_TIMEOUT_S,
+                 fixed_target_lines: tuple[int, ...] | None = None):
         self.backend = backend
         self.row = row
         self.case = case
@@ -302,6 +312,8 @@ class Kernel:
         self.run_id = run_id or uuid.uuid4().hex[:12]
         self.build_timeout = build_timeout
         self.probe_timeout = probe_timeout
+        self.fixed_target_lines = (_normalized_target_lines(fixed_target_lines)
+                                   if fixed_target_lines is not None else None)
         self._attempt = 0
         from .frameworks import framework
 
@@ -358,7 +370,8 @@ class Kernel:
 
     def run_probe(self, image: str, submission: Submission, revision: RevisionName, role: Role) -> ProbeRun:
         fw = self.framework
-        target = submission.hypothesis.target_file
+        hypothesis = self._revision_hypothesis(submission.hypothesis, revision)
+        target = hypothesis.target_file
         self._attempt += 1
         sandbox_labels = labels(self.run_id, "probe", role, revision=revision, n=str(self._attempt))
         name = sandbox_name(sandbox_labels)
@@ -402,7 +415,7 @@ class Kernel:
             files = self.backend.copy_out(name, fw.result_paths())
             confirmed = self.backend.remove(name)
             ours = False
-            return self._classify(revision, role, result, output, duration, files, submission.hypothesis, confirmed)
+            return self._classify(revision, role, result, output, duration, files, hypothesis, confirmed)
         except Exception as error:
             ours = not isinstance(error, SandboxExists)
             duration = time.monotonic() - started
@@ -416,6 +429,13 @@ class Kernel:
         finally:
             if ours:
                 self.backend.remove(name)
+
+    def _revision_hypothesis(self, hypothesis: Hypothesis, revision: RevisionName) -> Hypothesis:
+        """Use evaluator-owned fixed line identity without changing the submitted vulnerable hypothesis."""
+        if revision == "vulnerable" or self.fixed_target_lines is None:
+            return hypothesis
+        return Hypothesis.model_validate({**hypothesis.model_dump(mode="python"),
+                                          "target_lines": self.fixed_target_lines})
 
     def _infra(self, revision: RevisionName, role: Role, result: Exec, output: bytes, duration: float | None,
                confirmed: bool | None) -> ProbeRun:
@@ -570,7 +590,8 @@ class Kernel:
             reason = f"fixed revision did not build: {built.reason}"
             return self._inconclusive("fixed", "BUILD_FAILED", reason), Fix.NOT_VERIFIED, reason
         control, exploit = self._run_revision(image, submission, "fixed", runs)
-        failed = self._evidence_gate(submission.hypothesis, control, exploit)
+        fixed_hypothesis = self._revision_hypothesis(submission.hypothesis, "fixed")
+        failed = self._evidence_gate(fixed_hypothesis, control, exploit)
         if failed is not None:
             return self._inconclusive("fixed", failed.stage.name, failed.reason), Fix.NOT_VERIFIED, failed.reason
         assert exploit is not None
