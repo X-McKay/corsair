@@ -104,3 +104,30 @@ async def test_decisive_exploit_requires_every_target_line_on_each_revision(tmp_
     assert disposition.label is Label.INCONCLUSIVE and disposition.rule == "K3"
     if revision == "fixed":
         assert result.verdict.fix is Fix.NOT_VERIFIED
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("revision", ["vulnerable", "fixed"])
+@pytest.mark.parametrize("role", ["control", "exploit"])
+async def test_held_record_with_invariant_failure_is_error_and_cannot_verify_fix(tmp_path, revision, role):
+    from corsair.kernel import RESULT_DIR, Label, RoleResult
+
+    class ContradictoryHeldRecord(FakeSandboxes):
+        def _probe(self, name):
+            result = super()._probe(name)
+            if (self._labels[name]["corsair.lite.revision"], self._env[name]["CORSAIR_ROLE"]) == (revision, role):
+                path = f"{RESULT_DIR}/result.json"
+                record = json.loads(self._files[name][path])
+                record["invariant_failed"] = True
+                self._files[name][path] = json.dumps(record).encode()
+            return result
+
+    fake = ContradictoryHeldRecord({**HAPPY, (revision, role): Script("holds")})
+    evaluation = await kernel(fake, tmp_path).evaluate(REFERENCE)
+    run = next(run for run in evaluation.runs if (run.revision, run.role) == (revision, role))
+    assert run.result is RoleResult.ERROR
+    assert run.outcome is Outcome.ERRORED and run.invariant_held is None
+    assert "invariant failure" in run.message
+    disposition = next(item for item in evaluation.verdict.revisions if item.revision == revision)
+    assert disposition.label is Label.INCONCLUSIVE and disposition.rule == "K3"
+    assert evaluation.verdict.fix is Fix.NOT_VERIFIED

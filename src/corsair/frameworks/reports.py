@@ -94,6 +94,8 @@ def read_probe(files: Mapping[str, bytes | None], hypothesis, role: str) -> Prob
                 raise ValueError(f"native report disagrees with the driver record: {native}")
             if outcome is Outcome.HOLDS and exception_type is not None:
                 raise ValueError("a passing driver record contains an exception")
+            if outcome is Outcome.HOLDS and record.invariant_failed:
+                raise ValueError("a held driver record contains an invariant failure")
             if outcome is Outcome.VIOLATED and (exception_type != "AssertionError" or not record.invariant_failed):
                 raise ValueError("violation was not raised by the kernel-owned invariant check")
     except (ValueError, ET.ParseError) as error:
