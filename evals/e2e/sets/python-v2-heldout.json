@@ -1,0 +1,16 @@
+{
+  "held_out": true,
+  "note": "Frozen split of the 30 paired Python v2 cases (15 families with -a and -b variants). Families are sorted by name and every third one (index 2, 5, 8, 11, 14) is held out; the rest are dev. Each family's -a and -b variants stay together, so both splits hold one exploitable and one safe variant per family. Excluded: healthcheck-a, queryhelper-a (unpaired safe singletons), bare-tree-no-manifest, target-absent, local-dependency-missing, finding-text-injection, ineffective-fix (mechanics and lite-contract controls). Values are sha256 of each case's oracle.json; the eval command refuses a set whose oracle has changed. HELD-OUT: never use these cases to tune prompts, skills, budgets or contracts, and do not look at their failures to change the agent. Run them only against a configuration frozen on the dev split.",
+  "cases": {
+    "python/v2/deserialization-a": "beacc94eefd057f5152cba07425cae19a56b52515d275aad597086e4af4c9d79",
+    "python/v2/deserialization-b": "252f1695e5b53ae9749943df8bcd991b0e96a5f25fa776a8b3f53a12706643a6",
+    "python/v2/massassignment-a": "2eaeeebd74f4f6419bffe53eff99836ca3d933b051f3cf3dbc3c826094a8029d",
+    "python/v2/massassignment-b": "42cf375819285980b149d9db9e5c1fce5624cf54f1b5fff1bd52df408d76c77e",
+    "python/v2/pathtraversal-a": "9a931f7dcddaa0d5669fc73a0f04a557386ed7ad03a740eda2d2d0bfc145f6fc",
+    "python/v2/pathtraversal-b": "38cce00c65f9894e7591f8fe177dc0eda053040141e886ce9b6d46e843f807a0",
+    "python/v2/ssrf-a": "638e42633be1cc14d5b579bbf5289c30e79216ad6adac31c10bacd94b1c34ef3",
+    "python/v2/ssrf-b": "ad1b6416919bd9eb68439f14bcd10acaa5f1bccb41cf3034f424515650474a84",
+    "python/v2/xxe-a": "31586796960bbc7ec1f928a95da0052e0c14baae2f6081f42b124ccf2608c715",
+    "python/v2/xxe-b": "cf6f2a08865b940978a9cd3e3355cd459440de8f59e8821471526cb65a3936c5"
+  }
+}

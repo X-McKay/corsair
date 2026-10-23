@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import sys
 import time
 import uuid
+from collections import Counter
 from pathlib import Path
 
 from . import matrix
@@ -25,6 +27,8 @@ from .providers import agent_models, load_provider_config
 from .sandbox import sandboxes
 
 RUNS = Path(".runs/lite")
+LABELS = ("LIKELY_EXPLOITABLE", "LIKELY_NOT_EXPLOITABLE")  # the two decisive labels, reported with precision and recall
+TELEMETRY = ("requests", "input_tokens", "output_tokens", "tool_calls", "bash_calls", "duration_s")
 
 # v2 oracles whose expectation predates the lite contract. Lite's behaviour is the intended one here, so the case is
 # scored against the lite label (None: not scored) and the divergence is reported, not counted as a miss. See
@@ -129,39 +133,120 @@ async def _investigate(args: argparse.Namespace) -> int:
     return 0 if record["verdict"]["label"] == Label.LIKELY_EXPLOITABLE else 1
 
 
+def _load_set(path: Path) -> tuple[list[Path], bool]:
+    """Case directories of a frozen set file, and its held-out flag. Keys are relative to ``evals/e2e``; a case whose
+    oracle no longer matches the digest recorded at freeze time is refused, so a relabelled case cannot slip in."""
+    data = json.loads(path.read_text(encoding="utf-8"))
+    root = path.resolve().parent.parent
+    dirs = []
+    for key, digest in data["cases"].items():
+        oracle = root / key / "oracle.json"
+        if hashlib.sha256(oracle.read_bytes()).hexdigest() != digest:
+            raise SystemExit(f"{path}: the oracle for {key} changed since the set was frozen")
+        dirs.append(root / key)
+    return dirs, bool(data.get("held_out"))
+
+
+def _rate(part: int, whole: int) -> float | None:
+    return part / whole if whole else None
+
+
+def _telemetry(rows: list[dict], key: str) -> dict:
+    """Totals over the runs that reported the field. A field no run reported is unknown (total None), never zero."""
+    values = [row[key] for row in rows if row.get(key) is not None]
+    total = sum(values) if values else None
+    return {"reported_runs": len(values), "runs": len(rows), "total": total,
+            "mean": _rate(total, len(values)) if values else None}
+
+
+def summarise(rows: list[dict]) -> dict:
+    """Accuracy, per-label precision and recall, the INCONCLUSIVE rate and usage over per-run rows. Accuracy uses the
+    oracle's accepted labels (``correct``); precision and recall use its ``expected_label`` as the truth, and rows
+    without one are left out of them."""
+    scored = [row for row in rows if row["correct"] is not None]
+    truthed = [row for row in rows if row["expected_label"]]
+    per_label = {}
+    for label in LABELS:
+        tp = sum(1 for r in truthed if r["expected_label"] == label and r["label"] == label)
+        fp = sum(1 for r in truthed if r["expected_label"] != label and r["label"] == label)
+        fn = sum(1 for r in truthed if r["expected_label"] == label and r["label"] != label)
+        per_label[label] = {"tp": tp, "fp": fp, "fn": fn, "precision": _rate(tp, tp + fp), "recall": _rate(tp, tp + fn)}
+    counts = Counter(row["label"] for row in rows)
+    correct = sum(1 for r in scored if r["correct"])
+    return {"runs": len(rows), "scored_runs": len(scored), "correct_runs": correct,
+            "accuracy": _rate(correct, len(scored)), "forbidden_hits": sum(1 for r in rows if r["forbidden_hit"]),
+            "per_label": per_label, "label_counts": dict(sorted(counts.items())),
+            "inconclusive_rate": _rate(counts.get("INCONCLUSIVE", 0), len(rows)),
+            "telemetry": {key: _telemetry(rows, key) for key in TELEMETRY}}
+
+
+def per_case(rows: list[dict]) -> list[dict]:
+    """Per case over its repeats: label counts, the modal label and agreement (share of runs on the modal label)."""
+    groups: dict[str, list[dict]] = {}
+    for row in rows:
+        groups.setdefault(row["case"], []).append(row)
+    out = []
+    for case, group in groups.items():
+        counts = Counter(row["label"] for row in group)
+        modal, modal_count = counts.most_common(1)[0]
+        scored = [row for row in group if row["correct"] is not None]
+        out.append({"case": case, "case_id": group[0]["case_id"], "expected_label": group[0]["expected_label"],
+                    "runs": len(group), "label_counts": dict(sorted(counts.items())), "modal_label": modal,
+                    "agreement": modal_count / len(group), "scored_runs": len(scored),
+                    "accuracy": _rate(sum(1 for r in scored if r["correct"]), len(scored))})
+    return out
+
+
+def _models(config) -> dict:
+    """The profile, model name and endpoint each agent ran on, so results are compared by model."""
+    out = {}
+    for agent, name in sorted(config.agents.items()):
+        profile = config.profile(agent)
+        out[agent] = {"profile": name, "model_name": profile.model_name, "base_url": profile.base_url,
+                      "max_tokens": profile.max_tokens, "temperature": profile.temperature,
+                      "thinking": profile.thinking, "thinking_token_budget": profile.thinking_token_budget}
+    return out
+
+
 async def _eval(args: argparse.Namespace) -> int:
     config = load_provider_config(Path(args.provider))
+    if args.set:
+        case_dirs, held_out = _load_set(Path(args.set))
+    else:
+        case_dirs, held_out = [Path(p) for p in args.cases], None
     rows = []
     async with agent_models(config) as models:
-        for path in args.cases:
-            case_dir = Path(path)
+        for case_dir in case_dirs:
             case = load_case(case_dir)
             oracle = load_oracle(case_dir) or {}
-            record = await _investigate_one(case, args, models)
             expected = oracle.get("expected_label")
-            label = record["verdict"]["label"]
-            correct, forbidden_hit, note = score(case_dir.name, oracle, label)
-            rows.append({"case": str(case_dir), "case_id": case.case_id, "label": label, "fix": record["verdict"]["fix"],
-                         "expected_label": expected, "expected_fix": oracle.get("expected_fix"),
-                         "correct": correct, "forbidden_hit": forbidden_hit, "policy_note": note,
-                         "submissions": len(record["submissions"]), "early_stop": record.get("early_stop"),
-                         "gates": [s["gate"]["stage"] for s in record["submissions"]],
-                         "requests": record.get("requests"), "input_tokens": record.get("input_tokens"),
-                         "output_tokens": record.get("output_tokens"), "duration_s": record.get("duration_s"),
-                         "run_id": record["run_id"]})
-    scored = [r for r in rows if r["correct"] is not None]
-    summary = {"schema": "corsair-lite/eval/1", "cases": rows, "n": len(rows),
-               "correct": sum(1 for r in scored if r["correct"]), "scored": len(scored),
-               "forbidden_hits": sum(1 for r in rows if r["forbidden_hit"]),
+            for repeat in range(1, args.repeats + 1):
+                record = await _investigate_one(case, args, models)
+                label = record["verdict"]["label"]
+                correct, forbidden_hit, note = score(case_dir.name, oracle, label)
+                rows.append({"case": str(case_dir), "case_id": case.case_id, "repeat": repeat, "label": label,
+                             "fix": record["verdict"]["fix"], "expected_label": expected,
+                             "expected_fix": oracle.get("expected_fix"), "correct": correct,
+                             "forbidden_hit": forbidden_hit, "policy_note": note,
+                             "submissions": len(record["submissions"]), "early_stop": record.get("early_stop"),
+                             "gates": [s["gate"]["stage"] for s in record["submissions"]],
+                             "requests": record.get("requests"), "input_tokens": record.get("input_tokens"),
+                             "output_tokens": record.get("output_tokens"), "tool_calls": record.get("tool_calls"),
+                             "bash_calls": record.get("bash_calls"), "duration_s": record.get("duration_s"),
+                             "run_id": record["run_id"]})
+    summary = {"schema": "corsair-lite/eval/2", "provider": str(args.provider), "models": _models(config),
+               "set": str(args.set) if args.set else None, "held_out": held_out, "cases": len(case_dirs),
+               "repeats": args.repeats, "max_submissions": args.max_submissions,
+               "negative_threshold": args.negative_threshold, "metrics": summarise(rows),
+               "per_case": per_case(rows),
                "policy_divergences": [{"case_id": r["case_id"], "label": r["label"], "note": r["policy_note"]}
                                       for r in rows if r["policy_note"]],
-               "gate_ledger": _ledger(rows), "provider": str(args.provider), "max_submissions": args.max_submissions,
-               "negative_threshold": args.negative_threshold}
+               "gate_ledger": _ledger(rows), "runs": rows}
     out = Path(args.runs) / f"eval-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}.json"
     out.write_text(json.dumps(summary, indent=2) + "\n")
-    print(json.dumps({k: v for k, v in summary.items() if k != "cases"}, indent=2))
+    print(json.dumps({k: v for k, v in summary.items() if k not in ("runs", "per_case")}, indent=2))
     print(f"written {out}", file=sys.stderr)
-    return 0 if summary["forbidden_hits"] == 0 else 1
+    return 0 if summary["metrics"]["forbidden_hits"] == 0 else 1
 
 
 def score(name: str, oracle: dict, label: str) -> tuple[bool | None, bool, str | None]:
@@ -209,6 +294,13 @@ def _threshold(value: str) -> int:
     return number
 
 
+def _repeats(value: str) -> int:
+    number = int(value)
+    if number < 1:
+        raise argparse.ArgumentTypeError("repeats is at least 1")
+    return number
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="corsair", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -233,7 +325,11 @@ def main(argv: list[str] | None = None) -> int:
     inv.add_argument("--runs", default=str(RUNS))
 
     ev = sub.add_parser("eval", help="investigate several case directories and score them against oracle.json")
-    ev.add_argument("--cases", nargs="+", required=True)
+    source = ev.add_mutually_exclusive_group(required=True)
+    source.add_argument("--cases", nargs="+", help="case directories")
+    source.add_argument("--set", help="a frozen case set under evals/e2e/sets (dev or held-out)")
+    ev.add_argument("--repeats", type=_repeats, default=1,
+                    help="full investigations per case; repeats measure run-to-run agreement (default 1)")
     ev.add_argument("--provider", required=True)
     ev.add_argument("--max-submissions", type=int, default=4)
     ev.add_argument("--request-limit", type=int, default=60)

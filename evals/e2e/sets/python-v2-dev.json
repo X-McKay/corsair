@@ -1,0 +1,26 @@
+{
+  "held_out": false,
+  "note": "Frozen split of the 30 paired Python v2 cases (15 families with -a and -b variants). Families are sorted by name and every third one (index 2, 5, 8, 11, 14) is held out; the rest are dev. Each family's -a and -b variants stay together, so both splits hold one exploitable and one safe variant per family. Excluded: healthcheck-a, queryhelper-a (unpaired safe singletons), bare-tree-no-manifest, target-absent, local-dependency-missing, finding-text-injection, ineffective-fix (mechanics and lite-contract controls). Values are sha256 of each case's oracle.json; the eval command refuses a set whose oracle has changed. Dev cases are for prompt, skill, budget and contract tuning.",
+  "cases": {
+    "python/v2/cmdi-a": "7d0cce4c70858881cbddf31f0c0e4f14737c7ed8af63f259bf9e02896540f0a6",
+    "python/v2/cmdi-b": "c5abe034d8a9be1941f4b74164b5873f92c9c9599a254b255482ac5cd386954e",
+    "python/v2/codeinjection-a": "9e31f88f5792faa19f9f3ce459a50b1263503d99969f3a2db2f8f6f1b96b29c3",
+    "python/v2/codeinjection-b": "3c94ea1392fc57be463b7e8c9c88f536dcc61bb673ecf8fef84c76c9f34a1183",
+    "python/v2/errorexposure-a": "e3f12ab04137671b5c82de51c4453281ef5f0edb55723ebbec0f5d7b02de6e23",
+    "python/v2/errorexposure-b": "cf204cc882823d8f808f757f1961234a664beda1c98c111ede1fa1dbc409fa7f",
+    "python/v2/jwtnone-a": "438f42b9ba38bb1398cfaee70481fb2a5538bd1c34ce83a84632f7d4fc90f229",
+    "python/v2/jwtnone-b": "0cebae7dbf722328b68aee8a23af4f13d4da018eccbecfee710d9c12c5f85eca",
+    "python/v2/nullderef-a": "d8f57362565d9143650def2c9d168dc6c4772f5b25d926977fd9c578a2fbcb20",
+    "python/v2/nullderef-b": "10ba663db5da85d643884df52be73adbdb91f476639b00056e7b51fb0a4ad761",
+    "python/v2/openredirect-a": "a49b533cc9d3d83529bbea743b412dffb19ecf67f4d7e63ab0b7d182b14acf47",
+    "python/v2/openredirect-b": "2067bb67918477e9ce335688f145243e5034d4a03a639a3b223c48d9b321f4db",
+    "python/v2/pwhash-a": "16384374ac5b14addedea68811ef20d76497179bcc59a2541964819201a845ee",
+    "python/v2/pwhash-b": "839a362cc7f561906aef3a587cb93fc2d1021cf1074395ab499ba838b506f019",
+    "python/v2/redos-a": "5bf76b6985cffc42e8e56f0b6aaa458669d9a1fd1ba7e6d3951ccdfdfc858d2a",
+    "python/v2/redos-b": "3637a8b7432854472febfa5f1c00c66fc9e76c3c29b37a7986e90252ba6d5463",
+    "python/v2/tempfile-a": "8b2c2e77211523355796f92e31552dd88b16a98daab8e6528f18f0c7d1b710bc",
+    "python/v2/tempfile-b": "06098f580f2614fc150c9ffac8ed2c5a603d6edb11981c4f6c5b71b200a0d71f",
+    "python/v2/toctou-a": "0cddf6bfa7d79c19962ece5a369c3f29583e6665c9f316132e6b565fa9208a41",
+    "python/v2/toctou-b": "a6ed8c8081564e68555a20e0d14e986cfad8531543895909fb0f113b7a7b1868"
+  }
+}

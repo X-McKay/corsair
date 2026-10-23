@@ -39,12 +39,49 @@ make test            # plus the kernel on real containers (builds images/python)
 make verify          # kernel only, on the reviewed fixture with the reference submission
 make investigate CASE=cases/path-traversal-fixture PROVIDER=config/providers.local.json
 make eval            # the pilot set against their oracles; writes .runs/lite/eval-<stamp>.json
+make eval-dev        # the dev split (evals/e2e/sets/python-v2-dev.json); REPEATS=N runs each case N times
+make eval-heldout    # the held-out split (evals/e2e/sets/python-v2-heldout.json); report only, see below
 make cleanup         # remove every container this tool created
 ```
 
 Every run writes `.runs/lite/<run id>/run.json` with each submission's gate, the probe runs (outcomes, exception
 types, covered lines, JUnit and log references), the verdict and the producer's usage. `oracle.json` files beside
 cases are evaluator-only and never reach the agents.
+
+## Measuring accuracy
+
+`make eval` scores cases against their oracles; the eval summary (`.runs/lite/eval-<stamp>.json`) reports:
+
+- `metrics`: accuracy over scored runs (the oracle's accepted labels), per-label precision and recall for
+  `LIKELY_EXPLOITABLE` and `LIKELY_NOT_EXPLOITABLE` (truth is the oracle's `expected_label`), the `INCONCLUSIVE` rate,
+  label counts and usage (requests, tokens, tool and bash calls, duration). A field no run reported is `null`
+  (unknown), never zero; `reported_runs` says how many runs supplied it.
+- `per_case`: for each case over its repeats, the label counts, the modal label, `agreement` (share of runs on the
+  modal label) and accuracy.
+- `models`: the profile, model name, endpoint and sampling settings each agent ran on.
+- `runs`: one row per investigation, with its `run_id` and the full record under `.runs/lite/<run id>/`.
+
+`--repeats N` (`REPEATS=N` on the Makefile targets) runs every case N times. A single run of a stochastic model says
+little about accuracy; repeats show whether the label is stable as well as correct.
+
+**Splits.** `evals/e2e/sets/python-v2-dev.json` (20 cases, 10 families) and `python-v2-heldout.json` (10 cases, 5
+families) partition the 30 paired Python v2 cases: each family's `-a` and `-b` variants are in the same split, and each
+split holds one exploitable and one safe variant per family. The split is frozen: families are sorted by name and every
+third one is held out. The set files record a sha256 of each oracle, and `--set` refuses a set whose oracle has
+changed. **Held-out cases are for reporting only.** Do not use them to tune prompts, skills, budgets or contracts, and
+do not read their failures to change the agent. Tune on dev, freeze the configuration, then run held-out once for the
+report. Compare results only across runs with the same set, `REPEATS`, `MAX_SUBMISSIONS` and negative threshold.
+
+**Models.** The model is chosen by the provider config, not by a flag, so each model gets its own config file with the
+same agent mapping and only `model_name` (and endpoint) changed, and each run names it:
+
+```shell
+make eval-dev PROVIDER=config/providers.model-a.json REPEATS=3
+make eval-dev PROVIDER=config/providers.model-b.json REPEATS=3
+```
+
+Keep those files out of version control if they name private endpoints. Credentials are never stored in the config:
+`api_key_env` names an environment variable. The summary's `models` section is what makes two result files comparable.
 
 ## Layout
 

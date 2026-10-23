@@ -3,8 +3,11 @@ PROVIDER ?= config/providers.local.json
 CASE ?= cases/path-traversal-fixture
 RUNS ?= .runs/lite
 MAX_SUBMISSIONS ?= 4
+REPEATS ?= 1
+DEV_SET ?= evals/e2e/sets/python-v2-dev.json
+HELDOUT_SET ?= evals/e2e/sets/python-v2-heldout.json
 
-.PHONY: sync test test-offline test-docker image verify investigate eval pilot cleanup
+.PHONY: sync test test-offline test-docker image verify investigate eval eval-dev eval-heldout pilot cleanup
 
 sync:
 	uv sync --locked
@@ -31,7 +34,15 @@ investigate: image
 # The pilot set: the reviewed fixture plus the local Python corpus cases that carry a fixed revision.
 PILOT_CASES := cases/path-traversal-fixture $(wildcard evals/e2e/python/v2/*-a) $(wildcard evals/e2e/python/v2/*-b)
 eval: image
-	$(PYTHON) -m corsair.cli eval --cases $(PILOT_CASES) --provider $(PROVIDER) --max-submissions $(MAX_SUBMISSIONS) --runs $(RUNS)
+	$(PYTHON) -m corsair.cli eval --cases $(PILOT_CASES) --provider $(PROVIDER) --max-submissions $(MAX_SUBMISSIONS) --repeats $(REPEATS) --runs $(RUNS)
+
+# Frozen splits of the paired Python v2 cases. Tune prompts and skills on eval-dev only; eval-heldout is for reporting a
+# configuration already frozen on dev. REPEATS=N runs each case N times (provider config picks the model).
+eval-dev: image
+	$(PYTHON) -m corsair.cli eval --set $(DEV_SET) --provider $(PROVIDER) --max-submissions $(MAX_SUBMISSIONS) --repeats $(REPEATS) --runs $(RUNS)
+
+eval-heldout: image
+	$(PYTHON) -m corsair.cli eval --set $(HELDOUT_SET) --provider $(PROVIDER) --max-submissions $(MAX_SUBMISSIONS) --repeats $(REPEATS) --runs $(RUNS)
 
 pilot: image
 	$(PYTHON) -m corsair.cli verify --case cases/path-traversal-fixture --submission cases/path-traversal-fixture/reference-submission.json --provider $(PROVIDER) --runs $(RUNS)
