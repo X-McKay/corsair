@@ -3,10 +3,11 @@ from __future__ import annotations
 
 import json
 
+import anyio
 import pytest
 from pathlib import Path
 
-from pydantic_ai import ModelMessage, ModelResponse, TextPart, ToolCallPart
+from pydantic_ai import Agent, ModelMessage, ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.models.test import TestModel
 
@@ -38,6 +39,15 @@ def scripted(responses: list[list[tuple[str, dict] | str]]) -> FunctionModel:
 
 def make_kernel(fake: FakeSandboxes, tmp_path: Path) -> Kernel:
     return Kernel(fake, ROW, load_case(CASE), artifacts=ArtifactStore(tmp_path / "artifacts"), run_id="prod1")
+
+
+async def test_function_model_agent_run_completes():
+    def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        return ModelResponse(parts=[TextPart("ok")])
+
+    with anyio.fail_after(10):
+        result = await Agent(FunctionModel(respond), output_type=str).run("hi")
+    assert result.output == "ok"
 
 
 async def test_producer_explores_submits_and_stops_when_verified(tmp_path):
