@@ -3,8 +3,8 @@ review_status: candidate-evidence-unreviewed
 license_conclusion: absent-pending-independent-review
 clean_rebuild_identity: not-established
 qualification_blocker: "The evidence binds the exact collected image ID; no stable clean-rebuild image ID is asserted."
+case_binding: "Cases cite this evidence by runtime row, exact image ID, and receipt; the bundle is case-agnostic."
 runtime_row: "perl-tap-540"
-family_id: "cf-0004"
 image_reference: "corsair-lite-perl:dev"
 image_id: "sha256:90a29df261025b1c1e0d001373e10393ccc9c14f00b7baa14dc19a88c1c6b37f"
 platform: "linux/amd64"
@@ -13,9 +13,6 @@ parent_reference: "docker.io/library/debian@sha256:62bd423aeee912639ca8ee681c2b7
 parent_image_id: "sha256:133aec7ab1411181567fef7fc3f4512123e1f9660090b49851de4b698b4ff772"
 dockerfile: "images/perl/Dockerfile"
 dockerfile_sha256: "32fc7467c0abb6e9aa27b3fedf9b64a5e62025db12ed741895489972631a2126"
-case_ids:
-  - "cs-0004-a"
-  - "cs-0004-b"
 runtime_versions:
   - "Devel::Cover=1.44"
   - "JSON::PP=4.16"

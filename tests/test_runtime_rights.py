@@ -29,11 +29,19 @@ def test_runtime_images_pin_install_inputs_and_assert_runtime_versions():
 
     javascript = (ROOT / "images/javascript/Dockerfile").read_text()
     assert 'test "$(node --version)" = "v22.23.3"' in javascript
+    assert "rm -rf /usr/local/lib/node_modules/npm" in javascript
+    assert "/usr/local/lib/node_modules/corepack" in javascript
+    assert "/opt/yarn-v1.22.22" in javascript
+    assert "! command -v npm" in javascript
+    assert "! command -v corepack" in javascript
+    assert "! command -v yarn" in javascript
 
     java = (ROOT / "images/java21/Dockerfile").read_text()
     assert "java.runtime.version = 21.0.12.1+1-LTS" in java
     assert "/opt/corsair/licenses/jacoco-agent/about.html" in java
     assert "/opt/corsair/licenses/jacoco-cli/about.html" in java
+    assert "/opt/corsair/licenses/jacoco/EPL-2.0.txt" in java
+    assert "61616a4066701bc7888ad910de1633dbc55eb4d4d30d930feef55afb9492e33c" in java
 
     perl = (ROOT / "images/perl/Dockerfile").read_text()
     assert "5.040001" in perl
@@ -51,7 +59,7 @@ def test_runtime_images_pin_install_inputs_and_assert_runtime_versions():
 
 def test_runtime_rights_renderer_is_deterministic_and_embeds_exact_license_bytes():
     evidence = RuntimeEvidence(
-        runtime_row="row-a", family_id="cf-1", case_ids=("case-b", "case-a"),
+        runtime_row="row-a",
         image_reference="runtime:dev", image_id="sha256:" + "a" * 64,
         platform="linux/amd64", image_created="2026-10-23T00:00:00Z",
         parent_reference="registry.example/runtime@sha256:" + "b" * 64,
@@ -59,7 +67,7 @@ def test_runtime_rights_renderer_is_deterministic_and_embeds_exact_license_bytes
         dockerfile="images/runtime/Dockerfile", dockerfile_sha256="d" * 64,
         runtime_versions=("tool 2.0", "runtime 1.0"),
         packages=("zlib\t1.2", "base\t1.0"),
-        artifacts=(("tool.jar", "f" * 64), ("runtime.bin", "e" * 64)),
+        artifacts=(("/tool.jar", "f" * 64), ("/runtime.bin", "e" * 64)),
         license_files=(
             EvidenceFile(path="/licenses/z", content=b"last\n"),
             EvidenceFile(path="/licenses/a", content=b"first\nwith-newline\n"),
@@ -72,7 +80,10 @@ def test_runtime_rights_renderer_is_deterministic_and_embeds_exact_license_bytes
     assert b"review_status: candidate-evidence-unreviewed\n" in rendered
     assert b"clean_rebuild_identity: not-established\n" in rendered
     assert b"no stable clean-rebuild image ID is asserted" in rendered
-    assert rendered.index(b"case-a") < rendered.index(b"case-b")
+    assert b"family_id:" not in rendered
+    assert b"case_ids:" not in rendered
+    assert (b"case_binding: \"Cases cite this evidence by runtime row, exact image ID, "
+            b"and receipt; the bundle is case-agnostic.\"\n") in rendered
     assert rendered.index(b"base\\t1.0") < rendered.index(b"zlib\\t1.2")
     assert rendered.index(b"/licenses/a") < rendered.index(b"/licenses/z")
     assert b"sha256: b89545c5d2fccb30fc0bf847059b366633baf8e2a14f0a616f5e9741a656408f" in rendered
@@ -82,7 +93,7 @@ def test_runtime_rights_renderer_is_deterministic_and_embeds_exact_license_bytes
 
 def test_runtime_rights_renderer_rejects_ambiguous_evidence_paths():
     common = dict(
-        runtime_row="row-a", family_id="cf-1", case_ids=("case-a",),
+        runtime_row="row-a",
         image_reference="runtime:dev", image_id="sha256:" + "a" * 64,
         platform="linux/amd64", image_created="2026-10-23T00:00:00Z",
         parent_reference="registry.example/runtime@sha256:" + "b" * 64,
@@ -123,13 +134,46 @@ def test_runtime_rights_tar_reader_preserves_exact_regular_file_bytes():
     )
 
 
-@pytest.mark.parametrize("archive", [
-    _tar((("../escape", b"bad"),)),
-    _tar((), symlink="usr/share/doc/link"),
+@pytest.mark.parametrize("name", [
+    "../escape",
+    "/absolute",
+    "//server/share",
+    "a/../b",
+    "a//b",
+    "a/./b",
 ])
-def test_runtime_rights_tar_reader_rejects_nonregular_or_escaping_entries(archive):
+def test_runtime_rights_tar_reader_rejects_absolute_or_noncanonical_paths(name):
     with pytest.raises(ValueError, match="unsafe"):
-        evidence_files_from_tar(archive)
+        evidence_files_from_tar(_tar(((name, b"bad"),)))
+
+
+def test_runtime_rights_tar_reader_rejects_nonregular_entries():
+    with pytest.raises(ValueError, match="unsafe"):
+        evidence_files_from_tar(_tar((), symlink="usr/share/doc/link"))
+
+
+@pytest.mark.parametrize("path", [
+    "/../escape",
+    "/a/../b",
+    "//server/share",
+    "/a//b",
+    "/a/./b",
+    "relative/path",
+])
+def test_runtime_rights_renderer_rejects_noncanonical_artifact_paths(path):
+    evidence = RuntimeEvidence(
+        runtime_row="row-a",
+        image_reference="runtime:dev", image_id="sha256:" + "a" * 64,
+        platform="linux/amd64", image_created="2026-10-23T00:00:00Z",
+        parent_reference="registry.example/runtime@sha256:" + "b" * 64,
+        parent_image_id="sha256:" + "c" * 64,
+        dockerfile="images/runtime/Dockerfile", dockerfile_sha256="d" * 64,
+        runtime_versions=("runtime 1.0",), packages=(),
+        artifacts=((path, "e" * 64),),
+        license_files=(EvidenceFile(path="/LICENSE", content=b"terms\n"),),
+    )
+    with pytest.raises(ValueError, match="canonical absolute"):
+        render_rights_evidence(evidence)
 
 
 def test_runtime_rights_collector_binds_image_parent_dockerfile_and_inventory(tmp_path):
@@ -162,7 +206,7 @@ def test_runtime_rights_collector_binds_image_parent_dockerfile_and_inventory(tm
         raise AssertionError(arguments)
 
     spec = RuntimeSpec(
-        runtime_row="row-a", family_id="cf-1", case_ids=("case-a",), image="runtime:dev",
+        runtime_row="row-a", image="runtime:dev",
         parent="registry.example/runtime@sha256:" + "d" * 64,
         dockerfile="images/runtime/Dockerfile", version_command="versions-command",
         license_command="licenses-command", artifact_command="artifacts-command",
@@ -187,6 +231,9 @@ def test_runtime_rights_specs_cover_every_conformance_runtime_and_required_licen
     }
     by_row = {spec.runtime_row: spec for spec in RUNTIME_SPECS}
     assert "/usr/local/lib/python3.12/LICENSE.txt" in by_row["pytest-cpython312"].license_command
+    assert "*.dist-info/licenses/*" in by_row["pytest-cpython312"].license_command
+    assert "*.dist-info/METADATA" in by_row["pytest-cpython312"].license_command
+    assert "*/.dist-info/" not in by_row["pytest-cpython312"].license_command
     assert "/usr/local/LICENSE" in by_row["node-test-node22"].license_command
     assert '"$JAVA_HOME/legal"' in by_row["javac-java21"].license_command
     assert "/opt/corsair/licenses" in by_row["javac-java21"].license_command
@@ -200,7 +247,7 @@ def test_runtime_rights_specs_cover_every_conformance_runtime_and_required_licen
 
 def test_runtime_rights_writer_is_atomic_and_check_mode_detects_drift(tmp_path):
     evidence = RuntimeEvidence(
-        runtime_row="row-a", family_id="cf-1", case_ids=("case-a",),
+        runtime_row="row-a",
         image_reference="runtime:dev", image_id="sha256:" + "a" * 64,
         platform="linux/amd64", image_created="2026-10-23T00:00:00Z",
         parent_reference="registry.example/runtime@sha256:" + "b" * 64,

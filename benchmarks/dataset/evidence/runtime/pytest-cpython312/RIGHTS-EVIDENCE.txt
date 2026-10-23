@@ -3,8 +3,8 @@ review_status: candidate-evidence-unreviewed
 license_conclusion: absent-pending-independent-review
 clean_rebuild_identity: not-established
 qualification_blocker: "The evidence binds the exact collected image ID; no stable clean-rebuild image ID is asserted."
+case_binding: "Cases cite this evidence by runtime row, exact image ID, and receipt; the bundle is case-agnostic."
 runtime_row: "pytest-cpython312"
-family_id: "cf-0001"
 image_reference: "corsair-lite-python:dev"
 image_id: "sha256:43b0c43a93350375aa45a6ac664489826fce01599daae81dbc10127e4854110a"
 platform: "linux/amd64"
@@ -13,9 +13,6 @@ parent_reference: "docker.io/library/python@sha256:a0f57064cbdcd6285fa45f51237ab
 parent_image_id: "sha256:a33c10a97f11005523814c6eee013986119fe41f3122f444518117536675c8e1"
 dockerfile: "images/python/Dockerfile"
 dockerfile_sha256: "5dfaf829b03629a3829db2cbdb4ba4ad534cdce2eb0214696ffa643048e8f211"
-case_ids:
-  - "cs-0001-a"
-  - "cs-0001-b"
 runtime_versions:
   - "Pygments==2.21.0"
   - "Python 3.12.15"
@@ -403,6 +400,1817 @@ INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
 LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
 OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
+--- END LICENSE FILE ---
+
+--- BEGIN LICENSE FILE ---
+path: "/usr/local/lib/python3.12/site-packages/coverage-7.13.4.dist-info/METADATA"
+sha256: efc213f6d9b3943a17773b1c2040974cd237e2499cb6330b8d1712d8b91be1d4
+size: 8511
+content:
+Metadata-Version: 2.4
+Name: coverage
+Version: 7.13.4
+Summary: Code coverage measurement for Python
+Home-page: https://github.com/coveragepy/coveragepy
+Author: Ned Batchelder and 252 others
+Author-email: ned@nedbatchelder.com
+License: Apache-2.0
+Project-URL: Documentation, https://coverage.readthedocs.io/en/7.13.4
+Project-URL: Funding, https://tidelift.com/subscription/pkg/pypi-coverage?utm_source=pypi-coverage&utm_medium=referral&utm_campaign=pypi
+Project-URL: Issues, https://github.com/coveragepy/coveragepy/issues
+Project-URL: Mastodon, https://hachyderm.io/@coveragepy
+Project-URL: Mastodon (nedbat), https://hachyderm.io/@nedbat
+Keywords: code coverage testing
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Environment :: Console
+Classifier: Intended Audience :: Developers
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: 3.14
+Classifier: Programming Language :: Python :: 3.15
+Classifier: Programming Language :: Python :: Free Threading :: 3 - Stable
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Classifier: Topic :: Software Development :: Quality Assurance
+Classifier: Topic :: Software Development :: Testing
+Requires-Python: >=3.10
+Description-Content-Type: text/x-rst
+License-File: LICENSE.txt
+Provides-Extra: toml
+Requires-Dist: tomli; python_full_version <= "3.11.0a6" and extra == "toml"
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: keywords
+Dynamic: license
+Dynamic: license-file
+Dynamic: project-url
+Dynamic: provides-extra
+Dynamic: requires-python
+Dynamic: summary
+
+.. Licensed under the Apache License: http://www.apache.org/licenses/LICENSE-2.0
+.. For details: https://github.com/coveragepy/coveragepy/blob/main/NOTICE.txt
+
+===========
+Coverage.py
+===========
+
+Code coverage measurement for Python.
+
+.. image:: https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/banner2-direct.svg
+    :target: https://vshymanskyy.github.io/StandWithUkraine
+    :alt: Stand with Ukraine
+
+-------------
+
+|  |kit| |license| |versions|
+|  |test-status| |quality-status| |docs| |metacov|
+|  |tidelift| |sponsor| |stars| |mastodon-coveragepy| |mastodon-nedbat|
+   |bluesky-nedbat|
+
+Coverage.py measures code coverage, typically during test execution. It uses
+the code analysis tools and tracing hooks provided in the Python standard
+library to determine which lines are executable, and which have been executed.
+
+Coverage.py runs on these versions of Python:
+
+.. PYVERSIONS
+
+* Python 3.10 through 3.15 alpha, including free-threading.
+* PyPy3 versions 3.10 and 3.11.
+
+Documentation is on `Read the Docs`_.  Code repository and issue tracker are on
+`GitHub`_.
+
+.. _Read the Docs: https://coverage.readthedocs.io/en/7.13.4/
+.. _GitHub: https://github.com/coveragepy/coveragepy
+
+
+For Enterprise
+--------------
+
+.. |tideliftlogo| image:: https://nedbatchelder.com/pix/Tidelift_Logo_small.png
+   :alt: Tidelift
+   :target: https://tidelift.com/subscription/pkg/pypi-coverage?utm_source=pypi-coverage&utm_medium=referral&utm_campaign=readme
+
+.. list-table::
+   :widths: 10 100
+
+   * - |tideliftlogo|
+     - `Available as part of the Tidelift Subscription. <https://tidelift.com/subscription/pkg/pypi-coverage?utm_source=pypi-coverage&utm_medium=referral&utm_campaign=readme>`_
+       Coverage and thousands of other packages are working with
+       Tidelift to deliver one enterprise subscription that covers all of the open
+       source you use.  If you want the flexibility of open source and the confidence
+       of commercial-grade software, this is for you.
+       `Learn more. <https://tidelift.com/subscription/pkg/pypi-coverage?utm_source=pypi-coverage&utm_medium=referral&utm_campaign=readme>`_
+
+
+Getting Started
+---------------
+
+Looking to run ``coverage`` on your test suite? See the `Quick Start section`_
+of the docs.
+
+.. _Quick Start section: https://coverage.readthedocs.io/en/7.13.4/#quick-start
+
+
+Change history
+--------------
+
+The complete history of changes is on the `change history page`_.
+
+.. _change history page: https://coverage.readthedocs.io/en/7.13.4/changes.html
+
+
+Code of Conduct
+---------------
+
+Everyone participating in the coverage.py project is expected to treat other
+people with respect and to follow the guidelines articulated in the `Python
+Community Code of Conduct`_.
+
+.. _Python Community Code of Conduct: https://www.python.org/psf/codeofconduct/
+
+
+Contributing
+------------
+
+Found a bug? Want to help improve the code or documentation? See the
+`Contributing section`_ of the docs.
+
+.. _Contributing section: https://coverage.readthedocs.io/en/7.13.4/contributing.html
+
+
+Security
+--------
+
+To report a security vulnerability, please use the `Tidelift security
+contact`_.  Tidelift will coordinate the fix and disclosure.
+
+.. _Tidelift security contact: https://tidelift.com/security
+
+
+License
+-------
+
+Licensed under the `Apache 2.0 License`_.  For details, see `NOTICE.txt`_.
+
+.. _Apache 2.0 License: http://www.apache.org/licenses/LICENSE-2.0
+.. _NOTICE.txt: https://github.com/coveragepy/coveragepy/blob/main/NOTICE.txt
+
+
+.. |test-status| image:: https://github.com/coveragepy/coveragepy/actions/workflows/testsuite.yml/badge.svg?branch=main&event=push
+    :target: https://github.com/coveragepy/coveragepy/actions/workflows/testsuite.yml
+    :alt: Test suite status
+.. |quality-status| image:: https://github.com/coveragepy/coveragepy/actions/workflows/quality.yml/badge.svg?branch=main&event=push
+    :target: https://github.com/coveragepy/coveragepy/actions/workflows/quality.yml
+    :alt: Quality check status
+.. |docs| image:: https://readthedocs.org/projects/coverage/badge/?version=latest&style=flat
+    :target: https://coverage.readthedocs.io/en/7.13.4/
+    :alt: Documentation
+.. |kit| image:: https://img.shields.io/pypi/v/coverage
+    :target: https://pypi.org/project/coverage/
+    :alt: PyPI status
+.. |versions| image:: https://img.shields.io/pypi/pyversions/coverage.svg?logo=python&logoColor=FBE072
+    :target: https://pypi.org/project/coverage/
+    :alt: Python versions supported
+.. |license| image:: https://img.shields.io/pypi/l/coverage.svg
+    :target: https://github.com/coveragepy/coveragepy/blob/main/LICENSE.txt
+    :alt: License
+.. |metacov| image:: https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/nedbat/8c6980f77988a327348f9b02bbaf67f5/raw/metacov.json
+    :target: https://coveragepy.github.io/metacov-reports/latest.html
+    :alt: Coverage reports
+.. |tidelift| image:: https://tidelift.com/badges/package/pypi/coverage
+    :target: https://tidelift.com/subscription/pkg/pypi-coverage?utm_source=pypi-coverage&utm_medium=referral&utm_campaign=readme
+    :alt: Tidelift
+.. |stars| image:: https://img.shields.io/github/stars/coveragepy/coveragepy.svg?logo=github&style=flat
+    :target: https://github.com/coveragepy/coveragepy/stargazers
+    :alt: GitHub stars
+.. |mastodon-nedbat| image:: https://img.shields.io/badge/dynamic/json?style=flat&labelColor=450657&logo=mastodon&logoColor=ffffff&label=@nedbat&query=followers_count&url=https%3A%2F%2Fhachyderm.io%2Fapi%2Fv1%2Faccounts%2Flookup%3Facct=nedbat
+    :target: https://hachyderm.io/@nedbat
+    :alt: nedbat on Mastodon
+.. |mastodon-coveragepy| image:: https://img.shields.io/badge/dynamic/json?style=flat&labelColor=450657&logo=mastodon&logoColor=ffffff&label=@coveragepy&query=followers_count&url=https%3A%2F%2Fhachyderm.io%2Fapi%2Fv1%2Faccounts%2Flookup%3Facct=coveragepy
+    :target: https://hachyderm.io/@coveragepy
+    :alt: coveragepy on Mastodon
+.. |bluesky-nedbat| image:: https://img.shields.io/badge/dynamic/json?style=flat&color=96a3b0&labelColor=3686f7&logo=icloud&logoColor=white&label=@nedbat&url=https%3A%2F%2Fpublic.api.bsky.app%2Fxrpc%2Fapp.bsky.actor.getProfile%3Factor=nedbat.com&query=followersCount
+    :target: https://bsky.app/profile/nedbat.com
+    :alt: nedbat on Bluesky
+.. |sponsor| image:: https://img.shields.io/badge/%E2%9D%A4-Sponsor%20me-brightgreen?style=flat&logo=GitHub
+    :target: https://github.com/sponsors/nedbat
+    :alt: Sponsor me on GitHub
+--- END LICENSE FILE ---
+
+--- BEGIN LICENSE FILE ---
+path: "/usr/local/lib/python3.12/site-packages/coverage-7.13.4.dist-info/licenses/LICENSE.txt"
+sha256: 0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594
+size: 10174
+content:
+
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   1. Definitions.
+
+      "License" shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      "Licensor" shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
+
+      "Legal Entity" shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      "control" means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
+
+      "You" (or "Your") shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
+
+      "Source" form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
+
+      "Object" form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
+
+      "Work" shall mean the work of authorship, whether in Source or
+      Object form, made available under the License, as indicated by a
+      copyright notice that is included in or attached to the work
+      (an example is provided in the Appendix below).
+
+      "Derivative Works" shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
+
+      "Contribution" shall mean any work of authorship, including
+      the original version of the Work and any modifications or additions
+      to that Work or Derivative Works thereof, that is intentionally
+      submitted to Licensor for inclusion in the Work by the copyright owner
+      or by an individual or Legal Entity authorized to submit on behalf of
+      the copyright owner. For the purposes of this definition, "submitted"
+      means any form of electronic, verbal, or written communication sent
+      to the Licensor or its representatives, including but not limited to
+      communication on electronic mailing lists, source code control systems,
+      and issue tracking systems that are managed by, or on behalf of, the
+      Licensor for the purpose of discussing and improving the Work, but
+      excluding communication that is conspicuously marked or otherwise
+      designated in writing by the copyright owner as "Not a Contribution."
+
+      "Contributor" shall mean Licensor and any individual or Legal Entity
+      on behalf of whom a Contribution has been received by Licensor and
+      subsequently incorporated within the Work.
+
+   2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
+
+   3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by combination of their Contribution(s)
+      with the Work to which such Contribution(s) was submitted. If You
+      institute patent litigation against any entity (including a
+      cross-claim or counterclaim in a lawsuit) alleging that the Work
+      or a Contribution incorporated within the Work constitutes direct
+      or contributory patent infringement, then any patent licenses
+      granted to You under this License for that Work shall terminate
+      as of the date such litigation is filed.
+
+   4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
+
+      (a) You must give any other recipients of the Work or
+          Derivative Works a copy of this License; and
+
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
+
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
+
+      (d) If the Work includes a "NOTICE" text file as part of its
+          distribution, then any Derivative Works that You distribute must
+          include a readable copy of the attribution notices contained
+          within such NOTICE file, excluding those notices that do not
+          pertain to any part of the Derivative Works, in at least one
+          of the following places: within a NOTICE text file distributed
+          as part of the Derivative Works; within the Source form or
+          documentation, if provided along with the Derivative Works; or,
+          within a display generated by the Derivative Works, if and
+          wherever such third-party notices normally appear. The contents
+          of the NOTICE file are for informational purposes only and
+          do not modify the License. You may add Your own attribution
+          notices within Derivative Works that You distribute, alongside
+          or as an addendum to the NOTICE text from the Work, provided
+          that such additional attribution notices cannot be construed
+          as modifying the License.
+
+      You may add Your own copyright statement to Your modifications and
+      may provide additional or different license terms and conditions
+      for use, reproduction, or distribution of Your modifications, or
+      for any such Derivative Works as a whole, provided Your use,
+      reproduction, and distribution of the Work otherwise complies with
+      the conditions stated in this License.
+
+   5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
+
+   6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
+
+   7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an "AS IS" BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
+
+   8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or consequential damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or any and all
+      other commercial damages or losses), even if such Contributor
+      has been advised of the possibility of such damages.
+
+   9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may act only
+      on Your own behalf and on Your sole responsibility, not on behalf
+      of any other Contributor, and only if You agree to indemnify,
+      defend, and hold each Contributor harmless for any liability
+      incurred by, or claims asserted against, such Contributor by reason
+      of your accepting any such warranty or additional liability.
+
+   END OF TERMS AND CONDITIONS
+--- END LICENSE FILE ---
+
+--- BEGIN LICENSE FILE ---
+path: "/usr/local/lib/python3.12/site-packages/iniconfig-2.3.1.dist-info/METADATA"
+sha256: 47c2c35d936f5c649d8074c6464719a42966a67b5cebad01e3e5784cf090cfb6
+size: 2826
+content:
+Metadata-Version: 2.4
+Name: iniconfig
+Version: 2.3.1
+Summary: brain-dead simple config-ini parsing
+Author-email: Ronny Pfannschmidt <opensource@ronnypfannschmidt.de>, Holger Krekel <holger.krekel@gmail.com>
+License-Expression: MIT
+Project-URL: Homepage, https://github.com/pytest-dev/iniconfig
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: Operating System :: MacOS :: MacOS X
+Classifier: Operating System :: Microsoft :: Windows
+Classifier: Operating System :: POSIX
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: 3.14
+Classifier: Programming Language :: Python :: 3.15
+Classifier: Topic :: Software Development :: Libraries
+Classifier: Topic :: Utilities
+Requires-Python: >=3.10
+Description-Content-Type: text/x-rst
+License-File: LICENSE
+Dynamic: license-file
+
+iniconfig: brain-dead simple parsing of ini files
+=======================================================
+
+iniconfig is a small and simple INI-file parser module
+having a unique set of features:
+
+* maintains order of sections and entries
+* supports multi-line values with or without line-continuations
+* supports "#" comments everywhere
+* raises errors with proper line-numbers
+* no bells and whistles like automatic substitutions
+* iniconfig raises an Error if two sections have the same name.
+
+If you encounter issues or have feature wishes please report them to:
+
+    https://github.com/pytest-dev/iniconfig/issues
+
+Basic Example
+===================================
+
+If you have an ini file like this:
+
+.. code-block:: ini
+
+    # content of example.ini
+    [section1] # comment
+    name1=value1  # comment
+    name1b=value1,value2  # comment
+
+    [section2]
+    name2=
+        line1
+        line2
+
+use ``IniConfig.parse()`` to strip inline comments from values:
+
+.. code-block:: pycon
+
+    >>> import iniconfig
+    >>> ini = iniconfig.IniConfig.parse("example.ini")
+    >>> ini['section1']['name1'] # raises KeyError if not exists
+    'value1'
+    >>> ini.get('section1', 'name1b', [], lambda x: x.split(","))
+    ['value1', 'value2']
+    >>> ini.get('section1', 'notexist', [], lambda x: x.split(","))
+    []
+    >>> [x.name for x in list(ini)]
+    ['section1', 'section2']
+    >>> list(list(ini)[0].items())
+    [('name1', 'value1'), ('name1b', 'value1,value2')]
+    >>> 'section1' in ini
+    True
+    >>> 'inexistendsection' in ini
+    False
+
+The ``IniConfig()`` constructor preserves inline comments in values for backward
+compatibility. Use ``IniConfig.parse(..., strip_inline_comments=False)`` to
+preserve them when using the parsing method.
+--- END LICENSE FILE ---
+
+--- BEGIN LICENSE FILE ---
+path: "/usr/local/lib/python3.12/site-packages/iniconfig-2.3.1.dist-info/licenses/LICENSE"
+sha256: 3409fa91f7ace557894632676656e32264fe5ef7581535725dc9a23774551bd4
+size: 1098
+content:
+The MIT License (MIT)
+
+Copyright (c) 2010 - 2023 Holger Krekel and others
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+--- END LICENSE FILE ---
+
+--- BEGIN LICENSE FILE ---
+path: "/usr/local/lib/python3.12/site-packages/packaging-26.3.dist-info/METADATA"
+sha256: 70fdb89fc4d4a9a043bf7372b8972bcc883fddff34ab55e9cf80d73875384763
+size: 3544
+content:
+Metadata-Version: 2.4
+Name: packaging
+Version: 26.3
+Summary: Core utilities for Python packages
+Author-email: Donald Stufft <donald@stufft.io>
+Requires-Python: >=3.9
+Description-Content-Type: text/x-rst
+License-Expression: Apache-2.0 OR BSD-2-Clause
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: 3.14
+Classifier: Programming Language :: Python :: 3.15
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Classifier: Programming Language :: Python :: Free Threading :: 4 - Resilient
+Classifier: Typing :: Typed
+License-File: LICENSE
+License-File: LICENSE.APACHE
+License-File: LICENSE.BSD
+Project-URL: Documentation, https://packaging.pypa.io/
+Project-URL: Source, https://github.com/pypa/packaging
+
+packaging
+=========
+
+.. start-intro
+
+Reusable core utilities for various Python Packaging
+`interoperability specifications <https://packaging.python.org/specifications/>`_.
+
+This library provides utilities that implement the interoperability
+specifications which have clearly one correct behaviour (eg: :pep:`440`)
+or benefit greatly from having a single shared implementation (eg: :pep:`425`).
+
+.. end-intro
+
+The ``packaging`` project includes the following: version handling, specifiers,
+markers, requirements, tags, metadata, lockfiles, utilities.
+
+Documentation
+-------------
+
+The `documentation`_ provides information and the API for the following:
+
+- Version Handling
+- Specifiers
+- Markers
+- Licenses
+- Requirements
+- Metadata
+- Tags
+- Lockfiles (pylock)
+- Direct URL helpers
+- Dependency groups
+- Errors
+- Utilities
+
+Installation
+------------
+
+Use ``pip`` to install these utilities::
+
+    pip install packaging
+
+The ``packaging`` library uses calendar-based versioning (``YY.N``).
+
+Discussion
+----------
+
+If you run into bugs, you can file them in our `issue tracker`_.
+
+You can also join discussions on `GitHub Discussions`_ to ask questions or get involved.
+
+.. _`documentation`: https://packaging.pypa.io/
+.. _`issue tracker`: https://github.com/pypa/packaging/issues
+.. _`GitHub Discussions`: https://github.com/pypa/packaging/discussions
+
+
+Code of Conduct
+---------------
+
+Everyone interacting in the packaging project's codebases, issue trackers, chat
+rooms, and mailing lists is expected to follow the `PSF Code of Conduct`_.
+
+.. _PSF Code of Conduct: https://github.com/pypa/.github/blob/main/CODE_OF_CONDUCT.md
+
+Contributing
+------------
+
+The ``CONTRIBUTING.rst`` file outlines how to contribute to this project as
+well as how to report a potential security issue. The documentation for this
+project also covers information about `project development`_ and `security`_.
+
+.. _`project development`: https://packaging.pypa.io/en/latest/development/
+.. _`security`: https://packaging.pypa.io/en/latest/security/
+
+Project History
+---------------
+
+Please review the ``CHANGELOG.rst`` file or the `Changelog documentation`_ for
+recent changes and project history.
+
+.. _`Changelog documentation`: https://packaging.pypa.io/en/latest/changelog/
+
+--- END LICENSE FILE ---
+
+--- BEGIN LICENSE FILE ---
+path: "/usr/local/lib/python3.12/site-packages/packaging-26.3.dist-info/licenses/LICENSE"
+sha256: cad1ef5bd340d73e074ba614d26f7deaca5c7940c3d8c34852e65c4909686c48
+size: 197
+content:
+This software is made available under the terms of *either* of the licenses
+found in LICENSE.APACHE or LICENSE.BSD. Contributions to this software is made
+under the terms of *both* these licenses.
+--- END LICENSE FILE ---
+
+--- BEGIN LICENSE FILE ---
+path: "/usr/local/lib/python3.12/site-packages/packaging-26.3.dist-info/licenses/LICENSE.APACHE"
+sha256: 0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594
+size: 10174
+content:
+
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   1. Definitions.
+
+      "License" shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      "Licensor" shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
+
+      "Legal Entity" shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      "control" means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
+
+      "You" (or "Your") shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
+
+      "Source" form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
+
+      "Object" form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
+
+      "Work" shall mean the work of authorship, whether in Source or
+      Object form, made available under the License, as indicated by a
+      copyright notice that is included in or attached to the work
+      (an example is provided in the Appendix below).
+
+      "Derivative Works" shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
+
+      "Contribution" shall mean any work of authorship, including
+      the original version of the Work and any modifications or additions
+      to that Work or Derivative Works thereof, that is intentionally
+      submitted to Licensor for inclusion in the Work by the copyright owner
+      or by an individual or Legal Entity authorized to submit on behalf of
+      the copyright owner. For the purposes of this definition, "submitted"
+      means any form of electronic, verbal, or written communication sent
+      to the Licensor or its representatives, including but not limited to
+      communication on electronic mailing lists, source code control systems,
+      and issue tracking systems that are managed by, or on behalf of, the
+      Licensor for the purpose of discussing and improving the Work, but
+      excluding communication that is conspicuously marked or otherwise
+      designated in writing by the copyright owner as "Not a Contribution."
+
+      "Contributor" shall mean Licensor and any individual or Legal Entity
+      on behalf of whom a Contribution has been received by Licensor and
+      subsequently incorporated within the Work.
+
+   2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
+
+   3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by combination of their Contribution(s)
+      with the Work to which such Contribution(s) was submitted. If You
+      institute patent litigation against any entity (including a
+      cross-claim or counterclaim in a lawsuit) alleging that the Work
+      or a Contribution incorporated within the Work constitutes direct
+      or contributory patent infringement, then any patent licenses
+      granted to You under this License for that Work shall terminate
+      as of the date such litigation is filed.
+
+   4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
+
+      (a) You must give any other recipients of the Work or
+          Derivative Works a copy of this License; and
+
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
+
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
+
+      (d) If the Work includes a "NOTICE" text file as part of its
+          distribution, then any Derivative Works that You distribute must
+          include a readable copy of the attribution notices contained
+          within such NOTICE file, excluding those notices that do not
+          pertain to any part of the Derivative Works, in at least one
+          of the following places: within a NOTICE text file distributed
+          as part of the Derivative Works; within the Source form or
+          documentation, if provided along with the Derivative Works; or,
+          within a display generated by the Derivative Works, if and
+          wherever such third-party notices normally appear. The contents
+          of the NOTICE file are for informational purposes only and
+          do not modify the License. You may add Your own attribution
+          notices within Derivative Works that You distribute, alongside
+          or as an addendum to the NOTICE text from the Work, provided
+          that such additional attribution notices cannot be construed
+          as modifying the License.
+
+      You may add Your own copyright statement to Your modifications and
+      may provide additional or different license terms and conditions
+      for use, reproduction, or distribution of Your modifications, or
+      for any such Derivative Works as a whole, provided Your use,
+      reproduction, and distribution of the Work otherwise complies with
+      the conditions stated in this License.
+
+   5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
+
+   6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
+
+   7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an "AS IS" BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
+
+   8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or consequential damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or any and all
+      other commercial damages or losses), even if such Contributor
+      has been advised of the possibility of such damages.
+
+   9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may act only
+      on Your own behalf and on Your sole responsibility, not on behalf
+      of any other Contributor, and only if You agree to indemnify,
+      defend, and hold each Contributor harmless for any liability
+      incurred by, or claims asserted against, such Contributor by reason
+      of your accepting any such warranty or additional liability.
+
+   END OF TERMS AND CONDITIONS
+--- END LICENSE FILE ---
+
+--- BEGIN LICENSE FILE ---
+path: "/usr/local/lib/python3.12/site-packages/packaging-26.3.dist-info/licenses/LICENSE.BSD"
+sha256: b70e7e9b742f1cc6f948b34c16aa39ffece94196364bc88ff0d2180f0028fac5
+size: 1344
+content:
+Copyright (c) Donald Stufft and individual contributors.
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+    1. Redistributions of source code must retain the above copyright notice,
+       this list of conditions and the following disclaimer.
+
+    2. Redistributions in binary form must reproduce the above copyright
+       notice, this list of conditions and the following disclaimer in the
+       documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+--- END LICENSE FILE ---
+
+--- BEGIN LICENSE FILE ---
+path: "/usr/local/lib/python3.12/site-packages/pip-25.0.1.dist-info/LICENSE.txt"
+sha256: 634300a669d49aeae65b12c6c48c924c51a4cdf3d1ff086dc3456dc8bcaa2104
+size: 1093
+content:
+Copyright (c) 2008-present The pip developers (see AUTHORS.txt file)
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+--- END LICENSE FILE ---
+
+--- BEGIN LICENSE FILE ---
+path: "/usr/local/lib/python3.12/site-packages/pip-25.0.1.dist-info/METADATA"
+sha256: 4fa7318cf30f979db7cec45c12cbbc2b4f88a15f12eefbf59a6291d0a03af926
+size: 3677
+content:
+Metadata-Version: 2.2
+Name: pip
+Version: 25.0.1
+Summary: The PyPA recommended tool for installing Python packages.
+Author-email: The pip developers <distutils-sig@python.org>
+License: MIT
+Project-URL: Homepage, https://pip.pypa.io/
+Project-URL: Documentation, https://pip.pypa.io
+Project-URL: Source, https://github.com/pypa/pip
+Project-URL: Changelog, https://pip.pypa.io/en/stable/news/
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Topic :: Software Development :: Build Tools
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Requires-Python: >=3.8
+Description-Content-Type: text/x-rst
+License-File: LICENSE.txt
+License-File: AUTHORS.txt
+
+pip - The Python Package Installer
+==================================
+
+.. |pypi-version| image:: https://img.shields.io/pypi/v/pip.svg
+   :target: https://pypi.org/project/pip/
+   :alt: PyPI
+
+.. |python-versions| image:: https://img.shields.io/pypi/pyversions/pip
+   :target: https://pypi.org/project/pip
+   :alt: PyPI - Python Version
+
+.. |docs-badge| image:: https://readthedocs.org/projects/pip/badge/?version=latest
+   :target: https://pip.pypa.io/en/latest
+   :alt: Documentation
+
+|pypi-version| |python-versions| |docs-badge|
+
+pip is the `package installer`_ for Python. You can use pip to install packages from the `Python Package Index`_ and other indexes.
+
+Please take a look at our documentation for how to install and use pip:
+
+* `Installation`_
+* `Usage`_
+
+We release updates regularly, with a new version every 3 months. Find more details in our documentation:
+
+* `Release notes`_
+* `Release process`_
+
+If you find bugs, need help, or want to talk to the developers, please use our mailing lists or chat rooms:
+
+* `Issue tracking`_
+* `Discourse channel`_
+* `User IRC`_
+
+If you want to get involved head over to GitHub to get the source code, look at our development documentation and feel free to jump on the developer mailing lists and chat rooms:
+
+* `GitHub page`_
+* `Development documentation`_
+* `Development IRC`_
+
+Code of Conduct
+---------------
+
+Everyone interacting in the pip project's codebases, issue trackers, chat
+rooms, and mailing lists is expected to follow the `PSF Code of Conduct`_.
+
+.. _package installer: https://packaging.python.org/guides/tool-recommendations/
+.. _Python Package Index: https://pypi.org
+.. _Installation: https://pip.pypa.io/en/stable/installation/
+.. _Usage: https://pip.pypa.io/en/stable/
+.. _Release notes: https://pip.pypa.io/en/stable/news.html
+.. _Release process: https://pip.pypa.io/en/latest/development/release-process/
+.. _GitHub page: https://github.com/pypa/pip
+.. _Development documentation: https://pip.pypa.io/en/latest/development
+.. _Issue tracking: https://github.com/pypa/pip/issues
+.. _Discourse channel: https://discuss.python.org/c/packaging
+.. _User IRC: https://kiwiirc.com/nextclient/#ircs://irc.libera.chat:+6697/pypa
+.. _Development IRC: https://kiwiirc.com/nextclient/#ircs://irc.libera.chat:+6697/pypa-dev
+.. _PSF Code of Conduct: https://github.com/pypa/.github/blob/main/CODE_OF_CONDUCT.md
+--- END LICENSE FILE ---
+
+--- BEGIN LICENSE FILE ---
+path: "/usr/local/lib/python3.12/site-packages/pluggy-1.7.0.dist-info/METADATA"
+sha256: 20ac8237e37f1d6e7e75500cd663015177ba80c1a1a595ff6bae18a539ff8a2c
+size: 4966
+content:
+Metadata-Version: 2.4
+Name: pluggy
+Version: 1.7.0
+Summary: plugin and hook calling mechanisms for python
+Author: Holger Krekel
+Maintainer-email: pytest core team <core@pytest.org>
+License: MIT
+Project-URL: Homepage, https://github.com/pytest-dev/pluggy
+Project-URL: Documentation, https://pluggy.readthedocs.io/
+Project-URL: Changelog, https://pluggy.readthedocs.io/en/latest/changelog.html
+Project-URL: Repository, https://github.com/pytest-dev/pluggy
+Project-URL: Issues, https://github.com/pytest-dev/pluggy/issues
+Project-URL: Funding, https://tidelift.com/subscription/pkg/pypi-pluggy
+Classifier: Development Status :: 6 - Mature
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: POSIX
+Classifier: Operating System :: Microsoft :: Windows
+Classifier: Operating System :: MacOS :: MacOS X
+Classifier: Topic :: Software Development :: Testing
+Classifier: Topic :: Software Development :: Libraries
+Classifier: Topic :: Utilities
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: 3.14
+Requires-Python: >=3.10
+Description-Content-Type: text/x-rst
+License-File: LICENSE
+Dynamic: license-file
+
+====================================================
+pluggy - A minimalist production ready plugin system
+====================================================
+
+|pypi| |conda-forge| |versions| |github-actions| |gitter| |black| |codecov|
+
+This is the core framework used by the `pytest`_, `tox`_, and `devpi`_ projects.
+
+Please `read the docs`_ to learn more!
+
+A definitive example
+====================
+.. code-block:: python
+
+    import pluggy
+
+    hookspec = pluggy.HookspecMarker("myproject")
+    hookimpl = pluggy.HookimplMarker("myproject")
+
+
+    class MySpec:
+        """A hook specification namespace."""
+
+        @hookspec
+        def myhook(self, arg1, arg2):
+            """My special little hook that you can customize."""
+
+
+    class Plugin_1:
+        """A hook implementation namespace."""
+
+        @hookimpl
+        def myhook(self, arg1, arg2):
+            print("inside Plugin_1.myhook()")
+            return arg1 + arg2
+
+
+    class Plugin_2:
+        """A 2nd hook implementation namespace."""
+
+        @hookimpl
+        def myhook(self, arg1, arg2):
+            print("inside Plugin_2.myhook()")
+            return arg1 - arg2
+
+
+    # create a manager and add the spec
+    pm = pluggy.PluginManager("myproject")
+    pm.add_hookspecs(MySpec)
+
+    # register plugins
+    pm.register(Plugin_1())
+    pm.register(Plugin_2())
+
+    # call our ``myhook`` hook
+    results = pm.hook.myhook(arg1=1, arg2=2)
+    print(results)
+
+
+Running this directly gets us::
+
+    $ python docs/examples/toy-example.py
+    inside Plugin_2.myhook()
+    inside Plugin_1.myhook()
+    [-1, 3]
+
+
+.. badges
+
+.. |pypi| image:: https://img.shields.io/pypi/v/pluggy.svg
+    :target: https://pypi.org/pypi/pluggy
+
+.. |versions| image:: https://img.shields.io/pypi/pyversions/pluggy.svg
+    :target: https://pypi.org/pypi/pluggy
+
+.. |github-actions| image:: https://github.com/pytest-dev/pluggy/workflows/test/badge.svg
+    :target: https://github.com/pytest-dev/pluggy/actions
+
+.. |conda-forge| image:: https://img.shields.io/conda/vn/conda-forge/pluggy.svg
+    :target: https://anaconda.org/conda-forge/pytest
+
+.. |gitter| image:: https://badges.gitter.im/pytest-dev/pluggy.svg
+    :alt: Join the chat at https://gitter.im/pytest-dev/pluggy
+    :target: https://gitter.im/pytest-dev/pluggy?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
+
+.. |black| image:: https://img.shields.io/badge/code%20style-black-000000.svg
+    :target: https://github.com/psf/black
+
+.. |codecov| image:: https://codecov.io/gh/pytest-dev/pluggy/branch/main/graph/badge.svg
+    :target: https://codecov.io/gh/pytest-dev/pluggy
+    :alt: Code coverage Status
+
+.. links
+.. _pytest:
+    https://pytest.org
+.. _tox:
+    https://tox.wiki/
+.. _devpi:
+    https://doc.devpi.net
+.. _read the docs:
+   https://pluggy.readthedocs.io/en/latest/
+
+
+Support pluggy
+--------------
+
+`Open Collective`_ is an online funding platform for open and transparent communities.
+It provides tools to raise money and share your finances in full transparency.
+
+It is the platform of choice for individuals and companies that want to make one-time or
+monthly donations directly to the project.
+
+``pluggy`` is part of the ``pytest-dev`` project, see more details in the `pytest collective`_.
+
+.. _Open Collective: https://opencollective.com
+.. _pytest collective: https://opencollective.com/pytest
+--- END LICENSE FILE ---
+
+--- BEGIN LICENSE FILE ---
+path: "/usr/local/lib/python3.12/site-packages/pluggy-1.7.0.dist-info/licenses/LICENSE"
+sha256: d6b65e6c213a5d0b577911d34d6e5949b9f59d76c238c5071a2f3fc16cfb2606
+size: 1110
+content:
+The MIT License (MIT)
+
+Copyright (c) 2015 holger krekel (rather uses bitbucket/hpk42)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+--- END LICENSE FILE ---
+
+--- BEGIN LICENSE FILE ---
+path: "/usr/local/lib/python3.12/site-packages/pygments-2.21.0.dist-info/METADATA"
+sha256: 1dde075570136774c706bf0009183a793fe0ee262e4a5590cc6eff8453eedd43
+size: 2527
+content:
+Metadata-Version: 2.5
+Name: Pygments
+Version: 2.21.0
+Summary: Pygments is a syntax highlighting package written in Python.
+Project-URL: Homepage, https://pygments.org
+Project-URL: Documentation, https://pygments.org/docs
+Project-URL: Source, https://github.com/pygments/pygments
+Project-URL: Bug Tracker, https://github.com/pygments/pygments/issues
+Project-URL: Changelog, https://github.com/pygments/pygments/blob/master/CHANGES
+Author-email: Georg Brandl <georg@python.org>
+Maintainer: Matthäus G. Chajdas
+Maintainer-email: Georg Brandl <georg@python.org>, Jean Abou Samra <jean@abou-samra.fr>
+License-Expression: BSD-2-Clause
+License-File: AUTHORS
+License-File: LICENSE
+Keywords: syntax highlighting
+Classifier: Development Status :: 6 - Mature
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: End Users/Desktop
+Classifier: Intended Audience :: System Administrators
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: 3.14
+Classifier: Programming Language :: Python :: 3.15
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Classifier: Topic :: Text Processing :: Filters
+Classifier: Topic :: Utilities
+Requires-Python: >=3.9
+Provides-Extra: plugins
+Provides-Extra: windows-terminal
+Requires-Dist: colorama>=0.4.6; extra == 'windows-terminal'
+Description-Content-Type: text/x-rst
+
+Pygments
+~~~~~~~~
+
+Pygments is a syntax highlighting package written in Python.
+
+It is a generic syntax highlighter suitable for use in code hosting, forums,
+wikis or other applications that need to prettify source code.  Highlights
+are:
+
+* a wide range of over 500 languages and other text formats is supported
+* special attention is paid to details, increasing quality by a fair amount
+* support for new languages and formats are added easily
+* a number of output formats, presently HTML, LaTeX, RTF, SVG, all image
+  formats that PIL supports and ANSI sequences
+* it is usable as a command-line tool and as a library
+
+Copyright 2006-present by the Pygments team, see ``AUTHORS``.
+Licensed under the BSD, see ``LICENSE`` for details.
+--- END LICENSE FILE ---
+
+--- BEGIN LICENSE FILE ---
+path: "/usr/local/lib/python3.12/site-packages/pygments-2.21.0.dist-info/licenses/AUTHORS"
+sha256: 71a83872ad82f57be692cf827e048e2cd51d45169cfa1ea3f28706d97a872c0f
+size: 11048
+content:
+Pygments is written and maintained by Georg Brandl <georg@python.org>.
+
+Major developers are Tim Hatch <tim@timhatch.com> and Armin Ronacher
+<armin.ronacher@active-4.com>.
+
+Other contributors, listed alphabetically, are:
+
+* Sam Aaron -- Ioke lexer
+* Jean Abou Samra -- LilyPond lexer
+* João Abecasis -- JSLT lexer
+* Ali Afshar -- image formatter
+* Thomas Aglassinger -- Easytrieve, JCL, Rexx, Transact-SQL and VBScript
+  lexers
+* Maxence Ahlouche -- PostgreSQL Explain lexer
+* Muthiah Annamalai -- Ezhil lexer
+* Nikolay Antipov -- OpenSCAD lexer
+* Kumar Appaiah -- Debian control lexer
+* Andreas Amann -- AppleScript lexer
+* Timothy Armstrong -- Dart lexer fixes
+* Jeffrey Arnold -- R/S, Rd, BUGS, Jags, and Stan lexers
+* Eiríkr Åsheim -- Uxntal lexer
+* Jeremy Ashkenas -- CoffeeScript lexer
+* José Joaquín Atria -- Praat lexer
+* Stefan Matthias Aust -- Smalltalk lexer
+* Lucas Bajolet -- Nit lexer
+* Ben Bangert -- Mako lexers
+* Max Battcher -- Darcs patch lexer
+* Thomas Baruchel -- APL lexer
+* Tim Baumann -- (Literate) Agda lexer
+* Paul Baumgart, 280 North, Inc. -- Objective-J lexer
+* Michael Bayer -- Myghty lexers
+* Thomas Beale -- Archetype lexers
+* John Benediktsson -- Factor lexer
+* David Benjamin, Google LLC -- TLS lexer
+* Trevor Bergeron -- mIRC formatter
+* Vincent Bernat -- LessCSS lexer
+* Christopher Bertels -- Fancy lexer
+* Sébastien Bigaret -- QVT Operational lexer
+* Jarrett Billingsley -- MiniD lexer
+* Adam Blinkinsop -- Haskell, Redcode lexers
+* Stéphane Blondon -- Procfile, SGF and Sieve lexers
+* Frits van Bommel -- assembler lexers
+* Pierre Bourdon -- bugfixes
+* Martijn Braam -- Kernel log lexer, BARE lexer
+* JD Browne, Google LLC -- GoogleSQL lexer
+* Matthias Bussonnier -- ANSI style handling for terminal-256 formatter
+* chebee7i -- Python traceback lexer improvements
+* Hiram Chirino -- Scaml and Jade lexers
+* Mauricio Caceres -- SAS and Stata lexers.
+* Michael Camilleri, John Gabriele, sogaiu -- Janet lexer
+* Daren Chandisingh -- Gleam lexer
+* Ian Cooper -- VGL lexer
+* David Corbett -- Inform, Jasmin, JSGF, Snowball, and TADS 3 lexers
+* Leaf Corcoran -- MoonScript lexer
+* Fraser Cormack -- TableGen lexer
+* Gabriel Corona -- ASN.1 lexer
+* Radu Costache -- Boogie and Civl Verifier lexer improvements
+* Christopher Creutzig -- MuPAD lexer
+* Daniël W. Crompton -- Pike lexer
+* Pete Curry -- bugfixes
+* Bryan Davis -- EBNF lexer
+* Bruno Deferrari -- Shen lexer
+* Walter Dörwald -- UL4 lexer
+* Luke Drummond -- Meson lexer
+* Giedrius Dubinskas -- HTML formatter improvements
+* Owen Durni -- Haxe lexer
+* Alexander Dutton, Oxford University Computing Services -- SPARQL lexer
+* James Edwards -- Terraform lexer
+* Nick Efford -- Python 3 lexer
+* Sven Efftinge -- Xtend lexer
+* Artem Egorkine -- terminal256 formatter
+* Matthew Fernandez -- CAmkES lexer
+* Paweł Fertyk -- GDScript lexer, HTML formatter improvements
+* Michael Ficarra -- CPSA lexer
+* James H. Fisher -- PostScript lexer
+* Amanda Fitch, Google LLC -- GoogleSQL lexer
+* William S. Fulton -- SWIG lexer
+* Carlos Galdino -- Elixir and Elixir Console lexers
+* Michael Galloy -- IDL lexer
+* Naveen Garg -- Autohotkey lexer
+* Simon Garnotel -- FreeFem++ lexer
+* Laurent Gautier -- R/S lexer
+* Alex Gaynor -- PyPy log lexer
+* Richard Gerkin -- Igor Pro lexer
+* Alain Gilbert -- TypeScript lexer
+* Alex Gilding -- BlitzBasic lexer
+* GitHub, Inc -- DASM16, Augeas, TOML, and Slash lexers
+* Bertrand Goetzmann -- Groovy lexer
+* Krzysiek Goj -- Scala lexer
+* Rostyslav Golda -- FloScript lexer
+* Andrey Golovizin -- BibTeX lexers
+* Matt Good -- Genshi, Cheetah lexers
+* Michał Górny -- vim modeline support
+* Alex Gosse -- TrafficScript lexer
+* Patrick Gotthardt -- PHP namespaces support
+* Hubert Gruniaux -- C and C++ lexer improvements
+* Olivier Guibe -- Asymptote lexer
+* Armin Günther -- Go lexer improvements
+* Phil Hagelberg -- Fennel lexer
+* Florian Hahn -- Boogie lexer
+* Martin Harriman -- SNOBOL lexer
+* Matthew Harrison -- SVG formatter
+* Steven Hazel -- Tcl lexer
+* Dan Michael Heggø -- Turtle lexer
+* Aslak Hellesøy -- Gherkin lexer
+* Greg Hendershott -- Racket lexer
+* Justin Hendrick -- ParaSail lexer
+* Jordi Gutiérrez Hermoso -- Octave lexer
+* David Hess, Fish Software, Inc. -- Objective-J lexer
+* Ken Hilton -- Typographic Number Theory and Arrow lexers
+* Varun Hiremath -- Debian control lexer
+* Rob Hoelz -- Perl 6 lexer
+* Doug Hogan -- Mscgen lexer
+* Ben Hollis -- Mason lexer
+* Max Horn -- GAP lexer
+* Fred Hornsey -- OMG IDL Lexer
+* Alastair Houghton -- Lexer inheritance facility
+* Tim Howard -- BlitzMax lexer
+* Dustin Howett -- Logos lexer
+* Ivan Inozemtsev -- Fantom lexer
+* Hiroaki Itoh -- Shell console rewrite, Lexers for PowerShell session,
+  MSDOS session, BC, WDiff
+* Brian R. Jackson -- Tea lexer
+* Alex Jeffery, ChromaWay AB -- Rell lexer
+* Christian Jann -- ShellSession lexer
+* Jonas Camillus Jeppesen -- Line numbers and line highlighting for 
+  RTF-formatter
+* Dennis Kaarsemaker -- sources.list lexer
+* Dmitri Kabak -- Inferno Limbo lexer
+* Igor Kalnitsky -- vhdl lexer
+* Colin Kennedy - USD lexer
+* Alexander Kit -- MaskJS lexer
+* Pekka Klärck -- Robot Framework lexer
+* Gerwin Klein -- Isabelle lexer
+* Eric Knibbe -- Lasso lexer
+* Stepan Koltsov -- Clay lexer
+* Oliver Kopp - Friendly grayscale style
+* Adam Koprowski -- Opa lexer
+* Benjamin Kowarsch -- Modula-2 lexer
+* Domen Kožar -- Nix lexer
+* Oleh Krekel -- Emacs Lisp lexer
+* Alexander Kriegisch -- Kconfig and AspectJ lexers
+* Marek Kubica -- Scheme lexer
+* Jochen Kupperschmidt -- Markdown processor
+* Gerd Kurzbach -- Modelica lexer
+* Jon Larimer, Google Inc. -- Smali lexer
+* Olov Lassus -- Dart lexer
+* Matt Layman -- TAP lexer
+* Dan Lazin, Google LLC -- GoogleSQL lexer
+* Kristian Lyngstøl -- Varnish lexers
+* Sylvestre Ledru -- Scilab lexer
+* Chee Sing Lee -- Flatline lexer
+* Mark Lee -- Vala lexer
+* Thomas Linder Puls -- Visual Prolog lexer
+* Pete Lomax -- Phix lexer
+* Valentin Lorentz -- C++ lexer improvements
+* Ben Mabey -- Gherkin lexer
+* Angus MacArthur -- QML lexer
+* Louis Mandel -- X10 lexer
+* Louis Marchand -- Eiffel lexer
+* Simone Margaritelli -- Hybris lexer
+* Tim Martin - World of Warcraft TOC lexer
+* Kirk McDonald -- D lexer
+* Gordon McGregor -- SystemVerilog lexer
+* Stephen McKamey -- Duel/JBST lexer
+* Brian McKenna -- F# lexer
+* Charles McLaughlin -- Puppet lexer
+* Kurt McKee -- Tera Term macro lexer, PostgreSQL updates, MySQL overhaul, JSON lexer
+* Joe Eli McIlvain -- Savi lexer
+* Lukas Meuser -- BBCode formatter, Lua lexer
+* Bruno Mesquita -- Night Owl style
+* Cat Miller -- Pig lexer
+* Paul Miller -- LiveScript lexer
+* Hong Minhee -- HTTP lexer
+* Michael Mior -- Awk lexer
+* Bruce Mitchener -- Dylan lexer rewrite
+* Reuben Morais -- SourcePawn lexer
+* Jon Morton -- Rust lexer
+* Paulo Moura -- Logtalk lexer
+* Mher Movsisyan -- DTD lexer
+* Dejan Muhamedagic -- Crmsh lexer
+* Adrien Nayrat -- PostgreSQL Explain lexer
+* Ana Nelson -- Ragel, ANTLR, R console lexers
+* David Neto, Google LLC -- WebGPU Shading Language lexer
+* Kurt Neufeld -- Markdown lexer
+* Nam T. Nguyen -- Monokai style
+* Jesper Noehr -- HTML formatter "anchorlinenos"
+* Mike Nolta -- Julia lexer
+* Avery Nortonsmith -- Pointless lexer
+* Jonas Obrist -- BBCode lexer
+* Edward O'Callaghan -- Cryptol lexer
+* David Oliva -- Rebol lexer
+* Pat Pannuto -- nesC lexer
+* Jon Parise -- Protocol buffers and Thrift lexers
+* Benjamin Peterson -- Test suite refactoring
+* Ronny Pfannschmidt -- BBCode lexer
+* Dominik Picheta -- Nimrod lexer
+* Andrew Pinkham -- RTF Formatter Refactoring
+* Clément Prévost -- UrbiScript lexer
+* Tanner Prynn -- cmdline -x option and loading lexers from files
+* Oleh Prypin -- Crystal lexer (based on Ruby lexer)
+* Nick Psaris -- K and Q lexers
+* Xidorn Quan -- Web IDL lexer
+* Elias Rabel -- Fortran fixed form lexer
+* raichoo -- Idris lexer
+* Daniel Ramirez -- GDScript lexer
+* Kashif Rasul -- CUDA lexer
+* Nathan Reed -- HLSL lexer
+* Justin Reidy -- MXML lexer
+* Jonathon Reinhart, Google LLC -- Soong lexer
+* Norman Richards -- JSON lexer
+* Corey Richardson -- Rust lexer updates
+* Fabrizio Riguzzi -- cplint leder
+* Lubomir Rintel -- GoodData MAQL and CL lexers
+* Andre Roberge -- Tango style
+* Georg Rollinger -- HSAIL lexer
+* Michiel Roos -- TypoScript lexer
+* Konrad Rudolph -- LaTeX formatter enhancements
+* Mario Ruggier -- Evoque lexers
+* Miikka Salminen -- Lovelace style, Hexdump lexer, lexer enhancements
+* Stou Sandalski -- NumPy, FORTRAN, tcsh and XSLT lexers
+* Matteo Sasso -- Common Lisp lexer
+* Joe Schafer -- Ada lexer
+* Max Schillinger -- TiddlyWiki5 lexer
+* Andrew Schmidt -- X++ lexer
+* Ken Schutte -- Matlab lexers
+* René Schwaiger -- Rainbow Dash style
+* Sebastian Schweizer -- Whiley lexer
+* Tassilo Schweyer -- Io, MOOCode lexers
+* Pablo Seminario -- PromQL lexer
+* Ted Shaw -- AutoIt lexer
+* Joerg Sieker -- ABAP lexer
+* Robert Simmons -- Standard ML lexer
+* Kirill Simonov -- YAML lexer
+* Corbin Simpson -- Monte lexer
+* Ville Skyttä -- ASCII armored lexer
+* Alexander Smishlajev -- Visual FoxPro lexer
+* Steve Spigarelli -- XQuery lexer
+* Jerome St-Louis -- eC lexer
+* Camil Staps -- Clean and NuSMV lexers; Solarized style
+* James Strachan -- Kotlin lexer
+* Tom Stuart -- Treetop lexer
+* Colin Sullivan -- SuperCollider lexer
+* Ben Swift -- Extempore lexer
+* tatt61880 -- Kuin lexer
+* Edoardo Tenani -- Arduino lexer
+* Tiberius Teng -- default style overhaul
+* Jeremy Thurgood -- Erlang, Squid config lexers
+* Brian Tiffin -- OpenCOBOL lexer
+* Bob Tolbert -- Hy lexer
+* Doug Torrance -- Macaulay2 lexer
+* Matthias Trute -- Forth lexer
+* Tuoa Spi T4 -- Bdd lexer
+* Erick Tryzelaar -- Felix lexer
+* Alexander Udalov -- Kotlin lexer improvements
+* Thomas Van Doren -- Chapel lexer
+* Dave Van Ee -- Uxntal lexer updates
+* Daniele Varrazzo -- PostgreSQL lexers
+* Abe Voelker -- OpenEdge ABL lexer
+* Pepijn de Vos -- HTML formatter CTags support
+* Matthias Vallentin -- Bro lexer
+* Benoît Vinot -- AMPL lexer
+* Linh Vu Hong -- RSL lexer
+* Taavi Väänänen -- Debian control, PHP lexers
+* Immanuel Washington -- Smithy lexer
+* Nathan Weizenbaum -- Haml and Sass lexers
+* Nathan Whetsell -- Csound lexers
+* Dietmar Winkler -- Modelica lexer
+* Nils Winter -- Smalltalk lexer
+* Trevor Woerner -- BitBake lexer
+* Davy Wybiral -- Clojure lexer
+* Whitney Young -- ObjectiveC lexer
+* Diego Zamboni -- CFengine3 lexer
+* Enrique Zamudio -- Ceylon lexer
+* Alex Zimin -- Nemerle lexer
+* Rob Zimmerman -- Kal lexer
+* Evgenii Zheltonozhskii -- Maple lexer
+* Vincent Zurczak -- Roboconf lexer
+* Hubert Gruniaux -- C and C++ lexer improvements
+* Thomas Symalla -- AMDGPU Lexer
+* 15b3 -- Image Formatter improvements
+* Fabian Neumann -- CDDL lexer
+* Thomas Duboucher -- CDDL lexer
+* Philipp Imhof -- Pango Markup formatter
+* Thomas Voss -- Sed lexer
+* Martin Fischer -- WCAG contrast testing
+* Marc Auberer -- Spice lexer
+* Amr Hesham -- Carbon lexer
+* diskdance -- Wikitext lexer
+* vanillajonathan -- PRQL lexer
+* Nikolay Antipov -- OpenSCAD lexer
+* Markus Meyer, Nextron Systems -- YARA lexer
+* Hannes Römer -- Mojo lexer
+* Jan Frederik Schaefer -- PDDL lexer
+
+Many thanks for all contributions!
+--- END LICENSE FILE ---
+
+--- BEGIN LICENSE FILE ---
+path: "/usr/local/lib/python3.12/site-packages/pygments-2.21.0.dist-info/licenses/LICENSE"
+sha256: a9d66f1d526df02e29dce73436d34e56e8632f46c275bbdffc70569e882f9f17
+size: 1331
+content:
+Copyright (c) 2006-2022 by the respective authors (see AUTHORS file).
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+* Redistributions of source code must retain the above copyright
+  notice, this list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright
+  notice, this list of conditions and the following disclaimer in the
+  documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+--- END LICENSE FILE ---
+
+--- BEGIN LICENSE FILE ---
+path: "/usr/local/lib/python3.12/site-packages/pytest-9.0.3.dist-info/METADATA"
+sha256: c3966f28791686477bae35e518736d4cbea5b626d3a79011215854e2bc670207
+size: 7556
+content:
+Metadata-Version: 2.4
+Name: pytest
+Version: 9.0.3
+Summary: pytest: simple powerful testing with Python
+Author: Holger Krekel, Bruno Oliveira, Ronny Pfannschmidt, Floris Bruynooghe, Brianna Laugher, Freya Bruhin, Others (See AUTHORS)
+License-Expression: MIT
+Project-URL: Changelog, https://docs.pytest.org/en/stable/changelog.html
+Project-URL: Contact, https://docs.pytest.org/en/stable/contact.html
+Project-URL: Funding, https://docs.pytest.org/en/stable/sponsor.html
+Project-URL: Homepage, https://docs.pytest.org/en/latest/
+Project-URL: Source, https://github.com/pytest-dev/pytest
+Project-URL: Tracker, https://github.com/pytest-dev/pytest/issues
+Keywords: test,unittest
+Classifier: Development Status :: 6 - Mature
+Classifier: Intended Audience :: Developers
+Classifier: Operating System :: MacOS
+Classifier: Operating System :: Microsoft :: Windows
+Classifier: Operating System :: POSIX
+Classifier: Operating System :: Unix
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: 3.14
+Classifier: Topic :: Software Development :: Libraries
+Classifier: Topic :: Software Development :: Testing
+Classifier: Topic :: Utilities
+Requires-Python: >=3.10
+Description-Content-Type: text/x-rst
+License-File: LICENSE
+Requires-Dist: colorama>=0.4; sys_platform == "win32"
+Requires-Dist: exceptiongroup>=1; python_version < "3.11"
+Requires-Dist: iniconfig>=1.0.1
+Requires-Dist: packaging>=22
+Requires-Dist: pluggy<2,>=1.5
+Requires-Dist: pygments>=2.7.2
+Requires-Dist: tomli>=1; python_version < "3.11"
+Provides-Extra: dev
+Requires-Dist: argcomplete; extra == "dev"
+Requires-Dist: attrs>=19.2; extra == "dev"
+Requires-Dist: hypothesis>=3.56; extra == "dev"
+Requires-Dist: mock; extra == "dev"
+Requires-Dist: requests; extra == "dev"
+Requires-Dist: setuptools; extra == "dev"
+Requires-Dist: xmlschema; extra == "dev"
+Dynamic: license-file
+
+.. image:: https://github.com/pytest-dev/pytest/raw/main/doc/en/img/pytest_logo_curves.svg
+   :target: https://docs.pytest.org/en/stable/
+   :align: center
+   :height: 200
+   :alt: pytest
+
+
+------
+
+.. image:: https://img.shields.io/pypi/v/pytest.svg
+    :target: https://pypi.org/project/pytest/
+
+.. image:: https://img.shields.io/conda/vn/conda-forge/pytest.svg
+    :target: https://anaconda.org/conda-forge/pytest
+
+.. image:: https://img.shields.io/pypi/pyversions/pytest.svg
+    :target: https://pypi.org/project/pytest/
+
+.. image:: https://codecov.io/gh/pytest-dev/pytest/branch/main/graph/badge.svg
+    :target: https://codecov.io/gh/pytest-dev/pytest
+    :alt: Code coverage Status
+
+.. image:: https://github.com/pytest-dev/pytest/actions/workflows/test.yml/badge.svg
+    :target: https://github.com/pytest-dev/pytest/actions?query=workflow%3Atest
+
+.. image:: https://results.pre-commit.ci/badge/github/pytest-dev/pytest/main.svg
+   :target: https://results.pre-commit.ci/latest/github/pytest-dev/pytest/main
+   :alt: pre-commit.ci status
+
+.. image:: https://www.codetriage.com/pytest-dev/pytest/badges/users.svg
+    :target: https://www.codetriage.com/pytest-dev/pytest
+
+.. image:: https://readthedocs.org/projects/pytest/badge/?version=latest
+    :target: https://pytest.readthedocs.io/en/latest/?badge=latest
+    :alt: Documentation Status
+
+.. image:: https://img.shields.io/badge/Discord-pytest--dev-blue
+    :target: https://discord.com/invite/pytest-dev
+    :alt: Discord
+
+.. image:: https://img.shields.io/badge/Libera%20chat-%23pytest-orange
+    :target: https://web.libera.chat/#pytest
+    :alt: Libera chat
+
+
+The ``pytest`` framework makes it easy to write small tests, yet
+scales to support complex functional testing for applications and libraries.
+
+An example of a simple test:
+
+.. code-block:: python
+
+    # content of test_sample.py
+    def inc(x):
+        return x + 1
+
+
+    def test_answer():
+        assert inc(3) == 5
+
+
+To execute it::
+
+    $ pytest
+    ============================= test session starts =============================
+    collected 1 items
+
+    test_sample.py F
+
+    ================================== FAILURES ===================================
+    _________________________________ test_answer _________________________________
+
+        def test_answer():
+    >       assert inc(3) == 5
+    E       assert 4 == 5
+    E        +  where 4 = inc(3)
+
+    test_sample.py:5: AssertionError
+    ========================== 1 failed in 0.04 seconds ===========================
+
+
+Thanks to ``pytest``'s detailed assertion introspection, you can simply use plain ``assert`` statements. See `getting-started <https://docs.pytest.org/en/stable/getting-started.html#our-first-test-run>`_ for more examples.
+
+
+Features
+--------
+
+- Detailed info on failing `assert statements <https://docs.pytest.org/en/stable/how-to/assert.html>`_ (no need to remember ``self.assert*`` names)
+
+- `Auto-discovery
+  <https://docs.pytest.org/en/stable/explanation/goodpractices.html#python-test-discovery>`_
+  of test modules and functions
+
+- `Modular fixtures <https://docs.pytest.org/en/stable/explanation/fixtures.html>`_ for
+  managing small or parametrized long-lived test resources
+
+- Can run `unittest <https://docs.pytest.org/en/stable/how-to/unittest.html>`_ (or trial)
+  test suites out of the box
+
+- Python 3.10+ or PyPy3
+
+- Rich plugin architecture, with over 1300+ `external plugins <https://docs.pytest.org/en/latest/reference/plugin_list.html>`_ and thriving community
+
+
+Documentation
+-------------
+
+For full documentation, including installation, tutorials and PDF documents, please see https://docs.pytest.org/en/stable/.
+
+
+Bugs/Requests
+-------------
+
+Please use the `GitHub issue tracker <https://github.com/pytest-dev/pytest/issues>`_ to submit bugs or request features.
+
+
+Changelog
+---------
+
+Consult the `Changelog <https://docs.pytest.org/en/stable/changelog.html>`__ page for fixes and enhancements of each version.
+
+
+Support pytest
+--------------
+
+`Open Collective`_ is an online funding platform for open and transparent communities.
+It provides tools to raise money and share your finances in full transparency.
+
+It is the platform of choice for individuals and companies that want to make one-time or
+monthly donations directly to the project.
+
+See more details in the `pytest collective`_.
+
+.. _Open Collective: https://opencollective.com
+.. _pytest collective: https://opencollective.com/pytest
+
+
+pytest for enterprise
+---------------------
+
+Available as part of the Tidelift Subscription.
+
+The maintainers of pytest and thousands of other packages are working with Tidelift to deliver commercial support and
+maintenance for the open source dependencies you use to build your applications.
+Save time, reduce risk, and improve code health, while paying the maintainers of the exact dependencies you use.
+
+`Learn more. <https://tidelift.com/subscription/pkg/pypi-pytest?utm_source=pypi-pytest&utm_medium=referral&utm_campaign=enterprise&utm_term=repo>`_
+
+Security
+^^^^^^^^
+
+pytest has never been associated with a security vulnerability, but in any case, to report a
+security vulnerability please use the `Tidelift security contact <https://tidelift.com/security>`_.
+Tidelift will coordinate the fix and disclosure.
+
+
+License
+-------
+
+Copyright Holger Krekel and others, 2004.
+
+Distributed under the terms of the `MIT`_ license, pytest is free and open source software.
+
+.. _`MIT`: https://github.com/pytest-dev/pytest/blob/main/LICENSE
+--- END LICENSE FILE ---
+
+--- BEGIN LICENSE FILE ---
+path: "/usr/local/lib/python3.12/site-packages/pytest-9.0.3.dist-info/licenses/LICENSE"
+sha256: ca836a5f9ecca3b2f350230faa20a48fb8b145653b5568d784862df864706b9b
+size: 1091
+content:
+The MIT License (MIT)
+
+Copyright (c) 2004 Holger Krekel and others
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 --- END LICENSE FILE ---
 
 --- BEGIN LICENSE FILE ---

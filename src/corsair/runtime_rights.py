@@ -35,8 +35,6 @@ class EvidenceFile:
 @dataclass(frozen=True)
 class RuntimeEvidence:
     runtime_row: str
-    family_id: str
-    case_ids: tuple[str, ...]
     image_reference: str
     image_id: str
     platform: str
@@ -54,8 +52,6 @@ class RuntimeEvidence:
 @dataclass(frozen=True)
 class RuntimeSpec:
     runtime_row: str
-    family_id: str
-    case_ids: tuple[str, ...]
     image: str
     parent: str
     dockerfile: str
@@ -75,7 +71,7 @@ def _license_command(*sources: str) -> str:
 
 RUNTIME_SPECS = (
     RuntimeSpec(
-        runtime_row="pytest-cpython312", family_id="cf-0001", case_ids=("cs-0001-a", "cs-0001-b"),
+        runtime_row="pytest-cpython312",
         image="corsair-lite-python:dev",
         parent="docker.io/library/python@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704",
         dockerfile="images/python/Dockerfile",
@@ -83,13 +79,13 @@ RUNTIME_SPECS = (
         license_command=_license_command(
             "printf '%s\\0' /usr/local/lib/python3.12/LICENSE.txt",
             ("find -L /usr/local/lib/python3.12/site-packages -type f "
-             "\\( -path '*/.dist-info/licenses/*' -o -path '*/.dist-info/METADATA' "
-             "-o -path '*/.dist-info/LICENSE*' \\) -print0"),
+             "\\( -path '*.dist-info/licenses/*' -o -path '*.dist-info/METADATA' "
+             "-o -path '*.dist-info/LICENSE*' \\) -print0"),
         ),
         artifact_command="sha256sum /usr/local/bin/python3.12 /opt/corsair/requirements.lock",
     ),
     RuntimeSpec(
-        runtime_row="node-test-node22", family_id="cf-0002", case_ids=("cs-0002-a", "cs-0002-b"),
+        runtime_row="node-test-node22",
         image="corsair-lite-javascript:dev",
         parent="docker.io/library/node@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392",
         dockerfile="images/javascript/Dockerfile",
@@ -98,7 +94,7 @@ RUNTIME_SPECS = (
         artifact_command="sha256sum /usr/local/bin/node /usr/local/LICENSE",
     ),
     RuntimeSpec(
-        runtime_row="javac-java21", family_id="cf-0003", case_ids=("cs-0003-a", "cs-0003-b"),
+        runtime_row="javac-java21",
         image="corsair-lite-java:dev",
         parent=("docker.io/library/eclipse-temurin@sha256:"
                 "742daacb9316be4b6fc60258f6e4ac2a11882f6c597373c92290a57bfad0d2e0"),
@@ -113,7 +109,7 @@ RUNTIME_SPECS = (
                           "/opt/corsair/jacoco-cli.jar"),
     ),
     RuntimeSpec(
-        runtime_row="perl-tap-540", family_id="cf-0004", case_ids=("cs-0004-a", "cs-0004-b"),
+        runtime_row="perl-tap-540",
         image="corsair-lite-perl:dev",
         parent="docker.io/library/debian@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad",
         dockerfile="images/perl/Dockerfile",
@@ -129,6 +125,15 @@ RUNTIME_SPECS = (
 
 
 CommandRunner = Callable[[tuple[str, ...]], bytes]
+
+
+def _is_canonical_posix_path(value: str, *, absolute: bool) -> bool:
+    if not value or value == "/" or value.startswith("//"):
+        return False
+    candidate = PurePosixPath(value)
+    return (candidate.is_absolute() is absolute
+            and value == candidate.as_posix()
+            and not any(part in {"", ".", ".."} for part in candidate.parts))
 
 
 def missing_package_copyrights(packages: tuple[str, ...], files: tuple[EvidenceFile, ...]) -> tuple[str, ...]:
@@ -183,6 +188,8 @@ def _artifacts(raw: bytes) -> tuple[tuple[str, str], ...]:
             raise ValueError("invalid artifact inventory")
         name = pieces[1].strip()
         _safe_text("artifact name", name)
+        if not _is_canonical_posix_path(name, absolute=True):
+            raise ValueError("artifact name must be one canonical absolute path")
         artifacts.append((name, pieces[0]))
     if len({name for name, _ in artifacts}) != len(artifacts):
         raise ValueError("artifact names must be unique")
@@ -214,8 +221,6 @@ def collect_runtime_evidence(root: Path, spec: RuntimeSpec, *, runner: CommandRu
         runner((*prefix, "--entrypoint", "sh", spec.image, "-c", spec.artifact_command)))
     return RuntimeEvidence(
         runtime_row=spec.runtime_row,
-        family_id=spec.family_id,
-        case_ids=tuple(sorted(spec.case_ids)),
         image_reference=spec.image,
         image_id=image["Id"],
         platform=f"{image['Os']}/{image['Architecture']}",
@@ -241,12 +246,10 @@ def evidence_files_from_tar(archive: bytes) -> tuple[EvidenceFile, ...]:
             for member in source:
                 if not member.isfile():
                     raise ValueError("unsafe nonregular evidence archive entry")
-                raw = member.name.lstrip("/")
-                candidate = PurePosixPath(raw)
-                if (not raw or candidate.is_absolute() or any(part in {"", ".", ".."}
-                                                               for part in candidate.parts)):
+                raw = member.name
+                if not _is_canonical_posix_path(raw, absolute=False):
                     raise ValueError("unsafe evidence archive path")
-                path = "/" + candidate.as_posix()
+                path = "/" + raw
                 if path in seen or member.size > _MAX_EVIDENCE_FILE:
                     raise ValueError("unsafe evidence archive member")
                 stream = source.extractfile(member)
@@ -302,7 +305,8 @@ def render_rights_evidence(evidence: RuntimeEvidence) -> bytes:
     if len(paths) != len(set(paths)):
         raise ValueError("license evidence paths must be unique")
     for path in paths:
-        if not path.startswith("/") or any(ord(character) < 32 or ord(character) == 127 for character in path):
+        if (not _is_canonical_posix_path(path, absolute=True)
+                or any(ord(character) < 32 or ord(character) == 127 for character in path)):
             raise ValueError("unsafe license evidence path")
     artifact_names = [name for name, _ in evidence.artifacts]
     if len(artifact_names) != len(set(artifact_names)):
@@ -317,10 +321,11 @@ def render_rights_evidence(evidence: RuntimeEvidence) -> bytes:
         b"clean_rebuild_identity: not-established\n",
         (b"qualification_blocker: \"The evidence binds the exact collected image ID; "
          b"no stable clean-rebuild image ID is asserted.\"\n"),
+        (b"case_binding: \"Cases cite this evidence by runtime row, exact image ID, "
+         b"and receipt; the bundle is case-agnostic.\"\n"),
     ]
     for name, value in (
         ("runtime_row", evidence.runtime_row),
-        ("family_id", evidence.family_id),
         ("image_reference", evidence.image_reference),
         ("image_id", evidence.image_id),
         ("platform", evidence.platform),
@@ -331,12 +336,13 @@ def render_rights_evidence(evidence: RuntimeEvidence) -> bytes:
         ("dockerfile_sha256", evidence.dockerfile_sha256),
     ):
         _field(parts, name, value)
-    _list(parts, "case_ids", evidence.case_ids)
     _list(parts, "runtime_versions", evidence.runtime_versions)
     _list(parts, "installed_packages", evidence.packages)
     parts.append(b"artifacts:\n")
     for name, digest in sorted(evidence.artifacts):
         _safe_text("artifact name", name)
+        if not _is_canonical_posix_path(name, absolute=True):
+            raise ValueError("artifact name must be one canonical absolute path")
         parts.extend((b"  - name: ", _quoted(name), b"\n    sha256: ", digest.encode("ascii"), b"\n"))
     parts.append(b"\n")
     for item in sorted(evidence.license_files, key=lambda candidate: candidate.path):
