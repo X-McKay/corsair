@@ -160,6 +160,7 @@ class DatasetCase(Frozen):
     status: QualificationStatus
     language: Literal["python", "javascript", "java", "perl"]
     runtime: str = Field(min_length=1, max_length=128)
+    runtime_image_id: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     package: str = Field(min_length=1, max_length=256)
     framework: str = Field(min_length=1, max_length=256)
     execution_mode: Literal["function", "method", "script", "cli", "main"]

@@ -10,6 +10,7 @@
       "status": "candidate",
       "language": "python",
       "runtime": "python-3.12",
+      "runtime_image_id": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "package": "fixture-package",
       "framework": "stdlib",
       "execution_mode": "function",

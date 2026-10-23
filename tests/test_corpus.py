@@ -45,6 +45,7 @@ def dataset_case(*, case_id: str = "cs-1001", family_id: str = "cf-1001",
         "status": status,
         "language": "python",
         "runtime": runtime,
+        "runtime_image_id": "sha256:" + "c" * 64,
         "package": "example-package",
         "framework": "example-framework",
         "execution_mode": "method",
@@ -393,6 +394,13 @@ def test_admission_requires_three_complete_replays_and_one_family_review():
     incomplete_review = review.model_copy(update={"variants": review.variants[:1]})
     assert not admission_status(direct, records, incomplete_review, family_cases=(direct, script)).ready
 
+    second_author = script.model_copy(update={
+        "finding_provenance": script.finding_provenance.model_copy(update={"author": "second-author"})
+    })
+    author_review = family_review(direct, second_author).model_copy(update={"reviewer": "second-author"})
+    assert admission_status(direct, records, author_review,
+                            family_cases=(direct, second_author)).code == "REVIEW_NOT_INDEPENDENT"
+
     attached = direct.model_copy(update={
         "status": "qualified",
         "review_receipt": {"path": "receipts/review.json", "sha256": SHA_A,
@@ -431,11 +439,7 @@ def test_changed_source_or_probe_runtime_or_image_invalidates_receipts(field):
     elif field == "runtime":
         changed = original.model_copy(update={"runtime": "another-runtime-row"})
     else:
-        changed_records = tuple(record.model_copy(update={"runtime_image_id": "sha256:" + "d" * 64})
-                                for record in records)
-        assert not admission_status(original, changed_records, family_review(original),
-                                    family_cases=(original,), runtime_image_id="sha256:" + "c" * 64).ready
-        return
+        changed = original.model_copy(update={"runtime_image_id": "sha256:" + "d" * 64})
 
     assert case_revision_sha256(changed) != case_revision_sha256(original)
     assert not admission_status(changed, records, family_review(original), family_cases=(changed,)).ready
@@ -463,12 +467,48 @@ def test_receipt_publication_is_exclusive_atomic_and_rejects_symlink_roots(tmp_p
         publish_receipt(linked, case_revision_sha256(case), "replay-run-2.json", record)
 
 
+def test_receipt_publication_detects_a_directory_swap_without_writing_into_the_replacement(tmp_path, monkeypatch):
+    case = DatasetManifest.model_validate(manifest(dataset_case(runtime="pytest-cpython312"))).cases[0]
+    record = replay_record(case)
+    receipts = tmp_path / "receipts"
+    receipts.mkdir()
+    revision = case_revision_sha256(case)
+    revision_dir = receipts / revision
+    moved = receipts / f"{revision}-moved"
+    real_link = corpus_module.os.link
+
+    def swap_then_link(source, destination, **kwargs):
+        revision_dir.rename(moved)
+        revision_dir.mkdir()
+        return real_link(source, destination, **kwargs)
+
+    monkeypatch.setattr("corsair.benchmark.os.link", swap_then_link)
+    with pytest.raises(ValueError, match="identity changed"):
+        publish_receipt(receipts, revision, "replay-swapped-1.json", record)
+    assert not (revision_dir / "replay-swapped-1.json").exists()
+    assert not (moved / "replay-swapped-1.json").exists()
+
+
 def test_complete_replay_record_rejects_duplicate_or_inconsistent_role_evidence():
     case = DatasetManifest.model_validate(manifest(dataset_case(runtime="pytest-cpython312"))).cases[0]
     data = replay_record(case).model_dump(mode="json", by_alias=True)
     data["roles"][3] = data["roles"][2]
     with pytest.raises(ValidationError, match="role evidence"):
         ReplayRecord.model_validate(data)
+
+
+@pytest.mark.parametrize(("field", "value"), [
+    ("reviewer", "   "),
+    ("reviewer", "TODO"),
+    ("independence_basis", "  "),
+    ("independence_basis", "unknown"),
+])
+def test_technical_review_rejects_blank_or_placeholder_identity_fields(field, value):
+    case = DatasetManifest.model_validate(manifest(dataset_case(runtime="pytest-cpython312"))).cases[0]
+    data = family_review(case).model_dump(mode="json", by_alias=True)
+    data[field] = value
+    with pytest.raises(ValidationError):
+        TechnicalReviewRecord.model_validate(data)
 
 
 def test_admission_rejects_an_unattached_failure_in_the_selected_run(tmp_path):
@@ -503,9 +543,21 @@ def test_admission_rejects_an_unattached_failure_in_the_selected_run(tmp_path):
         manifest(attached.model_dump(mode="json")))
     assert admission_from_manifest(dataset, attached_manifest, attached).ready
 
+    changed_version = attached_manifest.model_copy(update={"dataset_version": "0.2.0"})
+    assert admission_from_manifest(dataset, changed_version, attached).ready
+
+    changed_image = attached.model_copy(update={"runtime_image_id": "sha256:" + "d" * 64})
+    changed_image_manifest = attached_manifest.model_copy(update={"cases": (changed_image,)})
+    assert not admission_from_manifest(dataset, changed_image_manifest, changed_image).ready
+
+    hardlink = tmp_path / "linked-receipt.json"
+    hardlink.hardlink_to(revision_dir / "replay-run-1.json")
+    assert admission_from_manifest(dataset, attached_manifest, attached).code == "RECEIPT_INVALID"
+    hardlink.unlink()
+
     hidden_failure = records[-1].model_copy(update={"attempt": 4, "outcome": "failed",
                                                      "failure_code": "EXPECTED_DISPOSITION_MISMATCH"})
-    (revision_dir / "replay-run-4.json").write_bytes(receipt_bytes(hidden_failure))
+    (revision_dir / "failure-hidden.json").write_bytes(receipt_bytes(hidden_failure))
     assert admission_from_manifest(dataset, attached_manifest, attached).code == "REPLAY_RUN_LEDGER_INVALID"
 
 

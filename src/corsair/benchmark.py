@@ -11,6 +11,7 @@ import json
 import os
 import re
 import secrets
+import stat
 import uuid
 from collections.abc import Callable
 from datetime import date, datetime, timezone
@@ -30,6 +31,7 @@ Sha256 = str
 _SHA256 = r"^[0-9a-f]{64}$"
 _IMAGE_ID = r"^sha256:[0-9a-f]{64}$"
 _CASE_REVISION_DOMAIN = b"corsair-case-revision-v1\0"
+_PLACEHOLDER_ATTESTATION = frozenset({"TODO", "TBD", "UNKNOWN", "NONE", "N/A", "NA"})
 
 
 class ReceiptArtifact(Frozen):
@@ -146,6 +148,16 @@ class TechnicalReviewRecord(Frozen):
     expected_results_reviewed: bool
     independence_basis: str = Field(min_length=1, max_length=2_000)
 
+    @field_validator("reviewer", "independence_basis", mode="before")
+    @classmethod
+    def _substantive_identity(cls, value: object) -> str:
+        if not isinstance(value, str):
+            raise ValueError("review identity fields must be strings")
+        normalized = value.strip()
+        if not normalized or normalized.upper() in _PLACEHOLDER_ATTESTATION:
+            raise ValueError("review identity fields must be substantive")
+        return normalized
+
     @model_validator(mode="after")
     def _unique_variants(self) -> "TechnicalReviewRecord":
         identities = [(variant.case_id, variant.case_revision_sha256) for variant in self.variants]
@@ -174,7 +186,6 @@ def case_revision_sha256(case: DatasetCase) -> str:
 def admission_status(case: DatasetCase, replays: tuple[ReplayRecord, ...],
                      review: TechnicalReviewRecord | None, *,
                      family_cases: tuple[DatasetCase, ...] | None = None,
-                     runtime_image_id: str | None = None,
                      runtime_row_sha256: str | None = None,
                      executor_sha256: str | None = None) -> AdmissionStatus:
     """Apply the three-fresh-replays plus independent family-review admission rule."""
@@ -200,15 +211,15 @@ def admission_status(case: DatasetCase, replays: tuple[ReplayRecord, ...],
         return AdmissionStatus(ready=False, code="REPLAY_ENVIRONMENT_MISMATCH")
     expected_controlled = (case.artifacts.input_sha256, case.artifacts.oracle_sha256,
                            case.artifacts.reference_submission_sha256, case.source_pair.vulnerable.tree_sha256,
-                           case.source_pair.fixed.tree_sha256, case.runtime)
+                           case.source_pair.fixed.tree_sha256, case.runtime, case.runtime_image_id)
     actual = replays[0]
     if (actual.input_sha256, actual.oracle_sha256, actual.reference_submission_sha256,
-            actual.vulnerable_tree_sha256, actual.fixed_tree_sha256, actual.runtime_row) != expected_controlled:
+            actual.vulnerable_tree_sha256, actual.fixed_tree_sha256, actual.runtime_row,
+            actual.runtime_image_id) != expected_controlled:
         return AdmissionStatus(ready=False, code="REPLAY_MATERIAL_MISMATCH")
     if any(not _receipt_matches_case(case, record) for record in replays):
         return AdmissionStatus(ready=False, code="REPLAY_EXPECTATION_MISMATCH")
-    if ((runtime_image_id is not None and actual.runtime_image_id != runtime_image_id)
-            or (runtime_row_sha256 is not None and actual.runtime_row_sha256 != runtime_row_sha256)
+    if ((runtime_row_sha256 is not None and actual.runtime_row_sha256 != runtime_row_sha256)
             or (executor_sha256 is not None and actual.executor_sha256 != executor_sha256)):
         return AdmissionStatus(ready=False, code="REPLAY_ENVIRONMENT_STALE")
     if review is None:
@@ -224,7 +235,8 @@ def admission_status(case: DatasetCase, replays: tuple[ReplayRecord, ...],
     reviewed_variants = {(variant.case_id, variant.case_revision_sha256) for variant in review.variants}
     if reviewed_variants != expected_variants:
         return AdmissionStatus(ready=False, code="REVIEW_FAMILY_MISMATCH")
-    if review.reviewer.strip().casefold() == case.finding_provenance.author.strip().casefold():
+    family_authors = {member.finding_provenance.author.strip().casefold() for member in members}
+    if review.reviewer.casefold() in family_authors:
         return AdmissionStatus(ready=False, code="REVIEW_NOT_INDEPENDENT")
     if review.reviewed_at > date.today():
         return AdmissionStatus(ready=False, code="REVIEW_FUTURE_DATED")
@@ -276,37 +288,85 @@ def publish_receipt(receipts_root: Path, case_revision: str, filename: str, reco
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,255}\.json", filename):
         raise ValueError("unsafe receipt filename")
     root = _safe_existing_directory(receipts_root)
-    revision_dir = root / case_revision
+    directory_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    root_fd = os.open(root, directory_flags)
+    revision_fd: int | None = None
+    temporary = f".{filename}.{os.getpid()}.{secrets.token_hex(8)}.tmp"
+    linked_identity: tuple[int, int] | None = None
+    publication_complete = False
     try:
-        os.mkdir(revision_dir, 0o700)
-    except FileExistsError:
-        pass
-    if revision_dir.is_symlink() or not revision_dir.is_dir() or revision_dir.resolve(strict=True).parent != root:
-        raise ValueError("receipt revision directory is unsafe")
-
-    final = revision_dir / filename
-    temporary = revision_dir / f".{filename}.{os.getpid()}.{secrets.token_hex(8)}.tmp"
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    descriptor = os.open(temporary, flags, 0o600)
-    try:
-        with os.fdopen(descriptor, "wb", closefd=True) as stream:
-            stream.write(receipt_bytes(record))
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.link(temporary, final, follow_symlinks=False)
-        directory_fd = os.open(revision_dir, os.O_RDONLY)
+        root_info = os.fstat(root_fd)
+        path_root_info = root.lstat()
+        if (not stat.S_ISDIR(root_info.st_mode) or root.is_symlink()
+                or (root_info.st_dev, root_info.st_ino) != (path_root_info.st_dev, path_root_info.st_ino)):
+            raise ValueError("receipt root identity changed during publication")
         try:
-            os.fsync(directory_fd)
-        finally:
-            os.close(directory_fd)
-    finally:
-        try:
-            temporary.unlink()
-        except FileNotFoundError:
+            os.mkdir(case_revision, 0o700, dir_fd=root_fd)
+            os.fsync(root_fd)
+        except FileExistsError:
             pass
-    return final
+        revision_fd = os.open(case_revision, directory_flags, dir_fd=root_fd)
+        revision_info = os.fstat(revision_fd)
+        path_revision_info = os.stat(case_revision, dir_fd=root_fd, follow_symlinks=False)
+        if (not stat.S_ISDIR(revision_info.st_mode)
+                or (revision_info.st_dev, revision_info.st_ino)
+                != (path_revision_info.st_dev, path_revision_info.st_ino)):
+            raise ValueError("receipt revision directory is unsafe")
+
+        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | nofollow,
+                             0o600, dir_fd=revision_fd)
+        try:
+            with os.fdopen(descriptor, "wb", closefd=True) as stream:
+                stream.write(receipt_bytes(record))
+                stream.flush()
+                os.fsync(stream.fileno())
+            temporary_info = os.stat(temporary, dir_fd=revision_fd, follow_symlinks=False)
+            os.link(temporary, filename, src_dir_fd=revision_fd, dst_dir_fd=revision_fd,
+                    follow_symlinks=False)
+            linked_identity = (temporary_info.st_dev, temporary_info.st_ino)
+        finally:
+            try:
+                os.unlink(temporary, dir_fd=revision_fd)
+            except FileNotFoundError:
+                pass
+        os.fsync(revision_fd)
+
+        final_fd = os.open(filename, os.O_RDONLY | nofollow, dir_fd=revision_fd)
+        try:
+            final_info = os.fstat(final_fd)
+        finally:
+            os.close(final_fd)
+        current_revision_info = os.stat(case_revision, dir_fd=root_fd, follow_symlinks=False)
+        current_root_info = root.lstat()
+        final = root / case_revision / filename
+        current_final_info = final.lstat()
+        if ((revision_info.st_dev, revision_info.st_ino)
+                != (current_revision_info.st_dev, current_revision_info.st_ino)
+                or (root_info.st_dev, root_info.st_ino)
+                != (current_root_info.st_dev, current_root_info.st_ino)
+                or (final_info.st_dev, final_info.st_ino)
+                != (current_final_info.st_dev, current_final_info.st_ino)):
+            raise ValueError("receipt directory identity changed during publication")
+        if (not stat.S_ISREG(final_info.st_mode) or final_info.st_nlink != 1
+                or final.is_symlink()):
+            raise ValueError("published receipt is not an exclusive regular file")
+        publication_complete = True
+        return final
+    except (FileNotFoundError, NotADirectoryError) as error:
+        raise ValueError("receipt directory identity changed during publication") from error
+    finally:
+        if revision_fd is not None:
+            if linked_identity is not None and not publication_complete:
+                try:
+                    linked_info = os.stat(filename, dir_fd=revision_fd, follow_symlinks=False)
+                    if (linked_info.st_dev, linked_info.st_ino) == linked_identity:
+                        os.unlink(filename, dir_fd=revision_fd)
+                        os.fsync(revision_fd)
+                except FileNotFoundError:
+                    pass
+            os.close(revision_fd)
+        os.close(root_fd)
 
 
 class QualificationAttempt(Frozen):
@@ -548,7 +608,8 @@ def _declared_receipt_path(dataset: Path, relative: str) -> Path:
     receipts = (dataset / "receipts").resolve(strict=True)
     path = dataset / relative
     resolved = path.resolve(strict=True)
-    if (path.is_symlink() or not path.is_file() or not resolved.is_relative_to(receipts)
+    info = path.lstat()
+    if (path.is_symlink() or not path.is_file() or info.st_nlink != 1 or not resolved.is_relative_to(receipts)
             or any((dataset.joinpath(*Path(relative).parts[:index])).is_symlink()
                    for index in range(1, len(Path(relative).parts) + 1))):
         raise ValueError("receipt path is not a regular file below the receipts root")
@@ -577,10 +638,16 @@ def admission_from_manifest(dataset: Path, manifest: DatasetManifest,
         selected_run = replays[0].qualification_run_id
         ledger: list[ReplayRecord] = []
         revision_directory = (dataset / "receipts" / revision).resolve(strict=True)
-        for candidate in sorted(revision_directory.glob("replay-*.json")):
-            if candidate.is_symlink() or not candidate.is_file():
+        for candidate in sorted(path for path in revision_directory.iterdir() if path.name.endswith(".json")):
+            if candidate.is_symlink() or not candidate.is_file() or candidate.lstat().st_nlink != 1:
                 return AdmissionStatus(ready=False, code="REPLAY_RUN_LEDGER_INVALID")
-            ledger_record = ReplayRecord.model_validate_json(candidate.read_bytes())
+            try:
+                ledger_record = ReplayRecord.model_validate_json(candidate.read_bytes())
+            except ValueError:
+                return AdmissionStatus(ready=False, code="REPLAY_RUN_LEDGER_INVALID")
+            if (ledger_record.case_id != case.case_id
+                    or ledger_record.case_revision_sha256 != revision):
+                return AdmissionStatus(ready=False, code="REPLAY_RUN_LEDGER_INVALID")
             if ledger_record.case_id == case.case_id and ledger_record.qualification_run_id == selected_run:
                 ledger.append(ledger_record)
         if (len(ledger) != 3 or sorted(record.attempt for record in ledger) != [1, 2, 3]
@@ -653,8 +720,9 @@ async def verify_references(*, root: Path, manifest_path: Path, eval_set: EvalSe
     if manifest_path.parent != expected_dataset or manifest_path.is_symlink() or not manifest_path.is_file():
         raise ValueError("manifest must be a regular file directly below benchmarks/dataset")
     receipts_root = _safe_existing_directory(receipts_root)
-    if not receipts_root.is_relative_to(root):
-        raise ValueError("receipts root must be inside the repository")
+    expected_receipts = (manifest_path.parent / "receipts").resolve(strict=True)
+    if receipts_root != expected_receipts:
+        raise ValueError("receipts root must be exactly benchmarks/dataset/receipts")
     corpus_report = (validate_corpus(root, manifest_path=manifest_path)
                      if corpus_validator is validate_corpus else corpus_validator(root))
     if not corpus_report.ok:
@@ -694,6 +762,14 @@ async def verify_references(*, root: Path, manifest_path: Path, eval_set: EvalSe
                     runtime_image_id=None, executor_digest=executor_digest,
                     started_at=started_at, finished_at=now(), failure_code="RUNTIME_IMAGE_UNRESOLVED",
                 )
+            elif kernel.runtime_image_id != dataset_case.runtime_image_id:
+                record = _infrastructure_record(
+                    dataset_case=dataset_case, dataset_version=manifest.dataset_version,
+                    manifest_sha256=manifest_digest, case_revision=revision,
+                    qualification_run_id=qualification_run_id, attempt=attempt, runtime_row=row,
+                    runtime_image_id=kernel.runtime_image_id, executor_digest=executor_digest,
+                    started_at=started_at, finished_at=now(), failure_code="RUNTIME_IMAGE_MISMATCH",
+                )
             else:
                 evaluation = await kernel.evaluate(submission)
                 record = _record_from_evaluation(
@@ -710,13 +786,12 @@ async def verify_references(*, root: Path, manifest_path: Path, eval_set: EvalSe
                 attempt=attempt, outcome=record.outcome, failure_code=record.failure_code,
                 path=relative, sha256=_sha256_file(published)))
             records.append(record)
-            if record.failure_code in {"CLEANUP_UNCONFIRMED", "RUNTIME_IMAGE_UNRESOLVED"}:
+            if record.failure_code in {"CLEANUP_UNCONFIRMED", "RUNTIME_IMAGE_UNRESOLVED",
+                                       "RUNTIME_IMAGE_MISMATCH"}:
                 break
         review = _load_review(manifest_path.parent, dataset_case)
-        current_image = records[0].runtime_image_id if records else None
         status = admission_status(dataset_case, tuple(records), review,
                                   family_cases=family_members[dataset_case.family_id],
-                                  runtime_image_id=current_image,
                                   runtime_row_sha256=runtime_row_sha256(row),
                                   executor_sha256=executor_digest)
         reports.append(QualificationCaseReport(

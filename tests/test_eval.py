@@ -126,6 +126,7 @@ def qualification_fixture(tmp_path: Path) -> Path:
     case = data["cases"][0]
     case["status"] = "candidate"
     case["runtime"] = "pytest-cpython312"
+    case["runtime_image_id"] = "sha256:" + "9" * 64
     case["expected"]["vulnerable"]["reason_code"] = "EXPLOIT_EXPECTATION_MET"
     case["expected"]["fixed"]["reason_code"] = "INVARIANT_PRESERVED"
     write_manifest(root, data)
@@ -314,3 +315,58 @@ async def test_reference_kernel_boundary_receives_only_case_and_submission(tmp_p
         receipts_root=root / "benchmarks/dataset/receipts",
         backend_factory=lambda: QualificationFake(dict(HAPPY)), corpus_validator=checked)
     assert report.ok and len(seen) == 1
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(("resolved_image", "failure_code"), [
+    (None, "RUNTIME_IMAGE_UNRESOLVED"),
+    ("sha256:" + "d" * 64, "RUNTIME_IMAGE_MISMATCH"),
+])
+async def test_reference_replay_fails_closed_when_the_current_image_cannot_match_the_manifest_pin(
+        tmp_path, resolved_image, failure_code):
+    from tests.test_corpus import checked
+    from tests.test_kernel import HAPPY
+
+    root = qualification_fixture(tmp_path)
+
+    class CurrentImageFake(QualificationFake):
+        def resolve_image(self, reference):
+            return resolved_image
+
+        def _probe(self, name):
+            pytest.fail("a missing or mismatched runtime image must fail before role execution")
+
+    report = await verify_references(
+        root=root, manifest_path=root / "benchmarks/dataset/manifest.json",
+        eval_set="development", attempts=3, runs_root=root / ".runs/lite",
+        receipts_root=root / "benchmarks/dataset/receipts",
+        backend_factory=lambda: CurrentImageFake(dict(HAPPY)), corpus_validator=checked)
+
+    assert not report.ok
+    assert len(report.cases[0].attempts) == 1
+    attempt = report.cases[0].attempts[0]
+    assert attempt.outcome == "infrastructure" and attempt.failure_code == failure_code
+    record = json.loads((root / attempt.path).read_text())
+    assert record["runtime_image_id"] == resolved_image
+
+
+@pytest.mark.anyio
+async def test_reference_replay_requires_the_exact_dataset_receipts_root_before_sandbox_construction(tmp_path):
+    from tests.test_corpus import checked
+
+    root = qualification_fixture(tmp_path)
+    alternate = root / "benchmarks/dataset/alternate-receipts"
+    alternate.mkdir()
+    constructed = False
+
+    def backend_factory():
+        nonlocal constructed
+        constructed = True
+        pytest.fail("an alternate receipts root must fail before sandbox construction")
+
+    with pytest.raises(ValueError, match="benchmarks/dataset/receipts"):
+        await verify_references(
+            root=root, manifest_path=root / "benchmarks/dataset/manifest.json",
+            eval_set="development", attempts=1, runs_root=root / ".runs/lite",
+            receipts_root=alternate, backend_factory=backend_factory, corpus_validator=checked)
+    assert not constructed
