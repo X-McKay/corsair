@@ -414,3 +414,76 @@ async def test_reference_replay_requires_the_exact_dataset_receipts_root_before_
             eval_set="development", attempts=1, runs_root=root / ".runs/lite",
             receipts_root=alternate, backend_factory=backend_factory, corpus_validator=checked)
     assert not constructed
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("alias_kind", ["hardlink", "intermediate-symlink"])
+async def test_reference_replay_applies_strict_declared_path_rules_to_the_review_receipt(tmp_path, alias_kind):
+    from corsair.benchmark import receipt_bytes
+    from corsair.corpus import load_manifest
+    from tests.test_corpus import checked, family_review, read_manifest, write_manifest
+    from tests.test_kernel import HAPPY
+
+    root = qualification_fixture(tmp_path)
+    dataset = root / "benchmarks/dataset"
+    receipts = dataset / "receipts"
+    case = load_manifest(dataset / "manifest.json").cases[0]
+    review_raw = receipt_bytes(family_review(case))
+    if alias_kind == "hardlink":
+        review_path = receipts / "review.json"
+        review_path.write_bytes(review_raw)
+        (root / "review-hardlink.json").hardlink_to(review_path)
+        pointer_path = "receipts/review.json"
+    else:
+        actual = receipts / "actual"
+        actual.mkdir()
+        review_path = actual / "review.json"
+        review_path.write_bytes(review_raw)
+        (receipts / "review-link").symlink_to(actual, target_is_directory=True)
+        pointer_path = "receipts/review-link/review.json"
+    data = read_manifest(root)
+    data["cases"][0]["review_receipt"] = {
+        "path": pointer_path,
+        "sha256": hashlib.sha256(review_raw).hexdigest(),
+        "reviewer": "independent-reviewer",
+        "reviewed_at": "2026-10-23",
+    }
+    write_manifest(root, data)
+
+    with pytest.raises(ValueError, match="regular file below the receipts root"):
+        await verify_references(
+            root=root, manifest_path=dataset / "manifest.json", eval_set="development", attempts=3,
+            runs_root=root / ".runs/lite", receipts_root=receipts,
+            backend_factory=lambda: QualificationFake(dict(HAPPY)), corpus_validator=checked,
+            now=lambda: datetime(2026, 10, 23, 10, 0, tzinfo=timezone.utc),
+            id_factory=lambda: f"strict-review-{alias_kind}")
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("alias_kind", ["manifest", "root"])
+async def test_reference_replay_rejects_lexical_symlink_aliases_before_sandbox_construction(
+        tmp_path, alias_kind):
+    from tests.test_corpus import checked
+
+    root = qualification_fixture(tmp_path)
+    if alias_kind == "manifest":
+        selected_root = root
+        selected_manifest = root / "benchmarks/dataset/manifest-alias.json"
+        selected_manifest.symlink_to("manifest.json")
+    else:
+        selected_root = tmp_path / "repository-alias"
+        selected_root.symlink_to(root, target_is_directory=True)
+        selected_manifest = selected_root / "benchmarks/dataset/manifest.json"
+    constructed = False
+
+    def backend_factory():
+        nonlocal constructed
+        constructed = True
+        pytest.fail("lexical symlink aliases must fail before sandbox construction")
+
+    with pytest.raises(ValueError, match="manifest|symlink"):
+        await verify_references(
+            root=selected_root, manifest_path=selected_manifest, eval_set="development", attempts=1,
+            runs_root=root / ".runs/lite", receipts_root=root / "benchmarks/dataset/receipts",
+            backend_factory=backend_factory, corpus_validator=checked)
+    assert not constructed

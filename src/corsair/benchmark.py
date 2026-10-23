@@ -337,6 +337,8 @@ def publish_receipt(receipts_root: Path, case_revision: str, filename: str, reco
             final_info = os.fstat(final_fd)
         finally:
             os.close(final_fd)
+        if (final_info.st_dev, final_info.st_ino) != linked_identity:
+            raise ValueError("receipt file identity changed during publication")
         current_revision_info = os.stat(case_revision, dir_fd=root_fd, follow_symlinks=False)
         current_root_info = root.lstat()
         final = root / case_revision / filename
@@ -363,7 +365,7 @@ def publish_receipt(receipts_root: Path, case_revision: str, filename: str, reco
                     if (linked_info.st_dev, linked_info.st_ino) == linked_identity:
                         os.unlink(filename, dir_fd=revision_fd)
                         os.fsync(revision_fd)
-                except FileNotFoundError:
+                except OSError:
                     pass
             os.close(revision_fd)
         os.close(root_fd)
@@ -591,10 +593,7 @@ def _load_review(dataset: Path, case: DatasetCase) -> TechnicalReviewRecord | No
     pointer = case.review_receipt
     if pointer is None:
         return None
-    path = dataset / pointer.path
-    resolved = path.resolve(strict=True)
-    if not resolved.is_relative_to((dataset / "receipts").resolve(strict=True)) or not path.is_file() or path.is_symlink():
-        raise ValueError(f"unsafe review receipt for {case.case_id}")
+    path = _declared_receipt_path(dataset, pointer.path)
     raw = path.read_bytes()
     if hashlib.sha256(raw).hexdigest() != pointer.sha256:
         raise ValueError(f"review receipt hash differs for {case.case_id}")
@@ -714,10 +713,20 @@ async def verify_references(*, root: Path, manifest_path: Path, eval_set: EvalSe
     """Replay checked-in references without a model and publish one immutable receipt per fresh attempt."""
     if attempts < 1:
         raise ValueError("attempts must be at least one")
-    root = Path(root).resolve(strict=True)
-    manifest_path = Path(manifest_path).resolve(strict=True)
-    expected_dataset = (root / "benchmarks/dataset").resolve(strict=True)
-    if manifest_path.parent != expected_dataset or manifest_path.is_symlink() or not manifest_path.is_file():
+    lexical_root = Path(os.path.abspath(root))
+    lexical_manifest = Path(os.path.abspath(manifest_path))
+    lexical_dataset = lexical_root / "benchmarks/dataset"
+    if lexical_manifest.parent != lexical_dataset:
+        raise ValueError("manifest must be a regular file directly below benchmarks/dataset")
+    root = _safe_existing_directory(lexical_root)
+    expected_dataset = _safe_existing_directory(lexical_dataset)
+    try:
+        manifest_info = lexical_manifest.lstat()
+        manifest_path = lexical_manifest.resolve(strict=True)
+    except OSError as error:
+        raise ValueError("manifest must be a regular file directly below benchmarks/dataset") from error
+    if (not stat.S_ISREG(manifest_info.st_mode) or manifest_path != lexical_manifest
+            or manifest_path.parent != expected_dataset):
         raise ValueError("manifest must be a regular file directly below benchmarks/dataset")
     receipts_root = _safe_existing_directory(receipts_root)
     expected_receipts = (manifest_path.parent / "receipts").resolve(strict=True)

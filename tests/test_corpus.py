@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 from copy import deepcopy
@@ -527,6 +528,33 @@ def test_receipt_publication_detects_a_directory_swap_without_writing_into_the_r
         publish_receipt(receipts, revision, "replay-swapped-1.json", record)
     assert not (revision_dir / "replay-swapped-1.json").exists()
     assert not (moved / "replay-swapped-1.json").exists()
+
+
+def test_receipt_publication_rejects_a_replaced_final_filename_without_deleting_the_replacement(
+        tmp_path, monkeypatch):
+    case = DatasetManifest.model_validate(manifest(dataset_case(runtime="pytest-cpython312"))).cases[0]
+    record = replay_record(case)
+    receipts = tmp_path / "receipts"
+    receipts.mkdir()
+    revision = case_revision_sha256(case)
+    filename = "replay-replaced-1.json"
+    final = receipts / revision / filename
+    replacement = b"concurrent replacement\n"
+    real_open = corpus_module.os.open
+    replaced = False
+
+    def replace_then_open(path, flags, mode=0o777, *, dir_fd=None):
+        nonlocal replaced
+        if path == filename and dir_fd is not None and flags & os.O_ACCMODE == os.O_RDONLY and not replaced:
+            replaced = True
+            final.unlink()
+            final.write_bytes(replacement)
+        return real_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr("corsair.benchmark.os.open", replace_then_open)
+    with pytest.raises(ValueError, match="file identity changed"):
+        publish_receipt(receipts, revision, filename, record)
+    assert replaced and final.read_bytes() == replacement
 
 
 def test_complete_replay_record_rejects_duplicate_or_inconsistent_role_evidence():
