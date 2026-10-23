@@ -247,6 +247,21 @@ def test_batch_c_dependency_locks_are_closed_and_hash_checked():
     assert all(f"/work/{path}" in jsoup_build for path in jsoup_lock["compiled_sources"])
 
 
+def test_requests_build_fetches_verifies_and_installs_only_locked_wheels():
+    case_dir = ROOT / "cases/cs-1009"
+    packages = json.loads((case_dir / "dependencies.lock").read_text())["packages"]
+    build = json.loads((case_dir / "reference-submission.json").read_text())["build_script"]
+    install = build.split("python -m pip install", 1)[1]
+
+    assert "--no-index" in install
+    assert " -r " not in install
+    for package in packages:
+        local = f'$wheel_dir/{package["filename"]}'
+        assert f'--dest "$wheel_dir" "{package["wheel_url"]}"' in build
+        assert f'{package["wheel_sha256"]}  {local}' in build
+        assert f'"{local}"' in install
+
+
 def test_batch_c_probes_preserve_runtime_compatible_owned_state_checks():
     javascript = json.loads((ROOT / "cases/cs-1010/reference-submission.json").read_text())["probe"]
     assert "const ownedPrototype = {};" in javascript
