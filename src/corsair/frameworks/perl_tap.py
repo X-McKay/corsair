@@ -131,23 +131,85 @@ BEGIN {
 }
 use Devel::Cover::DB;
 use JSON::PP qw(encode_json);
+use Fcntl qw(:mode O_RDONLY O_NOFOLLOW);
+use File::Compare qw(compare);
+use File::Basename qw(dirname);
+use File::Spec ();
+use File::Temp qw(tempfile);
 
-my ($database, $output) = @ARGV;
-my $db = Devel::Cover::DB->new(db => $database);
-$db->merge_runs;
-my $cover = $db->cover;
-my %files;
-while (my ($path, $file) = each %{$cover}) {
-    my $statements = $file->{statement} || {};
-    my @lines = sort { $a <=> $b } grep {
-        my $entries = $statements->{$_};
-        scalar grep { $_->covered } @{$entries};
-    } keys %{$statements};
-    $files{$path} = { executed_lines => \@lines };
+sub source_handle {
+    my ($path, $expected) = @_;
+    sysopen my $handle, $path, O_RDONLY | O_NOFOLLOW or die "cannot open source: $!";
+    my @opened = stat $handle;
+    die 'ambiguous source identity' unless @opened && S_ISREG($opened[2]) && $opened[3] == 1
+        && $opened[0] == $expected->[0] && $opened[1] == $expected->[1] && $opened[7] == $expected->[7];
+    binmode $handle or die "cannot read source bytes: $!";
+    return $handle;
 }
-open my $handle, '>', $output or die "cannot write coverage: $!";
-print {$handle} encode_json({ files => \%files });
-close $handle;
+
+sub unique_prepared_source {
+    my ($relative) = @_;
+    return 0 unless defined($relative) && length($relative)
+        && $relative !~ m{\A/|(?:\A|/)\.\.(?:/|\z)|\0};
+    my $target = File::Spec->canonpath("/work/$relative");
+    # Devel::Cover pools byte-identical files. Inspect build-generated sources too.
+    return eval {
+        my %sources;
+        my @pending = ('/work');
+        while (@pending) {
+            my $path = pop @pending;
+            next if $path eq '/work/.corsair';
+            my @metadata = lstat $path;
+            die 'unreadable prepared source entry' unless @metadata;
+            if (S_ISDIR($metadata[2])) {
+                opendir my $directory, $path or die "cannot inspect prepared sources: $!";
+                local $! = 0;
+                my @entries = readdir $directory;
+                die "cannot list prepared sources: $!" if $!;
+                closedir $directory or die "cannot close source directory: $!";
+                push @pending, map { "$path/$_" } grep { $_ ne '.' && $_ ne '..' } @entries;
+                next;
+            }
+            die 'linked or nonregular prepared source' unless S_ISREG($metadata[2]) && $metadata[3] == 1;
+            $sources{$path} = \@metadata;
+        }
+        my $metadata = $sources{$target} or die 'target source identity is missing';
+        my $target_handle = source_handle($target, $metadata);
+        for my $path (keys %sources) {
+            next if $path eq $target || $sources{$path}[7] != $metadata->[7];
+            my $candidate = source_handle($path, $sources{$path});
+            seek $target_handle, 0, 0 or die "cannot rewind target source: $!";
+            my $comparison = compare($candidate, $target_handle);
+            close $candidate or die "cannot close candidate source: $!";
+            die 'ambiguous prepared target source' if $comparison <= 0;
+        }
+        close $target_handle or die "cannot close target source: $!";
+        1;
+    } || 0;
+}
+
+my ($database, $output, $target) = @ARGV;
+my %files;
+if (unique_prepared_source($target)) {
+    my $db = Devel::Cover::DB->new(db => $database);
+    $db->merge_runs;
+    my $cover = $db->cover;
+    while (my ($path, $file) = each %{$cover}) {
+        my $statements = $file->{statement} || {};
+        my @lines = sort { $a <=> $b } grep {
+            my $entries = $statements->{$_};
+            scalar grep { $_->covered } @{$entries};
+        } keys %{$statements};
+        $files{$path} = { executed_lines => \@lines };
+    }
+}
+my $directory = dirname($output);
+my @directory = lstat $directory;
+die 'coverage output parent must be a real directory' unless @directory && S_ISDIR($directory[2]);
+my ($handle, $temporary) = tempfile('.coverage-XXXXXX', DIR => $directory, UNLINK => 1);
+print {$handle} encode_json({ files => \%files }) or die "cannot write coverage: $!";
+close $handle or die "cannot close coverage: $!";
+rename $temporary, $output or die "cannot publish coverage: $!";
 '''
 
 
@@ -209,7 +271,7 @@ class PerlTap:
         return PostCommand(("env", "-u", "PERL5OPT", "-u", "DEVEL_COVER_OPTIONS", "sh",
                             f"{PROBE_DIR}/perl-coverage.sh", "check", f"{RESULT_DIR}/cover_db",
                             "perl", f"{PROBE_DIR}/render_coverage.pl", f"{RESULT_DIR}/cover_db",
-                            f"{RESULT_DIR}/coverage.json"), environment)
+                            f"{RESULT_DIR}/coverage.json", target_file), environment)
 
     def environment(self, role: str) -> Mapping[str, str]:
         return {"CORSAIR_ROLE": role, "CORSAIR_RESULT": f"{RESULT_DIR}/result.json",

@@ -1,5 +1,5 @@
 {
-  "case_id": "fixture:perl-child-script",
+  "case_id": "cs-0004-b",
   "finding": {
     "title": "Path traversal in Perl script",
     "description": "An unconfined caller-supplied name can read a file outside the document root.",

@@ -168,20 +168,38 @@ async def test_perl_script_same_basename_does_not_cover_target(tmp_path):
 
 @pytest.mark.docker
 @pytest.mark.anyio
-async def test_perl_script_identical_decoy_cannot_supply_target_branch(tmp_path):
+@pytest.mark.parametrize("placement", [
+    "checkout", "build-copy", "build-extensionless", "build-hardlink", "build-symlink", "build-directory-link",
+])
+async def test_perl_script_identical_decoy_cannot_supply_target_branch(tmp_path, placement):
     require_perl_image()
     tree = tmp_path / "tree"
-    for filename in ("bin/script-target.pl", "other/script-target.pl"):
+    filenames = ("bin/script-target.pl", "other/script-target.pl") if placement == "checkout" else ("bin/script-target.pl",)
+    for filename in filenames:
         target = tree / filename
         target.parent.mkdir(parents=True)
         target.write_text((PERL_SCRIPT / "vulnerable/bin/script-target.pl").read_text())
     reference = perl_script_reference()
+    decoy = "/work/other/script-target.pl" if placement == "checkout" else "/work/generated/script-target.pl"
+    build = {
+        "checkout": "",
+        "build-copy": "mkdir -p /work/generated\ncp /work/bin/script-target.pl /work/generated/script-target.pl",
+        "build-extensionless": "mkdir -p /work/generated\ncp /work/bin/script-target.pl /work/generated/runner",
+        "build-hardlink": "mkdir -p /work/generated\nln /work/bin/script-target.pl /work/generated/script-target.pl",
+        "build-symlink": "mkdir -p /work/generated\nln -s ../bin/script-target.pl /work/generated/script-target.pl",
+        "build-directory-link": "mkdir -p /work/generated\nln -s ../bin /work/generated/source",
+    }[placement]
+    if placement == "build-directory-link":
+        decoy = "/work/generated/source/script-target.pl"
+    elif placement == "build-extensionless":
+        decoy = "/work/generated/runner"
     # The target only reaches line 8. A byte-identical decoy reaches line 10 afterwards.
     probe = reference.probe.replace("$payload, 'second');", "$payload, 'first');")
     probe = probe.replace("    return $content ne 'outside';",
-        "    _launch('/work/other/script-target.pl', \"$base/allowed\", 'document', 'second');\n"
+        "    _launch('" + decoy + "', \"$base/allowed\", 'document', 'second');\n"
         "    return $content ne 'outside';")
-    reference = reference.model_copy(update={"probe": probe, "hypothesis": reference.hypothesis.model_copy(
+    reference = reference.model_copy(update={"probe": probe, "build_script": build,
+        "hypothesis": reference.hypothesis.model_copy(
         update={"target_lines": (10,)})})
     case = load_case(PERL_SCRIPT).model_copy(update={"revision": revision(tree), "fixed_revision": None})
     backend = DockerSandboxes()
@@ -192,9 +210,58 @@ async def test_perl_script_identical_decoy_cannot_supply_target_branch(tmp_path)
     assert result.verdict.label is Label.INCONCLUSIVE
     assert [run.invariant_held for run in result.runs] == [True, False]
     for run in result.runs:
-        assert run.covered_target is None and run.covered_lines == () and run.cleanup_confirmed
+        assert run.covered_target in (None, False) and run.covered_lines == () and run.cleanup_confirmed
         assert run.result is RoleResult.PASS and run.junit_tests == 1
+        assert json.loads(store.get(run.coverage)) == {"files": {}}
     assert backend.labelled(kernel.run_id) == []
+
+
+@pytest.mark.docker
+@pytest.mark.parametrize("link_kind", ["symlink", "hardlink"])
+@pytest.mark.parametrize("alias_kind", ["raw-db", "sibling"])
+def test_perl_script_renderer_output_alias_preserves_evidence(link_kind, alias_kind):
+    require_perl_image()
+    adapter = framework("perl-tap")
+    backend = DockerSandboxes()
+    run_id = "perl-output-" + uuid4().hex[:12]
+    name = backend.create(SandboxSpec(image=PERL_IMAGE, labels=labels(run_id, "renderer")))
+    try:
+        assert backend.exec_once(name, ["mkdir", "-p", "/work/.corsair", "/tmp/corsair"],
+                                 workdir="/", timeout=60).exit_code == 0
+        for filename, data in adapter.driver_files().items():
+            backend.write_file(name, "/work/.corsair/" + filename, data)
+        target_data = b"my $value = 42;\nprint $value;\n"
+        backend.write_file(name, "/work/target.pl", target_data)
+        # Probe infrastructure does not contribute candidates to prepared source identity.
+        backend.write_file(name, "/work/.corsair/infrastructure-copy.pl", target_data)
+        seeded = backend.exec_once(name, ["perl", "/work/target.pl"], workdir="/work",
+                                   env=adapter.environment("control"), timeout=60)
+        assert seeded.exit_code == 0, seeded.stderr
+        post = adapter.post_command("control", "target.pl")
+        first = backend.exec_once(name, post.argv, workdir="/work", env=post.environment, timeout=60)
+        assert first.exit_code == 0, first.stderr
+        backend.write_file(name, "/tmp/corsair/keep.txt", b"unrelated prepared sibling")
+        raw = "/tmp/corsair/cover_db/cover.14"
+        sibling = "/tmp/corsair/keep.txt"
+        snapshot = backend.copy_out(name, [raw, sibling])
+        assert snapshot[raw] and snapshot[sibling]
+        output = "/tmp/corsair/coverage.json"
+        assert backend.exec_once(name, ["rm", output], workdir="/", timeout=60).exit_code == 0
+        alias = raw if alias_kind == "raw-db" else sibling
+        link = ["ln", *(["-s"] if link_kind == "symlink" else []), alias, output]
+        assert backend.exec_once(name, link, workdir="/", timeout=60).exit_code == 0
+        second = backend.exec_once(name, post.argv, workdir="/work", env=post.environment, timeout=60)
+        assert second.exit_code == 0, second.stderr
+        files = backend.copy_out(name, [raw, sibling, output])
+        assert {raw: files[raw], sibling: files[sibling]} == snapshot
+        assert json.loads(files[output])["files"]["target.pl"]["executed_lines"] == [1, 2]
+        independent = backend.exec_once(name, ["sh", "-c",
+            '[ ! -L /tmp/corsair/coverage.json ] && [ "$(stat -c %h /tmp/corsair/coverage.json)" = 1 ]'],
+            workdir="/", timeout=60)
+        assert independent.exit_code == 0
+    finally:
+        assert backend.remove(name)
+    assert backend.labelled(run_id) == []
 
 
 def perl_seed_database():
