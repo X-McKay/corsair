@@ -1119,6 +1119,16 @@ def test_nonconformance_cases_cannot_use_distinct_paths_to_hide_a_source_pair_co
     assert "SOURCE_PAIR_FAMILY_COLLISION" in issue_codes(checked(root))
 
 
+def test_conformance_collision_exception_does_not_cross_split_boundary(tmp_path):
+    root = corpus_fixture(tmp_path)
+    add_valid_self_authored_conformance_pair(root)
+    data = read_manifest(root)
+    data["cases"][1]["split"] = "development"
+    write_manifest(root, data)
+
+    assert "SOURCE_PAIR_FAMILY_COLLISION" in issue_codes(checked(root))
+
+
 def test_conformance_paths_only_distinguish_the_exact_foundation_revision(tmp_path):
     root = corpus_fixture(tmp_path)
     add_valid_self_authored_conformance_pair(root)

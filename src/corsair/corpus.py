@@ -1263,16 +1263,7 @@ def validate_corpus(root: Path, *, manifest_path: Path | None = None,
             upstream_repository = _normal_repository(revision.repository)
             if upstream_repository is None:
                 return ("INVALID_REPOSITORY", case.case_id)
-            snapshot = revision.vendored_snapshot
-            if snapshot is None:
-                return ("git", upstream_repository, revision.commit)
-            snapshot_repository = _normal_repository(snapshot.repository)
-            if snapshot_repository is None:
-                return ("INVALID_REPOSITORY", case.case_id)
-            if (case.split != "conformance" or upstream_repository != snapshot_repository
-                    or revision.commit != snapshot.commit):
-                return ("git", upstream_repository, revision.commit)
-            return ("conformance-vendored", upstream_repository, revision.commit, snapshot.path)
+            return upstream_repository, revision.commit
 
         vulnerable = revision_key(case.source_pair.vulnerable)
         fixed = revision_key(case.source_pair.fixed)
@@ -1280,9 +1271,24 @@ def validate_corpus(root: Path, *, manifest_path: Path | None = None,
             return ("INVALID_REPOSITORY", case.case_id)
         return vulnerable, fixed
 
+    def conformance_subtree_identity(case: DatasetCase) -> object | None:
+        if case.split != "conformance":
+            return None
+        identities = []
+        for revision in (case.source_pair.vulnerable, case.source_pair.fixed):
+            snapshot = revision.vendored_snapshot
+            upstream_repository = _normal_repository(revision.repository)
+            if snapshot is None or upstream_repository is None:
+                return None
+            snapshot_repository = _normal_repository(snapshot.repository)
+            if (snapshot_repository != upstream_repository
+                    or snapshot.commit != revision.commit):
+                return None
+            identities.append(snapshot.path)
+        return tuple(identities)
+
     collision_specs = (
         ("ALIAS_FAMILY_COLLISION", lambda c: tuple(sorted(alias.strip().upper() for alias in c.aliases))),
-        ("SOURCE_PAIR_FAMILY_COLLISION", source_pair_collision_key),
         ("PATCH_FAMILY_COLLISION", lambda c: c.source_pair.patch_sha256),
     )
     for code, key_for in collision_specs:
@@ -1299,6 +1305,22 @@ def validate_corpus(root: Path, *, manifest_path: Path | None = None,
             if len(distinct) > 1:
                 ids = tuple(sorted({member.case_id for member in members}))
                 add(code, f"distinct families share {key!r}", case_ids=ids)
+
+    source_pair_groups: dict[object, list[DatasetCase]] = defaultdict(list)
+    for case in manifest.cases:
+        source_pair_groups[source_pair_collision_key(case)].append(case)
+    for key, members in source_pair_groups.items():
+        for index, left in enumerate(members):
+            for right in members[index + 1:]:
+                if left.family_id == right.family_id:
+                    continue
+                left_identity = conformance_subtree_identity(left)
+                right_identity = conformance_subtree_identity(right)
+                if (left_identity is not None and right_identity is not None
+                        and left_identity != right_identity):
+                    continue
+                add("SOURCE_PAIR_FAMILY_COLLISION", f"distinct families share {key!r}",
+                    case_ids=tuple(sorted((left.case_id, right.case_id))))
     region_groups: dict[tuple[str, str], list[DatasetCase]] = defaultdict(list)
     for case in manifest.cases:
         for revision in (case.source_pair.vulnerable, case.source_pair.fixed):
