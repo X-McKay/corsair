@@ -22,6 +22,36 @@ source = {WORKDIR}
 data_file = {RESULT_DIR}/coverage
 '''
 
+COVERAGE_LAUNCHER = f'''"""Reset role-local data before enabling coverage's Python startup hook."""
+import os
+import sys
+
+for entry in os.scandir("{RESULT_DIR}"):
+    name = entry.name
+    if name == "coverage.json":
+        continue
+    if (name == "coverage" or name.startswith("coverage.")
+            or name in ("coverage-journal", "coverage-shm", "coverage-wal")):
+        os.unlink(entry.path)
+
+os.execv(sys.executable, [sys.executable, "-m", "coverage", "run", *sys.argv[1:]])
+'''
+
+COVERAGE_RENDERER = f'''"""Merge role data without treating the preserved JSON report as a shard."""
+import os
+
+from coverage import Coverage
+
+paths = sorted(entry.path for entry in os.scandir("{RESULT_DIR}")
+               if entry.name.startswith("coverage.") and entry.name != "coverage.json")
+if not paths:
+    raise RuntimeError("no coverage data files were produced")
+coverage = Coverage(config_file="{PROBE_DIR}/coverage.rc")
+coverage.combine(data_paths=paths, strict=True)
+coverage.save()
+coverage.json_report(outfile="{RESULT_DIR}/coverage.json")
+'''
+
 DRIVER = '''"""Kernel-owned driver: one native pytest test id per payload through the submitted run_target."""
 import json
 import os
@@ -119,10 +149,12 @@ class Pytest:
         return ast_guard(probe)
 
     def driver_files(self) -> dict[str, bytes]:
-        return {"test_corsair_probe.py": DRIVER.encode(), "coverage.rc": COVERAGE_RC.encode()}
+        return {"test_corsair_probe.py": DRIVER.encode(), "coverage.rc": COVERAGE_RC.encode(),
+                "run_coverage.py": COVERAGE_LAUNCHER.encode(), "render_coverage.py": COVERAGE_RENDERER.encode()}
 
     def command(self, role: str, target_file: str) -> list[str]:
-        return ["python", "-m", "coverage", "run", "-m", "pytest",
+        # -S keeps installed startup hooks from collecting before the launcher clears old data.
+        return ["python", "-S", f"{PROBE_DIR}/run_coverage.py", "-m", "pytest",
                 "-p", "no:cacheprovider", "-c", "/dev/null", "--rootdir", WORKDIR, "--noconftest",
                 "--import-mode=importlib", "-q", f"--junitxml={RESULT_DIR}/junit.xml",
                 "-o", "junit_logging=all", "-o", "junit_log_passing_tests=true",
@@ -133,8 +165,7 @@ class Pytest:
         environment = dict(self.environment(role))
         for variable in ("COVERAGE_PROCESS_START", "COVERAGE_PROCESS_CONFIG"):
             environment.pop(variable, None)
-        return PostCommand(("sh", "-c", "python -m coverage combine && "
-                            f"python -m coverage json -o {RESULT_DIR}/coverage.json"), environment)
+        return PostCommand(("python", f"{PROBE_DIR}/render_coverage.py"), environment)
 
     def environment(self, role: str) -> Mapping[str, str]:
         return {"CORSAIR_ROLE": role, "CORSAIR_RESULT": f"{RESULT_DIR}/result.json", "HOME": "/tmp",

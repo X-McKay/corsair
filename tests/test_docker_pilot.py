@@ -217,7 +217,8 @@ async def test_python_script_collects_exact_child_lines_and_verifies_fix(tmp_pat
 
 
 @needs_image
-async def test_python_script_without_child_startup_is_inconclusive(tmp_path):
+@pytest.mark.parametrize("seed_coverage", [False, True], ids=["clean", "seeded-shards"])
+async def test_python_script_without_child_startup_is_inconclusive(tmp_path, seed_coverage):
     reference = Submission.model_validate_json((SCRIPT_CASE / "reference-submission.json").read_text())
     probe = reference.probe.replace("import json\n", "import json\nimport os\n")
     probe = probe.replace("        completed = subprocess.run(\n",
@@ -227,6 +228,54 @@ async def test_python_script_without_child_startup_is_inconclusive(tmp_path):
                           "        completed = subprocess.run(\n")
     probe = probe.replace("cwd=root, check=True, capture_output=True, text=True, timeout=5,",
                           "cwd=root, check=True, capture_output=True, text=True, timeout=5, env=child_env,")
+    if seed_coverage:
+        # Prepared images can retain genuine build-time data. It cannot prove this role's child ran.
+        build_script = '''python - <<'PY'
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+from coverage import CoverageData
+
+results = Path("/tmp/corsair")
+results.mkdir(exist_ok=True)
+results.chmod(0o777)
+with tempfile.TemporaryDirectory() as root:
+    allowed = Path(root) / "allowed"
+    allowed.mkdir()
+    (allowed / "document.txt").write_text("seed-document")
+    completed = subprocess.run(
+        [sys.executable, "-m", "coverage", "run", "--parallel-mode", "--source=/work",
+         "/work/cli_target.py", "document.txt"], cwd=root, check=True, capture_output=True, text=True,
+        env=dict(os.environ, COVERAGE_FILE=str(results / "coverage")),
+    )
+    assert json.loads(completed.stdout) == "seed-document"
+shards = list(results.glob("coverage.*"))
+assert shards
+for shard in shards:
+    data = CoverageData(basename=str(shard))
+    data.read()
+    assert 7 in data.lines("/work/cli_target.py")
+shutil.copyfile(shards[0], results / "coverage")
+# The report path is preserved by reset but must never be an input to coverage combine.
+shutil.copyfile(shards[0], results / "coverage.json")
+(results / "coverage.json").chmod(0o666)
+for name in ("result.json", "junit.xml", "keep.txt", "coverage-not-data"):
+    artifact = results / name
+    artifact.write_text("prepared-marker")
+    artifact.chmod(0o666)
+PY
+'''
+        probe = probe.replace("def run_target(payload: str) -> bool:\n",
+                              "def run_target(payload: str) -> bool:\n"
+                              "    for name in ('result.json', 'junit.xml', 'keep.txt', 'coverage-not-data'):\n"
+                              "        assert (Path('/tmp/corsair') / name).read_text() == 'prepared-marker'\n"
+                              "    assert Path('/tmp/corsair/coverage.json').read_bytes().startswith(b'SQLite format 3')\n")
+        reference = reference.model_copy(update={"build_script": build_script})
     backend = DockerSandboxes()
     store = ArtifactStore(tmp_path / "artifacts")
     kernel = Kernel(backend, ROW, load_case(SCRIPT_CASE), artifacts=store,
