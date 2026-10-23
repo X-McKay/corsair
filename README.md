@@ -22,6 +22,8 @@ make benchmark        # all 385 generated twin cases through the real kernel; no
 
 For a smaller run, use `make benchmark LANGUAGE=java WORKERS=2`. `make benchmark-generate` only generates cases and explicitly reports that execution was not requested. Results are under `.runs/polyglot/`; `make cleanup` removes Corsair-labelled containers, and `uv run corsair cleanup --images` also removes cached sealed environments.
 
+Full batches retain Docker snapshots and can consume substantial disk space. Prefer per-language shards on constrained machines and reclaim inactive caches only after runs finish; resource failures are reported, not treated as passes.
+
 ## Languages and build systems
 
 | Target language | Native evidence | Included build/tool support |
@@ -79,7 +81,7 @@ src/corsair/
 │   ├── bug_seeder/               # Tool-free bug proposal agent
 │   ├── skill_crystallizer/       # Tool-free skill proposal agent
 │   └── resources.py              # Shared spec/resource validation only
-├── domain/                       # Immutable case, submission and evidence types
+├── domain/                       # Contracts and pure verdict/stopping rules
 ├── application/
 │   ├── kernel.py                 # Deterministic verification gates
 │   ├── investigation.py          # Bounded producer execution and stopping

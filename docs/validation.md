@@ -1,5 +1,7 @@
 # Validation record
 
+This is the preserved pre-refactor implementation record. See the [agent-package architecture record](architecture-refactor.md#validation) for the current layout, post-cleanup tests and subsequent CI validation.
+
 The implementation branch is **`feature/differential-oracle-spec-0090`**, cut from `feature/duo-refactor` at `827386b5deed6bbd82d0adad4d45c5ed1c5715a3`. Implementation and fixture fixes are at `ee5f3661694bffc914e960393695a37ea1f339a5`; the following evidence-only commit adds this completed record. The work follows the contract/evidence separation in `X-McKay/playbooks`, not a certification, deployment or merge approval.
 
 ## Final results
