@@ -120,8 +120,27 @@ if [ -L /tmp/corsair ] || [ -L "$raw" ] || [ ! -f "$raw" ] || [ ! -r "$raw" ] ||
   echo "missing or unsafe JaCoCo raw input" >&2
   exit 2
 fi
-exec java -jar /opt/corsair/jacoco-cli.jar report "$raw" \
-  --classfiles /work/.corsair-java/classes --sourcefiles /work --xml /tmp/corsair/jacoco.xml
+report=/tmp/corsair/jacoco.xml
+check_output() {
+  if [ -L "$report" ] || { [ -e "$report" ] && { [ ! -f "$report" ] || [ "$report" -ef "$raw" ]; }; }; then
+    echo "unsafe JaCoCo XML output" >&2
+    exit 2
+  fi
+}
+check_output
+# Never let the CLI open a prepared output inode, which could alias raw evidence or a sibling artifact.
+temporary=$(mktemp -d /tmp/corsair/.jacoco-report.XXXXXXXXXX)
+trap 'rm -rf -- "$temporary"' EXIT
+trap 'exit 2' HUP INT TERM
+java -jar /opt/corsair/jacoco-cli.jar report "$raw" \
+  --classfiles /work/.corsair-java/classes --sourcefiles /work --xml "$temporary/report.xml"
+if [ -L "$temporary/report.xml" ] || [ ! -f "$temporary/report.xml" ] || [ ! -s "$temporary/report.xml" ]; then
+  echo "missing or unsafe rendered JaCoCo XML" >&2
+  exit 2
+fi
+check_output
+# Atomic replacement does not follow a destination swapped after validation; -T also rejects directories.
+mv -fT -- "$temporary/report.xml" "$report"
 '''
 
 

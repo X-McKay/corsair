@@ -1,4 +1,5 @@
 """Java and Perl use the same kernel gates and boolean-invariant contract as JavaScript."""
+import hashlib
 import json
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -197,7 +198,7 @@ JAVA_SCRIPT_CASE = ROOT / "cases/cs-0003-b"
 class JavaEvidenceSandboxes(DockerSandboxes):
     """Inspect real role evidence around rendering without replacing execution."""
 
-    def __init__(self, *, inspect_prepared=False, replace_raw=None):
+    def __init__(self, *, inspect_prepared=False, replace_raw=None, inspect_xml=False):
         super().__init__()
         self.primary_names = []
         self.raw_snapshots = []
@@ -205,6 +206,8 @@ class JavaEvidenceSandboxes(DockerSandboxes):
         self.prepared_after = []
         self.inspect_prepared = inspect_prepared
         self.replace_raw = replace_raw
+        self.inspect_xml = inspect_xml
+        self.xml_siblings = []
 
     def exec_once(self, name, argv, **kwargs):
         primary = tuple(argv) == ("sh", "/work/.corsair/run-java.sh")
@@ -227,6 +230,8 @@ class JavaEvidenceSandboxes(DockerSandboxes):
             self.raw_snapshots.append([self.copy_out(name, ["/tmp/corsair/jacoco.exec"])["/tmp/corsair/jacoco.exec"]])
         elif rendering:
             self.raw_snapshots[-1].append(self.copy_out(name, ["/tmp/corsair/jacoco.exec"])["/tmp/corsair/jacoco.exec"])
+            if self.inspect_xml:
+                self.xml_siblings.append(self.copy_out(name, ["/tmp/corsair/keep.txt", "/tmp/corsair/missing.xml"]))
         return result
 
 
@@ -344,7 +349,13 @@ async def test_java_script_without_child_agent_cannot_reuse_prepared_evidence(tm
                     artifacts=store, auditor=accept)
     result = await kernel.evaluate(reference.model_copy(update={"probe": probe, "build_script": build}))
     assert result.verdict.label is Label.INCONCLUSIVE, result
-    if prepared in ("symlink", "dangling", "directory", "unwritable"):
+    if prepared == "locked-parent":
+        # Publishing a fresh report inode requires a writable parent; failure must remain nondecisive.
+        assert result.gate.stage is Gate.CONTROL_RUN, result
+        assert len(result.runs) == 1 and result.runs[0].result is RoleResult.ERROR
+        assert result.runs[0].coverage is None and result.runs[0].invariant_held is None
+        assert "coverage post-processing exited" in result.runs[0].message
+    elif prepared in ("symlink", "dangling", "directory", "unwritable"):
         assert result.gate.stage is Gate.CONTROL_RUN, result
         assert len(result.runs) == 1 and result.runs[0].result in (RoleResult.ERROR, RoleResult.NOT_RUN)
         assert result.runs[0].invariant_held is None and result.runs[0].covered_lines == ()
@@ -424,3 +435,53 @@ async def test_java_script_renderer_rejects_nonregular_current_raw(tmp_path, raw
     assert result.runs[0].coverage is None and result.runs[0].invariant_held is None
     assert "coverage post-processing exited" in result.runs[0].message
     assert result.runs[0].cleanup_confirmed and backend.labelled(kernel.run_id) == []
+
+
+@pytest.mark.docker
+@pytest.mark.anyio
+@pytest.mark.parametrize("output_path", [
+    "symlink-raw", "hardlink-raw", "dangling", "directory", "symlink-sibling", "hardlink-sibling", "regular",
+])
+async def test_java_script_renderer_preserves_raw_and_siblings_for_prepared_xml(tmp_path, output_path):
+    _require_java_image()
+    reference = _java_script_reference()
+    # Raw starts empty at build time and receives only genuine current compiler/driver/child evidence.
+    build = reference.build_script + "\n" + """
+mkdir -p /tmp/corsair
+chmod 777 /tmp/corsair
+: > /tmp/corsair/jacoco.exec
+chmod 666 /tmp/corsair/jacoco.exec
+printf sibling-marker > /tmp/corsair/keep.txt
+chmod 666 /tmp/corsair/keep.txt
+"""
+    build += {
+        "symlink-raw": "ln -s jacoco.exec /tmp/corsair/jacoco.xml\n",
+        "hardlink-raw": "ln /tmp/corsair/jacoco.exec /tmp/corsair/jacoco.xml\n",
+        "dangling": "ln -s missing.xml /tmp/corsair/jacoco.xml\n",
+        "directory": "mkdir /tmp/corsair/jacoco.xml\nchmod 777 /tmp/corsair/jacoco.xml\n",
+        "symlink-sibling": "ln -s keep.txt /tmp/corsair/jacoco.xml\n",
+        "hardlink-sibling": "ln /tmp/corsair/keep.txt /tmp/corsair/jacoco.xml\n",
+        "regular": "printf old-xml > /tmp/corsair/jacoco.xml\nchmod 666 /tmp/corsair/jacoco.xml\n",
+    }[output_path]
+    case = load_case(JAVA_SCRIPT_CASE)
+    backend = JavaEvidenceSandboxes(inspect_xml=True)
+    store = ArtifactStore(tmp_path / "artifacts")
+    kernel = Kernel(backend, matrix.select(case), case, artifacts=store, auditor=accept)
+    result = await kernel.evaluate(reference.model_copy(update={"build_script": build}))
+    assert backend.raw_snapshots, result
+    for before, after in backend.raw_snapshots:
+        assert before and before[:5] == bytes.fromhex("01c0c01007")
+        before_hash, after_hash = hashlib.sha256(before).hexdigest(), hashlib.sha256(after).hexdigest()
+        assert before_hash == after_hash, {"before": before_hash, "after": after_hash, "raw_after": after[:20]}
+    for siblings in backend.xml_siblings:
+        assert siblings == {"/tmp/corsair/keep.txt": b"sibling-marker", "/tmp/corsair/missing.xml": None}
+    if output_path in ("regular", "hardlink-sibling"):
+        assert result.gate.stage is Gate.VERIFIED and result.verdict.fix is Fix.VERIFIED, result
+        assert len(result.runs) == 4 and all(run.covered_lines == (8, 9) for run in result.runs)
+    else:
+        assert result.gate.stage is Gate.CONTROL_RUN and result.verdict.label is Label.INCONCLUSIVE, result
+        assert len(result.runs) == 1 and result.runs[0].result is RoleResult.ERROR
+        assert result.runs[0].coverage is None and result.runs[0].invariant_held is None
+        assert "coverage post-processing exited" in result.runs[0].message
+    assert all(run.cleanup_confirmed for run in result.runs)
+    assert backend.labelled(kernel.run_id) == []
