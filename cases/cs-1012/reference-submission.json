@@ -1,0 +1,14 @@
+{
+  "contract_version": "corsair-lite/differential-probe/2",
+  "hypothesis": {
+    "target_file": "lib/Module/ScanDeps.pm",
+    "target_symbol": "scan_file",
+    "target_lines": [
+      871
+    ],
+    "root_cause": "The scanner opens a supplied filename with Perl two-argument open, allowing leading mode syntax to change the interpretation of an owned literal path.",
+    "expected_violation": "scanning an owned literal filename changes the bytes of an independently owned sentinel"
+  },
+  "build_script": "",
+  "probe": "package CorsairProbe;\nuse strict;\nuse warnings;\nuse Cwd qw(getcwd);\nuse File::Temp qw(tempdir);\nuse lib '/work/lib';\nuse Module::ScanDeps ();\n\nour $CONTROL_PAYLOAD = 'input.pm';\nour $EXPLOIT_PAYLOAD = '>sentinel';\nour $LAST_SCAN_ERROR;\n\nsub run_target {\n    my ($payload) = @_;\n    $LAST_SCAN_ERROR = undef;\n    my $root = tempdir('corsair-XXXXXX', TMPDIR => 1, CLEANUP => 1);\n    my $old = getcwd();\n    chdir $root or die \"cannot enter owned directory: $!\";\n    my ($preserved, $outer_error);\n    {\n        local $@;\n        eval {\n            my $original = \"owned sentinel bytes\\n\";\n            for my $entry (['sentinel', $original], ['input.pm', \"# ordinary owned input\\n\"], ['>sentinel', \"# literal owned input\\n\"]) {\n                open my $out, '>', $entry->[0] or die \"cannot create owned fixture: $!\";\n                print {$out} $entry->[1] or die \"cannot write owned fixture: $!\";\n                close $out or die \"cannot close owned fixture: $!\";\n            }\n            my (@found, $scan_error);\n            {\n                local $@;\n                eval { @found = Module::ScanDeps::scan_file($payload); 1 } or $scan_error = \"$@\";\n            }\n            $LAST_SCAN_ERROR = $scan_error;\n            open my $in, '<', 'sentinel' or die \"cannot read owned sentinel: $!\";\n            my $actual = do { local $/; <$in> };\n            close $in or die \"cannot close owned sentinel: $!\";\n            die \"unexpected scan result\" if !$scan_error && @found;\n            die $scan_error if $scan_error && $actual eq $original;\n            $preserved = $actual eq $original;\n            1;\n        } or $outer_error = \"$@\";\n    }\n    chdir $old or die \"cannot restore owned directory: $!\";\n    die $outer_error if $outer_error;\n    return $preserved ? 1 : 0;\n}\n\n1;\n"
+}

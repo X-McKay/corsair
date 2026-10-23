@@ -1,0 +1,364 @@
+{
+  "schema": "corsair-lite/case-assets/1",
+  "case_id": "cs-1009",
+  "qualification_status": "candidate",
+  "family_id": "cf-1009",
+  "repository": "https://github.com/psf/requests",
+  "source_closure": [
+    "requests/__init__.py",
+    "requests/__version__.py",
+    "requests/_internal_utils.py",
+    "requests/adapters.py",
+    "requests/api.py",
+    "requests/auth.py",
+    "requests/certs.py",
+    "requests/compat.py",
+    "requests/cookies.py",
+    "requests/exceptions.py",
+    "requests/hooks.py",
+    "requests/models.py",
+    "requests/packages.py",
+    "requests/sessions.py",
+    "requests/status_codes.py",
+    "requests/structures.py",
+    "requests/utils.py"
+  ],
+  "target": {
+    "file": "requests/sessions.py",
+    "symbol": "SessionRedirectMixin.rebuild_proxies",
+    "lines": [
+      327
+    ],
+    "fixed_lines": [
+      329
+    ]
+  },
+  "upstream_source_pair": {
+    "vulnerable": {
+      "commit": "302225334678490ec66b3614a9dddb8a02c5f4fe",
+      "first_parent": "b639e66c816514e40604d46f0088fbceec1a5149",
+      "git_tree": "e30937c0f917b4fa66d6e4b795505f2a46c89a84",
+      "affected_file_sha256": "294a8971144ba2f35e7d4b3b49c39749454271f49ac93156b5b889ee03929532",
+      "affected_region_sha256": "04457d16058589362cd0a38c2191cc31f5667fa291dbb494d1c4810c0e495780",
+      "tree_sha256": "660206ebd2f449f2d2a74b5a0fa1cd55737e1a2a6549ed4306334d0530417abf"
+    },
+    "fixed": {
+      "commit": "74ea7cf7a6a27a4eeb2ae24e162bcc942a6706d5",
+      "first_parent": "302225334678490ec66b3614a9dddb8a02c5f4fe",
+      "git_tree": "ab6e18cda9d2c7bb7479e6f17f323aa379821ada",
+      "affected_file_sha256": "f8bbd3ceb3ed7ad493ad1ddbbb1bb85e176032b2452c1d6ae43ecffbe2f65e1c",
+      "affected_region_sha256": "73befcf13015c2cdea927f00c5a5936dcf9ba29ea184f56d03b6e8bb121be8c7",
+      "tree_sha256": "405167b2ed9dc50ef5c7ac5b25ac78e3506186633a216261cfdbadb9f0ad25b2"
+    },
+    "patch_sha256": "de702eb710109fb7c49d33213f729443f1788af3062aec57a2e6d6b147599786",
+    "relationship": "direct-parent-fix",
+    "archive_sha256": {
+      "vulnerable": "aea3d22a5e587b375bde91cc4efc179bd382edd92ddb5adaab26547c26dfa8fd",
+      "fixed": "f3786edfb0aabc9c80000a13be62c0bd03d59ec95cbc11eb9859c19f3f06db57"
+    }
+  },
+  "vendored_source_pair": {
+    "vulnerable": {
+      "affected_file_sha256": "294a8971144ba2f35e7d4b3b49c39749454271f49ac93156b5b889ee03929532",
+      "affected_region_sha256": "04457d16058589362cd0a38c2191cc31f5667fa291dbb494d1c4810c0e495780",
+      "tree_sha256": "eece4c5e06a0bb677402ec2cc6413934c8b48b6502c70fd2816e682fe1708b70"
+    },
+    "fixed": {
+      "affected_file_sha256": "f8bbd3ceb3ed7ad493ad1ddbbb1bb85e176032b2452c1d6ae43ecffbe2f65e1c",
+      "affected_region_sha256": "73befcf13015c2cdea927f00c5a5936dcf9ba29ea184f56d03b6e8bb121be8c7",
+      "tree_sha256": "57988ee3d481d500abd3a3eb9cac32336bec926e231c0ac61df7a576565a94df"
+    },
+    "patch_sha256": "146a165b2dd616e653534277247458c492505c9f199ff3e7424db32c185c5be5"
+  },
+  "source_file_sha256": {
+    "vulnerable": {
+      "requests/__init__.py": "2ef98a863233f261da297b610b632fe72919d5df76be8c9fde826977e56e0228",
+      "requests/__version__.py": "22fab4a5a2e89e808a71084c3b2cf7825a83fb836de4b7080bb8def665e4fa5f",
+      "requests/_internal_utils.py": "9cc4329abe21b37d93a95a3901b0ab99c24486f3d487bc57965bb2ab0b252e24",
+      "requests/adapters.py": "bff1668d4e4a67bea4f98b6d4a1658079469ac8ce184bf18df3816f69e1e050f",
+      "requests/api.py": "abad71717ab8b668889abbdc4952d36c5c82883d85f8bffe8562866f3e32f2f8",
+      "requests/auth.py": "87e1cb955c7d8fcaca57985f480c9c3f60293928254f3efb474b73eea09b6c41",
+      "requests/certs.py": "67d49be35d009efea35054f2b2cd23145854eb1b2df1cb442ea7f2f04bf6de0c",
+      "requests/compat.py": "cb19ed54e4841c632b9fb14daffdf61046a6d5934074f45d484d77ff2687cd39",
+      "requests/cookies.py": "903de43447028fe9b16ed7f97c9b12693f3a786a046290f75f4092829ce5ec13",
+      "requests/exceptions.py": "0e1bde1417255634d1c6145db95a4ef866cc60c203da09a374b7cd12a36923f5",
+      "requests/hooks.py": "0a2bb2b221c0dfd57951f702057148c7cdc8ac3a6ec1f37d45c4d482fdbc7ed4",
+      "requests/models.py": "f8394a8b4a2bf2014033a573bada1b5efbc15bfdb0ac9b8e17935f9dd4c875d0",
+      "requests/packages.py": "0d782ff852487336484e6bf4bc40408568f85bee4218220dfe4b2f811d7b0efb",
+      "requests/sessions.py": "294a8971144ba2f35e7d4b3b49c39749454271f49ac93156b5b889ee03929532",
+      "requests/status_codes.py": "16f1e64f9b87fbfba29ad473e611fd5426eded557e35e8b627dba96de8fa8fc8",
+      "requests/structures.py": "f886e6855cf4e92fb968f499b94b6167afba0fd5ce8d1b935c739a6d8d38d573",
+      "requests/utils.py": "eacc765f7708540f018163a0f28771172fbf95b5831444d4f072387d4e119aac"
+    },
+    "fixed": {
+      "requests/__init__.py": "2ef98a863233f261da297b610b632fe72919d5df76be8c9fde826977e56e0228",
+      "requests/__version__.py": "22fab4a5a2e89e808a71084c3b2cf7825a83fb836de4b7080bb8def665e4fa5f",
+      "requests/_internal_utils.py": "9cc4329abe21b37d93a95a3901b0ab99c24486f3d487bc57965bb2ab0b252e24",
+      "requests/adapters.py": "bff1668d4e4a67bea4f98b6d4a1658079469ac8ce184bf18df3816f69e1e050f",
+      "requests/api.py": "abad71717ab8b668889abbdc4952d36c5c82883d85f8bffe8562866f3e32f2f8",
+      "requests/auth.py": "87e1cb955c7d8fcaca57985f480c9c3f60293928254f3efb474b73eea09b6c41",
+      "requests/certs.py": "67d49be35d009efea35054f2b2cd23145854eb1b2df1cb442ea7f2f04bf6de0c",
+      "requests/compat.py": "cb19ed54e4841c632b9fb14daffdf61046a6d5934074f45d484d77ff2687cd39",
+      "requests/cookies.py": "903de43447028fe9b16ed7f97c9b12693f3a786a046290f75f4092829ce5ec13",
+      "requests/exceptions.py": "0e1bde1417255634d1c6145db95a4ef866cc60c203da09a374b7cd12a36923f5",
+      "requests/hooks.py": "0a2bb2b221c0dfd57951f702057148c7cdc8ac3a6ec1f37d45c4d482fdbc7ed4",
+      "requests/models.py": "f8394a8b4a2bf2014033a573bada1b5efbc15bfdb0ac9b8e17935f9dd4c875d0",
+      "requests/packages.py": "0d782ff852487336484e6bf4bc40408568f85bee4218220dfe4b2f811d7b0efb",
+      "requests/sessions.py": "f8bbd3ceb3ed7ad493ad1ddbbb1bb85e176032b2452c1d6ae43ecffbe2f65e1c",
+      "requests/status_codes.py": "16f1e64f9b87fbfba29ad473e611fd5426eded557e35e8b627dba96de8fa8fc8",
+      "requests/structures.py": "f886e6855cf4e92fb968f499b94b6167afba0fd5ce8d1b935c739a6d8d38d573",
+      "requests/utils.py": "eacc765f7708540f018163a0f28771172fbf95b5831444d4f072387d4e119aac"
+    }
+  },
+  "qualification_blockers": [
+    "dataset_manifest_entry_pending",
+    "runtime_rights_pending",
+    "python_replay_pending",
+    "independent_review_pending"
+  ],
+  "dependency_lock": {
+    "path": "dependencies.lock",
+    "packages": [
+      {
+        "name": "certifi",
+        "version": "2024.8.30",
+        "filename": "certifi-2024.8.30-py3-none-any.whl",
+        "wheel_url": "https://files.pythonhosted.org/packages/12/90/3c9ff0512038035f59d279fddeb79f5f1eccd8859f06d6163c58798b9487/certifi-2024.8.30-py3-none-any.whl",
+        "wheel_sha256": "922820b53db7a7257ffbda3f597266d435245903d80737e34f8a45ff3e3230d8",
+        "license_expression": "MPL-2.0"
+      },
+      {
+        "name": "charset-normalizer",
+        "version": "3.4.0",
+        "filename": "charset_normalizer-3.4.0-py3-none-any.whl",
+        "wheel_url": "https://files.pythonhosted.org/packages/bf/9b/08c0432272d77b04803958a4598a51e2a4b51c06640af8b8f0f908c18bf2/charset_normalizer-3.4.0-py3-none-any.whl",
+        "wheel_sha256": "fe9f97feb71aa9896b81973a7bbada8c49501dc73e58a10fcef6663af95e5079",
+        "license_expression": "MIT"
+      },
+      {
+        "name": "idna",
+        "version": "3.10",
+        "filename": "idna-3.10-py3-none-any.whl",
+        "wheel_url": "https://files.pythonhosted.org/packages/76/c6/c88e154df9c4e1a2a66ccf0005a88dfb2650c1dffb6f5ce603dfbd452ce3/idna-3.10-py3-none-any.whl",
+        "wheel_sha256": "946d195a0d259cbba61165e88e65941f16e9b36ea6ddb97f00452bae8b1287d3",
+        "license_expression": "BSD-3-Clause"
+      },
+      {
+        "name": "urllib3",
+        "version": "1.26.20",
+        "filename": "urllib3-1.26.20-py2.py3-none-any.whl",
+        "wheel_url": "https://files.pythonhosted.org/packages/33/cf/8435d5a7159e2a9c83a95896ed596f68cf798005fe107cc655b5c5c14704/urllib3-1.26.20-py2.py3-none-any.whl",
+        "wheel_sha256": "0ed14ccfbf1c30a9072c7ca157e4319b70d65f623e91e7b32fadb2853431016e",
+        "license_expression": "MIT"
+      }
+    ],
+    "member_manifest": "evidence/dependency-member-manifest.json"
+  },
+  "evidence": [
+    {
+      "path": "evidence/source-vulnerable-LICENSE",
+      "source_url": "https://raw.githubusercontent.com/psf/requests/302225334678490ec66b3614a9dddb8a02c5f4fe/LICENSE",
+      "revision": "302225334678490ec66b3614a9dddb8a02c5f4fe",
+      "sha256": "09e8a9bcec8067104652c168685ab0931e7868f9c8284b66f5ae6edae5f1130b",
+      "license_expression": "Apache-2.0"
+    },
+    {
+      "path": "evidence/source-fixed-LICENSE",
+      "source_url": "https://raw.githubusercontent.com/psf/requests/74ea7cf7a6a27a4eeb2ae24e162bcc942a6706d5/LICENSE",
+      "revision": "74ea7cf7a6a27a4eeb2ae24e162bcc942a6706d5",
+      "sha256": "09e8a9bcec8067104652c168685ab0931e7868f9c8284b66f5ae6edae5f1130b",
+      "license_expression": "Apache-2.0"
+    },
+    {
+      "path": "evidence/source-vulnerable-NOTICE",
+      "source_url": "https://raw.githubusercontent.com/psf/requests/302225334678490ec66b3614a9dddb8a02c5f4fe/NOTICE",
+      "revision": "302225334678490ec66b3614a9dddb8a02c5f4fe",
+      "sha256": "f5110972dedad2b4e9d314518daf3b7d72d6e02e499acd802181de6f74571dcc",
+      "license_expression": "Apache-2.0"
+    },
+    {
+      "path": "evidence/source-fixed-NOTICE",
+      "source_url": "https://raw.githubusercontent.com/psf/requests/74ea7cf7a6a27a4eeb2ae24e162bcc942a6706d5/NOTICE",
+      "revision": "74ea7cf7a6a27a4eeb2ae24e162bcc942a6706d5",
+      "sha256": "f5110972dedad2b4e9d314518daf3b7d72d6e02e499acd802181de6f74571dcc",
+      "license_expression": "Apache-2.0"
+    },
+    {
+      "path": "evidence/dependency-certifi-LICENSE",
+      "source_url": "https://files.pythonhosted.org/packages/12/90/3c9ff0512038035f59d279fddeb79f5f1eccd8859f06d6163c58798b9487/certifi-2024.8.30-py3-none-any.whl",
+      "revision": "2024.8.30",
+      "sha256": "e93716da6b9c0d5a4a1df60fe695b370f0695603d21f6f83f053e42cfc10caf7",
+      "license_expression": "MPL-2.0",
+      "archive_member": "certifi-2024.8.30.dist-info/LICENSE",
+      "archive_sha256": "922820b53db7a7257ffbda3f597266d435245903d80737e34f8a45ff3e3230d8"
+    },
+    {
+      "path": "evidence/dependency-charset-normalizer-LICENSE",
+      "source_url": "https://files.pythonhosted.org/packages/bf/9b/08c0432272d77b04803958a4598a51e2a4b51c06640af8b8f0f908c18bf2/charset_normalizer-3.4.0-py3-none-any.whl",
+      "revision": "3.4.0",
+      "sha256": "eb31a0c5a4fb09b8a4e32055d25c1e5f9c358a2752fef3cd720213d1ccfee241",
+      "license_expression": "MIT",
+      "archive_member": "charset_normalizer-3.4.0.dist-info/LICENSE",
+      "archive_sha256": "fe9f97feb71aa9896b81973a7bbada8c49501dc73e58a10fcef6663af95e5079"
+    },
+    {
+      "path": "evidence/dependency-idna-LICENSE.md",
+      "source_url": "https://files.pythonhosted.org/packages/76/c6/c88e154df9c4e1a2a66ccf0005a88dfb2650c1dffb6f5ce603dfbd452ce3/idna-3.10-py3-none-any.whl",
+      "revision": "3.10",
+      "sha256": "a59f0b0ef3635874109a4461ca44ff7a70d50696e814767bfaf721d4c9b0db0f",
+      "license_expression": "BSD-3-Clause",
+      "archive_member": "idna-3.10.dist-info/LICENSE.md",
+      "archive_sha256": "946d195a0d259cbba61165e88e65941f16e9b36ea6ddb97f00452bae8b1287d3"
+    },
+    {
+      "path": "evidence/dependency-urllib3-LICENSE.txt",
+      "source_url": "https://files.pythonhosted.org/packages/33/cf/8435d5a7159e2a9c83a95896ed596f68cf798005fe107cc655b5c5c14704/urllib3-1.26.20-py2.py3-none-any.whl",
+      "revision": "1.26.20",
+      "sha256": "c37bf186e27cf9dbe9619e55edfe3cea7b30091ceb3da63c7dacbe0e6d77907b",
+      "license_expression": "MIT",
+      "archive_member": "urllib3-1.26.20.dist-info/LICENSE.txt",
+      "archive_sha256": "0ed14ccfbf1c30a9072c7ca157e4319b70d65f623e91e7b32fadb2853431016e"
+    },
+    {
+      "path": "evidence/vulnerable-source-manifest.json",
+      "source_url": "urn:corsair-preparation:requests:vulnerable-source-manifest",
+      "revision": "302225334678490ec66b3614a9dddb8a02c5f4fe",
+      "sha256": "2b0a54f54e71b0c0e5262f884a80ce131f9153103c27be566a8aa44267009db4",
+      "evidence_kind": "generated_integrity_manifest"
+    },
+    {
+      "path": "evidence/fixed-source-manifest.json",
+      "source_url": "urn:corsair-preparation:requests:fixed-source-manifest",
+      "revision": "74ea7cf7a6a27a4eeb2ae24e162bcc942a6706d5",
+      "sha256": "e58bd6569d83d9a599fac3e1da4014e2817666db690b7062ef828e398c6dc684",
+      "evidence_kind": "generated_integrity_manifest"
+    },
+    {
+      "path": "evidence/dependency-member-manifest.json",
+      "source_url": "urn:corsair-preparation:requests:dependency-member-manifest",
+      "revision": "2026-10-23",
+      "sha256": "ec6227468142417f35ab222ab0caaf01d925d151932d33a5cf11d4a83d826508",
+      "evidence_kind": "generated_integrity_manifest"
+    }
+  ],
+  "rights_review": {
+    "reviewer": "OpenAI Codex automated factual rights preparation",
+    "reviewed_at": "2026-10-23",
+    "review_kind": "automated_factual",
+    "human_legal_approval": false,
+    "scope": "Exact unchanged source subsets and copied rights evidence; runtime, legal approval, replay, and admission excluded.",
+    "components": [
+      {
+        "name": "Requests source subset",
+        "license_expression": "Apache-2.0",
+        "redistribution_mode": "vendored",
+        "covered_paths": [
+          "vulnerable/requests/__init__.py",
+          "vulnerable/requests/__version__.py",
+          "vulnerable/requests/_internal_utils.py",
+          "vulnerable/requests/adapters.py",
+          "vulnerable/requests/api.py",
+          "vulnerable/requests/auth.py",
+          "vulnerable/requests/certs.py",
+          "vulnerable/requests/compat.py",
+          "vulnerable/requests/cookies.py",
+          "vulnerable/requests/exceptions.py",
+          "vulnerable/requests/hooks.py",
+          "vulnerable/requests/models.py",
+          "vulnerable/requests/packages.py",
+          "vulnerable/requests/sessions.py",
+          "vulnerable/requests/status_codes.py",
+          "vulnerable/requests/structures.py",
+          "vulnerable/requests/utils.py",
+          "fixed/requests/__init__.py",
+          "fixed/requests/__version__.py",
+          "fixed/requests/_internal_utils.py",
+          "fixed/requests/adapters.py",
+          "fixed/requests/api.py",
+          "fixed/requests/auth.py",
+          "fixed/requests/certs.py",
+          "fixed/requests/compat.py",
+          "fixed/requests/cookies.py",
+          "fixed/requests/exceptions.py",
+          "fixed/requests/hooks.py",
+          "fixed/requests/models.py",
+          "fixed/requests/packages.py",
+          "fixed/requests/sessions.py",
+          "fixed/requests/status_codes.py",
+          "fixed/requests/structures.py",
+          "fixed/requests/utils.py",
+          "evidence/source-vulnerable-LICENSE",
+          "evidence/source-vulnerable-NOTICE",
+          "evidence/source-fixed-LICENSE",
+          "evidence/source-fixed-NOTICE"
+        ],
+        "license_evidence_paths": [
+          "evidence/source-vulnerable-LICENSE",
+          "evidence/source-fixed-LICENSE"
+        ],
+        "notice_requirements": [
+          "Preserve the exact Apache-2.0 terms, Requests NOTICE attribution, source notices, and unchanged-source provenance."
+        ]
+      },
+      {
+        "name": "certifi",
+        "license_expression": "MPL-2.0",
+        "redistribution_mode": "evidence-only; complete wheel is a build input",
+        "covered_paths": [
+          "evidence/dependency-certifi-LICENSE"
+        ],
+        "license_evidence_paths": [
+          "evidence/dependency-certifi-LICENSE"
+        ],
+        "notice_requirements": [
+          "Preserve the exact wheel license notice and original wheel/member provenance; wheel bytes remain separate build inputs."
+        ]
+      },
+      {
+        "name": "charset-normalizer",
+        "license_expression": "MIT",
+        "redistribution_mode": "evidence-only; complete wheel is a build input",
+        "covered_paths": [
+          "evidence/dependency-charset-normalizer-LICENSE"
+        ],
+        "license_evidence_paths": [
+          "evidence/dependency-charset-normalizer-LICENSE"
+        ],
+        "notice_requirements": [
+          "Preserve the exact wheel license notice and original wheel/member provenance; wheel bytes remain separate build inputs."
+        ]
+      },
+      {
+        "name": "idna",
+        "license_expression": "BSD-3-Clause",
+        "redistribution_mode": "evidence-only; complete wheel is a build input",
+        "covered_paths": [
+          "evidence/dependency-idna-LICENSE.md"
+        ],
+        "license_evidence_paths": [
+          "evidence/dependency-idna-LICENSE.md"
+        ],
+        "notice_requirements": [
+          "Preserve the exact wheel license notice and original wheel/member provenance; wheel bytes remain separate build inputs."
+        ]
+      },
+      {
+        "name": "urllib3",
+        "license_expression": "MIT",
+        "redistribution_mode": "evidence-only; complete wheel is a build input",
+        "covered_paths": [
+          "evidence/dependency-urllib3-LICENSE.txt"
+        ],
+        "license_evidence_paths": [
+          "evidence/dependency-urllib3-LICENSE.txt"
+        ],
+        "notice_requirements": [
+          "Preserve the exact wheel license notice and original wheel/member provenance; wheel bytes remain separate build inputs."
+        ]
+      }
+    ],
+    "basis": [
+      "Exact endpoint source, source manifests, complete wheel member manifest, and bundled dependency license files were inspected; this is factual preparation, not independent legal approval."
+    ]
+  }
+}

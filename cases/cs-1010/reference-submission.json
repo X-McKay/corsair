@@ -1,0 +1,14 @@
+{
+  "contract_version": "corsair-lite/differential-probe/2",
+  "hypothesis": {
+    "target_file": "lib/validate.js",
+    "target_symbol": "checkObj",
+    "target_lines": [
+      211
+    ],
+    "root_cause": "The validator reads a schema-named value through normal property lookup without first requiring the instance to own it.",
+    "expected_violation": "validating an owned object invokes a private inherited getter for an ordinary property"
+  },
+  "build_script": "",
+  "probe": "const validate = require('/work/lib/validate.js');\n\nconst CONTROL_PAYLOAD = true;\nconst EXPLOIT_PAYLOAD = false;\n\nfunction sameDescriptor(left, right) {\n  if (!left || !right) return false;\n  const keys = Reflect.ownKeys(left);\n  return keys.length === Reflect.ownKeys(right).length && keys.every((key) => Object.is(left[key], right[key]));\n}\n\nfunction sameDescriptors(left, right) {\n  const keys = Reflect.ownKeys(left);\n  return keys.length === Reflect.ownKeys(right).length && keys.every((key) => sameDescriptor(left[key], right[key]));\n}\n\nfunction run_target(ownsValue) {\n  let reads = 0;\n  const ownedPrototype = {};\n  Object.defineProperty(ownedPrototype, 'ownedValue', {\n    get() { reads += 1; return 'owned'; }, enumerable: false, configurable: true,\n  });\n  const before = Object.getOwnPropertyDescriptor(ownedPrototype, 'ownedValue');\n  const sharedBefore = Object.getOwnPropertyDescriptors(Object.prototype);\n  const instance = Object.create(ownedPrototype);\n  if (ownsValue) Object.defineProperty(instance, 'ownedValue', { value: 'owned', enumerable: true, writable: true, configurable: true });\n  const result = validate(instance, { type: 'object', properties: { ownedValue: { type: 'string' } } });\n  if (!result.valid || result.errors.length !== 0) throw new Error('owned validation did not complete successfully');\n  if (Object.getPrototypeOf(instance) !== ownedPrototype || !sameDescriptor(before, Object.getOwnPropertyDescriptor(ownedPrototype, 'ownedValue'))) throw new Error('owned object shape changed');\n  if (!sameDescriptors(sharedBefore, Object.getOwnPropertyDescriptors(Object.prototype))) throw new Error('shared prototype shape changed');\n  return reads === 0;\n}\n\nmodule.exports = { CONTROL_PAYLOAD, EXPLOIT_PAYLOAD, run_target };\n"
+}

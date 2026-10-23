@@ -1,0 +1,187 @@
+{
+  "schema": "corsair-lite/case-assets/1",
+  "case_id": "cs-1011",
+  "qualification_status": "candidate",
+  "family_id": "cf-1011",
+  "repository": "https://github.com/jhy/jsoup",
+  "source_closure": [
+    "src/main/java/org/jsoup/helper/Validate.java",
+    "src/main/java/org/jsoup/helper/ValidationException.java",
+    "src/main/java/org/jsoup/internal/StringUtil.java"
+  ],
+  "target": {
+    "file": "src/main/java/org/jsoup/internal/StringUtil.java",
+    "symbol": "StringUtil.resolve",
+    "lines": [
+      315
+    ],
+    "fixed_lines": [
+      318
+    ]
+  },
+  "upstream_source_pair": {
+    "vulnerable": {
+      "commit": "985f1fe13aa0b1d37c6f6f17a948fc240a03dcef",
+      "first_parent": null,
+      "git_tree": "bb355a159c3a671a9123af3849539642053596d8",
+      "affected_file_sha256": "070fe7009f43af282f754817e592628f991054a2617f9a1698ce3f0f1af4282f",
+      "affected_region_sha256": "7d8dbce4f440a2dc8e02ba8c20dc9e2679432010217b6f98153db5dddf9c6eab",
+      "tree_sha256": "7ed4f6dd4d68c413d4f4d35c21b0b488ece4227771876b7eddcd2cb16963ab99"
+    },
+    "fixed": {
+      "commit": "4ea768d96b3d232e63edef9594766d44597b3882",
+      "first_parent": "985f1fe13aa0b1d37c6f6f17a948fc240a03dcef",
+      "git_tree": "c50d82b542527ca5a992ad72f2808263cbe80060",
+      "affected_file_sha256": "e6aec7293ce97b317cdaadf71c376b7caef3a5285c49666a93ff590612ec8910",
+      "affected_region_sha256": "8a20de39b6a6d0d26f69a695bcfeb53fcfa1df73767d21dde576bcdf20f0cfdc",
+      "tree_sha256": "178bbd1580e5e26da6e2cddab17f2383f9294d72dab9497a539132ffcff4a00e"
+    },
+    "patch_sha256": "5e8d19c6adb565e0bdde5e6a0c189cb00341438451eaa3d6311f6744b010333f",
+    "relationship": "direct-parent-fix",
+    "raw_production_diff_sha256": "c312c1fb4125ab8ac17ac7b080eaf103b2dae010ff778fe09c2fe4e4d3194d10",
+    "raw_full_diff_sha256": "67a90994c5815bbaee8fa4f3366a57565ed980e3f84f40d7155e744d4e1b5bac"
+  },
+  "vendored_source_pair": {
+    "vulnerable": {
+      "affected_file_sha256": "070fe7009f43af282f754817e592628f991054a2617f9a1698ce3f0f1af4282f",
+      "affected_region_sha256": "7d8dbce4f440a2dc8e02ba8c20dc9e2679432010217b6f98153db5dddf9c6eab",
+      "tree_sha256": "1692f0ac4f3b3ada0417123339d6dbbf0e75d8f8e90947662e1f0914b48b4420"
+    },
+    "fixed": {
+      "affected_file_sha256": "e6aec7293ce97b317cdaadf71c376b7caef3a5285c49666a93ff590612ec8910",
+      "affected_region_sha256": "8a20de39b6a6d0d26f69a695bcfeb53fcfa1df73767d21dde576bcdf20f0cfdc",
+      "tree_sha256": "37be9f2e4c4d90c3163ae7fa7fd449e26c514e3c3aee6675ecd05ed030e7fd8c"
+    },
+    "patch_sha256": "64a94d02d5bbbdd1e7b44bdc9a9ac2241a2abeb6c4435ca4fb767ebcaacebf72"
+  },
+  "source_file_sha256": {
+    "vulnerable": {
+      "src/main/java/org/jsoup/helper/Validate.java": "4449c8fa547a70051068046304ad10206324f5ad33e45a010eb753393871075a",
+      "src/main/java/org/jsoup/helper/ValidationException.java": "209e9b62845a9effe55d9e684c8ebe76d6f63be27cd66ee0a2ff24ce3585cfbd",
+      "src/main/java/org/jsoup/internal/StringUtil.java": "070fe7009f43af282f754817e592628f991054a2617f9a1698ce3f0f1af4282f"
+    },
+    "fixed": {
+      "src/main/java/org/jsoup/helper/Validate.java": "4449c8fa547a70051068046304ad10206324f5ad33e45a010eb753393871075a",
+      "src/main/java/org/jsoup/helper/ValidationException.java": "209e9b62845a9effe55d9e684c8ebe76d6f63be27cd66ee0a2ff24ce3585cfbd",
+      "src/main/java/org/jsoup/internal/StringUtil.java": "e6aec7293ce97b317cdaadf71c376b7caef3a5285c49666a93ff590612ec8910"
+    }
+  },
+  "qualification_blockers": [
+    "dataset_manifest_entry_pending",
+    "runtime_rights_pending",
+    "java21_jacoco_replay_pending",
+    "independent_review_pending"
+  ],
+  "dependency_lock": {
+    "path": "dependencies.lock",
+    "compiled_sources": [
+      "src/main/java/org/jsoup/helper/Validate.java",
+      "src/main/java/org/jsoup/helper/ValidationException.java",
+      "src/main/java/org/jsoup/internal/StringUtil.java"
+    ],
+    "artifacts": [
+      {
+        "coordinate": "com.google.code.findbugs:jsr305:3.0.2",
+        "jar_url": "https://repo.maven.apache.org/maven2/com/google/code/findbugs/jsr305/3.0.2/jsr305-3.0.2.jar",
+        "jar_sha256": "766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7",
+        "pom_sha256": "19889dbdf1b254b2601a5ee645b8147a974644882297684c798afe5d63d78dfe"
+      }
+    ]
+  },
+  "evidence": [
+    {
+      "path": "evidence/source-vulnerable-LICENSE",
+      "source_url": "https://raw.githubusercontent.com/jhy/jsoup/985f1fe13aa0b1d37c6f6f17a948fc240a03dcef/LICENSE",
+      "revision": "985f1fe13aa0b1d37c6f6f17a948fc240a03dcef",
+      "sha256": "2c7530cc19d93dcda58d20c77bd039aab2d2cd8bfe379d240b602c4cc31dd3a2",
+      "license_expression": "MIT"
+    },
+    {
+      "path": "evidence/source-vulnerable-pom.xml",
+      "source_url": "https://raw.githubusercontent.com/jhy/jsoup/985f1fe13aa0b1d37c6f6f17a948fc240a03dcef/pom.xml",
+      "revision": "985f1fe13aa0b1d37c6f6f17a948fc240a03dcef",
+      "sha256": "c1e67f71d94afd995420ace624ac0dfff142f48190ffc0fa026316957d18f75e",
+      "license_expression": "MIT"
+    },
+    {
+      "path": "evidence/source-fixed-LICENSE",
+      "source_url": "https://raw.githubusercontent.com/jhy/jsoup/4ea768d96b3d232e63edef9594766d44597b3882/LICENSE",
+      "revision": "4ea768d96b3d232e63edef9594766d44597b3882",
+      "sha256": "2c7530cc19d93dcda58d20c77bd039aab2d2cd8bfe379d240b602c4cc31dd3a2",
+      "license_expression": "MIT"
+    },
+    {
+      "path": "evidence/source-fixed-pom.xml",
+      "source_url": "https://raw.githubusercontent.com/jhy/jsoup/4ea768d96b3d232e63edef9594766d44597b3882/pom.xml",
+      "revision": "4ea768d96b3d232e63edef9594766d44597b3882",
+      "sha256": "c1e67f71d94afd995420ace624ac0dfff142f48190ffc0fa026316957d18f75e",
+      "license_expression": "MIT"
+    },
+    {
+      "path": "evidence/jsr305-3.0.2.pom",
+      "source_url": "https://repo.maven.apache.org/maven2/com/google/code/findbugs/jsr305/3.0.2/jsr305-3.0.2.pom",
+      "revision": "3.0.2",
+      "sha256": "19889dbdf1b254b2601a5ee645b8147a974644882297684c798afe5d63d78dfe",
+      "license_expression": "Apache-2.0"
+    },
+    {
+      "path": "evidence/jsr305-Apache-2.0.txt",
+      "source_url": "https://raw.githubusercontent.com/X-McKay/corsair/c423611703e65fb72e230cb4b7dd56cc02a7d038/benchmarks/dataset/LICENSE-BENCHMARKS",
+      "revision": "c423611703e65fb72e230cb4b7dd56cc02a7d038",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "license_expression": "Apache-2.0"
+    }
+  ],
+  "rights_review": {
+    "reviewer": "OpenAI Codex automated factual rights preparation",
+    "reviewed_at": "2026-10-23",
+    "review_kind": "automated_factual",
+    "human_legal_approval": false,
+    "scope": "Exact unchanged source subsets and copied rights evidence; runtime, legal approval, replay, and admission excluded.",
+    "components": [
+      {
+        "name": "jsoup source subset",
+        "license_expression": "MIT",
+        "redistribution_mode": "vendored",
+        "covered_paths": [
+          "vulnerable/src/main/java/org/jsoup/helper/Validate.java",
+          "vulnerable/src/main/java/org/jsoup/helper/ValidationException.java",
+          "vulnerable/src/main/java/org/jsoup/internal/StringUtil.java",
+          "fixed/src/main/java/org/jsoup/helper/Validate.java",
+          "fixed/src/main/java/org/jsoup/helper/ValidationException.java",
+          "fixed/src/main/java/org/jsoup/internal/StringUtil.java",
+          "evidence/source-vulnerable-LICENSE",
+          "evidence/source-vulnerable-pom.xml",
+          "evidence/source-fixed-LICENSE",
+          "evidence/source-fixed-pom.xml"
+        ],
+        "license_evidence_paths": [
+          "evidence/source-vulnerable-LICENSE",
+          "evidence/source-fixed-LICENSE"
+        ],
+        "notice_requirements": [
+          "Preserve Jonathan Hedley copyright, permission notice, and disclaimer with the unchanged source subset."
+        ]
+      },
+      {
+        "name": "jsr305 compiler dependency evidence",
+        "license_expression": "Apache-2.0",
+        "redistribution_mode": "build-input JAR; POM and full terms vendored as evidence",
+        "covered_paths": [
+          "evidence/jsr305-3.0.2.pom",
+          "evidence/jsr305-Apache-2.0.txt"
+        ],
+        "license_evidence_paths": [
+          "evidence/jsr305-3.0.2.pom",
+          "evidence/jsr305-Apache-2.0.txt"
+        ],
+        "notice_requirements": [
+          "Preserve the exact version-local POM grant and full pinned Apache-2.0 terms; the JAR remains a separately hashed build input."
+        ]
+      }
+    ],
+    "basis": [
+      "Exact historical source, MIT license, POM, jsr305 artifact hashes, and full Apache-2.0 terms were inspected; runtime/JaCoCo rights remain separate."
+    ]
+  }
+}

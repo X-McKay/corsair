@@ -1,0 +1,15 @@
+{
+  "case_id": "cs-1011",
+  "finding": {
+    "title": "URL resolution retains an interior ASCII control character",
+    "description": "String URL resolution retains an interior ASCII C0 character in owned relative path text instead of normalizing it away.",
+    "file_path": "src/main/java/org/jsoup/internal/StringUtil.java",
+    "start_line": 315,
+    "symbol": "StringUtil.resolve",
+    "cwe": "CWE-20"
+  },
+  "source": "vulnerable",
+  "commit": "985f1fe13aa0b1d37c6f6f17a948fc240a03dcef",
+  "fixed_source": "fixed",
+  "fixed_commit": "4ea768d96b3d232e63edef9594766d44597b3882"
+}

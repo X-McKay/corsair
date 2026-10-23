@@ -1,0 +1,149 @@
+{
+  "schema": "corsair-lite/case-assets/1",
+  "case_id": "cs-1012",
+  "qualification_status": "candidate",
+  "family_id": "cf-1012",
+  "repository": "https://github.com/rschupp/Module-ScanDeps",
+  "source_closure": [
+    "lib/Module/ScanDeps.pm"
+  ],
+  "target": {
+    "file": "lib/Module/ScanDeps.pm",
+    "symbol": "Module::ScanDeps::scan_file",
+    "lines": [
+      871
+    ]
+  },
+  "upstream_source_pair": {
+    "vulnerable": {
+      "commit": "bb448215c850cc1c009ec8c86196bd865141273d",
+      "first_parent": "e8e57160aa2e3bbf06a6a284bfd9ea85a28021ca",
+      "git_tree": "b361173588cccbc39b77e0a9966ebc2ad376ab93",
+      "affected_file_sha256": "14e4e942bcae5cf36267ec20c332ec90b374247a968969462eec2f911e598646",
+      "affected_region_sha256": "97b7f858d72878db784a9c2447c2a83f4f7c5df6174eefe9a5974d9a30683f77",
+      "tree_sha256": "dd773a224f8f8b9afaa68fa187d7176c4a27bdedfc91ddd4052a3d34ab33ff02"
+    },
+    "fixed": {
+      "commit": "30d43e2df13cfca74833b3aa8a641679427c5cd8",
+      "first_parent": "bb448215c850cc1c009ec8c86196bd865141273d",
+      "git_tree": "3f37f6f3c9bb2576a2438f0bd21ae63a5f54d7a1",
+      "affected_file_sha256": "5abc69d32a7338b6751a54b9dd55916403cd9083069bad179b006c1d610534ce",
+      "affected_region_sha256": "3d1e98784841e26c20ecbe55202f4ce30c38eb171192056d7eedbe805843826e",
+      "tree_sha256": "20bcaede5f170ae2222a86d5b2d47fbab8426823e82b6d2e7cea321c4e0b1e62"
+    },
+    "patch_sha256": "c2d7953cb72bd0f444c9bd586c5eefef3c859367d5fd1d23ff433d98ab9fb6d0",
+    "relationship": "direct-parent-fix",
+    "raw_git_diff_sha256": "fb6daa9ea64635fa72c509aafa78b80f90df722b8872eff530aa5130414cdc9a"
+  },
+  "vendored_source_pair": {
+    "vulnerable": {
+      "affected_file_sha256": "14e4e942bcae5cf36267ec20c332ec90b374247a968969462eec2f911e598646",
+      "affected_region_sha256": "97b7f858d72878db784a9c2447c2a83f4f7c5df6174eefe9a5974d9a30683f77",
+      "tree_sha256": "4be9abd26cacda0b73613ef29a4c21a6d6e5db60fe3603f80c9a575aa607bf79"
+    },
+    "fixed": {
+      "affected_file_sha256": "5abc69d32a7338b6751a54b9dd55916403cd9083069bad179b006c1d610534ce",
+      "affected_region_sha256": "3d1e98784841e26c20ecbe55202f4ce30c38eb171192056d7eedbe805843826e",
+      "tree_sha256": "c7b78b8b30368f1d0b190f7b30bf41b1d6bc32032047036f341d9a0b8aba52c3"
+    },
+    "patch_sha256": "c2d7953cb72bd0f444c9bd586c5eefef3c859367d5fd1d23ff433d98ab9fb6d0"
+  },
+  "source_file_sha256": {
+    "vulnerable": {
+      "lib/Module/ScanDeps.pm": "14e4e942bcae5cf36267ec20c332ec90b374247a968969462eec2f911e598646"
+    },
+    "fixed": {
+      "lib/Module/ScanDeps.pm": "5abc69d32a7338b6751a54b9dd55916403cd9083069bad179b006c1d610534ce"
+    }
+  },
+  "qualification_blockers": [
+    "dataset_manifest_entry_pending",
+    "runtime_rights_pending",
+    "perl_tap_replay_pending",
+    "independent_review_pending"
+  ],
+  "dependency_lock": {
+    "runtime_dependencies": [],
+    "perl": "5.40.1"
+  },
+  "evidence": [
+    {
+      "path": "evidence/source-vulnerable-LICENSE",
+      "source_url": "https://raw.githubusercontent.com/rschupp/Module-ScanDeps/bb448215c850cc1c009ec8c86196bd865141273d/LICENSE",
+      "revision": "bb448215c850cc1c009ec8c86196bd865141273d",
+      "sha256": "1d2d2030e5a5664cc2aebde2bd136b0315b7a3b3b8a26ddc4cf730d073f143a8",
+      "license_expression": "GPL-1.0-or-later OR LicenseRef-Module-ScanDeps-Artistic-1.0"
+    },
+    {
+      "path": "evidence/source-vulnerable-README",
+      "source_url": "https://raw.githubusercontent.com/rschupp/Module-ScanDeps/bb448215c850cc1c009ec8c86196bd865141273d/README",
+      "revision": "bb448215c850cc1c009ec8c86196bd865141273d",
+      "sha256": "9679c17475043ba7ab2f91d907a9442e1e71ffbbec70744bbe22394de4f6da59",
+      "license_expression": "GPL-1.0-or-later OR LicenseRef-Module-ScanDeps-Artistic-1.0"
+    },
+    {
+      "path": "evidence/source-vulnerable-Makefile.PL",
+      "source_url": "https://raw.githubusercontent.com/rschupp/Module-ScanDeps/bb448215c850cc1c009ec8c86196bd865141273d/Makefile.PL",
+      "revision": "bb448215c850cc1c009ec8c86196bd865141273d",
+      "sha256": "3bb507954e14ad0e02cb3ffc1def83ecbf9caffbbebe76e470b575d3362c9a52",
+      "license_expression": "GPL-1.0-or-later OR LicenseRef-Module-ScanDeps-Artistic-1.0"
+    },
+    {
+      "path": "evidence/source-fixed-LICENSE",
+      "source_url": "https://raw.githubusercontent.com/rschupp/Module-ScanDeps/30d43e2df13cfca74833b3aa8a641679427c5cd8/LICENSE",
+      "revision": "30d43e2df13cfca74833b3aa8a641679427c5cd8",
+      "sha256": "1d2d2030e5a5664cc2aebde2bd136b0315b7a3b3b8a26ddc4cf730d073f143a8",
+      "license_expression": "GPL-1.0-or-later OR LicenseRef-Module-ScanDeps-Artistic-1.0"
+    },
+    {
+      "path": "evidence/source-fixed-README",
+      "source_url": "https://raw.githubusercontent.com/rschupp/Module-ScanDeps/30d43e2df13cfca74833b3aa8a641679427c5cd8/README",
+      "revision": "30d43e2df13cfca74833b3aa8a641679427c5cd8",
+      "sha256": "9679c17475043ba7ab2f91d907a9442e1e71ffbbec70744bbe22394de4f6da59",
+      "license_expression": "GPL-1.0-or-later OR LicenseRef-Module-ScanDeps-Artistic-1.0"
+    },
+    {
+      "path": "evidence/source-fixed-Makefile.PL",
+      "source_url": "https://raw.githubusercontent.com/rschupp/Module-ScanDeps/30d43e2df13cfca74833b3aa8a641679427c5cd8/Makefile.PL",
+      "revision": "30d43e2df13cfca74833b3aa8a641679427c5cd8",
+      "sha256": "3bb507954e14ad0e02cb3ffc1def83ecbf9caffbbebe76e470b575d3362c9a52",
+      "license_expression": "GPL-1.0-or-later OR LicenseRef-Module-ScanDeps-Artistic-1.0"
+    }
+  ],
+  "rights_review": {
+    "reviewer": "OpenAI Codex automated factual rights preparation",
+    "reviewed_at": "2026-10-23",
+    "review_kind": "automated_factual",
+    "human_legal_approval": false,
+    "scope": "Exact unchanged source subsets and copied rights evidence; runtime, legal approval, replay, and admission excluded.",
+    "components": [
+      {
+        "name": "Module::ScanDeps source subset",
+        "license_expression": "GPL-1.0-or-later OR LicenseRef-Module-ScanDeps-Artistic-1.0",
+        "selected_license": "GPL-1.0-only",
+        "redistribution_mode": "vendored unchanged source subset",
+        "covered_paths": [
+          "vulnerable/lib/Module/ScanDeps.pm",
+          "fixed/lib/Module/ScanDeps.pm",
+          "evidence/source-vulnerable-LICENSE",
+          "evidence/source-vulnerable-README",
+          "evidence/source-vulnerable-Makefile.PL",
+          "evidence/source-fixed-LICENSE",
+          "evidence/source-fixed-README",
+          "evidence/source-fixed-Makefile.PL"
+        ],
+        "license_evidence_paths": [
+          "evidence/source-vulnerable-LICENSE",
+          "evidence/source-fixed-LICENSE"
+        ],
+        "notice_requirements": [
+          "Preserve the complete revision-local LICENSE, original GPL-or-Artistic offer, copyright/author notices, no-warranty terms, and exact source-subset attribution.",
+          "GPL-1.0-only is the selected redistribution branch; the historical alternative remains reproduced and is not rewritten."
+        ]
+      }
+    ],
+    "basis": [
+      "The exact revision-local LICENSE offers GPL version 1 or later or its historical Artistic alternative; GPL-1.0-only is explicitly selected for these unchanged source subsets. This automated preparation is not independent legal approval."
+    ]
+  }
+}

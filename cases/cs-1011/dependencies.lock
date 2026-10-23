@@ -1,0 +1,15 @@
+{
+  "java_release": 8,
+  "compiled_sources": [
+    "src/main/java/org/jsoup/helper/Validate.java",
+    "src/main/java/org/jsoup/helper/ValidationException.java",
+    "src/main/java/org/jsoup/internal/StringUtil.java"
+  ],
+  "artifacts": [
+    {
+      "coordinate": "com.google.code.findbugs:jsr305:3.0.2",
+      "jar_sha256": "766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7",
+      "pom_sha256": "19889dbdf1b254b2601a5ee645b8147a974644882297684c798afe5d63d78dfe"
+    }
+  ]
+}

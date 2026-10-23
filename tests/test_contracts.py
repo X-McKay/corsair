@@ -78,6 +78,10 @@ def test_conformance_inputs_bind_both_revisions_to_foundation(case_id):
         ("cs-1006", "node22_replay_pending", None),
         ("cs-1007", "java21_jacoco_replay_pending", None),
         ("cs-1008", "perl_tap_replay_pending", None),
+        ("cs-1009", "python_replay_pending", None),
+        ("cs-1010", "node22_replay_pending", None),
+        ("cs-1011", "java21_jacoco_replay_pending", None),
+        ("cs-1012", "perl_tap_replay_pending", None),
     ],
 )
 def test_benchmark_assets_have_the_exact_scoped_apache_2_license(
@@ -96,14 +100,14 @@ def test_benchmark_assets_have_the_exact_scoped_apache_2_license(
     # This closed table is the grant boundary: no wildcard case grant or upstream bytes.
     rows = {}
     for line in scope.splitlines():
-        if line.startswith("| `cases/cs-100"):
+        if line.startswith("| `cases/cs-10"):
             directory, authored, excluded = line.strip("|").split("|")
             rows[directory.strip().strip("`")] = (
                 set(re.findall(r"`([^`]+)`", authored)),
                 set(re.findall(r"`([^`]+)`", excluded)),
             )
     authored_files = {"input.json", "oracle.json", "reference-submission.json", "asset-manifest.json"}
-    if case_id in {"cs-1001", "cs-1005", "cs-1008"}:
+    if case_id in {"cs-1001", "cs-1005", "cs-1008", "cs-1009", "cs-1011"}:
         authored_files.add("dependencies.lock")
     exclusions = {"vulnerable/**", "fixed/**", "evidence/**"}
     assets = json.loads((ROOT / "cases" / case_id / "asset-manifest.json").read_text())
@@ -117,8 +121,8 @@ def test_benchmark_assets_have_the_exact_scoped_apache_2_license(
     assert (rows.get(f"cases/{case_id}"), set(assets["qualification_blockers"])) == (
         (authored_files, exclusions), blockers
     )
-    assert set(rows) == {f"cases/cs-{number}" for number in range(1001, 1009)}
-    assert sum(len(authored) for authored, _ in rows.values()) == 35
+    assert set(rows) == {f"cases/cs-{number}" for number in range(1001, 1013)}
+    assert sum(len(authored) for authored, _ in rows.values()) == 53
     assert all((ROOT / "cases" / case_id / name).is_file() for name in authored_files)
     oracle = json.loads((ROOT / "cases" / case_id / "oracle.json").read_text())
     assert oracle["qualification_status"] == "candidate"

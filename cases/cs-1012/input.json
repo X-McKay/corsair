@@ -1,0 +1,15 @@
+{
+  "case_id": "cs-1012",
+  "finding": {
+    "title": "A literal filename is interpreted as a two-argument open mode",
+    "description": "Direct file scanning passes an owned filename to Perl two-argument open, so a leading mode character changes an owned sentinel instead of treating the name literally.",
+    "file_path": "lib/Module/ScanDeps.pm",
+    "start_line": 871,
+    "symbol": "Module::ScanDeps::scan_file",
+    "cwe": "CWE-73"
+  },
+  "source": "vulnerable",
+  "commit": "bb448215c850cc1c009ec8c86196bd865141273d",
+  "fixed_source": "fixed",
+  "fixed_commit": "30d43e2df13cfca74833b3aa8a641679427c5cd8"
+}

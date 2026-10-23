@@ -1,0 +1,15 @@
+{
+  "case_id": "cs-1010",
+  "finding": {
+    "title": "Validation reads an inherited ordinary property",
+    "description": "Object validation reads a schema-named value through the prototype chain, invoking an owned prototype getter when the instance does not own that ordinary property.",
+    "file_path": "lib/validate.js",
+    "start_line": 211,
+    "symbol": "checkObj",
+    "cwe": "CWE-1321"
+  },
+  "source": "vulnerable",
+  "commit": "3b0cec3042a5aac5c967fd43475f5edc4c5b6eff",
+  "fixed_source": "fixed",
+  "fixed_commit": "f6f6a3b02d667aa4ba2d5d50cc19208c4462abfa"
+}

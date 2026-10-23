@@ -1,0 +1,22 @@
+{
+  "dataset_version": "batch-c-candidate/1",
+  "expected_label": "LIKELY_EXPLOITABLE",
+  "expected_fix": "verified",
+  "forbidden_labels": [],
+  "qualification_status": "candidate",
+  "case_name": "jsoup ASCII C0 URL-text normalization",
+  "risk_tags": [
+    "improper-input-validation",
+    "url-normalization"
+  ],
+  "capability_tags": [
+    "java",
+    "javac",
+    "jsoup",
+    "static-method",
+    "differential-probe"
+  ],
+  "provenance": "Finding independently derived from the pinned jsoup source pair and its string normalization boundary.",
+  "retention": "Public upstream source and independently authored benchmark annotations; retain permanently.",
+  "note": "Evaluator-only candidate. Admission still requires a dataset manifest entry with committed snapshot bindings, runtime rights, Java 21/JaCoCo replay, and independent review."
+}

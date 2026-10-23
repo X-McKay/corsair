@@ -1,0 +1,15 @@
+{
+  "case_id": "cs-1009",
+  "finding": {
+    "title": "TLS proxy credentials remain on a prepared request",
+    "description": "Proxy rebuilding can reattach a synthetic proxy authorization header to an owned HTTPS prepared request instead of leaving the tunneled request header absent.",
+    "file_path": "requests/sessions.py",
+    "start_line": 327,
+    "symbol": "SessionRedirectMixin.rebuild_proxies",
+    "cwe": "CWE-201"
+  },
+  "source": "vulnerable",
+  "commit": "302225334678490ec66b3614a9dddb8a02c5f4fe",
+  "fixed_source": "fixed",
+  "fixed_commit": "74ea7cf7a6a27a4eeb2ae24e162bcc942a6706d5"
+}

@@ -1,0 +1,135 @@
+{
+  "schema": "corsair-lite/case-assets/1",
+  "case_id": "cs-1010",
+  "qualification_status": "candidate",
+  "family_id": "cf-1010",
+  "repository": "https://github.com/kriszyp/json-schema",
+  "source_closure": [
+    "lib/validate.js",
+    "package.json"
+  ],
+  "target": {
+    "file": "lib/validate.js",
+    "symbol": "checkObj",
+    "lines": [
+      211
+    ]
+  },
+  "upstream_source_pair": {
+    "vulnerable": {
+      "commit": "3b0cec3042a5aac5c967fd43475f5edc4c5b6eff",
+      "first_parent": "c28470f2d64bace29c73d140f9c6876e3c3a9fef",
+      "git_tree": "46755491ead6b7a9a78166ddc52ee994c63caf66",
+      "affected_file_sha256": "3d2751d8eec3eb9de4630d461906f0851140a89cdcb737a9f78ce95dc6f4e05d",
+      "affected_region_sha256": "7b31786ae74432d5fb74d5aefcc1031120282572d711f27613870dfa93607a85",
+      "tree_sha256": "f133092168fe6e543f475f65ecac8495d8867cf2adde3bd7ebd51c2fe2f2ca12"
+    },
+    "fixed": {
+      "commit": "f6f6a3b02d667aa4ba2d5d50cc19208c4462abfa",
+      "first_parent": "ef60987a9a14b9d9c739384460044ba53cd9b9a2",
+      "git_tree": "39e437a3d8764e11563101165d6b9c64d90fad6c",
+      "affected_file_sha256": "b69694434212cdd4ffce4302d4f615da17a87345d6af72482014dcf90298fa26",
+      "affected_region_sha256": "a181ef3ec997a1136adde6c4e33d19a676c21c70e8463697fd49a887dfd9e09d",
+      "tree_sha256": "697650b39f1dfaa020e6cb04d9da8f782a5a3f6d1b6bccbdf2c0eb0287bcd109"
+    },
+    "patch_sha256": "a11f35df3c7930f6b9fd1392c90e8c97e5953ccf5abdd4e350db6782440ff019",
+    "relationship": "seven-commit-release-interval",
+    "ancestry": [
+      "3b0cec3042a5aac5c967fd43475f5edc4c5b6eff",
+      "b3f42b3331608fe83b6cc267c5fc513ec1b839ed",
+      "c52a27c653428149e4f9fb776d5e110d04639a9c",
+      "22f146111f541d9737e832823699ad3528ca7741",
+      "fb427cd4d175684786e4b2538718e72453e825e9",
+      "b62f1da1ff5442f23443d6be6a92d00e65cba93a",
+      "ef60987a9a14b9d9c739384460044ba53cd9b9a2",
+      "f6f6a3b02d667aa4ba2d5d50cc19208c4462abfa"
+    ],
+    "archive_sha256": {
+      "vulnerable": "8c5e46d63ccdea4675c9dbfeaf8bd43c330ea62068bf1f0445e8746977c14ee5",
+      "fixed": "35f3341e909465cd91fd100fd0c7b2af2a8307d9a4a79e8a84d1c5406c587233"
+    },
+    "raw_source_diff_sha256": "93546ca1674cf05dedabc979710306126e93801a6209d46e532fb8d087533962",
+    "raw_full_diff_sha256": "7a2d012d251b5bf5cfce193c6730b0eb20d14be807fe2f0fc0d3fe7a9acf0310"
+  },
+  "vendored_source_pair": {
+    "vulnerable": {
+      "affected_file_sha256": "3d2751d8eec3eb9de4630d461906f0851140a89cdcb737a9f78ce95dc6f4e05d",
+      "affected_region_sha256": "7b31786ae74432d5fb74d5aefcc1031120282572d711f27613870dfa93607a85",
+      "tree_sha256": "e24d55213be65a43368744bc8a875bda50d7a62d4b677b6217fb7eeb0709cd81"
+    },
+    "fixed": {
+      "affected_file_sha256": "b69694434212cdd4ffce4302d4f615da17a87345d6af72482014dcf90298fa26",
+      "affected_region_sha256": "a181ef3ec997a1136adde6c4e33d19a676c21c70e8463697fd49a887dfd9e09d",
+      "tree_sha256": "1e7cf193e858f440d786f8019ebf2b2353673feefd8bc82498e5c3906c29e579"
+    },
+    "patch_sha256": "ecc934c0bdbbec47f6600c44e653448295356234c27607cdc836a67f6a9b4552"
+  },
+  "source_file_sha256": {
+    "vulnerable": {
+      "lib/validate.js": "3d2751d8eec3eb9de4630d461906f0851140a89cdcb737a9f78ce95dc6f4e05d",
+      "package.json": "d189a5d099c2aacba3cb41186128870359d11519ac88e421cb31ee50540e8eb5"
+    },
+    "fixed": {
+      "lib/validate.js": "b69694434212cdd4ffce4302d4f615da17a87345d6af72482014dcf90298fa26",
+      "package.json": "22004c92d1d7d17e18d287e6b73e9a6b0c3be3259c9984735d68de67f5b37e44"
+    }
+  },
+  "qualification_blockers": [
+    "dataset_manifest_entry_pending",
+    "runtime_rights_pending",
+    "node22_replay_pending",
+    "independent_review_pending"
+  ],
+  "dependency_lock": {
+    "runtime_dependencies": []
+  },
+  "evidence": [
+    {
+      "path": "evidence/source-vulnerable-LICENSE",
+      "source_url": "https://raw.githubusercontent.com/kriszyp/json-schema/3b0cec3042a5aac5c967fd43475f5edc4c5b6eff/LICENSE",
+      "revision": "3b0cec3042a5aac5c967fd43475f5edc4c5b6eff",
+      "sha256": "9037c946f70e6397de29745f48caebf80c2b12c1d426d1d23581cb1c8595968e",
+      "license_expression": "AFL-2.1 OR BSD-3-Clause"
+    },
+    {
+      "path": "evidence/source-fixed-LICENSE",
+      "source_url": "https://raw.githubusercontent.com/kriszyp/json-schema/f6f6a3b02d667aa4ba2d5d50cc19208c4462abfa/LICENSE",
+      "revision": "f6f6a3b02d667aa4ba2d5d50cc19208c4462abfa",
+      "sha256": "9037c946f70e6397de29745f48caebf80c2b12c1d426d1d23581cb1c8595968e",
+      "license_expression": "AFL-2.1 OR BSD-3-Clause"
+    }
+  ],
+  "rights_review": {
+    "reviewer": "OpenAI Codex automated factual rights preparation",
+    "reviewed_at": "2026-10-23",
+    "review_kind": "automated_factual",
+    "human_legal_approval": false,
+    "scope": "Exact unchanged source subsets and copied rights evidence; runtime, legal approval, replay, and admission excluded.",
+    "components": [
+      {
+        "name": "json-schema source subset",
+        "license_expression": "AFL-2.1 OR BSD-3-Clause",
+        "selected_license": "BSD-3-Clause",
+        "redistribution_mode": "vendored",
+        "covered_paths": [
+          "vulnerable/lib/validate.js",
+          "vulnerable/package.json",
+          "fixed/lib/validate.js",
+          "fixed/package.json",
+          "evidence/source-vulnerable-LICENSE",
+          "evidence/source-fixed-LICENSE"
+        ],
+        "license_evidence_paths": [
+          "evidence/source-vulnerable-LICENSE",
+          "evidence/source-fixed-LICENSE"
+        ],
+        "notice_requirements": [
+          "Preserve the complete historical license, Dojo Foundation notice, BSD conditions and disclaimer, and source headers; do not imply endorsement."
+        ]
+      }
+    ],
+    "basis": [
+      "Both endpoint LICENSE files, package expressions, and source headers offer the recorded alternatives; BSD-3-Clause is explicitly selected for this unchanged subset."
+    ]
+  }
+}
