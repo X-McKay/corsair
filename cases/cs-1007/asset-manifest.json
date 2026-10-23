@@ -1,0 +1,116 @@
+{
+  "schema": "corsair-lite/case-assets/1",
+  "case_id": "cs-1007",
+  "qualification_status": "candidate",
+  "family_id": "cf-1007",
+  "repository": "https://github.com/bcgit/bc-java",
+  "source_closure": [
+    "crypto/DataLengthException.java",
+    "crypto/RuntimeCryptoException.java",
+    "crypto/generators/BCrypt.java",
+    "crypto/generators/OpenBSDBCrypt.java",
+    "util/Arrays.java",
+    "util/Objects.java",
+    "util/Pack.java",
+    "util/StringList.java",
+    "util/Strings.java",
+    "util/encoders/UTF8.java"
+  ],
+  "aliases": [
+    "CVE-2020-28052",
+    "GHSA-73xv-w5gp-frxh"
+  ],
+  "target": {
+    "file": "crypto/generators/OpenBSDBCrypt.java",
+    "symbol": "OpenBSDBCrypt.doCheckPassword",
+    "lines": [
+      312
+    ]
+  },
+  "upstream_source_pair": {
+    "vulnerable": {
+      "commit": "df521933f6e615306d552ed72f2d568f9728fc23",
+      "first_parent": "7b53c0915c190b441aad380528041f83a4b63a3a",
+      "git_tree": "59c7349076668b5ad4de5ac3ab2ea909251f8abe",
+      "tree_sha256": "82c46eceab429d4a529293a434d690ac1d0d2ac79d1ce97fe039bce6d936cc7a",
+      "affected_file_sha256": "c9d57d6ad23142acf2afb36e35b519648c0d5bfce86161bc5c3247ad7e6ffc6c",
+      "affected_region_sha256": "10c196d18c6a0d40e981d153c168d145ca2f08bedd408726c366013a65e61448"
+    },
+    "fixed": {
+      "commit": "97578f9b7ed277e6ecb58834e85e3d18385a4219",
+      "first_parent": "df521933f6e615306d552ed72f2d568f9728fc23",
+      "git_tree": "5771637eeb4ae9909e4680782b4178e1d07fdcc6",
+      "tree_sha256": "7b36ad62d1c0fb11dba1cec85a8b39c04fc0062c5534c40002940c80996bc677",
+      "affected_file_sha256": "23af5dc53bdf399c48ebb602ac24c4f15ff5a6a63b43a6f712830276389f1eef",
+      "affected_region_sha256": "52c22fb4c2a3abe27d94e2d599b34a3f56e2a6eba4aec68d0bbafbdaa66ebd6b"
+    },
+    "patch_sha256": "f537901e885b2c5b9350465c0efe72971116b4c246186bec12da44a50daf4725"
+  },
+  "vendored_source_pair": {
+    "vulnerable": {
+      "tree_sha256": "9ae711cc48cb0aee1c8ab712ff915a9c9a5f43b14ad5b53fa24a892097c4bad9",
+      "affected_file_sha256": "c9d57d6ad23142acf2afb36e35b519648c0d5bfce86161bc5c3247ad7e6ffc6c",
+      "affected_region_sha256": "10c196d18c6a0d40e981d153c168d145ca2f08bedd408726c366013a65e61448"
+    },
+    "fixed": {
+      "tree_sha256": "4aeb161ea81295f8fa917964f2842089721d6a8399404c8a8f32e7f6c2a6d15b",
+      "affected_file_sha256": "23af5dc53bdf399c48ebb602ac24c4f15ff5a6a63b43a6f712830276389f1eef",
+      "affected_region_sha256": "52c22fb4c2a3abe27d94e2d599b34a3f56e2a6eba4aec68d0bbafbdaa66ebd6b"
+    },
+    "patch_sha256": "31d65506ef6b7a4a6911030466268519bf39600e4311b769c17bf33418983258"
+  },
+  "dependency_lock": {
+    "runtime_dependencies": [],
+    "compiled_sources": [
+      "crypto/DataLengthException.java",
+      "crypto/RuntimeCryptoException.java",
+      "crypto/generators/BCrypt.java",
+      "crypto/generators/OpenBSDBCrypt.java",
+      "util/Arrays.java",
+      "util/Objects.java",
+      "util/Pack.java",
+      "util/StringList.java",
+      "util/Strings.java",
+      "util/encoders/UTF8.java"
+    ],
+    "release": 8
+  },
+  "evidence": [
+    {
+      "path": "evidence/source-vulnerable-LICENSE.html",
+      "source_url": "https://raw.githubusercontent.com/bcgit/bc-java/df521933f6e615306d552ed72f2d568f9728fc23/LICENSE.html",
+      "revision": "df521933f6e615306d552ed72f2d568f9728fc23",
+      "sha256": "07feba85e9808094dbe52877f28e399c08f7991ec2ce662d20fef666aabb6e66",
+      "license_expression": "LicenseRef-Bouncy-Castle-MIT-style"
+    },
+    {
+      "path": "evidence/source-fixed-LICENSE.html",
+      "source_url": "https://raw.githubusercontent.com/bcgit/bc-java/97578f9b7ed277e6ecb58834e85e3d18385a4219/LICENSE.html",
+      "revision": "97578f9b7ed277e6ecb58834e85e3d18385a4219",
+      "sha256": "07feba85e9808094dbe52877f28e399c08f7991ec2ce662d20fef666aabb6e66",
+      "license_expression": "LicenseRef-Bouncy-Castle-MIT-style"
+    },
+    {
+      "path": "evidence/GHSA-73xv-w5gp-frxh.json",
+      "source_url": "https://raw.githubusercontent.com/github/advisory-database/d24575275a753daa0ab016d4be74156115b15c38/advisories/github-reviewed/2021/04/GHSA-73xv-w5gp-frxh/GHSA-73xv-w5gp-frxh.json",
+      "revision": "d24575275a753daa0ab016d4be74156115b15c38",
+      "sha256": "0f69f64740ba84fea9c0ec62e19525877821bf5d9c77d4bb8992ed5a7790fa26",
+      "license_expression": "CC-BY-4.0"
+    },
+    {
+      "path": "evidence/advisory-LICENSE.md",
+      "source_url": "https://raw.githubusercontent.com/github/advisory-database/d24575275a753daa0ab016d4be74156115b15c38/LICENSE.md",
+      "revision": "d24575275a753daa0ab016d4be74156115b15c38",
+      "sha256": "9e5f1b3c610b9c2da5c313bf81d577a7d1acec686bdb0384edefa6df0f90cd94",
+      "license_expression": "CC-BY-4.0"
+    }
+  ],
+  "qualification_blockers": [
+    "dataset_license_scope_pending",
+    "vendored_snapshot_identity_pending",
+    "bouncy_castle_license_ref_review_pending",
+    "runtime_rights_pending",
+    "java21_jacoco_replay_pending",
+    "independent_review_pending"
+  ]
+}

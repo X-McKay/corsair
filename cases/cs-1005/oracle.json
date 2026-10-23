@@ -1,0 +1,22 @@
+{
+  "dataset_version": "batch-b-candidate/1",
+  "expected_label": "LIKELY_EXPLOITABLE",
+  "expected_fix": "verified",
+  "forbidden_labels": [],
+  "qualification_status": "candidate",
+  "case_name": "Jinja sandboxed attr filter capability exposure",
+  "risk_tags": [
+    "template-injection",
+    "sandbox-escape"
+  ],
+  "capability_tags": [
+    "python",
+    "pytest",
+    "jinja",
+    "function",
+    "differential-probe"
+  ],
+  "provenance": "Finding independently derived from the pinned Jinja source pair and GHSA-cpwx-vrp4-4pq7.",
+  "retention": "Public upstream source and independently authored benchmark annotations; retain permanently.",
+  "note": "Evaluator-only candidate. Admission still requires vendored snapshot identity, pending rights decisions, real-runtime replay, and independent review."
+}

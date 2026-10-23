@@ -1,0 +1,94 @@
+{
+  "schema": "corsair-lite/case-assets/1",
+  "case_id": "cs-1006",
+  "qualification_status": "candidate",
+  "family_id": "cf-1006",
+  "repository": "https://github.com/ljharb/shell-quote",
+  "source_closure": [
+    "index.js"
+  ],
+  "aliases": [
+    "CVE-2021-42740",
+    "GHSA-g4rg-993r-mgx7"
+  ],
+  "target": {
+    "file": "index.js",
+    "symbol": "exports.quote",
+    "lines": [
+      13
+    ]
+  },
+  "upstream_source_pair": {
+    "vulnerable": {
+      "commit": "c7de931fa4ed0975ea9756983c88334fe4b8cde5",
+      "first_parent": "414853f1fd98553368ce7507cd26ebae88d71b46",
+      "git_tree": "34a8afb7fe47c42fcbde47382cf67f1cba14b910",
+      "tree_sha256": "06a5f67ca77853509c7f992c522a654f08c04fdc40c90e2de22f7c02ac0add8b",
+      "affected_file_sha256": "74d1dc0106e8c34f48f11742ebb0ca5c4f1e64ede86a7a58715db7ae3e757f10",
+      "affected_region_sha256": "a238ee243c25d4b1f49f1ca8fc8220001d0dc300e2da794568153bf1777e5091"
+    },
+    "fixed": {
+      "commit": "6a8a899c62a58a30fb128a7079f02826ed4faee0",
+      "first_parent": "5799416ed454aa4ec9afafc895b4e31760ea1abe",
+      "git_tree": "defb9d93ae2d9a281007b4feac407e4a5c96d04b",
+      "tree_sha256": "1c54de15ee45ad42727b491be8af6ba8718a1ef5b2bf0e5ed567c0accb8f5b1d",
+      "affected_file_sha256": "1287f085e437b10ff183f42c7f8ea8c9cbd87bf190be016e17a6da4a0d4f79ac",
+      "affected_region_sha256": "2b0dfb3ca899dbebd35deeaa824fbbf6d7fff59d35d10538fd97960f362a61b0",
+      "contained_fix_commit": "5799416ed454aa4ec9afafc895b4e31760ea1abe"
+    },
+    "patch_sha256": "060bc8c19522fe7edafe9d52a65f94f6d0c0b01bd4cad6faaa213ad90e807f52"
+  },
+  "vendored_source_pair": {
+    "vulnerable": {
+      "tree_sha256": "86f80d065eb0ec5121b7e43316e8ab8dab3cfcc8c2d09c098fc12cf7529c764c",
+      "affected_file_sha256": "74d1dc0106e8c34f48f11742ebb0ca5c4f1e64ede86a7a58715db7ae3e757f10",
+      "affected_region_sha256": "a238ee243c25d4b1f49f1ca8fc8220001d0dc300e2da794568153bf1777e5091"
+    },
+    "fixed": {
+      "tree_sha256": "5bc13333abcbd77fa0eb6bffa22cec656cbe92d861a4bf83433ade7af852a1d1",
+      "affected_file_sha256": "1287f085e437b10ff183f42c7f8ea8c9cbd87bf190be016e17a6da4a0d4f79ac",
+      "affected_region_sha256": "2b0dfb3ca899dbebd35deeaa824fbbf6d7fff59d35d10538fd97960f362a61b0"
+    },
+    "patch_sha256": "72b5b6d1b9a806a412763ab5ff1cbaad96f3d200d200ba1400c6553c2f7ef5f6"
+  },
+  "dependency_lock": {
+    "runtime_dependencies": []
+  },
+  "evidence": [
+    {
+      "path": "evidence/source-vulnerable-LICENSE",
+      "source_url": "https://raw.githubusercontent.com/ljharb/shell-quote/c7de931fa4ed0975ea9756983c88334fe4b8cde5/LICENSE",
+      "revision": "c7de931fa4ed0975ea9756983c88334fe4b8cde5",
+      "sha256": "8bb16db1b047019e4395965f2cf3611b06c34bf86dc2d0210b3c3f91b53c21fe",
+      "license_expression": "MIT"
+    },
+    {
+      "path": "evidence/source-fixed-LICENSE",
+      "source_url": "https://raw.githubusercontent.com/ljharb/shell-quote/6a8a899c62a58a30fb128a7079f02826ed4faee0/LICENSE",
+      "revision": "6a8a899c62a58a30fb128a7079f02826ed4faee0",
+      "sha256": "8bb16db1b047019e4395965f2cf3611b06c34bf86dc2d0210b3c3f91b53c21fe",
+      "license_expression": "MIT"
+    },
+    {
+      "path": "evidence/GHSA-g4rg-993r-mgx7.json",
+      "source_url": "https://raw.githubusercontent.com/github/advisory-database/d24575275a753daa0ab016d4be74156115b15c38/advisories/github-reviewed/2022/05/GHSA-g4rg-993r-mgx7/GHSA-g4rg-993r-mgx7.json",
+      "revision": "d24575275a753daa0ab016d4be74156115b15c38",
+      "sha256": "3e751a17ce5b9dcab128226a200fdbe37f4db3169b5675c47ae8ebf83a2dc505",
+      "license_expression": "CC-BY-4.0"
+    },
+    {
+      "path": "evidence/advisory-LICENSE.md",
+      "source_url": "https://raw.githubusercontent.com/github/advisory-database/d24575275a753daa0ab016d4be74156115b15c38/LICENSE.md",
+      "revision": "d24575275a753daa0ab016d4be74156115b15c38",
+      "sha256": "9e5f1b3c610b9c2da5c313bf81d577a7d1acec686bdb0384edefa6df0f90cd94",
+      "license_expression": "CC-BY-4.0"
+    }
+  ],
+  "qualification_blockers": [
+    "dataset_license_scope_pending",
+    "vendored_snapshot_identity_pending",
+    "runtime_rights_pending",
+    "node22_replay_pending",
+    "independent_review_pending"
+  ]
+}

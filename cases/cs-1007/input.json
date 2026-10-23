@@ -1,0 +1,15 @@
+{
+  "case_id": "cs-1007",
+  "finding": {
+    "title": "BCrypt password check compares character search positions",
+    "description": "The BCrypt password verifier compares the positions at which loop indexes occur in two encoded strings instead of comparing the characters at each position, allowing a wrong password to be accepted.",
+    "file_path": "crypto/generators/OpenBSDBCrypt.java",
+    "start_line": 312,
+    "symbol": "OpenBSDBCrypt.doCheckPassword",
+    "cwe": "CWE-670"
+  },
+  "source": "vulnerable",
+  "commit": "df521933f6e615306d552ed72f2d568f9728fc23",
+  "fixed_source": "fixed",
+  "fixed_commit": "97578f9b7ed277e6ecb58834e85e3d18385a4219"
+}

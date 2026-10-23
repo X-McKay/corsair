@@ -1,0 +1,22 @@
+{
+  "dataset_version": "batch-b-candidate/1",
+  "expected_label": "LIKELY_EXPLOITABLE",
+  "expected_fix": "verified",
+  "forbidden_labels": [],
+  "qualification_status": "candidate",
+  "case_name": "Bouncy Castle BCrypt wrong-password acceptance",
+  "risk_tags": [
+    "authentication-bypass",
+    "incorrect-comparison"
+  ],
+  "capability_tags": [
+    "java",
+    "javac-java",
+    "bouncy-castle",
+    "method",
+    "differential-probe"
+  ],
+  "provenance": "Finding independently derived from the direct Bouncy Castle source pair and GHSA-73xv-w5gp-frxh.",
+  "retention": "Public upstream source and independently authored benchmark annotations; retain permanently.",
+  "note": "Evaluator-only candidate. Admission still requires vendored snapshot identity, pending rights decisions, real-runtime replay, and independent review."
+}

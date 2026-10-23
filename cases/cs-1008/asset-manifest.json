@@ -1,0 +1,130 @@
+{
+  "schema": "corsair-lite/case-assets/1",
+  "case_id": "cs-1008",
+  "qualification_status": "candidate",
+  "family_id": "cf-1008",
+  "repository": "https://github.com/richardc/perl-file-find-rule",
+  "source_closure": [
+    "File/Find/Rule.pm",
+    "Number/Compare.pm",
+    "Text/Glob.pm"
+  ],
+  "aliases": [
+    "CVE-2011-10007",
+    "GHSA-cvg9-q978-4569",
+    "CPANSA-File-Find-Rule"
+  ],
+  "target": {
+    "file": "File/Find/Rule.pm",
+    "symbol": "File::Find::Rule::grep",
+    "lines": [
+      423
+    ]
+  },
+  "upstream_source_pair": {
+    "vulnerable": {
+      "commit": "835cb561643e1eed51aa27a4dce9e17937325273",
+      "first_parent": "955a8c3faeaf18c33adc2b4ba1c9137865f01c0e",
+      "git_tree": "000c707f69771e7266f7c7d3aa62fab02bad2e3c",
+      "tree_sha256": "88a88a08b9e97124344f0c958d2f5c91b0a75ae6db4278f0fb7c4a1f4352b854",
+      "affected_file_sha256": "2e0abbacc15c6f15199477caf48afaee0a243af164b26ff9d07598859e4b9f5c",
+      "affected_region_sha256": "80b4aad3e67e831031611db272b0468864ddf04d68130180ade2cc8ac2489809"
+    },
+    "fixed": {
+      "commit": "df58128bcee4c1da78c34d7f3fe1357e575ad56f",
+      "first_parent": "835cb561643e1eed51aa27a4dce9e17937325273",
+      "git_tree": "85944a887e1ace32221cee7133afcc1072b883fb",
+      "tree_sha256": "c3abb9692e7a7157b649f044fd6ca57e456f636eff145066bc9c8200ecce1302",
+      "affected_file_sha256": "d47958ec4174c1c2245085816c201a4ac1a2515a4f5cb70d61f057c74bae8014",
+      "affected_region_sha256": "d24e43ecd1574e844715e743677cb622c8ea3183624e4e088bae6d0581ceadde"
+    },
+    "patch_sha256": "d735e9f1de01a299ac94fa1f6f7fb3f5d436580bf6445e93057bf20e3342113e"
+  },
+  "vendored_source_pair": {
+    "vulnerable": {
+      "tree_sha256": "4fcf71d5c7bb5d7d27575a6b0d3ae28b71bb91fb050335388489193a068aa81b",
+      "affected_file_sha256": "2e0abbacc15c6f15199477caf48afaee0a243af164b26ff9d07598859e4b9f5c",
+      "affected_region_sha256": "80b4aad3e67e831031611db272b0468864ddf04d68130180ade2cc8ac2489809"
+    },
+    "fixed": {
+      "tree_sha256": "9ecbc8d5692966eaf4e66d76afca3210f4ba75ea64b6906101084cf4b72569e6",
+      "affected_file_sha256": "d47958ec4174c1c2245085816c201a4ac1a2515a4f5cb70d61f057c74bae8014",
+      "affected_region_sha256": "d24e43ecd1574e844715e743677cb622c8ea3183624e4e088bae6d0581ceadde"
+    },
+    "patch_sha256": "58fa25e60c4589d3fec7b9006e04a40067c311d24f99ebccabed18e3095a711e"
+  },
+  "dependency_lock": {
+    "path": "dependencies.lock",
+    "perl": "5.40.1",
+    "packages": [
+      {
+        "name": "Number::Compare",
+        "version": "0.03",
+        "archive_sha256": "83293737e803b43112830443fb5208ec5208a2e6ea512ed54ef8e4dd2b880827",
+        "module_sha256": "624e30890c19bd56089bd8318235ca995bfab7d31bcf2a371e4ae3e6bd79c008"
+      },
+      {
+        "name": "Text::Glob",
+        "version": "0.11",
+        "archive_sha256": "069ccd49d3f0a2dedb115f4bdc9fbac07a83592840953d1fcdfc39eb9d305287",
+        "module_sha256": "39edabab69b3a5438b39682149581dbc36c98932821eb160e9dc13760aed4c12"
+      }
+    ]
+  },
+  "evidence": [
+    {
+      "path": "evidence/source-vulnerable-Rule.pm",
+      "source_url": "https://raw.githubusercontent.com/richardc/perl-file-find-rule/835cb561643e1eed51aa27a4dce9e17937325273/lib/File/Find/Rule.pm",
+      "revision": "835cb561643e1eed51aa27a4dce9e17937325273",
+      "sha256": "2e0abbacc15c6f15199477caf48afaee0a243af164b26ff9d07598859e4b9f5c",
+      "license_expression": "LicenseRef-Perl-Terms"
+    },
+    {
+      "path": "evidence/source-fixed-Rule.pm",
+      "source_url": "https://raw.githubusercontent.com/richardc/perl-file-find-rule/df58128bcee4c1da78c34d7f3fe1357e575ad56f/lib/File/Find/Rule.pm",
+      "revision": "df58128bcee4c1da78c34d7f3fe1357e575ad56f",
+      "sha256": "d47958ec4174c1c2245085816c201a4ac1a2515a4f5cb70d61f057c74bae8014",
+      "license_expression": "LicenseRef-Perl-Terms"
+    },
+    {
+      "path": "evidence/dependency-Number-Compare.pm",
+      "source_url": "https://cpan.metacpan.org/authors/id/R/RC/RCLAMP/Number-Compare-0.03.tar.gz",
+      "revision": "0.03",
+      "sha256": "624e30890c19bd56089bd8318235ca995bfab7d31bcf2a371e4ae3e6bd79c008",
+      "license_expression": "LicenseRef-Perl-Terms",
+      "archive_sha256": "83293737e803b43112830443fb5208ec5208a2e6ea512ed54ef8e4dd2b880827",
+      "archive_member": "Number-Compare-0.03/lib/Number/Compare.pm"
+    },
+    {
+      "path": "evidence/dependency-Text-Glob.pm",
+      "source_url": "https://cpan.metacpan.org/authors/id/R/RC/RCLAMP/Text-Glob-0.11.tar.gz",
+      "revision": "0.11",
+      "sha256": "39edabab69b3a5438b39682149581dbc36c98932821eb160e9dc13760aed4c12",
+      "license_expression": "LicenseRef-Perl-Terms",
+      "archive_sha256": "069ccd49d3f0a2dedb115f4bdc9fbac07a83592840953d1fcdfc39eb9d305287",
+      "archive_member": "Text-Glob-0.11/lib/Text/Glob.pm"
+    },
+    {
+      "path": "evidence/CPANSA-File-Find-Rule.yml",
+      "source_url": "https://raw.githubusercontent.com/briandfoy/cpan-security-advisory/da5fabaf31280ce087c43b256553947960b26753/cpansa/CPANSA-File-Find-Rule.yml",
+      "revision": "da5fabaf31280ce087c43b256553947960b26753",
+      "sha256": "99710b425d40c2f62d78a545374a01cb5eb92b229122e373c4dae72363ecad31",
+      "license_expression": "Artistic-2.0"
+    },
+    {
+      "path": "evidence/advisory-LICENSE",
+      "source_url": "https://raw.githubusercontent.com/briandfoy/cpan-security-advisory/da5fabaf31280ce087c43b256553947960b26753/LICENSE",
+      "revision": "da5fabaf31280ce087c43b256553947960b26753",
+      "sha256": "4cabb00406b10ab960d3ebb5c14e5042cf54d2b970cc4047588aa28c703525fe",
+      "license_expression": "Artistic-2.0"
+    }
+  ],
+  "qualification_blockers": [
+    "dataset_license_scope_pending",
+    "vendored_snapshot_identity_pending",
+    "perl_terms_license_expression_review_pending",
+    "runtime_rights_pending",
+    "perl_tap_replay_pending",
+    "independent_review_pending"
+  ]
+}

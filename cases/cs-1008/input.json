@@ -1,0 +1,15 @@
+{
+  "case_id": "cs-1008",
+  "finding": {
+    "title": "Filename is interpreted by two-argument open in grep rule",
+    "description": "The grep rule opens each discovered filename with Perl two-argument open, allowing a filename that begins with a pipe to be interpreted as a command rather than a literal file.",
+    "file_path": "File/Find/Rule.pm",
+    "start_line": 423,
+    "symbol": "File::Find::Rule::grep",
+    "cwe": "CWE-78"
+  },
+  "source": "vulnerable",
+  "commit": "835cb561643e1eed51aa27a4dce9e17937325273",
+  "fixed_source": "fixed",
+  "fixed_commit": "df58128bcee4c1da78c34d7f3fe1357e575ad56f"
+}

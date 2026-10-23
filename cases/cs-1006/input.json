@@ -1,0 +1,15 @@
+{
+  "case_id": "cs-1006",
+  "finding": {
+    "title": "Drive-letter expression leaves command syntax unescaped",
+    "description": "The quote function uses an overbroad ASCII range for an optional Windows drive prefix, allowing punctuation to be treated as a drive letter and emitted without escaping.",
+    "file_path": "index.js",
+    "start_line": 13,
+    "symbol": "exports.quote",
+    "cwe": "CWE-77"
+  },
+  "source": "vulnerable",
+  "commit": "c7de931fa4ed0975ea9756983c88334fe4b8cde5",
+  "fixed_source": "fixed",
+  "fixed_commit": "6a8a899c62a58a30fb128a7079f02826ed4faee0"
+}

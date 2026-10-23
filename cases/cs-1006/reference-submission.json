@@ -1,0 +1,14 @@
+{
+  "contract_version": "corsair-lite/differential-probe/2",
+  "hypothesis": {
+    "target_file": "index.js",
+    "target_symbol": "exports.quote",
+    "target_lines": [
+      13
+    ],
+    "root_cause": "The optional Windows drive prefix uses the range A-z, which includes punctuation between uppercase and lowercase letters, so a leading backtick followed by a colon bypasses escaping.",
+    "expected_violation": "the quoted token contains an unescaped backtick that can retain command-substitution syntax"
+  },
+  "build_script": "",
+  "probe": "const { quote } = require('/work/index.js');\n\nconst CONTROL_PAYLOAD = 'ordinary-token';\nconst EXPLOIT_PAYLOAD = '`:;owned`:;';\n\nfunction hasUnescapedBacktick(value) {\n  for (let index = 0; index < value.length; index += 1) {\n    if (value[index] !== '`') continue;\n    let slashes = 0;\n    for (let cursor = index - 1; cursor >= 0 && value[cursor] === '\\\\'; cursor -= 1) slashes += 1;\n    if (slashes % 2 === 0) return true;\n  }\n  return false;\n}\n\nfunction run_target(payload) {\n  const rendered = quote([payload]);\n  if (payload === CONTROL_PAYLOAD) return rendered === CONTROL_PAYLOAD;\n  return !hasUnescapedBacktick(rendered);\n}\n\nmodule.exports = { CONTROL_PAYLOAD, EXPLOIT_PAYLOAD, run_target };\n"
+}

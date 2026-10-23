@@ -1,0 +1,21 @@
+{
+  "perl": "5.40.1",
+  "packages": [
+    {
+      "name": "Number::Compare",
+      "version": "0.03",
+      "archive_url": "https://cpan.metacpan.org/authors/id/R/RC/RCLAMP/Number-Compare-0.03.tar.gz",
+      "archive_sha256": "83293737e803b43112830443fb5208ec5208a2e6ea512ed54ef8e4dd2b880827",
+      "vendored_module": "Number/Compare.pm",
+      "module_sha256": "624e30890c19bd56089bd8318235ca995bfab7d31bcf2a371e4ae3e6bd79c008"
+    },
+    {
+      "name": "Text::Glob",
+      "version": "0.11",
+      "archive_url": "https://cpan.metacpan.org/authors/id/R/RC/RCLAMP/Text-Glob-0.11.tar.gz",
+      "archive_sha256": "069ccd49d3f0a2dedb115f4bdc9fbac07a83592840953d1fcdfc39eb9d305287",
+      "vendored_module": "Text/Glob.pm",
+      "module_sha256": "39edabab69b3a5438b39682149581dbc36c98932821eb160e9dc13760aed4c12"
+    }
+  ]
+}

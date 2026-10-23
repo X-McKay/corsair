@@ -1,0 +1,139 @@
+{
+  "schema": "corsair-lite/case-assets/1",
+  "case_id": "cs-1005",
+  "qualification_status": "candidate",
+  "family_id": "cf-1005",
+  "repository": "https://github.com/pallets/jinja",
+  "source_closure": [
+    "jinja2/__init__.py",
+    "jinja2/_identifier.py",
+    "jinja2/async_utils.py",
+    "jinja2/bccache.py",
+    "jinja2/compiler.py",
+    "jinja2/constants.py",
+    "jinja2/debug.py",
+    "jinja2/defaults.py",
+    "jinja2/environment.py",
+    "jinja2/exceptions.py",
+    "jinja2/ext.py",
+    "jinja2/filters.py",
+    "jinja2/idtracking.py",
+    "jinja2/lexer.py",
+    "jinja2/loaders.py",
+    "jinja2/meta.py",
+    "jinja2/nativetypes.py",
+    "jinja2/nodes.py",
+    "jinja2/optimizer.py",
+    "jinja2/parser.py",
+    "jinja2/py.typed",
+    "jinja2/runtime.py",
+    "jinja2/sandbox.py",
+    "jinja2/tests.py",
+    "jinja2/utils.py",
+    "jinja2/visitor.py"
+  ],
+  "aliases": [
+    "CVE-2025-27516",
+    "GHSA-cpwx-vrp4-4pq7"
+  ],
+  "target": {
+    "file": "jinja2/filters.py",
+    "symbol": "do_attr",
+    "lines": [
+      1433
+    ]
+  },
+  "upstream_source_pair": {
+    "vulnerable": {
+      "commit": "033c20015c7ca899ab52eb921bb0f08e6d3dd145",
+      "first_parent": "bc68d4efa99c5f77334f0e519628558059ae8c35",
+      "git_tree": "bf0d8f919f67e7261e8f323a2048fe602102795b",
+      "tree_sha256": "a397e3d5a7bafbd038763213e47f2f042fd3226c8dc495736a182696e0d1568e",
+      "affected_file_sha256": "72f448da9a9734ccf0f1b6b8d55381a60bbfc2ed6bfa5d7f431c03eb25682798",
+      "affected_region_sha256": "a6085e56ed1591c4ee2e8bdd2b35ba3c55df90aa6032c845cc0f9b64aaffdca1"
+    },
+    "fixed": {
+      "commit": "90457bbf33b8662926ae65cdde4c4c32e756e403",
+      "first_parent": "033c20015c7ca899ab52eb921bb0f08e6d3dd145",
+      "git_tree": "4a9fe8f7e822755257e1bac8f8e43f7983010ee2",
+      "tree_sha256": "c36a98956a752fe404e934455510244fa759b2d09a05165bcd4a5442e16e4630",
+      "affected_file_sha256": "3d0fc481df67f634a0b671906321782b98f69d8c21508ba584f9f28a691dafe9",
+      "affected_region_sha256": "2ee482280f362602f4e8f4b75e356bac00469d51aa452a881945493eb94a2ccc",
+      "additional_parents": [
+        "065334d1ee5b7210e1a0a93c37238c86858f2af7"
+      ],
+      "contained_fix_commit": "065334d1ee5b7210e1a0a93c37238c86858f2af7"
+    },
+    "patch_sha256": "c9d47b88aba656e4b92bdb3aa117bd3813c09735f78adc6673a113fb83b48039"
+  },
+  "vendored_source_pair": {
+    "vulnerable": {
+      "tree_sha256": "ec56261e9388b9844260ddcfd4130685f18ead7eafaaed6678d2d4e4266a9ab7",
+      "affected_file_sha256": "72f448da9a9734ccf0f1b6b8d55381a60bbfc2ed6bfa5d7f431c03eb25682798",
+      "affected_region_sha256": "a6085e56ed1591c4ee2e8bdd2b35ba3c55df90aa6032c845cc0f9b64aaffdca1"
+    },
+    "fixed": {
+      "tree_sha256": "74d1c0effb83fbc86e6cc11e2f8f385ea5f4589f12de43f92d9fa50e104c10f5",
+      "affected_file_sha256": "3d0fc481df67f634a0b671906321782b98f69d8c21508ba584f9f28a691dafe9",
+      "affected_region_sha256": "2ee482280f362602f4e8f4b75e356bac00469d51aa452a881945493eb94a2ccc"
+    },
+    "patch_sha256": "f2ccdeffb15e4209bdd21a0fec8131e3143fc9b088eac91c58220fa9698626e9"
+  },
+  "dependency_lock": {
+    "path": "dependencies.lock",
+    "python": "3.12",
+    "packages": [
+      {
+        "name": "MarkupSafe",
+        "version": "3.0.3",
+        "wheel_sha256": "d6dd0be5b5b189d31db7cda48b91d7e0a9795f31430b7f271219ab30f1d3ac9d"
+      }
+    ]
+  },
+  "evidence": [
+    {
+      "path": "evidence/source-vulnerable-LICENSE.txt",
+      "source_url": "https://raw.githubusercontent.com/pallets/jinja/033c20015c7ca899ab52eb921bb0f08e6d3dd145/LICENSE.txt",
+      "revision": "033c20015c7ca899ab52eb921bb0f08e6d3dd145",
+      "sha256": "3b49dcee4105eb37bac10faf1be260408fe85d252b8e9df2e0979fc1e094437b",
+      "license_expression": "BSD-3-Clause"
+    },
+    {
+      "path": "evidence/source-fixed-LICENSE.txt",
+      "source_url": "https://raw.githubusercontent.com/pallets/jinja/90457bbf33b8662926ae65cdde4c4c32e756e403/LICENSE.txt",
+      "revision": "90457bbf33b8662926ae65cdde4c4c32e756e403",
+      "sha256": "3b49dcee4105eb37bac10faf1be260408fe85d252b8e9df2e0979fc1e094437b",
+      "license_expression": "BSD-3-Clause"
+    },
+    {
+      "path": "evidence/dependency-markupsafe-LICENSE.txt",
+      "source_url": "https://files.pythonhosted.org/packages/3c/2e/8d0c2ab90a8c1d9a24f0399058ab8519a3279d1bd4289511d74e909f060e/markupsafe-3.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+      "revision": "3.0.3",
+      "sha256": "489a8e1108509ed98a37bb983e11e0f7e1d31f0bd8f99a79c8448e7ff37d07ea",
+      "license_expression": "BSD-3-Clause",
+      "archive_sha256": "d6dd0be5b5b189d31db7cda48b91d7e0a9795f31430b7f271219ab30f1d3ac9d",
+      "archive_member": "markupsafe-3.0.3.dist-info/licenses/LICENSE.txt"
+    },
+    {
+      "path": "evidence/GHSA-cpwx-vrp4-4pq7.json",
+      "source_url": "https://raw.githubusercontent.com/github/advisory-database/d24575275a753daa0ab016d4be74156115b15c38/advisories/github-reviewed/2025/03/GHSA-cpwx-vrp4-4pq7/GHSA-cpwx-vrp4-4pq7.json",
+      "revision": "d24575275a753daa0ab016d4be74156115b15c38",
+      "sha256": "dd20a2e4e7fbc8812f5b4216fdc9f9d192003e5ef0ee9148f9a5d525084b6438",
+      "license_expression": "CC-BY-4.0"
+    },
+    {
+      "path": "evidence/advisory-LICENSE.md",
+      "source_url": "https://raw.githubusercontent.com/github/advisory-database/d24575275a753daa0ab016d4be74156115b15c38/LICENSE.md",
+      "revision": "d24575275a753daa0ab016d4be74156115b15c38",
+      "sha256": "9e5f1b3c610b9c2da5c313bf81d577a7d1acec686bdb0384edefa6df0f90cd94",
+      "license_expression": "CC-BY-4.0"
+    }
+  ],
+  "qualification_blockers": [
+    "dataset_license_scope_pending",
+    "vendored_snapshot_identity_pending",
+    "runtime_rights_pending",
+    "python_replay_pending",
+    "independent_review_pending"
+  ]
+}

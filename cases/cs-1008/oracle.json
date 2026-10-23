@@ -1,0 +1,22 @@
+{
+  "dataset_version": "batch-b-candidate/1",
+  "expected_label": "LIKELY_EXPLOITABLE",
+  "expected_fix": "verified",
+  "forbidden_labels": [],
+  "qualification_status": "candidate",
+  "case_name": "File::Find::Rule two-argument-open command injection",
+  "risk_tags": [
+    "command-injection",
+    "unsafe-file-open"
+  ],
+  "capability_tags": [
+    "perl",
+    "perl-tap",
+    "file-find-rule",
+    "method",
+    "differential-probe"
+  ],
+  "provenance": "Finding independently derived from the pinned File::Find::Rule source pair and CPANSA-File-Find-Rule.",
+  "retention": "Public upstream source and independently authored benchmark annotations; retain permanently.",
+  "note": "Evaluator-only candidate. Admission still requires vendored snapshot identity, pending rights decisions, real-runtime replay, and independent review."
+}

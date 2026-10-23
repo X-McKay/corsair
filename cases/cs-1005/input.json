@@ -1,0 +1,15 @@
+{
+  "case_id": "cs-1005",
+  "finding": {
+    "title": "Sandboxed attr filter exposes unsafe string formatting",
+    "description": "The attr filter resolves an attribute before applying the sandbox environment lookup, allowing a template to obtain a string formatting method that the sandbox normally blocks.",
+    "file_path": "jinja2/filters.py",
+    "start_line": 1433,
+    "symbol": "do_attr",
+    "cwe": "CWE-1336"
+  },
+  "source": "vulnerable",
+  "commit": "033c20015c7ca899ab52eb921bb0f08e6d3dd145",
+  "fixed_source": "fixed",
+  "fixed_commit": "90457bbf33b8662926ae65cdde4c4c32e756e403"
+}
