@@ -680,6 +680,24 @@ class _RightsEvidenceError(ValueError):
         self.code = code
 
 
+def _git_regular_blob_identity(root: Path, revision: str, path: str) -> tuple[bytes, str] | None:
+    """Return the mode and object id for one exact regular blob in a local Git tree."""
+    listing = _run_git(root, "ls-tree", "-z", revision, "--", path)
+    entries = [entry for entry in listing.stdout.split(b"\0") if entry]
+    if listing.returncode != 0 or len(entries) != 1:
+        return None
+    try:
+        header, raw_path = entries[0].split(b"\t", 1)
+        mode, kind, object_id = header.split(b" ", 2)
+        listed_path = raw_path.decode("utf-8")
+        oid = object_id.decode("ascii")
+    except (UnicodeDecodeError, ValueError):
+        return None
+    if mode not in {b"100644", b"100755"} or kind != b"blob" or listed_path != path:
+        return None
+    return mode, oid
+
+
 def _committed_rights_evidence(root: Path, record: RightsRecord, snapshot: VendoredSnapshot,
                                case_id: str) -> bytes:
     """Read an exact case-local evidence blob from Git and require identical safe disk bytes."""
@@ -732,22 +750,15 @@ def _committed_rights_evidence(root: Path, record: RightsRecord, snapshot: Vendo
         raise _RightsEvidenceError("RIGHTS_LOCAL_EVIDENCE_COMMIT_NOT_ANCESTOR",
                                    "the local rights evidence commit is not in the current history")
 
-    listing = _run_git(top_level, "ls-tree", "-z", commit, "--", evidence_path)
-    entries = [entry for entry in listing.stdout.split(b"\0") if entry]
-    if listing.returncode != 0 or len(entries) != 1:
+    declared_blob = _git_regular_blob_identity(top_level, commit, evidence_path)
+    if declared_blob is None:
         raise _RightsEvidenceError("RIGHTS_LOCAL_EVIDENCE_OBJECT_UNAVAILABLE",
                                    "the local rights evidence path is absent from the declared commit")
-    try:
-        header, raw_path = entries[0].split(b"\t", 1)
-        mode, kind, object_id = header.split(b" ", 2)
-        listed_path = raw_path.decode("utf-8")
-        oid = object_id.decode("ascii")
-    except (UnicodeDecodeError, ValueError) as error:
-        raise _RightsEvidenceError("RIGHTS_LOCAL_EVIDENCE_OBJECT_UNAVAILABLE",
-                                   "the local rights evidence object cannot be read safely") from error
-    if mode not in {b"100644", b"100755"} or kind != b"blob" or listed_path != evidence_path:
-        raise _RightsEvidenceError("RIGHTS_LOCAL_EVIDENCE_OBJECT_UNAVAILABLE",
-                                   "the local rights evidence object is not a regular Git blob")
+    _, oid = declared_blob
+    head_blob = _git_regular_blob_identity(top_level, "HEAD", evidence_path)
+    if head_blob is None or head_blob[1] != oid:
+        raise _RightsEvidenceError("RIGHTS_LOCAL_EVIDENCE_HEAD_MISMATCH",
+                                   "HEAD does not contain the declared local rights evidence blob")
     blob = _run_git(top_level, "cat-file", "blob", oid)
     if blob.returncode != 0:
         raise _RightsEvidenceError("RIGHTS_LOCAL_EVIDENCE_OBJECT_UNAVAILABLE",
@@ -1065,39 +1076,54 @@ def validate_corpus(root: Path, *, manifest_path: Path | None = None,
         for missing in sorted(required - present):
             add("RIGHTS_LAYER_MISSING", f"missing rights layer: {missing}", path=case_dir,
                 case_ids=(case.case_id,))
-        source_revisions = {
-            record.origin.revision if record.origin is not None else record.evidence_revision
-            for record in case.rights if record.layer == "target_source"
-        }
-        for revision in (case.source_pair.vulnerable.commit, case.source_pair.fixed.commit):
-            if revision not in source_revisions:
-                add("RIGHTS_SOURCE_REVISION_MISSING", f"target-source rights omit revision {revision}", path=case_dir,
-                    case_ids=(case.case_id,))
-        for index, declared in enumerate((case.source_pair.vulnerable, case.source_pair.fixed)):
-            if not local_revisions[index]:
-                continue
-            records = [
-                record for record in case.rights if record.layer == "target_source"
-                and (record.origin.revision if record.origin is not None
-                     else record.evidence_revision) == declared.commit
-            ]
-            vendored = [record for record in records if record.redistribution_mode == "vendored"]
-            if not vendored:
-                add("LOCAL_SOURCE_PROVENANCE_UNVERIFIED",
-                    "local snapshots require vendored rights for the exact declared revision", path=case_dir,
-                    case_ids=(case.case_id,))
-            repositories = {normalized for record in vendored
-                            if (url := record.origin.url if record.origin is not None else record.evidence_url)
-                            if (revision := record.origin.revision
-                                if record.origin is not None else record.evidence_revision)
-                            if (location := _evidence_location(url, revision)) is not None
-                            if (normalized := _normal_repository(location[0])) is not None}
-            declared_repository = _normal_repository(declared.repository)
-            if declared_repository is None or declared_repository not in repositories:
-                add("RIGHTS_SOURCE_REPOSITORY_MISMATCH",
-                    "target-source rights evidence is not tied to the declared repository", path=case_dir,
-                    case_ids=(case.case_id,))
         declared_revisions = (case.source_pair.vulnerable, case.source_pair.fixed)
+        target_bindings: list[tuple[RightsRecord, str | None, str]] = []
+        for record in case.rights:
+            if record.layer != "target_source":
+                continue
+            binding_url = record.origin.url if record.origin is not None else record.evidence_url
+            binding_revision = record.origin.revision if record.origin is not None else record.evidence_revision
+            location = _evidence_location(binding_url, binding_revision)
+            repository = _normal_repository(location[0]) if location is not None else None
+            target_bindings.append((record, repository, binding_revision))
+
+        for index, declared in enumerate(declared_revisions):
+            declared_repository = _normal_repository(declared.repository)
+            revision_records = [binding for binding in target_bindings if binding[2] == declared.commit]
+            if local_revisions[index]:
+                candidates = [binding for binding in revision_records
+                              if binding[0].origin is not None
+                              and binding[0].redistribution_mode == "vendored"]
+                matching = [binding for binding in candidates
+                            if declared_repository is not None and binding[1] == declared_repository]
+                if not matching:
+                    add("LOCAL_SOURCE_PROVENANCE_UNVERIFIED",
+                        "local snapshots require origin-bound vendored rights for the exact source identity",
+                        path=case_dir, case_ids=(case.case_id,))
+                    if candidates:
+                        add("RIGHTS_SOURCE_REPOSITORY_MISMATCH",
+                            "target-source rights evidence is not tied to the declared repository", path=case_dir,
+                            case_ids=(case.case_id,))
+                    else:
+                        add("RIGHTS_ORIGIN_MISSING",
+                            "local vendored target-source rights require immutable upstream origin metadata",
+                            path=case_dir, case_ids=(case.case_id,))
+                        if not revision_records:
+                            add("RIGHTS_SOURCE_REVISION_MISSING",
+                                f"target-source rights omit the declared {('vulnerable', 'fixed')[index]} revision",
+                                path=case_dir, case_ids=(case.case_id,))
+            else:
+                candidates = [binding for binding in revision_records if binding[0].origin is None]
+                matching = [binding for binding in candidates
+                            if declared_repository is not None and binding[1] == declared_repository]
+                if not candidates:
+                    add("RIGHTS_SOURCE_REVISION_MISSING",
+                        f"Git source rights require direct evidence for the {('vulnerable', 'fixed')[index]} revision",
+                        path=case_dir, case_ids=(case.case_id,))
+                elif not matching:
+                    add("RIGHTS_SOURCE_REPOSITORY_MISMATCH",
+                        "target-source rights evidence is not tied to the declared repository", path=case_dir,
+                        case_ids=(case.case_id,))
         for record in case.rights:
             tokens = _license_tokens(record.license_expression)
             if {"NOASSERTION", "NONE"}.intersection(tokens):
@@ -1115,25 +1141,30 @@ def validate_corpus(root: Path, *, manifest_path: Path | None = None,
                 add("RIGHTS_MUTABLE_EVIDENCE", "rights evidence URL is mutable or not revision-local", path=case_dir,
                     case_ids=(case.case_id,))
             origin = record.origin
-            matched_index = None
+            matching_indices: tuple[int, ...] = ()
+            local_matches: tuple[int, ...] = ()
             if record.layer == "target_source":
                 effective_revision = origin.revision if origin is not None else record.evidence_revision
-                matched_index = next((index for index, declared in enumerate(declared_revisions)
-                                      if declared.commit == effective_revision), None)
-                direct_index = next((index for index, declared in enumerate(declared_revisions)
-                                     if declared.commit == record.evidence_revision), None)
-                if origin is None and record.redistribution_mode == "vendored" and (
-                        (direct_index is not None and local_revisions[direct_index])
-                        or (direct_index is None and any(local_revisions))):
-                    add("RIGHTS_ORIGIN_MISSING",
-                        "local vendored target-source rights require immutable upstream origin metadata",
-                        path=case_dir, case_ids=(case.case_id,))
-                elif origin is not None:
-                    if matched_index is None:
+                effective_url = origin.url if origin is not None else record.evidence_url
+                location = _evidence_location(effective_url, effective_revision)
+                effective_repository = _normal_repository(location[0]) if location is not None else None
+                revision_indices = tuple(index for index, declared in enumerate(declared_revisions)
+                                         if declared.commit == effective_revision)
+                matching_indices = tuple(
+                    index for index in revision_indices
+                    if effective_repository is not None
+                    and _normal_repository(declared_revisions[index].repository) == effective_repository)
+                local_matches = tuple(index for index in matching_indices if local_revisions[index])
+                if origin is not None:
+                    if not revision_indices:
                         add("RIGHTS_ORIGIN_REVISION_MISMATCH",
                             "rights origin revision does not match either declared source revision",
                             path=case_dir, case_ids=(case.case_id,))
-                    elif not local_revisions[matched_index]:
+                    elif not matching_indices:
+                        add("RIGHTS_ORIGIN_REPOSITORY_MISMATCH",
+                            "rights origin repository differs from the declared upstream source",
+                            path=case_dir, case_ids=(case.case_id,))
+                    elif not local_matches:
                         add("RIGHTS_ORIGIN_UNEXPECTED",
                             "Git sources use direct rights evidence and cannot carry a vendored origin binding",
                             path=case_dir, case_ids=(case.case_id,))
@@ -1150,14 +1181,6 @@ def validate_corpus(root: Path, *, manifest_path: Path | None = None,
                     add("RIGHTS_ORIGIN_HASH_MISMATCH",
                         "rights origin and local evidence copy declare different byte hashes", path=case_dir,
                         case_ids=(case.case_id,))
-                if matched_index is not None and local_revisions[matched_index]:
-                    declared = declared_revisions[matched_index]
-                    location = _evidence_location(origin.url, origin.revision)
-                    if (location is None
-                            or not _same_repository(location[0], declared.repository)):
-                        add("RIGHTS_ORIGIN_REPOSITORY_MISMATCH",
-                            "rights origin repository differs from the declared upstream source",
-                            path=case_dir, case_ids=(case.case_id,))
             if record.reviewed_at > date.today():
                 add("RIGHTS_FUTURE_REVIEW", "rights review date is in the future", path=case_dir,
                     case_ids=(case.case_id,))
@@ -1165,21 +1188,22 @@ def validate_corpus(root: Path, *, manifest_path: Path | None = None,
                 add("RIGHTS_REVIEWER_MISSING", "rights reviewer is blank or a placeholder", path=case_dir,
                     case_ids=(case.case_id,))
             evidence = None
-            local_evidence = (record.layer == "target_source" and origin is not None
-                              and matched_index is not None and local_revisions[matched_index])
+            local_evidence = record.layer == "target_source" and origin is not None and bool(local_matches)
             if local_evidence:
-                snapshot = declared_revisions[matched_index].vendored_snapshot
-                if snapshot is not None:
-                    try:
-                        evidence = _committed_rights_evidence(root, record, snapshot, case.case_id)
-                    except _RightsEvidenceError as error:
-                        add(error.code, str(error), path=case_dir, case_ids=(case.case_id,))
-                else:
-                    add("RIGHTS_LOCAL_EVIDENCE_REPOSITORY_MISMATCH",
-                        "local rights evidence has no vendored snapshot repository binding",
-                        path=case_dir, case_ids=(case.case_id,))
-            elif not (record.layer == "target_source" and origin is not None
-                      and matched_index is None and any(local_revisions)):
+                for matched_index in local_matches:
+                    snapshot = declared_revisions[matched_index].vendored_snapshot
+                    if snapshot is not None:
+                        try:
+                            candidate_evidence = _committed_rights_evidence(
+                                root, record, snapshot, case.case_id)
+                            evidence = candidate_evidence if evidence is None else evidence
+                        except _RightsEvidenceError as error:
+                            add(error.code, str(error), path=case_dir, case_ids=(case.case_id,))
+                    else:
+                        add("RIGHTS_LOCAL_EVIDENCE_REPOSITORY_MISMATCH",
+                            "local rights evidence has no vendored snapshot repository binding",
+                            path=case_dir, case_ids=(case.case_id,))
+            else:
                 evidence = resolver(record.evidence_url, record.evidence_revision)
             if evidence is None:
                 if not local_evidence:
@@ -1245,9 +1269,10 @@ def validate_corpus(root: Path, *, manifest_path: Path | None = None,
             snapshot_repository = _normal_repository(snapshot.repository)
             if snapshot_repository is None:
                 return ("INVALID_REPOSITORY", case.case_id)
-            if upstream_repository != snapshot_repository:
+            if (case.split != "conformance" or upstream_repository != snapshot_repository
+                    or revision.commit != snapshot.commit):
                 return ("git", upstream_repository, revision.commit)
-            return ("self-authored-vendored", upstream_repository, revision.commit, snapshot.path)
+            return ("conformance-vendored", upstream_repository, revision.commit, snapshot.path)
 
         vulnerable = revision_key(case.source_pair.vulnerable)
         fixed = revision_key(case.source_pair.fixed)

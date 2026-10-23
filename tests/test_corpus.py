@@ -814,6 +814,127 @@ def bind_vendored_rights_evidence(root: Path) -> str:
     return foundation
 
 
+def configure_mixed_shared_commit_sources(root: Path, monkeypatch, *, local_revision: str) -> None:
+    """Make one source local and one Git-backed at the same upstream identity."""
+    data = read_manifest(root)
+    case = data["cases"][0]
+    remote_revision = "fixed" if local_revision == "vulnerable" else "vulnerable"
+    shared_repository = case["source_pair"]["vulnerable"]["repository"]
+    shared_commit = case["source_pair"]["vulnerable"]["commit"]
+    for revision in ("vulnerable", "fixed"):
+        declared = case["source_pair"][revision]
+        declared["repository"] = shared_repository
+        declared["commit"] = shared_commit
+    case["source_pair"][remote_revision].pop("vendored_snapshot")
+
+    request_path = root / "cases/cs-1001/input.json"
+    request = json.loads(request_path.read_text())
+    request["commit"] = shared_commit
+    request["fixed_commit"] = shared_commit
+    request_field = "source" if remote_revision == "vulnerable" else "fixed_source"
+    request[request_field] = {"url": shared_repository, "commit": shared_commit}
+    request_path.write_text(json.dumps(request, indent=2) + "\n")
+    case["artifacts"]["input_sha256"] = hashlib.sha256(request_path.read_bytes()).hexdigest()
+
+    records = [record for record in case["rights"] if record["layer"] == "target_source"]
+    direct_origin = records[0].pop("origin")
+    records[0].update(
+        evidence_url=direct_origin["url"],
+        evidence_revision=direct_origin["revision"],
+        evidence_sha256=direct_origin["sha256"],
+        redistribution_mode="acquisition_recipe",
+    )
+    records[1]["origin"]["url"] = records[1]["origin"]["url"].replace("b" * 40, shared_commit)
+    records[1]["origin"]["revision"] = shared_commit
+    write_manifest(root, data)
+
+    remote_source = root / "cases/cs-1001" / remote_revision
+    monkeypatch.setattr(corpus_module, "_offline_git_source", lambda *_args, **_kwargs: remote_source)
+
+
+def add_valid_self_authored_conformance_pair(root: Path) -> None:
+    """Create two complete local conformance cases at one Corsair foundation commit."""
+    first_dir = root / "cases/cs-1001"
+    second_dir = root / "cases/cs-1002"
+    shutil.copytree(first_dir, second_dir)
+    (second_dir / "vulnerable/target.py").write_text(
+        "def parse_variant(value):\n"
+        "    suffix = '!'\n"
+        "    normalized = value.strip()\n"
+        "    if normalized.endswith(suffix):\n"
+        "        return normalized + suffix\n"
+        "    return normalized\n")
+    (second_dir / "fixed/target.py").write_text(
+        "def parse_variant(value):\n"
+        "    suffix = '!'\n"
+        "    normalized = value.strip()\n"
+        "    if normalized.endswith(suffix):\n"
+        "        return normalized\n"
+        "    return normalized\n")
+    reference_path = second_dir / "reference-submission.json"
+    reference = json.loads(reference_path.read_text())
+    reference["hypothesis"]["target_symbol"] = "parse_variant"
+    reference_path.write_text(json.dumps(reference, indent=2) + "\n")
+    _test_git(root, "add", "--", "cases/cs-1002")
+    _test_git(root, "commit", "-q", "-m", "add second conformance source")
+    foundation = _test_git(root, "rev-parse", "HEAD")
+
+    data = read_manifest(root)
+    first = data["cases"][0]
+    first["split"] = "conformance"
+    repository = first["source_pair"]["vulnerable"]["vendored_snapshot"]["repository"]
+
+    def bind_case(case: dict, case_id: str, directory: Path) -> None:
+        request_path = directory / "input.json"
+        request = json.loads(request_path.read_text())
+        request.update(case_id=case_id, commit=foundation, fixed_commit=foundation)
+        if case_id == "cs-1002":
+            request["finding"]["symbol"] = "parse_variant"
+            request["finding"]["title"] = "Path handling in parse_variant"
+        request_path.write_text(json.dumps(request, indent=2) + "\n")
+        case["artifacts"]["input_sha256"] = hashlib.sha256(request_path.read_bytes()).hexdigest()
+        for revision, filename in (("vulnerable", "source-v-LICENSE"),
+                                   ("fixed", "source-f-LICENSE")):
+            source_root = directory / revision
+            declared = case["source_pair"][revision]
+            declared.update(
+                repository=repository,
+                commit=foundation,
+                tree_sha256=tree_sha256(source_root),
+                affected_file_sha256=hashlib.sha256((source_root / "target.py").read_bytes()).hexdigest(),
+                affected_region_sha256=_region_sha256(source_root / "target.py", (4,)),
+                vendored_snapshot={
+                    "repository": repository,
+                    "commit": foundation,
+                    "path": f"cases/{case_id}/{revision}",
+                    "tree_sha256": tree_sha256(source_root),
+                },
+            )
+            record = [record for record in case["rights"] if record["layer"] == "target_source"
+                      and record["evidence_url"].endswith(filename)][0]
+            record["origin"].update(
+                url=f"{repository}/blob/{foundation}/evidence/{filename}",
+                revision=foundation,
+            )
+            if case_id == "cs-1002":
+                record.update(
+                    evidence_url=f"{repository}/blob/{foundation}/cases/{case_id}/evidence/{filename}",
+                    evidence_revision=foundation,
+                )
+        case["source_pair"]["patch_sha256"] = _patch_sha256(
+            directory / "vulnerable", directory / "fixed")
+
+    bind_case(first, "cs-1001", first_dir)
+    second = deepcopy(first)
+    second.update(case_id="cs-1002", family_id="cf-1002", aliases=["CVE-2026-2002"])
+    second["target"]["symbol"] = "parse_variant"
+    second["artifacts"]["reference_submission_sha256"] = hashlib.sha256(
+        (second_dir / "reference-submission.json").read_bytes()).hexdigest()
+    bind_case(second, "cs-1002", second_dir)
+    data["cases"].append(second)
+    write_manifest(root, data)
+
+
 def issue_codes(report) -> set[str]:
     return {issue.code for issue in (*report.errors, *report.warnings)}
 
@@ -977,49 +1098,34 @@ def test_family_leakage_is_rejected(tmp_path, field, code):
     assert any(set(issue.case_ids) == {"cs-1001", "cs-1002"} for issue in report.errors if issue.code == code)
 
 
-def test_distinct_self_authored_subtrees_at_one_foundation_commit_do_not_collide(tmp_path):
+def test_distinct_conformance_subtrees_at_their_foundation_commit_do_not_collide(tmp_path):
     root = corpus_fixture(tmp_path)
-    data = read_manifest(root)
-    first = data["cases"][0]
-    for revision in ("vulnerable", "fixed"):
-        declared = first["source_pair"][revision]
-        declared["repository"] = declared["vendored_snapshot"]["repository"]
-        declared["commit"] = declared["vendored_snapshot"]["commit"]
-    second = deepcopy(first)
-    second.update(case_id="cs-1002", family_id="cf-1002", aliases=["CVE-2026-2002"])
-    second["source_pair"]["vulnerable"]["vendored_snapshot"]["path"] = "cases/cs-1002/vulnerable"
-    second["source_pair"]["fixed"]["vendored_snapshot"]["path"] = "cases/cs-1002/fixed"
-    data["cases"].append(second)
-    write_manifest(root, data)
+    add_valid_self_authored_conformance_pair(root)
 
-    assert "SOURCE_PAIR_FAMILY_COLLISION" not in issue_codes(checked(root))
+    report = checked(root)
+
+    assert report.ok, report.errors
+    assert "SOURCE_PAIR_FAMILY_COLLISION" not in issue_codes(report)
 
 
-def test_same_self_authored_subtrees_remain_a_source_pair_collision(tmp_path):
+def test_nonconformance_cases_cannot_use_distinct_paths_to_hide_a_source_pair_collision(tmp_path):
     root = corpus_fixture(tmp_path)
+    add_valid_self_authored_conformance_pair(root)
     data = read_manifest(root)
-    first = data["cases"][0]
-    for revision in ("vulnerable", "fixed"):
-        declared = first["source_pair"][revision]
-        declared["repository"] = declared["vendored_snapshot"]["repository"]
-        declared["commit"] = declared["vendored_snapshot"]["commit"]
-    second = deepcopy(first)
-    second.update(case_id="cs-1002", family_id="cf-1002", aliases=["CVE-2026-2002"])
-    data["cases"].append(second)
+    for case in data["cases"]:
+        case["split"] = "development"
     write_manifest(root, data)
 
     assert "SOURCE_PAIR_FAMILY_COLLISION" in issue_codes(checked(root))
 
 
-def test_distinct_local_paths_cannot_hide_an_upstream_source_pair_collision(tmp_path):
+def test_conformance_paths_only_distinguish_the_exact_foundation_revision(tmp_path):
     root = corpus_fixture(tmp_path)
+    add_valid_self_authored_conformance_pair(root)
     data = read_manifest(root)
-    first = data["cases"][0]
-    second = deepcopy(first)
-    second.update(case_id="cs-1002", family_id="cf-1002", aliases=["CVE-2026-2002"])
-    second["source_pair"]["vulnerable"]["vendored_snapshot"]["path"] = "cases/cs-1002/vulnerable"
-    second["source_pair"]["fixed"]["vendored_snapshot"]["path"] = "cases/cs-1002/fixed"
-    data["cases"].append(second)
+    for case in data["cases"]:
+        for revision in ("vulnerable", "fixed"):
+            case["source_pair"][revision]["vendored_snapshot"]["commit"] = "f" * 40
     write_manifest(root, data)
 
     assert "SOURCE_PAIR_FAMILY_COLLISION" in issue_codes(checked(root))
@@ -1423,6 +1529,29 @@ def test_vendored_rights_reject_uncommitted_evidence_drift(tmp_path):
     assert "RIGHTS_LOCAL_EVIDENCE_DRIFT" in issue_codes(checked(root))
 
 
+def test_vendored_rights_reject_evidence_deleted_from_head_and_recreated_untracked(tmp_path):
+    root = corpus_fixture(tmp_path)
+    evidence = root / "cases/cs-1001/evidence/source-v-LICENSE"
+    original = evidence.read_bytes()
+    _test_git(root, "rm", "-q", "--", "cases/cs-1001/evidence/source-v-LICENSE")
+    _test_git(root, "commit", "-q", "-m", "delete evidence from head")
+    evidence.write_bytes(original)
+
+    assert "RIGHTS_LOCAL_EVIDENCE_HEAD_MISMATCH" in issue_codes(checked(root))
+
+
+def test_vendored_rights_reject_a_committed_replacement_masked_by_old_disk_bytes(tmp_path):
+    root = corpus_fixture(tmp_path)
+    evidence = root / "cases/cs-1001/evidence/source-v-LICENSE"
+    original = evidence.read_bytes()
+    evidence.write_text("committed replacement\n")
+    _test_git(root, "add", "--", "cases/cs-1001/evidence/source-v-LICENSE")
+    _test_git(root, "commit", "-q", "-m", "replace evidence in head")
+    evidence.write_bytes(original)
+
+    assert "RIGHTS_LOCAL_EVIDENCE_HEAD_MISMATCH" in issue_codes(checked(root))
+
+
 def test_vendored_rights_reject_a_symlinked_evidence_copy(tmp_path):
     root = corpus_fixture(tmp_path)
     bind_vendored_rights_evidence(root)
@@ -1431,6 +1560,33 @@ def test_vendored_rights_reject_a_symlinked_evidence_copy(tmp_path):
     evidence.symlink_to(root / "evidence/source-v-LICENSE")
 
     assert "RIGHTS_LOCAL_EVIDENCE_PATH_INVALID" in issue_codes(checked(root))
+
+
+@pytest.mark.parametrize("local_revision", ["vulnerable", "fixed"])
+def test_mixed_sources_with_one_shared_commit_validate_rights_by_acquisition_type(
+        tmp_path, monkeypatch, local_revision):
+    root = corpus_fixture(tmp_path)
+    configure_mixed_shared_commit_sources(root, monkeypatch, local_revision=local_revision)
+
+    report = checked(root)
+
+    assert report.ok, report.errors
+    assert not ({"RIGHTS_ORIGIN_MISSING", "RIGHTS_ORIGIN_UNEXPECTED",
+                 "LOCAL_SOURCE_PROVENANCE_UNVERIFIED"} & issue_codes(report))
+
+    data = read_manifest(root)
+    local_record = [record for record in data["cases"][0]["rights"]
+                    if record["layer"] == "target_source" and record.get("origin") is not None][0]
+    origin = local_record.pop("origin")
+    local_record.update(
+        evidence_url=origin["url"],
+        evidence_revision=origin["revision"],
+        evidence_sha256=origin["sha256"],
+    )
+    write_manifest(root, data)
+
+    codes = issue_codes(checked(root))
+    assert {"RIGHTS_ORIGIN_MISSING", "LOCAL_SOURCE_PROVENANCE_UNVERIFIED"} <= codes
 
 
 def test_git_sources_reject_vendored_rights_origin_metadata(tmp_path):
