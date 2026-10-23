@@ -1,5 +1,5 @@
 {
-  "case_id": "fixture:path-traversal",
+  "case_id": "cs-0001-a",
   "finding": {
     "title": "Path traversal in read_document",
     "description": "documents.read_document joins a caller-supplied filename onto a root directory and reads the result without confining it to that root, so a filename with parent-directory segments reads files outside the root.",

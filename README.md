@@ -55,8 +55,8 @@ make test            # plus real Python, JavaScript, Java and Perl containers
 make verify          # kernel mechanics; no audit configured, so nondecisive
 make verify-scripts  # deterministic native script/CLI/main mechanics for all four runtimes; no model
 make verify AUDIT_PROVIDER=config/providers.local.json # enable the blind auditor
-make verify CASE=cases/path-traversal-javascript
-make investigate CASE=cases/path-traversal-fixture PROVIDER=config/providers.local.json
+make verify CASE=cases/cs-0002-a
+make investigate CASE=cases/cs-0001-a PROVIDER=config/providers.local.json
 make eval            # reviewed release case for every supported runtime
 make historical-eval # unqualified legacy corpus; exploratory, not a release gate
 make cleanup         # remove every container this tool created
@@ -132,10 +132,10 @@ quality or production sandbox assurance.
 
 | Runtime | Direct fixture | Script fixture / invocation | Inherited evidence and conformance limit |
 | --- | --- | --- | --- |
-| Python | `path-traversal-fixture` | `cs-0001-b`, waited `sys.executable` CLI | coverage.py subprocess/parallel data; effective startup/configuration must remain inherited |
-| JavaScript | `path-traversal-javascript` | `cs-0002-b`, waited `execFile` Node CLI | raw V8 reports merged by literal path; CommonJS/ESM only, no transpiler |
-| Java | `path-traversal-java` | `cs-0003-b`, waited `ProcessBuilder` main | append-enabled JaCoCo via `JAVA_TOOL_OPTIONS`; normal orderly child shutdown only |
-| Perl | `path-traversal-perl` | `cs-0004-b`, waited list-form child | Devel::Cover shards with inherited Perl paths; byte-identical source ambiguity is nondecisive |
+| Python | `cs-0001-a` | `cs-0001-b`, waited `sys.executable` CLI | coverage.py subprocess/parallel data; effective startup/configuration must remain inherited |
+| JavaScript | `cs-0002-a` | `cs-0002-b`, waited `execFile` Node CLI | raw V8 reports merged by literal path; CommonJS/ESM only, no transpiler |
+| Java | `cs-0003-a` | `cs-0003-b`, waited `ProcessBuilder` main | append-enabled JaCoCo via `JAVA_TOOL_OPTIONS`; normal orderly child shutdown only |
+| Perl | `cs-0004-a` | `cs-0004-b`, waited list-form child | Devel::Cover shards with inherited Perl paths; byte-identical source ambiguity is nondecisive |
 
 Changes to model-facing guidance still require live `make eval` and `make pilot` comparison with the operator's
 provider configuration before merge. A green deterministic script gate establishes mechanics only.

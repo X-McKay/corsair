@@ -19,6 +19,7 @@ from corsair.sandbox.port import SandboxSpec, labels
 from tests.test_kernel import accept
 
 ROOT = Path(__file__).resolve().parents[1]
+DIRECT_CASES = {"java": "cs-0003-a", "perl": "cs-0004-a"}
 PERL_SCRIPT = ROOT / "cases/cs-0004-b"
 PERL_IMAGE = "corsair-lite-perl:dev"
 
@@ -592,7 +593,7 @@ async def test_java_kernel_rejects_coverage_merged_across_module_source_roots(tm
 ])
 def test_adapter_registry_has_explicit_java_and_perl_contracts(adapter_name, language, probe_fragment):
     adapter = framework(adapter_name)
-    case_dir = ROOT / f"cases/path-traversal-{language}"
+    case_dir = ROOT / "cases" / DIRECT_CASES[language]
     submission = Submission.model_validate_json((case_dir / "reference-submission.json").read_text())
     assert adapter.language == language and adapter.guard(submission.probe).passed
     assert probe_fragment in submission.probe
@@ -608,7 +609,7 @@ def test_adapter_registry_has_explicit_java_and_perl_contracts(adapter_name, lan
 async def test_reference_submission_is_verified_in_native_runtime(tmp_path, language, image):
     if not (docker_available() and docker("image", "inspect", image).returncode == 0):
         pytest.skip(f"docker or {image} unavailable (make image)")
-    case_dir = ROOT / f"cases/path-traversal-{language}"
+    case_dir = ROOT / "cases" / DIRECT_CASES[language]
     case = load_case(case_dir)
     submission = Submission.model_validate_json((case_dir / "reference-submission.json").read_text())
     backend = DockerSandboxes()
@@ -645,7 +646,7 @@ async def test_reference_submission_is_verified_in_native_runtime(tmp_path, lang
 async def test_probe_or_application_assertions_are_errors_in_boolean_runtimes(tmp_path, language, image):
     if not (docker_available() and docker("image", "inspect", image).returncode == 0):
         pytest.skip(f"docker or {image} unavailable (make image)")
-    case_dir = ROOT / f"cases/path-traversal-{language}"
+    case_dir = ROOT / "cases" / DIRECT_CASES[language]
     case = load_case(case_dir)
     submission = Submission.model_validate_json((case_dir / "reference-submission.json").read_text())
     if language == "java":
@@ -672,7 +673,7 @@ async def test_probe_or_application_assertions_are_errors_in_boolean_runtimes(tm
 async def test_native_drivers_require_boolean(tmp_path, language, image, value):
     if not (docker_available() and docker("image", "inspect", image).returncode == 0):
         pytest.skip(f"docker or {image} unavailable (make image)")
-    case_dir = ROOT / f"cases/path-traversal-{language}"
+    case_dir = ROOT / "cases" / DIRECT_CASES[language]
     case = load_case(case_dir)
     submission = Submission.model_validate_json((case_dir / "reference-submission.json").read_text())
     if language == "java":

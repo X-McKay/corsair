@@ -21,7 +21,7 @@ from corsair.sandbox.docker import docker, docker_available
 from tests.test_kernel import accept
 
 ROOT = Path(__file__).resolve().parents[1]
-CASE = ROOT / "cases/path-traversal-fixture"
+CASE = ROOT / "cases/cs-0001-a"
 ROW = matrix.load()[0]
 REFERENCE = Submission.model_validate_json((CASE / "reference-submission.json").read_text())
 SCRIPT_CASE = ROOT / "cases/cs-0001-b"

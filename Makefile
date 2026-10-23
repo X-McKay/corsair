@@ -1,7 +1,7 @@
 PYTHON := uv run --locked python
 PROVIDER ?= config/providers.local.json
 AUDIT_PROVIDER ?=
-CASE ?= cases/path-traversal-fixture
+CASE ?= cases/cs-0001-a
 RUNS ?= .runs/lite
 MAX_SUBMISSIONS ?= 4
 REQUEST_LIMIT ?= 60
@@ -53,7 +53,7 @@ investigate: image
 
 # The release gate contains only cases reviewed for the lite verdict semantics. Historical cases remain exploratory
 # until their oracles and probes are reviewed against the Boolean v2 submission contract.
-RELEASE_CASES := cases/path-traversal-fixture cases/path-traversal-javascript cases/path-traversal-java cases/path-traversal-perl
+RELEASE_CASES := cases/cs-0001-a cases/cs-0002-a cases/cs-0003-a cases/cs-0004-a
 HISTORICAL_CASES := $(wildcard evals/e2e/python/v2/*-a) $(wildcard evals/e2e/python/v2/*-b)
 EVAL_CASES ?= $(RELEASE_CASES)
 eval: image
@@ -63,7 +63,7 @@ historical-eval: image
 	$(PYTHON) -m corsair.cli eval --cases $(HISTORICAL_CASES) --provider $(PROVIDER) --max-submissions $(MAX_SUBMISSIONS) --request-limit $(REQUEST_LIMIT) --runs $(RUNS)
 
 pilot: image
-	$(PYTHON) -m corsair.cli verify --case cases/path-traversal-fixture --submission cases/path-traversal-fixture/reference-submission.json --provider $(PROVIDER) --runs $(RUNS)
+	$(PYTHON) -m corsair.cli verify --case cases/cs-0001-a --submission cases/cs-0001-a/reference-submission.json --provider $(PROVIDER) --runs $(RUNS)
 	$(PYTHON) -m corsair.cli eval --cases $(RELEASE_CASES) --provider $(PROVIDER) --max-submissions $(MAX_SUBMISSIONS) --request-limit $(REQUEST_LIMIT) --runs $(RUNS)
 
 cleanup:

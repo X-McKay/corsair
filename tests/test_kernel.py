@@ -19,7 +19,7 @@ from corsair.sandbox.port import Exec
 pytestmark = pytest.mark.anyio
 
 ROOT = Path(__file__).resolve().parents[1]
-CASE = ROOT / "cases/path-traversal-fixture"
+CASE = ROOT / "cases/cs-0001-a"
 REFERENCE = Submission.model_validate_json((CASE / "reference-submission.json").read_text())
 ROW = matrix.load()[0]
 

@@ -20,7 +20,7 @@ from tests.test_kernel import accept
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PYTHON_CASE = ROOT / "cases/path-traversal-fixture"
+PYTHON_CASE = ROOT / "cases/cs-0001-a"
 
 
 def test_bounded_process_stops_at_the_combined_output_limit():

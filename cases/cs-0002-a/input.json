@@ -1,5 +1,5 @@
 {
-  "case_id": "fixture:path-traversal-javascript",
+  "case_id": "cs-0002-a",
   "finding": {
     "title": "Path traversal in read_document",
     "description": "An unconfined caller-supplied name can read a file outside the document root.",

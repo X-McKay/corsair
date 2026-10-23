@@ -16,3 +16,15 @@ explicitly permit a snapshot.
 
 The `quarantine` split is never scored. A public repository is not license evidence, and missing, conflicting,
 noncommercial or `NOASSERTION` material remains quarantined until separately resolved.
+
+## Corsair-authored benchmark license
+
+The unmodified Apache License 2.0 text in `LICENSE-BENCHMARKS` covers the Corsair-authored benchmark material in
+`cases/cs-0001-a`, `cases/cs-0001-b`, `cases/cs-0002-a`, `cases/cs-0002-b`, `cases/cs-0003-a`, `cases/cs-0003-b`,
+`cases/cs-0004-a`, and `cases/cs-0004-b`. Within those directories it covers findings, source pairs, evaluator
+oracles, reference probes, and harness material. It also covers Corsair-authored dataset annotations in this
+directory, the manifest, and Corsair-authored qualification and technical-review receipts.
+
+That grant is limited to these benchmark assets. Unrelated repository code, upstream projects, runtime images,
+runtime dependencies, test frameworks, coverage tools, and their transitive dependencies are not covered. Each
+runtime row needs separate revision-pinned rights evidence and review before a case can be qualified.

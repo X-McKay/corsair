@@ -2,8 +2,10 @@
   "contract_version": "corsair-lite/differential-probe/2",
   "hypothesis": {
     "target_file": "Documents.pm",
-    "target_symbol": "read_document",
-    "target_lines": [8],
+    "target_symbol": "Documents::read_document",
+    "target_lines": [
+      8
+    ],
     "root_cause": "The filename is joined without confining it to the document root.",
     "expected_violation": "The outside sentinel content is returned."
   },

@@ -17,7 +17,7 @@ from corsair.sandbox.port import SandboxSpec, labels
 from tests.test_kernel import accept
 
 ROOT = Path(__file__).resolve().parents[1]
-CASE = ROOT / "cases/path-traversal-javascript"
+CASE = ROOT / "cases/cs-0002-a"
 SCRIPT_CASE = ROOT / "cases/cs-0002-b"
 IMAGE = "corsair-lite-javascript:dev"
 

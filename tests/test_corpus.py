@@ -538,7 +538,7 @@ def test_oracle_fields_never_cross_agent_boundary(tmp_path):
     assert row is not None
     producer_payload = render_case(case, row)
     submission = Submission.model_validate_json(
-        (ROOT / "cases/path-traversal-fixture/reference-submission.json").read_text())
+        (ROOT / "cases/cs-0001-a/reference-submission.json").read_text())
     auditor_payload = render_auditor(submission)
     for payload in (producer_payload, auditor_payload):
         assert "EVALUATOR_SECRET_71b32" not in payload

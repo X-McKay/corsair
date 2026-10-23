@@ -1,6 +1,7 @@
 """Case loading, the runtime matrix and provider profiles; no containers, no model."""
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -12,7 +13,20 @@ from corsair.case import Case, Finding, from_request, load_case, load_oracle, tr
 from corsair.providers import ModelProfile, ProviderConfig, load_provider_config, model_settings
 
 ROOT = Path(__file__).resolve().parents[1]
-CASE = ROOT / "cases/path-traversal-fixture"
+CASE = ROOT / "cases/cs-0001-a"
+
+DIRECT_CASES = {
+    "python": "cs-0001-a",
+    "javascript": "cs-0002-a",
+    "java": "cs-0003-a",
+    "perl": "cs-0004-a",
+}
+LEGACY_DIRECT_CASES = (
+    "path-traversal-fixture",
+    "path-traversal-javascript",
+    "path-traversal-java",
+    "path-traversal-perl",
+)
 
 
 def _historical_parent_inputs():
@@ -28,20 +42,49 @@ def _historical_parent_inputs():
 HISTORICAL_PARENT_INPUTS = _historical_parent_inputs()
 
 
+def test_direct_conformance_cases_use_opaque_directory_and_case_ids():
+    for case_id in DIRECT_CASES.values():
+        case_dir = ROOT / "cases" / case_id
+        assert case_dir.is_dir()
+        assert json.loads((case_dir / "input.json").read_text())["case_id"] == case_id
+    assert all(not (ROOT / "cases" / name).exists() for name in LEGACY_DIRECT_CASES)
+
+
+def test_benchmark_assets_have_the_exact_scoped_apache_2_license():
+    license_path = ROOT / "benchmarks/dataset/LICENSE-BENCHMARKS"
+    assert hashlib.sha256(license_path.read_bytes()).hexdigest() == (
+        "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    )
+    scope = (ROOT / "benchmarks/dataset/README.md").read_text()
+    for case_id in (*DIRECT_CASES.values(), "cs-0001-b", "cs-0002-b", "cs-0003-b", "cs-0004-b"):
+        assert f"`cases/{case_id}`" in scope
+    assert "runtime dependencies" in scope
+    assert "not covered" in scope
+
+
+def test_direct_reference_targets_match_the_agent_visible_finding():
+    for case_id in DIRECT_CASES.values():
+        case_dir = ROOT / "cases" / case_id
+        request = json.loads((case_dir / "input.json").read_text())
+        reference = json.loads((case_dir / "reference-submission.json").read_text())
+        assert reference["hypothesis"]["target_file"] == request["finding"]["file_path"]
+        assert reference["hypothesis"]["target_symbol"] == request["finding"]["symbol"]
+
+
 def test_fixture_case_loads_with_both_revisions_and_keeps_the_oracle_out():
     case = load_case(CASE)
-    assert case.case_id == "fixture:path-traversal" and case.finding.cwe == "CWE-22"
-    assert case.revision.source.endswith("path-traversal-fixture/vulnerable") and case.fixed_revision is not None
+    assert case.case_id == "cs-0001-a" and case.finding.cwe == "CWE-22"
+    assert case.revision.source.endswith("cs-0001-a/vulnerable") and case.fixed_revision is not None
     assert case.revision.tree_sha256 != case.fixed_revision.tree_sha256
     assert load_oracle(CASE)["expected_label"] == "LIKELY_EXPLOITABLE"
     assert "expected_label" not in case.model_dump_json()
 
 
-@pytest.mark.parametrize("language", ["fixture", "javascript", "java", "perl"])
-def test_v2_reference_submission_round_trips_without_changing_its_identity(language):
+@pytest.mark.parametrize("case_id", DIRECT_CASES.values())
+def test_v2_reference_submission_round_trips_without_changing_its_identity(case_id):
     from corsair.kernel import Submission
 
-    data = json.loads((ROOT / f"cases/path-traversal-{language}/reference-submission.json").read_text())
+    data = json.loads((ROOT / "cases" / case_id / "reference-submission.json").read_text())
     data["contract_version"] = "corsair-lite/differential-probe/2"
     submission = Submission.model_validate(data)
     serialized = submission.model_dump_json()
