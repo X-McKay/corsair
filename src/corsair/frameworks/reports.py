@@ -1,4 +1,4 @@
-"""Validate native evidence once for every adapter; malformed evidence never becomes a decisive outcome."""
+"""Validate native evidence once for every adapter; malformed evidence never becomes decisive."""
 from __future__ import annotations
 
 import posixpath
@@ -15,10 +15,10 @@ class DriverRecord(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     role: Literal["control", "exploit"]
-    outcome: Literal["holds", "violated", "errored"]
+    result: Literal["PASS", "FAIL", "ERROR"]
+    invariant_held: bool | None
     exception_type: str | None
     message: str | None
-    invariant_failed: bool
 
 
 class CoveredFile(BaseModel):
@@ -48,14 +48,16 @@ def read_coverage(data: bytes | None, hypothesis) -> tuple[bool | None, tuple[in
     return bool(executed), tuple(sorted(executed.intersection(hypothesis.target_lines)))
 
 
-def read_junit(data: bytes | None, role: str) -> tuple[int, str | None]:
-    """Exactly one named, non-skipped native test. Invalid reports raise; missing reports have no tests."""
+def read_junit(data: bytes | None, role: str) -> tuple[int, str | None, str | None]:
+    """Exactly one named, non-skipped native test, with its failure/error kind and detail."""
     if not data:
-        return 0, None
+        return 0, None, None
     root = ET.fromstring(data)
+    if root.tag not in ("testsuites", "testsuite"):
+        raise ValueError("invalid native report root")
     cases = list(root.iter("testcase"))
     if not cases:
-        return 0, "the native test never ran (collection or import error)"
+        return 0, None, "the native test never ran (collection or import error)"
     if len(cases) != 1:
         raise ValueError(f"expected one native test, found {len(cases)}")
     case = cases[0]
@@ -63,42 +65,58 @@ def read_junit(data: bytes | None, role: str) -> tuple[int, str | None]:
         raise ValueError("native test identity does not match the requested payload")
     if case.find("skipped") is not None:
         raise ValueError("native test was skipped")
-    for kind in ("failure", "error"):
-        node = case.find(kind)
-        if node is not None:
-            return 1, f"{kind}: {(node.get('message') or node.text or '')[:500]}"
-    return 1, None
+    problems = [node for node in case if node.tag in ("failure", "error")]
+    if len(problems) > 1:
+        raise ValueError("native test contains multiple failures or errors")
+    if problems:
+        node = problems[0]
+        return 1, node.tag, f"{node.tag}: {(node.get('message') or node.text or '')[:500]}"
+    return 1, None, None
 
 
-def read_probe(files: Mapping[str, bytes | None], hypothesis, role: str) -> ProbeResult:
-    from ..kernel import Outcome
+def read_probe(files: Mapping[str, bytes | None], hypothesis, role: str, *,
+               native_error_kind: Literal["failure", "error"] = "failure") -> ProbeResult:
+    from ..kernel import RoleResult, role_result
 
     covered_target, covered_lines = read_coverage(files.get(f"{RESULT_DIR}/coverage.json"), hypothesis)
     count = 0
+    invariant_held = None
     exception_type = message = None
     try:
         data = files.get(f"{RESULT_DIR}/result.json")
         if not data:
-            return ProbeResult(Outcome.NOT_RUN, None, "the driver never ran (collection or import error)",
+            return ProbeResult(RoleResult.NOT_RUN, None, None, "the driver never ran (collection or import error)",
                                0, covered_target, covered_lines)
-        count, native = read_junit(files.get(f"{RESULT_DIR}/junit.xml"), role)
+        record = DriverRecord.model_validate_json(data)
+        if record.role != role:
+            raise ValueError("driver role does not match the requested payload")
+        result = RoleResult(record.result)
+        if result in (RoleResult.PASS, RoleResult.FAIL):
+            if record.invariant_held is None:
+                raise ValueError("a clean driver record requires a Boolean invariant")
+            if record.exception_type is not None:
+                raise ValueError("a clean driver record contains an exception")
+            if result is not role_result(role, record.invariant_held):
+                raise ValueError("driver result disagrees with the role's Boolean expectation")
+        elif record.invariant_held is not None or not record.exception_type:
+            raise ValueError("an error record requires an exception and no Boolean invariant")
+        count, native_kind, native_message = read_junit(files.get(f"{RESULT_DIR}/junit.xml"), role)
         if count == 0:
-            outcome, message = Outcome.NOT_RUN, native or "the driver record or native report is missing"
+            result, message = RoleResult.NOT_RUN, native_message or "the native report is missing"
         else:
-            record = DriverRecord.model_validate_json(data)
-            outcome = Outcome(record.outcome)
+            if (result is RoleResult.PASS) != (native_kind is None):
+                raise ValueError(f"native report disagrees with the driver record: {native_message}")
+            if result is RoleResult.FAIL and native_kind != "failure":
+                raise ValueError("native error disagrees with a clean driver failure")
+            # pytest/node:test use <failure> for call exceptions; Java/Perl emit <error>.
+            if result is RoleResult.ERROR and native_kind != native_error_kind:
+                raise ValueError("native exception kind disagrees with the driver error")
+            invariant_held = record.invariant_held
             exception_type, message = record.exception_type, record.message
-            if record.role != role:
-                raise ValueError("driver role does not match the requested payload")
-            if (outcome is Outcome.HOLDS) != (native is None):
-                raise ValueError(f"native report disagrees with the driver record: {native}")
-            if outcome is Outcome.HOLDS and exception_type is not None:
-                raise ValueError("a passing driver record contains an exception")
-            if outcome is Outcome.HOLDS and record.invariant_failed:
-                raise ValueError("a held driver record contains an invariant failure")
-            if outcome is Outcome.VIOLATED and (exception_type != "AssertionError" or not record.invariant_failed):
-                raise ValueError("violation was not raised by the kernel-owned invariant check")
+    except ValidationError as error:
+        result = RoleResult.ERROR
+        message = f"invalid probe evidence: {error.errors(include_input=False, include_url=False)}"
     except (ValueError, ET.ParseError) as error:
-        outcome, message = Outcome.ERRORED, f"invalid probe evidence: {error}"
-    return ProbeResult(outcome, exception_type, message[:2000] if message else None,
+        result, message = RoleResult.ERROR, f"invalid probe evidence: {error}"
+    return ProbeResult(result, invariant_held, exception_type, message[:2000] if message else None,
                        count, covered_target, covered_lines)

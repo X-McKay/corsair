@@ -19,19 +19,21 @@ DRIVER = '''"""Kernel-owned driver: one native pytest test id per payload throug
 import json
 import os
 import sys
-import traceback
 
 import pytest
 
 _DUMPS = json.dumps
-_EXTRACT_TB = traceback.extract_tb
 _OPEN = open
 _STR = str
 _TYPE = type
+_BOOL = bool
+_TYPE_ERROR = TypeError
 _ASSERTION_ERROR = AssertionError
 _BASE_EXCEPTION = BaseException
+_PARAMETRIZE = pytest.mark.parametrize
 ROLE = os.environ["CORSAIR_ROLE"]
 RESULT = os.environ["CORSAIR_RESULT"]
+EXPECTED = ROLE == "control"
 
 for _path in ("/work/.corsair", "/work"):
     if _path not in sys.path:
@@ -41,29 +43,27 @@ import corsair_probe as probe  # noqa: E402
 PAYLOADS = {"control": probe.CONTROL_PAYLOAD, "exploit": probe.EXPLOIT_PAYLOAD}
 
 
-def _record(outcome, exc=None):
-    frames = _EXTRACT_TB(exc.__traceback__) if exc is not None else []
-    deepest = frames[-1].filename if frames else ""
-    record = {"role": ROLE, "outcome": outcome, "exception_type": _TYPE(exc).__name__ if exc is not None else None,
-              "message": _STR(exc)[:2000] if exc is not None else None,
-              "invariant_failed": deepest == probe.__file__}
-    if outcome == "violated" and not record["invariant_failed"]:
-        record["outcome"] = "errored"
+def _record(result, invariant_held=None, exc=None):
+    record = {"role": ROLE, "result": result, "invariant_held": invariant_held,
+              "exception_type": _TYPE(exc).__name__ if exc is not None else None,
+              "message": _STR(exc)[:2000] if exc is not None else None}
     with _OPEN(RESULT, "w") as handle:
         handle.write(_DUMPS(record))
 
 
-@pytest.mark.parametrize("role", [ROLE])
+@_PARAMETRIZE("role", [ROLE])
 def test_probe(role):
     try:
-        probe.run_target(PAYLOADS[role])
-    except _ASSERTION_ERROR as exc:
-        _record("violated", exc)
-        raise
+        invariant = probe.run_target(PAYLOADS[role])
+        if _TYPE(invariant) is not _BOOL:
+            raise _TYPE_ERROR("run_target(payload) must return a boolean security invariant")
     except _BASE_EXCEPTION as exc:
-        _record("errored", exc)
+        _record("ERROR", exc=exc)
         raise
-    _record("holds")
+    result = "PASS" if invariant == EXPECTED else "FAIL"
+    _record(result, invariant)
+    if result == "FAIL":
+        raise _ASSERTION_ERROR("security invariant did not match the role expectation")
 '''
 
 

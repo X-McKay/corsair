@@ -1,5 +1,6 @@
 """Java and Perl use the same kernel gates and boolean-invariant contract as JavaScript."""
 import json
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
@@ -9,7 +10,7 @@ from corsair.artifacts import ArtifactStore
 from corsair.case import Case, Finding, load_case, revision
 from corsair.frameworks import framework
 from corsair.frameworks.javac_java import _jacoco_coverage
-from corsair.kernel import Fix, Gate, Hypothesis, Kernel, Label, Outcome, Submission
+from corsair.kernel import Fix, Gate, Hypothesis, Kernel, Label, RoleResult, Submission
 from corsair.sandbox import DockerSandboxes
 from corsair.sandbox.docker import docker, docker_available
 from tests.test_kernel import accept
@@ -116,12 +117,22 @@ async def test_reference_submission_is_verified_in_native_runtime(tmp_path, lang
     assert result.gate.stage is Gate.VERIFIED, result
     assert result.verdict is not None
     assert result.verdict.label is Label.LIKELY_EXPLOITABLE and result.verdict.fix is Fix.VERIFIED
-    assert [run.outcome for run in result.runs] == [
-        Outcome.HOLDS, Outcome.VIOLATED, Outcome.HOLDS, Outcome.HOLDS,
+    assert result.verdict.revisions[1].label is Label.LIKELY_NOT_EXPLOITABLE
+    assert [run.invariant_held for run in result.runs] == [True, False, True, True]
+    assert [run.result for run in result.runs] == [
+        RoleResult.PASS, RoleResult.PASS, RoleResult.PASS, RoleResult.FAIL,
     ]
     for run in result.runs:
         assert run.junit_tests == 1 and run.coverage is not None and run.cleanup_confirmed
+        assert run.covered_lines == submission.hypothesis.target_lines
         assert f"test_probe[{run.role}]" in store.get(run.junit).decode()
+        native_case = next(ET.fromstring(store.get(run.junit)).iter("testcase"))
+        assert (native_case.find("failure") is None) == (run.result is RoleResult.PASS)
+        assert native_case.find("error") is None
+        assert run.exception_type is None
+        if language == "perl":
+            status = "ok" if run.result is RoleResult.PASS else "not ok"
+            assert f"{status} 1 - test_probe[{run.role}]" in store.get(run.output).decode().splitlines()
     assert backend.labelled() == []
 
 
@@ -150,5 +161,31 @@ async def test_probe_or_application_assertions_are_errors_in_boolean_runtimes(tm
     result = await Kernel(backend, matrix.select(case), case, artifacts=ArtifactStore(tmp_path / "artifacts"), auditor=accept).evaluate(
         submission.model_copy(update={"probe": probe}))
     assert result.gate.stage is Gate.EXPLOIT_RUN, result
-    assert result.runs[-1].outcome is Outcome.ERRORED
+    assert result.runs[-1].result is RoleResult.ERROR
+    assert backend.labelled() == []
+
+
+@pytest.mark.docker
+@pytest.mark.anyio
+@pytest.mark.parametrize("language,image", [("java", "corsair-lite-java:dev"), ("perl", "corsair-lite-perl:dev")])
+@pytest.mark.parametrize("value", ["string", "number", "object", "missing"])
+async def test_native_drivers_require_boolean(tmp_path, language, image, value):
+    if not (docker_available() and docker("image", "inspect", image).returncode == 0):
+        pytest.skip(f"docker or {image} unavailable (make image)")
+    case_dir = ROOT / f"cases/path-traversal-{language}"
+    case = load_case(case_dir)
+    submission = Submission.model_validate_json((case_dir / "reference-submission.json").read_text())
+    if language == "java":
+        returned = {"string": '\"true\"', "number": "1", "object": "new Object()", "missing": "null"}[value]
+        probe = submission.probe.replace("static boolean runTarget", "static Object runTarget")
+        probe = probe.replace('return !"outside".equals(content);', "return " + returned + ";")
+    else:
+        returned = {"string": "'true'", "number": "2", "object": "{}", "missing": "undef"}[value]
+        probe = submission.probe.replace("return $content ne 'outside';", "return " + returned + ";")
+    backend = DockerSandboxes()
+    result = await Kernel(backend, matrix.select(case), case, artifacts=ArtifactStore(tmp_path / "artifacts"),
+                          auditor=accept).evaluate(submission.model_copy(update={"probe": probe}))
+    assert result.gate.stage is Gate.CONTROL_RUN
+    assert result.runs[0].result is RoleResult.ERROR
+    assert result.runs[0].exception_type == "TypeError" and result.runs[0].invariant_held is None
     assert backend.labelled() == []

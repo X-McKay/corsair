@@ -6,6 +6,7 @@ mechanics on real pytest, coverage and JUnit output, not sandbox policy.
 from __future__ import annotations
 
 import json
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
@@ -13,7 +14,7 @@ import pytest
 from corsair import matrix
 from corsair.artifacts import ArtifactStore
 from corsair.case import load_case
-from corsair.kernel import Fix, Gate, Kernel, Label, Outcome, Submission
+from corsair.kernel import Fix, Gate, Kernel, Label, RoleResult, Submission
 from corsair.sandbox import DockerSandboxes
 from corsair.sandbox.docker import docker, docker_available
 from tests.test_kernel import accept
@@ -37,15 +38,22 @@ async def test_reference_submission_is_verified_with_real_pytest_coverage_and_ju
     assert evaluation.gate.stage is Gate.VERIFIED, evaluation.gate
     verdict = evaluation.verdict
     assert verdict is not None and verdict.label is Label.LIKELY_EXPLOITABLE and verdict.fix is Fix.VERIFIED
-    outcomes = [(r.revision, r.role, r.outcome) for r in verdict.runs]
-    assert outcomes == [("vulnerable", "control", Outcome.HOLDS), ("vulnerable", "exploit", Outcome.VIOLATED),
-                        ("fixed", "control", Outcome.HOLDS), ("fixed", "exploit", Outcome.HOLDS)]
+    outcomes = [(r.revision, r.role, r.result) for r in verdict.runs]
+    assert outcomes == [("vulnerable", "control", RoleResult.PASS), ("vulnerable", "exploit", RoleResult.PASS),
+                        ("fixed", "control", RoleResult.PASS), ("fixed", "exploit", RoleResult.FAIL)]
     for run in verdict.runs:
         assert run.junit_tests == 1 and run.cleanup_confirmed is True
         junit = store.get(run.junit).decode()
         assert f"test_probe[{run.role}]" in junit  # one native test id per payload
-    assert verdict.runs[0].covered_lines == (4,) and verdict.runs[1].covered_lines == (4,)
-    assert verdict.runs[1].exception_type == "AssertionError"
+        native_case = next(ET.fromstring(store.get(run.junit)).iter("testcase"))
+        assert (native_case.find("failure") is None) == (run.result is RoleResult.PASS)
+        assert native_case.find("error") is None
+        assert run.exception_type is None
+    assert all(run.covered_lines == REFERENCE.hypothesis.target_lines for run in verdict.runs)
+    assert [run.invariant_held for run in verdict.runs] == [True, False, True, True]
+    assert all(run.exception_type is None for run in verdict.runs)
+    assert verdict.revisions[1].label is Label.LIKELY_NOT_EXPLOITABLE
+    assert all("outcome" not in run for run in verdict.model_dump(mode="json")["runs"])
     assert backend.labelled(kernel.run_id) == []  # nothing left behind
 
 
@@ -59,7 +67,7 @@ async def test_a_benign_exploit_payload_has_an_audited_negative_disposition(tmp_
     evaluation = await kernel.evaluate(benign)
     assert evaluation.gate.stage is Gate.VERIFIED and evaluation.gate.passed
     assert evaluation.verdict.label is Label.LIKELY_NOT_EXPLOITABLE and evaluation.verdict.rule == "K4"
-    assert [r.outcome for r in evaluation.runs] == [Outcome.HOLDS] * 4
+    assert [r.result for r in evaluation.runs] == [RoleResult.PASS, RoleResult.FAIL] * 2
     assert backend.labelled(kernel.run_id) == []
 
 
@@ -70,7 +78,7 @@ async def test_an_import_error_in_the_probe_is_not_run_and_a_wrong_target_fails_
                     run_id=f"c{tmp_path.name[-8:]}".lower())
     broken = REFERENCE.model_copy(update={"probe": "import nosuchmodule\n" + REFERENCE.probe})
     evaluation = await kernel.evaluate(broken)
-    assert evaluation.gate.stage is Gate.CONTROL_RUN and evaluation.runs[0].outcome is Outcome.NOT_RUN
+    assert evaluation.gate.stage is Gate.CONTROL_RUN and evaluation.runs[0].result is RoleResult.NOT_RUN
     wrong_lines = REFERENCE.model_copy(update={"hypothesis": REFERENCE.hypothesis.model_copy(update={"target_lines": (1,)})})
     evaluation = await kernel.evaluate(wrong_lines)
     # line 1 is the import, executed at module load, so coverage counts it; use a line that never executes instead
@@ -91,11 +99,11 @@ async def test_probes_run_unprivileged_and_cannot_edit_system_files(tmp_path):
     kernel = Kernel(backend, ROW, load_case(CASE), artifacts=ArtifactStore(tmp_path / "artifacts"), auditor=accept,
                     run_id=f"u{tmp_path.name[-8:]}".lower())
     hosts_probe = REFERENCE.probe.replace(
-        "def run_target(payload: str) -> None:\n",
-        "def run_target(payload: str) -> None:\n    with open('/etc/hosts', 'a') as handle:\n        handle.write('127.0.0.1 docs.example.com\\n')\n")
+        "    with tempfile.TemporaryDirectory() as root:\n",
+        "    with open('/etc/hosts', 'a') as handle:\n        handle.write('127.0.0.1 docs.example.com\\n')\n    with tempfile.TemporaryDirectory() as root:\n")
     evaluation = await kernel.evaluate(REFERENCE.model_copy(update={"probe": hosts_probe}))
     assert evaluation.gate.stage is Gate.CONTROL_RUN
-    assert evaluation.runs[0].outcome is Outcome.ERRORED and evaluation.runs[0].exception_type == "PermissionError"
+    assert evaluation.runs[0].result is RoleResult.ERROR and evaluation.runs[0].exception_type == "PermissionError"
     assert backend.labelled(kernel.run_id) == []
 
 
@@ -110,9 +118,10 @@ async def test_source_permissions_are_normalized_for_a_read_only_unprivileged_pr
     for path in tree.rglob("*"):
         path.chmod(0o700 if path.is_dir() else 0o600)
     case = load_case(CASE).model_copy(update={"revision": revision(tree), "fixed_revision": None})
-    probe = REFERENCE.probe.replace("def run_target(payload: str) -> None:\n",
-                                    "def run_target(payload: str) -> None:\n    import os\n"
-                                    "    assert not os.access('/work/documents.py', os.W_OK)\n")
+    probe = REFERENCE.probe.replace("    with tempfile.TemporaryDirectory() as root:\n",
+                                    "    import os\n"
+                                    "    assert not os.access('/work/documents.py', os.W_OK)\n"
+                                    "    with tempfile.TemporaryDirectory() as root:\n")
     backend = DockerSandboxes()
     result = await Kernel(backend, ROW, case, artifacts=ArtifactStore(tmp_path / "artifacts"), auditor=accept).evaluate(
         REFERENCE.model_copy(update={"probe": probe}))
@@ -129,3 +138,36 @@ async def test_probe_import_cannot_redirect_or_reformat_the_driver_record(tmp_pa
     result = await Kernel(backend, ROW, load_case(CASE), artifacts=ArtifactStore(tmp_path / "artifacts"), auditor=accept).evaluate(
         REFERENCE.model_copy(update={"probe": probe}))
     assert result.gate.stage is Gate.VERIFIED, result
+
+
+@needs_image
+async def test_python_driver_requires_boolean(tmp_path):
+    # Assertion-style probes and ignored return values must never count as Boolean evidence.
+    probe = REFERENCE.probe.replace("def run_target(", "def original_target(")
+    probe += "\ndef run_target(payload):\n    original_target(payload)\n"
+    backend = DockerSandboxes()
+    result = await Kernel(backend, ROW, load_case(CASE), artifacts=ArtifactStore(tmp_path / "artifacts"),
+                          auditor=accept).evaluate(REFERENCE.model_copy(update={"probe": probe}))
+    assert result.gate.stage is Gate.CONTROL_RUN
+    assert result.runs[0].result is RoleResult.ERROR
+    assert result.runs[0].exception_type == "TypeError"
+    assert result.runs[0].invariant_held is None
+    assert backend.labelled() == []
+
+
+@needs_image
+@pytest.mark.parametrize("value,error_type", [("1", "TypeError"), ('"true"', "TypeError"),
+                                               ("{}", "TypeError"), ("None", "TypeError"),
+                                               ("raise AssertionError('application')", "AssertionError"),
+                                               ("raise ValueError('application')", "ValueError")])
+async def test_python_boolean_errors(tmp_path, value, error_type):
+    probe = REFERENCE.probe.replace("def run_target(", "def original_target(")
+    action = value if value.startswith("raise ") else "return " + value
+    probe += "\ndef run_target(payload):\n    original_target(payload)\n    " + action + "\n"
+    backend = DockerSandboxes()
+    result = await Kernel(backend, ROW, load_case(CASE), artifacts=ArtifactStore(tmp_path / "artifacts"),
+                          auditor=accept).evaluate(REFERENCE.model_copy(update={"probe": probe}))
+    assert result.gate.stage is Gate.CONTROL_RUN
+    assert result.runs[0].result is RoleResult.ERROR and result.runs[0].exception_type == error_type
+    assert result.runs[0].invariant_held is None
+    assert backend.labelled() == []

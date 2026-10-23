@@ -44,52 +44,49 @@ public final class CorsairDriver {
         return out.toString();
     }
 
-    private static void record(String outcome, Throwable error, boolean invariantFailed) throws Exception {
+    private static void record(String result, Boolean invariantHeld, Throwable error) throws Exception {
         String type = error == null ? null : error.getClass().getSimpleName();
         String message = error == null ? null : error.getMessage();
-        String json = "{\"role\":\"" + escaped(ROLE, false) + "\",\"outcome\":\"" + outcome
+        String json = "{\"role\":\"" + escaped(ROLE, false) + "\",\"result\":\"" + result
             + "\",\"exception_type\":" + (type == null ? "null" : "\"" + escaped(type, false) + "\"")
             + ",\"message\":" + (message == null ? "null" : "\"" + escaped(message, false) + "\"")
-            + ",\"invariant_failed\":" + invariantFailed + "}";
+            + ",\"invariant_held\":" + invariantHeld + "}";
         Files.writeString(RESULT, json, StandardCharsets.UTF_8);
         String problem = "";
-        if (error != null) {
-            String tag = invariantFailed ? "failure" : "error";
+        if (!"PASS".equals(result)) {
+            String tag = "ERROR".equals(result) ? "error" : "failure";
+            String detail = error == null ? "security invariant did not match the role expectation" : message;
             problem = "<" + tag + " type=\"" + escaped(type, true) + "\" message=\""
-                + escaped(message, true) + "\"/>";
+                + escaped(detail, true) + "\"/>";
         }
         String junit = "<testsuites><testsuite tests=\"1\"><testcase name=\"test_probe[" + escaped(ROLE, true)
             + "]\">" + problem + "</testcase></testsuite></testsuites>";
         Files.writeString(JUNIT, junit, StandardCharsets.UTF_8);
     }
 
+    private static final class TypeError extends Exception {
+        TypeError(String message) { super(message); }
+    }
+
     public static void main(String[] args) throws Exception {
-        final String payload;
+        final boolean expected = "control".equals(ROLE);
+        final Boolean invariant;
         try {
-            payload = "control".equals(ROLE) ? CorsairProbe.CONTROL_PAYLOAD : CorsairProbe.EXPLOIT_PAYLOAD;
+            String payload = expected ? CorsairProbe.CONTROL_PAYLOAD : CorsairProbe.EXPLOIT_PAYLOAD;
+            Object observed = CorsairProbe.runTarget(payload);
+            if (!(observed instanceof Boolean)) {
+                throw new TypeError("runTarget(payload) must return a boolean security invariant");
+            }
+            invariant = (Boolean) observed;
         } catch (Throwable error) {
-            record("errored", error, false);
+            record("ERROR", null, error);
             error.printStackTrace();
             System.exit(1);
             return;
         }
-        final boolean invariant;
-        try {
-            invariant = CorsairProbe.runTarget(payload);
-        } catch (Throwable error) {
-            record("errored", error, false);
-            error.printStackTrace();
-            System.exit(1);
-            return;
-        }
-        if (!invariant) {
-            AssertionError error = new AssertionError("security invariant did not hold");
-            record("violated", error, true);
-            error.printStackTrace();
-            System.exit(1);
-            return;
-        }
-        record("holds", null, false);
+        String result = invariant.booleanValue() == expected ? "PASS" : "FAIL";
+        record(result, invariant, null);
+        if ("FAIL".equals(result)) System.exit(1);
     }
 }
 '''
@@ -303,4 +300,4 @@ class JavacJava:
         normalized = dict(files)
         normalized[f"{RESULT_DIR}/coverage.json"] = _jacoco_coverage(
             files.get(f"{RESULT_DIR}/jacoco.xml"), hypothesis.target_file, source)
-        return read_probe(normalized, hypothesis, role)
+        return read_probe(normalized, hypothesis, role, native_error_kind="error")

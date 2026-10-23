@@ -9,7 +9,7 @@ import pytest
 from corsair import matrix
 from corsair.artifacts import ArtifactStore
 from corsair.case import load_case
-from corsair.kernel import (AuditResult, Fix, Gate, Hypothesis, Kernel, Label, Outcome, RevisionDisposition,
+from corsair.kernel import (AuditResult, Fix, Gate, Hypothesis, Kernel, Label, RevisionDisposition,
                             RoleResult, Submission, ast_guard, environment_key, reported_target_present,
                             role_result, target_binding, terminal_verdict)
 from tests.fakes import FakeSandboxes, Script
@@ -73,9 +73,9 @@ async def test_verified_submission_runs_both_payloads_on_both_revisions_and_veri
     assert verdict is not None
     assert verdict.label is Label.LIKELY_EXPLOITABLE and verdict.rule == "K1"
     assert verdict.fix is Fix.VERIFIED
-    assert [(r.revision, r.role, r.outcome) for r in verdict.runs] == [
-        ("vulnerable", "control", Outcome.HOLDS), ("vulnerable", "exploit", Outcome.VIOLATED),
-        ("fixed", "control", Outcome.HOLDS), ("fixed", "exploit", Outcome.HOLDS)]
+    assert [(r.revision, r.role, r.result) for r in verdict.runs] == [
+        ("vulnerable", "control", RoleResult.PASS), ("vulnerable", "exploit", RoleResult.PASS),
+        ("fixed", "control", RoleResult.PASS), ("fixed", "exploit", RoleResult.FAIL)]
     assert all(run.junit_tests == 1 and run.junit is not None for run in verdict.runs)
     assert verdict.runs[0].covered_lines == (4,)
     assert audited == [REFERENCE]
@@ -163,7 +163,7 @@ async def test_exploit_crash_or_application_assertion_is_errored_not_violated(tm
     assert evaluation.gate.stage is Gate.EXPLOIT_RUN and "TypeError" in evaluation.gate.reason
     app_assert = FakeSandboxes({**HAPPY, ("vulnerable", "exploit"): Script("violated", "AssertionError", "app", invariant_failed=False)})
     evaluation = await kernel(app_assert, tmp_path).evaluate(REFERENCE)
-    assert evaluation.gate.stage is Gate.EXPLOIT_RUN and evaluation.runs[-1].outcome is Outcome.ERRORED
+    assert evaluation.gate.stage is Gate.EXPLOIT_RUN and evaluation.runs[-1].result is RoleResult.ERROR
 
 
 async def test_exploit_without_target_coverage_is_rejected(tmp_path):
@@ -200,17 +200,17 @@ async def test_fixed_build_failure_leaves_the_finding_and_marks_the_fix_unverifi
 async def test_collection_failure_is_not_run_and_timeout_is_infra(tmp_path):
     not_run = FakeSandboxes({**HAPPY, ("vulnerable", "control"): Script("not_run")})
     evaluation = await kernel(not_run, tmp_path).evaluate(REFERENCE)
-    assert evaluation.gate.stage is Gate.CONTROL_RUN and evaluation.runs[0].outcome is Outcome.NOT_RUN
+    assert evaluation.gate.stage is Gate.CONTROL_RUN and evaluation.runs[0].result is RoleResult.NOT_RUN
     timeout = FakeSandboxes({**HAPPY, ("vulnerable", "exploit"): Script("timeout")})
     evaluation = await kernel(timeout, tmp_path).evaluate(REFERENCE)
-    assert evaluation.gate.stage is Gate.INFRA and evaluation.runs[-1].outcome is Outcome.INFRA
+    assert evaluation.gate.stage is Gate.INFRA and evaluation.runs[-1].result is RoleResult.INFRA
     assert terminal_verdict(evaluation.gate, 1).label is Label.ERROR
 
 
 async def test_native_report_and_driver_record_must_agree(tmp_path):
     fake = FakeSandboxes({**HAPPY, ("vulnerable", "control"): Script("holds", junit_disagrees=True)})
     evaluation = await kernel(fake, tmp_path).evaluate(REFERENCE)
-    assert evaluation.runs[0].outcome is Outcome.ERRORED and "disagrees" in (evaluation.runs[0].message or "")
+    assert evaluation.runs[0].result is RoleResult.ERROR and "disagrees" in (evaluation.runs[0].message or "")
 
 
 async def test_held_sandbox_identity_is_never_reused_or_removed(tmp_path):
@@ -282,16 +282,18 @@ async def test_symbol_and_lines_must_exist_in_the_target_file(tmp_path):
     assert fake.creates == []
 
 
-@pytest.mark.parametrize(("role", "outcome", "expected"), [
-    ("control", Outcome.HOLDS, "PASS"),
-    ("control", Outcome.VIOLATED, "FAIL"),
-    ("exploit", Outcome.VIOLATED, "PASS"),
-    ("exploit", Outcome.HOLDS, "FAIL"),
-    *[(role, outcome, expected) for role in ("control", "exploit") for outcome, expected in
-      [(Outcome.ERRORED, "ERROR"), (Outcome.NOT_RUN, "NOT_RUN"), (Outcome.INFRA, "INFRA")]],
+@pytest.mark.parametrize(("role", "invariant_held", "expected"), [
+    ("control", True, "PASS"), ("control", False, "FAIL"),
+    ("exploit", False, "PASS"), ("exploit", True, "FAIL"),
 ])
-def test_role_result_maps_invariant_observation_to_role_expectation(role, outcome, expected):
-    assert role_result(role, outcome).value == expected
+def test_role_result_maps_boolean_invariant_to_role_expectation(role, invariant_held, expected):
+    assert role_result(role, invariant_held).value == expected
+
+
+@pytest.mark.parametrize("value", [None, 0, 1, "false", {}, []])
+def test_role_result_rejects_non_boolean_invariants(value):
+    with pytest.raises(TypeError):
+        role_result("exploit", value)
 
 
 async def test_both_roles_pass_is_likely_exploitable(tmp_path):

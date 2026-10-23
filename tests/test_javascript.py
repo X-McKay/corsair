@@ -1,4 +1,5 @@
 """Native JavaScript outcomes through the same kernel and Docker boundary as Python."""
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
@@ -7,7 +8,7 @@ from corsair import matrix
 from corsair.artifacts import ArtifactStore
 from corsair.case import load_case
 from corsair.frameworks import framework
-from corsair.kernel import Fix, Gate, Kernel, Label, Outcome, Submission
+from corsair.kernel import Fix, Gate, Kernel, Label, RoleResult, Submission
 from corsair.sandbox import DockerSandboxes
 from corsair.sandbox.docker import docker, docker_available
 from tests.test_kernel import accept
@@ -40,6 +41,8 @@ needs_image = pytest.mark.skipif(not (docker_available() and docker("image", "in
     ("benign", Gate.VERIFIED), ("import-error", Gate.CONTROL_RUN),
     ("application-assertion", Gate.EXPLOIT_RUN), ("syntax-error", Gate.CONTROL_RUN),
     ("hidden-application-frame", Gate.EXPLOIT_RUN), ("missing-invariant", Gate.CONTROL_RUN),
+    ("string-invariant", Gate.CONTROL_RUN), ("number-invariant", Gate.CONTROL_RUN),
+    ("object-invariant", Gate.CONTROL_RUN),
 ])
 async def test_native_node_outcomes(tmp_path, mode, expected):
     case = load_case(CASE)
@@ -88,6 +91,9 @@ async def test_native_node_outcomes(tmp_path, mode, expected):
                  "JSON.stringify = () => '{\\\"outcome\\\":\\\"holds\\\"}';\n" + probe)
     elif mode == "missing-invariant":
         probe = probe.replace("return content !== 'outside';", "void content;")
+    if mode in ("string-invariant", "number-invariant", "object-invariant"):
+        value = {"string-invariant": "'true'", "number-invariant": "1", "object-invariant": "{}"}[mode]
+        probe = probe.replace("return content !== 'outside';", "return " + value + ";")
     submission = submission.model_copy(update={"probe": probe})
     backend = DockerSandboxes()
     store = ArtifactStore(tmp_path / "artifacts")
@@ -96,15 +102,25 @@ async def test_native_node_outcomes(tmp_path, mode, expected):
     assert result.gate.stage is expected, result
     if expected is Gate.VERIFIED:
         assert result.verdict.fix is Fix.VERIFIED
+        assert result.verdict.revisions[1].label is Label.LIKELY_NOT_EXPLOITABLE
         if mode == "benign":
             assert result.verdict.label is Label.LIKELY_NOT_EXPLOITABLE and result.verdict.rule == "K4"
-            assert [run.outcome for run in result.runs] == [Outcome.HOLDS] * 4
+            assert [run.result for run in result.runs] == [RoleResult.PASS, RoleResult.FAIL] * 2
         else:
             assert result.verdict.label is Label.LIKELY_EXPLOITABLE and result.verdict.rule == "K1"
-            assert [run.outcome for run in result.runs] == [Outcome.HOLDS, Outcome.VIOLATED, Outcome.HOLDS, Outcome.HOLDS]
+            assert [run.result for run in result.runs] == [RoleResult.PASS, RoleResult.PASS, RoleResult.PASS, RoleResult.FAIL]
         for run in result.runs:
             assert run.junit_tests == 1 and run.coverage is not None and run.cleanup_confirmed
+            assert run.covered_lines == submission.hypothesis.target_lines
             assert f"test_probe[{run.role}]" in store.get(run.junit).decode()
-    elif mode in ("application-assertion", "hidden-application-frame", "missing-invariant"):
-        assert result.runs[-1].outcome is Outcome.ERRORED
+            native_case = next(ET.fromstring(store.get(run.junit)).iter("testcase"))
+            assert (native_case.find("failure") is None) == (run.result is RoleResult.PASS)
+            assert native_case.find("error") is None
+            assert run.exception_type is None
+    elif mode in ("application-assertion", "hidden-application-frame", "missing-invariant",
+                  "string-invariant", "number-invariant", "object-invariant"):
+        assert result.runs[-1].result is RoleResult.ERROR
+        assert result.runs[-1].invariant_held is None
+        if mode.endswith("invariant"):
+            assert result.runs[-1].exception_type == "TypeError"
     assert backend.labelled(kernel.run_id) == []

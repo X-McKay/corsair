@@ -15,8 +15,8 @@ Each evaluated revision retains its own disposition. The top-level label mirrors
 a fixed revision verifies the fix only when it independently earns the negative disposition. A removed fixed
 target remains INCONCLUSIVE/TARGET_REMOVED and does not verify the fix.
 
-The adapters temporarily report ``Outcome`` invariant observations while their drivers migrate to the boolean
-contract. Public role results express whether each payload met its role's expectation.
+Drivers require a Boolean security invariant and report whether it matches the trusted role expectation.
+Public run records retain the Boolean alongside PASS, FAIL, ERROR, NOT_RUN or INFRA.
 
 The two payloads run as two native test ids through one kernel-owned driver, so "exactly two native probes through
 the same seam" holds by construction. The framework adapter (``corsair.frameworks``) owns the driver, the command
@@ -108,14 +108,6 @@ class GateVerdict(Frozen):
     stderr_tail: str = Field(default="", max_length=TAIL)
 
 
-class Outcome(StrEnum):
-    HOLDS = "holds"          # run_target returned: the invariant held
-    VIOLATED = "violated"    # the trusted invariant check failed: the reported condition occurred
-    ERRORED = "errored"      # an application/probe exception, including an application assertion
-    NOT_RUN = "not_run"      # the test never ran (import or collection error, no test found)
-    INFRA = "infra"          # timeout, container failure or unreadable results
-
-
 class RoleResult(StrEnum):
     PASS = "PASS"
     FAIL = "FAIL"
@@ -124,24 +116,16 @@ class RoleResult(StrEnum):
     INFRA = "INFRA"
 
 
-def role_result(role: Role, outcome: Outcome) -> RoleResult:
-    """Translate the transitional adapter observation into the role's expectation."""
-    if outcome is Outcome.HOLDS:
-        return RoleResult.PASS if role == "control" else RoleResult.FAIL
-    if outcome is Outcome.VIOLATED:
-        return RoleResult.FAIL if role == "control" else RoleResult.PASS
-    return {Outcome.ERRORED: RoleResult.ERROR, Outcome.NOT_RUN: RoleResult.NOT_RUN,
-            Outcome.INFRA: RoleResult.INFRA}[outcome]
-
-
-def _invariant_held(outcome: Outcome) -> bool | None:
-    return True if outcome is Outcome.HOLDS else False if outcome is Outcome.VIOLATED else None
+def role_result(role: Role, invariant_held: bool) -> RoleResult:
+    """Compare a clean Boolean observation with the trusted role expectation."""
+    if type(invariant_held) is not bool:
+        raise TypeError("the security invariant must be a Boolean")
+    return RoleResult.PASS if invariant_held == (role == "control") else RoleResult.FAIL
 
 
 class ProbeRun(Frozen):
     revision: RevisionName
     role: Role
-    outcome: Outcome  # Transitional adapter observation; removed from public records in the adapter migration.
     result: RoleResult
     invariant_held: bool | None
     exception_type: str | None = None
@@ -397,7 +381,7 @@ class Kernel:
             output += f"\n[infra: {type(error).__name__}: {error}]\n".encode()
             confirmed = self.backend.remove(name) if ours else None
             ours = False
-            return ProbeRun(revision=revision, role=role, outcome=Outcome.INFRA,
+            return ProbeRun(revision=revision, role=role,
                             result=RoleResult.INFRA, invariant_held=None, exception_type=type(error).__name__,
                             message=str(error)[:2000], exit_code=None, junit_tests=0, duration_s=duration,
                             output=self.artifacts.put(output), cleanup_confirmed=confirmed)
@@ -407,7 +391,7 @@ class Kernel:
 
     def _infra(self, revision: RevisionName, role: Role, result: Exec, output: bytes, duration: float | None,
                confirmed: bool | None) -> ProbeRun:
-        return ProbeRun(revision=revision, role=role, outcome=Outcome.INFRA,
+        return ProbeRun(revision=revision, role=role,
                         result=RoleResult.INFRA, invariant_held=None, exit_code=result.exit_code,
                         message=("timed out" if result.timed_out else "output limit exceeded"
                                  if result.output_limited else "container failed"), junit_tests=0,
@@ -418,18 +402,19 @@ class Kernel:
         revision_source = self.case.revision if revision == "vulnerable" else self.case.fixed_revision
         assert revision_source is not None
         read = self.framework.read(files, hypothesis, role, Path(revision_source.source))
-        expected_exit = 0 if read.outcome is Outcome.HOLDS else 1
-        outcome, message = read.outcome, read.message
-        if outcome in (Outcome.HOLDS, Outcome.VIOLATED) and result.exit_code != expected_exit:
-            outcome, message = Outcome.ERRORED, "process exit code disagrees with the native evidence"
+        expected_exit = 0 if read.result is RoleResult.PASS else 1
+        observed, invariant_held, message = read.result, read.invariant_held, read.message
+        if observed in (RoleResult.PASS, RoleResult.FAIL, RoleResult.ERROR) and result.exit_code != expected_exit:
+            observed, invariant_held = RoleResult.ERROR, None
+            message = ((message + "; ") if message else "") + "process exit code disagrees with the native evidence"
         junit_path = next((p for p in self.framework.result_paths() if p.endswith(".xml")), None)
         junit_bytes = files.get(junit_path) if junit_path else None
         coverage_path = next((path for path in self.framework.result_paths()
                               if path.endswith(("coverage.json", "jacoco.xml"))), None)
         coverage_bytes = files.get(coverage_path) if coverage_path else None
-        return ProbeRun(revision=revision, role=role, outcome=outcome,
-                        result=role_result(role, outcome), invariant_held=_invariant_held(outcome),
-                        exception_type=read.exception_type, message=message, exit_code=result.exit_code, junit_tests=read.junit_tests,
+        return ProbeRun(revision=revision, role=role, result=observed, invariant_held=invariant_held,
+                        exception_type=read.exception_type, message=message[:2000] if message else None,
+                        exit_code=result.exit_code, junit_tests=read.junit_tests,
                         covered_target=read.covered_target, covered_lines=read.covered_lines, duration_s=duration,
                         output=self.artifacts.put(output),
                         junit=self.artifacts.put(junit_bytes) if junit_bytes else None,
@@ -491,7 +476,7 @@ class Kernel:
                                               f"EXPLOIT_PAYLOAD raised {fixed_exploit.exception_type}: "
                                               f"{(fixed_exploit.message or '')[:500]}. If that exception is how the "
                                               "fix rejects the payload, catch it inside run_target and let the "
-                                              "invariant decide; the fix is not verified until the exploit run holds there")
+                                              "invariant decide; the fix is not verified until the exploit invariant is true there")
         verdict = Verdict(label=source.label, rule=source.rule, reason=source.reason,
                           fix=fix, fix_reason=fix_reason, submission_sha256=submission.sha256,
                           environment_image=image, runs=tuple(runs), audit=audit, revisions=tuple(dispositions))
@@ -539,7 +524,7 @@ class Kernel:
         return RevisionDisposition(revision=revision,
                                    label=Label.LIKELY_EXPLOITABLE if positive else Label.LIKELY_NOT_EXPLOITABLE,
                                    rule="K1" if positive else "K4",
-                                   reason_code="INVARIANT_VIOLATED" if positive else "INVARIANT_HELD",
+                                   reason_code="EXPLOIT_EXPECTATION_MET" if positive else "INVARIANT_PRESERVED",
                                    reason=f"control passed and exploit {'passed' if positive else 'failed'} on the "
                                           f"{revision} revision, with clean invariant evidence, exact target coverage "
                                           "and an accepted outcome-blind audit")

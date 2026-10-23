@@ -15,6 +15,9 @@ my $role = $ENV{CORSAIR_ROLE};
 my $result_path = $ENV{CORSAIR_RESULT};
 my $junit_path = $ENV{CORSAIR_JUNIT};
 my $encode_json = \&JSON::PP::encode_json;
+my $true = JSON::PP::true;
+my $false = JSON::PP::false;
+my $expected = $role eq 'control';
 
 sub xml_escape {
     my ($value) = @_;
@@ -29,17 +32,18 @@ sub xml_escape {
 }
 
 sub record {
-    my ($outcome, $type, $message, $invariant_failed) = @_;
-    open my $result, '>', $result_path or die "cannot write result: $!";
-    print {$result} $encode_json->({
-        role => $role, outcome => $outcome, exception_type => $type,
+    my ($result, $invariant, $type, $message) = @_;
+    open my $record, '>', $result_path or die "cannot write result: $!";
+    print {$record} $encode_json->({
+        role => $role, result => $result, exception_type => $type,
         message => defined($message) ? substr($message, 0, 2000) : undef,
-        invariant_failed => $invariant_failed ? JSON::PP::true : JSON::PP::false,
+        invariant_held => defined($invariant) ? ($invariant ? $true : $false) : undef,
     });
-    close $result;
+    close $record;
     my $problem = '';
-    if (defined $type) {
-        my $tag = $invariant_failed ? 'failure' : 'error';
+    if ($result ne 'PASS') {
+        my $tag = $result eq 'ERROR' ? 'error' : 'failure';
+        $message = 'security invariant did not match the role expectation' unless defined $message;
         $problem = '<' . $tag . ' type="' . xml_escape($type) . '" message="' . xml_escape($message) . '"/>';
     }
     open my $junit, '>', $junit_path or die "cannot write junit: $!";
@@ -51,7 +55,7 @@ sub record {
 my $loaded = eval { require CorsairProbe; 1 };
 if (!$loaded) {
     my $message = "$@";
-    record('errored', 'CompileError', $message, 0);
+    record('ERROR', undef, 'CompileError', $message);
     print "not ok 1 - test_probe[$role]\n1..1\n";
     warn $message;
     exit 1;
@@ -66,27 +70,23 @@ my ($invariant, $error);
 }
 if (length $error) {
     my $type = ref($error) || 'RuntimeError';
-    record('errored', $type, "$error", 0);
+    record('ERROR', undef, $type, "$error");
     print "not ok 1 - test_probe[$role]\n1..1\n";
     warn $error;
     exit 1;
 }
 if (ref($invariant) || !defined($invariant) || "$invariant" !~ /\A(?:|0|1)\z/) {
     my $message = 'run_target(payload) must return a scalar boolean';
-    record('errored', 'TypeError', $message, 0);
+    record('ERROR', undef, 'TypeError', $message);
     print "not ok 1 - test_probe[$role]\n1..1\n";
     warn "$message\n";
     exit 1;
 }
-if (!$invariant) {
-    my $message = 'security invariant did not hold';
-    record('violated', 'AssertionError', $message, 1);
-    print "not ok 1 - test_probe[$role]\n1..1\n";
-    warn "$message\n";
-    exit 1;
-}
-record('holds', undef, undef, 0);
-print "ok 1 - test_probe[$role]\n1..1\n";
+my $actual = $invariant ? 1 : 0;
+my $result = $actual == $expected ? 'PASS' : 'FAIL';
+record($result, $actual, undef, undef);
+print (($result eq 'PASS' ? 'ok' : 'not ok') . " 1 - test_probe[$role]\n1..1\n");
+exit($result eq 'PASS' ? 0 : 1);
 '''
 
 COVERAGE_RENDERER = r'''use strict;
@@ -150,4 +150,4 @@ class PerlTap:
         return [f"{RESULT_DIR}/result.json", f"{RESULT_DIR}/junit.xml", f"{RESULT_DIR}/coverage.json"]
 
     def read(self, files: Mapping[str, bytes | None], hypothesis, role: str, source=None) -> ProbeResult:
-        return read_probe(files, hypothesis, role)
+        return read_probe(files, hypothesis, role, native_error_kind="error")

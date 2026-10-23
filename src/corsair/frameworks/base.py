@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from ..kernel import GateVerdict, Hypothesis, Outcome
+    from ..kernel import GateVerdict, Hypothesis, RoleResult
 
 PROBE_DIR = "/work/.corsair"
 RESULT_DIR = "/tmp/corsair"
@@ -18,7 +18,8 @@ WORKDIR = "/work"
 class ProbeResult:
     """What one payload's run showed, read from the collected result files only."""
 
-    outcome: "Outcome"
+    result: "RoleResult"
+    invariant_held: bool | None
     exception_type: str | None
     message: str | None
     junit_tests: int
@@ -63,6 +64,6 @@ class Framework(Protocol):
     def read(self, files: Mapping[str, bytes | None], hypothesis: "Hypothesis", role: str,
              source: Path) -> ProbeResult:
         """Classify the run from the collected files. A missing driver record or an empty native report is
-        ``not_run``; a driver record that disagrees with the native report is ``errored``. ``source`` is the
+        ``NOT_RUN``; a driver record that disagrees with the native report is ``ERROR``. ``source`` is the
         trusted host revision used to disambiguate native coverage formats that omit source roots."""
         ...

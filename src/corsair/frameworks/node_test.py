@@ -11,21 +11,25 @@ const { test } = require('node:test');
 const fs = require('node:fs');
 const writeFileSync = fs.writeFileSync.bind(fs);
 const stringify = JSON.stringify.bind(JSON);
+const hasOwn = Object.hasOwn.bind(Object);
+const TypeErrorClass = TypeError;
+const string = String;
 const role = process.env.CORSAIR_ROLE;
 const resultPath = process.env.CORSAIR_RESULT;
+const expected = role === 'control';
 const probe = require('./corsair_probe.cjs');
 const payloads = { control: probe.CONTROL_PAYLOAD, exploit: probe.EXPLOIT_PAYLOAD };
 
-if (!Object.hasOwn(probe, 'CONTROL_PAYLOAD') || !Object.hasOwn(probe, 'EXPLOIT_PAYLOAD') ||
+if (!hasOwn(probe, 'CONTROL_PAYLOAD') || !hasOwn(probe, 'EXPLOIT_PAYLOAD') ||
     typeof probe.run_target !== 'function' || probe.run_target.length !== 1) {
-  throw new TypeError('Export CONTROL_PAYLOAD, EXPLOIT_PAYLOAD and run_target(payload) from the probe');
+  throw new TypeErrorClass('Export CONTROL_PAYLOAD, EXPLOIT_PAYLOAD and run_target(payload) from the probe');
 }
 
-function record(outcome, error, invariant_failed = false) {
-  const exception_type = error ? error.name : null;
+function record(result, invariant_held = null, error = null) {
   writeFileSync(resultPath, stringify({
-    role, outcome, exception_type, invariant_failed,
-    message: error ? String(error.message).slice(0, 2000) : null,
+    role, result, invariant_held,
+    exception_type: error === null ? null : (error?.name || 'Error'),
+    message: error === null ? null : string(error?.message ?? error).slice(0, 2000),
   }));
 }
 
@@ -33,22 +37,16 @@ test(`test_probe[${role}]`, async () => {
   let invariant;
   try {
     invariant = await probe.run_target(payloads[role]);
+    if (typeof invariant !== 'boolean') {
+      throw new TypeErrorClass('run_target(payload) must return a boolean security invariant');
+    }
   } catch (error) {
-    record('errored', error);
+    record('ERROR', null, error);
     throw error;
   }
-  if (typeof invariant !== 'boolean') {
-    const error = new TypeError('run_target(payload) must return a boolean security invariant');
-    record('errored', error);
-    throw error;
-  }
-  try {
-    strictEqual(invariant, true, 'security invariant did not hold');
-  } catch (error) {
-    record('violated', error, true);
-    throw error;
-  }
-  record('holds');
+  const result = invariant === expected ? 'PASS' : 'FAIL';
+  record(result, invariant);
+  strictEqual(invariant, expected, 'security invariant did not match the role expectation');
 });
 '''
 

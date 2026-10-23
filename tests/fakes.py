@@ -98,13 +98,14 @@ class FakeSandboxes:
         if script.outcome == "not_run":
             files[f"{RESULT_DIR}/junit.xml"] = JUNIT_ERROR.encode()
             return Exec(2, b"", b"ImportError while importing test module\n")
-        record = {"role": role, "outcome": script.outcome, "exception_type": script.exception_type,
-                  "message": script.message,
-                  "invariant_failed": script.outcome == "violated" and script.invariant_failed}
-        if script.outcome == "violated" and not script.invariant_failed:
-            record["outcome"] = "errored"
+        held = True if script.outcome == "holds" else False if script.outcome == "violated" else None
+        errored = script.outcome == "errored" or (script.outcome == "violated" and not script.invariant_failed)
+        result = "ERROR" if errored else "PASS" if held == (role == "control") else "FAIL"
+        record = {"role": role, "result": result, "invariant_held": None if errored else held,
+                  "exception_type": script.exception_type if errored else None,
+                  "message": script.message}
         files[f"{RESULT_DIR}/result.json"] = json.dumps(record).encode()
-        failed = record["outcome"] != "holds"
+        failed = result != "PASS"
         if script.junit_disagrees:
             failed = not failed
         junit = JUNIT_PASS if not failed else JUNIT_FAIL
