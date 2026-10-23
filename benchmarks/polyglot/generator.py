@@ -191,7 +191,7 @@ public final class Policy {{
 def _js_policy(family: str, safe: bool, *, typescript: bool) -> str:
     flag = str(safe).lower()
     annotation = ": string" if typescript else ""
-    return f'''const FAMILY = {_quoted(family)};
+    return f'''const FAMILY{annotation} = {_quoted(family)};
 const SAFE = {flag};
 
 function number(value{annotation}) {{
@@ -342,7 +342,7 @@ sub allowed {{
         return $SAFE ? !($value eq "__proto__" || $value eq "constructor" || $value eq "prototype" || $value eq "__defineGetter__" || $value eq "__defineSetter__") : length($value) > 0; # TARGET: object-property-pollution
     }}
     if ($FAMILY eq "header-crlf") {{
-        return $SAFE ? (index($value, "\r") < 0 && index($value, "\n") < 0) : length($value) > 0; # TARGET: header-crlf
+        return $SAFE ? (index($value, "\\r") < 0 && index($value, "\\n") < 0) : length($value) > 0; # TARGET: header-crlf
     }}
     if ($FAMILY eq "filename-extension-case") {{
         return $SAFE ? $value =~ /\\.pdf\\z/ : index(lc($value), ".pdf") >= 0; # TARGET: filename-extension-case

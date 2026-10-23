@@ -13,7 +13,7 @@
   module or built output, not a long-lived dev server.
 - The build script runs once with network, then `/work` is sealed read-only and each payload runs offline as uid/gid
   `1000`. Install project dependencies during build replay (prefer `npm ci` when the repository lockfile supports it);
-  the probe may write only `/tmp` and `/work/.corsair`.
+  the probe may write temporary output under `/tmp`, not root-owned `/work/.corsair` support files.
 - The kernel sets `NODE_V8_COVERAGE` to `/tmp/corsair/node/v8`, then renders it with its trusted `c8` after pytest
   exits. It accepts only c8's remapped LCOV entry for the exact `target_file`; Python coverage of the probe is never
   evidence for a JS or TS target. For TypeScript, select `target_lines` in the original `.ts` source and ensure source

@@ -131,6 +131,33 @@ def test_source_layouts_declare_and_invoke_the_requested_real_build_frameworks(f
     assert "CXXFLAGS = -std=c++17 --coverage -O0 -g" in (make_case / "vulnerable/Makefile").read_text()
 
 
+def test_generated_typescript_policies_widen_family_before_all_family_comparisons(fixture_root: Path):
+    """A literal-narrowed FAMILY makes later generated branches TS2367 errors."""
+    sources = [path / revision / "src/policy.ts" for path in _paths(fixture_root)
+               if path.parent.name == "typescript" for revision in ("vulnerable", "fixed")]
+    assert len(sources) == len(FAMILIES) * VARIANTS_PER_FAMILY * 2
+    for source in sources:
+        policy = source.read_text()
+        assert policy.startswith('const FAMILY: string = "')
+        assert policy.count("if (FAMILY === ") == len(FAMILIES)
+
+
+def test_generated_perl_target_markers_bind_to_executable_return_statements(fixture_root: Path):
+    """Keep target lines aligned with Devel::Cover's native statement locations."""
+    cases = [path for path in _paths(fixture_root) if path.parent.name == "perl"]
+    assert len(cases) == len(FAMILIES) * VARIANTS_PER_FAMILY
+    for case in cases:
+        provenance = json.loads((case / "provenance.json").read_text())
+        for revision in ("vulnerable", "fixed"):
+            policy = (case / revision / "lib/VulnApp.pm").read_text()
+            # Literal control characters split a Perl statement and make the marker
+            # point after the location reported by the native statement collector.
+            assert "\r" not in policy
+            marker_line = policy.splitlines()[provenance["target_line"] - 1]
+            assert marker_line.lstrip().startswith("return ")
+            assert marker_line.endswith(f"# TARGET: {provenance['family']}")
+
+
 def test_generated_python_sources_parse_and_trusted_native_policy_smoke_all_variants(fixture_root: Path):
     """Local subprocesses are trusted-fixture smoke only, never sandbox/isolation evidence."""
     for path in (candidate for candidate in _paths(fixture_root) if candidate.parent.name == "python"):

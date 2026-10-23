@@ -56,7 +56,7 @@ The generator includes executable project metadata **and makes the reference bui
 | JavaScript | npm package | `npm run build` |
 | TypeScript | npm + pinned `@types/node` 22, TypeScript 5.7.3, Vite 6.0.11 | `npm install --ignore-scripts --no-audit --no-fund && npm run build` (`tsc && vite build`) |
 | Java | Alternating Maven and Gradle cases | `mvn -q -DskipTests package` or `gradle --no-daemon classes`; Gradle targets Java 17 without requiring a JDK 17 toolchain |
-| Ruby | Bundler and Rake | `bundle install --quiet && bundle exec rake build` |
+| Ruby | Bundler and Rake | `bundle install --local --quiet && bundle exec rake build` (pinned image-installed gems) |
 | Perl | `Makefile.PL`, Make, prove | `perl Makefile.PL >/dev/null && make >/dev/null && prove -l`; each test uses its family's benign control |
 | C++ | Alternating CMake and Make cases | `cmake -S . -B build ... && cmake --build build ...` or `make all`; both use `--coverage -O0 -g` for gcov |
 

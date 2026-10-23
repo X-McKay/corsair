@@ -38,4 +38,4 @@ uv run --locked pytest -m 'not live' -q
 make benchmark WORKERS=2
 ```
 
-The sandbox validation uses Docker 26.1.3, network-disabled unprivileged probe containers, the committed toolchain Dockerfiles, and the pinned Python development environment. Images are cached by resolved base-image identity, runtime configuration, source hash and exact build script; altered source or unresolved image identity cannot reuse a stale build. The final report and cleanup confirmation belong to the completed validation record, not this provisional section.
+The sandbox validation uses Docker 29.1.3, network-disabled unprivileged probe containers, the committed toolchain Dockerfiles, and the pinned Python development environment. Images are cached by resolved base-image identity, runtime configuration, source hash and exact build script; altered source or unresolved image identity cannot reuse a stale build. The final report and cleanup confirmation belong to the completed validation record, not this provisional section.

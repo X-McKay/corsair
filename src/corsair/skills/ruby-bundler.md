@@ -10,7 +10,7 @@
   loads the trusted SimpleCov bootstrap before application code. Do **not** override `RUBYOPT`, call `SimpleCov.start`
   yourself, or move its output: the one accepted native report is `/tmp/corsair/ruby/.resultset.json`.
 - The build script runs once with network and then the repository at `/work` is sealed read-only. A probe runs offline
-  as uid/gid `1000`, while `/tmp` and the kernel's `.corsair` directory are writable. Run `bundle install` (or another
+  as uid/gid `1000`; only temporary output under `/tmp` is writable. Kernel `.corsair` support is root-owned/read-only. Run `bundle install` (or another
   minimal project dependency install) in the build script only when it is genuinely required; prefer the repository's
   lockfile and do not download or run setup scripts outside that replay.
 - Native evidence is SimpleCov line coverage for the exact `target_file`; the Python driver's coverage report is not
