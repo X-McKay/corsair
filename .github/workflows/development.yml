@@ -12,8 +12,8 @@ jobs:
   offline:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16c7ca2a5a2a7a
-      - uses: astral-sh/setup-uv@d4d0e1a9c3c46c83c7e2a3e8b0bc6ea0c71f4d4d
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
         with:
           version: "0.11.12"
       - run: uv sync --locked
