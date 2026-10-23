@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
@@ -12,6 +13,18 @@ if TYPE_CHECKING:
 PROBE_DIR = "/work/.corsair"
 RESULT_DIR = "/tmp/corsair"
 WORKDIR = "/work"
+
+
+@dataclass(frozen=True)
+class PostCommand:
+    """A report-rendering command with its own immutable environment snapshot."""
+
+    argv: tuple[str, ...]
+    environment: Mapping[str, str]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "argv", tuple(self.argv))
+        object.__setattr__(self, "environment", MappingProxyType(dict(self.environment)))
 
 
 @dataclass(frozen=True)
@@ -53,8 +66,8 @@ class Framework(Protocol):
     def environment(self, role: str) -> Mapping[str, str]:
         ...
 
-    def after_command(self) -> list[str] | None:
-        """Optional coverage rendering after the native test process exits."""
+    def post_command(self, role: str, target_file: str) -> PostCommand | None:
+        """Optional report rendering after the native test process exits, using a separate environment."""
         ...
 
     def result_paths(self) -> list[str]:

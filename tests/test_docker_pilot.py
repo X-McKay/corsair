@@ -72,13 +72,14 @@ async def test_a_benign_exploit_payload_has_an_audited_negative_disposition(tmp_
 
 
 @needs_image
-async def test_an_import_error_in_the_probe_is_not_run_and_a_wrong_target_fails_coverage(tmp_path):
+async def test_an_import_error_fails_post_processing_and_a_wrong_target_fails_coverage(tmp_path):
     backend = DockerSandboxes()
     kernel = Kernel(backend, ROW, load_case(CASE), artifacts=ArtifactStore(tmp_path / "artifacts"), auditor=accept,
                     run_id=f"c{tmp_path.name[-8:]}".lower())
     broken = REFERENCE.model_copy(update={"probe": "import nosuchmodule\n" + REFERENCE.probe})
     evaluation = await kernel.evaluate(broken)
-    assert evaluation.gate.stage is Gate.CONTROL_RUN and evaluation.runs[0].result is RoleResult.NOT_RUN
+    assert evaluation.gate.stage is Gate.CONTROL_RUN and evaluation.runs[0].result is RoleResult.ERROR
+    assert "coverage post-processing exited 1" in evaluation.runs[0].message
     wrong_lines = REFERENCE.model_copy(update={"hypothesis": REFERENCE.hypothesis.model_copy(update={"target_lines": (1,)})})
     evaluation = await kernel.evaluate(wrong_lines)
     # line 1 is the import, executed at module load, so coverage counts it; use a line that never executes instead

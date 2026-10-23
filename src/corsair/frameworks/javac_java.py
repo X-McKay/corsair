@@ -286,7 +286,7 @@ class JavacJava:
     def command(self, role: str, target_file: str) -> list[str]:
         return ["sh", f"{PROBE_DIR}/run-java.sh"]
 
-    def after_command(self) -> None:
+    def post_command(self, role: str, target_file: str) -> None:
         return None
 
     def environment(self, role: str) -> Mapping[str, str]:

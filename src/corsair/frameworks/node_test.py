@@ -91,7 +91,7 @@ class NodeTest:
                 f"--test-reporter={PROBE_DIR}/coverage-reporter.cjs",
                 f"--test-reporter-destination={RESULT_DIR}/coverage.json", f"{PROBE_DIR}/test_corsair_probe.cjs"]
 
-    def after_command(self) -> None:
+    def post_command(self, role: str, target_file: str) -> None:
         return None
 
     def environment(self, role: str) -> Mapping[str, str]:

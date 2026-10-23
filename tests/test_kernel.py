@@ -9,10 +9,12 @@ import pytest
 from corsair import matrix
 from corsair.artifacts import ArtifactStore
 from corsair.case import load_case
+from corsair.frameworks.pytest_ import Pytest
 from corsair.kernel import (AuditResult, Fix, Gate, Hypothesis, Kernel, Label, RevisionDisposition,
                             RoleResult, Submission, ast_guard, environment_key, reported_target_present,
                             role_result, target_binding, terminal_verdict)
 from tests.fakes import FakeSandboxes, Script
+from corsair.sandbox.port import Exec
 
 pytestmark = pytest.mark.anyio
 
@@ -34,6 +36,111 @@ async def accept(submission: Submission) -> AuditResult:
 def kernel(fake: FakeSandboxes, tmp_path: Path, *, auditor=accept, case_path: Path = CASE) -> Kernel:
     case = load_case(case_path)
     return Kernel(fake, ROW, case, artifacts=ArtifactStore(tmp_path / "artifacts"), auditor=auditor, run_id="run1")
+
+
+class PostFramework(Pytest):
+    def post_command(self, role, target_file):
+        from corsair.frameworks.base import PostCommand
+
+        return PostCommand(("render-coverage", role, target_file), {"HOME": "/tmp", "POST_ONLY": "1"})
+
+
+class PostSandboxes(FakeSandboxes):
+    def __init__(self, post_result=Exec(0, b"rendered report\n", b"renderer warning\n"), *, clock=None):
+        super().__init__(dict(HAPPY))
+        self.post_result = post_result
+        self.clock = clock
+
+    def exec_once(self, name, argv, *, workdir, env=None, timeout=None):
+        if argv[0] == "render-coverage":
+            self.execs.append((name, tuple(argv)))
+            self.exec_environments.append(dict(env or {}))
+            if self.clock is not None:
+                self.clock[0] = 14.0
+            if isinstance(self.post_result, Exception):
+                raise self.post_result
+            return self.post_result
+        result = super().exec_once(name, argv, workdir=workdir, env=env, timeout=timeout)
+        if "pytest" in argv and self.clock is not None:
+            self.clock[0] = 11.0
+        return result
+
+
+def test_post_command_environment_is_an_immutable_snapshot():
+    from corsair.frameworks.base import PostCommand
+
+    environment = {"HOME": "/tmp"}
+    command = PostCommand(("render-coverage",), environment)
+    environment["COVERAGE_PROCESS_START"] = "/work/coverage.rc"
+
+    assert dict(command.environment) == {"HOME": "/tmp"}
+    with pytest.raises(TypeError):
+        command.environment["COVERAGE_PROCESS_START"] = "/work/coverage.rc"
+
+
+def test_post_command_uses_its_own_environment_and_records_the_whole_invocation(tmp_path, monkeypatch):
+    clock = [10.0]
+    monkeypatch.setattr("corsair.kernel.time.monotonic", lambda: clock[0])
+    fake = PostSandboxes(clock=clock)
+    k = kernel(fake, tmp_path)
+    k.framework = PostFramework()
+
+    run = k.run_probe("image", REFERENCE, "vulnerable", "control")
+
+    assert run.result is RoleResult.PASS
+    assert [argv[0] for _, argv in fake.execs] == ["mkdir", "python", "render-coverage"]
+    assert fake.execs[-1][1] == ("render-coverage", "control", "documents.py")
+    assert fake.exec_environments[-1] == {"HOME": "/tmp", "POST_ONLY": "1"}
+    assert fake.exec_environments[-2]["COVERAGE_FILE"] == "/tmp/corsair/coverage"
+    output = k.artifacts.get(run.output)
+    assert b"$ render-coverage control documents.py" in output
+    assert b"1 passed" in output and b"rendered report" in output and b"renderer warning" in output
+    assert run.duration_s == 4.0
+    assert run.cleanup_confirmed is True and fake.labelled() == []
+
+
+@pytest.mark.parametrize(("post_result", "expected", "message"), [
+    (Exec(2, b"partial report\n", b"render failed\n"), RoleResult.ERROR, "exited 2"),
+    (Exec(None, b"partial report\n", b"", timed_out=True), RoleResult.INFRA, "timed out"),
+    (Exec(None, b"partial report\n", b"", output_limited=True), RoleResult.INFRA, "output limit"),
+    (Exec(None, b"partial report\n", b"", container_failed=True), RoleResult.INFRA, "container failed"),
+    (RuntimeError("renderer control failure"), RoleResult.INFRA, "renderer control failure"),
+])
+def test_post_command_failure_rejects_even_complete_primary_reports(tmp_path, post_result, expected, message):
+    fake = PostSandboxes(post_result)
+    k = kernel(fake, tmp_path)
+    k.framework = PostFramework()
+
+    run = k.run_probe("image", REFERENCE, "vulnerable", "control")
+
+    assert run.result is expected
+    assert run.invariant_held is None and run.covered_target is None
+    assert run.junit_tests == 0 and run.junit is None and run.coverage is None
+    assert message in run.message
+    assert fake.copied_results == []
+    assert run.duration_s is not None
+    assert run.cleanup_confirmed is True and fake.labelled() == []
+    output = k.artifacts.get(run.output)
+    assert b"$ render-coverage control documents.py" in output
+    assert b"1 passed" in output
+    if isinstance(post_result, Exec):
+        assert b"partial report" in output
+
+
+def test_no_post_command_keeps_the_direct_probe_result(tmp_path):
+    class DirectFramework(Pytest):
+        def post_command(self, role, target_file):
+            return None
+
+    fake = FakeSandboxes(dict(HAPPY))
+    k = kernel(fake, tmp_path)
+    k.framework = DirectFramework()
+
+    run = k.run_probe("image", REFERENCE, "vulnerable", "control")
+
+    assert run.result is RoleResult.PASS and run.covered_lines == (4,)
+    assert [argv[0] for _, argv in fake.execs] == ["mkdir", "python"]
+    assert run.cleanup_confirmed is True and fake.labelled() == []
 
 
 # --- gate 1 -------------------------------------------------------------------------------------------------------

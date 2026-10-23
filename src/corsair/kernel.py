@@ -381,15 +381,31 @@ class Kernel:
             output = b"$ " + shlex.join(argv).encode() + b"\n--- stdout ---\n" + result.stdout + b"\n--- stderr ---\n" + result.stderr
             if result.timed_out or result.output_limited or result.container_failed:
                 return self._infra(revision, role, result, output, duration, self.backend.remove(name) if ours else None)
-            after = fw.after_command()
-            if after:
-                self.backend.exec_once(name, after, workdir=WORKDIR, env=env, timeout=120)
+            post = fw.post_command(role, target)
+            if post is not None:
+                output += b"\n$ " + shlex.join(post.argv).encode() + b"\n"
+                post_result = self.backend.exec_once(name, post.argv, workdir=WORKDIR,
+                                                     env=post.environment, timeout=120)
+                duration = time.monotonic() - started
+                output += (b"--- stdout ---\n" + post_result.stdout + b"\n--- stderr ---\n"
+                           + post_result.stderr)
+                if (post_result.exit_code != 0 or post_result.timed_out or post_result.output_limited
+                        or post_result.container_failed):
+                    infrastructure = post_result.timed_out or post_result.output_limited or post_result.container_failed
+                    confirmed = self.backend.remove(name)
+                    ours = False
+                    return ProbeRun(revision=revision, role=role,
+                                    result=RoleResult.INFRA if infrastructure else RoleResult.ERROR,
+                                    invariant_held=None, exit_code=post_result.exit_code,
+                                    message=_failure(post_result, "coverage post-processing"), junit_tests=0,
+                                    duration_s=duration, output=self.artifacts.put(output), cleanup_confirmed=confirmed)
             files = self.backend.copy_out(name, fw.result_paths())
             confirmed = self.backend.remove(name)
             ours = False
             return self._classify(revision, role, result, output, duration, files, submission.hypothesis, confirmed)
         except Exception as error:
             ours = not isinstance(error, SandboxExists)
+            duration = time.monotonic() - started
             output += f"\n[infra: {type(error).__name__}: {error}]\n".encode()
             confirmed = self.backend.remove(name) if ours else None
             ours = False

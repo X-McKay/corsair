@@ -43,6 +43,8 @@ class FakeSandboxes:
     creates: list[SandboxSpec] = field(default_factory=list)
     opened: list[str] = field(default_factory=list)
     execs: list[tuple[str, tuple[str, ...]]] = field(default_factory=list)
+    exec_environments: list[dict[str, str]] = field(default_factory=list)
+    copied_results: list[str] = field(default_factory=list)
     removed: list[str] = field(default_factory=list)
     sealed: dict[str, str] = field(default_factory=dict)        # tag -> key
     held: set[str] = field(default_factory=set)                 # names that already exist
@@ -68,12 +70,14 @@ class FakeSandboxes:
         self._files.setdefault(name, {})[path] = data
 
     def copy_out(self, name: str, paths: Sequence[str]) -> dict[str, bytes | None]:
+        self.copied_results.append(name)
         return {path: self._files.get(name, {}).get(path) for path in paths}
 
     def exec_once(self, name: str, argv: Sequence[str], *, workdir: str, env: Mapping[str, str] | None = None,
                   timeout: float | None = None) -> Exec:
         argv = tuple(argv)
         self.execs.append((name, argv))
+        self.exec_environments.append(dict(env or {}))
         if env:
             self._env[name] = dict(env)
         if argv[0] == "bash" and argv[-1].endswith("build.sh"):

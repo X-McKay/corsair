@@ -9,7 +9,7 @@ from __future__ import annotations
 import ast
 from collections.abc import Mapping
 
-from .base import PROBE_DIR, RESULT_DIR, WORKDIR, ProbeResult
+from .base import PROBE_DIR, RESULT_DIR, WORKDIR, PostCommand, ProbeResult
 from .reports import read_coverage, read_probe
 
 BANNED_IMPORTS = ("unittest.mock", "mock", "pytest_mock", "responses", "httpretty", "requests_mock")
@@ -121,9 +121,10 @@ class Pytest:
                 "-o", "junit_logging=all", "-o", "junit_log_passing_tests=true",
                 f"{PROBE_DIR}/test_corsair_probe.py"]
 
-    def after_command(self) -> list[str] | None:
+    def post_command(self, role: str, target_file: str) -> PostCommand:
         """Run after the test command in the same container, to render the coverage report."""
-        return ["python", "-m", "coverage", "json", "-o", f"{RESULT_DIR}/coverage.json"]
+        return PostCommand(("python", "-m", "coverage", "json", "-o", f"{RESULT_DIR}/coverage.json"),
+                           self.environment(role))
 
     def environment(self, role: str) -> Mapping[str, str]:
         return {"CORSAIR_ROLE": role, "CORSAIR_RESULT": f"{RESULT_DIR}/result.json", "HOME": "/tmp",

@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 
-from .base import PROBE_DIR, RESULT_DIR, ProbeResult
+from .base import PROBE_DIR, RESULT_DIR, PostCommand, ProbeResult
 from .reports import read_probe
 
 DRIVER = r'''use strict;
@@ -138,9 +138,9 @@ class PerlTap:
         return ["perl", f"-MDevel::Cover=-db,{RESULT_DIR}/cover_db", "-I/work", f"-I{PROBE_DIR}",
                 f"{PROBE_DIR}/corsair_driver.t"]
 
-    def after_command(self) -> list[str]:
-        return ["perl", f"{PROBE_DIR}/render_coverage.pl", f"{RESULT_DIR}/cover_db",
-                f"{RESULT_DIR}/coverage.json"]
+    def post_command(self, role: str, target_file: str) -> PostCommand:
+        return PostCommand(("perl", f"{PROBE_DIR}/render_coverage.pl", f"{RESULT_DIR}/cover_db",
+                            f"{RESULT_DIR}/coverage.json"), self.environment(role))
 
     def environment(self, role: str) -> Mapping[str, str]:
         return {"CORSAIR_ROLE": role, "CORSAIR_RESULT": f"{RESULT_DIR}/result.json",
