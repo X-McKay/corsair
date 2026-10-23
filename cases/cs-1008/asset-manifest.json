@@ -120,8 +120,7 @@
     }
   ],
   "qualification_blockers": [
-    "dataset_license_scope_pending",
-    "vendored_snapshot_identity_pending",
+    "dataset_manifest_entry_pending",
     "perl_terms_license_expression_review_pending",
     "runtime_rights_pending",
     "perl_tap_replay_pending",

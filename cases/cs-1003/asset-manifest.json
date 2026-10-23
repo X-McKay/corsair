@@ -108,7 +108,7 @@
     }
   ],
   "qualification_blockers": [
-    "vendored_snapshot_identity_pending",
+    "dataset_manifest_entry_pending",
     "runtime_rights_pending",
     "java21_jacoco_replay_pending",
     "independent_review_pending"

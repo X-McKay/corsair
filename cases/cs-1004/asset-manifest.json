@@ -107,7 +107,7 @@
     }
   ],
   "qualification_blockers": [
-    "vendored_snapshot_identity_pending",
+    "dataset_manifest_entry_pending",
     "source_license_expression_review_pending",
     "runtime_rights_pending",
     "perl_tap_replay_pending",

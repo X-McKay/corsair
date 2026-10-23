@@ -85,8 +85,7 @@
     }
   ],
   "qualification_blockers": [
-    "dataset_license_scope_pending",
-    "vendored_snapshot_identity_pending",
+    "dataset_manifest_entry_pending",
     "runtime_rights_pending",
     "node22_replay_pending",
     "independent_review_pending"

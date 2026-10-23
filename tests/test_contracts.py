@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 
 import pytest
@@ -50,16 +51,63 @@ def test_direct_conformance_cases_use_opaque_directory_and_case_ids():
     assert all(not (ROOT / "cases" / name).exists() for name in LEGACY_DIRECT_CASES)
 
 
-def test_benchmark_assets_have_the_exact_scoped_apache_2_license():
+@pytest.mark.parametrize(
+    "case_id,replay_blocker,rights_blocker",
+    [
+        ("cs-1001", "real_runtime_replay_pending", None),
+        ("cs-1002", "node22_replay_pending", None),
+        ("cs-1003", "java21_jacoco_replay_pending", None),
+        ("cs-1004", "perl_tap_replay_pending", "source_license_expression_review_pending"),
+        ("cs-1005", "python_replay_pending", None),
+        ("cs-1006", "node22_replay_pending", None),
+        ("cs-1007", "java21_jacoco_replay_pending", "bouncy_castle_license_ref_review_pending"),
+        ("cs-1008", "perl_tap_replay_pending", "perl_terms_license_expression_review_pending"),
+    ],
+)
+def test_benchmark_assets_have_the_exact_scoped_apache_2_license(
+    case_id, replay_blocker, rights_blocker
+):
     license_path = ROOT / "benchmarks/dataset/LICENSE-BENCHMARKS"
     assert hashlib.sha256(license_path.read_bytes()).hexdigest() == (
         "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
     )
     scope = (ROOT / "benchmarks/dataset/README.md").read_text()
-    for case_id in (*DIRECT_CASES.values(), "cs-0001-b", "cs-0002-b", "cs-0003-b", "cs-0004-b"):
-        assert f"`cases/{case_id}`" in scope
+    for conformance_id in (*DIRECT_CASES.values(), "cs-0001-b", "cs-0002-b", "cs-0003-b", "cs-0004-b"):
+        assert f"`cases/{conformance_id}`" in scope
     assert "runtime dependencies" in scope
     assert "not covered" in scope
+
+    # This closed table is the grant boundary: no wildcard case grant or upstream bytes.
+    rows = {}
+    for line in scope.splitlines():
+        if line.startswith("| `cases/cs-100"):
+            directory, authored, excluded = line.strip("|").split("|")
+            rows[directory.strip().strip("`")] = (
+                set(re.findall(r"`([^`]+)`", authored)),
+                set(re.findall(r"`([^`]+)`", excluded)),
+            )
+    authored_files = {"input.json", "oracle.json", "reference-submission.json", "asset-manifest.json"}
+    if case_id in {"cs-1001", "cs-1005", "cs-1008"}:
+        authored_files.add("dependencies.lock")
+    exclusions = {"vulnerable/**", "fixed/**", "evidence/**"}
+    assets = json.loads((ROOT / "cases" / case_id / "asset-manifest.json").read_text())
+    blockers = {
+        "dataset_manifest_entry_pending", "runtime_rights_pending",
+        replay_blocker, "independent_review_pending",
+    }
+    if rights_blocker:
+        blockers.add(rights_blocker)
+    assert assets["qualification_status"] == "candidate"
+    assert (rows.get(f"cases/{case_id}"), set(assets["qualification_blockers"])) == (
+        (authored_files, exclusions), blockers
+    )
+    assert set(rows) == {f"cases/cs-{number}" for number in range(1001, 1009)}
+    assert sum(len(authored) for authored, _ in rows.values()) == 35
+    assert all((ROOT / "cases" / case_id / name).is_file() for name in authored_files)
+    oracle = json.loads((ROOT / "cases" / case_id / "oracle.json").read_text())
+    assert oracle["qualification_status"] == "candidate"
+    assert "dataset manifest entry with committed snapshot bindings" in oracle["note"]
+    assert "vendored snapshot identity" not in oracle["note"]
 
 
 def test_direct_reference_targets_match_the_agent_visible_finding():

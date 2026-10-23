@@ -106,8 +106,7 @@
     }
   ],
   "qualification_blockers": [
-    "dataset_license_scope_pending",
-    "vendored_snapshot_identity_pending",
+    "dataset_manifest_entry_pending",
     "bouncy_castle_license_ref_review_pending",
     "runtime_rights_pending",
     "java21_jacoco_replay_pending",

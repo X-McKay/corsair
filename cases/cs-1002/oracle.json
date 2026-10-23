@@ -17,5 +17,5 @@
   ],
   "provenance": "Finding independently derived from the direct parent/fix pair named by GHSA-pxg6-pf52-xh8x.",
   "retention": "Public upstream source and independently authored benchmark annotations; retain permanently.",
-  "note": "Evaluator-only candidate. Admission still requires vendored snapshot identity, runtime rights, real-runtime replay, and independent review."
+  "note": "Evaluator-only candidate. Admission still requires a dataset manifest entry with committed snapshot bindings, runtime rights, real-runtime replay, and independent review."
 }
