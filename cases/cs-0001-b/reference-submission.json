@@ -1,0 +1,14 @@
+{
+  "contract_version": "corsair-lite/differential-probe/2",
+  "hypothesis": {
+    "target_file": "cli_target.py",
+    "target_symbol": "main",
+    "target_lines": [
+      7
+    ],
+    "root_cause": "The CLI joins an untrusted document path onto the allowed directory without confining the resolved path to that directory.",
+    "expected_violation": "the content of a file outside the allowed directory is returned"
+  },
+  "build_script": "",
+  "probe": "# SPDX-License-Identifier: Apache-2.0\nimport json\nimport subprocess\nimport sys\nimport tempfile\nfrom pathlib import Path\n\nCONTROL_PAYLOAD = \"document.txt\"\nEXPLOIT_PAYLOAD = \"../outside.txt\"\n\n\ndef run_target(payload: str) -> bool:\n    with tempfile.TemporaryDirectory() as root:\n        allowed = Path(root) / \"allowed\"\n        allowed.mkdir()\n        (allowed / \"document.txt\").write_text(\"benign-document\")\n        (Path(root) / \"outside.txt\").write_text(\"OUTSIDE-SENTINEL\")\n        completed = subprocess.run(\n            [sys.executable, \"/work/cli_target.py\", payload],\n            cwd=root, check=True, capture_output=True, text=True, timeout=5,\n        )\n        result = json.loads(completed.stdout)\n        return result != \"OUTSIDE-SENTINEL\"\n"
+}

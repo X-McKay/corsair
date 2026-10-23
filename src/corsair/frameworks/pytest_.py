@@ -2,7 +2,7 @@
 
 The probe is a Python module defining ``CONTROL_PAYLOAD``, ``EXPLOIT_PAYLOAD`` and ``run_target(payload)``. The
 driver is a pytest file with one parametrized test id per payload; each run executes one id under coverage.py,
-restricted to the target file, and writes a JSON record classifying how ``run_target`` ended.
+collects repository coverage from Python children too, and records how ``run_target`` ended.
 """
 from __future__ import annotations
 
@@ -14,6 +14,13 @@ from .reports import read_coverage, read_probe
 
 BANNED_IMPORTS = ("unittest.mock", "mock", "pytest_mock", "responses", "httpretty", "requests_mock")
 REQUIRED_SYMBOLS = ("CONTROL_PAYLOAD", "EXPLOIT_PAYLOAD", "run_target")
+
+COVERAGE_RC = f'''[run]
+parallel = true
+patch = subprocess
+source = {WORKDIR}
+data_file = {RESULT_DIR}/coverage
+'''
 
 DRIVER = '''"""Kernel-owned driver: one native pytest test id per payload through the submitted run_target."""
 import json
@@ -112,24 +119,28 @@ class Pytest:
         return ast_guard(probe)
 
     def driver_files(self) -> dict[str, bytes]:
-        return {"test_corsair_probe.py": DRIVER.encode()}
+        return {"test_corsair_probe.py": DRIVER.encode(), "coverage.rc": COVERAGE_RC.encode()}
 
     def command(self, role: str, target_file: str) -> list[str]:
-        return ["python", "-m", "coverage", "run", f"--include={WORKDIR}/{target_file}", "-m", "pytest",
+        return ["python", "-m", "coverage", "run", "-m", "pytest",
                 "-p", "no:cacheprovider", "-c", "/dev/null", "--rootdir", WORKDIR, "--noconftest",
                 "--import-mode=importlib", "-q", f"--junitxml={RESULT_DIR}/junit.xml",
                 "-o", "junit_logging=all", "-o", "junit_log_passing_tests=true",
                 f"{PROBE_DIR}/test_corsair_probe.py"]
 
     def post_command(self, role: str, target_file: str) -> PostCommand:
-        """Run after the test command in the same container, to render the coverage report."""
-        return PostCommand(("python", "-m", "coverage", "json", "-o", f"{RESULT_DIR}/coverage.json"),
-                           self.environment(role))
+        """Merge parent/child data and render without starting another coverage collector."""
+        environment = dict(self.environment(role))
+        for variable in ("COVERAGE_PROCESS_START", "COVERAGE_PROCESS_CONFIG"):
+            environment.pop(variable, None)
+        return PostCommand(("sh", "-c", "python -m coverage combine && "
+                            f"python -m coverage json -o {RESULT_DIR}/coverage.json"), environment)
 
     def environment(self, role: str) -> Mapping[str, str]:
         return {"CORSAIR_ROLE": role, "CORSAIR_RESULT": f"{RESULT_DIR}/result.json", "HOME": "/tmp",
                 "PYTHONPATH": f"{WORKDIR}:{PROBE_DIR}", "PYTHONDONTWRITEBYTECODE": "1",
-                "COVERAGE_FILE": f"{RESULT_DIR}/coverage"}
+                "COVERAGE_FILE": f"{RESULT_DIR}/coverage", "COVERAGE_RCFILE": f"{PROBE_DIR}/coverage.rc",
+                "COVERAGE_PROCESS_START": f"{PROBE_DIR}/coverage.rc"}
 
     def result_paths(self) -> list[str]:
         return [f"{RESULT_DIR}/result.json", f"{RESULT_DIR}/junit.xml", f"{RESULT_DIR}/coverage.json"]

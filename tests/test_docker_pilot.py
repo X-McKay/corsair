@@ -6,6 +6,7 @@ mechanics on real pytest, coverage and JUnit output, not sandbox policy.
 from __future__ import annotations
 
 import json
+import shutil
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -13,7 +14,7 @@ import pytest
 
 from corsair import matrix
 from corsair.artifacts import ArtifactStore
-from corsair.case import load_case
+from corsair.case import load_case, revision
 from corsair.kernel import Fix, Gate, Kernel, Label, RoleResult, Submission
 from corsair.sandbox import DockerSandboxes
 from corsair.sandbox.docker import docker, docker_available
@@ -23,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CASE = ROOT / "cases/path-traversal-fixture"
 ROW = matrix.load()[0]
 REFERENCE = Submission.model_validate_json((CASE / "reference-submission.json").read_text())
+SCRIPT_CASE = ROOT / "cases/cs-0001-b"
 
 pytestmark = [pytest.mark.docker, pytest.mark.anyio]
 needs_image = pytest.mark.skipif(not (docker_available() and docker("image", "inspect", ROW.image).returncode == 0),
@@ -72,14 +74,17 @@ async def test_a_benign_exploit_payload_has_an_audited_negative_disposition(tmp_
 
 
 @needs_image
-async def test_an_import_error_fails_post_processing_and_a_wrong_target_fails_coverage(tmp_path):
+async def test_an_import_error_is_not_run_and_a_wrong_target_fails_coverage(tmp_path):
     backend = DockerSandboxes()
     kernel = Kernel(backend, ROW, load_case(CASE), artifacts=ArtifactStore(tmp_path / "artifacts"), auditor=accept,
                     run_id=f"c{tmp_path.name[-8:]}".lower())
     broken = REFERENCE.model_copy(update={"probe": "import nosuchmodule\n" + REFERENCE.probe})
     evaluation = await kernel.evaluate(broken)
-    assert evaluation.gate.stage is Gate.CONTROL_RUN and evaluation.runs[0].result is RoleResult.ERROR
-    assert "coverage post-processing exited 1" in evaluation.runs[0].message
+    assert evaluation.gate.stage is Gate.CONTROL_RUN and evaluation.runs[0].result is RoleResult.NOT_RUN
+    # Repository-wide coverage can render driver-only data even when importing the probe fails.
+    assert evaluation.runs[0].covered_target is False and evaluation.runs[0].covered_lines == ()
+    assert evaluation.runs[0].junit_tests == 0 and evaluation.runs[0].invariant_held is None
+    assert b"collection failure" in kernel.artifacts.get(evaluation.runs[0].junit)
     wrong_lines = REFERENCE.model_copy(update={"hypothesis": REFERENCE.hypothesis.model_copy(update={"target_lines": (1,)})})
     evaluation = await kernel.evaluate(wrong_lines)
     # line 1 is the import, executed at module load, so coverage counts it; use a line that never executes instead
@@ -172,3 +177,107 @@ async def test_python_boolean_errors(tmp_path, value, error_type):
     assert result.runs[0].result is RoleResult.ERROR and result.runs[0].exception_type == error_type
     assert result.runs[0].invariant_held is None
     assert backend.labelled() == []
+
+
+@needs_image
+@pytest.mark.parametrize("remove_start_only", [False, True], ids=["inherited", "config-inherited"])
+async def test_python_script_collects_exact_child_lines_and_verifies_fix(tmp_path, remove_start_only):
+    # Dropping START alone must not lose coverage.py 7.13's inherited PROCESS_CONFIG.
+    reference = Submission.model_validate_json((SCRIPT_CASE / "reference-submission.json").read_text())
+    if remove_start_only:
+        probe = reference.probe.replace("import json\n", "import json\nimport os\n")
+        probe = probe.replace("        completed = subprocess.run(\n",
+                              "        child_env = dict(os.environ)\n"
+                              "        child_env.pop('COVERAGE_PROCESS_START', None)\n"
+                              "        completed = subprocess.run(\n")
+        probe = probe.replace("cwd=root, check=True, capture_output=True, text=True, timeout=5,",
+                              "cwd=root, check=True, capture_output=True, text=True, timeout=5, env=child_env,")
+        reference = reference.model_copy(update={"probe": probe})
+    backend = DockerSandboxes()
+    store = ArtifactStore(tmp_path / "artifacts")
+    kernel = Kernel(backend, ROW, load_case(SCRIPT_CASE), artifacts=store, auditor=accept,
+                    run_id=f"pys{tmp_path.name[-8:]}".lower())
+    result = await kernel.evaluate(reference)
+    assert result.gate.stage is Gate.VERIFIED, result
+    assert result.verdict.label is Label.LIKELY_EXPLOITABLE and result.verdict.fix is Fix.VERIFIED
+    assert result.verdict.revisions[1].label is Label.LIKELY_NOT_EXPLOITABLE
+    assert [(run.revision, run.role, run.result) for run in result.runs] == [
+        ("vulnerable", "control", RoleResult.PASS), ("vulnerable", "exploit", RoleResult.PASS),
+        ("fixed", "control", RoleResult.PASS), ("fixed", "exploit", RoleResult.FAIL),
+    ]
+    assert [run.invariant_held for run in result.runs] == [True, False, True, True]
+    for run in result.runs:
+        assert run.covered_target is True and run.covered_lines == (7,)
+        assert run.junit_tests == 1 and run.cleanup_confirmed is True
+        report = json.loads(store.get(run.coverage))
+        target = report["files"].get("cli_target.py", report["files"].get("/work/cli_target.py"))
+        assert target is not None and 7 in target["executed_lines"]
+        assert run.exception_type is None
+    assert backend.labelled(kernel.run_id) == []
+
+
+@needs_image
+async def test_python_script_without_child_startup_is_inconclusive(tmp_path):
+    reference = Submission.model_validate_json((SCRIPT_CASE / "reference-submission.json").read_text())
+    probe = reference.probe.replace("import json\n", "import json\nimport os\n")
+    probe = probe.replace("        completed = subprocess.run(\n",
+                          "        child_env = dict(os.environ)\n"
+                          "        child_env.pop('COVERAGE_PROCESS_START', None)\n"
+                          "        child_env.pop('COVERAGE_PROCESS_CONFIG', None)\n"
+                          "        completed = subprocess.run(\n")
+    probe = probe.replace("cwd=root, check=True, capture_output=True, text=True, timeout=5,",
+                          "cwd=root, check=True, capture_output=True, text=True, timeout=5, env=child_env,")
+    backend = DockerSandboxes()
+    store = ArtifactStore(tmp_path / "artifacts")
+    kernel = Kernel(backend, ROW, load_case(SCRIPT_CASE), artifacts=store,
+                    auditor=accept, run_id=f"pyn{tmp_path.name[-8:]}".lower())
+    result = await kernel.evaluate(reference.model_copy(update={"probe": probe}))
+    assert result.gate.stage is Gate.CONTROL_COVERAGE, result
+    assert result.verdict.label is Label.INCONCLUSIVE
+    assert [(run.revision, run.role, run.result) for run in result.runs] == [
+        ("vulnerable", "control", RoleResult.PASS), ("vulnerable", "exploit", RoleResult.PASS),
+    ]
+    assert [run.invariant_held for run in result.runs] == [True, False]
+    for run in result.runs:
+        assert run.covered_target is False and run.covered_lines == ()
+        assert run.junit_tests == 1 and run.cleanup_confirmed is True
+        report = json.loads(store.get(run.coverage))
+        target = report["files"].get("cli_target.py", report["files"].get("/work/cli_target.py"))
+        assert target is None or target["executed_lines"] == []
+    assert backend.labelled(kernel.run_id) == []
+
+
+@needs_image
+@pytest.mark.parametrize("run_target_child", [False, True], ids=["decoy-only", "merged-children"])
+async def test_python_script_path_identity_across_multiple_children(tmp_path, run_target_child):
+    reference = Submission.model_validate_json((SCRIPT_CASE / "reference-submission.json").read_text())
+    tree = tmp_path / "tree"
+    shutil.copytree(SCRIPT_CASE / "vulnerable", tree)
+    decoy = tree / "other" / "cli_target.py"
+    decoy.parent.mkdir()
+    decoy.write_text((tree / "cli_target.py").read_text())
+    case = load_case(SCRIPT_CASE).model_copy(update={"revision": revision(tree), "fixed_revision": None})
+    # Run an identical basename at a different path first. It cannot satisfy /work/cli_target.py.
+    probe = reference.probe.replace('        completed = subprocess.run(\n',
+                                    '        subprocess.run(\n'
+                                    '            [sys.executable, "/work/other/cli_target.py", payload],\n'
+                                    '            cwd=root, check=True, capture_output=True, text=True, timeout=5,\n'
+                                    '        )\n'
+                                    '        completed = subprocess.run(\n')
+    if not run_target_child:
+        probe = probe.replace('[sys.executable, "/work/cli_target.py", payload]',
+                              '[sys.executable, "/work/other/cli_target.py", payload]')
+    backend = DockerSandboxes()
+    store = ArtifactStore(tmp_path / "artifacts")
+    kernel = Kernel(backend, ROW, case, artifacts=store, auditor=accept,
+                    run_id=f"pyp{tmp_path.name[-8:]}".lower())
+    result = await kernel.evaluate(reference.model_copy(update={"probe": probe}))
+    assert result.gate.stage is (Gate.VERIFIED if run_target_child else Gate.CONTROL_COVERAGE), result
+    assert result.verdict.label is (Label.LIKELY_EXPLOITABLE if run_target_child else Label.INCONCLUSIVE)
+    for run in result.runs:
+        assert run.covered_lines == ((7,) if run_target_child else ())
+        assert run.cleanup_confirmed is True
+        report = json.loads(store.get(run.coverage))
+        other = report["files"].get("other/cli_target.py", report["files"].get("/work/other/cli_target.py"))
+        assert other is not None and 7 in other["executed_lines"]
+    assert backend.labelled(kernel.run_id) == []

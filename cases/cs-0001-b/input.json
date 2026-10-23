@@ -1,0 +1,13 @@
+{
+  "case_id": "cs-0001-b",
+  "finding": {
+    "title": "Path traversal in a Python CLI",
+    "description": "The CLI reads a caller-selected document without confining its path to the allowed directory.",
+    "file_path": "cli_target.py",
+    "start_line": 7,
+    "symbol": "main",
+    "cwe": "CWE-22"
+  },
+  "source": "vulnerable",
+  "fixed_source": "fixed"
+}
