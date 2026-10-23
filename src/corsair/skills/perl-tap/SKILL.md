@@ -26,10 +26,15 @@ sub run_target {
 1;
 ```
 
-- Return one scalar boolean invariant for both payloads: `1` means it held; `0` or the empty string means the
-  reported condition occurred. The kernel-owned driver emits TAP and performs the assertion.
-- Every exception from the probe or application is an error. Catch only an expected fixed-revision rejection, then
-  let the boolean invariant decide.
+- Return the same Boolean invariant through the same setup and target call for both payloads: `1` means true
+  (preserved); `0` or the empty string means false (the reported condition occurred). The driver assigns control
+  `PASS` for true and exploit `PASS` for false; exploit `FAIL` is a clean true observation and scoped negative
+  evidence. Undefined values, references and arbitrary truthy values are invalid. The probe receives no role or
+  expected answer; the kernel-owned driver emits TAP.
+- Every uncaught exception from the probe or application is `ERROR`; do not assert in the probe. Catch only an
+  expected rejection, then let the Boolean invariant decide using the same path for both payloads and revisions.
+- Repository-local Perl script or CLI execution requires native coverage of the child target lines; observing
+  exit status and stdout alone cannot satisfy the coverage gate.
 - Call the real module through its public subroutine. Do not use `Test::MockModule`, `Test::MockObject`,
   `Sub::Override`, symbol-table replacement, or a copied implementation.
 - The repository root is on `PERL5LIB`. Use the project's checked-in `Makefile.PL`, `Build.PL`, or `cpanfile` only

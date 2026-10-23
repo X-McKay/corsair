@@ -5,13 +5,19 @@ description: Write and troubleshoot Python probes under pytest and coverage.py. 
 
 # Python / pytest runtime
 
+- `run_target(payload) -> bool` returns the same Boolean invariant through the same setup and target call for both
+  payloads: `True` means preserved and `False` means the reported condition occurred. The driver assigns control
+  `PASS` for true and exploit `PASS` for false; exploit `FAIL` is a clean true observation and scoped negative
+  evidence. Use actual `bool` values; integers, strings and other truthy values are invalid. The probe receives no
+  role or expected answer. An uncaught exception, including `AssertionError`, is `ERROR`; do not assert in the probe.
 - Image: Python 3.12 with `pytest` and `coverage` installed; nothing else until your build script installs it.
 - The repository root is `/work`, which is on `PYTHONPATH` when the probe runs. A top-level module `app.py` is
   `import app`; a package `src/pkg/` installed with `pip install -e .` is `import pkg`. Check with
   `bash: python -c "import <module>"` in your working sandbox first.
 - The kernel writes your probe to `/work/.corsair/corsair_probe.py` and drives it with its own pytest file. Do not
   write tests yourself; do not use pytest fixtures or `conftest.py`; `run_target` must be self-contained.
-- Use `tempfile.TemporaryDirectory()` for files; the probe runs without network and as a single process.
+- Use `tempfile.TemporaryDirectory()` for files; the probe runs without network. A repository-local script or CLI
+  requires native coverage of its child target lines; importing a launcher or observing stdout alone is insufficient.
 - Coverage is measured on `target_file` only, with `coverage.py`. Lines inside functions count when executed;
   module-level lines count on import. Choose `target_lines` inside the vulnerable function.
 - Exploring: `bash: sed -n 1,80p path/to/file.py`, `bash: grep -rn "def read_doc" .`, `bash: python -m pytest -q`

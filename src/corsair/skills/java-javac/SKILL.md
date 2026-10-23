@@ -19,8 +19,13 @@ public final class CorsairProbe {
 }
 ```
 
-- Return one boolean security invariant for both payloads. `true` means it held; `false` means the reported condition
-  occurred. The kernel-owned driver performs the assertion. Every thrown application or probe exception is an error.
+- Return the same Boolean security invariant through the same setup and target call for both payloads: `true`
+  means preserved and `false` means the reported condition occurred. The driver assigns control `PASS` for true
+  and exploit `PASS` for false; exploit `FAIL` is a clean true observation and scoped negative evidence. Use
+  primitive `boolean` or a non-null `Boolean`; strings and arbitrary truthy values are invalid. The probe receives
+  no role or expected answer. Every uncaught application or probe exception is `ERROR`; do not assert in the probe.
+- A repository-local Java main or CLI entry point requires native coverage of its child target lines. Compiling
+  the class or observing exit status and stdout alone cannot satisfy the coverage gate.
 - Call the real target through its public API. Do not use Mockito, PowerMock, EasyMock, bytecode agents, reflection
   to replace behavior, or a hand-written copy of the target.
 - Put compiled project classes in `/work/.corsair-java/classes` in the build script. Put optional dependency jars

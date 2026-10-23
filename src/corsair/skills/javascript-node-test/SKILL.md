@@ -21,9 +21,13 @@ module.exports = { CONTROL_PAYLOAD, EXPLOIT_PAYLOAD, run_target };
 - Read the reported file first. Use absolute `/work/...` imports: the probe lives in a separate directory.
 - For ESM targets use `await import('/work/path/to/target.mjs')` inside the async function. A `.js` target follows its own package's `type` setting. The probe always stays `.cjs`.
 - Await callbacks via a Promise or `node:util.promisify`. Unawaited work is not evidence.
-- Call the real public seam and return the same boolean security invariant for both payloads: `true` means it held,
-  `false` means the reported condition occurred. The kernel-owned driver performs the assertion. Do not assert in
-  the probe; every exception thrown by the probe or application is an error, including `AssertionError`.
+- Call the real public seam using the same setup and target call for both payloads, and return the same Boolean
+  invariant: `true` means preserved, `false` means the reported condition occurred. The driver assigns control
+  `PASS` for true and exploit `PASS` for false; exploit `FAIL` is a clean true observation and scoped negative
+  evidence. Return a primitive boolean; strings, Boolean objects and arbitrary truthy values are invalid. The probe
+  receives no role or expected answer. Every uncaught exception is `ERROR`, including `AssertionError`; do not assert
+  in the probe. Repository-local script or CLI execution requires native coverage of the child target lines;
+  stdout and exit status alone cannot satisfy the coverage gate.
 - Use `fs.mkdtempSync` under `os.tmpdir()` for fixtures and clean up in `finally`. The source tree is read-only, and probes have no network.
 - The kernel supplies the test runner and JUnit/V8 coverage. Do not add `test()` calls, Jest, mocking libraries, reporters, or transpilers. Native collection validates the probe's exports and arity in the container; the host's symbol preflight is not a JavaScript parser.
 - The runtime has no project dependencies initially. Use an empty build script for built-in modules, or `npm ci --ignore-scripts --no-audit --no-fund` when a checked-in lockfile supplies required dependencies. For a package without a lockfile, use `npm install --ignore-scripts --no-audit --no-fund` and record that weaker reproducibility.

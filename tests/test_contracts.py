@@ -141,3 +141,44 @@ def test_agent_manifest_matches_the_factories_capability_allowlists():
     assert set(producer._function_toolset.tools) == set(spec["agents"]["producer"]["tools"])
     assert set(auditor._function_toolset.tools) == set(spec["agents"]["auditor"]["tools"]) == set()
     assert set(SKILL_NAMES) == set(spec["agents"]["producer"]["skills"])
+
+
+@pytest.mark.parametrize("name", ["differential-probing", "python-pytest", "javascript-node-test", "java-javac", "perl-tap"])
+def test_probe_guidance_teaches_one_boolean_invariant_and_role_relative_results(name):
+    from corsair.producer import SKILLS_DIR
+
+    guidance = " ".join((SKILLS_DIR / name / "SKILL.md").read_text().split())
+    lower = guidance.lower()
+    assert "boolean" in lower and "same" in lower and "invariant" in lower
+    assert "control `PASS`" in guidance and "exploit `PASS`" in guidance and "exploit `FAIL`" in guidance
+    assert "true" in lower and "false" in lower
+    assert "role" in lower and "expected answer" in lower
+    assert "exception" in lower and "`ERROR`" in guidance
+    assert "truthy" in lower
+    assert "holds" not in lower and "violated" not in lower
+
+
+def test_agent_instructions_teach_decisive_positive_and_scoped_negative_results():
+    from corsair.auditor import INSTRUCTIONS as audit_instructions
+    from corsair.producer import INSTRUCTIONS as producer_instructions
+
+    for instructions in (producer_instructions, audit_instructions):
+        assert "Boolean" in instructions
+        assert "control PASS" in instructions and "exploit PASS" in instructions
+        assert "true" in instructions and "false" in instructions
+        assert "role" in instructions and "expected answer" in instructions
+        assert "holds" not in instructions.lower() and "violated" not in instructions.lower()
+    assert "LIKELY_EXPLOITABLE" in producer_instructions
+    assert "LIKELY_NOT_EXPLOITABLE" in producer_instructions
+    assert "exploit FAIL" in producer_instructions and "scoped negative" in producer_instructions
+
+
+def test_agent_manifest_declares_the_boolean_role_contract_and_stop_rule():
+    import yaml
+
+    spec = yaml.safe_load((ROOT / "src/corsair/agent-contracts.yaml").read_text())
+    probe = spec["agents"]["producer"]["probe_contract"]
+    assert probe["return"] == "Boolean security invariant; true means preserved, false means the reported condition occurred"
+    assert probe["role_expectations"] == {"control": True, "exploit": False}
+    assert probe["role_input"] is False
+    assert spec["agents"]["producer"]["stop_labels"] == ["LIKELY_EXPLOITABLE", "LIKELY_NOT_EXPLOITABLE"]

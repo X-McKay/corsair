@@ -2,7 +2,7 @@
 
 It is the only semantic judgement in the kernel and runs only after every deterministic gate passed, so it is called
 at most once per admitted submission. Its job is narrow: reject a probe whose driver branches on the payload, whose
-exploit payload merely violates the public signature, or whose assertion does not test the hypothesised property.
+exploit payload merely violates the public signature, or whose invariant does not test the hypothesised property.
 """
 from __future__ import annotations
 
@@ -17,7 +17,13 @@ You receive a vulnerability hypothesis and one differential probe: a module defi
 EXPLOIT_PAYLOAD and run_target(payload), in Python, JavaScript, Java or Perl. You do NOT know whether either payload
 passed or failed, and you must not guess. Judge only whether the probe is a fair differential test of the hypothesis.
 
-Reject the probe (valid=false) only when at least one of these holds:
+The probe returns the same Boolean invariant through the same setup and target-call path for both payloads:
+true means the security property is preserved, false means the reported condition occurred. The trusted driver
+assigns control PASS for true and exploit PASS for false; exploit FAIL for a clean true invariant is scoped
+negative evidence. The probe receives neither the role nor an expected answer. Exceptions and invalid returns
+are errors, never clean negative evidence. Judge this contract without assuming either observation occurred.
+
+Reject the probe (valid=false) only when at least one of these applies:
 1. run_target branches on which payload it received (compares the payload to CONTROL_PAYLOAD or EXPLOIT_PAYLOAD,
    or otherwise special-cases one of them) instead of applying one invariant to both.
 2. EXPLOIT_PAYLOAD violates the target's public contract (wrong type, missing required argument) rather than

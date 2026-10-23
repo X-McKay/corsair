@@ -43,6 +43,16 @@ agents:
     denied: [host execution, provider selection, runtime selection, oracle access, verdict assignment]
     budgets: {submissions: 4, shell_calls: 12, requests: 60, total_tokens: 400000}
     budget_authority: Operator arguments; the model cannot extend a budget.
+    probe_contract:
+      return: Boolean security invariant; true means preserved, false means the reported condition occurred
+      role_expectations: {control: true, exploit: false}
+      role_input: false
+      path: Same setup, target call and invariant for both payloads; no role or expected answer in the probe
+      errors: Exceptions, invalid returns, missing native evidence and infrastructure failures are never clean negative evidence
+      decisive_prerequisites: Both roles execute every declared target line; accepted outcome-blind audit
+      negative_scope: This hypothesis, payload and environment only; no absence proof
+    stop_labels: [LIKELY_EXPLOITABLE, LIKELY_NOT_EXPLOITABLE]
+    decisive_retry: Only LIKELY_EXPLOITABLE with a correctable fixed-side probe error; preserve source disposition while improving fix verification
     failures: Gate feedback within budget; then INCONCLUSIVE, UNABLE_TO_RUN or ERROR from the kernel.
   auditor:
     factory: corsair.auditor.build_auditor
@@ -87,7 +97,7 @@ capabilities:
     consumer: producer
     owner: repository operator
     input: corsair.kernel.Submission
-    output: Verified kernel result or bounded failed-gate feedback
+    output: Audited LIKELY_EXPLOITABLE or scoped LIKELY_NOT_EXPLOITABLE completion; otherwise bounded failed-gate feedback
     dependencies: Selected runtime row, immutable source digests, sandbox backend and artifact store; no credentials
     authorization: Current run and case only; runtime and verdict authority remain kernel-owned
     side_effect: write_reversible local containers, sealed environments and artifacts

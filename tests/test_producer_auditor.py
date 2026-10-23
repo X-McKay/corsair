@@ -238,6 +238,69 @@ async def test_producer_accepts_a_clean_audited_negative_disposition(tmp_path):
     assert run.error is None
 
 
+@pytest.mark.parametrize("source_exploit,fixed_exploit", [
+    ("violated", "violated"),  # positive source; the fix still reproduces the condition
+    ("violated", "timeout"),   # fixed infrastructure cannot be repaired by changing the probe
+    ("holds", "holds"),       # scoped negative source
+    ("holds", "errored"),     # a negative source does not open a fix-repair loop
+])
+async def test_completed_dispositions_do_not_evaluate_another_submission(tmp_path, source_exploit, fixed_exploit):
+    fake = FakeSandboxes({**HAPPY, ("vulnerable", "exploit"): Script(source_exploit),
+                          ("fixed", "exploit"): Script(fixed_exploit, "ValueError", "fixed rejection")})
+    replies = []
+    calls = 0
+
+    def respond(messages, info):
+        nonlocal calls
+        calls += 1
+        if calls > 1:
+            replies.extend(messages[-1].parts)
+        if calls <= 2:
+            return ModelResponse(parts=[ToolCallPart(tool_name="submit", args={"submission": REFERENCE.model_dump(mode="json")})])
+        return ModelResponse(parts=[TextPart("Keeping the completed source disposition.")])
+
+    run = await investigate(load_case(CASE), ROW, model=FunctionModel(respond), kernel=make_kernel(fake, tmp_path),
+                            backend=fake, max_submissions=3)
+    assert len(run.evaluations) == 1
+    assert run.verdict.label is (Label.LIKELY_EXPLOITABLE if source_exploit == "violated" else Label.LIKELY_NOT_EXPLOITABLE)
+    assert not any(type(reply).__name__ == "RetryPromptPart" for reply in replies)
+    assert any(run.verdict.label.value in str(getattr(reply, "content", "")) for reply in replies)
+    assert run.error is None
+
+
+async def test_positive_source_without_a_fixed_revision_stops_after_one_submission(tmp_path):
+    case = load_case(CASE).model_copy(update={"fixed_revision": None})
+    fake = FakeSandboxes(dict(HAPPY))
+    kernel = Kernel(fake, ROW, case, artifacts=ArtifactStore(tmp_path / "artifacts"), auditor=accept, run_id="prod1")
+    call = ("submit", {"submission": REFERENCE.model_dump(mode="json")})
+    run = await investigate(case, ROW, model=scripted([[call], [call], ["Keeping the result."]]), kernel=kernel,
+                            backend=fake, max_submissions=3)
+    assert len(run.evaluations) == 1 and run.verdict.label is Label.LIKELY_EXPLOITABLE
+    assert run.verdict.fix.value == "not_applicable" and run.error is None
+
+
+async def test_fixed_probe_retry_cannot_replace_the_established_positive_source_label(tmp_path):
+    fake = FakeSandboxes({**HAPPY, ("fixed", "exploit"): Script("errored", "ValueError", "fixed rejection")})
+    calls = 0
+
+    def respond(messages, info):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            fake.scenario[("vulnerable", "exploit")] = Script("holds")
+            fake.scenario[("fixed", "exploit")] = Script("holds")
+        if calls <= 2:
+            return ModelResponse(parts=[ToolCallPart(tool_name="submit", args={"submission": REFERENCE.model_dump(mode="json")})])
+        return ModelResponse(parts=[TextPart("Keeping the original source result; the fix remains unverified.")])
+
+    run = await investigate(load_case(CASE), ROW, model=FunctionModel(respond), kernel=make_kernel(fake, tmp_path),
+                            backend=fake, max_submissions=2)
+    assert [evaluation.verdict.label for evaluation in run.evaluations] == [Label.LIKELY_EXPLOITABLE, Label.LIKELY_NOT_EXPLOITABLE]
+    assert run.verdict.label is Label.LIKELY_EXPLOITABLE and run.verdict.fix.value == "not_verified"
+    assert run.verdict.submission_sha256 == run.evaluations[0].submission_sha256
+    assert run.error is None
+
+
 async def test_inconclusive_submission_is_reported_as_rejected_at_last_attempt(tmp_path):
     fake = FakeSandboxes({**HAPPY, ("vulnerable", "exploit"): Script("errored", "ValueError", "bad payload")})
     replies = []
