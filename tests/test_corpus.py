@@ -695,6 +695,7 @@ def corpus_fixture(tmp_path: Path) -> Path:
         record["evidence_url"] = record["evidence_url"].replace(COMMIT_A, commit).replace(COMMIT_B, commit)
     case["artifacts"]["input_sha256"] = hashlib.sha256(request_path.read_bytes()).hexdigest()
     write_manifest(root, data)
+    declare_vendored_snapshots(root)
     return root
 
 
@@ -731,21 +732,47 @@ def write_request(root: Path, request: dict) -> None:
     write_manifest(root, data)
 
 
-def set_local_revision_commit(root: Path, revision: str, commit: str) -> None:
-    request_path = root / "cases/cs-1001/input.json"
-    request = json.loads(request_path.read_text())
-    request_field = "commit" if revision == "vulnerable" else "fixed_commit"
-    request[request_field] = commit
-    request_path.write_text(json.dumps(request, indent=2) + "\n")
+def set_local_snapshot_commit(root: Path, revision: str, commit: str) -> None:
     data = read_manifest(root)
     declared = data["cases"][0]["source_pair"][revision]
-    old_commit = declared["commit"]
-    declared["commit"] = commit
-    for record in data["cases"][0]["rights"]:
-        if record["layer"] == "target_source" and record["evidence_revision"] == old_commit:
-            record["evidence_revision"] = commit
-            record["evidence_url"] = record["evidence_url"].replace(old_commit, commit)
-    data["cases"][0]["artifacts"]["input_sha256"] = hashlib.sha256(request_path.read_bytes()).hexdigest()
+    declared["vendored_snapshot"]["commit"] = commit
+    write_manifest(root, data)
+
+
+def declare_vendored_snapshots(root: Path, *, distinct_upstream: bool = False) -> None:
+    """Bind local source paths to foundation commits without replacing upstream identity."""
+    data = read_manifest(root)
+    case = data["cases"][0]
+    request_path = root / "cases/cs-1001/input.json"
+    request = json.loads(request_path.read_text())
+    snapshot_repository = "https://fixture.invalid/owner/project"
+    upstream_repository = ("https://upstream.invalid/example/project" if distinct_upstream
+                           else snapshot_repository)
+    upstream_commits = ("a" * 40, "b" * 40) if distinct_upstream else (
+        case["source_pair"]["vulnerable"]["commit"], case["source_pair"]["fixed"]["commit"])
+    snapshot_commits = (
+        case["source_pair"]["vulnerable"]["commit"], case["source_pair"]["fixed"]["commit"])
+    for revision, local_path, snapshot_commit, upstream_commit in zip(
+            ("vulnerable", "fixed"),
+            ("cases/cs-1001/vulnerable", "cases/cs-1001/fixed"),
+            snapshot_commits, upstream_commits, strict=True):
+        declared = case["source_pair"][revision]
+        declared["vendored_snapshot"] = {
+            "repository": snapshot_repository,
+            "commit": snapshot_commit,
+            "path": local_path,
+            "tree_sha256": declared["tree_sha256"],
+        }
+        declared["repository"] = upstream_repository
+        declared["commit"] = upstream_commit
+    request["commit"], request["fixed_commit"] = upstream_commits
+    request_path.write_text(json.dumps(request, indent=2) + "\n")
+    target_rights = [record for record in case["rights"] if record["layer"] == "target_source"]
+    for record, upstream_commit in zip(target_rights, upstream_commits, strict=True):
+        record["evidence_revision"] = upstream_commit
+        record["evidence_url"] = (
+            f"{upstream_repository}/blob/{upstream_commit}/{record['evidence_url'].rsplit('/', 1)[-1]}")
+    case["artifacts"]["input_sha256"] = hashlib.sha256(request_path.read_bytes()).hexdigest()
     write_manifest(root, data)
 
 
@@ -980,13 +1007,17 @@ def test_local_source_bytes_must_match_the_declared_git_commit(tmp_path):
     assert "LOCAL_SOURCE_COMMIT_MISMATCH" in issue_codes(checked(root))
 
 
-def test_local_source_requires_the_declared_path_at_the_commit(tmp_path):
+def test_local_source_requires_the_declared_path_at_the_snapshot_commit(tmp_path):
     root = corpus_fixture(tmp_path)
     current_only = root / "cases/cs-1001/current-only"
     shutil.copytree(root / "cases/cs-1001/vulnerable", current_only)
     request = json.loads((root / "cases/cs-1001/input.json").read_text())
     request["source"] = "current-only"
     write_request(root, request)
+    data = read_manifest(root)
+    data["cases"][0]["source_pair"]["vulnerable"]["vendored_snapshot"]["path"] = \
+        "cases/cs-1001/current-only"
+    write_manifest(root, data)
 
     assert "LOCAL_SOURCE_COMMIT_PATH_MISSING" in issue_codes(checked(root))
 
@@ -1024,6 +1055,83 @@ def test_local_source_requires_a_matching_normalized_origin(tmp_path):
     _test_git(root, "remote", "set-url", "origin", "https://fixture.invalid/unrelated/project.git")
 
     assert "LOCAL_SOURCE_REPOSITORY_MISMATCH" in issue_codes(checked(root))
+
+
+def test_vendored_snapshot_preserves_upstream_identity_while_binding_local_git_bytes(tmp_path):
+    root = corpus_fixture(tmp_path)
+    declare_vendored_snapshots(root, distinct_upstream=True)
+
+    report = checked(root)
+
+    assert report.ok, report.errors
+    case = load_manifest(root / "benchmarks/dataset/manifest.json").cases[0]
+    assert case.source_pair.vulnerable.repository == "https://upstream.invalid/example/project"
+    assert case.source_pair.vulnerable.commit == "a" * 40
+    assert case.source_pair.vulnerable.vendored_snapshot is not None
+    assert case.source_pair.vulnerable.vendored_snapshot.repository == \
+        "https://fixture.invalid/owner/project"
+
+    changed_snapshot = case.source_pair.vulnerable.vendored_snapshot.model_copy(
+        update={"commit": "c" * 40})
+    changed = case.model_copy(update={
+        "source_pair": case.source_pair.model_copy(update={
+            "vulnerable": case.source_pair.vulnerable.model_copy(
+                update={"vendored_snapshot": changed_snapshot})
+        })
+    })
+    assert case_revision_sha256(changed) != case_revision_sha256(case)
+
+
+def test_local_source_requires_an_explicit_vendored_snapshot_binding(tmp_path):
+    root = corpus_fixture(tmp_path)
+    declare_vendored_snapshots(root)
+    data = read_manifest(root)
+    data["cases"][0]["source_pair"]["vulnerable"].pop("vendored_snapshot")
+    write_manifest(root, data)
+
+    assert "LOCAL_SOURCE_VENDORED_BINDING_MISSING" in issue_codes(checked(root))
+
+
+@pytest.mark.parametrize(("field", "value", "code"), [
+    ("repository", "https://fixture.invalid/unrelated/project", "LOCAL_SOURCE_REPOSITORY_MISMATCH"),
+    ("commit", "f" * 40, "LOCAL_SOURCE_COMMIT_UNAVAILABLE"),
+    ("path", "cases/cs-1001/fixed", "LOCAL_SOURCE_SNAPSHOT_PATH_MISMATCH"),
+    ("tree_sha256", "f" * 64, "LOCAL_SOURCE_COMMIT_MISMATCH"),
+])
+def test_local_source_rejects_incorrect_vendored_snapshot_identity(tmp_path, field, value, code):
+    root = corpus_fixture(tmp_path)
+    declare_vendored_snapshots(root, distinct_upstream=True)
+    data = read_manifest(root)
+    data["cases"][0]["source_pair"]["vulnerable"]["vendored_snapshot"][field] = value
+    write_manifest(root, data)
+
+    assert code in issue_codes(checked(root))
+
+
+def test_local_source_snapshot_commit_must_be_in_the_current_history(tmp_path):
+    root = corpus_fixture(tmp_path)
+    tree = _test_git(root, "rev-parse", "HEAD^{tree}")
+    detached = _test_git(root, "commit-tree", tree, "-m", "detached snapshot")
+    data = read_manifest(root)
+    data["cases"][0]["source_pair"]["vulnerable"]["vendored_snapshot"]["commit"] = detached
+    write_manifest(root, data)
+
+    assert "LOCAL_SOURCE_COMMIT_NOT_ANCESTOR" in issue_codes(checked(root))
+
+
+def test_git_source_rejects_vendored_snapshot_metadata(tmp_path):
+    root = corpus_fixture(tmp_path)
+    declare_vendored_snapshots(root, distinct_upstream=True)
+    request = json.loads((root / "cases/cs-1001/input.json").read_text())
+    request_upstream = read_manifest(root)["cases"][0]["source_pair"]["vulnerable"]["repository"]
+    request["source"] = {
+        "url": request_upstream,
+        "commit": request["commit"],
+    }
+    write_request(root, request)
+
+    assert request_upstream == "https://upstream.invalid/example/project"
+    assert "VENDORED_SNAPSHOT_UNEXPECTED" in issue_codes(checked(root))
 
 
 @pytest.mark.parametrize("origin", [
@@ -1093,7 +1201,7 @@ def test_invalid_declared_and_git_source_urls_never_compare_equal(tmp_path, repo
 
 def test_local_source_requires_the_declared_commit_object_offline(tmp_path):
     root = corpus_fixture(tmp_path)
-    set_local_revision_commit(root, "vulnerable", "3" * 40)
+    set_local_snapshot_commit(root, "vulnerable", "3" * 40)
 
     assert "LOCAL_SOURCE_COMMIT_UNAVAILABLE" in issue_codes(checked(root))
 
@@ -1104,7 +1212,7 @@ def test_local_source_rejects_a_submodule_in_the_declared_tree(tmp_path):
     _test_git(root, "update-index", "--add", "--cacheinfo", "160000", head,
               "cases/cs-1001/vulnerable/vendor")
     _test_git(root, "commit", "-q", "-m", "add unsupported gitlink")
-    set_local_revision_commit(root, "vulnerable", _test_git(root, "rev-parse", "HEAD"))
+    set_local_snapshot_commit(root, "vulnerable", _test_git(root, "rev-parse", "HEAD"))
 
     assert "LOCAL_SOURCE_TREE_UNSUPPORTED" in issue_codes(checked(root))
 
@@ -1118,7 +1226,7 @@ def test_local_source_rejects_a_non_tree_at_the_declared_path(tmp_path):
     blob = _test_git(root, "hash-object", "-w", str(replacement))
     _test_git(root, "update-index", "--add", "--cacheinfo", "100644", blob, source_path)
     _test_git(root, "commit", "-q", "-m", "replace source tree with blob")
-    set_local_revision_commit(root, "vulnerable", _test_git(root, "rev-parse", "HEAD"))
+    set_local_snapshot_commit(root, "vulnerable", _test_git(root, "rev-parse", "HEAD"))
 
     assert "LOCAL_SOURCE_TREE_UNSUPPORTED" in issue_codes(checked(root))
 

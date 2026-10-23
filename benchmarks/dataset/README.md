@@ -14,6 +14,12 @@ the outcome-blind auditor request. Agent-visible `input.json` retains only the `
 source revisions. Upstream source is acquired by immutable HTTPS Git commit unless reviewed redistribution rights
 explicitly permit a snapshot.
 
+A redistributed local snapshot keeps its upstream repository and vulnerable/fixed commit in `source_pair`. Its
+separate `vendored_snapshot` binds the checked-in bytes to the Corsair repository, an ancestor foundation commit,
+the exact repository-relative subtree path, and its tree digest. Curators therefore commit source bytes first and
+attach the manifest entry in a later commit. Local paths without that binding fail closed; remote `GitSource`
+entries cannot carry it. Vendored rights evidence remains tied to the upstream repository and revision.
+
 `target.lines` binds the submitted hypothesis and vulnerable revision. When a fix shifts the same semantic seam,
 `target.fixed_lines` records its fixed-revision line identity; omitting it keeps the original shared-line behavior.
 The fixed mapping stays in this evaluator-only manifest. Corpus region hashes, native coverage, replay receipts,

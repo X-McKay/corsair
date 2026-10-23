@@ -62,12 +62,24 @@ class ProvenanceRecord(Frozen):
     _source_is_https = field_validator("source_url")(_https)
 
 
+class VendoredSnapshot(Frozen):
+    """Repository-local source identity, separate from the upstream security revision."""
+
+    repository: str = Field(min_length=9, max_length=2_000)
+    commit: Commit = Field(pattern=r"^[0-9a-f]{40}$")
+    path: SafePath
+    tree_sha256: Sha256 = Field(pattern=r"^[0-9a-f]{64}$")
+
+    _repository_is_https = field_validator("repository")(_https)
+
+
 class SourceRevision(Frozen):
     repository: str = Field(min_length=9, max_length=2_000)
     commit: Commit = Field(pattern=r"^[0-9a-f]{40}$")
     tree_sha256: Sha256 = Field(pattern=r"^[0-9a-f]{64}$")
     affected_file_sha256: Sha256 = Field(pattern=r"^[0-9a-f]{64}$")
     affected_region_sha256: Sha256 = Field(pattern=r"^[0-9a-f]{64}$")
+    vendored_snapshot: VendoredSnapshot | None = None
 
     _repository_is_https = field_validator("repository")(_https)
 
@@ -395,7 +407,7 @@ class _GitTreeError(ValueError):
         self.code = code
 
 
-def _git_tree_sha256(source_root: Path, declared: SourceRevision) -> str:
+def _git_tree_sha256(source_root: Path, snapshot: VendoredSnapshot) -> str:
     """Hash the declared source subtree directly from locally available Git objects."""
     top_level_result = _run_git(source_root, "rev-parse", "--show-toplevel")
     inside_result = _run_git(source_root, "rev-parse", "--is-inside-work-tree")
@@ -412,6 +424,9 @@ def _git_tree_sha256(source_root: Path, declared: SourceRevision) -> str:
     if not relative_source or relative_source == ".":
         raise _GitTreeError("LOCAL_SOURCE_TREE_UNSUPPORTED",
                             "the repository root cannot be used as a local source snapshot")
+    if relative_source != snapshot.path:
+        raise _GitTreeError("LOCAL_SOURCE_SNAPSHOT_PATH_MISMATCH",
+                            "the local source path differs from the vendored snapshot binding")
 
     origin_result = _run_git(top_level, "config", "--get-all", "remote.origin.url")
     try:
@@ -420,16 +435,20 @@ def _git_tree_sha256(source_root: Path, declared: SourceRevision) -> str:
         raise _GitTreeError("LOCAL_SOURCE_REPOSITORY_MISMATCH",
                             "the Git origin is not a valid repository identity") from error
     if (origin_result.returncode != 0 or not origins
-            or any(not _same_repository(origin, declared.repository) for origin in origins)):
+            or any(not _same_repository(origin, snapshot.repository) for origin in origins)):
         raise _GitTreeError("LOCAL_SOURCE_REPOSITORY_MISMATCH",
                             "the containing Git worktree origin differs from the declared repository")
 
-    commit_result = _run_git(top_level, "cat-file", "-e", f"{declared.commit}^{{commit}}")
+    commit_result = _run_git(top_level, "cat-file", "-e", f"{snapshot.commit}^{{commit}}")
     if commit_result.returncode != 0:
         raise _GitTreeError("LOCAL_SOURCE_COMMIT_UNAVAILABLE",
                             "the declared commit object is unavailable offline")
+    ancestor_result = _run_git(top_level, "merge-base", "--is-ancestor", snapshot.commit, "HEAD")
+    if ancestor_result.returncode != 0:
+        raise _GitTreeError("LOCAL_SOURCE_COMMIT_NOT_ANCESTOR",
+                            "the vendored snapshot commit is not in the current repository history")
 
-    treeish = f"{declared.commit}:{relative_source}"
+    treeish = f"{snapshot.commit}:{relative_source}"
     type_result = _run_git(top_level, "cat-file", "-t", treeish)
     if type_result.returncode != 0:
         raise _GitTreeError("LOCAL_SOURCE_COMMIT_PATH_MISSING",
@@ -844,6 +863,10 @@ def validate_corpus(root: Path, *, manifest_path: Path | None = None,
                     add("SOURCE_IDENTITY_MISMATCH", "input commit is absent or differs from the manifest",
                         path=input_path, case_ids=(case.case_id,))
                 if isinstance(spec, GitSource):
+                    if declared.vendored_snapshot is not None:
+                        add("VENDORED_SNAPSHOT_UNEXPECTED",
+                            "Git sources cannot declare repository-local vendored snapshot metadata",
+                            path=input_path, case_ids=(case.case_id,))
                     if (not _same_repository(spec.url, declared.repository) or spec.commit != declared.commit):
                         add("SOURCE_IDENTITY_MISMATCH", "Git source does not match manifest repository and commit",
                             path=input_path, case_ids=(case.case_id,))
@@ -853,6 +876,10 @@ def validate_corpus(root: Path, *, manifest_path: Path | None = None,
                             path=input_path, case_ids=(case.case_id,))
                 else:
                     local_revisions[index] = True
+                    if declared.vendored_snapshot is None:
+                        add("LOCAL_SOURCE_VENDORED_BINDING_MISSING",
+                            "local sources require an explicit vendored snapshot binding",
+                            path=input_path, case_ids=(case.case_id,))
                     roots[index] = _local_source(root, case_dir, spec)
                     if roots[index] is None:
                         add("PATH_ESCAPE", "local source is missing or leaves the repository", path=input_path,
@@ -882,16 +909,19 @@ def validate_corpus(root: Path, *, manifest_path: Path | None = None,
                     ("fixed", fixed, case.source_pair.fixed))):
                 actual_tree_sha256 = tree_sha256(source_root)
                 if local_revisions[index]:
-                    try:
-                        committed_tree_sha256 = _git_tree_sha256(source_root, declared)
-                    except _GitTreeError as error:
-                        add(error.code, str(error), path=source_root, case_ids=(case.case_id,))
-                    else:
-                        if (committed_tree_sha256 != actual_tree_sha256
-                                or committed_tree_sha256 != declared.tree_sha256):
-                            add("LOCAL_SOURCE_COMMIT_MISMATCH",
-                                f"{revision_name} local bytes do not match the declared commit tree",
-                                path=source_root, case_ids=(case.case_id,))
+                    snapshot = declared.vendored_snapshot
+                    if snapshot is not None:
+                        try:
+                            committed_tree_sha256 = _git_tree_sha256(source_root, snapshot)
+                        except _GitTreeError as error:
+                            add(error.code, str(error), path=source_root, case_ids=(case.case_id,))
+                        else:
+                            if (committed_tree_sha256 != actual_tree_sha256
+                                    or committed_tree_sha256 != declared.tree_sha256
+                                    or committed_tree_sha256 != snapshot.tree_sha256):
+                                add("LOCAL_SOURCE_COMMIT_MISMATCH",
+                                    f"{revision_name} local bytes do not match the vendored snapshot tree",
+                                    path=source_root, case_ids=(case.case_id,))
                 if actual_tree_sha256 != declared.tree_sha256:
                     add("SOURCE_TREE_HASH_MISMATCH", f"{revision_name} tree hash differs", path=source_root,
                         case_ids=(case.case_id,))
