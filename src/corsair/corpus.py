@@ -145,6 +145,7 @@ class DatasetCase(Frozen):
     artifacts: ArtifactHashes
     visibility: Literal["public", "private", "restricted"]
     retention: Literal["permanent", "review_controlled", "ephemeral"]
+    redaction: Literal["none", "metadata_only", "source_and_secrets"]
     rights: tuple[RightsRecord, ...] = Field(min_length=1, max_length=32)
     review_receipt: ReviewReceipt | None = None
     replay_receipts: tuple[ReplayReceipt, ...] = Field(default=(), max_length=32)

@@ -8,6 +8,6 @@
     "symbol": "read_document",
     "cwe": "CWE-22"
   },
-  "source": "../../benchmarks/fixtures/path-traversal/vulnerable",
-  "fixed_source": "../../benchmarks/fixtures/path-traversal/fixed"
+  "source": "vulnerable",
+  "fixed_source": "fixed"
 }

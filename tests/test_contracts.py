@@ -17,7 +17,7 @@ CASE = ROOT / "cases/path-traversal-fixture"
 def test_fixture_case_loads_with_both_revisions_and_keeps_the_oracle_out():
     case = load_case(CASE)
     assert case.case_id == "fixture:path-traversal" and case.finding.cwe == "CWE-22"
-    assert case.revision.source.endswith("path-traversal/vulnerable") and case.fixed_revision is not None
+    assert case.revision.source.endswith("path-traversal-fixture/vulnerable") and case.fixed_revision is not None
     assert case.revision.tree_sha256 != case.fixed_revision.tree_sha256
     assert load_oracle(CASE)["expected_label"] == "LIKELY_EXPLOITABLE"
     assert "expected_label" not in case.model_dump_json()
@@ -60,6 +60,55 @@ def test_request_with_an_oracle_key_is_refused(tmp_path):
     (tmp_path / "input.json").write_text(json.dumps(request))
     with pytest.raises(ValueError):
         from_request(tmp_path / "input.json")
+
+
+@pytest.mark.parametrize("local_source", [".", "..", "nested/../source", "/tmp"])
+def test_local_request_source_must_be_a_strict_descendant_without_parent_segments(tmp_path, local_source):
+    case_dir = tmp_path / "case"
+    (case_dir / "source").mkdir(parents=True)
+    (case_dir / "source/app.py").write_text("x = 1\n")
+    request = {"finding": {"title": "t"}, "source": local_source}
+    (case_dir / "input.json").write_text(json.dumps(request))
+
+    with pytest.raises(ValueError, match="strict descendant"):
+        from_request(case_dir / "input.json")
+
+
+@pytest.mark.parametrize("field", ["source", "fixed_source"])
+def test_local_request_source_rejects_a_symlink_escape_before_creating_a_revision(tmp_path, monkeypatch, field):
+    case_dir = tmp_path / "case"
+    case_dir.mkdir()
+    outside = tmp_path / "evaluator-only"
+    outside.mkdir()
+    (outside / "oracle.json").write_text('{"expected_label":"SECRET"}\n')
+    (case_dir / "escape").symlink_to(outside, target_is_directory=True)
+    (case_dir / "valid").mkdir()
+    (case_dir / "valid/app.py").write_text("x = 1\n")
+    request = {"finding": {"title": "t"}, "source": "valid", field: "escape"}
+    (case_dir / "input.json").write_text(json.dumps(request))
+
+    import corsair.case as case_module
+    revisions = []
+    original = case_module.revision
+    monkeypatch.setattr(case_module, "revision", lambda *args, **kwargs: revisions.append(args) or original(*args, **kwargs))
+    with pytest.raises(ValueError, match="strict descendant"):
+        from_request(case_dir / "input.json")
+    assert not revisions
+
+
+def test_local_request_accepts_real_nested_source_directories(tmp_path):
+    case_dir = tmp_path / "case"
+    (case_dir / "trees/vulnerable").mkdir(parents=True)
+    (case_dir / "trees/fixed").mkdir(parents=True)
+    (case_dir / "trees/vulnerable/app.py").write_text("x = 1\n")
+    (case_dir / "trees/fixed/app.py").write_text("x = 2\n")
+    request = {"finding": {"title": "t"}, "source": "trees/vulnerable", "fixed_source": "trees/fixed"}
+    (case_dir / "input.json").write_text(json.dumps(request))
+
+    case = from_request(case_dir / "input.json")
+
+    assert Path(case.revision.source) == (case_dir / "trees/vulnerable").resolve()
+    assert Path(case.fixed_revision.source) == (case_dir / "trees/fixed").resolve()
 
 
 def test_tree_digest_ignores_umask_and_git_but_sees_content_and_mode(tmp_path):

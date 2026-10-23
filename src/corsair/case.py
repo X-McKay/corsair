@@ -153,8 +153,8 @@ def acquire(source: GitSource, root: Path | None = None) -> Path:
 def from_request(path: Path) -> Case:
     """A Case from a request file (``input.json``): ``finding`` and ``source`` are required; ``fixed_source``,
     ``commit``, ``fixed_commit`` and ``case_id`` are optional; any other key (a label, an oracle) is refused.
-    A source is a directory relative to the file, or ``{"url": ..., "commit": ..., "subdir": ...}`` acquired by
-    ``acquire`` at that exact commit."""
+    A local source must be a real strict descendant directory of the request's case directory. A pinned
+    ``{"url": ..., "commit": ..., "subdir": ...}`` source is acquired by ``acquire`` at that exact commit."""
     path = Path(path).resolve()
     raw = path.read_bytes()
     request = _Request.model_validate_json(raw)
@@ -163,7 +163,16 @@ def from_request(path: Path) -> Case:
     def resolve(spec: str | GitSource, commit: str | None) -> Revision:
         if isinstance(spec, GitSource):
             return revision(acquire(spec), spec.commit)
-        return revision(base / spec, commit)
+        relative = Path(spec)
+        invalid_syntax = (not spec or relative.is_absolute() or ".." in relative.parts or "\0" in spec)
+        try:
+            candidate = (base / relative).resolve(strict=True) if not invalid_syntax else None
+        except (OSError, RuntimeError):
+            candidate = None
+        if (candidate is None or candidate == base or not candidate.is_relative_to(base)
+                or not candidate.is_dir()):
+            raise ValueError("a local source must be a real strict descendant directory of the case directory")
+        return revision(candidate, commit)
 
     fixed = resolve(request.fixed_source, request.fixed_commit) if request.fixed_source else None
     return Case(case_id=request.case_id or f"issue:{hashlib.sha256(raw).hexdigest()[:16]}", finding=request.finding,

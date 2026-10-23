@@ -80,6 +80,7 @@ def dataset_case(*, case_id: str = "cs-1001", family_id: str = "cf-1001",
         },
         "visibility": "public",
         "retention": "permanent",
+        "redaction": "metadata_only",
         "rights": [{
             "layer": "target_source",
             "license_expression": "Apache-2.0",
@@ -120,6 +121,17 @@ def test_manifest_models_are_strict_frozen_and_load_the_empty_repository_manifes
     assert shipped.schema_version == "corsair-lite/dataset-manifest/1"
     assert shipped.cases == ()
     assert select_cases(shipped, "release") == ()
+
+
+@pytest.mark.parametrize("redaction", [None, "best_effort", "private"])
+def test_manifest_requires_an_explicit_supported_redaction_classification(redaction):
+    case = dataset_case()
+    if redaction is None:
+        case.pop("redaction")
+    else:
+        case["redaction"] = redaction
+    with pytest.raises(ValidationError, match="redaction"):
+        DatasetManifest.model_validate(manifest(case))
 
 
 def test_manifest_rejects_duplicate_case_and_undeclared_family_ids():
