@@ -330,20 +330,40 @@ def _region_sha256(path: Path, lines: tuple[int, ...]) -> str | None:
     return digest.hexdigest()
 
 
-def _normal_repository(value: str) -> str:
-    parsed = urlsplit(value)
-    path = parsed.path.rstrip("/")
+def _normal_repository(value: str) -> str | None:
+    """Return one conservative HTTPS repository identity, or ``None`` for an adorned/invalid URL."""
+    try:
+        parsed = urlsplit(value)
+        port = parsed.port
+    except ValueError:
+        return None
+    if (parsed.scheme.lower() != "https" or not parsed.netloc or parsed.hostname is None
+            or parsed.username is not None or parsed.password is not None or (port is not None and port < 1)
+            or "?" in value or "#" in value or any(character.isspace() for character in value)
+            or not parsed.path.startswith("/") or parsed.path in {"", "/"} or parsed.path.endswith("//")):
+        return None
+    path = parsed.path[:-1] if parsed.path.endswith("/") else parsed.path
     if path.endswith(".git"):
         path = path[:-4]
-    return urlunsplit((parsed.scheme.lower(), parsed.netloc.lower(), path, "", ""))
+    if not path or path == "/" or path.endswith("/"):
+        return None
+    return urlunsplit(("https", parsed.netloc.lower(), path, "", ""))
+
+
+def _same_repository(left: str, right: str) -> bool:
+    normalized_left = _normal_repository(left)
+    normalized_right = _normal_repository(right)
+    return normalized_left is not None and normalized_right is not None and normalized_left == normalized_right
 
 
 def _run_git(root: Path, *arguments: str) -> subprocess.CompletedProcess[bytes]:
     """Run a read-only Git command without lazy object acquisition or an interactive prompt."""
     environment = os.environ.copy()
-    for name in ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
-                 "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CEILING_DIRECTORIES"):
-        environment.pop(name, None)
+    for name in tuple(environment):
+        if (name in {"GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
+                     "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CEILING_DIRECTORIES",
+                     "GIT_CONFIG"} or name.startswith("GIT_CONFIG_")):
+            environment.pop(name, None)
     environment.update({
         "GIT_NO_LAZY_FETCH": "1",
         "GIT_TERMINAL_PROMPT": "0",
@@ -390,7 +410,7 @@ def _git_tree_sha256(source_root: Path, declared: SourceRevision) -> str:
         raise _GitTreeError("LOCAL_SOURCE_REPOSITORY_MISMATCH",
                             "the Git origin is not a valid repository identity") from error
     if (origin_result.returncode != 0 or not origins
-            or any(_normal_repository(origin) != _normal_repository(declared.repository) for origin in origins)):
+            or any(not _same_repository(origin, declared.repository) for origin in origins)):
         raise _GitTreeError("LOCAL_SOURCE_REPOSITORY_MISMATCH",
                             "the containing Git worktree origin differs from the declared repository")
 
@@ -588,8 +608,7 @@ def _cached_evidence(root: Path, url: str, revision: str) -> bytes | None:
     if location is None:
         return None
     repository_url, evidence_path = location
-    corsair = _normal_repository("https://github.com/X-McKay/corsair")
-    if _normal_repository(repository_url) == corsair:
+    if _same_repository(repository_url, "https://github.com/X-McKay/corsair"):
         result = _run_git(root, "show", f"{raw_revision}:{evidence_path}")
         return result.stdout if result.returncode == 0 else None
     source = GitSource(url=repository_url, commit=raw_revision)
@@ -791,8 +810,7 @@ def validate_corpus(root: Path, *, _evidence_resolver: EvidenceResolver | None =
                     add("SOURCE_IDENTITY_MISMATCH", "input commit is absent or differs from the manifest",
                         path=input_path, case_ids=(case.case_id,))
                 if isinstance(spec, GitSource):
-                    if (_normal_repository(spec.url) != _normal_repository(declared.repository)
-                            or spec.commit != declared.commit):
+                    if (not _same_repository(spec.url, declared.repository) or spec.commit != declared.commit):
                         add("SOURCE_IDENTITY_MISMATCH", "Git source does not match manifest repository and commit",
                             path=input_path, case_ids=(case.case_id,))
                     roots[index] = _offline_git_source(root, spec)
@@ -887,10 +905,12 @@ def validate_corpus(root: Path, *, _evidence_resolver: EvidenceResolver | None =
                 add("LOCAL_SOURCE_PROVENANCE_UNVERIFIED",
                     "local snapshots require vendored rights for the exact declared revision", path=case_dir,
                     case_ids=(case.case_id,))
-            repositories = {_normal_repository(location[0]) for record in vendored
+            repositories = {normalized for record in vendored
                             if (location := _evidence_location(record.evidence_url,
-                                                               record.evidence_revision)) is not None}
-            if _normal_repository(declared.repository) not in repositories:
+                                                               record.evidence_revision)) is not None
+                            if (normalized := _normal_repository(location[0])) is not None}
+            declared_repository = _normal_repository(declared.repository)
+            if declared_repository is None or declared_repository not in repositories:
                 add("RIGHTS_SOURCE_REPOSITORY_MISMATCH",
                     "target-source rights evidence is not tied to the declared repository", path=case_dir,
                     case_ids=(case.case_id,))
@@ -961,12 +981,17 @@ def validate_corpus(root: Path, *, _evidence_resolver: EvidenceResolver | None =
             add("FAMILY_SPLIT_LEAKAGE", f"family {family_id} spans splits",
                 case_ids=tuple(member.case_id for member in members))
 
+    def source_pair_collision_key(case: DatasetCase) -> object:
+        vulnerable_repository = _normal_repository(case.source_pair.vulnerable.repository)
+        fixed_repository = _normal_repository(case.source_pair.fixed.repository)
+        if vulnerable_repository is None or fixed_repository is None:
+            return ("INVALID_REPOSITORY", case.case_id)
+        return (vulnerable_repository, fixed_repository, case.source_pair.vulnerable.commit,
+                case.source_pair.fixed.commit)
+
     collision_specs = (
         ("ALIAS_FAMILY_COLLISION", lambda c: tuple(sorted(alias.strip().upper() for alias in c.aliases))),
-        ("SOURCE_PAIR_FAMILY_COLLISION", lambda c: (_normal_repository(c.source_pair.vulnerable.repository),
-                                                     _normal_repository(c.source_pair.fixed.repository),
-                                                     c.source_pair.vulnerable.commit,
-                                                     c.source_pair.fixed.commit)),
+        ("SOURCE_PAIR_FAMILY_COLLISION", source_pair_collision_key),
         ("PATCH_FAMILY_COLLISION", lambda c: c.source_pair.patch_sha256),
     )
     for code, key_for in collision_specs:
@@ -996,8 +1021,8 @@ def validate_corpus(root: Path, *, _evidence_resolver: EvidenceResolver | None =
         for second in manifest.cases[index + 1:]:
             if first.family_id == second.family_id or first.language != second.language:
                 continue
-            same_seam = (_normal_repository(first.source_pair.vulnerable.repository)
-                         == _normal_repository(second.source_pair.vulnerable.repository)
+            same_seam = (_same_repository(first.source_pair.vulnerable.repository,
+                                          second.source_pair.vulnerable.repository)
                          and first.target.file == second.target.file and first.target.symbol == second.target.symbol)
             first_lines = target_text.get(f"{first.case_id}:vulnerable", [])
             second_lines = target_text.get(f"{second.case_id}:vulnerable", [])

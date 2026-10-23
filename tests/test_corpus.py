@@ -555,6 +555,71 @@ def test_local_source_requires_a_matching_normalized_origin(tmp_path):
     assert "LOCAL_SOURCE_REPOSITORY_MISMATCH" in issue_codes(checked(root))
 
 
+@pytest.mark.parametrize("origin", [
+    "https://fixture.invalid/owner/project",
+    "https://fixture.invalid/owner/project/",
+    "https://fixture.invalid/owner/project.git",
+    "https://fixture.invalid/owner/project.git/",
+])
+def test_local_source_accepts_only_conservative_repository_aliases(tmp_path, origin):
+    root = corpus_fixture(tmp_path)
+    _test_git(root, "remote", "set-url", "origin", origin)
+
+    assert checked(root).ok
+
+
+@pytest.mark.parametrize("origin", [
+    "https://fixture.invalid/owner/project?mirror=true",
+    "https://fixture.invalid/owner/project#mirror",
+    "https://user:secret@fixture.invalid/owner/project",
+    "https://fixture.invalid/owner/project//",
+    "http://fixture.invalid/owner/project",
+    "ssh://fixture.invalid/owner/project",
+])
+def test_local_source_rejects_adorned_origin_urls(tmp_path, origin):
+    root = corpus_fixture(tmp_path)
+    _test_git(root, "remote", "set-url", "origin", origin)
+
+    assert "LOCAL_SOURCE_REPOSITORY_MISMATCH" in issue_codes(checked(root))
+
+
+@pytest.mark.parametrize("repository", [
+    "https://fixture.invalid/owner/project?mirror=true",
+    "https://fixture.invalid/owner/project#mirror",
+    "https://user:secret@fixture.invalid/owner/project",
+    "https://fixture.invalid/owner/project//",
+])
+def test_invalid_declared_and_origin_urls_never_compare_equal(tmp_path, repository):
+    root = corpus_fixture(tmp_path)
+    _test_git(root, "remote", "set-url", "origin", repository)
+    data = read_manifest(root)
+    data["cases"][0]["source_pair"]["vulnerable"]["repository"] = repository
+    data["cases"][0]["source_pair"]["fixed"]["repository"] = repository
+    write_manifest(root, data)
+
+    assert "LOCAL_SOURCE_REPOSITORY_MISMATCH" in issue_codes(checked(root))
+
+
+@pytest.mark.parametrize("repository", [
+    "https://fixture.invalid/owner/project?mirror=true",
+    "https://fixture.invalid/owner/project#mirror",
+    "https://user:secret@fixture.invalid/owner/project",
+    "https://fixture.invalid/owner/project//",
+])
+def test_invalid_declared_and_git_source_urls_never_compare_equal(tmp_path, repository):
+    root = corpus_fixture(tmp_path)
+    request_path = root / "cases/cs-1001/input.json"
+    request = json.loads(request_path.read_text())
+    request["source"] = {"url": repository, "commit": request["commit"]}
+    request_path.write_text(json.dumps(request, indent=2) + "\n")
+    data = read_manifest(root)
+    data["cases"][0]["source_pair"]["vulnerable"]["repository"] = repository
+    data["cases"][0]["artifacts"]["input_sha256"] = hashlib.sha256(request_path.read_bytes()).hexdigest()
+    write_manifest(root, data)
+
+    assert "SOURCE_IDENTITY_MISMATCH" in issue_codes(checked(root))
+
+
 def test_local_source_requires_the_declared_commit_object_offline(tmp_path):
     root = corpus_fixture(tmp_path)
     set_local_revision_commit(root, "vulnerable", "3" * 40)
@@ -853,8 +918,23 @@ def test_rights_evidence_resolution_is_offline(tmp_path, monkeypatch):
     assert "SOURCE_NOT_ACQUIRED" in issue_codes(checked(root)) and calls == []
 
 
-def test_validation_git_commands_disable_lazy_fetch_and_prompts(tmp_path, monkeypatch):
+def test_validation_git_commands_disable_lazy_fetch_prompts_and_ambient_config(tmp_path, monkeypatch):
     captured = {}
+
+    injected = {
+        "GIT_CONFIG": str(tmp_path / "injected.config"),
+        "GIT_CONFIG_COUNT": "2",
+        "GIT_CONFIG_PARAMETERS": "'remote.origin.url=https://injected.invalid/project'",
+        "GIT_CONFIG_KEY_0": "remote.origin.url",
+        "GIT_CONFIG_VALUE_0": "https://injected.invalid/project",
+        "GIT_CONFIG_KEY_custom": "include.path",
+        "GIT_CONFIG_VALUE_custom": str(tmp_path / "injected.config"),
+        "GIT_CONFIG_SYSTEM": str(tmp_path / "injected.config"),
+        "GIT_CONFIG_GLOBAL": str(tmp_path / "injected.config"),
+        "GIT_CONFIG_NOSYSTEM": "0",
+    }
+    for name, value in injected.items():
+        monkeypatch.setenv(name, value)
 
     def run(command, **options):
         captured.update(command=command, options=options)
@@ -869,7 +949,33 @@ def test_validation_git_commands_disable_lazy_fetch_and_prompts(tmp_path, monkey
     assert environment["GCM_INTERACTIVE"] == "never"
     assert environment["GIT_ASKPASS"] == "/bin/false"
     assert environment["SSH_ASKPASS"] == "/bin/false"
+    assert "GIT_CONFIG" not in environment
+    assert "GIT_CONFIG_COUNT" not in environment
+    assert "GIT_CONFIG_PARAMETERS" not in environment
+    assert "GIT_CONFIG_SYSTEM" not in environment
+    assert environment["GIT_CONFIG_GLOBAL"] == "/dev/null"
+    assert environment["GIT_CONFIG_NOSYSTEM"] == "1"
+    assert not any(name.startswith(("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_")) for name in environment)
     assert captured["options"]["stdin"] is subprocess.DEVNULL
+
+
+@pytest.mark.parametrize("mechanism", ["count", "parameters", "config-file"])
+def test_ambient_git_config_cannot_fake_the_origin(tmp_path, monkeypatch, mechanism):
+    root = corpus_fixture(tmp_path)
+    _test_git(root, "remote", "remove", "origin")
+    declared = "https://fixture.invalid/owner/project"
+    if mechanism == "count":
+        monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+        monkeypatch.setenv("GIT_CONFIG_KEY_0", "remote.origin.url")
+        monkeypatch.setenv("GIT_CONFIG_VALUE_0", declared)
+    elif mechanism == "parameters":
+        monkeypatch.setenv("GIT_CONFIG_PARAMETERS", f"'remote.origin.url={declared}'")
+    else:
+        injected = tmp_path / "injected.config"
+        injected.write_text(f'[remote "origin"]\nurl = {declared}\n')
+        monkeypatch.setenv("GIT_CONFIG", str(injected))
+
+    assert "LOCAL_SOURCE_REPOSITORY_MISMATCH" in issue_codes(checked(root))
 
 
 def test_promisor_checkout_with_a_missing_blob_fails_without_fetching(tmp_path, monkeypatch):

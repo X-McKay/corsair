@@ -268,10 +268,12 @@ Corsair-authored scaffolding are identified as such.
 Every request declares both source commit fields and they must equal the manifest revisions. A local snapshot also
 requires `vendored` target-source rights evidence for each revision, tied to the declared repository, plus exact
 tree, target-file, target-region and patch hashes. Local snapshots cross a commit barrier before qualification: each
-snapshot must be inside a real Git worktree whose normalized `origin` matches the declared repository, the declared
-commit object must be available locally, and the snapshot path must be a tree at that commit. The validator hashes the
-committed blobs, executable modes and symlink targets at `<commit>:<source-path>` and requires that digest to
-match both the working snapshot and the manifest tree hash. Missing objects, paths, non-blob entries, gitlinks,
+snapshot must be inside a real Git worktree whose conservative HTTPS `origin` identity matches the declared
+repository, the declared commit object must be available locally, and the snapshot path must be a tree at that commit.
+Repository identity accepts only the plain, trailing-slash, `.git` and `.git/` spellings; credentials, queries and
+fragments are invalid rather than ignored. The validator hashes the committed blobs, executable modes and symlink
+targets at `<commit>:<source-path>` and requires that digest to match both the working snapshot and the manifest tree
+hash. Missing objects, paths, non-blob entries, gitlinks,
 symlink aliases and uncommitted or fabricated substitutions fail closed. All object inspection disables Git lazy
 fetch and interactive credential prompts; validation never repairs missing evidence by fetching it.
 
