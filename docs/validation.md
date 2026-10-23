@@ -1,34 +1,58 @@
 # Validation record
 
-This implementation starts from `feature/duo-refactor` at `827386b5deed6bbd82d0adad4d45c5ed1c5715a3` and is developed on `feature/differential-oracle-spec-0090`. The review is aligned with the contract/evidence guidance in `X-McKay/playbooks`; it is not a certification, deployment, or merge approval.
+The implementation branch is **`feature/differential-oracle-spec-0090`**, cut from `feature/duo-refactor` at `827386b5deed6bbd82d0adad4d45c5ed1c5715a3`. Implementation and fixture fixes are at `ee5f3661694bffc914e960393695a37ea1f339a5`; the following evidence-only commit adds this completed record. The work follows the contract/evidence separation in `X-McKay/playbooks`, not a certification, deployment or merge approval.
 
-## Confirmed checks
+## Final results
 
-The expanded offline suite passed **165 tests**, including real native-runtime parser smoke checks when their SDKs were installed. The original source-tree identity algorithm is preserved. New checks cover full requested-line reachability, malformed and duplicate JSON, exact native path binding, multi-file LCOV isolation, driver/exit-status consistency, build-time source substitution, root-owned support files, reserved-path collisions, bounded agent budgets, proposal-only seeding, checkpoints, and an unavailable auditor.
+| Check | Result |
+| --- | --- |
+| Final post-cleanup test suite, `pytest -m 'not live'` | **188 passed**, including **21 real Docker checks**, no skips or failures |
+| Final retained kernel benchmark cases | **385 passed: 55 per language** |
+| Source revision variants / final retained probe runs | **770 revisions / 1,540 probe runs** |
+| Final GitHub workflow | **Success: contracts and all seven language shards** |
+| Static correctness checks | Ruff `F,W605` and `git diff --check` passed |
+| Packaging | Wheel and source distribution build; installed-wheel CLI/resources verified outside checkout |
+| Final container cleanup | No Corsair-labelled containers remaining; no unconfirmed removals |
 
-The final combined command, `pytest -m 'not live'`, passed **186 tests**, including **21 real Docker integration/security checks**, with no skips or failures in the fully provisioned validation environment.
+The successful GitHub run is [39894115044](https://github.com/X-McKay/corsair/actions/runs/39894115044), on the final implementation commit. It independently builds fresh images and replays all 55 cases for each language. Its artifact-retention action emitted a non-failing Node runtime deprecation annotation; every job completed successfully.
 
-One representative synthetic case for each of Python, Java, JavaScript, TypeScript, Perl, Ruby and C++ passed through the hardened production Docker kernel: clean build, vulnerable control/exploit, and fixed control/exploit. These seven smoke results are confirmed, not substitutes for the full 385-case run.
+[Machine-readable benchmark evidence](benchmark-results.json) records each case's vulnerable/fixed source identities, submission digest, runtime row, timing, observed role outcomes, target-line coverage and confirmed cleanup. This is **trusted-reference kernel validation without model calls**, not a model-accuracy or semantic-certification result.
 
-A wheel and source distribution built successfully. The wheel was installed in a clean virtual environment and imported from outside the checkout; CLI help, seven packaged runtime rows and operator skill resources were present. Upstream Ruff checks for undefined/unused names and invalid escapes passed, and `git diff --check` passed.
+## Exhaustive run and repairs
 
-## Full-corpus execution
+The first complete local 385-case run passed 315 cases and rejected 70. Strict TypeScript detected 50 fixture literal-narrowing errors; Perl coverage rejected 20 fixture target-line bindings affected by physical control characters in generated source. Neither failure was converted into a pass, and no kernel gate was weakened.
 
-The final generator creates **55 twin cases per language**, **385 case directories**, and **770 source revision variants**. The full hardened Docker run is in progress at the time of this implementation commit. Its eventual result must replace this status before final delivery. Each completed case is saved atomically as `results/NNNN.json`, alongside the native artifact store, so an interrupted aggregate does not erase completed evidence.
+After fixing generated TypeScript typing and Perl escape literals, **all 55 TypeScript and all 55 Perl twin cases were rerun through the production Docker kernel and passed**. The final local record retains the other five complete passing language suites and replaces the two affected suites with their complete reruns. Every retained source and submission digest was then compared against the final generator output. The final fresh GitHub run replayed all seven complete language suites successfully. The original failed run remains visible as [39891996047](https://github.com/X-McKay/corsair/actions/runs/39891996047); the evidence does not conceal it.
 
-The 11 mechanism families and five input variants are synthetic policy regressions. Maven/Gradle, npm/TypeScript/Vite, Python packaging, Bundler/Rake, Perl MakeMaker/prove and CMake/Make execute real build commands. No model or blind auditor is used for trusted-reference benchmark replay. The result measures runtime, build and gate mechanics, not real-CVE exploitation, semantic certification, or LLM accuracy.
+## Languages and frameworks actually exercised
+
+| Language | Final twin cases | Native evidence / build systems |
+| --- | ---: | --- |
+| Python | 55 | coverage.py; pip/setuptools packaging |
+| Java | 55 | JaCoCo; Maven and Gradle |
+| JavaScript | 55 | V8/c8 LCOV; Node/npm |
+| TypeScript | 55 | c8 remapped source lines; strict TypeScript and Vite |
+| Perl | 55 | Devel::Cover; MakeMaker/Make/prove |
+| Ruby | 55 | SimpleCov; Bundler/Rake |
+| C++ | 55 | gcov JSON; CMake and Make |
+
+The cases span **11 mechanism families and five input variants**, with paired vulnerable and fixed source revisions. They execute real compilers, build tools, native targets and coverage SDKs, but their security behavior is synthetic policy computation. They are **not 385 unique vulnerabilities, production-framework exploit chains, or reproduced CVEs**. The full framework/version space is not certified.
 
 ## Independent hardening review
 
-A separate static review found and prompted fixes for writable collector support, helper-file substitution during build replay, and reserved support-path redirection. All original entry types, executable modes, link targets and content hashes are checked before sealing, while new build outputs remain allowed. Support files are injected root-owned/read-only; probes use a different non-root uid, no capabilities, and no network. Native collectors execute immutable support code without extra container privileges. Native raw reports are not cryptographic attestations; hostile model-authored build and probe code still needs review.
+A separate static review identified writable collector support, helper-file substitution during build replay, and reserved support-path redirection. Fixes preserve all original entry types, executable modes, link targets and content hashes before sealing, while allowing newly generated build outputs. Source collisions at `.corsair` and build-time support-directory redirection are refused. Support files are injected root-owned/read-only, and probes run as a distinct non-root uid without network or capabilities. Native collectors execute immutable support code without extra container privileges.
+
+The final regression suite checks full requested-line reachability, exact path binding, malformed/duplicate JSON, multi-file LCOV isolation, driver/native/exit-status consistency, direct and helper-source substitution, immutable support files, reserved-path collisions, budget validation, atomic checkpoints, proposal-only seeding, and unavailable auditors. Raw native reports are **not cryptographic execution attestations**. Hostile model-authored builds and probes still require review; containers are not a guarantee against escapes.
 
 ## Blocked or unrun work
 
-The live GPT-6.1 Sol pilot returned the provider's `cyber_policy` rejection before any submission. It correctly recorded `ERROR` and confirmed workspace cleanup; that refusal was not bypassed. Consequently **no live producer/auditor accuracy result is claimed**, and there is no completed model-accuracy sweep across the corpus. SDK agent-contract tests use controlled models.
+The live GPT-6.1 Sol pilot returned the provider's `cyber_policy` refusal before any submission. Corsair recorded `ERROR` and confirmed workspace cleanup; the refusal was not bypassed. **No live producer/auditor accuracy claim or live model sweep is made.** Agent contracts and proposal handling were tested with controlled SDK models.
 
-The external catalog has **1,032 candidate records** with provenance and license/reuse notes. They are **unexecuted leads**, not imported or validated Corsair fixtures. Some records are ecosystem or project-only candidates rather than confirmed vulnerabilities; TypeScript's inventory explicitly includes JavaScript/TypeScript ecosystem entries whose individual language remains unverified. Production OpenShell, arbitrary framework layouts, and arbitrary compiler/runtime versions are not delivered or certified.
+The research catalog contains **1,032 external candidate records** with source and license/reuse notes. They are **unexecuted leads**, not imported or validated Corsair fixtures. Some are ecosystem/project-only candidates rather than established vulnerabilities; TypeScript's catalog explicitly includes JavaScript/TypeScript ecosystem entries whose individual source language remains unverified. Upstream source, license, exact revision pairs, bounded triggers and oracles must be checked before promotion to executed benchmarks.
 
-## Reproduction
+Automatic patch/skill application is deliberately proposal-only. Production OpenShell integration, arbitrary framework layouts, and arbitrary compiler/runtime versions are not delivered. Builds that deliberately rewrite original tracked source fail closed until an operator explicitly designs a suitable policy.
+
+## Reproduction and delivery workflow
 
 ```bash
 make sync
@@ -38,4 +62,4 @@ uv run --locked pytest -m 'not live' -q
 make benchmark WORKERS=2
 ```
 
-The sandbox validation uses Docker 29.1.3, network-disabled unprivileged probe containers, the committed toolchain Dockerfiles, and the pinned Python development environment. Images are cached by resolved base-image identity, runtime configuration, source hash and exact build script; altered source or unresolved image identity cannot reuse a stale build. The final report and cleanup confirmation belong to the completed validation record, not this provisional section.
+Validation used Docker **29.1.3**, the committed Debian-based runtime Dockerfiles, offline unprivileged probes, and the pinned development environment. Resolved runtime image identities are recorded in the JSON evidence. Source/image/configuration/build-script cache keys prevent stale replay. The completed workflow was implementation, end-to-end testing, final static/documentation cleanup, post-cleanup retesting, evidence verification, confirmed container cleanup, and packaging of the final committed source.
