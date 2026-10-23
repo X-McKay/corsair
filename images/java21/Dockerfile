@@ -9,6 +9,12 @@ RUN --mount=type=secret,id=proxy_ca \
     curl -fsS -o /opt/corsair/jacoco-cli.jar \
       "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.cli/${JACOCO_VERSION}/org.jacoco.cli-${JACOCO_VERSION}-nodeps.jar" && \
     echo "3fb76eea65f81bd9415202bab34b6571728841dff1ab8e6bbe81adc2e299face  /opt/corsair/jacoco-agent.jar" | sha256sum -c - && \
-    echo "811c7f8c6b358c5d68a8973cfa867f6892be7a671b697a4b13c4b447e6daf75c  /opt/corsair/jacoco-cli.jar" | sha256sum -c -
+    echo "811c7f8c6b358c5d68a8973cfa867f6892be7a671b697a4b13c4b447e6daf75c  /opt/corsair/jacoco-cli.jar" | sha256sum -c - && \
+    mkdir -p /opt/corsair/licenses/jacoco-agent /opt/corsair/licenses/jacoco-cli && \
+    (cd /opt/corsair/licenses/jacoco-agent && jar xf /opt/corsair/jacoco-agent.jar about.html) && \
+    (cd /opt/corsair/licenses/jacoco-cli && jar xf /opt/corsair/jacoco-cli.jar about.html) && \
+    test -s /opt/corsair/licenses/jacoco-agent/about.html && \
+    test -s /opt/corsair/licenses/jacoco-cli/about.html && \
+    java -XshowSettings:properties -version 2>&1 | grep -F "java.runtime.version = 21.0.12.1+1-LTS"
 RUN useradd --create-home --uid 1000 corsair
 WORKDIR /work

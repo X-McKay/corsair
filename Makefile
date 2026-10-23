@@ -11,7 +11,7 @@ EVAL_SET ?= development
 ATTEMPTS ?= 3
 RECEIPTS ?= benchmarks/dataset/receipts
 
-.PHONY: sync test test-offline test-docker corpus-check benchmark-verify image verify verify-scripts investigate eval historical-eval pilot cleanup
+.PHONY: sync test test-offline test-docker corpus-check benchmark-verify runtime-rights runtime-rights-check image verify verify-scripts investigate eval historical-eval pilot cleanup
 
 sync:
 	uv sync --locked
@@ -31,6 +31,12 @@ corpus-check:
 benchmark-verify: image
 	$(PYTHON) -m corsair.cli benchmark-verify --manifest $(CORPUS_MANIFEST) --eval-set $(EVAL_SET) \
 	  --attempts $(ATTEMPTS) --runs $(RUNS) --receipts $(RECEIPTS)
+
+runtime-rights: image
+	$(PYTHON) -m corsair.runtime_rights --root . --write
+
+runtime-rights-check: image
+	$(PYTHON) -m corsair.runtime_rights --root . --check
 
 image:
 	docker build $(DOCKER_BUILD_FLAGS) -q -t corsair-lite-python:dev images/python

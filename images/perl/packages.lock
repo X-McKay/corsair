@@ -1,0 +1,21 @@
+# Complete package closure added to the digest-pinned Debian parent on linux/amd64.
+cpanminus=1.7048-1
+libcpan-distnameinfo-perl=0.12-3
+libcpan-meta-check-perl=0.018-1
+libcpanel-json-xs-perl=4.39-2~deb13u1
+libdevel-cover-perl=1.44-1+b2
+libfile-pushd-perl=1.016-2
+libgdbm-compat4t64=1.24-2
+libgdbm6t64=1.24-2
+libhtml-parser-perl=3.83-2~deb13u1
+libhtml-tagset-perl=3.24-1
+libjson-maybexs-perl=1.004008-1
+liblocal-lib-perl=2.000029-1
+libmodule-build-perl=0.423400-3
+libmodule-cpanfile-perl=1.1004-2
+libparse-pmfile-perl=0.47-1
+libperl5.40=5.40.1-6+deb13u1
+libstring-shellquote-perl=1.04-3
+liburi-perl=5.30-1
+perl=5.40.1-6+deb13u1
+perl-modules-5.40=5.40.1-6+deb13u1
