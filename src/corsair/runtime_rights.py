@@ -106,12 +106,23 @@ class RuntimeSpec:
 
 
 _COPYRIGHT_FILES = "find -L /usr/share/doc -mindepth 2 -maxdepth 2 -name copyright -type f -print0"
-_ARCHIVE_FILES = ("LC_ALL=C sort -zu | tar --null --verbatim-files-from --files-from=- "
-                  "--create --dereference --hard-dereference --file=-")
+_TAR_FILES = ("tar --null --verbatim-files-from --files-from=- "
+              "--create --dereference --hard-dereference --file=-")
+_ARCHIVE_FILES = "LC_ALL=C sort -zu | " + _TAR_FILES
 
 
 def _license_command(*sources: str) -> str:
-    return "{ " + "; ".join((_COPYRIGHT_FILES, "find -L /usr/share/common-licenses -maxdepth 1 -type f -print0", *sources)) + "; } | " + _ARCHIVE_FILES
+    discovery = " && ".join((_COPYRIGHT_FILES,
+                              "find -L /usr/share/common-licenses -maxdepth 1 -type f -print0",
+                              *sources))
+    # POSIX sh reports only the last pipeline stage. Keep the binary archive on
+    # fd 3 and collect every stage's status on fd 4, without files or pipefail.
+    # Status arrival order is immaterial: success requires exactly three zeros.
+    return ("{ statuses=$( { "
+            "{ " + discovery + "; printf '%s\\n' \"$?\" >&4; } | "
+            "{ LC_ALL=C sort -zu; printf '%s\\n' \"$?\" >&4; } | "
+            "{ " + _TAR_FILES + " >&3; printf '%s\\n' \"$?\" >&4; }"
+            " ; } 4>&1 ); [ \"$statuses\" = '0\n0\n0' ]; } 3>&1")
 
 
 RUNTIME_SPECS = (

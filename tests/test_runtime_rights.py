@@ -719,3 +719,58 @@ def test_phase_a_node_path_program_counts_a_dangling_link_as_present(tmp_path):
     result=subprocess.run(('/bin/sh','-c',command),env={'PATH':str(directory)},check=True,capture_output=True)
     assert f'path:{directory}/npm=present\n'.encode() in result.stdout
     assert b'launcher:npm=absent\n' in result.stdout
+
+
+@pytest.mark.parametrize('failure', ['common-loop', 'extra-source'])
+def test_phase_a_license_command_propagates_discovery_failure(tmp_path, failure):
+    import subprocess
+    docs = tmp_path / 'doc'
+    common = tmp_path / 'common'
+    (docs / 'base').mkdir(parents=True)
+    common.mkdir()
+    (docs / 'base/copyright').write_bytes(b'base terms')
+    (common / 'GPL').write_bytes(b'common terms')
+    if failure == 'common-loop':
+        (common / 'loop').symlink_to('loop')
+        command = rights._license_command()
+    else:
+        # A later successful source must not erase the earlier failed source.
+        command = rights._license_command('false', "printf '%s\\0' \"$extra\"")
+    command = command.replace('/usr/share/doc', str(docs)).replace('/usr/share/common-licenses', str(common))
+    result = subprocess.run(('/bin/sh', '-c', command), env={**os.environ, 'LC_ALL': 'C', 'extra': str(common / 'GPL')},
+                            capture_output=True)
+    assert result.returncode != 0, 'discovery failure was masked by the successful archive pipeline'
+    if failure == 'common-loop':
+        assert b'Too many levels of symbolic links' in result.stderr
+
+
+def test_phase_a_license_command_preserves_binary_archive_and_deduplicates(tmp_path):
+    import subprocess
+    docs = tmp_path / 'doc'
+    common = tmp_path / 'common'
+    (docs / 'base').mkdir(parents=True)
+    common.mkdir()
+    (docs / 'base/copyright').write_bytes(b'base\x00terms\xff')
+    (common / 'GPL-3').write_bytes(b'common\nterms')
+    (common / 'GPL').symlink_to('GPL-3')
+    command = rights._license_command("printf '%s\\0' \"$extra\"")
+    command = command.replace('/usr/share/doc', str(docs)).replace('/usr/share/common-licenses', str(common))
+    result = subprocess.run(('/bin/sh', '-c', command), env={**os.environ, 'LC_ALL': 'C', 'extra': str(common / 'GPL')},
+                            capture_output=True, check=True)
+    files = evidence_files_from_tar(result.stdout)
+    assert files == tuple(sorted((EvidenceFile(str(docs / 'base/copyright'), b'base\x00terms\xff'),
+                                 EvidenceFile(str(common / 'GPL'), b'common\nterms'),
+                                 EvidenceFile(str(common / 'GPL-3'), b'common\nterms')), key=lambda f: f.path))
+
+
+@pytest.mark.parametrize('stage', ['sort', 'tar'])
+def test_phase_a_license_command_propagates_archive_stage_failure(tmp_path, stage):
+    import subprocess
+    docs = tmp_path / 'doc'
+    common = tmp_path / 'common'
+    docs.mkdir()
+    common.mkdir()
+    command = rights._license_command().replace('/usr/share/doc', str(docs)).replace('/usr/share/common-licenses', str(common))
+    # Shell functions fail a real pipeline stage without changing the generated command.
+    result = subprocess.run(('/bin/sh', '-c', f'{stage}() {{ return 7; }}; ' + command), capture_output=True)
+    assert result.returncode != 0, f'{stage} failure was masked'
