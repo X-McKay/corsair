@@ -1,0 +1,15 @@
+{
+  "case_id": "cs-1001",
+  "finding": {
+    "title": "Sibling-prefix escape in StaticFiles lookup",
+    "description": "StaticFiles compares a resolved requested path to its configured directory using a character prefix, so a sibling directory whose name starts with the configured directory name can be treated as contained.",
+    "file_path": "starlette/staticfiles.py",
+    "start_line": 172,
+    "symbol": "StaticFiles.lookup_path",
+    "cwe": "CWE-22"
+  },
+  "source": "vulnerable",
+  "commit": "24c1fac62a80bb153c6548145334fc643991e35a",
+  "fixed_source": "fixed",
+  "fixed_commit": "1797de464124b090f10cf570441e8292936d63e3"
+}

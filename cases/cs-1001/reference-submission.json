@@ -1,0 +1,14 @@
+{
+  "contract_version": "corsair-lite/differential-probe/2",
+  "hypothesis": {
+    "target_file": "starlette/staticfiles.py",
+    "target_symbol": "StaticFiles.lookup_path",
+    "target_lines": [
+      172
+    ],
+    "root_cause": "lookup_path uses a string prefix comparison to decide whether a resolved path is inside its configured directory, which does not distinguish the directory from a sibling with the same leading characters.",
+    "expected_violation": "a request containing a parent segment returns a real file from the owned sibling directory"
+  },
+  "build_script": "cat > /tmp/corsair-starlette-requirements.lock <<'EOF'\nanyio==3.7.1 \\\n    --hash=sha256:91dee416e570e92c64041bd18b900d1d6fa78dff7048769ce5ac5ddad004fbb5\nidna==3.10 \\\n    --hash=sha256:946d195a0d259cbba61165e88e65941f16e9b36ea6ddb97f00452bae8b1287d3\nsniffio==1.3.1 \\\n    --hash=sha256:2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2\nEOF\npython -m pip install --disable-pip-version-check --only-binary=:all: --no-deps --require-hashes -r /tmp/corsair-starlette-requirements.lock",
+  "probe": "import os\nimport tempfile\nfrom pathlib import Path\n\nfrom starlette.staticfiles import StaticFiles\n\nCONTROL_PAYLOAD = \"ok.txt\"\nEXPLOIT_PAYLOAD = \"../public-private/secret.txt\"\n\n\ndef run_target(payload: str) -> bool:\n    with tempfile.TemporaryDirectory() as temporary:\n        root = Path(temporary)\n        public = root / \"public\"\n        sibling = root / \"public-private\"\n        public.mkdir()\n        sibling.mkdir()\n        (public / \"ok.txt\").write_text(\"ordinary\")\n        (sibling / \"secret.txt\").write_text(\"owned-secret\")\n\n        returned_path, returned_stat = StaticFiles(directory=str(public)).lookup_path(payload)\n        if not returned_path or returned_stat is None:\n            return True\n        expected_root = os.path.realpath(public)\n        observed = os.path.realpath(returned_path)\n        try:\n            return os.path.commonpath([observed, expected_root]) == expected_root\n        except ValueError:\n            return False\n"
+}

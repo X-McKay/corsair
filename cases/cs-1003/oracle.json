@@ -1,0 +1,22 @@
+{
+  "dataset_version": "batch-a-candidate/1",
+  "expected_label": "LIKELY_EXPLOITABLE",
+  "expected_fix": "verified",
+  "forbidden_labels": [],
+  "qualification_status": "candidate",
+  "case_name": "Commons IO improper UNC hostname normalization",
+  "risk_tags": [
+    "path-traversal",
+    "input-validation",
+    "unc-path"
+  ],
+  "capability_tags": [
+    "java",
+    "javac-java",
+    "function",
+    "differential-probe"
+  ],
+  "provenance": "Finding independently derived from the IO-559 fix seam and GHSA-gwrp-pvrq-jmwv. Apache IO-556 is retained as the duplicate report alias of IO-559.",
+  "retention": "Public upstream source and independently authored benchmark annotations; retain permanently.",
+  "note": "Evaluator-only candidate. Admission still requires vendored snapshot identity, runtime rights, real-runtime replay, and independent review."
+}

@@ -1,0 +1,22 @@
+{
+  "dataset_version": "batch-a-candidate/1",
+  "expected_label": "LIKELY_EXPLOITABLE",
+  "expected_fix": "verified",
+  "forbidden_labels": [],
+  "qualification_status": "candidate",
+  "case_name": "Net::Netmask leading-zero address ambiguity",
+  "risk_tags": [
+    "input-validation",
+    "address-confusion",
+    "access-control-bypass"
+  ],
+  "capability_tags": [
+    "perl",
+    "perl-tap",
+    "method",
+    "differential-probe"
+  ],
+  "provenance": "Finding independently derived from the pinned Net::Netmask source pair and CPANSA-Net-Netmask-2021-01.",
+  "retention": "Public upstream source and independently authored benchmark annotations; retain permanently.",
+  "note": "Evaluator-only candidate. Admission still requires vendored snapshot identity, runtime rights, real-runtime replay, and independent review."
+}

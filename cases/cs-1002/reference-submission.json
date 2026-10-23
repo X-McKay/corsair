@@ -1,0 +1,14 @@
+{
+  "contract_version": "corsair-lite/differential-probe/2",
+  "hypothesis": {
+    "target_file": "index.js",
+    "target_symbol": "serialize",
+    "target_lines": [
+      119
+    ],
+    "root_cause": "serialize validates a cookie name with a general header field-content expression that permits semicolons instead of a cookie-name expression.",
+    "expected_violation": "a semicolon in the supplied name appears in the serialized cookie text and creates a second syntactic element"
+  },
+  "build_script": "",
+  "probe": "const cookie = require('/work/index.js');\n\nconst CONTROL_PAYLOAD = 'mode';\nconst EXPLOIT_PAYLOAD = 'mode; Secure';\n\nfunction run_target(payload) {\n  try {\n    const observed = cookie.serialize(payload, 'owned');\n    return typeof observed === 'string'\n      && observed === `${payload}=owned`\n      && !observed.includes(';');\n  } catch (error) {\n    if (error instanceof TypeError && error.message === 'argument name is invalid') return true;\n    throw error;\n  }\n}\n\nmodule.exports = { CONTROL_PAYLOAD, EXPLOIT_PAYLOAD, run_target };\n"
+}

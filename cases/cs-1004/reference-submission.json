@@ -1,0 +1,14 @@
+{
+  "contract_version": "corsair-lite/differential-probe/2",
+  "hypothesis": {
+    "target_file": "lib/Net/Netmask.pm",
+    "target_symbol": "quad2int",
+    "target_lines": [
+      392
+    ],
+    "root_cause": "quad2int accepts digit-only IPv4 octets without rejecting a multi-digit octet that begins with zero, and later rendering loses that textual distinction.",
+    "expected_violation": "a leading-zero address is accepted and returned with a base address different from the exact address text supplied"
+  },
+  "build_script": "",
+  "probe": "package CorsairProbe;\nuse strict;\nuse warnings;\nuse lib '/work/lib';\nuse Net::Netmask;\n\nour $CONTROL_PAYLOAD = '192.0.1.2/32';\nour $EXPLOIT_PAYLOAD = '192.0.01.2/32';\n\nsub run_target {\n    my ($payload) = @_;\n    my ($address) = split m{/}, $payload, 2;\n    my $network;\n    {\n        local $@;\n        $network = eval { Net::Netmask->new2($payload) };\n        die $@ if $@;\n    }\n    return 1 unless defined $network;\n    return $network->base() eq $address ? 1 : 0;\n}\n\n1;\n"
+}

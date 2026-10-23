@@ -1,0 +1,15 @@
+{
+  "case_id": "cs-1002",
+  "finding": {
+    "title": "Cookie name accepts delimiter characters",
+    "description": "The cookie serializer accepts a semicolon in a caller-controlled name, allowing the serialized text to introduce an additional cookie attribute-like element.",
+    "file_path": "index.js",
+    "start_line": 119,
+    "symbol": "serialize",
+    "cwe": "CWE-74"
+  },
+  "source": "vulnerable",
+  "commit": "26031e362d8473112b24a76c7c03b45ef7576d61",
+  "fixed_source": "fixed",
+  "fixed_commit": "e10042845354fea83bd8f34af72475eed1dadf5c"
+}

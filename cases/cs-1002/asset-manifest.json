@@ -1,0 +1,93 @@
+{
+  "schema": "corsair-lite/case-assets/1",
+  "case_id": "cs-1002",
+  "qualification_status": "candidate",
+  "family_id": "cf-1002",
+  "repository": "https://github.com/jshttp/cookie",
+  "source_closure": [
+    "index.js"
+  ],
+  "aliases": [
+    "CVE-2024-47764",
+    "GHSA-pxg6-pf52-xh8x"
+  ],
+  "target": {
+    "file": "index.js",
+    "symbol": "serialize",
+    "lines": [
+      119
+    ],
+    "fixed_lines": [
+      165
+    ]
+  },
+  "upstream_source_pair": {
+    "vulnerable": {
+      "commit": "26031e362d8473112b24a76c7c03b45ef7576d61",
+      "git_tree": "91a0239cf53396d65edddc309298b772a6623342",
+      "tree_sha256": "44ec5ab3a6942d3ca7b04f2ef9145260beff640e7f314950e39d4e13a1612c43",
+      "affected_file_sha256": "59dd66dee5b0b03693339eb4d1a785edf59c56d8b72ea27f7e689a646c5b3a9a",
+      "affected_region_sha256": "629c918e7fb59ad4e07a8de584b8d181d25dfc6ca1b46e1f201e9b3a4f4d9d63"
+    },
+    "fixed": {
+      "commit": "e10042845354fea83bd8f34af72475eed1dadf5c",
+      "git_tree": "34fde7e4b1a99bce8879e258b5d7f76b56e879cf",
+      "tree_sha256": "5e3248d5a6ead1ec9099c764bdd34a1a391801f80389e550584031f0d76c21fc",
+      "affected_file_sha256": "8ba746b1f86f950060d83d8e5f416fe4c0253981c2ed74199f5fc3354a3b49ef",
+      "affected_region_sha256": "5062798e62ce7765fe3c3df60ca14d899f2d7459089e82be2334c8d0f4c129d2"
+    },
+    "patch_sha256": "a39195930ae7ae92a0db356ecc47eaae69468c67ce57514ca98a719197492f7f"
+  },
+  "vendored_source_pair": {
+    "vulnerable": {
+      "tree_sha256": "792d611ffe5f410666060902fb72177a459b26635a5db7137bc3bc3a938ccf6a",
+      "affected_file_sha256": "59dd66dee5b0b03693339eb4d1a785edf59c56d8b72ea27f7e689a646c5b3a9a",
+      "affected_region_sha256": "629c918e7fb59ad4e07a8de584b8d181d25dfc6ca1b46e1f201e9b3a4f4d9d63"
+    },
+    "fixed": {
+      "tree_sha256": "04b040d94abd2f215cfd711940d24a8ca01fc2acce5236ee2633b91483a85a7f",
+      "affected_file_sha256": "8ba746b1f86f950060d83d8e5f416fe4c0253981c2ed74199f5fc3354a3b49ef",
+      "affected_region_sha256": "5062798e62ce7765fe3c3df60ca14d899f2d7459089e82be2334c8d0f4c129d2"
+    },
+    "patch_sha256": "2d8bd094f4c10f78be804af9aa8bd0dd613bcaa15f54fdda9a56550b0505a130"
+  },
+  "dependency_lock": {
+    "runtime_dependencies": []
+  },
+  "evidence": [
+    {
+      "path": "evidence/source-vulnerable-LICENSE",
+      "source_url": "https://raw.githubusercontent.com/jshttp/cookie/26031e362d8473112b24a76c7c03b45ef7576d61/LICENSE",
+      "revision": "26031e362d8473112b24a76c7c03b45ef7576d61",
+      "sha256": "c02110eedc16c7114f1a9bdc026c65626ce1d9c7e27fd51a8e0feee8a48a6858",
+      "license_expression": "MIT"
+    },
+    {
+      "path": "evidence/source-fixed-LICENSE",
+      "source_url": "https://raw.githubusercontent.com/jshttp/cookie/e10042845354fea83bd8f34af72475eed1dadf5c/LICENSE",
+      "revision": "e10042845354fea83bd8f34af72475eed1dadf5c",
+      "sha256": "c02110eedc16c7114f1a9bdc026c65626ce1d9c7e27fd51a8e0feee8a48a6858",
+      "license_expression": "MIT"
+    },
+    {
+      "path": "evidence/GHSA-pxg6-pf52-xh8x.json",
+      "source_url": "https://raw.githubusercontent.com/github/advisory-database/a87e4dafed07d139f03ea80d60f0df278eb920fc/advisories/github-reviewed/2024/10/GHSA-pxg6-pf52-xh8x/GHSA-pxg6-pf52-xh8x.json",
+      "revision": "a87e4dafed07d139f03ea80d60f0df278eb920fc",
+      "sha256": "4243ecd5ea099639d2a4b83a1abe7c91c9e2fb514aeea312520c9c2466ad64b3",
+      "license_expression": "CC-BY-4.0"
+    },
+    {
+      "path": "evidence/advisory-LICENSE.md",
+      "source_url": "https://raw.githubusercontent.com/github/advisory-database/a87e4dafed07d139f03ea80d60f0df278eb920fc/LICENSE.md",
+      "revision": "a87e4dafed07d139f03ea80d60f0df278eb920fc",
+      "sha256": "9e5f1b3c610b9c2da5c313bf81d577a7d1acec686bdb0384edefa6df0f90cd94",
+      "license_expression": "CC-BY-4.0"
+    }
+  ],
+  "qualification_blockers": [
+    "vendored_snapshot_identity_pending",
+    "runtime_rights_pending",
+    "node22_replay_pending",
+    "independent_review_pending"
+  ]
+}

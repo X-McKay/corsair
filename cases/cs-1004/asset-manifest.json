@@ -1,0 +1,116 @@
+{
+  "schema": "corsair-lite/case-assets/1",
+  "case_id": "cs-1004",
+  "qualification_status": "candidate",
+  "family_id": "cf-1004",
+  "repository": "https://github.com/jmaslak/Net-Netmask",
+  "source_closure": [
+    "lib/Net/Netmask.pm"
+  ],
+  "aliases": [
+    "CVE-2021-29424",
+    "GHSA-p75p-x3j9-7vj3",
+    "CPANSA-Net-Netmask-2021-01"
+  ],
+  "target": {
+    "file": "lib/Net/Netmask.pm",
+    "symbol": "quad2int",
+    "lines": [
+      392
+    ],
+    "fixed_lines": [
+      398
+    ]
+  },
+  "upstream_source_pair": {
+    "vulnerable": {
+      "commit": "d98776e4badf6a92f281600756b962e696b906f0",
+      "git_tree": "6636ba287a623e45af2c50367c007f66543ce1d0",
+      "tree_sha256": "5ee8f183bb635a983ee64cc609450179a727e7ed1426e92faa890504429f5119",
+      "affected_file_sha256": "7bc9f02df5833ab64d7d8a2f13400aa67946c37908573bd647d17c3fed950745",
+      "affected_region_sha256": "e09af2160e06e0b28405728a01b9d40095ebeba9f27f01656cbb57cc70e54e07"
+    },
+    "fixed": {
+      "commit": "9023b403682f1eaadadf6cb71ba0117a1fa4f163",
+      "git_tree": "62b216d1f2edbcd4ebfcfc0134b758e72a178deb",
+      "tree_sha256": "b8fb3e1ed684b1ddd83ab184e51e33ef298a91f8cb290c5cd03988256db06d90",
+      "affected_file_sha256": "434fdfabc79a06e6670573144a676a6311c45140dfd9d0fb3ce906ec4d0ebe27",
+      "affected_region_sha256": "e13e3117eb028018af085051f57c8b37ad2038db82b9ded93982f92f32769e8f"
+    },
+    "patch_sha256": "44dc34974b3801229e0df5196cc948ca13137b8b446f33dea100931f193fe6dd"
+  },
+  "vendored_source_pair": {
+    "vulnerable": {
+      "tree_sha256": "1d17a8f435d8721e749f1314a6da91369daa214c0df8b2ae56be9f1a29be4a85",
+      "affected_file_sha256": "7bc9f02df5833ab64d7d8a2f13400aa67946c37908573bd647d17c3fed950745",
+      "affected_region_sha256": "e09af2160e06e0b28405728a01b9d40095ebeba9f27f01656cbb57cc70e54e07"
+    },
+    "fixed": {
+      "tree_sha256": "a3825fa3b85150a70e2b617807afcd20bc7aa9ec2db3626b4535e93a1f4ce2e7",
+      "affected_file_sha256": "434fdfabc79a06e6670573144a676a6311c45140dfd9d0fb3ce906ec4d0ebe27",
+      "affected_region_sha256": "e13e3117eb028018af085051f57c8b37ad2038db82b9ded93982f92f32769e8f"
+    },
+    "patch_sha256": "c6c8a8d065385abe5446ee115a1bc7c73e460cc6c1894c051e7bd9c43dcb5b36"
+  },
+  "dependency_lock": {
+    "runtime_dependencies": [],
+    "core_modules": [
+      "Carp",
+      "POSIX",
+      "Math::BigInt"
+    ],
+    "observed_runtime": "perl-5.40.1",
+    "observed_math_bigint": "2.003002"
+  },
+  "evidence": [
+    {
+      "path": "evidence/source-vulnerable-dist.ini",
+      "source_url": "https://raw.githubusercontent.com/jmaslak/Net-Netmask/d98776e4badf6a92f281600756b962e696b906f0/dist.ini",
+      "revision": "d98776e4badf6a92f281600756b962e696b906f0",
+      "sha256": "8f2e592cae4612026e37eaa98500ee3f8991fa82ff34d7cd58d5e90b505e3937",
+      "license_expression": "Artistic-1.0-Perl OR GPL-1.0-or-later"
+    },
+    {
+      "path": "evidence/source-fixed-dist.ini",
+      "source_url": "https://raw.githubusercontent.com/jmaslak/Net-Netmask/9023b403682f1eaadadf6cb71ba0117a1fa4f163/dist.ini",
+      "revision": "9023b403682f1eaadadf6cb71ba0117a1fa4f163",
+      "sha256": "195c7b3e4b52f32b1aadcfc46645d7330ed02b63ea09e83b4451924148356ed6",
+      "license_expression": "Artistic-1.0-Perl OR GPL-1.0-or-later"
+    },
+    {
+      "path": "evidence/source-vulnerable-Netmask.pod",
+      "source_url": "https://raw.githubusercontent.com/jmaslak/Net-Netmask/d98776e4badf6a92f281600756b962e696b906f0/lib/Net/Netmask.pod",
+      "revision": "d98776e4badf6a92f281600756b962e696b906f0",
+      "sha256": "524dc16e913a8a9005eb65f2af461fd4359f3651b2db67c618ce8f06755f18ae",
+      "license_expression": "Artistic-1.0-Perl OR GPL-1.0-or-later"
+    },
+    {
+      "path": "evidence/source-fixed-Netmask.pod",
+      "source_url": "https://raw.githubusercontent.com/jmaslak/Net-Netmask/9023b403682f1eaadadf6cb71ba0117a1fa4f163/lib/Net/Netmask.pod",
+      "revision": "9023b403682f1eaadadf6cb71ba0117a1fa4f163",
+      "sha256": "40362c41b136b4cbcec9ccd8228f9de1799836e49604b1550b38741aa2f7f399",
+      "license_expression": "Artistic-1.0-Perl OR GPL-1.0-or-later"
+    },
+    {
+      "path": "evidence/CPANSA-Net-Netmask.yml",
+      "source_url": "https://raw.githubusercontent.com/briandfoy/cpan-security-advisory/da5fabaf31280ce087c43b256553947960b26753/cpansa/CPANSA-Net-Netmask.yml",
+      "revision": "da5fabaf31280ce087c43b256553947960b26753",
+      "sha256": "7ed834df8628814ccf38dcb68af949a060b663ee211310538ab23f6029d21570",
+      "license_expression": "Artistic-2.0"
+    },
+    {
+      "path": "evidence/advisory-LICENSE",
+      "source_url": "https://raw.githubusercontent.com/briandfoy/cpan-security-advisory/da5fabaf31280ce087c43b256553947960b26753/LICENSE",
+      "revision": "da5fabaf31280ce087c43b256553947960b26753",
+      "sha256": "4cabb00406b10ab960d3ebb5c14e5042cf54d2b970cc4047588aa28c703525fe",
+      "license_expression": "Artistic-2.0"
+    }
+  ],
+  "qualification_blockers": [
+    "vendored_snapshot_identity_pending",
+    "source_license_expression_review_pending",
+    "runtime_rights_pending",
+    "perl_tap_replay_pending",
+    "independent_review_pending"
+  ]
+}

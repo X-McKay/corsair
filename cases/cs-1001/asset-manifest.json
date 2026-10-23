@@ -1,0 +1,156 @@
+{
+  "schema": "corsair-lite/case-assets/1",
+  "case_id": "cs-1001",
+  "qualification_status": "candidate",
+  "family_id": "cf-1001",
+  "repository": "https://github.com/encode/starlette",
+  "source_closure": [
+    "starlette/__init__.py",
+    "starlette/_compat.py",
+    "starlette/_utils.py",
+    "starlette/background.py",
+    "starlette/concurrency.py",
+    "starlette/datastructures.py",
+    "starlette/exceptions.py",
+    "starlette/responses.py",
+    "starlette/staticfiles.py",
+    "starlette/types.py"
+  ],
+  "aliases": [
+    "CVE-2023-29159",
+    "GHSA-v5gw-mw7f-84px",
+    "PYSEC-2023-83"
+  ],
+  "target": {
+    "file": "starlette/staticfiles.py",
+    "symbol": "StaticFiles.lookup_path",
+    "lines": [
+      172
+    ],
+    "fixed_lines": [
+      172
+    ]
+  },
+  "upstream_source_pair": {
+    "vulnerable": {
+      "commit": "24c1fac62a80bb153c6548145334fc643991e35a",
+      "git_tree": "54b9b4a500b2505269706ab0cdb0d795bb92ebce",
+      "tree_sha256": "06f78df461811c2548479ce7e6221903244cae7e3815e122bf2d1fc1144d5978",
+      "affected_file_sha256": "8c59da75accc2f80f437847dec9aab5a3adf40d0221322a9a69d9a4aa37377ff",
+      "affected_region_sha256": "082adb9a93b7c9291e34747b6d5cbd653de5457f0ab4b76ad102f55990d121a7"
+    },
+    "fixed": {
+      "commit": "1797de464124b090f10cf570441e8292936d63e3",
+      "git_tree": "2b296c720dd21756c131001ca39a3cac9166b0ef",
+      "tree_sha256": "ad6eb294cd52af99465fe84ac12536e9c52b6526e6221c7950bb705d3d2af04b",
+      "affected_file_sha256": "388a4936861b10fb97ac3fd50ead04616fd0beb2ad3df1694b9f0be52e76fe9f",
+      "affected_region_sha256": "53ca2c97fe8dc9d1f98d7f8708104d7fd5f55e486c43c2df24fa33c2ec0717a6"
+    },
+    "patch_sha256": "2cfd33b9e26650e642609c01ff494a7dd53f422a85254e8e38269497da331f80"
+  },
+  "vendored_source_pair": {
+    "vulnerable": {
+      "tree_sha256": "1dfea6699ac78d3d94129ad7095d3b58570e2d12ba68504d50d42417074d1e93",
+      "affected_file_sha256": "8c59da75accc2f80f437847dec9aab5a3adf40d0221322a9a69d9a4aa37377ff",
+      "affected_region_sha256": "082adb9a93b7c9291e34747b6d5cbd653de5457f0ab4b76ad102f55990d121a7"
+    },
+    "fixed": {
+      "tree_sha256": "2e7c23669bdef77ff5c5e082aae2cf183f358e31e5c14551dafe0c16f2808458",
+      "affected_file_sha256": "388a4936861b10fb97ac3fd50ead04616fd0beb2ad3df1694b9f0be52e76fe9f",
+      "affected_region_sha256": "53ca2c97fe8dc9d1f98d7f8708104d7fd5f55e486c43c2df24fa33c2ec0717a6"
+    },
+    "patch_sha256": "0316e29052b8a23459543ed9d88fbb04102af5deddb688a797264dca8b8d7840"
+  },
+  "dependency_lock": {
+    "path": "dependencies.lock",
+    "python": "3.12",
+    "packages": [
+      {
+        "name": "anyio",
+        "version": "3.7.1",
+        "wheel_sha256": "91dee416e570e92c64041bd18b900d1d6fa78dff7048769ce5ac5ddad004fbb5"
+      },
+      {
+        "name": "idna",
+        "version": "3.10",
+        "wheel_sha256": "946d195a0d259cbba61165e88e65941f16e9b36ea6ddb97f00452bae8b1287d3"
+      },
+      {
+        "name": "sniffio",
+        "version": "1.3.1",
+        "wheel_sha256": "2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2"
+      }
+    ]
+  },
+  "evidence": [
+    {
+      "path": "evidence/source-vulnerable-LICENSE.md",
+      "source_url": "https://raw.githubusercontent.com/encode/starlette/24c1fac62a80bb153c6548145334fc643991e35a/LICENSE.md",
+      "revision": "24c1fac62a80bb153c6548145334fc643991e35a",
+      "sha256": "dcb95677a02240243187e964f941847d19b17821cf99e5afae684fab328c19bf",
+      "license_expression": "BSD-3-Clause"
+    },
+    {
+      "path": "evidence/source-fixed-LICENSE.md",
+      "source_url": "https://raw.githubusercontent.com/encode/starlette/1797de464124b090f10cf570441e8292936d63e3/LICENSE.md",
+      "revision": "1797de464124b090f10cf570441e8292936d63e3",
+      "sha256": "dcb95677a02240243187e964f941847d19b17821cf99e5afae684fab328c19bf",
+      "license_expression": "BSD-3-Clause"
+    },
+    {
+      "path": "evidence/dependency-anyio-LICENSE",
+      "source_url": "https://raw.githubusercontent.com/agronholm/anyio/3e182fa619002d90c7c3c531a25d76cab0e92893/LICENSE",
+      "revision": "3e182fa619002d90c7c3c531a25d76cab0e92893",
+      "sha256": "5361ac9dc58f2ef5fd2e9b09c68297c17f04950909bbc8023bdb82eacf22c2b0",
+      "license_expression": "MIT"
+    },
+    {
+      "path": "evidence/dependency-idna-LICENSE.md",
+      "source_url": "https://raw.githubusercontent.com/kjd/idna/729225d8b0c58bc66bb38d1d0faf281a757ece59/LICENSE.md",
+      "revision": "729225d8b0c58bc66bb38d1d0faf281a757ece59",
+      "sha256": "a59f0b0ef3635874109a4461ca44ff7a70d50696e814767bfaf721d4c9b0db0f",
+      "license_expression": "BSD-3-Clause"
+    },
+    {
+      "path": "evidence/dependency-sniffio-LICENSE",
+      "source_url": "https://raw.githubusercontent.com/python-trio/sniffio/ae020e13b98d276a6558ffc25e82509fd4c288f0/LICENSE",
+      "revision": "ae020e13b98d276a6558ffc25e82509fd4c288f0",
+      "sha256": "652c878488d1456361e08c3f8607fd7ba59892a14103d15cce4ff93c85b5cc8b",
+      "license_expression": "MIT OR Apache-2.0"
+    },
+    {
+      "path": "evidence/dependency-sniffio-LICENSE.MIT",
+      "source_url": "https://raw.githubusercontent.com/python-trio/sniffio/ae020e13b98d276a6558ffc25e82509fd4c288f0/LICENSE.MIT",
+      "revision": "ae020e13b98d276a6558ffc25e82509fd4c288f0",
+      "sha256": "3e6dae555eb92787fc82d1d48355677f454c7f65aeb38d3f9e72bf9a3daf034b",
+      "license_expression": "MIT"
+    },
+    {
+      "path": "evidence/dependency-sniffio-LICENSE.APACHE2",
+      "source_url": "https://raw.githubusercontent.com/python-trio/sniffio/ae020e13b98d276a6558ffc25e82509fd4c288f0/LICENSE.APACHE2",
+      "revision": "ae020e13b98d276a6558ffc25e82509fd4c288f0",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "license_expression": "Apache-2.0"
+    },
+    {
+      "path": "evidence/GHSA-v5gw-mw7f-84px.json",
+      "source_url": "https://raw.githubusercontent.com/github/advisory-database/a87e4dafed07d139f03ea80d60f0df278eb920fc/advisories/github-reviewed/2023/05/GHSA-v5gw-mw7f-84px/GHSA-v5gw-mw7f-84px.json",
+      "revision": "a87e4dafed07d139f03ea80d60f0df278eb920fc",
+      "sha256": "a95f82b24837081ef2299a42eed6941df0b9f8298ca01790b643fd6e622236aa",
+      "license_expression": "CC-BY-4.0"
+    },
+    {
+      "path": "evidence/advisory-LICENSE.md",
+      "source_url": "https://raw.githubusercontent.com/github/advisory-database/a87e4dafed07d139f03ea80d60f0df278eb920fc/LICENSE.md",
+      "revision": "a87e4dafed07d139f03ea80d60f0df278eb920fc",
+      "sha256": "9e5f1b3c610b9c2da5c313bf81d577a7d1acec686bdb0384edefa6df0f90cd94",
+      "license_expression": "CC-BY-4.0"
+    }
+  ],
+  "qualification_blockers": [
+    "vendored_snapshot_identity_pending",
+    "runtime_rights_pending",
+    "real_runtime_replay_pending",
+    "independent_review_pending"
+  ]
+}

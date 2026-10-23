@@ -1,0 +1,21 @@
+{
+  "dataset_version": "batch-a-candidate/1",
+  "expected_label": "LIKELY_EXPLOITABLE",
+  "expected_fix": "verified",
+  "forbidden_labels": [],
+  "qualification_status": "candidate",
+  "case_name": "Starlette sibling-prefix path confinement",
+  "risk_tags": [
+    "path-traversal",
+    "sibling-prefix"
+  ],
+  "capability_tags": [
+    "python",
+    "pytest",
+    "method",
+    "differential-probe"
+  ],
+  "provenance": "Finding independently derived from the pinned Starlette source pair and GHSA-v5gw-mw7f-84px.",
+  "retention": "Public upstream source and independently authored benchmark annotations; retain permanently.",
+  "note": "Evaluator-only candidate. Admission still requires vendored snapshot identity, runtime rights, real-runtime replay, and independent review."
+}

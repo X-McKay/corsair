@@ -1,0 +1,15 @@
+{
+  "case_id": "cs-1003",
+  "finding": {
+    "title": "UNC hostname accepts a parent segment",
+    "description": "Filename normalization accepts a UNC path whose hostname component is a parent-directory token, allowing path interpretation to escape the intended UNC host boundary.",
+    "file_path": "src/main/java/org/apache/commons/io/FilenameUtils.java",
+    "start_line": 679,
+    "symbol": "FilenameUtils.getPrefixLength",
+    "cwe": "CWE-20"
+  },
+  "source": "vulnerable",
+  "commit": "7791a851c4a303f47743b156007fb19c6ed8ed81",
+  "fixed_source": "fixed",
+  "fixed_commit": "2736b6fe0b3fa22ec8e2b4184897ecadb021fc78"
+}

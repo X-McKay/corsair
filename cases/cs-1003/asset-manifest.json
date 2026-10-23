@@ -1,0 +1,116 @@
+{
+  "schema": "corsair-lite/case-assets/1",
+  "case_id": "cs-1003",
+  "qualification_status": "candidate",
+  "family_id": "cf-1003",
+  "repository": "https://github.com/apache/commons-io",
+  "source_closure": [
+    "src/main/java/org/apache/commons/io/FilenameUtils.java",
+    "src/main/java/org/apache/commons/io/IOCase.java"
+  ],
+  "aliases": [
+    "CVE-2021-29425",
+    "GHSA-gwrp-pvrq-jmwv",
+    "IO-556",
+    "IO-559"
+  ],
+  "alias_resolution": "IO-556 is the duplicate report; IO-559 is the fixed implementation issue at the getPrefixLength seam. Both name fix version 2.7.",
+  "target": {
+    "file": "src/main/java/org/apache/commons/io/FilenameUtils.java",
+    "symbol": "FilenameUtils.getPrefixLength",
+    "lines": [
+      679
+    ],
+    "fixed_lines": [
+      685
+    ]
+  },
+  "upstream_source_pair": {
+    "vulnerable": {
+      "commit": "7791a851c4a303f47743b156007fb19c6ed8ed81",
+      "git_tree": "b11bbe735a6247fb5618f683fed78240d66eafd7",
+      "tree_sha256": "c4b4fe96e8ced4952ada06ad9ec61968572e4fe8cee724f555a49948643c9519",
+      "affected_file_sha256": "75dca88fd2be41bc12bdc4ff9009a1ac6d240400eb4943e829f0a87e7309da95",
+      "affected_region_sha256": "1acf8d1e9d20db4c8cbb2170ed7b251bcc59da4f0fdf8c4cc67fb29dea3e2f8c"
+    },
+    "fixed": {
+      "commit": "2736b6fe0b3fa22ec8e2b4184897ecadb021fc78",
+      "git_tree": "4e78b3194e19f186aedec931fdbbebeb1ee96ab7",
+      "tree_sha256": "a6178eb6889f684be59eb3a05ba4145e4b46c2638c071bf8b5847011a4c01025",
+      "affected_file_sha256": "dc05d2223824423dba5a7da91ea455763508924ae67216df48ca7303d19f4196",
+      "affected_region_sha256": "fb53e09e4bccc45481cc31157d60a4bc29f57a90f2feb028bd1fe1beee16ef81"
+    },
+    "patch_sha256": "60d86b55ed0665b6bdedb139377bb976f4850dd15f0285295d689f987b825ece"
+  },
+  "vendored_source_pair": {
+    "vulnerable": {
+      "tree_sha256": "4ddfa795d23c802316ad509f476ee3e21879736154fca806ea9ced7ee3ffe414",
+      "affected_file_sha256": "75dca88fd2be41bc12bdc4ff9009a1ac6d240400eb4943e829f0a87e7309da95",
+      "affected_region_sha256": "1acf8d1e9d20db4c8cbb2170ed7b251bcc59da4f0fdf8c4cc67fb29dea3e2f8c"
+    },
+    "fixed": {
+      "tree_sha256": "68968c19c8fc9f88e73962068caf0398d46cf6b7f8dce9bb0052b2c1aabe0496",
+      "affected_file_sha256": "dc05d2223824423dba5a7da91ea455763508924ae67216df48ca7303d19f4196",
+      "affected_region_sha256": "fb53e09e4bccc45481cc31157d60a4bc29f57a90f2feb028bd1fe1beee16ef81"
+    },
+    "patch_sha256": "84b792e0d0583c70453f9de889e7bfb71a37f983b31ce62d98d64aa3b180f5b1"
+  },
+  "dependency_lock": {
+    "runtime_dependencies": [],
+    "compiled_sources": [
+      "src/main/java/org/apache/commons/io/IOCase.java",
+      "src/main/java/org/apache/commons/io/FilenameUtils.java"
+    ],
+    "release": 8
+  },
+  "evidence": [
+    {
+      "path": "evidence/source-vulnerable-LICENSE.txt",
+      "source_url": "https://raw.githubusercontent.com/apache/commons-io/7791a851c4a303f47743b156007fb19c6ed8ed81/LICENSE.txt",
+      "revision": "7791a851c4a303f47743b156007fb19c6ed8ed81",
+      "sha256": "8c6db340475136df3c1201d458fa5755698eace76e510471ecc9d857d6083dac",
+      "license_expression": "Apache-2.0"
+    },
+    {
+      "path": "evidence/source-fixed-LICENSE.txt",
+      "source_url": "https://raw.githubusercontent.com/apache/commons-io/2736b6fe0b3fa22ec8e2b4184897ecadb021fc78/LICENSE.txt",
+      "revision": "2736b6fe0b3fa22ec8e2b4184897ecadb021fc78",
+      "sha256": "8c6db340475136df3c1201d458fa5755698eace76e510471ecc9d857d6083dac",
+      "license_expression": "Apache-2.0"
+    },
+    {
+      "path": "evidence/source-vulnerable-NOTICE.txt",
+      "source_url": "https://raw.githubusercontent.com/apache/commons-io/7791a851c4a303f47743b156007fb19c6ed8ed81/NOTICE.txt",
+      "revision": "7791a851c4a303f47743b156007fb19c6ed8ed81",
+      "sha256": "f738390135295a249c4fb7118469ff881ae0bd11401b410f7564a52b7e54c4d2",
+      "license_expression": "Apache-2.0-NOTICE"
+    },
+    {
+      "path": "evidence/source-fixed-NOTICE.txt",
+      "source_url": "https://raw.githubusercontent.com/apache/commons-io/2736b6fe0b3fa22ec8e2b4184897ecadb021fc78/NOTICE.txt",
+      "revision": "2736b6fe0b3fa22ec8e2b4184897ecadb021fc78",
+      "sha256": "f738390135295a249c4fb7118469ff881ae0bd11401b410f7564a52b7e54c4d2",
+      "license_expression": "Apache-2.0-NOTICE"
+    },
+    {
+      "path": "evidence/GHSA-gwrp-pvrq-jmwv.json",
+      "source_url": "https://raw.githubusercontent.com/github/advisory-database/a87e4dafed07d139f03ea80d60f0df278eb920fc/advisories/github-reviewed/2021/04/GHSA-gwrp-pvrq-jmwv/GHSA-gwrp-pvrq-jmwv.json",
+      "revision": "a87e4dafed07d139f03ea80d60f0df278eb920fc",
+      "sha256": "32410342c8df9755e75128fdcd5a9add018149119b49a5267dd3bb01980ad036",
+      "license_expression": "CC-BY-4.0"
+    },
+    {
+      "path": "evidence/advisory-LICENSE.md",
+      "source_url": "https://raw.githubusercontent.com/github/advisory-database/a87e4dafed07d139f03ea80d60f0df278eb920fc/LICENSE.md",
+      "revision": "a87e4dafed07d139f03ea80d60f0df278eb920fc",
+      "sha256": "9e5f1b3c610b9c2da5c313bf81d577a7d1acec686bdb0384edefa6df0f90cd94",
+      "license_expression": "CC-BY-4.0"
+    }
+  ],
+  "qualification_blockers": [
+    "vendored_snapshot_identity_pending",
+    "runtime_rights_pending",
+    "java21_jacoco_replay_pending",
+    "independent_review_pending"
+  ]
+}

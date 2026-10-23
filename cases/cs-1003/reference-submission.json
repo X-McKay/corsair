@@ -1,0 +1,14 @@
+{
+  "contract_version": "corsair-lite/differential-probe/2",
+  "hypothesis": {
+    "target_file": "src/main/java/org/apache/commons/io/FilenameUtils.java",
+    "target_symbol": "FilenameUtils.getPrefixLength",
+    "target_lines": [
+      679
+    ],
+    "root_cause": "getPrefixLength accepts the text between a leading double separator and the next separator without validating that the UNC hostname is a valid host name.",
+    "expected_violation": "normalization returns a UNC path whose hostname component is the parent-directory token"
+  },
+  "build_script": "mkdir -p /work/.corsair-java/classes\njavac --release 8 -d /work/.corsair-java/classes /work/src/main/java/org/apache/commons/io/IOCase.java /work/src/main/java/org/apache/commons/io/FilenameUtils.java",
+  "probe": "import org.apache.commons.io.FilenameUtils;\n\npublic final class CorsairProbe {\n    public static final String CONTROL_PAYLOAD = \"//trusted-host/share/item\";\n    public static final String EXPLOIT_PAYLOAD = \"//../owned-marker\";\n\n    public static boolean runTarget(String payload) {\n        String normalized = FilenameUtils.normalize(payload, true);\n        if (normalized == null) return true;\n        int start = normalized.startsWith(\"//\") ? 2 : 0;\n        int separator = normalized.indexOf('/', start);\n        String hostname = separator < 0 ? normalized.substring(start) : normalized.substring(start, separator);\n        return !hostname.equals(\".\") && !hostname.equals(\"..\");\n    }\n}\n"
+}

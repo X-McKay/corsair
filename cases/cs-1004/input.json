@@ -1,0 +1,15 @@
+{
+  "case_id": "cs-1004",
+  "finding": {
+    "title": "Ambiguous leading-zero IPv4 octet",
+    "description": "An IPv4 address parser accepts an octet with a leading zero and canonicalizes it to a different textual address, allowing two distinct inputs to compare as the same network address.",
+    "file_path": "lib/Net/Netmask.pm",
+    "start_line": 392,
+    "symbol": "quad2int",
+    "cwe": "CWE-20"
+  },
+  "source": "vulnerable",
+  "commit": "d98776e4badf6a92f281600756b962e696b906f0",
+  "fixed_source": "fixed",
+  "fixed_commit": "9023b403682f1eaadadf6cb71ba0117a1fa4f163"
+}
