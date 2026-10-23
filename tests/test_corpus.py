@@ -695,7 +695,7 @@ def corpus_fixture(tmp_path: Path) -> Path:
         record["evidence_url"] = record["evidence_url"].replace(COMMIT_A, commit).replace(COMMIT_B, commit)
     case["artifacts"]["input_sha256"] = hashlib.sha256(request_path.read_bytes()).hexdigest()
     write_manifest(root, data)
-    declare_vendored_snapshots(root)
+    bind_vendored_rights_evidence(root)
     return root
 
 
@@ -750,8 +750,10 @@ def declare_vendored_snapshots(root: Path, *, distinct_upstream: bool = False) -
                            else snapshot_repository)
     upstream_commits = ("a" * 40, "b" * 40) if distinct_upstream else (
         case["source_pair"]["vulnerable"]["commit"], case["source_pair"]["fixed"]["commit"])
-    snapshot_commits = (
-        case["source_pair"]["vulnerable"]["commit"], case["source_pair"]["fixed"]["commit"])
+    snapshot_commits = tuple(
+        case["source_pair"][revision].get("vendored_snapshot", {}).get(
+            "commit", case["source_pair"][revision]["commit"])
+        for revision in ("vulnerable", "fixed"))
     for revision, local_path, snapshot_commit, upstream_commit in zip(
             ("vulnerable", "fixed"),
             ("cases/cs-1001/vulnerable", "cases/cs-1001/fixed"),
@@ -769,11 +771,47 @@ def declare_vendored_snapshots(root: Path, *, distinct_upstream: bool = False) -
     request_path.write_text(json.dumps(request, indent=2) + "\n")
     target_rights = [record for record in case["rights"] if record["layer"] == "target_source"]
     for record, upstream_commit in zip(target_rights, upstream_commits, strict=True):
-        record["evidence_revision"] = upstream_commit
-        record["evidence_url"] = (
-            f"{upstream_repository}/blob/{upstream_commit}/{record['evidence_url'].rsplit('/', 1)[-1]}")
+        binding = record.get("origin", record)
+        binding["revision" if "origin" in record else "evidence_revision"] = upstream_commit
+        url_key = "url" if "origin" in record else "evidence_url"
+        binding[url_key] = (
+            f"{upstream_repository}/blob/{upstream_commit}/{binding[url_key].rsplit('/', 1)[-1]}")
     case["artifacts"]["input_sha256"] = hashlib.sha256(request_path.read_bytes()).hexdigest()
     write_manifest(root, data)
+
+
+def bind_vendored_rights_evidence(root: Path) -> str:
+    """Commit local evidence copies while retaining their immutable upstream identity."""
+    declare_vendored_snapshots(root, distinct_upstream=True)
+    data = read_manifest(root)
+    records = [record for record in data["cases"][0]["rights"] if record["layer"] == "target_source"]
+    if records and all(record.get("origin") is not None
+                       and "/cases/cs-1001/evidence/" in record["evidence_url"] for record in records):
+        revisions = {record["evidence_revision"] for record in records}
+        assert len(revisions) == 1
+        return revisions.pop()
+    relative_paths = []
+    for record in records:
+        filename = record["evidence_url"].rsplit("/", 1)[-1]
+        relative = Path("cases/cs-1001/evidence") / filename
+        destination = root / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(root / "evidence" / filename, destination)
+        relative_paths.append(relative.as_posix())
+        record["origin"] = {
+            "url": record["evidence_url"],
+            "revision": record["evidence_revision"],
+            "sha256": record["evidence_sha256"],
+        }
+    _test_git(root, "add", "--", *relative_paths)
+    _test_git(root, "commit", "-q", "-m", "commit rights evidence copies")
+    foundation = _test_git(root, "rev-parse", "HEAD")
+    for record, relative in zip(records, relative_paths, strict=True):
+        record["evidence_url"] = \
+            f"https://fixture.invalid/owner/project/blob/{foundation}/{relative}"
+        record["evidence_revision"] = foundation
+    write_manifest(root, data)
+    return foundation
 
 
 def issue_codes(report) -> set[str]:
@@ -864,7 +902,8 @@ def test_rights_require_revision_and_evidence_hash(tmp_path):
     fixed_commit = data["cases"][0]["source_pair"]["fixed"]["commit"]
     data["cases"][0]["rights"] = [r for r in data["cases"][0]["rights"]
                                       if not (r["layer"] == "target_source"
-                                              and r["evidence_revision"] == fixed_commit)]
+                                              and r.get("origin", {}).get(
+                                                  "revision", r["evidence_revision"]) == fixed_commit)]
     write_manifest(root, data)
     assert "RIGHTS_SOURCE_REVISION_MISSING" in issue_codes(checked(root))
 
@@ -936,6 +975,54 @@ def test_family_leakage_is_rejected(tmp_path, field, code):
     report = checked(root)
     assert code in issue_codes(report)
     assert any(set(issue.case_ids) == {"cs-1001", "cs-1002"} for issue in report.errors if issue.code == code)
+
+
+def test_distinct_self_authored_subtrees_at_one_foundation_commit_do_not_collide(tmp_path):
+    root = corpus_fixture(tmp_path)
+    data = read_manifest(root)
+    first = data["cases"][0]
+    for revision in ("vulnerable", "fixed"):
+        declared = first["source_pair"][revision]
+        declared["repository"] = declared["vendored_snapshot"]["repository"]
+        declared["commit"] = declared["vendored_snapshot"]["commit"]
+    second = deepcopy(first)
+    second.update(case_id="cs-1002", family_id="cf-1002", aliases=["CVE-2026-2002"])
+    second["source_pair"]["vulnerable"]["vendored_snapshot"]["path"] = "cases/cs-1002/vulnerable"
+    second["source_pair"]["fixed"]["vendored_snapshot"]["path"] = "cases/cs-1002/fixed"
+    data["cases"].append(second)
+    write_manifest(root, data)
+
+    assert "SOURCE_PAIR_FAMILY_COLLISION" not in issue_codes(checked(root))
+
+
+def test_same_self_authored_subtrees_remain_a_source_pair_collision(tmp_path):
+    root = corpus_fixture(tmp_path)
+    data = read_manifest(root)
+    first = data["cases"][0]
+    for revision in ("vulnerable", "fixed"):
+        declared = first["source_pair"][revision]
+        declared["repository"] = declared["vendored_snapshot"]["repository"]
+        declared["commit"] = declared["vendored_snapshot"]["commit"]
+    second = deepcopy(first)
+    second.update(case_id="cs-1002", family_id="cf-1002", aliases=["CVE-2026-2002"])
+    data["cases"].append(second)
+    write_manifest(root, data)
+
+    assert "SOURCE_PAIR_FAMILY_COLLISION" in issue_codes(checked(root))
+
+
+def test_distinct_local_paths_cannot_hide_an_upstream_source_pair_collision(tmp_path):
+    root = corpus_fixture(tmp_path)
+    data = read_manifest(root)
+    first = data["cases"][0]
+    second = deepcopy(first)
+    second.update(case_id="cs-1002", family_id="cf-1002", aliases=["CVE-2026-2002"])
+    second["source_pair"]["vulnerable"]["vendored_snapshot"]["path"] = "cases/cs-1002/vulnerable"
+    second["source_pair"]["fixed"]["vendored_snapshot"]["path"] = "cases/cs-1002/fixed"
+    data["cases"].append(second)
+    write_manifest(root, data)
+
+    assert "SOURCE_PAIR_FAMILY_COLLISION" in issue_codes(checked(root))
 
 
 def test_source_and_patch_hashes_are_verified(tmp_path):
@@ -1247,11 +1334,121 @@ def test_local_source_rights_cannot_be_substituted_from_an_unrelated_repository(
     vulnerable_commit = data["cases"][0]["source_pair"]["vulnerable"]["commit"]
     acquisition_only = deepcopy(data["cases"][0]["rights"][0])
     acquisition_only["redistribution_mode"] = "acquisition_recipe"
-    data["cases"][0]["rights"][0]["evidence_url"] = \
+    data["cases"][0]["rights"][0]["origin"]["url"] = \
         f"https://fixture.invalid/unrelated/project/blob/{vulnerable_commit}/source-v-LICENSE"
     data["cases"][0]["rights"].append(acquisition_only)
     write_manifest(root, data)
     assert "RIGHTS_SOURCE_REPOSITORY_MISMATCH" in issue_codes(checked(root))
+
+
+def test_vendored_rights_evidence_is_bound_to_upstream_origin_and_local_git_bytes(tmp_path):
+    root = corpus_fixture(tmp_path)
+    foundation = bind_vendored_rights_evidence(root)
+    fallback = fixture_evidence(root)
+    local_resolution_calls = []
+
+    def resolve(url: str, revision: str) -> bytes | None:
+        if "/cases/cs-1001/evidence/" in url:
+            local_resolution_calls.append((url, revision))
+            return None
+        return fallback(url, revision)
+
+    report = validate_corpus(root, _evidence_resolver=resolve)
+
+    assert report.ok, report.errors
+    assert local_resolution_calls == []
+    case = load_manifest(root / "benchmarks/dataset/manifest.json").cases[0]
+    records = [record for record in case.rights if record.layer == "target_source"]
+    assert {record.evidence_revision for record in records} == {foundation}
+    assert {record.origin.revision for record in records if record.origin is not None} == {"a" * 40, "b" * 40}
+
+
+def test_local_target_source_rights_require_an_origin_binding(tmp_path):
+    root = corpus_fixture(tmp_path)
+    bind_vendored_rights_evidence(root)
+    data = read_manifest(root)
+    data["cases"][0]["rights"][0].pop("origin")
+    write_manifest(root, data)
+
+    assert "RIGHTS_ORIGIN_MISSING" in issue_codes(checked(root))
+
+
+@pytest.mark.parametrize(("mutation", "code"), [
+    ("origin_repository", "RIGHTS_ORIGIN_REPOSITORY_MISMATCH"),
+    ("origin_revision", "RIGHTS_ORIGIN_REVISION_MISMATCH"),
+    ("origin_hash", "RIGHTS_ORIGIN_HASH_MISMATCH"),
+    ("copy_hash", "RIGHTS_ORIGIN_HASH_MISMATCH"),
+    ("evidence_repository", "RIGHTS_LOCAL_EVIDENCE_REPOSITORY_MISMATCH"),
+    ("evidence_revision", "RIGHTS_LOCAL_EVIDENCE_COMMIT_UNAVAILABLE"),
+    ("evidence_path", "RIGHTS_LOCAL_EVIDENCE_PATH_INVALID"),
+    ("evidence_object", "RIGHTS_LOCAL_EVIDENCE_OBJECT_UNAVAILABLE"),
+])
+def test_vendored_rights_reject_inconsistent_origin_or_local_identity(tmp_path, mutation, code):
+    root = corpus_fixture(tmp_path)
+    foundation = bind_vendored_rights_evidence(root)
+    data = read_manifest(root)
+    record = data["cases"][0]["rights"][0]
+    if mutation == "origin_repository":
+        record["origin"]["url"] = record["origin"]["url"].replace(
+            "upstream.invalid/example/project", "upstream.invalid/unrelated/project")
+    elif mutation == "origin_revision":
+        record["origin"]["revision"] = "c" * 40
+        record["origin"]["url"] = record["origin"]["url"].replace("a" * 40, "c" * 40)
+    elif mutation == "origin_hash":
+        record["origin"]["sha256"] = "f" * 64
+    elif mutation == "copy_hash":
+        record["evidence_sha256"] = "f" * 64
+    elif mutation == "evidence_repository":
+        record["evidence_url"] = record["evidence_url"].replace(
+            "fixture.invalid/owner/project", "fixture.invalid/unrelated/project")
+    elif mutation == "evidence_revision":
+        record["evidence_revision"] = "c" * 40
+        record["evidence_url"] = record["evidence_url"].replace(foundation, "c" * 40)
+    elif mutation == "evidence_path":
+        record["evidence_url"] = record["evidence_url"].replace(
+            "cases/cs-1001/evidence", "cases/cs-1001/vulnerable")
+    else:
+        record["evidence_url"] = record["evidence_url"].replace(
+            "source-v-LICENSE", "missing-LICENSE")
+    write_manifest(root, data)
+
+    assert code in issue_codes(checked(root))
+
+
+def test_vendored_rights_reject_uncommitted_evidence_drift(tmp_path):
+    root = corpus_fixture(tmp_path)
+    bind_vendored_rights_evidence(root)
+    (root / "cases/cs-1001/evidence/source-v-LICENSE").write_text("uncommitted replacement\n")
+
+    assert "RIGHTS_LOCAL_EVIDENCE_DRIFT" in issue_codes(checked(root))
+
+
+def test_vendored_rights_reject_a_symlinked_evidence_copy(tmp_path):
+    root = corpus_fixture(tmp_path)
+    bind_vendored_rights_evidence(root)
+    evidence = root / "cases/cs-1001/evidence/source-v-LICENSE"
+    evidence.unlink()
+    evidence.symlink_to(root / "evidence/source-v-LICENSE")
+
+    assert "RIGHTS_LOCAL_EVIDENCE_PATH_INVALID" in issue_codes(checked(root))
+
+
+def test_git_sources_reject_vendored_rights_origin_metadata(tmp_path):
+    root = corpus_fixture(tmp_path)
+    bind_vendored_rights_evidence(root)
+    data = read_manifest(root)
+    case = data["cases"][0]
+    request_path = root / "cases/cs-1001/input.json"
+    request = json.loads(request_path.read_text())
+    for request_field, revision_name in (("source", "vulnerable"), ("fixed_source", "fixed")):
+        declared = case["source_pair"][revision_name]
+        declared.pop("vendored_snapshot")
+        request[request_field] = {"url": declared["repository"], "commit": declared["commit"]}
+    request_path.write_text(json.dumps(request, indent=2) + "\n")
+    case["artifacts"]["input_sha256"] = hashlib.sha256(request_path.read_bytes()).hexdigest()
+    write_manifest(root, data)
+
+    assert "RIGHTS_ORIGIN_UNEXPECTED" in issue_codes(checked(root))
 
 
 @pytest.mark.parametrize(("expression", "code"), [

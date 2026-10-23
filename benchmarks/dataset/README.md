@@ -18,7 +18,15 @@ A redistributed local snapshot keeps its upstream repository and vulnerable/fixe
 separate `vendored_snapshot` binds the checked-in bytes to the Corsair repository, an ancestor foundation commit,
 the exact repository-relative subtree path, and its tree digest. Curators therefore commit source bytes first and
 attach the manifest entry in a later commit. Local paths without that binding fail closed; remote `GitSource`
-entries cannot carry it. Vendored rights evidence remains tied to the upstream repository and revision.
+entries cannot carry it.
+
+Vendored target-source rights use the same two-identity rule. The record's `evidence_url`, `evidence_revision`, and
+`evidence_sha256` bind a byte-identical copy below `cases/<case-id>/evidence` to an ancestor Corsair commit. Its
+nested `origin` records the immutable upstream `url`, `revision`, and `sha256`; the upstream repository and revision
+must equal the corresponding `source_pair` revision, and both hashes must agree. Validation reads the Corsair Git
+blob and current disk file directly, rejects missing objects, unsafe paths, links, and uncommitted drift, and never
+fetches or consults the source cache. Direct `GitSource` rights retain their upstream evidence fields and cannot
+carry this local-copy origin binding. Other rights layers retain their existing direct evidence records.
 
 `target.lines` binds the submitted hypothesis and vulnerable revision. When a fix shifts the same semantic seam,
 `target.fixed_lines` records its fixed-revision line identity; omitting it keeps the original shared-line behavior.
