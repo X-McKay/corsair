@@ -1,0 +1,33 @@
+name: producer
+version: "1"
+owner: X-McKay
+execution: ephemeral_sandbox
+risk: untrusted repository and finding content; kernel gates are the only evidence
+self_certification: prohibited
+contracts:
+  input: finding, runtime row, and isolated vulnerable workspace
+  output: differential submission or one-sentence stop reason
+budgets:
+  - submissions
+  - shell_calls
+  - model_requests
+  - model_tokens
+errors:
+  - budget_exhausted
+  - negative_threshold_reached
+  - provider_or_transport_failure
+tools:
+  - bash
+  - read_skill
+  - submit
+skills:
+  - build-recipes
+  - cpp-cmake
+  - differential-probing
+  - java-maven
+  - node-vite
+  - perl-cpan
+  - python-pytest
+  - ruby-bundler
+  - runtime-selection
+  - sanitizers

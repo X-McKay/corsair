@@ -1,0 +1,17 @@
+name: skill-crystallizer
+version: "1"
+owner: X-McKay
+execution: ephemeral
+risk: untrusted trace; emits a reviewed skill proposal only
+self_certification: prohibited
+contracts:
+  input: successful verdict, repeated gate rejections, and allowed skill inventory
+  output: at-most-three-line review proposal
+budgets:
+  - one_model_request
+errors:
+  - no_operator_owned_skills
+  - invalid_skill_proposal
+  - provider_or_transport_failure
+tools: []
+skills: []

@@ -1,4 +1,5 @@
 """Case loading, the runtime matrix and provider profiles; no containers, no model."""
+
 from __future__ import annotations
 
 import json
@@ -6,9 +7,11 @@ from pathlib import Path
 
 import pytest
 
-from corsair import matrix
-from corsair.case import Case, Finding, from_request, load_case, load_oracle, tree_sha256
-from corsair.providers import ModelProfile, ProviderConfig, load_provider_config, model_settings
+from corsair.adapters.inference.openai import model_settings
+from corsair.application.cases import from_request, load_case, load_oracle
+from corsair.domain.case import Case, Finding, tree_sha256
+from corsair.runtime import matrix
+from corsair.runtime.inference import ModelProfile, ProviderConfig, load_provider_config
 
 ROOT = Path(__file__).resolve().parents[1]
 CASE = ROOT / "cases/path-traversal-fixture"
@@ -58,12 +61,24 @@ def test_finding_paths_stay_inside_the_tree():
 def test_matrix_selects_the_python_row_for_the_fixture_and_none_for_an_unknown_tree(tmp_path):
     rows = matrix.load()
     assert rows[0].id == "pytest-cpython312" and rows[0].framework == "pytest"
-    assert {row.language for row in rows} == {"python", "java", "javascript", "typescript", "perl", "ruby", "cpp"}
+    assert {row.language for row in rows} == {
+        "python",
+        "java",
+        "javascript",
+        "typescript",
+        "perl",
+        "ruby",
+        "cpp",
+    }
     case = load_case(CASE)
     assert matrix.select(case).id == "pytest-cpython312"
     (tmp_path / "x").mkdir()
     (tmp_path / "x/README").write_text("nothing\n")
-    other = Case(case_id="c", finding=Finding(title="t"), revision=case.revision.model_copy(update={"source": str(tmp_path / "x")}))
+    other = Case(
+        case_id="c",
+        finding=Finding(title="t"),
+        revision=case.revision.model_copy(update={"source": str(tmp_path / "x")}),
+    )
     assert matrix.select(other) is None
 
 
@@ -82,9 +97,13 @@ def test_provider_config_maps_both_agents_and_keeps_vllm_settings():
 
 
 def test_git_source_request_schema_and_cache_key(tmp_path, monkeypatch):
-    from corsair.case import GitSource, _Request, acquire
-    request = _Request.model_validate({"finding": {"title": "t"}, "source": {"url": "https://example.invalid/r.git",
-                                                                            "commit": "0" * 40}})
+    from corsair.adapters.scm.git import GitSCM
+    from corsair.application.cases import _Request
+    from corsair.domain.case import GitSource
+
+    request = _Request.model_validate(
+        {"finding": {"title": "t"}, "source": {"url": "https://example.invalid/r.git", "commit": "0" * 40}}
+    )
     assert isinstance(request.source, GitSource)
     with pytest.raises(ValueError):
         GitSource(url="git://example.invalid/r.git", commit="0" * 40)
@@ -94,15 +113,23 @@ def test_git_source_request_schema_and_cache_key(tmp_path, monkeypatch):
     local = tmp_path / "repo"
     local.mkdir()
     import subprocess
+
     subprocess.run(["git", "-C", str(local), "init", "-q"], check=True)
     (local / "a.py").write_text("x = 1\n")
-    subprocess.run(["git", "-C", str(local), "-c", "user.email=t@t", "-c", "user.name=t", "add", "a.py"], check=True)
-    subprocess.run(["git", "-C", str(local), "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "i"], check=True)
-    commit = subprocess.run(["git", "-C", str(local), "rev-parse", "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
+    subprocess.run(
+        ["git", "-C", str(local), "-c", "user.email=t@t", "-c", "user.name=t", "add", "a.py"], check=True
+    )
+    subprocess.run(
+        ["git", "-C", str(local), "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "i"],
+        check=True,
+    )
+    commit = subprocess.run(
+        ["git", "-C", str(local), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
+    ).stdout.strip()
     source = GitSource(url="https://example.invalid/placeholder.git", commit=commit)
     cache = tmp_path / "cache"
     key_dir = cache / __import__("hashlib").sha256(f"{source.url}\n{source.commit}".encode()).hexdigest()[:24]
     key_dir.mkdir(parents=True)
     (key_dir / "a.py").write_text("x = 1\n")
     (key_dir / ".corsair-complete").write_text("done")
-    assert acquire(source, cache) == key_dir
+    assert GitSCM().acquire(source, cache) == key_dir

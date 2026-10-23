@@ -1,0 +1,1 @@
+"""Adapters artifacts package."""

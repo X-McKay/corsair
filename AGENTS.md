@@ -5,9 +5,10 @@ design is in [README.md](README.md) and [docs/design.md](docs/design.md); the pi
 
 ## What the kernel guarantees, and what code may never weaken
 
-- A verdict comes only from `corsair.kernel`: deterministic gates over one probe with two payloads, run as two native
-  pytest test ids in fresh offline containers built by replaying the submitted build script. No model output is a
-  verdict; the blind auditor sees hypothesis and probe, never an outcome, and can only reject.
+- A verdict comes only from `corsair.application.kernel` and the pure stopping rules in `corsair.domain.policy`:
+  deterministic gates over one probe with two payloads, run as two native pytest test ids in fresh offline containers
+  built by replaying the submitted build script. No model output is a verdict; the blind auditor sees hypothesis and
+  probe, never an outcome, and can only reject.
 - Polarity: `holds` means the probe's invariant held; `violated` means the probe's own assertion failed, i.e. the
   reported condition occurred. `LIKELY_EXPLOITABLE` needs control `holds` and exploit `violated` on the vulnerable
   revision with both runs executing the target lines. `LIKELY_NOT_EXPLOITABLE` (K4) needs, over one investigation, at
@@ -26,10 +27,13 @@ design is in [README.md](README.md) and [docs/design.md](docs/design.md); the pi
 
 ## How to change it
 
-- Keep it small. Every module has one job: `case`, `matrix`, `providers`, `sandbox`, `kernel`, `auditor`,
-  `producer`, `cli`. Add a module only to remove a responsibility from another. Languages are matrix rows and images,
-  not code paths, once the kernel supports their framework.
-- Skills in `src/corsair/skills/` are operator-owned guidance. A skill or prompt change is an agent behaviour change:
+- Keep it small. Agent factories, specifications, instructions and private tools/skills live together under
+  `src/corsair/agents/<name>/`. Pure contracts live in `domain/`; deterministic services in `application/`; typed
+  boundaries in `ports/`; concrete integrations in `adapters/`; operator settings in `runtime/`. `cli.py` is the
+  composition root. Inner layers must not import concrete adapters, and the kernel receives its framework and
+  artifact/sandbox ports explicitly. Reuse the PydanticAI `Model` interface rather than wrapping model invocation.
+  Add a module only to remove a responsibility from another; do not create empty future layers or compatibility shims.
+- Skills in `src/corsair/agents/producer/skills/<name>/SKILL.md` are operator-owned guidance. A skill or prompt change is an agent behaviour change:
   rerun `make eval` and compare the gate ledger and verdict accuracy before merging.
 - Checks: `make test-offline` for any change (scripted model and sandbox doubles); `make test` when the kernel,
   sandbox or image changed (real containers); `make pilot` with the operator's provider config for agent changes.

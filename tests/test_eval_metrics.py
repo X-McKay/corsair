@@ -2,15 +2,17 @@
 
 The repeat path runs through ``main`` with the investigation replaced by a scripted record; nothing calls a model.
 """
+
 from __future__ import annotations
 
 import json
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import pytest
 
 from corsair import cli
-from corsair.case import load_case, load_oracle
+from corsair.application.cases import load_case, load_oracle
 
 ROOT = Path(__file__).resolve().parents[1]
 E2E = ROOT / "evals/e2e"
@@ -65,17 +67,32 @@ def test_loading_a_set_refuses_an_oracle_that_changed_after_freezing(tmp_path):
 
 def _row(case, label, expected, *, repeat=1, requests=None, input_tokens=None, tool_calls=None):
     correct = None if expected is None else label in {expected}
-    return {"case": case, "case_id": case, "repeat": repeat, "label": label, "expected_label": expected,
-            "correct": correct, "forbidden_hit": False, "requests": requests, "input_tokens": input_tokens,
-            "output_tokens": None, "tool_calls": tool_calls, "bash_calls": None, "duration_s": 1.0}
+    return {
+        "case": case,
+        "case_id": case,
+        "repeat": repeat,
+        "label": label,
+        "expected_label": expected,
+        "correct": correct,
+        "forbidden_hit": False,
+        "requests": requests,
+        "input_tokens": input_tokens,
+        "output_tokens": None,
+        "tool_calls": tool_calls,
+        "bash_calls": None,
+        "duration_s": 1.0,
+    }
 
 
 def test_summary_reports_accuracy_precision_recall_and_inconclusive_rate():
     E, N = "LIKELY_EXPLOITABLE", "LIKELY_NOT_EXPLOITABLE"
     rows = [
-        _row("a", E, E), _row("a", N, E), _row("a", "INCONCLUSIVE", E),  # recall misses for E: N and INCONCLUSIVE
-        _row("b", N, N), _row("b", E, N),                                 # b: an N run that is right, and an E run that is a false positive
-        _row("c", "UNABLE_TO_RUN", None),                                 # unscored, no truth
+        _row("a", E, E),
+        _row("a", N, E),
+        _row("a", "INCONCLUSIVE", E),  # recall misses for E: N and INCONCLUSIVE
+        _row("b", N, N),
+        _row("b", E, N),  # b: an N run that is right, and an E run that is a false positive
+        _row("c", "UNABLE_TO_RUN", None),  # unscored, no truth
     ]
     m = cli.summarise(rows)
     assert (m["runs"], m["scored_runs"], m["correct_runs"]) == (6, 5, 2)
@@ -83,13 +100,21 @@ def test_summary_reports_accuracy_precision_recall_and_inconclusive_rate():
     assert m["per_label"][E] == {"tp": 1, "fp": 1, "fn": 2, "precision": 0.5, "recall": pytest.approx(1 / 3)}
     assert m["per_label"][N] == {"tp": 1, "fp": 1, "fn": 1, "precision": 0.5, "recall": 0.5}
     assert m["inconclusive_rate"] == pytest.approx(1 / 6)
-    assert m["label_counts"] == {"INCONCLUSIVE": 1, "LIKELY_EXPLOITABLE": 2, "LIKELY_NOT_EXPLOITABLE": 2,
-                                 "UNABLE_TO_RUN": 1}
+    assert m["label_counts"] == {
+        "INCONCLUSIVE": 1,
+        "LIKELY_EXPLOITABLE": 2,
+        "LIKELY_NOT_EXPLOITABLE": 2,
+        "UNABLE_TO_RUN": 1,
+    }
 
 
 def test_missing_telemetry_is_unknown_not_zero():
-    rows = [_row("a", "LIKELY_EXPLOITABLE", "LIKELY_EXPLOITABLE", requests=3, input_tokens=100, tool_calls=4),
-            _row("a", "LIKELY_EXPLOITABLE", "LIKELY_EXPLOITABLE", requests=None, input_tokens=None, tool_calls=None)]
+    rows = [
+        _row("a", "LIKELY_EXPLOITABLE", "LIKELY_EXPLOITABLE", requests=3, input_tokens=100, tool_calls=4),
+        _row(
+            "a", "LIKELY_EXPLOITABLE", "LIKELY_EXPLOITABLE", requests=None, input_tokens=None, tool_calls=None
+        ),
+    ]
     telemetry = cli.summarise(rows)["telemetry"]
     assert telemetry["input_tokens"] == {"reported_runs": 1, "runs": 2, "total": 100, "mean": 100.0}
     assert telemetry["output_tokens"] == {"reported_runs": 0, "runs": 2, "total": None, "mean": None}
@@ -98,8 +123,12 @@ def test_missing_telemetry_is_unknown_not_zero():
 
 def test_per_case_agreement_is_the_share_on_the_modal_label():
     E, N = "LIKELY_EXPLOITABLE", "LIKELY_NOT_EXPLOITABLE"
-    rows = [_row("a", E, E, repeat=1), _row("a", E, E, repeat=2), _row("a", N, E, repeat=3),
-            _row("b", N, N, repeat=1)]
+    rows = [
+        _row("a", E, E, repeat=1),
+        _row("a", E, E, repeat=2),
+        _row("a", N, E, repeat=3),
+        _row("b", N, N, repeat=1),
+    ]
     by_case = {c["case"]: c for c in cli.per_case(rows)}
     assert by_case["a"]["modal_label"] == E
     assert by_case["a"]["agreement"] == pytest.approx(2 / 3)
@@ -109,8 +138,10 @@ def test_per_case_agreement_is_the_share_on_the_modal_label():
 
 
 def _provider(tmp_path: Path) -> Path:
-    config = {"profiles": {"p": {"base_url": "https://llm.example.test/v1", "model_name": "model-under-test"}},
-              "agents": {"producer": "p", "auditor": "p"}}
+    config = {
+        "profiles": {"p": {"base_url": "https://llm.example.test/v1", "model_name": "model-under-test"}},
+        "agents": {"producer": "p", "auditor": "p"},
+    }
     path = tmp_path / "providers.json"
     path.write_text(json.dumps(config))
     return path
@@ -128,11 +159,32 @@ def test_repeats_run_each_case_n_times_and_write_the_aggregate(tmp_path, monkeyp
         calls.append(case.case_id)
         repeat = calls.count(case.case_id)
         label = "INCONCLUSIVE" if repeat == 3 else expected_by_id[case.case_id]
-        return {"verdict": {"label": label, "fix": "not_applicable"}, "submissions": [], "run_id": f"r{len(calls)}"}
+        return {
+            "verdict": {"label": label, "fix": "not_applicable"},
+            "submissions": [],
+            "run_id": f"r{len(calls)}",
+        }
+
+    class ScriptedInference:
+        @asynccontextmanager
+        async def models(self, config, agents=("producer", "auditor")):
+            yield {name: object() for name in agents}
 
     monkeypatch.setattr(cli, "_investigate_one", scripted)
-    code = cli.main(["eval", "--set", str(DEV), "--provider", str(_provider(tmp_path)), "--repeats", "3",
-                     "--runs", str(tmp_path)])
+    code = cli.main(
+        [
+            "eval",
+            "--set",
+            str(DEV),
+            "--provider",
+            str(_provider(tmp_path)),
+            "--repeats",
+            "3",
+            "--runs",
+            str(tmp_path),
+        ],
+        inference=ScriptedInference(),
+    )
     assert code == 0
     (out,) = tmp_path.glob("eval-*.json")
     summary = json.loads(out.read_text())

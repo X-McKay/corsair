@@ -1,0 +1,15 @@
+name: auditor
+version: "1"
+owner: X-McKay
+execution: ephemeral
+risk: untrusted hypothesis and probe text; never receives outcomes
+self_certification: prohibited
+contracts:
+  input: hypothesis and differential probe only
+  output: typed blind audit result
+budgets:
+  - one_model_request
+errors:
+  - provider_or_transport_failure
+tools: []
+skills: []

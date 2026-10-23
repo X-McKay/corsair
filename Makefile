@@ -10,10 +10,14 @@ WORKERS ?= 4
 BENCH_ROOT ?= .runs/polyglot
 LANGUAGE ?=
 
-.PHONY: sync test test-offline test-docker image images benchmark benchmark-generate verify investigate eval eval-dev eval-heldout pilot cleanup
+.PHONY: sync check test test-offline test-docker image images benchmark benchmark-generate verify investigate eval eval-dev eval-heldout pilot cleanup
 
 sync:
 	uv sync --locked
+
+check:
+	uvx ruff==0.11.13 check src/corsair tests tools benchmarks/polyglot
+	uvx ruff==0.11.13 format --check src/corsair tests tools benchmarks/polyglot
 
 test: image
 	$(PYTHON) -m pytest -q -m "not live"
@@ -42,27 +46,27 @@ benchmark:
 
 # Kernel only: verify a human- or agent-written submission (no model unless PROVIDER adds the blind auditor).
 verify: image
-	$(PYTHON) -m corsair.cli verify --case $(CASE) --submission $(CASE)/reference-submission.json --runs $(RUNS)
+	$(PYTHON) -m corsair verify --case $(CASE) --submission $(CASE)/reference-submission.json --runs $(RUNS)
 
 investigate: image
-	$(PYTHON) -m corsair.cli investigate --case $(CASE) --provider $(PROVIDER) --max-submissions $(MAX_SUBMISSIONS) --runs $(RUNS)
+	$(PYTHON) -m corsair investigate --case $(CASE) --provider $(PROVIDER) --max-submissions $(MAX_SUBMISSIONS) --runs $(RUNS)
 
 # The pilot set: the reviewed fixture plus the local Python corpus cases that carry a fixed revision.
 PILOT_CASES := cases/path-traversal-fixture $(wildcard evals/e2e/python/v2/*-a) $(wildcard evals/e2e/python/v2/*-b)
 eval: image
-	$(PYTHON) -m corsair.cli eval --cases $(PILOT_CASES) --provider $(PROVIDER) --max-submissions $(MAX_SUBMISSIONS) --repeats $(REPEATS) --runs $(RUNS)
+	$(PYTHON) -m corsair eval --cases $(PILOT_CASES) --provider $(PROVIDER) --max-submissions $(MAX_SUBMISSIONS) --repeats $(REPEATS) --runs $(RUNS)
 
 # Frozen splits of the paired Python v2 cases. Tune prompts and skills on eval-dev only; eval-heldout is for reporting a
 # configuration already frozen on dev. REPEATS=N runs each case N times (provider config picks the model).
 eval-dev: image
-	$(PYTHON) -m corsair.cli eval --set $(DEV_SET) --provider $(PROVIDER) --max-submissions $(MAX_SUBMISSIONS) --repeats $(REPEATS) --runs $(RUNS)
+	$(PYTHON) -m corsair eval --set $(DEV_SET) --provider $(PROVIDER) --max-submissions $(MAX_SUBMISSIONS) --repeats $(REPEATS) --runs $(RUNS)
 
 eval-heldout: image
-	$(PYTHON) -m corsair.cli eval --set $(HELDOUT_SET) --provider $(PROVIDER) --max-submissions $(MAX_SUBMISSIONS) --repeats $(REPEATS) --runs $(RUNS)
+	$(PYTHON) -m corsair eval --set $(HELDOUT_SET) --provider $(PROVIDER) --max-submissions $(MAX_SUBMISSIONS) --repeats $(REPEATS) --runs $(RUNS)
 
 pilot: image
-	$(PYTHON) -m corsair.cli verify --case cases/path-traversal-fixture --submission cases/path-traversal-fixture/reference-submission.json --provider $(PROVIDER) --runs $(RUNS)
-	$(PYTHON) -m corsair.cli eval --cases $(PILOT_CASES) --provider $(PROVIDER) --max-submissions $(MAX_SUBMISSIONS) --runs $(RUNS)
+	$(PYTHON) -m corsair verify --case cases/path-traversal-fixture --submission cases/path-traversal-fixture/reference-submission.json --provider $(PROVIDER) --runs $(RUNS)
+	$(PYTHON) -m corsair eval --cases $(PILOT_CASES) --provider $(PROVIDER) --max-submissions $(MAX_SUBMISSIONS) --runs $(RUNS)
 
 cleanup:
-	$(PYTHON) -m corsair.cli cleanup
+	$(PYTHON) -m corsair cleanup

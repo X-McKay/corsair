@@ -19,6 +19,7 @@ jobs:
         with:
           version: '0.11.12'
       - run: uv sync --locked
+      - run: make check
       - run: uv run --locked python -m pytest -q -m 'not docker and not live'
       - run: uv build
 

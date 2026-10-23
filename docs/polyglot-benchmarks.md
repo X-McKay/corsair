@@ -13,7 +13,7 @@ case_paths = generate(Path("/tmp/corsair-polyglot"), languages=["python", "java"
 
 - `root` is a caller-selected writable directory. The generator creates it when absent and deterministically overwrites only matching generated fixture files; it does not delete unrelated files.
 - `languages` is optional and accepts lowercase names from `python`, `java`, `javascript`, `typescript`, `perl`, `ruby`, and `cpp`.
-- The return value is a stable-order `list[Path]` of **case directories**, each directly acceptable to `corsair.case.load_case`.
+- The return value is a stable-order `list[Path]` of **case directories**, each directly acceptable to `corsair.application.cases.load_case`.
 - Each case has `input.json`, `reference-submission.json`, `provenance.json`, `oracle.json`, and `vulnerable/` plus `fixed/` source trees. `oracle.json` is evaluator-only and is absent from both the Case request and Submission.
 
 Every target exposes a small command-line policy API that evaluates its supplied raw request and writes `ALLOW` or `DENY`; it is a policy computation in language source, not a stored expected-result marker.

@@ -1,0 +1,12 @@
+---
+name: perl-cpan
+description: Build and cover Perl targets using their project tooling.
+---
+# Perl / CPAN runtime
+
+- Image: Debian Bookworm with Perl, `make`, `cpanm`, `libdevel-cover-perl`, and a Python virtual environment containing `pytest==9.0.3` and `coverage==7.13.4`. The build container may fetch CPAN dependencies; every probe runs offline.
+- The probe remains one Python module. Define `CONTROL_PAYLOAD`, `EXPLOIT_PAYLOAD`, and `run_target(payload)`; invoke the **already-built** Perl program through `subprocess.run`, inspect its real output, and assert one payload-independent invariant. Do not add a Perl test that replaces the target or use a mock seam.
+- Build the project's real dependencies before probing. For a CPAN project, a typical build script is `cpanm --notest --installdeps .` or the repository's documented `perl Makefile.PL && make`; prefer its lockfile or normal installation mechanism where present.
+- The kernel sets `PERL5OPT` to load `Devel::Cover` before every Perl subprocess and writes its database under `/tmp/corsair/perl`. **Do not** clear, override, or add another `PERL5OPT`; let `subprocess.run` inherit its environment. If an explicit environment is necessary, start with `os.environ.copy()`.
+- Native evidence comes only from the kernel-owned collector's `Devel::Cover::DB` statement counts, not Python coverage and not `cover -report json` (that report provides only summaries). Set `target_file` to the exact repository-relative `.pl` or `.pm` file and select executable statement lines in the real target path. Missing database/report data, an absent exact target record, malformed line data, or no positive statement hits fails the coverage gate.
+- The sealed project tree is read-only during probes. Keep temporary request bodies and output files under `/tmp`; do not write into `/work` or `/tmp/corsair`, which is reserved for kernel evidence.

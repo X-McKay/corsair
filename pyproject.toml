@@ -31,7 +31,12 @@ package = true
 [tool.uv.build-backend]
 # src/corsair is a namespace package (no __init__.py).
 namespace = true
-source-include = ["src/corsair/runtime-matrix.yaml", "src/corsair/skills/*.md"]
+source-include = [
+    "src/corsair/runtime/*.yaml",
+    "src/corsair/agents/**/agent.yaml",
+    "src/corsair/agents/**/instructions/*.md",
+    "src/corsair/agents/**/skills/*/SKILL.md",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -41,3 +46,9 @@ markers = [
     "docker: runs real containers against the local Docker daemon (skipped when Docker is unavailable)",
     "live: calls the configured model endpoint (never run by default; make pilot)",
 ]
+
+[tool.ruff]
+line-length = 110
+
+[tool.ruff.lint]
+select = ["F", "I", "W605"]

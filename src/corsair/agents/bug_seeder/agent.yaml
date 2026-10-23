@@ -1,0 +1,16 @@
+name: bug-seeder
+version: "1"
+owner: X-McKay
+execution: ephemeral
+risk: untrusted source; emits an unvalidated patch proposal only
+self_certification: prohibited
+contracts:
+  input: one bounded source file and requested vulnerability class
+  output: one-file unified-diff proposal
+budgets:
+  - one_model_request
+errors:
+  - invalid_target_or_diff
+  - provider_or_transport_failure
+tools: []
+skills: []

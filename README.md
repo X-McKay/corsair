@@ -12,6 +12,7 @@ Requirements: Linux, Docker, Python 3.12, and [uv](https://docs.astral.sh/uv/). 
 
 ```bash
 make sync             # pinned development environment
+make check            # pinned lint and formatting checks
 make test-offline     # contracts, parser regressions, scripted agents; no model or Docker required
 make verify           # build Python image and verify the reviewed paired fixture
 make images           # all six images; Node covers JavaScript and TypeScript
@@ -33,7 +34,7 @@ For a smaller run, use `make benchmark LANGUAGE=java WORKERS=2`. `make benchmark
 | Ruby | SimpleCov resultset | Bundler and Rake |
 | C++ | GCC gcov JSON | GCC, CMake, Make and Ninja; `--coverage -O0 -g` |
 
-The operator-owned [runtime matrix](matrix.yaml) selects the image and native collector. Build-system commands belong in the submitted build script and [language skills](src/corsair/skills), not framework-specific kernel branches. Target extensions disambiguate mixed-language trees. Unsupported toolchain versions or layouts fail honestly; the matrix is not a claim that every project or framework has been validated.
+The operator-owned [runtime matrix](matrix.yaml) selects the image and native collector. Build-system commands belong in the submitted build script and [producer skills](src/corsair/agents/producer/skills), not framework-specific kernel branches. Target extensions disambiguate mixed-language trees. Unsupported toolchain versions or layouts fail honestly; the matrix is not a claim that every project or framework has been validated.
 
 ## Run the agents
 
@@ -62,17 +63,49 @@ Both operations return schema-validated **review proposals**. They do not apply 
 
 ## Navigate the codebase
 
-| Location | Responsibility |
-| --- | --- |
-| `src/corsair/case.py`, `matrix.py`, `providers.py` | immutable source identity; operator runtime/model configuration |
-| `src/corsair/kernel.py` | gates, isolated twin execution, verdict and fix annotation |
-| `src/corsair/frameworks/` | one shared pytest driver plus native coverage collectors/parsers |
-| `src/corsair/sandbox/` | PydanticAI workspace and Docker execution boundary |
-| `src/corsair/producer.py`, `auditor.py`, `seed.py` | bounded agent work, blind review, proposal generation |
-| `src/corsair/cli.py`, `artifacts.py`, `skills/` | commands, atomic records/evidence, operator guidance |
-| `images/`, `tests/` | toolchain images; offline and real-container regressions |
-| `benchmarks/polyglot/`, `tools/benchmark.py` | compact deterministic generator and bounded parallel runner |
-| `benchmarks/catalog/`, `docs/benchmark-sources/` | sourced external candidate backlog, explicitly unvalidated |
+```text
+src/corsair/
+├── cli.py                         # Composition root: configure and connect adapters
+├── agents/
+│   ├── producer/
+│   │   ├── agent.py               # PydanticAI factory and explicit capabilities
+│   │   ├── agent.yaml             # Reviewable agent contract and allowlists
+│   │   ├── dependencies.py        # Typed runtime context
+│   │   ├── types.py               # Run output and bounded-stop types
+│   │   ├── instructions/system.md
+│   │   ├── tools/                # bash, read_skill, submit
+│   │   └── skills/<name>/SKILL.md
+│   ├── auditor/                  # Tool-free, outcome-blind agent
+│   ├── bug_seeder/               # Tool-free bug proposal agent
+│   ├── skill_crystallizer/       # Tool-free skill proposal agent
+│   └── resources.py              # Shared spec/resource validation only
+├── domain/                       # Immutable case, submission and evidence types
+├── application/
+│   ├── kernel.py                 # Deterministic verification gates
+│   ├── investigation.py          # Bounded producer execution and stopping
+│   ├── cases.py                  # Source requests; evaluator-only oracle loading
+│   └── evaluation.py             # Frozen sets, scoring and metrics
+├── ports/                        # Typed boundaries, no implementation selection
+│   ├── sandbox.py
+│   ├── inference.py              # Model assembly; SDK Model owns invocation
+│   ├── scm.py
+│   ├── artifacts.py
+│   ├── framework.py
+│   └── verification.py
+├── adapters/
+│   ├── sandbox/docker.py
+│   ├── inference/openai.py       # Native SDK model/client lifecycle
+│   ├── scm/git.py                # Pinned Git acquisition with hooks disabled
+│   ├── artifacts/filesystem.py   # Content-addressed evidence and atomic JSON
+│   └── frameworks/               # Native coverage SDKs and shared pytest driver
+└── runtime/                      # Operator model settings and runtime matrix
+```
+
+Start with `cli.py` to see composition, then `application/kernel.py` for the verification path. Follow an agent's `agent.py` to its private tools, instructions and skills. To change Docker or Git behavior, go directly to the matching adapter rather than looking through agent code.
+
+Dependencies point inward: concrete adapters implement ports; application services receive them explicitly; domain contracts know neither adapters nor agents. The kernel does not select Docker, a filesystem store or a coverage implementation. Agents use PydanticAI's existing `Model` interface, not another home-built model API. Architecture tests enforce these boundaries. Only genuinely shared resource validation is shared; the tool-free agents do not have empty `tools/` or `skills/` directories.
+
+`images/` holds toolchains, `tests/` the regression suite, and `benchmarks/polyglot/` plus `tools/benchmark.py` the deterministic generator and runner. External leads remain separate in `benchmarks/catalog/` and `docs/benchmark-sources/`. Generated projects and private run evidence live under ignored `.runs/`, not in the source package.
 
 ## Evidence and limitations
 
@@ -80,4 +113,4 @@ The [polyglot benchmark guide](docs/polyglot-benchmarks.md) describes **55 twin 
 
 Docker is the implemented execution backend, not a production OpenShell deployment. Hardened containers reduce risk but are not a guarantee against container escapes. Probe structure checks and a blind auditor are not an adversarial proof system: native reports are not cryptographic execution attestations, and model-authored builds and probes still require review. Original source entries must stay unchanged, so projects that deliberately rewrite tracked source during builds need an explicit policy decision rather than a silent exception. C++ fatal sanitizer aborts may lose coverage and remain inconclusive; Java nonstandard source layouts need explicit support. Build replay can access the network, while probes cannot. No tool bypasses an unavailable runtime, coverage failure, or provider refusal.
 
-See [implementation contract](docs/spec-0090-implementation.md), [validation record](docs/validation.md), [original design](docs/design.md), and [earlier Python pilot](docs/pilot.md). This branch follows the contract/evidence separation in `X-McKay/playbooks`; it is a review candidate, not a certification or merge approval.
+See the [architecture refactor](docs/architecture-refactor.md), [implementation contract](docs/spec-0090-implementation.md), [validation record](docs/validation.md), [original design](docs/design.md), and [earlier Python pilot](docs/pilot.md). This branch follows the agent-private layout and contract/evidence separation in `X-McKay/playbooks`; it is a review candidate, not a certification or merge approval.
