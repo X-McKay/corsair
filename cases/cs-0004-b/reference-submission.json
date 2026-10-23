@@ -1,0 +1,15 @@
+{
+  "contract_version": "corsair-lite/differential-probe/2",
+  "hypothesis": {
+    "target_file": "bin/script-target.pl",
+    "target_symbol": "main",
+    "target_lines": [
+      5,
+      6
+    ],
+    "root_cause": "The CLI joins an untrusted path without confining it to the allowed directory.",
+    "expected_violation": "The outside sentinel content is returned."
+  },
+  "build_script": "",
+  "probe": "# SPDX-License-Identifier: Apache-2.0\npackage CorsairProbe;\nuse strict;\nuse warnings;\nuse File::Path qw(make_path);\nuse File::Temp qw(tempdir);\nour $CONTROL_PAYLOAD = 'document';\nour $EXPLOIT_PAYLOAD = '../outside';\nsub run_target {\n    my ($payload) = @_;\n    my $base = tempdir('corsair-script-XXXXXX', TMPDIR => 1, CLEANUP => 1);\n    make_path(\"$base/allowed\");\n    _write(\"$base/allowed/document\", 'inside');\n    _write(\"$base/outside\", 'outside');\n    chdir $base or die \"cannot enter fixture: $!\";\n    my $content = _launch('/work/bin/script-target.pl', \"$base/allowed\", $payload, 'second');\n    return $content ne 'outside';\n}\nsub _launch {\n    my (@args) = @_;\n    open my $child, '-|', $^X, @args or die \"cannot launch child: $!\";\n    local $/;\n    my $content = <$child>;\n    close $child or die \"child failed: $?\";\n    die 'malformed child output' unless defined($content) && $content =~ /\\A(?:inside|outside|rejected)\\z/;\n    return $content;\n}\nsub _write {\n    my ($path, $content) = @_;\n    open my $handle, '>', $path or die \"cannot write fixture: $!\";\n    print {$handle} $content;\n    close $handle or die \"cannot close fixture: $!\";\n}\n1;\n"
+}

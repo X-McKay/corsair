@@ -1,0 +1,13 @@
+{
+  "case_id": "fixture:perl-child-script",
+  "finding": {
+    "title": "Path traversal in Perl script",
+    "description": "An unconfined caller-supplied name can read a file outside the document root.",
+    "file_path": "bin/script-target.pl",
+    "start_line": 6,
+    "symbol": "main",
+    "cwe": "CWE-22"
+  },
+  "source": "vulnerable",
+  "fixed_source": "fixed"
+}

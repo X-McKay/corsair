@@ -3,13 +3,17 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
+from pathlib import Path
 
 from .base import PROBE_DIR, RESULT_DIR, PostCommand, ProbeResult
 from .reports import read_probe
 
 DRIVER = r'''use strict;
 use warnings;
-use JSON::PP ();
+BEGIN {
+    local @INC = grep { !ref($_) && $_ ne '.' && $_ !~ m{^/work(?:/|$)} } @INC;
+    require JSON::PP;
+}
 
 my $role = $ENV{CORSAIR_ROLE};
 my $result_path = $ENV{CORSAIR_RESULT};
@@ -89,8 +93,42 @@ print (($result eq 'PASS' ? 'ok' : 'not ok') . " 1 - test_probe[$role]\n1..1\n")
 exit($result eq 'PASS' ? 0 : 1);
 '''
 
+COVERAGE_BOOTSTRAP = r'''package CorsairCoverage;
+use strict;
+use warnings;
+BEGIN {
+    # Repository lookup resumes for the application after trusted collector imports.
+    local @INC = grep { !ref($_) && $_ ne '.' && $_ !~ m{^/work(?:/|$)} } @INC;
+    require Devel::Cover;
+    Devel::Cover->import;
+}
+1;
+'''
+
+COVERAGE_LAUNCHER = r'''set -eu
+mode=$1
+database=$2
+shift 2
+case "$mode" in reset|check) ;; *) exit 1 ;; esac
+[ ! -L "$database" ] || { echo 'linked Perl coverage root' >&2; exit 1; }
+if [ "$mode" = reset ] && [ ! -e "$database" ]; then
+    mkdir -p "$database"
+fi
+[ -d "$database" ] || { echo 'Perl coverage root must be a directory' >&2; exit 1; }
+invalid=$(find "$database" \( \( ! -type d -a ! -type f \) -o ! -readable -o ! -writable -o \( -type d -a ! -executable \) \) -print -quit)
+[ -z "$invalid" ] || { echo 'invalid Perl coverage storage' >&2; exit 1; }
+if [ "$mode" = reset ]; then
+    # Clear only adapter-owned raw data, before any inherited Perl collector starts.
+    find "$database" -mindepth 1 -delete
+fi
+exec "$@"
+'''
+
 COVERAGE_RENDERER = r'''use strict;
 use warnings;
+BEGIN {
+    @INC = grep { !ref($_) && $_ ne '.' && $_ !~ m{^/work(?:/|$)} } @INC;
+}
 use Devel::Cover::DB;
 use JSON::PP qw(encode_json);
 
@@ -113,6 +151,28 @@ close $handle;
 '''
 
 
+def _unique_source_content(source: Path, target: str) -> bool:
+    """Devel::Cover 1.44 canonicalizes byte-identical sources to one path."""
+    try:
+        root = source.resolve()
+        target_path = root / target
+        if not target_path.resolve().is_relative_to(root) or not target_path.is_file():
+            return False
+        content = target_path.read_bytes()
+        for candidate in root.rglob("*"):
+            if ".git" in candidate.relative_to(root).parts or candidate == target_path:
+                continue
+            if not candidate.is_file():
+                continue
+            if not candidate.resolve().is_relative_to(root):
+                return False
+            if candidate.stat().st_size == len(content) and candidate.read_bytes() == content:
+                return False
+    except (OSError, RuntimeError, ValueError):
+        return False
+    return True
+
+
 class PerlTap:
     name = "perl-tap"
     language = "perl"
@@ -132,22 +192,37 @@ class PerlTap:
         return GateVerdict(passed=not missing and banned is None, stage=Gate.AST_GUARD, reason=reason)
 
     def driver_files(self) -> dict[str, bytes]:
-        return {"corsair_driver.t": DRIVER.encode(), "render_coverage.pl": COVERAGE_RENDERER.encode()}
+        return {"corsair_driver.t": DRIVER.encode(), "render_coverage.pl": COVERAGE_RENDERER.encode(),
+                "CorsairCoverage.pm": COVERAGE_BOOTSTRAP.encode(),
+                "perl-coverage.sh": COVERAGE_LAUNCHER.encode()}
 
     def command(self, role: str, target_file: str) -> list[str]:
-        return ["perl", f"-MDevel::Cover=-db,{RESULT_DIR}/cover_db", "-I/work", f"-I{PROBE_DIR}",
+        return ["sh", f"{PROBE_DIR}/perl-coverage.sh", "reset", f"{RESULT_DIR}/cover_db",
+                "perl", "-I/work", f"-I{PROBE_DIR}",
                 f"{PROBE_DIR}/corsair_driver.t"]
 
     def post_command(self, role: str, target_file: str) -> PostCommand:
-        return PostCommand(("perl", f"{PROBE_DIR}/render_coverage.pl", f"{RESULT_DIR}/cover_db",
-                            f"{RESULT_DIR}/coverage.json"), self.environment(role))
+        environment = dict(self.environment(role))
+        environment.pop("PERL5OPT")
+        environment.pop("DEVEL_COVER_OPTIONS")
+        # An omitted Docker exec overlay does not unset an image-level variable.
+        return PostCommand(("env", "-u", "PERL5OPT", "-u", "DEVEL_COVER_OPTIONS", "sh",
+                            f"{PROBE_DIR}/perl-coverage.sh", "check", f"{RESULT_DIR}/cover_db",
+                            "perl", f"{PROBE_DIR}/render_coverage.pl", f"{RESULT_DIR}/cover_db",
+                            f"{RESULT_DIR}/coverage.json"), environment)
 
     def environment(self, role: str) -> Mapping[str, str]:
         return {"CORSAIR_ROLE": role, "CORSAIR_RESULT": f"{RESULT_DIR}/result.json",
-                "CORSAIR_JUNIT": f"{RESULT_DIR}/junit.xml", "HOME": "/tmp", "PERL5LIB": "/work"}
+                "CORSAIR_JUNIT": f"{RESULT_DIR}/junit.xml", "HOME": "/tmp", "PERL5LIB": "/work",
+                "PERL5OPT": f"-I{PROBE_DIR} -MCorsairCoverage",
+                "DEVEL_COVER_OPTIONS": f"-db,{RESULT_DIR}/cover_db,-merge,1,-silent,1,-coverage,statement,"
+                                       "-select,^/work/(?![.]corsair/)"}
 
     def result_paths(self) -> list[str]:
         return [f"{RESULT_DIR}/result.json", f"{RESULT_DIR}/junit.xml", f"{RESULT_DIR}/coverage.json"]
 
     def read(self, files: Mapping[str, bytes | None], hypothesis, role: str, source=None) -> ProbeResult:
-        return read_probe(files, hypothesis, role, native_error_kind="error")
+        normalized = dict(files)
+        if source is None or not _unique_source_content(source, hypothesis.target_file):
+            normalized[f"{RESULT_DIR}/coverage.json"] = None
+        return read_probe(normalized, hypothesis, role, native_error_kind="error")
