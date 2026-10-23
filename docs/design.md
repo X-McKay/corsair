@@ -50,6 +50,20 @@ V8, JaCoCo or Devel::Cover and is normalized before the same exact-target and ta
 methods, scripts, CLIs and Java main entry points share this contract. Child-process target execution requires
 verified native child coverage; launcher coverage, stdout and exit status alone are insufficient.
 
+The primary native command injects role-local instrumentation that ordinary waited children inherit. Each role
+starts with fresh raw data. Python combines coverage.py subprocess shards; Node unions raw V8 reports by literal
+source identity; Java child JVMs append JaCoCo data inherited through `JAVA_TOOL_OPTIONS`; Perl merges native
+Devel::Cover statement runs while preserving application `PERL5LIB`. The Java package/basename mapping and Perl
+byte-identical-source mapping reject ambiguous identities rather than crediting a target. Detached or uninstrumented
+children and abnormal termination remain outside conformance.
+
+Coverage rendering runs as a separate sanitized `PostCommand(argv, environment)` after the primary process exits.
+Its environment does not inherit probe-controlled variables. A failed post-command cannot consume a partial or stale
+report: a nonzero renderer exit produces a role `ERROR`, while timeout, output cap, container loss or unconfirmed
+cleanup produces `INFRA`. `make verify-scripts` deterministically replays one reviewed script/CLI/main reference per
+runtime with a test-only accepting auditor. Its fixed scripts turn their documented rejection into the same Boolean
+invariant; the gate establishes native mechanics and does not measure model quality.
+
 ## Verdict
 
 | Facts | Label | Fix |
@@ -57,7 +71,7 @@ verified native child coverage; launcher coverage, stdout and exit status alone 
 | source: control `PASS`, exploit `PASS`, exact target lines covered by both, audit accepted | `LIKELY_EXPLOITABLE` (K1) | Fixed control `PASS` and exploit `FAIL`, with the same decisive prerequisites → `verified`; otherwise `not_verified`; no fixed revision → `not_applicable` |
 | source: control `PASS`, exploit `FAIL` with clean true invariant, exact target lines covered by both, audit accepted | `LIKELY_NOT_EXPLOITABLE` (K4), scoped to the reported finding, submitted payload, exact revision and runtime; no claim about other attacks | Fixed revision has its own disposition and derived fix status |
 | no source disposition and last gate was `build_replay` | `UNABLE_TO_RUN` (K2) | n/a |
-| no source disposition and last gate was `infra` (timeout, container failure, held identity) | `ERROR` (K0) | n/a |
+| no source disposition and last gate was `infra` (timeout, output overflow, container failure, held identity) | `ERROR` (K0) | n/a |
 | budget exhausted at any other gate | `INCONCLUSIVE` (K3) with the last gate and reason | n/a |
 
 Both decisive labels require an accepted blind audit; a run without an auditor is nondecisive. A valid exploit

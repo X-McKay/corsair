@@ -7,7 +7,7 @@ MAX_SUBMISSIONS ?= 4
 REQUEST_LIMIT ?= 60
 DOCKER_BUILD_FLAGS ?=
 
-.PHONY: sync test test-offline test-docker image verify investigate eval historical-eval pilot cleanup
+.PHONY: sync test test-offline test-docker image verify verify-scripts investigate eval historical-eval pilot cleanup
 
 sync:
 	uv sync --locked
@@ -30,6 +30,12 @@ image:
 # Verify a v2 submission. Without AUDIT_PROVIDER, the evidence remains nondecisive and exits nonzero.
 verify: image
 	$(PYTHON) -m corsair.cli verify --case $(CASE) --submission $(CASE)/reference-submission.json --runs $(RUNS) $(if $(AUDIT_PROVIDER),--provider $(AUDIT_PROVIDER))
+
+# Deterministic native mechanics gate for the four reviewed script/CLI/main references. The test-only accepting
+# auditor isolates runtime and coverage mechanics; this target is not evidence of live producer model quality.
+SCRIPT_CASES := cases/cs-0001-b cases/cs-0002-b cases/cs-0003-b cases/cs-0004-b
+verify-scripts: image
+	SCRIPT_CASES='$(SCRIPT_CASES)' CORSAIR_REQUIRE_SCRIPT_GATE=1 $(PYTHON) -m pytest -q tests/test_script_conformance.py
 
 investigate: image
 	$(PYTHON) -m corsair.cli investigate --case $(CASE) --provider $(PROVIDER) --max-submissions $(MAX_SUBMISSIONS) --request-limit $(REQUEST_LIMIT) --runs $(RUNS)

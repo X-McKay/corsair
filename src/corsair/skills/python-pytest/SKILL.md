@@ -16,8 +16,15 @@ description: Write and troubleshoot Python probes under pytest and coverage.py. 
   `bash: python -c "import <module>"` in your working sandbox first.
 - The kernel writes your probe to `/work/.corsair/corsair_probe.py` and drives it with its own pytest file. Do not
   write tests yourself; do not use pytest fixtures or `conftest.py`; `run_target` must be self-contained.
-- Use `tempfile.TemporaryDirectory()` for files; the probe runs without network. A repository-local script or CLI
-  requires native coverage of its child target lines; importing a launcher or observing stdout alone is insufficient.
+- Use `tempfile.TemporaryDirectory()` for files; the probe runs without network. For a repository-local script or
+  CLI, prefer `subprocess.run([sys.executable, '/work/path/to/script.py', payload], capture_output=True,
+  text=True, timeout=...)`. Omit `env`, or start with a copy of `os.environ` when adding application variables.
+  Preserve `PYTHONPATH`, `COVERAGE_PROCESS_START`, `COVERAGE_PROCESS_CONFIG`, `COVERAGE_FILE` and
+  `COVERAGE_RCFILE`; replacing the environment and losing effective startup/configuration makes the run
+  nondecisive. Coverage.py 7.13 subprocess patching may propagate `COVERAGE_PROCESS_CONFIG`, so deleting only
+  `COVERAGE_PROCESS_START` does not prove coverage is absent. Wait for completion, parse only documented output,
+  and recognize a fixed refusal only when it proves the shared invariant. The adapter combines parallel child data
+  before rendering JSON. Importing a launcher or observing stdout alone is insufficient.
 - Coverage is measured on `target_file` only, with `coverage.py`. Lines inside functions count when executed;
   module-level lines count on import. Choose `target_lines` inside the vulnerable function.
 - Exploring: `bash: sed -n 1,80p path/to/file.py`, `bash: grep -rn "def read_doc" .`, `bash: python -m pytest -q`

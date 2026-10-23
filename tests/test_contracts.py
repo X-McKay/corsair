@@ -212,3 +212,55 @@ def test_agent_manifest_declares_the_boolean_role_contract_and_stop_rule():
     assert probe["role_expectations"] == {"control": True, "exploit": False}
     assert probe["role_input"] is False
     assert spec["agents"]["producer"]["stop_labels"] == ["LIKELY_EXPLOITABLE", "LIKELY_NOT_EXPLOITABLE"]
+
+
+def test_script_conformance_gate_names_exactly_the_four_reviewed_entrypoints():
+    makefile = (ROOT / "Makefile").read_text()
+    assert ("SCRIPT_CASES := cases/cs-0001-b cases/cs-0002-b "
+            "cases/cs-0003-b cases/cs-0004-b") in makefile
+    assert "verify-scripts: image" in makefile
+    assert "CORSAIR_REQUIRE_SCRIPT_GATE=1" in makefile
+    assert "SCRIPT_CASES='$(SCRIPT_CASES)'" in makefile
+    assert "tests/test_script_conformance.py" in makefile
+
+
+def test_runtime_matrix_advertises_only_the_reviewed_waited_script_cases():
+    rows = {row.language: row for row in matrix.load()}
+    cases = {"python": "cs-0001-b", "javascript": "cs-0002-b", "java": "cs-0003-b", "perl": "cs-0004-b"}
+    for language, case_id in cases.items():
+        note = rows[language].note.lower()
+        assert case_id in note
+        assert "waited" in note
+        assert "make verify-scripts" in note
+
+
+def test_script_probe_guidance_requires_inherited_instrumentation_and_bounded_children():
+    from corsair.producer import SKILLS_DIR
+
+    shared = " ".join((SKILLS_DIR / "differential-probing" / "SKILL.md").read_text().split()).lower()
+    for term in ("argument list", "inherit", "wait", "timeout", "output", "exit status", "exact", "infra"):
+        assert term in shared
+
+    requirements = {
+        "python-pytest": ("subprocess.run", "coverage_process_config", "coverage_file"),
+        "javascript-node-test": ("execfilesync", "node_v8_coverage", "literal"),
+        "java-javac": ("processbuilder", "java_tool_options", "forcibly"),
+        "perl-tap": ("open my $child", "perl5opt", "devel_cover_options"),
+    }
+    for name, terms in requirements.items():
+        guidance = " ".join((SKILLS_DIR / name / "SKILL.md").read_text().split()).lower()
+        for term in terms:
+            assert term in guidance
+
+
+def test_agent_manifest_declares_script_entrypoint_evidence_and_gate_scope():
+    import yaml
+
+    spec = yaml.safe_load((ROOT / "src/corsair/agent-contracts.yaml").read_text())
+    probe = spec["agents"]["producer"]["probe_contract"]
+    assert "script" in probe["entrypoints"].lower() and "java main" in probe["entrypoints"].lower()
+    assert "inherit" in probe["child_processes"].lower() and "wait" in probe["child_processes"].lower()
+    assert "coverage" in probe["child_processes"].lower()
+    deterministic = " ".join(spec["evaluation"]["deterministic"]).lower()
+    assert "make verify-scripts" in deterministic
+    assert "test-only" in deterministic and "model quality" in deterministic

@@ -33,8 +33,14 @@ sub run_target {
   expected answer; the kernel-owned driver emits TAP.
 - Every uncaught exception from the probe or application is `ERROR`; do not assert in the probe. Catch only an
   expected rejection, then let the Boolean invariant decide using the same path for both payloads and revisions.
-- Repository-local Perl script or CLI execution requires native coverage of the child target lines; observing
-  exit status and stdout alone cannot satisfy the coverage gate.
+- For a repository-local Perl script, use list-form
+  `open my $child, '-|', $^X, '/work/bin/script.pl', $payload`, read bounded documented output, then inspect
+  `close $child` and `$?`. Preserve inherited `PERL5OPT`, `DEVEL_COVER_OPTIONS` and `PERL5LIB`. A failed close is
+  not automatically safe: recognize a fixed refusal only through its documented status/output and the shared
+  invariant. The adapter merges native statement runs with an uninstrumented trusted renderer. Byte-identical
+  repository source copies can remain nondecisive even with different basenames; repository lookup also cannot
+  replace already-imported trusted coverage infrastructure. Observing exit status and stdout alone cannot satisfy
+  native child target-line coverage.
 - Call the real module through its public subroutine. Do not use `Test::MockModule`, `Test::MockObject`,
   `Sub::Override`, symbol-table replacement, or a copied implementation.
 - The repository root is on `PERL5LIB`. Use the project's checked-in `Makefile.PL`, `Build.PL`, or `cpanfile` only

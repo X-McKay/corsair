@@ -67,8 +67,21 @@ Rules the kernel enforces, so write to them:
 | Missing authorization | the protected operation returns the denied result for the unprivileged principal |
 
 Make the sentinel yours: create it in the fixture, check it after the call. Return the invariant from the observation.
-Repository-local script, CLI and Java main entry points require native child target-line coverage; a child exit
-status or output alone cannot satisfy the coverage gate. Read the runtime guidance before selecting that seam.
+
+## Scripts, CLIs and child processes
+
+Call the repository's real executable, module or Java main with the current runtime. Pass argv as an argument list,
+never through a shell string. Use the same fixture, child call, observation and invariant for both payloads and both
+revisions. Inherit the adapter's environment, wait for and reap the child, apply a timeout, bound its output, and
+clean temporary fixtures. Output, filesystem effects and documented exit status may supply the observation.
+Unrecognized output, launch failures, unexpected exits and timeouts are errors, not `true`.
+
+A documented fixed-side refusal may yield `true` only when its status or output establishes the same security
+invariant used on the vulnerable revision. Do not branch on role, payload identity or revision to recognize it.
+Declare target lines reached before a legitimate refusal on both revisions. The adapter owns child instrumentation,
+role-local raw-data reset and sanitized post-processing; do not install another coverage agent or forge a report.
+Exact native coverage of the child's target lines is required. Replacing the inherited environment can remove that
+coverage and makes the result nondecisive. Output flooding is `INFRA`, and cleanup must still be confirmed.
 
 ## Hypothesis
 

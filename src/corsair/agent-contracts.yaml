@@ -48,7 +48,11 @@ agents:
       role_expectations: {control: true, exploit: false}
       role_input: false
       path: Same setup, target call and invariant for both payloads; no role or expected answer in the probe
+      entrypoints: Direct functions and methods, repository-local scripts and CLIs, and Java main entry points use the same payload-only Boolean invariant.
+      child_processes: Inherit adapter instrumentation and application import paths, wait for and reap children, and require exact native target coverage; output or exit status may support the invariant but never replace coverage.
+      fixed_rejection: Convert a documented fixed-side refusal to the Boolean invariant only when it proves the security property through the same logic on both revisions; propagate unknown errors.
       errors: Exceptions, invalid returns, missing native evidence and infrastructure failures are never clean negative evidence
+      infrastructure: Launch failure, timeout, output overflow, lost instrumentation or cleanup failure is nondecisive and never a clean negative.
       decisive_prerequisites: Both roles execute every declared target line; accepted outcome-blind audit
       negative_scope: This hypothesis, payload and environment only; no absence proof
     stop_labels: [LIKELY_EXPLOITABLE, LIKELY_NOT_EXPLOITABLE]
@@ -108,7 +112,9 @@ capabilities:
     redaction: Output tails are bounded; raw private artifacts remain in the local run directory.
     trace: run id, submission hash, tree hashes, runtime image id, gate ledger and artifact hashes
 evaluation:
-  deterministic: make test-offline; make test; reviewed Python, JavaScript, Java and Perl fixtures
+  deterministic:
+    - make test-offline and make test exercise scripted models, sandbox mechanics and reviewed runtime fixtures
+    - make verify-scripts uses a test-only accepting auditor to prove four-runtime native script mechanics, not model quality
   stochastic: make eval and make pilot with operator provider configuration
   hard_gates: Every native evidence invariant passes; no forbidden labels; every supplied label/fix expectation matches.
   target: 100% exact label and fix agreement on every reviewed release case; zero forbidden labels.

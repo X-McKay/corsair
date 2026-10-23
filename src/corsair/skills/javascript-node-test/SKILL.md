@@ -21,6 +21,12 @@ module.exports = { CONTROL_PAYLOAD, EXPLOIT_PAYLOAD, run_target };
 - Read the reported file first. Use absolute `/work/...` imports: the probe lives in a separate directory.
 - For ESM targets use `await import('/work/path/to/target.mjs')` inside the async function. A `.js` target follows its own package's `type` setting. The probe always stays `.cjs`.
 - Await callbacks via a Promise or `node:util.promisify`. Unawaited work is not evidence.
+- For a repository-local CLI, use `execFileSync(process.execPath, ['/work/path/to/cli.cjs', payload],
+  {cwd: '/work', encoding: 'utf8', timeout: ...})` or an awaited equivalent. Omit `env`, or extend it with
+  `{...process.env, ...applicationChanges}` so `NODE_V8_COVERAGE` is inherited. Wait for completion. The adapter
+  unions raw parent and child reports by literal file URL/path, including spaces and brackets; launcher or decoy
+  coverage is insufficient. Unknown child failures must throw. Convert only a documented refusal into `true`
+  through the same invariant.
 - Call the real public seam using the same setup and target call for both payloads, and return the same Boolean
   invariant: `true` means preserved, `false` means the reported condition occurred. The driver assigns control
   `PASS` for true and exploit `PASS` for false; exploit `FAIL` is a clean true observation and scoped negative

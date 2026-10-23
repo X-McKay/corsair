@@ -53,6 +53,7 @@ make sync            # install
 make test-offline    # scripted model and sandbox doubles; no Docker, no model
 make test            # plus real Python, JavaScript, Java and Perl containers
 make verify          # kernel mechanics; no audit configured, so nondecisive
+make verify-scripts  # deterministic native script/CLI/main mechanics for all four runtimes; no model
 make verify AUDIT_PROVIDER=config/providers.local.json # enable the blind auditor
 make verify CASE=cases/path-traversal-javascript
 make investigate CASE=cases/path-traversal-fixture PROVIDER=config/providers.local.json
@@ -60,6 +61,10 @@ make eval            # reviewed release case for every supported runtime
 make historical-eval # unqualified legacy corpus; exploratory, not a release gate
 make cleanup         # remove every container this tool created
 ```
+
+`verify-scripts` replays the four reviewed reference submissions with a test-only accepting auditor. It proves
+native execution, exact child coverage, polarity and cleanup without model calls; it does not measure live producer
+or auditor quality. Public `make verify` intentionally remains nondecisive unless an auditor provider is configured.
 
 Every run writes `.runs/lite/<run id>/run.json` with each submission's gate, the probe runs (role results, Boolean invariants, exception
 types, covered lines, JUnit, coverage and log references), the verdict and the producer's usage. Records include the
@@ -70,8 +75,9 @@ cases are evaluator-only and never reach the agents.
 `verify` and `investigate` exit zero for either decisive source disposition and nonzero for a nondecisive result.
 Invalid submission JSON or a stale contract version exits with code 2 before creating a sandbox.
 The JSON report separates label and fix correctness and includes the gate ledger and runtime for each case.
-Use `EVAL_CASES`, `MAX_SUBMISSIONS`, and `REQUEST_LIMIT` to select and bound model work. The default release set is
-the four reviewed fixtures. Historical corpus oracles retain their original semantics and need review before becoming
+Use `EVAL_CASES`, `MAX_SUBMISSIONS`, and `REQUEST_LIMIT` to select and bound model work. The default model release
+set is the four reviewed direct-call fixtures. Four additional script conformance fixtures are exercised by
+`verify-scripts`. Historical corpus oracles retain their original semantics and need review before becoming
 release baselines for this redesign; `make historical-eval` keeps them explicit and never silently relabels them.
 
 For builds behind a TLS proxy, supply its public CA through `DOCKER_BUILD_FLAGS="--secret id=proxy_ca,src=/path/to/ca-bundle.pem"`.
@@ -96,7 +102,7 @@ images/python/   Python/pytest pilot image
 images/javascript/  Node 22/node:test pilot image
 images/java21/   Java 21/JaCoCo pilot image
 images/perl/     Perl 5.40/Devel::Cover pilot image
-cases/           reviewed fixture per supported runtime, with reference submissions
+cases/           reviewed direct and script conformance fixtures per supported runtime, with reference submissions
 evals/e2e/python Local Python corpus cases (input.json + evaluator-only oracle.json)
 benchmarks/      the fixture trees and the Python corpus they point at
 docs/            design.md, historical pilot.md, current readiness.md
@@ -110,8 +116,11 @@ read-only source, with capabilities dropped and no network. Python/pytest, JavaS
 javac/JaCoCo, and Perl 5.40 with TAP/Devel::Cover are supported. JavaScript targets may use CommonJS or ESM; Java
 builds normalize compiled classes into one documented directory; Perl modules load through `PERL5LIB`. Runtime
 selection follows the reported file, so unrelated tooling cannot select the wrong language. Functions, methods,
-repository scripts, CLIs and Java `main` entry points use the same Boolean contract. Child processes must produce
-verified native coverage of their target lines; compiling a launcher or observing stdout/exit status alone is insufficient.
+repository scripts, CLIs and Java `main` entry points use the same Boolean contract. Ordinary waited child processes
+inherit adapter-owned instrumentation and must produce verified native coverage of their target lines; compiling a
+launcher or observing stdout/exit status alone is insufficient. Each role/revision runs in a fresh container with
+offline read-only source and bounded resources. Detached children, cleared instrumentation, unexpected child exits,
+timeouts, output overflow and report failures remain nondecisive.
 Unknown adapters and languages fail closed. Legacy image/corpus
 directories for other languages are retained as historical inputs, not advertised as supported adapters.
 Results in `docs/pilot.md` predate the v2 probe contract, are from the operator's local model and are small-n.
@@ -120,3 +129,13 @@ The [agent contracts](src/corsair/agent-contracts.yaml) and [readiness review](d
 playbook alignment and remaining production blockers. Kernel-only `verify` records when no blind auditor is configured;
 a fixture run without an auditor remains nondecisive. Deterministic checks demonstrate mechanics, not live model
 quality or production sandbox assurance.
+
+| Runtime | Direct fixture | Script fixture / invocation | Inherited evidence and conformance limit |
+| --- | --- | --- | --- |
+| Python | `path-traversal-fixture` | `cs-0001-b`, waited `sys.executable` CLI | coverage.py subprocess/parallel data; effective startup/configuration must remain inherited |
+| JavaScript | `path-traversal-javascript` | `cs-0002-b`, waited `execFile` Node CLI | raw V8 reports merged by literal path; CommonJS/ESM only, no transpiler |
+| Java | `path-traversal-java` | `cs-0003-b`, waited `ProcessBuilder` main | append-enabled JaCoCo via `JAVA_TOOL_OPTIONS`; normal orderly child shutdown only |
+| Perl | `path-traversal-perl` | `cs-0004-b`, waited list-form child | Devel::Cover shards with inherited Perl paths; byte-identical source ambiguity is nondecisive |
+
+Changes to model-facing guidance still require live `make eval` and `make pilot` comparison with the operator's
+provider configuration before merge. A green deterministic script gate establishes mechanics only.

@@ -24,8 +24,13 @@ public final class CorsairProbe {
   and exploit `PASS` for false; exploit `FAIL` is a clean true observation and scoped negative evidence. Use
   primitive `boolean` or a non-null `Boolean`; strings and arbitrary truthy values are invalid. The probe receives
   no role or expected answer. Every uncaught application or probe exception is `ERROR`; do not assert in the probe.
-- A repository-local Java main or CLI entry point requires native coverage of its child target lines. Compiling
-  the class or observing exit status and stdout alone cannot satisfy the coverage gate.
+- A repository-local Java main or CLI entry point uses `new ProcessBuilder("java", "-cp",
+  documentedClasspath, "package.Main", payload)`. Keep its default inherited environment, including
+  `JAVA_TOOL_OPTIONS`. Drain both bounded child streams while waiting to avoid pipe backpressure, impose a timeout,
+  and call `destroyForcibly()` then reap the process on timeout. Reject unexpected exits or output. The adapter owns
+  fresh raw-data reset and `append=true,dumponexit=true` instrumentation plus uninstrumented report generation.
+  Normal waited shutdown is qualified; detached, killed or arbitrary concurrent JVM trees are not promised.
+  Compiling the class or observing exit status and stdout alone cannot satisfy child target-line coverage.
 - Call the real target through its public API. Do not use Mockito, PowerMock, EasyMock, bytecode agents, reflection
   to replace behavior, or a hand-written copy of the target.
 - Put compiled project classes in `/work/.corsair-java/classes` in the build script. Put optional dependency jars
@@ -33,7 +38,7 @@ public final class CorsairProbe {
 
   ```bash
   mkdir -p /work/.corsair-java/classes
-  javac -d /work/.corsair-java/classes /work/path/to/Target.java
+  javac -g -d /work/.corsair-java/classes /work/path/to/Target.java
   ```
 
 - Maven and Gradle are supported when the checked-in project defines them: run the locked/offline-capable build,
