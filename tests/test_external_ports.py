@@ -132,7 +132,7 @@ async def test_openai_inference_shares_and_closes_native_sdk_model_clients(monke
     FakeAsyncOpenAI.instances = []
     monkeypatch.setattr(openai, "AsyncOpenAI", FakeAsyncOpenAI)
     monkeypatch.setattr(
-        adapter, "build_model", lambda profile, *, openai_client: TestModel(model_name=profile.model_name)
+        adapter, "_build_model", lambda profile, *, openai_client: TestModel(model_name=profile.model_name)
     )
     async with OpenAIInference().models(_shared_config()) as models:
         assert set(models) == {"producer", "auditor"}

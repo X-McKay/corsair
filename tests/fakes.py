@@ -188,6 +188,3 @@ class FakeSandboxes:
         self._labels[name] = dict(sandbox_labels)
         self._files[name] = {}
         return name
-
-    def agent_workspace(self, image: str, sandbox_labels: Mapping[str, str]):
-        raise NotImplementedError

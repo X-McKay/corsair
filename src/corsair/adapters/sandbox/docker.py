@@ -1,10 +1,7 @@
-"""A Docker workspace: the native PydanticAI ``WorkspaceBackend`` over the docker CLI, plus the small synchronous
-container helpers trusted code (build replay, probe execution, the reconciler) uses directly.
+"""Docker implementation of the trusted sandbox port.
 
-One long-lived container per workspace, created on first use with a deterministic name derived from its labels,
-every capability dropped, no new privileges, no network unless configured, and CPU, memory and PID limits. The
-backend never removes its container when a run ends; the owner calls ``destroy()`` (or the reconciler sweeps it).
-File operations use PydanticAI's shell fallback, so commands and files always see one filesystem.
+Native CLI helpers create hardened containers, replay builds, freeze source, run offline probes and reconcile
+labelled resources. The application owns each container's lifecycle; no separate workspace abstraction is retained.
 """
 
 from __future__ import annotations
@@ -21,20 +18,10 @@ from pathlib import Path
 from subprocess import DEVNULL, PIPE
 from typing import Literal
 
-import anyio
-import anyio.abc
 from pydantic_ai.workspaces import (
-    CommandResult,
-    SupportsCommands,
-    WorkspaceBackend,
-    WorkspaceCommand,
     WorkspaceError,
-    WorkspaceOutputLimitError,
-    WorkspaceRef,
-    WorkspaceTimeoutError,
     WorkspaceUnavailableError,
 )
-from pydantic_ai.workspaces.protocol import validate_timeout
 
 from corsair.ports.sandbox import LABEL, RUN_LABEL, Exec, SandboxExists, SandboxSpec, sandbox_name
 
@@ -42,12 +29,6 @@ PROVIDER = "docker"
 HARDENED = ("--cap-drop=ALL", "--security-opt=no-new-privileges")
 CONTROL_TIMEOUT_S = 120.0
 """Bound on one docker control-plane call (create, inspect, cp, rm), never on a workload command."""
-MAX_OUTPUT_BYTES = 32 * 1024 * 1024
-DRAIN_GRACE_S = 5.0
-
-# Records the command's pid (a session leader under docker exec) so a timeout or cancellation can kill its whole
-# process group inside the container; killing the docker client alone leaves the process running.
-_WRAPPER = 'echo $$ > "$1" 2>/dev/null; shift; exec "$@"'
 
 
 @dataclass(frozen=True)
@@ -292,192 +273,6 @@ def remove(name: str) -> bool:
     return absent.returncode != 0 and b"no such" in absent.stderr.lower()
 
 
-# --- the native WorkspaceBackend --------------------------------------------------------------------------------
-
-
-class DockerWorkspace(WorkspaceBackend, SupportsCommands):
-    """A PydanticAI workspace backed by one long-lived Docker container.
-
-    Built without I/O. The first operation creates the container (or, given a ref, attaches to it and raises
-    ``WorkspaceUnavailableError`` if it is gone). The ref is the container name and is recorded as soon as the
-    create returns. Nothing here removes the container except ``destroy()``.
-    """
-
-    def __init__(self, config: DockerConfig, ref: WorkspaceRef | None = None):
-        if ref is not None and ref.provider != PROVIDER:
-            raise ValueError(f"not a docker workspace ref: {ref!r}")
-        self.config = config
-        self._ref = ref
-        self._ready = False
-        self._attached = ref is not None
-        self._lock = anyio.Lock()
-
-    @property
-    def ref(self) -> WorkspaceRef | None:
-        return self._ref
-
-    @property
-    def name(self) -> str:
-        return self._ref.id if self._ref is not None else self.config.name
-
-    async def _ensure(self) -> str:
-        if self._ready:
-            return self.name
-        async with self._lock:
-            if self._ready:
-                return self.name
-            if self._attached:
-                if not await anyio.to_thread.run_sync(running, self.name):
-                    raise WorkspaceUnavailableError(f"container {self.name} is gone")
-            else:
-                if self._ref is None:
-                    # Shielded so a cancelled caller still records the ref of the container it created.
-                    with anyio.CancelScope(shield=True):
-                        name = await anyio.to_thread.run_sync(create, self.config)
-                        self._ref = WorkspaceRef(provider=PROVIDER, id=name)
-                await anyio.to_thread.run_sync(self._prepare)
-            self._ready = True
-        return self.name
-
-    def _prepare(self) -> None:
-        if not running(self.name):
-            raise WorkspaceUnavailableError(f"container {self.name} is gone")
-        uid, gid = owner(self.name)
-        make_workdir(self.name, self.config.workdir, uid, gid)
-
-    async def working_dir(self) -> str:
-        await self._ensure()
-        return self.config.workdir
-
-    async def run(
-        self,
-        command: WorkspaceCommand,
-        *,
-        shell: bool = False,
-        env: Mapping[str, str] | None = None,
-        timeout: float | None = None,
-    ) -> CommandResult:
-        validate_timeout(timeout)
-        if isinstance(command, str):
-            if not shell:
-                raise TypeError("a string command requires shell=True; pass an argv sequence otherwise")
-            argv = ["sh", "-c", command]
-        elif shell:
-            raise TypeError(
-                "an argv sequence cannot be combined with shell=True; pass a single command string"
-            )
-        else:
-            argv = list(command)
-        name = await self._ensure()
-        deadline = None if timeout is None else anyio.current_time() + timeout
-        pidfile = f"/tmp/.corsair-exec-{uuid.uuid4().hex}"
-        merged = {**self.config.env, **(env or {})}
-        environment = [arg for key, value in merged.items() for arg in ("-e", f"{key}={value}")]
-        process = await anyio.open_process(
-            [
-                "docker",
-                "exec",
-                "-w",
-                self.config.workdir,
-                *environment,
-                name,
-                "sh",
-                "-c",
-                _WRAPPER,
-                "sh",
-                pidfile,
-                *argv,
-            ],
-            stdin=DEVNULL,
-            stdout=PIPE,
-            stderr=PIPE,
-        )
-        stdout, stderr = bytearray(), bytearray()
-        try:
-            exit_code = await self._collect(process, stdout, stderr, deadline)
-        except BaseException as error:
-            with anyio.CancelScope(shield=True):
-                await self._kill(name, pidfile, process)
-            if isinstance(error, TimeoutError):
-                raise WorkspaceTimeoutError(
-                    f"command timed out after {timeout:g}s and was killed",
-                    stdout=stdout.decode(errors="replace"),
-                    stderr=stderr.decode(errors="replace"),
-                ) from error
-            raise
-        await process.aclose()
-        if exit_code != 0 and not await anyio.to_thread.run_sync(running, name):
-            raise WorkspaceUnavailableError(f"container {name} is gone")
-        return CommandResult(
-            exit_code=exit_code,
-            stdout=stdout.decode(errors="replace"),
-            stderr=stderr.decode(errors="replace"),
-        )
-
-    @staticmethod
-    async def _collect(
-        process: anyio.abc.Process, stdout: bytearray, stderr: bytearray, deadline: float | None
-    ) -> int:
-        assert process.stdout is not None and process.stderr is not None
-        overflowed = False
-
-        async def drain(stream: anyio.abc.ByteReceiveStream, buffer: bytearray) -> None:
-            nonlocal overflowed
-            async for chunk in stream:
-                buffer.extend(chunk)
-                if len(stdout) + len(stderr) > MAX_OUTPUT_BYTES:
-                    overflowed = True
-                    group.cancel_scope.cancel()
-
-        with anyio.fail_after(None if deadline is None else max(0.0, deadline - anyio.current_time())):
-            async with anyio.create_task_group() as group:
-                group.start_soon(drain, process.stdout, stdout)
-                group.start_soon(drain, process.stderr, stderr)
-            if overflowed:
-                raise WorkspaceOutputLimitError(
-                    "command output exceeded its cap",
-                    limit=MAX_OUTPUT_BYTES,
-                    stdout=stdout.decode(errors="replace"),
-                    stderr=stderr.decode(errors="replace"),
-                )
-            return await process.wait()
-
-    @staticmethod
-    async def _kill(name: str, pidfile: str, process: anyio.abc.Process) -> None:
-        """Best effort: kill the command's process group in the container, then the local docker client."""
-        script = (
-            'pid=$(cat "$1" 2>/dev/null) && { kill -9 "-$pid" || kill -9 "$pid"; } 2>/dev/null; rm -f "$1"'
-        )
-        with anyio.move_on_after(30):
-            await anyio.to_thread.run_sync(
-                lambda: docker("exec", "-w", "/", name, "sh", "-c", script, "sh", pidfile, timeout=30)
-            )
-        if process.returncode is None:
-            process.kill()
-        with anyio.move_on_after(DRAIN_GRACE_S):
-            await process.wait()
-        await process.aclose()
-
-    # --- owner operations, outside the protocol ---
-
-    async def copy_in(self, source: Path, destination: str | None = None) -> None:
-        """Copy a host directory tree into the workspace (by default into the working directory)."""
-        name = await self._ensure()
-        uid, gid = await anyio.to_thread.run_sync(owner, name)
-        await anyio.to_thread.run_sync(
-            copy_tree_in, name, source, destination or self.config.workdir, uid, gid
-        )
-
-    async def copy_out(self, paths: Sequence[str]) -> dict[str, bytes | None]:
-        """Read declared files out of the workspace; missing paths map to None."""
-        name = await self._ensure()
-        return await anyio.to_thread.run_sync(copy_out, name, list(paths))
-
-    async def destroy(self) -> bool:
-        """Remove the container. Returns whether its absence was confirmed (False is ``cleanup_unconfirmed``)."""
-        return await anyio.to_thread.run_sync(remove, self.name)
-
-
 # --- the trusted Sandboxes port ---------------------------------------------------------------------------------
 
 ENV_LOG_LABEL = f"{LABEL}.env.log"
@@ -655,9 +450,6 @@ class DockerSandboxes:
         )
         self._owners[name] = owner(name)
         return name
-
-    def agent_workspace(self, image: str, sandbox_labels: Mapping[str, str]) -> DockerWorkspace:
-        return DockerWorkspace(DockerConfig(image=image, labels=sandbox_labels, network="bridge"))
 
     def workspace_state(self, name: str) -> dict[str, tuple[str, str]] | None:
         """Bounded size/mtime inventory for observability, not security evidence or a content digest."""

@@ -31,23 +31,13 @@ def _api_key(profile: ModelProfile) -> str:
     return key
 
 
-def build_model(profile: ModelProfile, *, openai_client=None) -> Model:
-    """Build a native ``OpenAIChatModel``; a supplied client remains owned by its caller."""
-    from openai import AsyncOpenAI
+def _build_model(profile: ModelProfile, *, openai_client) -> Model:
+    """Build a native SDK model using only the client owned by the inference context."""
     from pydantic_ai import InlineDefsJsonSchemaTransformer
     from pydantic_ai.models.openai import OpenAIChatModel
     from pydantic_ai.profiles.openai import OpenAIModelProfile
     from pydantic_ai.providers.vllm import VLLMProvider
 
-    if openai_client is None:
-        openai_client = AsyncOpenAI(
-            base_url=profile.base_url,
-            api_key=_api_key(profile),
-            organization="",
-            project="",
-            max_retries=0,
-            timeout=profile.timeout_s,
-        )
     model_profile = OpenAIModelProfile(
         json_schema_transformer=InlineDefsJsonSchemaTransformer,
         default_structured_output_mode="prompted",
@@ -90,5 +80,5 @@ class OpenAIInference:
                             timeout=profile.timeout_s,
                         )
                     )
-                    built[profile] = build_model(profile, openai_client=client)
+                    built[profile] = _build_model(profile, openai_client=client)
             yield {agent: built[profile] for agent, profile in profiles.items()}

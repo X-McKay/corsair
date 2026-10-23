@@ -1,14 +1,13 @@
-"""Sandbox backends: the ``Sandboxes`` port for trusted code and the PydanticAI workspace backend for agents,
-implemented over Docker. ``sandboxes()`` selects the backend explicitly from ``CORSAIR_SANDBOX`` (``docker`` when
-unset); any other value is an error. An OpenShell backend implementing the same port is the intended production
-adapter and is not part of the pilot.
+"""Explicit Docker sandbox selection at the composition boundary.
+
+Unsupported backends are errors, never fallback choices. Future adapters are not pre-registered.
 """
 
 from __future__ import annotations
 
 import os
 
-from corsair.adapters.sandbox.docker import DockerConfig, DockerSandboxes, DockerWorkspace
+from corsair.adapters.sandbox.docker import DockerConfig, DockerSandboxes
 from corsair.ports.sandbox import Exec, Sandboxes, SandboxExists, SandboxSpec, labels, sandbox_name
 
 BACKEND_ENV = "CORSAIR_SANDBOX"
@@ -26,7 +25,6 @@ __all__ = (
     "BACKENDS",
     "DockerConfig",
     "DockerSandboxes",
-    "DockerWorkspace",
     "Exec",
     "SandboxExists",
     "SandboxSpec",

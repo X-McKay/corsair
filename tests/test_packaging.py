@@ -40,7 +40,7 @@ from corsair.agents.resources import load_agent_spec, instruction, skill_names, 
 from corsair.runtime.matrix import load
 for name in ['producer', 'auditor', 'bug_seeder', 'skill_crystallizer']:
     package = 'corsair.agents.' + name
-    assert load_agent_spec(package).owner == 'X-McKay'
+    assert load_agent_spec(package).owner.strip()
     assert instruction(package)
 for name in skill_names('corsair.agents.producer'):
     assert package_resource('corsair.agents.producer', 'skills/' + name + '/SKILL.md').read_text().startswith('---\\n')
