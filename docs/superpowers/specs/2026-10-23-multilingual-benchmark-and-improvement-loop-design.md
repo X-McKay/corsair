@@ -270,6 +270,12 @@ Upstream files remain byte-for-byte intact wherever possible. Reductions or comp
 from upstream code, record before/after hashes and preserve a reviewable transformation. Generated adapters and
 Corsair-authored scaffolding are identified as such.
 
+Every request declares both source commit fields and they must equal the manifest revisions. A local snapshot also
+requires `vendored` target-source rights evidence for each revision, tied to the declared repository, plus exact
+tree, target-file, target-region and patch hashes. This binds reduced snapshots to their asserted origin without
+requiring a copied Git object database. An optional harness is one regular case-relative file declared by a paired
+path and SHA-256; it may not alias a core artifact or source snapshot.
+
 ### Rights model
 
 Each case carries independent evidence for:
@@ -288,6 +294,13 @@ The default public distribution contains Corsair-authored metadata, sanitized fi
 acquisition recipes rather than copied third-party source or PoCs. `NOASSERTION`, custom noncommercial terms,
 conflicting notices or missing evidence place expressive imported content in quarantine until resolved. Private Azure
 DevOps source remains reference-based and access-controlled.
+
+License-expression validation tokenizes the full expression and rejects `NOASSERTION`, `NONE`, placeholder, and
+noncommercial components even when they appear inside a composite. A specifically reviewed `LicenseRef` remains
+possible. Source-similarity reads are strict UTF-8 and capped at 256 KiB per target; undecodable or oversized source
+emits a deterministic review issue rather than crashing or reading without a bound. The broad answer-token denylist
+applies to opaque identities. Finding prose rejects canonical oracle labels and explicit status-field phrases while
+allowing ordinary security words such as `vulnerable`, `fixed`, `development`, and `release`.
 
 ### Splits
 

@@ -1,6 +1,7 @@
 """Evaluator-only corpus metadata stays strict and outside every agent boundary."""
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 from copy import deepcopy
@@ -10,9 +11,9 @@ import pytest
 from pydantic import ValidationError
 
 from corsair.auditor import render as render_auditor
-from corsair.case import Case, load_case
-from corsair.corpus import (DatasetManifest, _patch_sha256, load_manifest, main as corpus_main, select_cases,
-                            validate_corpus)
+from corsair.case import Case, load_case, tree_sha256
+from corsair.corpus import (DatasetManifest, _cached_evidence, _patch_sha256, load_manifest,
+                            main as corpus_main, select_cases, validate_corpus)
 from corsair.kernel import Submission
 from corsair.matrix import select
 from corsair.producer import render_case
@@ -411,11 +412,63 @@ def test_local_sources_cannot_escape_the_case_directory(tmp_path):
     assert "PATH_ESCAPE" in issue_codes(checked(root))
 
 
+@pytest.mark.parametrize(("commit_field", "value"), [
+    ("commit", None),
+    ("fixed_commit", None),
+    ("commit", "3" * 40),
+    ("fixed_commit", "3" * 40),
+])
+def test_local_sources_require_both_declared_commits(tmp_path, commit_field, value):
+    root = corpus_fixture(tmp_path)
+    request_path = root / "cases/cs-1001/input.json"
+    request = json.loads(request_path.read_text())
+    if value is None:
+        request.pop(commit_field)
+    else:
+        request[commit_field] = value
+    request_path.write_text(json.dumps(request, indent=2) + "\n")
+    data = read_manifest(root)
+    data["cases"][0]["artifacts"]["input_sha256"] = hashlib.sha256(request_path.read_bytes()).hexdigest()
+    write_manifest(root, data)
+    assert "SOURCE_IDENTITY_MISMATCH" in issue_codes(checked(root))
+
+
+def test_local_snapshots_require_vendored_revision_rights(tmp_path):
+    root = corpus_fixture(tmp_path)
+    data = read_manifest(root)
+    for record in data["cases"][0]["rights"]:
+        if record["layer"] == "target_source":
+            record["redistribution_mode"] = "acquisition_recipe"
+    write_manifest(root, data)
+    assert "LOCAL_SOURCE_PROVENANCE_UNVERIFIED" in issue_codes(checked(root))
+
+
+def test_local_source_rights_cannot_be_substituted_from_an_unrelated_repository(tmp_path):
+    root = corpus_fixture(tmp_path)
+    data = read_manifest(root)
+    acquisition_only = deepcopy(data["cases"][0]["rights"][0])
+    acquisition_only["redistribution_mode"] = "acquisition_recipe"
+    data["cases"][0]["rights"][0]["evidence_url"] = \
+        f"https://fixture.invalid/unrelated/project/blob/{COMMIT_A}/source-v-LICENSE"
+    data["cases"][0]["rights"].append(acquisition_only)
+    write_manifest(root, data)
+    assert "RIGHTS_SOURCE_REPOSITORY_MISMATCH" in issue_codes(checked(root))
+
+
 @pytest.mark.parametrize(("expression", "code"), [
     ("NOASSERTION", "RIGHTS_NOASSERTION"),
     ("NONE", "RIGHTS_NOASSERTION"),
     ("TODO", "RIGHTS_PLACEHOLDER"),
     ("CC-BY-NC-4.0", "RIGHTS_NONCOMMERCIAL"),
+    ("MIT OR NOASSERTION", "RIGHTS_NOASSERTION"),
+    ("Apache-2.0 AND NONE", "RIGHTS_NOASSERTION"),
+    ("MIT OR UNKNOWN", "RIGHTS_PLACEHOLDER"),
+    ("TODO license review", "RIGHTS_PLACEHOLDER"),
+    ("MIT AND TBD", "RIGHTS_PLACEHOLDER"),
+    ("CC BY-NC 4.0", "RIGHTS_NONCOMMERCIAL"),
+    ("MIT OR LicenseRef-NonCommercial", "RIGHTS_NONCOMMERCIAL"),
+    ("MIT OR NON COMMERCIAL", "RIGHTS_NONCOMMERCIAL"),
+    ("LicenseRef-NC", "RIGHTS_NONCOMMERCIAL"),
 ])
 def test_noassertion_cannot_be_scored(tmp_path, expression, code):
     root = corpus_fixture(tmp_path)
@@ -424,6 +477,14 @@ def test_noassertion_cannot_be_scored(tmp_path, expression, code):
     write_manifest(root, data)
     report = checked(root)
     assert not report.ok and code in issue_codes(report)
+
+
+def test_reviewed_license_ref_can_be_scored(tmp_path):
+    root = corpus_fixture(tmp_path)
+    data = read_manifest(root)
+    data["cases"][0]["rights"][0]["license_expression"] = "LicenseRef-Bouncy-Castle"
+    write_manifest(root, data)
+    assert checked(root).ok
 
 
 @pytest.mark.parametrize("location", ["case_id", "variant_id", "title", "description"])
@@ -444,6 +505,39 @@ def test_case_names_do_not_encode_answers(tmp_path, location):
     assert "ANSWER_BEARING_IDENTITY" in issue_codes(checked(root))
 
 
+def test_normal_security_finding_prose_is_not_treated_as_an_answer_oracle(tmp_path):
+    root = corpus_fixture(tmp_path)
+    request_path = root / "cases/cs-1001/input.json"
+    request = json.loads(request_path.read_text())
+    request["finding"]["description"] = \
+        "The vulnerable parser was fixed during development before release."
+    request_path.write_text(json.dumps(request, indent=2) + "\n")
+    data = read_manifest(root)
+    data["cases"][0]["artifacts"]["input_sha256"] = hashlib.sha256(request_path.read_bytes()).hexdigest()
+    write_manifest(root, data)
+    assert checked(root).ok
+
+
+@pytest.mark.parametrize("phrase", [
+    "expected_label: LIKELY_EXPLOITABLE",
+    "The oracle label is LIKELY_NOT_EXPLOITABLE",
+    '"status": "INCONCLUSIVE"',
+    "expected_fix=verified",
+    '"fix": "verified"',
+    '"status": "not_verified"',
+])
+def test_explicit_oracle_labels_and_status_fields_are_rejected_from_finding_prose(tmp_path, phrase):
+    root = corpus_fixture(tmp_path)
+    request_path = root / "cases/cs-1001/input.json"
+    request = json.loads(request_path.read_text())
+    request["finding"]["description"] = phrase
+    request_path.write_text(json.dumps(request, indent=2) + "\n")
+    data = read_manifest(root)
+    data["cases"][0]["artifacts"]["input_sha256"] = hashlib.sha256(request_path.read_bytes()).hexdigest()
+    write_manifest(root, data)
+    assert "ANSWER_BEARING_IDENTITY" in issue_codes(checked(root))
+
+
 def test_quarantine_is_never_selected(tmp_path):
     root = corpus_fixture(tmp_path)
     assert checked(root).ok
@@ -460,6 +554,43 @@ def test_quarantine_is_never_selected(tmp_path):
     assert not checked(root).ok
 
 
+def test_historical_corpus_roots_require_complete_quarantine_entries(tmp_path):
+    root = corpus_fixture(tmp_path)
+    (root / "evals/e2e").mkdir(parents=True)
+    (root / "benchmarks/corpus/infosec-harness").mkdir(parents=True)
+    report = checked(root)
+    assert "QUARANTINE_REQUIRED_ENTRY_MISSING" in issue_codes(report)
+
+    quarantine_path = root / "benchmarks/dataset/quarantine.json"
+    quarantine = json.loads(quarantine_path.read_text())
+    quarantine["entries"].append({
+        "path": "evals/e2e",
+        "reason_codes": ["rights_unreviewed"],
+        "reviewer": "reviewer",
+        "reviewed_at": "2026-10-22",
+        "note": "Historical corpus is not qualified.",
+    })
+    quarantine_path.write_text(json.dumps(quarantine, indent=2) + "\n")
+    report = checked(root)
+    assert {"QUARANTINE_REQUIRED_ENTRY_MISSING", "QUARANTINE_REASON_MISSING"} <= issue_codes(report)
+
+    root = corpus_fixture(tmp_path / "alias")
+    (root / "evals/e2e").mkdir(parents=True)
+    (root / "alias-evals").symlink_to(root / "evals/e2e", target_is_directory=True)
+    quarantine_path = root / "benchmarks/dataset/quarantine.json"
+    quarantine = json.loads(quarantine_path.read_text())
+    quarantine["entries"].append({
+        "path": "alias-evals",
+        "reason_codes": ["rights_unreviewed", "stale_probe_contract", "stale_oracle_semantics",
+                         "answer_bearing_metadata", "unsupported_scope"],
+        "reviewer": "reviewer",
+        "reviewed_at": "2026-10-22",
+        "note": "An alias must not replace the mandatory lexical entry.",
+    })
+    quarantine_path.write_text(json.dumps(quarantine, indent=2) + "\n")
+    assert "QUARANTINE_REQUIRED_ENTRY_MISSING" in issue_codes(checked(root))
+
+
 def test_declared_artifact_hashes_and_reference_target_are_verified(tmp_path):
     root = corpus_fixture(tmp_path)
     (root / "cases/cs-1001/oracle.json").write_text("{}\n")
@@ -474,6 +605,68 @@ def test_declared_artifact_hashes_and_reference_target_are_verified(tmp_path):
         __import__("hashlib").sha256((root / "cases/cs-1001/reference-submission.json").read_bytes()).hexdigest()
     write_manifest(root, data)
     assert "REFERENCE_TARGET_MISMATCH" in issue_codes(checked(root))
+
+
+@pytest.mark.parametrize("missing", ["harness_path", "harness_sha256"])
+def test_harness_path_and_hash_must_be_declared_together(tmp_path, missing):
+    root = corpus_fixture(tmp_path)
+    data = read_manifest(root)
+    harness = root / "cases/cs-1001/harness.py"
+    harness.write_text("print('harness')\n")
+    data["cases"][0]["artifacts"].update(
+        harness_path="harness.py", harness_sha256=hashlib.sha256(harness.read_bytes()).hexdigest())
+    data["cases"][0]["artifacts"].pop(missing)
+    write_manifest(root, data)
+    assert "MANIFEST_INVALID" in issue_codes(checked(root))
+
+
+def test_declared_harness_is_case_relative_nonaliasing_and_hash_verified(tmp_path):
+    root = corpus_fixture(tmp_path)
+    data = read_manifest(root)
+    harness = root / "cases/cs-1001/harness.py"
+    harness.write_text("print('harness')\n")
+    data["cases"][0]["artifacts"].update(harness_path="harness.py", harness_sha256="f" * 64)
+    write_manifest(root, data)
+    assert "HARNESS_HASH_MISMATCH" in issue_codes(checked(root))
+
+    data["cases"][0]["artifacts"].update(
+        harness_path="input.json", harness_sha256=hashlib.sha256(
+            (root / "cases/cs-1001/input.json").read_bytes()).hexdigest())
+    write_manifest(root, data)
+    assert "HARNESS_ALIAS" in issue_codes(checked(root))
+
+    harness.unlink()
+    harness.write_text("print('valid harness')\n")
+    data["cases"][0]["artifacts"].update(
+        harness_path="harness.py", harness_sha256=hashlib.sha256(harness.read_bytes()).hexdigest())
+    write_manifest(root, data)
+    assert checked(root).ok
+
+    harness.unlink()
+    harness.hardlink_to(root / "cases/cs-1001/vulnerable/target.py")
+    data["cases"][0]["artifacts"]["harness_sha256"] = hashlib.sha256(harness.read_bytes()).hexdigest()
+    write_manifest(root, data)
+    assert "HARNESS_ALIAS" in issue_codes(checked(root))
+
+    harness.unlink()
+    vulnerable = root / "cases/cs-1001/vulnerable"
+    helper = vulnerable / "helper.py"
+    helper.write_text("HELPER = True\n")
+    harness.hardlink_to(helper)
+    data["cases"][0]["source_pair"]["vulnerable"]["tree_sha256"] = tree_sha256(vulnerable)
+    data["cases"][0]["source_pair"]["patch_sha256"] = _patch_sha256(
+        vulnerable, root / "cases/cs-1001/fixed")
+    data["cases"][0]["artifacts"]["harness_sha256"] = hashlib.sha256(harness.read_bytes()).hexdigest()
+    write_manifest(root, data)
+    assert "HARNESS_ALIAS" in issue_codes(checked(root))
+
+
+@pytest.mark.parametrize("content", [b"\xff\xfe\xfd", b"x" * (256 * 1024 + 1)])
+def test_similarity_input_is_bounded_and_decode_failures_become_deterministic_issues(tmp_path, content):
+    root = corpus_fixture(tmp_path)
+    (root / "cases/cs-1001/vulnerable/target.py").write_bytes(content)
+    report = checked(root)
+    assert "SOURCE_SIMILARITY_UNAVAILABLE" in issue_codes(report)
 
 
 def test_rights_evidence_resolution_is_offline(tmp_path, monkeypatch):
@@ -502,6 +695,41 @@ def test_rights_evidence_resolution_is_offline(tmp_path, monkeypatch):
         __import__("hashlib").sha256(request_path.read_bytes()).hexdigest()
     write_manifest(root, data)
     assert "SOURCE_NOT_ACQUIRED" in issue_codes(checked(root)) and calls == []
+
+
+@pytest.mark.parametrize("repository", [
+    "https://github.com/example/project",
+    "https://github.com/example/project/",
+    "https://github.com/example/project.git",
+    "https://github.com/example/project.git/",
+])
+def test_cached_evidence_accepts_equivalent_acquisition_identities(tmp_path, repository):
+    key = hashlib.sha256(f"{repository}\n{COMMIT_A}".encode()).hexdigest()[:24]
+    checkout = tmp_path / ".runs/sources" / key
+    checkout.mkdir(parents=True)
+    (checkout / ".corsair-complete").write_text(f"{repository}\n{COMMIT_A}\n")
+    (checkout / "LICENSE").write_bytes(b"licensed\n")
+
+    evidence_url = f"https://github.com/example/project/blob/{COMMIT_A}/LICENSE"
+    assert _cached_evidence(tmp_path, evidence_url, COMMIT_A) == b"licensed\n"
+
+    (checkout / ".corsair-complete").write_text(f"https://github.com/unrelated/project.git\n{COMMIT_A}\n")
+    assert _cached_evidence(tmp_path, evidence_url, COMMIT_A) is None
+
+
+def test_cached_evidence_rejects_a_symlinked_checkout_outside_the_cache(tmp_path):
+    repository = "https://github.com/example/project.git"
+    key = hashlib.sha256(f"{repository}\n{COMMIT_A}".encode()).hexdigest()[:24]
+    cache = tmp_path / ".runs/sources"
+    cache.mkdir(parents=True)
+    outside = tmp_path / "outside-cache"
+    outside.mkdir()
+    (outside / ".corsair-complete").write_text(f"{repository}\n{COMMIT_A}\n")
+    (outside / "LICENSE").write_bytes(b"licensed\n")
+    (cache / key).symlink_to(outside, target_is_directory=True)
+
+    evidence_url = f"https://github.com/example/project/blob/{COMMIT_A}/LICENSE"
+    assert _cached_evidence(tmp_path, evidence_url, COMMIT_A) is None
 
 
 def test_corpus_report_is_sorted_and_cli_exit_is_fail_closed(tmp_path, capsys):

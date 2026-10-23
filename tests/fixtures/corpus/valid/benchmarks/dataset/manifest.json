@@ -36,14 +36,14 @@
       },
       "source_pair": {
         "vulnerable": {
-          "repository": "https://fixture.invalid/project",
+          "repository": "https://fixture.invalid/owner/project",
           "commit": "1111111111111111111111111111111111111111",
           "tree_sha256": "bfbec57566e5c12ef5e1acc63cd440a89bbc4c73cd47e65da5e637b4a1127353",
           "affected_file_sha256": "8c8fbae86deaccc5aac7a28f8c6bd6aac12b726fd660e0b14c469ca1b3b03419",
           "affected_region_sha256": "4eaf3bda4aa5ea8b22f79bae79da9d39b52c4f1dcbe24b1196263d6744147a85"
         },
         "fixed": {
-          "repository": "https://fixture.invalid/project",
+          "repository": "https://fixture.invalid/owner/project",
           "commit": "2222222222222222222222222222222222222222",
           "tree_sha256": "552ce393807d2ac7f8831cc085b3287318f1f8c83cc9f33e6cd7b237ed230984",
           "affected_file_sha256": "6d0b73762fe1d5329581bd020f5f777e1265b87b7ff2bf63f2f8ef6323c1ff66",
@@ -74,7 +74,8 @@
         "input_sha256": "703b41791dafa6ea05b0107f3f90c92f22e8328a2c16c0f6df31f8df2f868def",
         "oracle_sha256": "6e569567b6194b434329454a04880015433d49b2367d40f1d8619b5f37a22ca9",
         "reference_submission_sha256": "a5bd458edaa3d807686ea8b1d0bea4aca86a403875b40fd0c6aaded6548be1f5",
-        "harness_sha256": null
+        "harness_sha256": null,
+        "harness_path": null
       },
       "visibility": "public",
       "retention": "permanent",
@@ -83,26 +84,26 @@
         {
           "layer": "target_source",
           "license_expression": "Apache-2.0",
-          "evidence_url": "https://fixture.invalid/evidence/1111111111111111111111111111111111111111/source-v-LICENSE",
+          "evidence_url": "https://fixture.invalid/owner/project/blob/1111111111111111111111111111111111111111/source-v-LICENSE",
           "evidence_revision": "1111111111111111111111111111111111111111",
           "evidence_sha256": "e5b88ea55db26313dd934ebeb4d4ebef078a07855af97a7794eb75cf69fdb046",
           "notice_requirements": [
             "retain notice"
           ],
-          "redistribution_mode": "acquisition_recipe",
+          "redistribution_mode": "vendored",
           "reviewer": "fixture-reviewer",
           "reviewed_at": "2026-10-22"
         },
         {
           "layer": "target_source",
           "license_expression": "Apache-2.0",
-          "evidence_url": "https://fixture.invalid/evidence/2222222222222222222222222222222222222222/source-f-LICENSE",
+          "evidence_url": "https://fixture.invalid/owner/project/blob/2222222222222222222222222222222222222222/source-f-LICENSE",
           "evidence_revision": "2222222222222222222222222222222222222222",
           "evidence_sha256": "b3b98a2853f8d0fab59e7030c111bbf2a108122daa11bf9e121df33d411859aa",
           "notice_requirements": [
             "retain notice"
           ],
-          "redistribution_mode": "acquisition_recipe",
+          "redistribution_mode": "vendored",
           "reviewer": "fixture-reviewer",
           "reviewed_at": "2026-10-22"
         },

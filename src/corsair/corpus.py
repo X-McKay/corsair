@@ -37,6 +37,13 @@ RIGHTS_LAYERS = frozenset({"target_source", "dataset_annotations", "advisory", "
 ANSWER_WORDS = frozenset({"likely_exploitable", "likely_not_exploitable", "inconclusive", "unable_to_run",
                           "verified", "not_verified", "vulnerable", "fixed", "patched", "exploitable",
                           "conformance", "development", "regression", "release", "quarantine", "holdout"})
+SIMILARITY_READ_LIMIT = 256 * 1024
+MANDATORY_QUARANTINE = {
+    "evals/e2e": frozenset({"rights_unreviewed", "stale_probe_contract", "stale_oracle_semantics",
+                             "answer_bearing_metadata", "unsupported_scope"}),
+    "benchmarks/corpus/infosec-harness": frozenset({"rights_unreviewed", "stale_oracle_semantics",
+                                                     "answer_bearing_metadata"}),
+}
 
 
 def _https(value: str) -> str:
@@ -107,7 +114,14 @@ class ArtifactHashes(Frozen):
     input_sha256: Sha256 = Field(pattern=r"^[0-9a-f]{64}$")
     oracle_sha256: Sha256 = Field(pattern=r"^[0-9a-f]{64}$")
     reference_submission_sha256: Sha256 = Field(pattern=r"^[0-9a-f]{64}$")
+    harness_path: SafePath | None = None
     harness_sha256: Sha256 | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def _paired_harness_identity(self) -> "ArtifactHashes":
+        if (self.harness_path is None) != (self.harness_sha256 is None):
+            raise ValueError("harness_path and harness_sha256 must be declared together")
+        return self
 
 
 class RightsRecord(Frozen):
@@ -328,22 +342,63 @@ def _inside(path: Path, root: Path) -> bool:
     return path == root or path.is_relative_to(root)
 
 
-def _answer_bearing(value: str) -> bool:
+def _answer_bearing_identity(value: str) -> bool:
     return bool(ANSWER_WORDS.intersection(re.findall(r"[a-z0-9]+(?:_[a-z0-9]+)*", value.lower())))
 
 
+def _answer_bearing_finding(value: str) -> bool:
+    """Reject explicit evaluator labels and status fields while allowing ordinary security prose."""
+    label = r"(?:likely[_ -]+not[_ -]+exploitable|likely[_ -]+exploitable|inconclusive|unable[_ -]+to[_ -]+run)"
+    status = r"(?:verified|not[_ -]+verified)"
+    return bool(re.search(rf"\b{label}\b", value, re.IGNORECASE)
+                or re.search(r"\b(?:expected_label|expected_fix|oracle[_ ]+label|ground[_ ]+truth)\b",
+                             value, re.IGNORECASE)
+                or re.search(
+                    rf"(?<!\w)[\"']?(?:fix|fix[_ ]+status|status)[\"']?\s*[:=]\s*"
+                    rf"[\"']?(?:{label}|{status})[\"']?(?!\w)", value, re.IGNORECASE))
+
+
+def _license_tokens(expression: str) -> tuple[str, ...]:
+    return tuple(re.findall(r"[A-Z0-9]+", expression.upper()))
+
+
+def _git_url_variants(url: str) -> tuple[str, ...]:
+    """Return equivalent repository spellings while preserving every other URL component."""
+    parsed = urlsplit(url)
+    path = parsed.path.rstrip("/")
+    repository_path = path[:-4] if path.endswith(".git") else path
+    paths = (repository_path, f"{repository_path}/", f"{repository_path}.git", f"{repository_path}.git/")
+    variants: list[str] = []
+    for candidate_path in paths:
+        candidate = urlunsplit((parsed.scheme, parsed.netloc, candidate_path, parsed.query, parsed.fragment))
+        if candidate not in variants:
+            variants.append(candidate)
+    return tuple(variants)
+
+
 def _offline_git_source(root: Path, source: GitSource) -> Path | None:
-    key = hashlib.sha256(f"{source.url}\n{source.commit}".encode()).hexdigest()[:24]
     cache_root = Path(os.environ.get("CORSAIR_SOURCES") or root / ".runs/sources")
-    checkout = cache_root / key
-    marker = checkout / ".corsair-complete"
     try:
-        if marker.read_text() != f"{source.url}\n{source.commit}\n":
-            return None
-        tree = (checkout / source.subdir).resolve(strict=True) if source.subdir else checkout.resolve(strict=True)
-        return tree if tree.is_dir() and tree.is_relative_to(checkout.resolve(strict=True)) else None
+        cache_boundary = cache_root.resolve(strict=True)
     except (OSError, RuntimeError):
         return None
+    for candidate_url in _git_url_variants(source.url):
+        key = hashlib.sha256(f"{candidate_url}\n{source.commit}".encode()).hexdigest()[:24]
+        checkout = cache_root / key
+        try:
+            boundary = checkout.resolve(strict=True)
+            if boundary == cache_boundary or not boundary.is_relative_to(cache_boundary):
+                continue
+            marker = boundary / ".corsair-complete"
+            if (not _regular_file(marker, boundary)
+                    or marker.read_bytes() != f"{candidate_url}\n{source.commit}\n".encode()):
+                continue
+            tree = (boundary / source.subdir).resolve(strict=True) if source.subdir else boundary
+            if tree.is_dir() and tree.is_relative_to(boundary):
+                return tree
+        except (OSError, RuntimeError):
+            continue
+    return None
 
 
 def _local_source(root: Path, case_dir: Path, value: str) -> Path | None:
@@ -366,6 +421,19 @@ def _regular_file(path: Path, boundary: Path) -> bool:
         return False
 
 
+def _aliases_file_in_tree(path: Path, root: Path) -> bool:
+    """Return whether a regular path shares an inode with any file in a source snapshot."""
+    try:
+        for directory, dirnames, filenames in os.walk(root):
+            dirnames[:] = sorted(name for name in dirnames if name != ".git")
+            for filename in sorted(filenames):
+                if os.path.samefile(path, Path(directory) / filename):
+                    return True
+    except OSError:
+        return True
+    return False
+
+
 EvidenceResolver = Callable[[str, str], bytes | None]
 
 
@@ -377,30 +445,39 @@ def _immutable_evidence_url(url: str, revision: str) -> bool:
                 or any(part.lower() in {"main", "master", "head", "latest"} for part in segments))
 
 
-def _cached_evidence(root: Path, url: str, revision: str) -> bytes | None:
-    """Read immutable evidence from a local checkout or the current Git object database; never fetch."""
+def _evidence_location(url: str, revision: str) -> tuple[str, str] | None:
+    """Extract the repository identity and file from a supported immutable evidence URL."""
     parsed = urlsplit(url)
     parts = [part for part in parsed.path.split("/") if part]
     raw_revision = revision.removeprefix("sha256:")
-    try:
-        if parsed.netloc.lower() == "github.com" and len(parts) >= 5 and parts[2] == "blob":
-            owner, repository, marker_revision = parts[0], parts[1], parts[3]
-            evidence_path = "/".join(parts[4:])
-            repository_url = f"https://github.com/{owner}/{repository}"
-        elif parsed.netloc.lower() == "raw.githubusercontent.com" and len(parts) >= 4:
-            owner, repository, marker_revision = parts[0], parts[1], parts[2]
-            evidence_path = "/".join(parts[3:])
-            repository_url = f"https://github.com/{owner}/{repository}"
-        elif len(parts) >= 6 and parts[2:4] == ["-", "blob"]:
-            owner, repository, marker_revision = parts[0], parts[1], parts[4]
-            evidence_path = "/".join(parts[5:])
-            repository_url = f"{parsed.scheme}://{parsed.netloc}/{owner}/{repository}"
-        else:
-            return None
-    except (IndexError, ValueError):
+    if revision.startswith("sha256:"):
         return None
-    if marker_revision != raw_revision or revision.startswith("sha256:"):
+    if parsed.netloc.lower() == "raw.githubusercontent.com" and len(parts) >= 4:
+        owner, repository, marker_revision = parts[0], parts[1], parts[2]
+        evidence_path = "/".join(parts[3:])
+        repository_url = f"https://github.com/{owner}/{repository}"
+    elif len(parts) >= 5 and parts[2] == "blob":
+        owner, repository, marker_revision = parts[0], parts[1], parts[3]
+        evidence_path = "/".join(parts[4:])
+        repository_url = f"{parsed.scheme}://{parsed.netloc}/{owner}/{repository}"
+    elif len(parts) >= 6 and parts[2:4] == ["-", "blob"]:
+        owner, repository, marker_revision = parts[0], parts[1], parts[4]
+        evidence_path = "/".join(parts[5:])
+        repository_url = f"{parsed.scheme}://{parsed.netloc}/{owner}/{repository}"
+    else:
         return None
+    if marker_revision != raw_revision or not evidence_path:
+        return None
+    return repository_url, evidence_path
+
+
+def _cached_evidence(root: Path, url: str, revision: str) -> bytes | None:
+    """Read immutable evidence from a local checkout or the current Git object database; never fetch."""
+    raw_revision = revision.removeprefix("sha256:")
+    location = _evidence_location(url, revision)
+    if location is None:
+        return None
+    repository_url, evidence_path = location
     corsair = _normal_repository("https://github.com/X-McKay/corsair")
     if _normal_repository(repository_url) == corsair:
         result = subprocess.run(["git", "-C", str(root), "show", f"{raw_revision}:{evidence_path}"],
@@ -412,6 +489,15 @@ def _cached_evidence(root: Path, url: str, revision: str) -> bytes | None:
         return None
     evidence = checkout / evidence_path
     return evidence.read_bytes() if _regular_file(evidence, checkout) else None
+
+
+def _similarity_lines(path: Path) -> list[str]:
+    """Read at most 256 KiB of strict UTF-8 for heuristic source comparison."""
+    with path.open("rb") as stream:
+        content = stream.read(SIMILARITY_READ_LIMIT + 1)
+    if len(content) > SIMILARITY_READ_LIMIT:
+        raise ValueError(f"source exceeds the {SIMILARITY_READ_LIMIT}-byte similarity limit")
+    return [line for line in content.decode("utf-8").splitlines() if line.strip()]
 
 
 def _sorted_issues(issues: list[CorpusIssue]) -> tuple[CorpusIssue, ...]:
@@ -453,6 +539,7 @@ def validate_corpus(root: Path, *, _evidence_resolver: EvidenceResolver | None =
         quarantine = QuarantineManifest(schema="corsair-lite/quarantine/1", entries=())
 
     quarantined: list[Path] = []
+    quarantine_by_path: dict[Path, QuarantineEntry] = {}
     for entry in quarantine.entries:
         lexical = root / entry.path
         try:
@@ -468,6 +555,27 @@ def validate_corpus(root: Path, *, _evidence_resolver: EvidenceResolver | None =
         if any(_inside(resolved, previous) or _inside(previous, resolved) for previous in quarantined):
             add("QUARANTINE_OVERLAP", "quarantine roots overlap", path=lexical)
         quarantined.append(resolved)
+        quarantine_by_path[resolved] = entry
+
+    for relative, reasons in MANDATORY_QUARANTINE.items():
+        historical = root / relative
+        if not historical.exists():
+            continue
+        try:
+            resolved_historical = historical.resolve(strict=True)
+        except (OSError, RuntimeError):
+            add("QUARANTINE_REQUIRED_ENTRY_MISSING", "historical corpus root has no exact quarantine entry",
+                path=historical)
+            continue
+        entry = quarantine_by_path.get(resolved_historical)
+        if entry is None or entry.path != relative:
+            add("QUARANTINE_REQUIRED_ENTRY_MISSING", "historical corpus root has no exact quarantine entry",
+                path=historical)
+            continue
+        missing_reasons = sorted(reasons - set(entry.reason_codes))
+        if missing_reasons:
+            add("QUARANTINE_REASON_MISSING", f"mandatory reasons are absent: {', '.join(missing_reasons)}",
+                path=historical)
 
     target_text: dict[str, list[str]] = {}
     cases_root = (root / "cases").resolve()
@@ -484,7 +592,7 @@ def validate_corpus(root: Path, *, _evidence_resolver: EvidenceResolver | None =
             add("CASE_DIRECTORY_MISSING", "case directory is not an exact child of cases", path=case_dir,
                 case_ids=(case.case_id,))
         for value in (case.case_id, case.variant_id or ""):
-            if _answer_bearing(value):
+            if _answer_bearing_identity(value):
                 add("ANSWER_BEARING_IDENTITY", "case identity contains an outcome, fix or split token",
                     path=case_dir, case_ids=(case.case_id,))
         input_path = case_dir / "input.json"
@@ -503,7 +611,7 @@ def validate_corpus(root: Path, *, _evidence_resolver: EvidenceResolver | None =
             if finding.file_path != case.target.file or finding.symbol != case.target.symbol:
                 add("TARGET_IDENTITY_MISMATCH", "input finding target differs from the manifest", path=input_path,
                     case_ids=(case.case_id,))
-            if _answer_bearing(f"{finding.title} {finding.description}"):
+            if _answer_bearing_finding(f"{finding.title} {finding.description}"):
                 add("ANSWER_BEARING_IDENTITY", "agent-visible finding contains an outcome, fix or split token",
                     path=input_path, case_ids=(case.case_id,))
 
@@ -517,14 +625,35 @@ def validate_corpus(root: Path, *, _evidence_resolver: EvidenceResolver | None =
             elif _sha256(path) != expected:
                 add("ARTIFACT_HASH_MISMATCH", "artifact SHA-256 differs from the manifest", path=path,
                     case_ids=(case.case_id,))
+        harness_path: Path | None = None
+        if case.artifacts.harness_path is not None:
+            harness_path = case_dir / case.artifacts.harness_path
+            if not _regular_file(harness_path, resolved_case):
+                add("HARNESS_MISSING", "harness is missing, nonregular or outside the exact case directory",
+                    path=harness_path, case_ids=(case.case_id,))
+            else:
+                core_artifacts = [case_dir / name for name, _ in artifact_specs]
+                try:
+                    aliases_core = any(os.path.samefile(harness_path, artifact) for artifact in core_artifacts)
+                except OSError:
+                    aliases_core = True
+                if aliases_core:
+                    add("HARNESS_ALIAS", "harness aliases a core case artifact", path=harness_path,
+                        case_ids=(case.case_id,))
+                elif _sha256(harness_path) != case.artifacts.harness_sha256:
+                    add("HARNESS_HASH_MISMATCH", "harness SHA-256 differs from the manifest", path=harness_path,
+                        case_ids=(case.case_id,))
+                if any(_inside(harness_path.resolve(), quarantined_root) for quarantined_root in quarantined):
+                    add("QUARANTINE_SELECTION_LEAK", "harness enters a quarantined root", path=harness_path,
+                        case_ids=(case.case_id,))
         reference_path = case_dir / "reference-submission.json"
         try:
             submission = Submission.model_validate_json(reference_path.read_bytes())
             hypothesis = submission.hypothesis
             if (hypothesis.target_file != case.target.file or hypothesis.target_symbol != case.target.symbol
                     or hypothesis.target_lines != case.target.lines):
-                add("REFERENCE_TARGET_MISMATCH", "reference hypothesis differs from manifest target", path=reference_path,
-                    case_ids=(case.case_id,))
+                add("REFERENCE_TARGET_MISMATCH", "reference hypothesis differs from manifest target",
+                    path=reference_path, case_ids=(case.case_id,))
         except (OSError, ValidationError, ValueError) as error:
             add("REFERENCE_TARGET_MISMATCH", f"invalid reference submission: {error}", path=reference_path,
                 case_ids=(case.case_id,))
@@ -540,6 +669,7 @@ def validate_corpus(root: Path, *, _evidence_resolver: EvidenceResolver | None =
                 case_ids=(case.case_id,))
 
         roots: list[Path | None] = [None, None]
+        local_revisions = [False, False]
         if request is not None:
             for index, (spec, declared, commit) in enumerate((
                     (request.source, case.source_pair.vulnerable, request.commit),
@@ -548,6 +678,9 @@ def validate_corpus(root: Path, *, _evidence_resolver: EvidenceResolver | None =
                     add("SOURCE_IDENTITY_MISMATCH", "fixed source is absent", path=input_path,
                         case_ids=(case.case_id,))
                     continue
+                if commit != declared.commit:
+                    add("SOURCE_IDENTITY_MISMATCH", "input commit is absent or differs from the manifest",
+                        path=input_path, case_ids=(case.case_id,))
                 if isinstance(spec, GitSource):
                     if (_normal_repository(spec.url) != _normal_repository(declared.repository)
                             or spec.commit != declared.commit):
@@ -555,15 +688,13 @@ def validate_corpus(root: Path, *, _evidence_resolver: EvidenceResolver | None =
                             path=input_path, case_ids=(case.case_id,))
                     roots[index] = _offline_git_source(root, spec)
                     if roots[index] is None:
-                        add("SOURCE_NOT_ACQUIRED", "pinned Git source is absent from the offline cache", path=input_path,
-                            case_ids=(case.case_id,))
+                        add("SOURCE_NOT_ACQUIRED", "pinned Git source is absent from the offline cache",
+                            path=input_path, case_ids=(case.case_id,))
                 else:
+                    local_revisions[index] = True
                     roots[index] = _local_source(root, case_dir, spec)
                     if roots[index] is None:
                         add("PATH_ESCAPE", "local source is missing or leaves the repository", path=input_path,
-                            case_ids=(case.case_id,))
-                    if commit is not None and commit != declared.commit:
-                        add("SOURCE_IDENTITY_MISMATCH", "local source commit differs from the manifest", path=input_path,
                             case_ids=(case.case_id,))
         if all(root_path is not None for root_path in roots):
             vulnerable, fixed = roots[0], roots[1]
@@ -571,6 +702,19 @@ def validate_corpus(root: Path, *, _evidence_resolver: EvidenceResolver | None =
             for path in (resolved_case, vulnerable, fixed):
                 if any(_inside(path, quarantined_root) for quarantined_root in quarantined):
                     add("QUARANTINE_SELECTION_LEAK", "case material enters a quarantined root", path=path,
+                        case_ids=(case.case_id,))
+            if harness_path is not None and _regular_file(harness_path, resolved_case):
+                try:
+                    aliases_source = any(
+                        _inside(harness_path.resolve(strict=True), source_root.resolve(strict=True))
+                        or _aliases_file_in_tree(harness_path, source_root)
+                        for source_root in (vulnerable, fixed)
+                    )
+                    if aliases_source:
+                        add("HARNESS_ALIAS", "harness aliases a declared source snapshot", path=harness_path,
+                            case_ids=(case.case_id,))
+                except (OSError, RuntimeError):
+                    add("HARNESS_ALIAS", "harness/source nonaliasing could not be verified", path=harness_path,
                         case_ids=(case.case_id,))
             for revision_name, source_root, declared in (("vulnerable", vulnerable, case.source_pair.vulnerable),
                                                           ("fixed", fixed, case.source_pair.fixed)):
@@ -593,10 +737,10 @@ def validate_corpus(root: Path, *, _evidence_resolver: EvidenceResolver | None =
                     add("AFFECTED_REGION_HASH_MISMATCH", f"{revision_name} region hash differs", path=target,
                         case_ids=(case.case_id,))
                 try:
-                    target_text[f"{case.case_id}:{revision_name}"] = [line for line in target.read_text().splitlines()
-                                                                      if line.strip()]
-                except OSError:
-                    pass
+                    target_text[f"{case.case_id}:{revision_name}"] = _similarity_lines(target)
+                except (OSError, UnicodeDecodeError, ValueError) as error:
+                    add("SOURCE_SIMILARITY_UNAVAILABLE", f"source cannot be compared safely: {error}", path=target,
+                        case_ids=(case.case_id,), warning=True)
             if _patch_sha256(vulnerable, fixed) != case.source_pair.patch_sha256:
                 add("PATCH_HASH_MISMATCH", "canonical patch hash differs", path=case_dir,
                     case_ids=(case.case_id,))
@@ -611,15 +755,34 @@ def validate_corpus(root: Path, *, _evidence_resolver: EvidenceResolver | None =
             if revision not in source_revisions:
                 add("RIGHTS_SOURCE_REVISION_MISSING", f"target-source rights omit revision {revision}", path=case_dir,
                     case_ids=(case.case_id,))
+        for index, declared in enumerate((case.source_pair.vulnerable, case.source_pair.fixed)):
+            if not local_revisions[index]:
+                continue
+            records = [record for record in case.rights
+                       if record.layer == "target_source" and record.evidence_revision == declared.commit]
+            vendored = [record for record in records if record.redistribution_mode == "vendored"]
+            if not vendored:
+                add("LOCAL_SOURCE_PROVENANCE_UNVERIFIED",
+                    "local snapshots require vendored rights for the exact declared revision", path=case_dir,
+                    case_ids=(case.case_id,))
+            repositories = {_normal_repository(location[0]) for record in vendored
+                            if (location := _evidence_location(record.evidence_url,
+                                                               record.evidence_revision)) is not None}
+            if _normal_repository(declared.repository) not in repositories:
+                add("RIGHTS_SOURCE_REPOSITORY_MISMATCH",
+                    "target-source rights evidence is not tied to the declared repository", path=case_dir,
+                    case_ids=(case.case_id,))
         for record in case.rights:
-            expression = record.license_expression.strip().upper()
-            if expression in {"NOASSERTION", "NONE"}:
+            tokens = _license_tokens(record.license_expression)
+            if {"NOASSERTION", "NONE"}.intersection(tokens):
                 add("RIGHTS_NOASSERTION", "rights use NOASSERTION/NONE", path=case_dir,
                     case_ids=(case.case_id,))
-            if not expression or expression in {"TODO", "UNKNOWN", "TBD"}:
+            if not tokens or {"TODO", "UNKNOWN", "TBD"}.intersection(tokens):
                 add("RIGHTS_PLACEHOLDER", "rights use a placeholder license", path=case_dir,
                     case_ids=(case.case_id,))
-            if "NONCOMMERCIAL" in expression or re.search(r"(?:^|-)NC(?:-|$)", expression):
+            if ("NC" in tokens or "NONCOMMERCIAL" in tokens
+                    or any(tokens[index:index + 2] == ("NON", "COMMERCIAL")
+                           for index in range(len(tokens) - 1))):
                 add("RIGHTS_NONCOMMERCIAL", "noncommercial rights cannot enter a scored set", path=case_dir,
                     case_ids=(case.case_id,))
             if not _immutable_evidence_url(record.evidence_url, record.evidence_revision):
