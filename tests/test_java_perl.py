@@ -170,6 +170,7 @@ async def test_perl_script_same_basename_does_not_cover_target(tmp_path):
 @pytest.mark.anyio
 @pytest.mark.parametrize("placement", [
     "checkout", "build-copy", "build-extensionless", "build-hardlink", "build-symlink", "build-directory-link",
+    "build-corsair", "build-corsair-unexecuted",
 ])
 async def test_perl_script_identical_decoy_cannot_supply_target_branch(tmp_path, placement):
     require_perl_image()
@@ -188,16 +189,21 @@ async def test_perl_script_identical_decoy_cannot_supply_target_branch(tmp_path,
         "build-hardlink": "mkdir -p /work/generated\nln /work/bin/script-target.pl /work/generated/script-target.pl",
         "build-symlink": "mkdir -p /work/generated\nln -s ../bin/script-target.pl /work/generated/script-target.pl",
         "build-directory-link": "mkdir -p /work/generated\nln -s ../bin /work/generated/source",
+        "build-corsair": "mkdir -p /work/.corsair\ncp /work/bin/script-target.pl /work/.corsair/generated-runner.pl",
+        "build-corsair-unexecuted": "mkdir -p /work/.corsair\ncp /work/bin/script-target.pl /work/.corsair/generated-runner.pl",
     }[placement]
     if placement == "build-directory-link":
         decoy = "/work/generated/source/script-target.pl"
     elif placement == "build-extensionless":
         decoy = "/work/generated/runner"
-    # The target only reaches line 8. A byte-identical decoy reaches line 10 afterwards.
+    elif placement.startswith("build-corsair"):
+        decoy = "/work/.corsair/generated-runner.pl"
+    # Only the decoy can reach line 10; even an unexecuted duplicate is ambiguous.
     probe = reference.probe.replace("$payload, 'second');", "$payload, 'first');")
-    probe = probe.replace("    return $content ne 'outside';",
-        "    _launch('" + decoy + "', \"$base/allowed\", 'document', 'second');\n"
-        "    return $content ne 'outside';")
+    if placement != "build-corsair-unexecuted":
+        probe = probe.replace("    return $content ne 'outside';",
+            "    _launch('" + decoy + "', \"$base/allowed\", 'document', 'second');\n"
+            "    return $content ne 'outside';")
     reference = reference.model_copy(update={"probe": probe, "build_script": build,
         "hypothesis": reference.hypothesis.model_copy(
         update={"target_lines": (10,)})})
@@ -232,8 +238,6 @@ def test_perl_script_renderer_output_alias_preserves_evidence(link_kind, alias_k
             backend.write_file(name, "/work/.corsair/" + filename, data)
         target_data = b"my $value = 42;\nprint $value;\n"
         backend.write_file(name, "/work/target.pl", target_data)
-        # Probe infrastructure does not contribute candidates to prepared source identity.
-        backend.write_file(name, "/work/.corsair/infrastructure-copy.pl", target_data)
         seeded = backend.exec_once(name, ["perl", "/work/target.pl"], workdir="/work",
                                    env=adapter.environment("control"), timeout=60)
         assert seeded.exit_code == 0, seeded.stderr

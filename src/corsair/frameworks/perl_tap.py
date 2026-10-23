@@ -152,13 +152,12 @@ sub unique_prepared_source {
     return 0 unless defined($relative) && length($relative)
         && $relative !~ m{\A/|(?:\A|/)\.\.(?:/|\z)|\0};
     my $target = File::Spec->canonpath("/work/$relative");
-    # Devel::Cover pools byte-identical files. Inspect build-generated sources too.
+    # Devel::Cover pools byte-identical files, including generated probe helpers.
     return eval {
         my %sources;
         my @pending = ('/work');
         while (@pending) {
             my $path = pop @pending;
-            next if $path eq '/work/.corsair';
             my @metadata = lstat $path;
             die 'unreadable prepared source entry' unless @metadata;
             if (S_ISDIR($metadata[2])) {
