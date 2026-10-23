@@ -6,8 +6,12 @@ RUNS ?= .runs/lite
 MAX_SUBMISSIONS ?= 4
 REQUEST_LIMIT ?= 60
 DOCKER_BUILD_FLAGS ?=
+CORPUS_MANIFEST ?= benchmarks/dataset/manifest.json
+EVAL_SET ?= development
+ATTEMPTS ?= 3
+RECEIPTS ?= benchmarks/dataset/receipts
 
-.PHONY: sync test test-offline test-docker corpus-check image verify verify-scripts investigate eval historical-eval pilot cleanup
+.PHONY: sync test test-offline test-docker corpus-check benchmark-verify image verify verify-scripts investigate eval historical-eval pilot cleanup
 
 sync:
 	uv sync --locked
@@ -23,6 +27,10 @@ test-docker: image
 
 corpus-check:
 	$(PYTHON) -m corsair.corpus .
+
+benchmark-verify: image
+	$(PYTHON) -m corsair.cli benchmark-verify --manifest $(CORPUS_MANIFEST) --eval-set $(EVAL_SET) \
+	  --attempts $(ATTEMPTS) --runs $(RUNS) --receipts $(RECEIPTS)
 
 image:
 	docker build $(DOCKER_BUILD_FLAGS) -q -t corsair-lite-python:dev images/python

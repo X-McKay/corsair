@@ -6,12 +6,13 @@ import json
 import shutil
 import subprocess
 from copy import deepcopy
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
-from corsair import corpus as corpus_module
+from corsair import corpus as corpus_module, matrix
 from corsair.auditor import render as render_auditor
 from corsair.case import Case, GitSource, load_case, tree_sha256
 from corsair.corpus import (DatasetManifest, _cached_evidence, _patch_sha256, load_manifest,
@@ -19,6 +20,9 @@ from corsair.corpus import (DatasetManifest, _cached_evidence, _patch_sha256, lo
 from corsair.kernel import Submission
 from corsair.matrix import select
 from corsair.producer import render_case
+from corsair.benchmark import (ReplayRecord, TechnicalReviewRecord, admission_status,
+                               admission_from_manifest, case_revision_sha256, executor_sha256,
+                               publish_receipt, receipt_bytes, runtime_row_sha256)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,7 +36,7 @@ COMMIT_B = "2" * 40
 
 def dataset_case(*, case_id: str = "cs-1001", family_id: str = "cf-1001",
                  variant_id: str | None = None, split: str = "development",
-                 status: str = "candidate") -> dict:
+                 status: str = "candidate", runtime: str = "python-3.12") -> dict:
     return {
         "case_id": case_id,
         "family_id": family_id,
@@ -40,7 +44,7 @@ def dataset_case(*, case_id: str = "cs-1001", family_id: str = "cf-1001",
         "split": split,
         "status": status,
         "language": "python",
-        "runtime": "python-3.12",
+        "runtime": runtime,
         "package": "example-package",
         "framework": "example-framework",
         "execution_mode": "method",
@@ -74,8 +78,8 @@ def dataset_case(*, case_id: str = "cs-1001", family_id: str = "cf-1001",
         },
         "target": {"file": "src/example.py", "symbol": "read_file", "lines": [10, 11]},
         "expected": {
-            "vulnerable": {"label": "LIKELY_EXPLOITABLE", "reason_code": "VERIFIED"},
-            "fixed": {"label": "LIKELY_NOT_EXPLOITABLE", "reason_code": "VERIFIED"},
+            "vulnerable": {"label": "LIKELY_EXPLOITABLE", "reason_code": "EXPLOIT_EXPECTATION_MET"},
+            "fixed": {"label": "LIKELY_NOT_EXPLOITABLE", "reason_code": "INVARIANT_PRESERVED"},
             "fix": "verified",
         },
         "allowed_variations": [],
@@ -105,6 +109,84 @@ def dataset_case(*, case_id: str = "cs-1001", family_id: str = "cf-1001",
 
 def manifest(*cases: dict) -> dict:
     return {"schema": "corsair-lite/dataset-manifest/1", "dataset_version": "0.1.0", "cases": list(cases)}
+
+
+def replay_record(case, *, run_id="qualification-1", attempt=1, outcome="complete") -> ReplayRecord:
+    revision = case_revision_sha256(case)
+    return ReplayRecord.model_validate({
+        "schema": "corsair-lite/qualification-replay/1",
+        "qualification_run_id": run_id,
+        "attempt": attempt,
+        "case_id": case.case_id,
+        "family_id": case.family_id,
+        "dataset_version": "0.1.0",
+        "manifest_sha256": SHA_A,
+        "case_revision_sha256": revision,
+        "input_sha256": case.artifacts.input_sha256,
+        "oracle_sha256": case.artifacts.oracle_sha256,
+        "reference_submission_sha256": case.artifacts.reference_submission_sha256,
+        "vulnerable_tree_sha256": case.source_pair.vulnerable.tree_sha256,
+        "fixed_tree_sha256": case.source_pair.fixed.tree_sha256,
+        "runtime_row": case.runtime,
+        "runtime_row_sha256": SHA_B,
+        "runtime_image_id": "sha256:" + "c" * 64,
+        "executor_sha256": SHA_C,
+        "started_at": "2026-10-23T10:00:00Z",
+        "finished_at": "2026-10-23T10:00:01Z",
+        "gate": "verified" if outcome == "complete" else "infra",
+        "source_label": "LIKELY_EXPLOITABLE" if outcome == "complete" else None,
+        "fixed_label": "LIKELY_NOT_EXPLOITABLE" if outcome == "complete" else None,
+        "fix": "verified" if outcome == "complete" else None,
+        "dispositions": ([
+            {"revision": "vulnerable", "label": "LIKELY_EXPLOITABLE", "rule": "K1",
+             "reason_code": "EXPLOIT_EXPECTATION_MET"},
+            {"revision": "fixed", "label": "LIKELY_NOT_EXPLOITABLE", "rule": "K4",
+             "reason_code": "INVARIANT_PRESERVED"},
+        ] if outcome == "complete" else []),
+        "roles": ([
+            {"revision": "vulnerable", "role": "control", "result": "PASS", "invariant_held": True,
+             "exception_type": None, "exit_code": 0, "junit_tests": 1, "covered_target": True,
+             "covered_lines": list(case.target.lines), "cleanup_confirmed": True,
+             "output": {"sha256": SHA_A, "size": 1}, "junit": {"sha256": SHA_B, "size": 1},
+             "coverage": {"sha256": SHA_C, "size": 1}},
+            {"revision": "vulnerable", "role": "exploit", "result": "PASS", "invariant_held": False,
+             "exception_type": None, "exit_code": 0, "junit_tests": 1, "covered_target": True,
+             "covered_lines": list(case.target.lines), "cleanup_confirmed": True,
+             "output": {"sha256": SHA_A, "size": 1}, "junit": {"sha256": SHA_B, "size": 1},
+             "coverage": {"sha256": SHA_C, "size": 1}},
+            {"revision": "fixed", "role": "control", "result": "PASS", "invariant_held": True,
+             "exception_type": None, "exit_code": 0, "junit_tests": 1, "covered_target": True,
+             "covered_lines": list(case.target.lines), "cleanup_confirmed": True,
+             "output": {"sha256": SHA_A, "size": 1}, "junit": {"sha256": SHA_B, "size": 1},
+             "coverage": {"sha256": SHA_C, "size": 1}},
+            {"revision": "fixed", "role": "exploit", "result": "FAIL", "invariant_held": True,
+             "exception_type": None, "exit_code": 1, "junit_tests": 1, "covered_target": True,
+             "covered_lines": list(case.target.lines), "cleanup_confirmed": True,
+             "output": {"sha256": SHA_A, "size": 1}, "junit": {"sha256": SHA_B, "size": 1},
+             "coverage": {"sha256": SHA_C, "size": 1}},
+        ] if outcome == "complete" else []),
+        "cleanup_confirmed": outcome == "complete",
+        "outcome": outcome,
+        "failure_code": None if outcome == "complete" else "SANDBOX_INFRASTRUCTURE",
+        "audit_mode": "trusted_reference",
+    })
+
+
+def family_review(*cases) -> TechnicalReviewRecord:
+    return TechnicalReviewRecord.model_validate({
+        "schema": "corsair-lite/technical-review/1",
+        "family_id": cases[0].family_id,
+        "variants": [{"case_id": case.case_id, "case_revision_sha256": case_revision_sha256(case)}
+                     for case in cases],
+        "decision": "approved",
+        "reviewer": "independent-reviewer",
+        "reviewed_at": "2026-10-23",
+        "finding_reviewed": True,
+        "invariant_reviewed": True,
+        "payloads_reviewed": True,
+        "expected_results_reviewed": True,
+        "independence_basis": "Reviewer did not author the finding or reference probe.",
+    })
 
 
 def test_manifest_models_are_strict_frozen_and_load_the_empty_repository_manifest(tmp_path):
@@ -284,6 +366,147 @@ def test_selection_uses_only_qualified_cases_and_keeps_family_variants_together(
     assert [case.case_id for case in select_cases(model, "development")] == ["cs-0001-a", "cs-1001"]
     assert [case.case_id for case in select_cases(model, "release")] == ["cs-0001-a", "cs-1001"]
     assert select_cases(model, "regression") == ()
+
+
+def test_admission_requires_three_complete_replays_and_one_family_review():
+    direct = DatasetManifest.model_validate(manifest(
+        dataset_case(case_id="cs-1001-a", family_id="cf-1001", variant_id="direct",
+                     runtime="pytest-cpython312")
+    )).cases[0]
+    script_data = dataset_case(case_id="cs-1001-b", family_id="cf-1001", variant_id="script")
+    script_data["runtime"] = "pytest-cpython312"
+    script = DatasetManifest.model_validate(manifest(script_data)).cases[0]
+    review = family_review(direct, script)
+    records = tuple(replay_record(direct, attempt=attempt) for attempt in (1, 2, 3))
+
+    assert not admission_status(direct, records[:2], review, family_cases=(direct, script)).ready
+    assert admission_status(direct, records, review, family_cases=(direct, script)).ready
+    assert not admission_status(
+        direct, (records[0], records[1], replay_record(direct, run_id="other", attempt=3)), review,
+        family_cases=(direct, script),
+    ).ready
+    assert not admission_status(
+        direct, (records[0], replay_record(direct, attempt=2, outcome="infrastructure"), records[2]), review,
+        family_cases=(direct, script),
+    ).ready
+
+    incomplete_review = review.model_copy(update={"variants": review.variants[:1]})
+    assert not admission_status(direct, records, incomplete_review, family_cases=(direct, script)).ready
+
+    attached = direct.model_copy(update={
+        "status": "qualified",
+        "review_receipt": {"path": "receipts/review.json", "sha256": SHA_A,
+                           "reviewer": "independent-reviewer", "reviewed_at": date(2026, 10, 23)},
+        "replay_receipts": tuple({"path": f"receipts/replay-{attempt}.json", "sha256": SHA_B,
+                                  "attempt": attempt} for attempt in (1, 2, 3)),
+    })
+    assert case_revision_sha256(attached) == case_revision_sha256(direct)
+
+
+def test_changed_oracle_invalidates_receipts():
+    original = DatasetManifest.model_validate(manifest(dataset_case(runtime="pytest-cpython312"))).cases[0]
+    records = tuple(replay_record(original, attempt=attempt) for attempt in (1, 2, 3))
+    changed = original.model_copy(update={
+        "artifacts": original.artifacts.model_copy(update={"oracle_sha256": "d" * 64})
+    })
+
+    assert case_revision_sha256(changed) != case_revision_sha256(original)
+    assert not admission_status(changed, records, family_review(original), family_cases=(changed,)).ready
+
+
+@pytest.mark.parametrize("field", ["source", "probe", "runtime", "image"])
+def test_changed_source_or_probe_runtime_or_image_invalidates_receipts(field):
+    original = DatasetManifest.model_validate(manifest(dataset_case(runtime="pytest-cpython312"))).cases[0]
+    records = tuple(replay_record(original, attempt=attempt) for attempt in (1, 2, 3))
+    if field == "source":
+        changed = original.model_copy(update={
+            "source_pair": original.source_pair.model_copy(update={
+                "vulnerable": original.source_pair.vulnerable.model_copy(update={"tree_sha256": "d" * 64})
+            })
+        })
+    elif field == "probe":
+        changed = original.model_copy(update={
+            "artifacts": original.artifacts.model_copy(update={"reference_submission_sha256": "d" * 64})
+        })
+    elif field == "runtime":
+        changed = original.model_copy(update={"runtime": "another-runtime-row"})
+    else:
+        changed_records = tuple(record.model_copy(update={"runtime_image_id": "sha256:" + "d" * 64})
+                                for record in records)
+        assert not admission_status(original, changed_records, family_review(original),
+                                    family_cases=(original,), runtime_image_id="sha256:" + "c" * 64).ready
+        return
+
+    assert case_revision_sha256(changed) != case_revision_sha256(original)
+    assert not admission_status(changed, records, family_review(original), family_cases=(changed,)).ready
+
+
+def test_receipt_publication_is_exclusive_atomic_and_rejects_symlink_roots(tmp_path):
+    case = DatasetManifest.model_validate(manifest(dataset_case(runtime="pytest-cpython312"))).cases[0]
+    record = replay_record(case)
+    receipts = tmp_path / "receipts"
+    receipts.mkdir()
+
+    published = publish_receipt(receipts, case_revision_sha256(case), "replay-run-1.json", record)
+    original = published.read_bytes()
+    with pytest.raises(FileExistsError):
+        publish_receipt(receipts, case_revision_sha256(case), "replay-run-1.json",
+                        record.model_copy(update={"attempt": 2}))
+    assert published.read_bytes() == original
+    assert not list(published.parent.glob(".*.tmp"))
+
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    linked = tmp_path / "linked"
+    linked.symlink_to(outside, target_is_directory=True)
+    with pytest.raises(ValueError, match="symlink"):
+        publish_receipt(linked, case_revision_sha256(case), "replay-run-2.json", record)
+
+
+def test_complete_replay_record_rejects_duplicate_or_inconsistent_role_evidence():
+    case = DatasetManifest.model_validate(manifest(dataset_case(runtime="pytest-cpython312"))).cases[0]
+    data = replay_record(case).model_dump(mode="json", by_alias=True)
+    data["roles"][3] = data["roles"][2]
+    with pytest.raises(ValidationError, match="role evidence"):
+        ReplayRecord.model_validate(data)
+
+
+def test_admission_rejects_an_unattached_failure_in_the_selected_run(tmp_path):
+    case = DatasetManifest.model_validate(manifest(dataset_case(runtime="pytest-cpython312"))).cases[0]
+    row = next(row for row in matrix.load() if row.id == case.runtime)
+    environment = {"dataset_version": "0.1.0", "runtime_row_sha256": runtime_row_sha256(row),
+                   "executor_sha256": executor_sha256()}
+    records = tuple(replay_record(case, attempt=attempt).model_copy(update=environment)
+                    for attempt in (1, 2, 3))
+    review = family_review(case)
+    dataset = tmp_path / "benchmarks/dataset"
+    revision_dir = dataset / "receipts" / case_revision_sha256(case)
+    revision_dir.mkdir(parents=True)
+    pointers = []
+    for record in records:
+        path = revision_dir / f"replay-run-{record.attempt}.json"
+        path.write_bytes(receipt_bytes(record))
+        pointers.append({"path": path.relative_to(dataset).as_posix(),
+                         "sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "attempt": record.attempt})
+    review_path = dataset / "receipts/review.json"
+    review_path.write_bytes(receipt_bytes(review))
+    attached_data = case.model_dump(mode="json")
+    attached_data.update({
+        "status": "qualified",
+        "replay_receipts": pointers,
+        "review_receipt": {"path": "receipts/review.json",
+                           "sha256": hashlib.sha256(review_path.read_bytes()).hexdigest(),
+                           "reviewer": review.reviewer, "reviewed_at": review.reviewed_at.isoformat()},
+    })
+    attached = corpus_module.DatasetCase.model_validate(attached_data)
+    attached_manifest = DatasetManifest.model_validate(
+        manifest(attached.model_dump(mode="json")))
+    assert admission_from_manifest(dataset, attached_manifest, attached).ready
+
+    hidden_failure = records[-1].model_copy(update={"attempt": 4, "outcome": "failed",
+                                                     "failure_code": "EXPECTED_DISPOSITION_MISMATCH"})
+    (revision_dir / "replay-run-4.json").write_bytes(receipt_bytes(hidden_failure))
+    assert admission_from_manifest(dataset, attached_manifest, attached).code == "REPLAY_RUN_LEDGER_INVALID"
 
 
 def test_oracle_fields_never_cross_agent_boundary(tmp_path):
@@ -902,6 +1125,16 @@ def test_quarantine_is_never_selected(tmp_path):
     assert not checked(root).ok
 
 
+def test_qualified_case_without_current_admission_receipts_fails_closed(tmp_path):
+    root = corpus_fixture(tmp_path)
+    data = read_manifest(root)
+    data["cases"][0]["status"] = "qualified"
+    write_manifest(root, data)
+
+    report = checked(root)
+    assert "QUALIFICATION_REPLAY_TRIO_REQUIRED" in issue_codes(report)
+
+
 def test_historical_corpus_roots_require_complete_quarantine_entries(tmp_path):
     root = corpus_fixture(tmp_path)
     (root / "evals/e2e").mkdir(parents=True)
@@ -1180,8 +1413,27 @@ def test_corpus_report_is_sorted_and_cli_exit_is_fail_closed(tmp_path, capsys):
     assert lines == sorted(lines)
 
 
+def test_corpus_validation_uses_the_explicit_manifest_inside_the_dataset_root(tmp_path):
+    root = corpus_fixture(tmp_path)
+    alternate = root / "benchmarks/dataset/conformance.json"
+    alternate.write_bytes((root / "benchmarks/dataset/manifest.json").read_bytes())
+    (root / "benchmarks/dataset/manifest.json").write_text("not json\n")
+
+    report = validate_corpus(root, manifest_path=alternate, _evidence_resolver=fixture_evidence(root))
+    assert report.ok and report.case_count == 1
+
+    outside = root / "alternate.json"
+    outside.write_bytes(alternate.read_bytes())
+    assert "MANIFEST_INVALID" in issue_codes(
+        validate_corpus(root, manifest_path=outside, _evidence_resolver=fixture_evidence(root)))
+
+
 def test_makefile_exposes_provider_free_corpus_check():
     makefile = (ROOT / "Makefile").read_text()
     assert "corpus-check:" in makefile
     assert "$(PYTHON) -m corsair.corpus ." in makefile
+    benchmark_target = makefile.split("benchmark-verify:", 1)[1].split("\n\n", 1)[0]
+    assert "--manifest $(CORPUS_MANIFEST)" in benchmark_target
+    assert "--eval-set $(EVAL_SET)" in benchmark_target and "--attempts $(ATTEMPTS)" in benchmark_target
+    assert "$(PROVIDER)" not in benchmark_target and "$(wildcard" not in benchmark_target
 

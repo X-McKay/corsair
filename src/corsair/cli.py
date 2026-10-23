@@ -20,6 +20,7 @@ from pydantic import ValidationError
 from . import matrix
 from .artifacts import ArtifactStore
 from .auditor import audit, build_auditor
+from .benchmark import verify_references
 from .case import Case, load_case, load_oracle
 from .kernel import Evaluation, Fix, Kernel, Label, Submission, Verdict, reported_target_present, terminal_verdict
 from .producer import ProducerRun, investigate
@@ -199,6 +200,43 @@ def _cleanup(args: argparse.Namespace) -> int:
     return 0 if not unconfirmed else 1
 
 
+async def _benchmark_verify(args: argparse.Namespace) -> int:
+    try:
+        report = await verify_references(
+            root=Path.cwd(), manifest_path=Path(args.manifest), eval_set=args.eval_set,
+            attempts=args.attempts, runs_root=Path(args.runs), receipts_root=Path(args.receipts))
+    except (OSError, ValidationError, ValueError) as error:
+        print(f"benchmark-verify input invalid: {error}", file=sys.stderr)
+        return 2
+    for case in report.cases:
+        for attempt in case.attempts:
+            detail = f" failure={attempt.failure_code}" if attempt.failure_code else ""
+            print(f"{case.case_id} attempt={attempt.attempt} outcome={attempt.outcome} "
+                  f"receipt={attempt.path}{detail}", file=sys.stderr)
+    complete = sum(attempt.outcome == "complete" for case in report.cases for attempt in case.attempts)
+    total = sum(len(case.attempts) for case in report.cases)
+    summary = {
+        "schema": report.schema_version,
+        "dataset_version": report.dataset_version,
+        "eval_set": report.eval_set,
+        "qualification_run_id": report.qualification_run_id,
+        "cases": len(report.cases),
+        "attempts": total,
+        "complete": complete,
+        "admission_ready": sum(case.admission_ready for case in report.cases),
+        "ok": report.ok,
+    }
+    print(json.dumps(summary, indent=2))
+    return 0 if report.ok else 1
+
+
+def _positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be at least one")
+    return parsed
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="corsair", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -227,6 +265,14 @@ def main(argv: list[str] | None = None) -> int:
     ev.add_argument("--no-audit", action="store_true")
     ev.add_argument("--runs", default=str(RUNS))
 
+    benchmark = sub.add_parser("benchmark-verify", help="replay trusted corpus references and write receipts")
+    benchmark.add_argument("--manifest", default="benchmarks/dataset/manifest.json")
+    benchmark.add_argument("--eval-set", choices=("conformance", "development", "regression", "release"),
+                           default="development")
+    benchmark.add_argument("--attempts", type=_positive_int, default=3)
+    benchmark.add_argument("--runs", default=str(RUNS))
+    benchmark.add_argument("--receipts", default="benchmarks/dataset/receipts")
+
     clean = sub.add_parser("cleanup", help="remove every container this tool created (optionally one run)")
     clean.add_argument("--run-id")
     clean.add_argument("--images", action="store_true", help="also remove the sealed corsair-lite-env images")
@@ -238,6 +284,8 @@ def main(argv: list[str] | None = None) -> int:
         return asyncio.run(_investigate(args))
     if args.command == "eval":
         return asyncio.run(_eval(args))
+    if args.command == "benchmark-verify":
+        return asyncio.run(_benchmark_verify(args))
     return _cleanup(args)
 
 

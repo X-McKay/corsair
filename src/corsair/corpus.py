@@ -650,7 +650,8 @@ def _sorted_issues(issues: list[CorpusIssue]) -> tuple[CorpusIssue, ...]:
     return tuple(sorted(issues, key=lambda issue: (issue.code, issue.path or "", issue.case_ids, issue.message)))
 
 
-def validate_corpus(root: Path, *, _evidence_resolver: EvidenceResolver | None = None) -> CorpusReport:
+def validate_corpus(root: Path, *, manifest_path: Path | None = None,
+                    _evidence_resolver: EvidenceResolver | None = None) -> CorpusReport:
     """Validate benchmark provenance and isolation offline, without refreshing source or evidence."""
     try:
         root = Path(root).resolve(strict=True)
@@ -673,10 +674,18 @@ def validate_corpus(root: Path, *, _evidence_resolver: EvidenceResolver | None =
         (warnings if warning else errors).append(issue)
 
     dataset = root / "benchmarks/dataset"
+    chosen_manifest = Path(manifest_path) if manifest_path is not None else dataset / "manifest.json"
+    if not chosen_manifest.is_absolute():
+        chosen_manifest = root / chosen_manifest
     try:
-        manifest = load_manifest(dataset / "manifest.json")
+        resolved_dataset = dataset.resolve(strict=True)
+        resolved_manifest = chosen_manifest.resolve(strict=True)
+        if (chosen_manifest.is_symlink() or not chosen_manifest.is_file()
+                or resolved_manifest.parent != resolved_dataset):
+            raise ValueError("manifest must be a regular file directly below benchmarks/dataset")
+        manifest = load_manifest(resolved_manifest)
     except (OSError, ValidationError, ValueError) as error:
-        add("MANIFEST_INVALID", str(error), path=dataset / "manifest.json")
+        add("MANIFEST_INVALID", str(error), path=chosen_manifest)
         return CorpusReport(errors=_sorted_issues(errors), case_count=0, family_count=0)
     try:
         quarantine = QuarantineManifest.model_validate_json((dataset / "quarantine.json").read_bytes())
@@ -989,6 +998,14 @@ def validate_corpus(root: Path, *, _evidence_resolver: EvidenceResolver | None =
                         case_ids=(case.case_id,))
             except (OSError, RuntimeError):
                 pass
+        if case.status == "qualified":
+            from .benchmark import admission_from_manifest
+
+            admission = admission_from_manifest(dataset, manifest, case)
+            if not admission.ready:
+                add(f"QUALIFICATION_{admission.code}",
+                    f"qualified case lacks current admission evidence: {admission.code}",
+                    path=case_dir, case_ids=(case.case_id,))
 
     families = {case.family_id for case in manifest.cases}
     family_cases: dict[str, list[DatasetCase]] = defaultdict(list)

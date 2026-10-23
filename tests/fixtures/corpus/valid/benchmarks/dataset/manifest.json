@@ -7,7 +7,7 @@
       "family_id": "cf-1001",
       "variant_id": null,
       "split": "development",
-      "status": "qualified",
+      "status": "candidate",
       "language": "python",
       "runtime": "python-3.12",
       "package": "fixture-package",
