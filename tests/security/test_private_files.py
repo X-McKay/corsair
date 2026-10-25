@@ -1,9 +1,11 @@
 """Private local data must stay out of commits without hiding public project inputs."""
 
+import os
 import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+PUBLIC_SKILL_NAMES = ("corsair-development", "corsair-evaluations")
 
 
 def _ignored(paths: list[str]) -> set[str]:
@@ -58,3 +60,28 @@ def test_public_project_inputs_are_not_hidden():
         "scripts/check_docs.py",
     ]
     assert not _ignored(paths)
+
+
+def test_canonical_public_skills_and_claude_links_remain_public():
+    public_paths: list[str] = []
+    for skill_name in PUBLIC_SKILL_NAMES:
+        canonical = ROOT / ".agents/skills" / skill_name
+        claude_link = ROOT / ".claude/skills" / skill_name
+
+        assert (canonical / "SKILL.md").is_file()
+        assert claude_link.is_symlink()
+        assert os.readlink(claude_link) == f"../../.agents/skills/{skill_name}"
+        assert claude_link.resolve() == canonical.resolve()
+        public_paths.append(f".agents/skills/{skill_name}/SKILL.md")
+
+    assert not _ignored(public_paths)
+
+
+def test_private_skill_tool_configuration_is_ignored():
+    private_paths = [
+        ".agents/private-tool-config.json",
+        ".claude/private-tool-config.json",
+        ".codex/private-tool-config.json",
+    ]
+
+    assert _ignored(private_paths) == set(private_paths)

@@ -50,8 +50,8 @@ There is no application-owned agent graph, scheduler, generic provider protocol,
 
 ## Design invariants
 
-- `Submission` (including `PlanRevision`) and `AuditResult` are canonical Pydantic contracts in [`src/corsair/contracts/agents.py`](../../src/corsair/contracts/agents.py). ADK consumes those models through native `output_schema`; this page does not reproduce a changing schema.
-- The producer can only use `read_file` and `list_files` against an already admitted immutable snapshot. It proposes JSON payload data, never executable probes or assertions. The tool-free auditor receives an outcome-blind review packet.
+- `ProducerDecision` (proposal with `Submission`/`PlanRevision`, or explicit abstention) and `AuditResult` are canonical Pydantic contracts in [`src/corsair/contracts/agents.py`](../../src/corsair/contracts/agents.py). ADK consumes those models through native `output_schema`; this page does not reproduce a changing schema.
+- The producer can only use `read_file` and `list_files` against an already admitted immutable snapshot. It proposes JSON payload data, never executable probes or assertions. The private-guidance-only auditor receives an outcome-blind review packet.
 - Native Docker execution returns raw immutable receipts, not a verdict. Verification checks the receipt, source/submission identity, container cleanup, driver report, and relevant coverage before policy code considers a disposition.
 - Temporal durability is at the round/activity level. A fresh ADK episode is not resumable at an arbitrary model call; uncertain side effects are reconciled by identity and are not automatically replayed.
 - Shared artifacts are required for worker/client inspection and recovery. A local artifact host remains a single-host durability limit; Temporal history alone cannot recreate lost artifacts.

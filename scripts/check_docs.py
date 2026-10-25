@@ -23,6 +23,10 @@ EXCLUDED_DIRECTORIES = frozenset(
         "outputs",
     }
 )
+PUBLIC_SKILL_MARKDOWN = (
+    Path(".agents/skills/corsair-development/SKILL.md"),
+    Path(".agents/skills/corsair-evaluations/SKILL.md"),
+)
 LINK_PATTERN = re.compile(r"(?<!!)\[[^\]]*\]\((?P<destination>[^\n)]+)\)")
 HEADING_PATTERN = re.compile(r"^\s{0,3}#{1,6}\s+(?P<heading>.*?)(?:\s+#+)?\s*$")
 SETEXT_PATTERN = re.compile(r"^\s{0,3}(?:=+|-+)\s*$")
@@ -46,7 +50,7 @@ class Issue:
 
 
 def markdown_files(root: Path) -> list[Path]:
-    """Return repository Markdown files without private or generated directories."""
+    """Return public Markdown, including only allowlisted project skill instructions."""
 
     files: list[Path] = []
     for directory, child_directories, names in root.walk():
@@ -56,6 +60,11 @@ def markdown_files(root: Path) -> list[Path]:
             if name not in EXCLUDED_DIRECTORIES and not name.startswith(".")
         ]
         files.extend(directory / name for name in names if name.endswith(".md"))
+    files.extend(
+        skill_file
+        for relative_path in PUBLIC_SKILL_MARKDOWN
+        if (skill_file := root / relative_path).is_file()
+    )
     return sorted(files)
 
 

@@ -99,6 +99,19 @@ def test_agent_factories_do_not_depend_on_concrete_inference_adapters():
         ), path
 
 
+def test_role_local_agent_layout_has_only_concrete_source_tools_and_native_toolsets():
+    producer = ROOT / "src/corsair/agents/producer"
+    auditor = ROOT / "src/corsair/agents/auditor"
+
+    assert not (producer / "tools.py").exists()
+    assert (producer / "tools/read_file.py").is_file()
+    assert (producer / "tools/list_files.py").is_file()
+    assert (producer / "toolsets.py").is_file()
+    assert (auditor / "toolsets.py").is_file()
+    assert (producer / "contracts.py").is_file()
+    assert (auditor / "contracts.py").is_file()
+
+
 @pytest.mark.parametrize(
     "value", ["text", 7, 0.5, True, None, [1, {"nested": False}], {"a": [None]}]
 )

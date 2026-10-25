@@ -3,10 +3,12 @@ from __future__ import annotations
 import io
 import json
 import tarfile
+from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
 import pytest
+from google.adk.tools.skill_toolset import SkillToolset
 from google.adk.tools.tool_context import ToolContext
 
 from corsair.adapters.inference.adk import (
@@ -18,8 +20,10 @@ from corsair.adapters.inference.adk import (
 from corsair.adapters.scm.local import StoredSourceReader
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.agents.auditor.factory import build_auditor
+from corsair.agents.auditor.toolsets import build_auditor_toolset
 from corsair.agents.producer.factory import build_producer
-from corsair.agents.producer.tools import build_producer_tools
+from corsair.agents.producer.toolsets import build_producer_toolset
+from corsair.agents.resources import load_runtime_skills
 from corsair.contracts import (
     AuditInput,
     AuditResult,
@@ -187,8 +191,10 @@ async def test_adk_native_schema_tool_completion_is_counted_and_validated(tmp_pa
 async def test_tool_cap_is_charged_before_work_and_source_path_escape_is_rejected(tmp_path: Path):
     store = ArtifactStore(tmp_path)
     producer_input = _producer_input(store, tool_call_limit=1)
-    tools = build_producer_tools(producer_input, StoredSourceReader(store))
-    escaped = await tools.read_file("../private.txt", cast(ToolContext, object()))
+    tools = build_producer_toolset(producer_input, StoredSourceReader(store))
+    read_file = tools[0]
+    assert isinstance(read_file, Callable)
+    escaped = await read_file("../private.txt", cast(ToolContext, object()))
     assert "normalized relative" in escaped["error"]
     model = ScriptedLlm(
         model="scripted-tool-limit",
@@ -203,19 +209,25 @@ async def test_tool_cap_is_charged_before_work_and_source_path_escape_is_rejecte
 
 def test_factories_share_canonical_pydantic_output_models(tmp_path: Path):
     store = ArtifactStore(tmp_path)
-    tools = build_producer_tools(_producer_input(store), StoredSourceReader(store))
-    producer = build_producer("gemini-2.5-flash", tools=tools.native_tools())
-    auditor = build_auditor("gemini-2.5-flash")
+    tools = build_producer_toolset(_producer_input(store), StoredSourceReader(store))
+    producer = build_producer("gemini-2.5-flash", tools=tools)
+    auditor_tools = build_auditor_toolset()
+    auditor = build_auditor("gemini-2.5-flash", auditor_tools)
 
     assert producer.name == "producer"
     tool_names = []
-    for tool in producer.tools:
+    for tool in producer.tools[:2]:
         assert callable(tool)
         name = getattr(tool, "__name__", None)
         assert isinstance(name, str)
         tool_names.append(name)
     assert tool_names == ["read_file", "list_files"]
-    assert auditor.tools == []
+    producer_loader = producer.tools[2]
+    auditor_loader = auditor.tools[0]
+    assert isinstance(producer_loader, SkillToolset)
+    assert isinstance(auditor_loader, SkillToolset)
+    assert [skill.name for skill in producer_loader.skills] == ["source-grounding"]
+    assert [skill.name for skill in auditor_loader.skills] == ["semantic-review"]
     assert auditor.include_contents == "none"
     assert auditor.output_schema is AuditResult
     assert producer.output_schema is ProducerDecision
@@ -229,8 +241,8 @@ def test_factories_share_canonical_pydantic_output_models(tmp_path: Path):
         schema["$defs"]["Submission"]["required"]
     )
     assert schema["$defs"]["PlanRevision"]["additionalProperties"] is False
-    with pytest.raises(ValueError, match="exactly match"):
-        build_producer("gemini-2.5-flash", tools.native_tools()[:-1])
+    with pytest.raises(ValueError, match="exactly one native SkillToolset"):
+        build_producer("gemini-2.5-flash", tools[:-1])
 
 
 def test_producer_output_uses_decisions_and_decodes_predecision_activity_data():
@@ -359,4 +371,49 @@ async def test_source_inspection_then_structured_completion_share_one_native_epi
     assert output.feedback is None and output.submission_for_verification() is not None
     assert output.usage.llm_calls == 2 and output.usage.tool_calls == 1
     assert all(request.config.response_schema is ProducerDecision for request in model.requests)
-    assert all(set(request.tools_dict) == {"read_file", "list_files"} for request in model.requests)
+    assert all(
+        set(request.tools_dict) == {"read_file", "list_files", "load_skill", "load_skill_resource"}
+        for request in model.requests
+    )
+
+
+@pytest.mark.asyncio
+async def test_core_procedure_reaches_first_model_request_without_inventing_tool_calls(tmp_path):
+    store = ArtifactStore(tmp_path)
+    producer_model = ScriptedLlm(
+        model="scripted", responses=[text_response(json.dumps(_proposal_args()))]
+    )
+    produced = await run_producer(_producer_input(store), ModelSettings(), store, producer_model)
+    assert produced.usage.skills_preloaded == ["source-grounding"]
+    assert produced.usage.skills_loaded == []
+    assert produced.usage.tool_calls == 0
+    assert "Runtime procedure: source-grounding" in str(
+        producer_model.requests[0].config.system_instruction
+    )
+    assert load_runtime_skills("producer")[0].instructions in str(
+        producer_model.requests[0].config.system_instruction
+    )
+    audit_model = ScriptedLlm(
+        model="scripted",
+        responses=[
+            text_response('{"decision":"INSUFFICIENT_CONTEXT","reason":"insufficient source"}')
+        ],
+    )
+    prepared = _prepared(store)
+    audited = await run_auditor(
+        AuditInput(
+            finding=prepared.finding,
+            recipe=prepared.recipe,
+            source_excerpt=prepared.source_excerpt,
+            submission=Submission(**_submit_args()),
+            max_output_tokens=512,
+        ),
+        ModelSettings(),
+        audit_model,
+    )
+    assert audited.usage.skills_preloaded == ["semantic-review"]
+    assert audited.usage.skills_loaded == []
+    assert audited.usage.tool_calls == 0
+    assert "Runtime procedure: semantic-review" in str(
+        audit_model.requests[0].config.system_instruction
+    )

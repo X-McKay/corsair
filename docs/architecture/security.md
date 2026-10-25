@@ -14,7 +14,7 @@ Corsair’s security design limits what agents can do, binds evidence to admitte
 | Boundary | Control | Limit |
 | --- | --- | --- |
 | Source admission | Operator-scoped local root; descriptor/no-follow traversal; regular-file, size, count, sensitive-name, and digest checks; deterministic immutable archive | This is not remote-SCM trust, malware scanning, or a general secret detector. |
-| Agent episode | Canonical structured output; bounded model/tool/time budgets; producer read-only `read_file`/`list_files`; tool-free outcome-blind auditor | A valid model object can still be semantically wrong; model roles can share correlated failure. |
+| Agent episode | Canonical structured output; bounded model/tool/time budgets; producer read-only `read_file`/`list_files`; private-guidance-only outcome-blind auditor | A valid model object can still be semantically wrong; model roles can share correlated failure. |
 | Source/evidence separation | Private fixture is generated only for the native observer and excluded from agent packets, artifacts’ reasons, and logs | The design does not attest arbitrary target/interpreter behavior. |
 | Container execution | Docker SDK, unprivileged user, dropped capabilities, no-new-privileges, read-only mounts, no network, resource/output/time limits, and cleanup confirmation | Docker daemon/kernel compromise and hostile interpreter evasion remain outside the containment claim. |
 | Evidence acceptance | Immutable raw receipts; operation/source/submission/image identity; native exit/JUnit/driver/coverage agreement; trusted verifier | A receipt only supports the defined recipe and scoped component claim. |

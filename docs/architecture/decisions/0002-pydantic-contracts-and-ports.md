@@ -28,3 +28,7 @@ The implementation also needs real extension seams without speculative modules f
 The contracts can be validated and evaluated without loading execution adapters, and concrete adapters can evolve behind explicit typed operations. The producer remains a data proposer with two immutable-source read tools; it is not given a generic tool/execution surface. Model capability differences still matter: native ADK handles schema/tool behavior, while Corsair retains its budget and contract checks.
 
 Adding a source provider or vendor-specific path now requires a real adapter that fulfills an existing or justified new port, plus isolated and composed qualification. It is not satisfied by adding a package name. See [Components](../components.md) and [System context](../system-context.md).
+
+## 2026-10-25 amendment: canonical producer decision
+
+The initial decision above used direct `Submission` output. The accepted latest branch wraps proposals in canonical `ProducerDecision`, a native Pydantic discriminated proposal-or-abstention model. The proposal still contains the same `Submission` and `PlanRevision`; the auditor still outputs `AuditResult`. The old `ProducerOutput.submission` field remains solely for decoding pre-decision persisted payloads, with one canonical projection shared by evidence and evaluation. This changes neither SDK ownership nor evidence authority. Native conformance and small live cohorts are recorded separately in [current plans](../../plans/README.md), with producer diagnostics still unpromoted.

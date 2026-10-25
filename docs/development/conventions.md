@@ -21,11 +21,11 @@ Use concrete composition for real consumers. Add an abstraction only when a seco
 
 ## Preserve the native execution model
 
-Google ADK owns each fresh producer or auditor episode. Its factories use the canonical `Submission`/`PlanRevision` and `AuditResult` Pydantic models through native `output_schema`; do not restore string-to-object repair or a custom submission state. Native callbacks account for model/tool calls and constrain per-episode budgets.
+Google ADK owns each fresh producer or auditor episode. Its factories use the canonical `ProducerDecision` and `AuditResult` Pydantic models (proposals retain `Submission`/`PlanRevision`) through native `output_schema`; do not restore string-to-object repair or a custom submission state. Native callbacks account for model/tool calls and constrain per-episode budgets.
 
 Temporal owns durable rounds, deadlines, cancellation, activity retries, and recording. Workflows coordinate deterministic state only; ordinary activities perform ADK, source, Docker, and storage work. Do not substitute an upstream Google ADK Temporal integration for the implemented ordinary-activity model, or claim that an interrupted model call resumes mid-episode.
 
-The producer receives only the episode-local, read-only `read_file` and `list_files` tools over an admitted immutable snapshot. The auditor is tool-free and outcome-blind. Models propose JSON data only; trusted native code executes the configured observer and policy code evaluates its validated receipts. Oracles remain evaluator-owned and outside agent, tool, and workflow packets.
+The producer receives only the episode-local, read-only `read_file` and `list_files` tools over an admitted immutable snapshot. The auditor is private-guidance-only and outcome-blind. Models propose JSON data only; trusted native code executes the configured observer and policy code evaluates its validated receipts. Oracles remain evaluator-owned and outside agent, tool, and workflow packets.
 
 ## Treat identity, evidence, and cleanup as part of behavior
 
@@ -47,7 +47,7 @@ Run the maintained gate before delivery:
 just check
 ```
 
-It executes `ruff check src tests evals`, `ruff format --check src tests evals`, `just --fmt --check`, and `ty check --error-on-warning`. Ruff intentionally excludes `evals/fixtures`: formatting frozen target inputs could change declared line numbers and canonical source hashes. That exclusion is not a waiver—typing and native conformance still cover them.
+It executes `ruff check src tests evals scripts`, `ruff format --check src tests evals scripts`, `just --fmt --check`, and `ty check --error-on-warning`. Ruff intentionally excludes `evals/fixtures`: formatting frozen target inputs could change declared line numbers and canonical source hashes. That exclusion is not a waiver—typing and native conformance still cover them.
 
 ## Records, limits, and safe changes
 

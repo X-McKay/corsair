@@ -14,6 +14,7 @@ from corsair.adapters.inference.adk import run_auditor, run_producer
 from corsair.adapters.scm.local import prepare_case
 from corsair.adapters.scm.requests import normalize_request_sources
 from corsair.adapters.storage.filesystem import ArtifactStore
+from corsair.agents.resources import load_agent_spec, prompt_text, runtime_skill_digest
 from corsair.contracts import (
     AuditInput,
     AuditOutput,
@@ -138,8 +139,17 @@ def fixture_score_row(
         "agent": agent,
         "output_artifact": store.put_json(output).model_dump(mode="json"),
         "config_digest": settings.identity,
+        "agent_resources_digest": digest(
+            {
+                "spec": load_agent_spec(agent).model_dump(mode="json"),
+                "instruction": prompt_text(agent),
+                "runtime_skills_digest": runtime_skill_digest(agent),
+            }
+        ),
         "llm_calls": output.usage.llm_calls,
         "tool_calls": output.usage.tool_calls,
+        "skills_loaded": output.usage.skills_loaded,
+        "skills_preloaded": output.usage.skills_preloaded,
         "input_tokens": output.usage.input_tokens,
         "output_tokens": output.usage.output_tokens,
         "agent_seconds": output.usage.seconds,

@@ -199,21 +199,44 @@ class InvestigationWorkflow:
                     result = result.model_copy(update={"reason": "No budget remains for review."})
                     break
                 self.phase = "audit"
-                audit = await self._execute_bounded_activity(
-                    "corsair.audit",
-                    AuditInput(
+                audit_llm_call_limit, audit_tool_call_limit = 1, 0
+                if workflow.patched("auditor-runtime-budget-v1"):
+                    audit_llm_call_limit = min(2, calls_left)
+                    audit_tool_call_limit = min(4, tools_left)
+                    audit_request: AuditInput | dict[str, Any] = AuditInput(
                         finding=prepared.finding,
                         recipe=prepared.recipe,
                         source_excerpt=prepared.source_excerpt,
                         submission=previous,
                         max_output_tokens=budget.max_output_tokens,
-                    ),
+                        llm_call_limit=audit_llm_call_limit,
+                        tool_call_limit=audit_tool_call_limit,
+                    )
+                else:
+                    # Default-valued Pydantic fields serialize into Temporal payloads.
+                    # Retain this exact pre-limit command shape for old histories.
+                    audit_request = {
+                        "finding": prepared.finding,
+                        "recipe": prepared.recipe,
+                        "source_excerpt": prepared.source_excerpt,
+                        "submission": previous,
+                        "max_output_tokens": budget.max_output_tokens,
+                    }
+                audit = await self._execute_bounded_activity(
+                    "corsair.audit",
+                    audit_request,
                     AuditOutput,
                     180,
                 )
                 calls_left -= audit.usage.llm_calls
-                if audit.usage.llm_calls > 1:
-                    raise ValueError("Auditor returned usage outside its one-call budget")
+                tools_left -= audit.usage.tool_calls
+                if (
+                    audit.usage.llm_calls > audit_llm_call_limit
+                    or audit.usage.tool_calls > audit_tool_call_limit
+                    or calls_left < 0
+                    or tools_left < 0
+                ):
+                    raise ValueError("Auditor returned usage outside its admitted sub-budget")
                 round_result = round_result.model_copy(update={"audit": audit})
                 rounds[-1] = round_result
                 label, status, reason = decide(prepared, observation, audit)

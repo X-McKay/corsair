@@ -25,6 +25,7 @@ from corsair.contracts import (
     InvestigationResult,
     NoGroundedCandidate,
     Observation,
+    PlanRevision,
     ProducerDecision,
     ProducerInput,
     ProducerOutput,
@@ -75,6 +76,76 @@ def _maximum_round_budget() -> Budget:
     )
 
 
+def _audit_input(
+    *, llm_call_limit: int | None = None, tool_call_limit: int | None = None
+) -> AuditInput:
+    request = investigation_request()
+    limits = {}
+    if llm_call_limit is not None:
+        limits["llm_call_limit"] = llm_call_limit
+    if tool_call_limit is not None:
+        limits["tool_call_limit"] = tool_call_limit
+    return AuditInput(
+        finding=request.case.finding,
+        recipe=request.case.recipe,
+        source_excerpt="4: return payload\n",
+        submission=Submission(
+            control_payload="hello.txt",
+            exploit_payload="../private/secret.txt",
+            hypothesis="The configured target returns an attacker-controlled payload.",
+            plan=PlanRevision(
+                revision=1,
+                objective="exercise the submitted control and adversarial payload pair",
+                next_steps=["submit the pair to trusted evidence collection"],
+                reason="the submitted source configuration admits this pair",
+            ),
+        ),
+        max_output_tokens=256,
+        **limits,
+    )
+
+
+async def test_audit_input_episode_limits_are_bounded_and_allow_exhausted_admission():
+    defaults = _audit_input()
+
+    assert defaults.llm_call_limit == 2
+    assert defaults.tool_call_limit == 4
+    assert _audit_input(llm_call_limit=0, tool_call_limit=0).model_dump(
+        include={"llm_call_limit", "tool_call_limit"}
+    ) == {"llm_call_limit": 0, "tool_call_limit": 0}
+    with pytest.raises(ValueError):
+        _audit_input(llm_call_limit=3)
+    with pytest.raises(ValueError):
+        _audit_input(tool_call_limit=-1)
+    await asyncio.sleep(0)
+
+
+async def test_native_auditor_does_not_overrun_exhausted_loader_budget():
+    """Run the native ADK runner directly; no Temporal service or live model."""
+
+    from corsair.adapters.inference.adk import run_auditor
+    from corsair.settings import ModelSettings
+    from tests.unit.adk import ScriptedLlm, text_response, tool_response
+
+    audit_input = _audit_input(llm_call_limit=1, tool_call_limit=0)
+    model = ScriptedLlm(
+        model="scripted",
+        responses=[
+            tool_response("load_skill", {"skill_name": "semantic-review"}),
+            text_response(
+                '{"decision":"ACCEPT","rule":"independent-evidence-review",'
+                '"reason":"the packet is semantically coherent"}'
+            ),
+        ],
+    )
+
+    output = await run_auditor(audit_input, ModelSettings(), model)
+
+    assert output.usage.llm_calls <= audit_input.llm_call_limit
+    assert output.usage.tool_calls <= audit_input.tool_call_limit
+    assert len(model.requests) <= audit_input.llm_call_limit
+
+
 async def test_supported_paired_observation_records_bound_result(
     temporal_server, temporal_artifact_store
 ):
@@ -109,6 +180,68 @@ async def test_supported_paired_observation_records_bound_result(
     assert "observation" not in audit_packet
     assert "control" not in audit_packet
     assert "adversarial" not in audit_packet
+
+
+async def test_auditor_receives_only_remaining_root_budgets(
+    temporal_server, temporal_artifact_store
+):
+    held = ActivityScenario(outcomes=((RoleOutcome.HELD, RoleOutcome.HELD),) * 3)
+    request = investigation_request("remaining-auditor-budget", budget=_three_round_budget())
+    async with temporal_server.worker(temporal_artifact_store, held) as (task_queue, activities):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            request,
+            id=temporal_id("remaining-auditor-budget"),
+            task_queue=task_queue,
+            result_type=InvestigationResult,
+        )
+
+    assert result.execution_status is ExecutionStatus.COMPLETED
+    assert [
+        (request.llm_call_limit, request.tool_call_limit) for request in activities.audit_inputs
+    ] == [(2, 2), (2, 1), (1, 0)]
+
+
+async def test_auditor_usage_cannot_exceed_its_admitted_remaining_budget(
+    temporal_server, temporal_artifact_store
+):
+    from temporalio import activity
+
+    class OverBudgetAuditorActivities(FakeActivities):
+        @activity.defn(name="corsair.audit")
+        async def audit(self, request: AuditInput) -> AuditOutput:
+            self.call_counts["corsair.audit"] += 1
+            self.audit_inputs.append(request)
+            return AuditOutput(
+                usage=Usage(
+                    llm_calls=request.llm_call_limit + 1,
+                    tool_calls=request.tool_call_limit + 1,
+                )
+            )
+
+    activities = OverBudgetAuditorActivities(temporal_artifact_store)
+    identity, queue = temporal_id("over-budget-audit"), temporal_id("over-budget-audit-queue")
+    async with Worker(
+        temporal_server.client,
+        task_queue=queue,
+        workflows=[InvestigationWorkflow],
+        activities=activities.registered(),
+    ):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            investigation_request("over-budget-audit"),
+            id=identity,
+            task_queue=queue,
+            result_type=InvestigationResult,
+        )
+
+    assert activities.call_counts["corsair.audit"] == 1
+    assert [
+        (request.llm_call_limit, request.tool_call_limit) for request in activities.audit_inputs
+    ] == [(1, 0)]
+    assert result.execution_status is ExecutionStatus.ERROR
+    assert result.reason == "Auditor returned usage outside its admitted sub-budget"
+    assert result.rounds[0].audit is None
 
 
 async def test_held_adversarial_results_stay_inconclusive_with_revised_plans(

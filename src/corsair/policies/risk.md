@@ -16,21 +16,20 @@ Operational risks: a lost local artifact host loses retrievability; Temporal doe
 
 Production/team use, privileged capabilities, remote publication, arbitrary probes, new evidence types, and new languages require a new assessment, affected conformance tests, human review of residual risk, and new capability identities. No automatic external approval or risk acceptance is implemented.
 
-
 Raw native evidence requires a non-empty image identity equal to the admitted manifest image. Missing or mismatched image identity invalidates evidence; this does not establish generic hostile-source observation integrity.
-
-
 
 The control role must confirm physical container cleanup before admitting the adversarial role. Unconfirmed cleanup stops the operation and remains explicit uncertainty, never a negative security verdict.
 
-
-
 The native producer schema permits an explicit no-grounded-candidate decision. It cannot create an observation, refute a finding, claim a fix, or authorize publication. The model/recipe combination remains unpromoted until its separate live fixture and composed evaluation gates qualify it.
-
-
 
 Terminal JSON is limited to 1,000,000 bytes. Optional diagnostics are capped with an explicit marker and exception chains are bounded at transport boundaries. Factual evidence and operation claims are not shortened; oversized structured results fail explicitly and may have no committed final-result receipt, while referenced native artifacts remain retained.
 
-
-
 The declared outer probe timeout is forwarded to the trusted controller instead of a hidden 120-second cap. Controller supervision, coverage collection limits, isolated execution and immutable-container cleanup remain separate boundaries; a longer configured timeout does not grant broader sandbox permissions.
+
+## Native procedural skill loading
+
+The role-local procedure configuration admits reviewed installed-package SKILL.md text and references through native ADK loading only. The producer retains its two bounded source readers; the outcome-blind auditor gains only its own packaged procedure/reference loaders. No role receives a script runner, host code executor, environment, registry, remote skill discovery or additional network/source/target-execution permission. Always-on instructions and trusted evidence policy remain authoritative. Loader calls consume finite native episode budgets; successful loads are recorded separately from declaration. All admitted skill resources contribute to manifest capability identity and the existing immutable execution intent binding.
+
+This is a changed prompt/tool/configuration identity requiring independent frozen producer/auditor diagnostics, real native consumer tests and a distinct composed live gate. Loading a procedure is not evidence that its reasoning is correct, and does not promote model quality, negative clearance, host isolation or production readiness. Missing usage/cost and loader/provider errors remain explicit.
+
+Required role procedures are loaded by the native ADK parser during controlled factory assembly and supplied as instruction text before generation. Usage.skills_preloaded and agent.skill_preloaded record that actual preparation independently of optional agent-requested load_skill calls, which alone populate Usage.skills_loaded and consume tool calls. A model skipping optional loading does not omit the core procedure or become a claimed tool execution. This preload prompt identity supersedes the optional-loader-only diagnostic stage, whose zero-load results remain retained.

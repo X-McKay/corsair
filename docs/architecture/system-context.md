@@ -29,7 +29,7 @@ CLI / typed Python API ── submits, observes, or cancels ──► Temporal s
 
 **Worker.** One standard Temporal SDK worker registers the investigation/evaluation workflows and their activities. It constructs the concrete ADK, source-snapshot, Docker, and filesystem integrations. It is the component that can reach the configured model provider and local Docker daemon.
 
-**Google ADK and model provider.** A producer episode creates a structured `Submission`; a fresh, tool-free auditor episode creates an `AuditResult`. Both use canonical Pydantic schemas through ADK `output_schema` and native callbacks for model/tool/output limits and usage. The model provider is untrusted for verdicts and is not a persistence boundary.
+**Google ADK and model provider.** A producer episode creates a structured `ProducerDecision`; a fresh, private-guidance-only auditor episode creates an `AuditResult`. Both use canonical Pydantic schemas through ADK `output_schema` and native callbacks for model/tool/output limits and usage. The model provider is untrusted for verdicts and is not a persistence boundary.
 
 **Source admission and artifacts.** The local source adapter admits only a bounded, descriptor-checked source tree under the configured root, creates deterministic archive bytes, and later exposes snapshot reads. No live checkout path is given to an agent or container. The local artifact store content-addresses blobs and immutably maps operation identities to committed artifacts.
 
@@ -37,7 +37,7 @@ CLI / typed Python API ── submits, observes, or cancels ──► Temporal s
 
 ## Information boundaries
 
-The producer receives a public recipe configuration, admitted source excerpt, round context, and limited source-reading tools. It does not receive private fixtures, execution outcomes, verifier oracles, source paths outside the snapshot, or an execution/write capability. The auditor is separately fresh and outcome-blind; it receives the finding, public recipe configuration, source excerpt, and submission, with no tools.
+The producer receives a public recipe configuration, admitted source excerpt, round context, and limited source-reading tools. It does not receive private fixtures, execution outcomes, verifier oracles, source paths outside the snapshot, or an execution/write capability. The auditor is separately fresh and outcome-blind; it receives the finding, public recipe configuration, source excerpt, and submission, plus its own packaged procedure loaders only.
 
 The native observer creates private fixture material only at execution time. It keeps that material out of agent prompts, submission data, logs, evidence reasons, and driver job data. Logs are sanitized operational metadata, not an alternate source or evidence channel.
 

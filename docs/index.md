@@ -31,6 +31,7 @@ Recorded architecture decisions describe implemented choices:
 - [Testing](development/testing.md): quality, isolated agents, native dependencies and package gates.
 - [Debugging](development/debugging.md): attributable failures and safe diagnostics.
 - [Contributing](development/contributing.md): bounded changes, reviews, handoffs and final delivery.
+- [Claude Code/Codex workflows](development/coding-agent-workflows.md): shared development and evaluation skills with concrete commands.
 
 Root [AGENTS.md](../AGENTS.md) is the repository instruction entrypoint; [CONTRIBUTING.md](../CONTRIBUTING.md) is the human contribution entrypoint.
 
@@ -42,6 +43,7 @@ These pages explain how to perform a task; exact signatures/defaults live in ref
 - [Pilot deployment](guides/deployment.md).
 - [Python integration](guides/integration.md).
 - [Advanced usage](guides/advanced-usage.md).
+- [Add a language, framework, recipe or image](guides/extensions.md): a consistent implementation and qualification checklist, not currently supported runtimes.
 
 ## Operations
 
@@ -64,7 +66,8 @@ These pages explain how to perform a task; exact signatures/defaults live in ref
 
 - [Overview](agents/overview.md): producer and outcome-blind auditor roles.
 - [Development](agents/development.md): bounded changes and native structured output.
-- [Tools and skills](agents/tools-and-skills.md): actual capabilities and what is not an agent tool.
+- [Tools and skills](agents/tools-and-skills.md): source capabilities versus private procedural loaders.
+- [Role-local packages and runtime skills](guides/agent-packages.md): native ADK composition, packaged guidance and finite admission.
 - [Evaluations](agents/evaluations.md): frozen isolated-agent improvement before composition.
 - [Safety](agents/safety.md): data-only proposals, oracle separation and operator policy.
 

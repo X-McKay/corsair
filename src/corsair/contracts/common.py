@@ -7,7 +7,7 @@ import json
 from pathlib import PurePosixPath
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
 
 Digest = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 Identifier = Annotated[str, Field(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$")]
@@ -60,9 +60,22 @@ class ArtifactRef(Contract):
 class Usage(Contract):
     llm_calls: int = Field(default=0, ge=0)
     tool_calls: int = Field(default=0, ge=0)
+    skills_loaded: list[Annotated[str, Field(min_length=1, max_length=64)]] = Field(
+        default_factory=list, max_length=2
+    )
+    skills_preloaded: list[Annotated[str, Field(min_length=1, max_length=64)]] = Field(
+        default_factory=list, max_length=2
+    )
     input_tokens: int | None = Field(default=None, ge=0)
     output_tokens: int | None = Field(default=None, ge=0)
     seconds: float = Field(default=0, ge=0)
+
+    @field_validator("skills_loaded", "skills_preloaded")
+    @classmethod
+    def unique_skill_names(cls, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)):
+            raise ValueError("loaded skill names must be unique")
+        return value
 
 
 class Feedback(Contract):

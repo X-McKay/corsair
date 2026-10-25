@@ -19,13 +19,13 @@ just -- eval-agent auditor evals/datasets/auditor-dev.json \
   --settings /path/to/settings.json --repeats 3
 ```
 
-`just eval-agent` invokes the installed module, not a retired evaluator script. The producer invocation admits an immutable local snapshot for source reads but does not run the target or arbitrary probe code on the host. The auditor invocation is tool-free. Raw reports belong under ignored `.runs/`; retain sanitized baselines and experiment notes under [`evals/baselines/`](../../evals/baselines/) and [`evals/experiments/`](../../evals/experiments/).
+`just eval-agent` invokes the installed module, not a retired evaluator script. The producer invocation admits an immutable local snapshot for source reads but does not run the target or arbitrary probe code on the host. The auditor invocation is private-guidance-only. Raw reports belong under ignored `.runs/`; retain sanitized baselines and experiment notes under [`evals/baselines/`](../../evals/baselines/) and [`evals/experiments/`](../../evals/experiments/).
 
 Each frozen fixture input and oracle is read and digest-verified before use. The evaluator keeps its oracle local: it passes only the role input to the factory and compares the returned typed output outside the agent boundary. The producer diagnostic checks the exact canonical control payload and an allowed candidate payload; it is not semantic-equivalence or vulnerability-accuracy scoring. The auditor diagnostic checks its decision on the supplied source/submission packet without an observation or expected label.
 
 A provider policy block, provider failure, malformed output, or other operational error remains an operational failure in the report. No frozen label turns into a pass after a policy block. For full investigations, the external scorer holds the oracle outside agents, tools, and workflows; it scores terminal results only after trusted evidence validation and policy processing, retaining invalid positive evidence, forbidden labels, inconclusive outcomes, and operational failures in the record.
 
-## Current diagnostic evidence
+## Earlier diagnostic evidence
 
 The following results are intentionally small and have different scopes:
 
@@ -35,7 +35,7 @@ The following results are intentionally small and have different scopes:
 | Isolated auditor frozen development diagnostic | **6/6** | Two cases repeated three times; semantic-review decision matching only. |
 | Physical-Mac live model/worker/Docker/Temporal batch with external scorer | **2/3** | A separate composed batch. The safe case's second bounded round had an execution error and correctly remained `ERROR` / `INCONCLUSIVE`. |
 
-The third result does not upgrade either isolated diagnostic into an end-to-end pass. Its retained limitation is documented in [ISSUE-0010](../plans/active/ISSUE-0010-live-safe-case-probe.md). The current local revision passed **134 tests** in the cited physical-Mac qualification; Linux amd64 was **not rerun** for that local revision. Supported targets remain macOS arm64 and Linux amd64, as described in the [platform reference](../reference/platforms.md).
+The third result does not upgrade either isolated diagnostic into an end-to-end pass. Its retained limitation is documented in [ISSUE-0010](../plans/active/ISSUE-0010-live-safe-case-probe.md). That earlier local revision passed **134 tests** in the cited physical-Mac qualification; Linux amd64 was **not rerun** for that local revision. Supported targets remain macOS arm64 and Linux amd64, as described in the [platform reference](../reference/platforms.md).
 
 No result above claims a population accuracy rate, false-positive rate, production baseline, hostile-target attestation, or automated baseline promotion. See the [baseline policy](../../evals/baselines/README.md) and [frozen experiment index](../../evals/experiments/README.md) for the evidence rules. Current work and planned follow-up are indexed in the [plans](../plans/README.md).
 
@@ -55,3 +55,13 @@ The [candidate receipt](../../evals/baselines/candidates/expanded-diagnostics-20
 
 
 The later publication cleanup repeat scored producer4/9 (original case3/3) and auditor12/12, with0 provider/operational failures. [Publication receipt](../../evals/baselines/qualifications/qualification-publication-2026-10-25.json) preserves it separately from the earlier5/9 repeat. Candidate exact-match failures and ISSUE-0010 remain open; fluctuating small-cohort scores are not a promoted accuracy estimate.
+
+## Current consolidated configuration
+
+The producer now returns canonical `ProducerDecision`, with either a proposal or explicit abstention; exact-match diagnostics classify the projection without declaring semantic equivalence. The merged-root post-cleanup expanded freeze scored producer4/9 and auditor12/12, with0 provider/operational errors. These are tiny AI-authored candidate diagnostics, not population accuracy or baseline promotion. A separate final three-case full-live batch passed3/3 (two correctly resolved, one expected inconclusive), with0 operational errors; this is not population accuracy or a passed producer diagnostic. Prior producer3/9 and live0/3 results remain retained in [ISSUE-0012](../plans/active/ISSUE-0012-producer-decision-live-quality.md). Current root/live/native counts and configuration identities belong in [current plans](../plans/README.md), not inferred from old tables.
+
+Use [the eval skill and coding-agent workflow](../development/coding-agent-workflows.md) for the concrete iteration sequence, and [extension qualification](../guides/extensions.md) before changing recipe, language, framework or image. Keep prior reports immutable and give each comparison a separate output path.
+
+### What the producer4/9 actually means
+
+The saved expanded repeat has three cases repeated three times, not nine independent findings. `case01` passed3/3; `producer02` passed1/3 with two `candidate_exact_mismatch` results; `producer03` passed0/3 with two `control_mismatch` results and one `candidate_exact_mismatch`. All nine were structurally valid proposals; no provider failure or abstention occurred. Three exploit candidates were outside the frozen allowed-value list and two benign controls differed from the canonical expected control. These diagnostics compare payload values, not general security accuracy. Alternate exploit strings require separately admitted trusted native replay before calling them equivalent; do not expand the oracle to hide a failure. The distinct full-live3/3 cohort is not an override for this failed producer diagnostic.

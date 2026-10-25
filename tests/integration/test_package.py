@@ -50,7 +50,12 @@ from pathlib import Path
 import corsair
 from corsair.adapters.scm.requests import normalize_request_sources
 from corsair.adapters.temporal.client import connect, wait_for_result
-from corsair.agents.resources import load_agent_spec, prompt_text
+from corsair.agents.resources import (
+    load_agent_spec,
+    load_runtime_skills,
+    prompt_text,
+    runtime_skill_digest,
+)
 from corsair.entrypoints.terminal import Terminal
 from corsair.observability.logging import LifecycleLoggingInterceptor
 from corsair.entrypoints.cli import parser
@@ -62,6 +67,11 @@ assert Path(corsair.__file__).is_relative_to(Path('installed').resolve()), corsa
 for role in ('producer', 'auditor'):
     assert load_agent_spec(role).name == role
     assert len(prompt_text(role)) > 100
+    assert len(runtime_skill_digest(role)) == 64
+assert [skill.name for skill in load_runtime_skills('producer')] == ['source-grounding']
+assert [skill.name for skill in load_runtime_skills('auditor')] == ['semantic-review']
+assert files('corsair.agents.producer').joinpath('skills/source-grounding/SKILL.md').is_file()
+assert files('corsair.agents.auditor').joinpath('skills/semantic-review/SKILL.md').is_file()
 assert 'pilot risk' in files('corsair.policies').joinpath('risk.md').read_text().lower()
 assert files('corsair.adapters.sandboxing').joinpath('driver.py').is_file()
 assert parser().parse_args(['report', 'report.json']).command == 'report'

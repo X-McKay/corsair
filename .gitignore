@@ -47,3 +47,13 @@ coverage.xml
 .direnv/
 result
 result-*
+
+# Public developer skills are canonical; editor/session state is private.
+.agents/*
+!.agents/skills/
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/corsair-development
+!.claude/skills/corsair-evaluations
+.codex/

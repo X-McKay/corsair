@@ -1,0 +1,147 @@
+{
+  "producer-dev": {
+    "passed": 2,
+    "attempts": 3,
+    "operational_failures": 0,
+    "preloaded_attempts": 3,
+    "successful_model_requested_loads": 0,
+    "match_kinds": {
+      "exact_match": 2,
+      "control_mismatch": 1
+    },
+    "dataset_digest": "7d42f2b0428936d7082b3fd99be4dae323a57743d10afb29c6b54e37a852b1f5",
+    "agent_resource_digests": [
+      "3bd82516330e76852dd3dd2cc9ce27a97cf6fce35ac89f64e5ec44b34ef56409"
+    ],
+    "cost_usd": null
+  },
+  "auditor-dev": {
+    "passed": 2,
+    "attempts": 6,
+    "operational_failures": 0,
+    "preloaded_attempts": 6,
+    "successful_model_requested_loads": 0,
+    "match_kinds": {
+      "candidate_exact_mismatch": 4,
+      "exact_match": 2
+    },
+    "dataset_digest": "e865d259995f2e31d971ba5e01a3b5a627fe02771a195436fb73203b927fe0ef",
+    "agent_resource_digests": [
+      "b308a3c1d43b828f453bfe9d9d7b666ba39f0a6a74c5a54f28144bccd1facf19"
+    ],
+    "cost_usd": null
+  },
+  "producer-expanded": {
+    "passed": 3,
+    "attempts": 9,
+    "operational_failures": 0,
+    "preloaded_attempts": 9,
+    "successful_model_requested_loads": 0,
+    "match_kinds": {
+      "exact_match": 3,
+      "candidate_exact_mismatch": 4,
+      "no_valid_output": 1,
+      "control_mismatch": 1
+    },
+    "dataset_digest": "a2a6907fd06dc09003558ecfbe844f7659acc75ffa2a82a2feca4e150c74a3e2",
+    "agent_resource_digests": [
+      "3bd82516330e76852dd3dd2cc9ce27a97cf6fce35ac89f64e5ec44b34ef56409"
+    ],
+    "cost_usd": null
+  },
+  "auditor-expanded": {
+    "passed": 6,
+    "attempts": 12,
+    "operational_failures": 0,
+    "preloaded_attempts": 12,
+    "successful_model_requested_loads": 0,
+    "match_kinds": {
+      "candidate_exact_mismatch": 6,
+      "exact_match": 6
+    },
+    "dataset_digest": "b7284e237d2dce26f2f5a4719af4a7e9520ee750bad8fb5a9abd312946437bc7",
+    "agent_resource_digests": [
+      "b308a3c1d43b828f453bfe9d9d7b666ba39f0a6a74c5a54f28144bccd1facf19"
+    ],
+    "cost_usd": null
+  },
+  "full_live": {
+    "summary": {
+      "attempts": 3,
+      "passed": 2,
+      "failed": 1,
+      "pass_rate": 0.6666666666666666,
+      "correctly_resolved": 1,
+      "invalid_positive_evidence": 0,
+      "forbidden_labels": 0,
+      "inconclusive": 2,
+      "operational_failures": 0,
+      "unavailable_results": 0,
+      "llm_calls": 4,
+      "tool_calls": 0,
+      "input_tokens": 8291,
+      "output_tokens": 814,
+      "cost_usd": null
+    },
+    "rows": [
+      {
+        "case_id": "case01",
+        "status": "fail",
+        "disposition": "INCONCLUSIVE",
+        "execution_status": "COMPLETED",
+        "evidence_valid": true,
+        "correctly_resolved": false
+      },
+      {
+        "case_id": "case02",
+        "status": "pass",
+        "disposition": "INCONCLUSIVE",
+        "execution_status": "COMPLETED",
+        "evidence_valid": true,
+        "correctly_resolved": false
+      },
+      {
+        "case_id": "case03",
+        "status": "pass",
+        "disposition": "CONDITIONAL",
+        "execution_status": "COMPLETED",
+        "evidence_valid": true,
+        "correctly_resolved": true
+      }
+    ],
+    "dataset_digest": "90e1290effee2b63a58d0b7bc7c8902907e261f1ca36b2d1fc90261b1715bf04"
+  },
+  "unpromoted": true,
+  "scope": "small frozen diagnostics; loaded context is not model compliance or generic hostile-source security",
+  "tool_calls_invented": false,
+  "native": {
+    "passed": 209,
+    "failed": 0,
+    "skipped": 0,
+    "seconds": 270.566,
+    "platform": "macOS arm64",
+    "cohort": "real Docker + real Temporal + scripted native ADK + live auditor + CLI/replay + long probe + fresh wheel"
+  },
+  "runtime_source_digest": "b7f7d674af6713ccd8109db557784b9bea9064075f58458cacf6d78a85d2d2d4",
+  "earlier_stage_failures": {
+    "initial_native": {
+      "passed": 205,
+      "failed": 3,
+      "causes": [
+        "wrong older observer image selected for long probe",
+        "two nested AgentSpec provenance serialization failures"
+      ]
+    },
+    "optional_loader_stage": {
+      "native_passed": 208,
+      "model_requested_loads": 0,
+      "isolated_attempts": 30
+    },
+    "required_preload_stage": {
+      "initial_native_passed": 209,
+      "final_native_passed": 209
+    }
+  },
+  "outside_checkout_wheel_resources": "passed with root interpreter; no second environment created",
+  "model_quality_promoted": false
+}

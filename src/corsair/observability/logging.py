@@ -48,6 +48,8 @@ _FIELDS = frozenset(
         "image_id",
         "usage_complete",
         "message",
+        "role",
+        "skill_name",
     ]
 )
 

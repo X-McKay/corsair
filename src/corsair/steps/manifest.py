@@ -4,6 +4,7 @@ import json
 from importlib.resources import files
 
 from corsair import __version__
+from corsair.agents.resources import runtime_skill_digest
 from corsair.contracts import (
     AuditResult,
     InvestigationRequest,
@@ -26,6 +27,7 @@ def build_manifest(request: InvestigationRequest, settings: Settings, image_id: 
             "spec_digest": digest(spec),
             "instruction_digest": prompts[role],
             "output_schema_digest": digest(schema.model_json_schema()),
+            "runtime_skills_digest": runtime_skill_digest(role),
             "risk_assessment_digest": risk_digest,
             "execution_class": spec["execution_class"],
             "governance_tier": spec["governance_tier"],

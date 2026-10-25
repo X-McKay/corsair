@@ -25,6 +25,7 @@ The [documentation index](docs/index.md) is the main navigation page.
 | Configure or integrate | [Configuration guide](docs/guides/configuration.md), [Python integration](docs/guides/integration.md), [API reference](docs/reference/api.md) |
 | Operate the pilot | [Operations](docs/operations/overview.md), [deployment guide](docs/guides/deployment.md), [pilot runbook](docs/operations/runbooks/pilot.md) |
 | Use the CLI | [CLI reference](docs/reference/cli.md), [monitoring](docs/operations/monitoring.md), [troubleshooting](docs/operations/troubleshooting.md) |
+| Extend support | [Extension guide](docs/guides/extensions.md), [coding-agent workflows](docs/development/coding-agent-workflows.md) |
 | Improve agents | [Agent development](docs/agents/development.md), [evaluations](docs/agents/evaluations.md), [safety](docs/agents/safety.md) |
 | Inspect contracts or status | [Schemas](docs/reference/schemas.md), [active work and evidence](docs/plans/README.md), [changelog](CHANGELOG.md) |
 
@@ -32,7 +33,7 @@ The [documentation index](docs/index.md) is the main navigation page.
 
 ```text
 src/corsair/
-  agents/          role-local ADK factories, prompts, metadata and private tools
+  agents/          role-local ADK factories, metadata, contract views, tools and runtime skills
   contracts/       canonical SDK-free Pydantic models
   ports/           narrow inference, source-snapshot and sandbox interfaces
   adapters/        real inference, SCM, sandboxing, storage and Temporal integrations
@@ -61,7 +62,9 @@ just test
 
 ## Qualification and limits
 
-The current physical-Mac runtime suite passed **150 tests** before and after cleanup, with real Docker, Temporal, installed-wheel, CLI and live-auditor checks. Original frozen diagnostics passed producer **3/3** and auditor **6/6**. Expanded AI-authored candidate diagnostics scored producer **4/9** and auditor **12/12** on the publication repeat (earlier producer repeats scored4/9 and5/9); candidate-string exact-match failures remain [open](docs/plans/active/ISSUE-0011-expanded-producer-diagnostics.md) and the cohort is not promoted or held-out population accuracy. A separate actual live-model batch remains **2/3**, with the [safe-case operational failure](docs/plans/active/ISSUE-0010-live-safe-case-probe.md) retained as inconclusive. [Current evidence](docs/plans/README.md) separates these results from revision-specific CI and local Linux qualification boundaries.
+`manus/just` includes all eight latest recommendation heads and the role-local agent layout. Each role owns its native factory, typed metadata, canonical contract views, instructions, toolsets and private procedural skills. The producer's source tools have one file each; the auditor has no source/external tools. Final physical-Mac native qualification passed **209 tests before and after cleanup**, including real Docker, Temporal, replay, CLI, live-auditor and installed-wheel checks. See [current evidence](docs/plans/README.md).
+
+Required core procedures are native-ADK-loaded into instructions before generation, with honest preload versus model-requested tool-use logs. Context loading is not model compliance: the current frozen expanded producer scored **3/9**, auditor **6/12**, and the fresh full-live batch scored **2/3** with zero operational failures. No live-model baseline was promoted; [ISSUE-0013](docs/plans/active/ISSUE-0013-runtime-procedure-live-quality.md) and [ISSUE-0012](docs/plans/active/ISSUE-0012-producer-decision-live-quality.md) retain the misses. Earlier3/3 composition and12/12 auditor results remain revision-specific evidence, not current accuracy. Failed reproduction never becomes negative security clearance.
 
 Local artifacts do not survive artifact-host loss without backups or shared storage. The pilot does not establish hostile-interpreter observation integrity or production readiness. See [disaster recovery](docs/operations/disaster-recovery.md) and the [packaged risk assessment](src/corsair/policies/risk.md).
 

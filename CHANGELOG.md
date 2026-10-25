@@ -25,3 +25,10 @@ The live three-case model/native batch is partially qualified at 2/3. An invalid
 ### Boundary and local-state consolidation
 
 Private/generated data and deliverables are Git-ignored. The worker explicitly composes concrete adapters; shared source normalization no longer depends on CLI code, and agent factories use native SDK model types directly. Local documentation/import/privacy checks are maintained gates. A canonical root environment and verified private state/history locations replace dated task environment/persistence dependencies. Expanded AI-authored diagnostic candidates expose retained producer exact-payload failures; qualification receipts remain separate from promoted baselines. No release or production qualification is asserted.
+
+### Role-local agents and native procedural resources
+
+- Added producer/auditor controlled factories, native toolsets, canonical contract views and packaged runtime procedure skills; source tools have separate modules.
+- Guaranteed core procedure context through native ADK loading before generation, with separate preload and actual model-requested load accounting.
+- Bound runtime resource bytes to capability/evaluation identity, preserved remaining-root auditor budget admission and old-history command compatibility via a native Temporal patch.
+- Recorded209 passing physical-Mac native tests and the still-unpromoted frozen/full-live quality misses; no release or production-readiness claim is made.

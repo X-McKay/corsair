@@ -123,6 +123,8 @@ class AuditInput(Contract):
     source_excerpt: str
     submission: Submission
     max_output_tokens: int = Field(ge=256, le=16384)
+    llm_call_limit: int = Field(default=2, ge=0, le=2)
+    tool_call_limit: int = Field(default=4, ge=0, le=4)
 
 
 class AuditOutput(Contract):

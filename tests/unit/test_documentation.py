@@ -1,12 +1,14 @@
 """Behavior checks for the maintained local documentation checker."""
 
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECKER = ROOT / "scripts/check_docs.py"
+PUBLIC_SKILL_NAMES = ("corsair-development", "corsair-evaluations")
 
 
 def run_checker(root: Path) -> subprocess.CompletedProcess[str]:
@@ -50,3 +52,61 @@ def test_docs_checker_reports_missing_heading_anchor(tmp_path: Path):
 
     assert result.returncode == 1
     assert "README.md: guide.md#not-here: missing anchor" in result.stderr
+
+
+def test_docs_checker_validates_allowlisted_public_skill_markdown(tmp_path: Path):
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs/guide.md").write_text("# Guide\n\n## Boundaries\n")
+    skill = tmp_path / ".agents/skills/corsair-development/SKILL.md"
+    skill.parent.mkdir(parents=True)
+    skill.write_text("# Skill\n\n[Guide](../../../docs/guide.md#boundaries)\n")
+
+    result = run_checker(tmp_path)
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_docs_checker_ignores_private_tool_configuration_markdown(tmp_path: Path):
+    skill = tmp_path / ".agents/skills/corsair-development/SKILL.md"
+    skill.parent.mkdir(parents=True)
+    skill.write_text("# Public skill\n")
+    private_config = skill.parent / "private-tool-config.md"
+    private_config.write_text("# Private\n\n[Missing](does-not-exist.md)\n")
+
+    result = run_checker(tmp_path)
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_public_skills_have_unique_matching_frontmatter_and_checked_links():
+    names: list[str] = []
+    for skill_name in PUBLIC_SKILL_NAMES:
+        skill = ROOT / ".agents/skills" / skill_name / "SKILL.md"
+        content = skill.read_text(encoding="utf-8")
+        match = re.match(r"^---\nname: (?P<name>[^\n]+)\n", content)
+
+        assert match is not None
+        assert match.group("name") == skill_name
+        assert "description: " in content.split("---", maxsplit=2)[1]
+        names.append(match.group("name"))
+
+    result = run_checker(ROOT)
+
+    assert len(names) == len(set(names))
+    assert result.returncode == 0, result.stderr
+
+
+def test_coding_agent_workflow_guide_links_the_canonical_skills():
+    guide = ROOT / "docs/development/coding-agent-workflows.md"
+    content = guide.read_text(encoding="utf-8")
+
+    assert guide.is_file()
+    for skill_name in PUBLIC_SKILL_NAMES:
+        assert f"../../.agents/skills/{skill_name}/SKILL.md" in content
+    for destination in (
+        "../../AGENTS.md",
+        "conventions.md",
+        "testing.md",
+        "../guides/extensions.md",
+    ):
+        assert destination in content

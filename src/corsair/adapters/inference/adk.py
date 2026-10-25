@@ -12,7 +12,7 @@ import json
 import os
 import re
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from google.adk.agents import LlmAgent
@@ -32,20 +32,23 @@ from pydantic import ValidationError
 from corsair.adapters.inference.models import model_for_role
 from corsair.adapters.scm.local import StoredSourceReader
 from corsair.adapters.storage.filesystem import ArtifactStore
+from corsair.agents.auditor.contracts import AuditInput, AuditOutput, AuditResult
 from corsair.agents.auditor.factory import build_auditor
-from corsair.agents.producer.factory import build_producer
-from corsair.agents.producer.tools import build_producer_tools
-from corsair.contracts import (
-    AuditInput,
-    AuditOutput,
-    AuditResult,
-    Feedback,
+from corsair.agents.auditor.toolsets import build_auditor_toolset
+from corsair.agents.producer.contracts import (
     ProducerDecision,
     ProducerInput,
     ProducerOutput,
     ProducerProposal,
+)
+from corsair.agents.producer.factory import build_producer
+from corsair.agents.producer.toolsets import build_producer_toolset
+from corsair.agents.resources import load_agent_spec
+from corsair.contracts import (
+    Feedback,
     Usage,
 )
+from corsair.observability.logging import event
 from corsair.settings import ModelSettings, Settings
 
 _MAX_PROMPT_BYTES = 32_768
@@ -71,14 +74,22 @@ class _EpisodeAccounting:
     max_llm_calls: int
     max_output_tokens: int
     max_tool_calls: int = 0
+    max_loader_calls: int = 0
+    role: str = ""
+    loader_tool_names: frozenset[str] = frozenset()
+    allowed_skill_names: frozenset[str] = frozenset()
     tool_calls: int = 0
+    loader_calls: int = 0
     tool_limit_exhausted: bool = False
+    loader_limit_exhausted: bool = False
     llm_calls: int = 0
     input_tokens: int | None = None
     output_tokens: int | None = None
     llm_limit_exhausted: bool = False
     provider_error_code: str | None = None
     provider_error_message: str | None = None
+    skills_loaded: list[str] = field(default_factory=list)
+    skills_preloaded: list[str] = field(default_factory=list)
 
     async def before_model(
         self, callback_context: CallbackContext, llm_request: LlmRequest
@@ -107,12 +118,18 @@ class _EpisodeAccounting:
     ) -> dict[str, str] | None:
         """Charge every native tool, including ADK schema completion, before work."""
 
-        del tool, args
+        del args
         if self.tool_calls >= self.max_tool_calls:
             self.tool_limit_exhausted = True
             tool_context._invocation_context.end_invocation = True
             return {"error": "tool-call budget exhausted"}
+        if tool.name in self.loader_tool_names and self.loader_calls >= self.max_loader_calls:
+            self.loader_limit_exhausted = True
+            tool_context._invocation_context.end_invocation = True
+            return {"error": "runtime skill loader budget exhausted"}
         self.tool_calls += 1
+        if tool.name in self.loader_tool_names:
+            self.loader_calls += 1
         return None
 
     async def after_model(
@@ -134,10 +151,35 @@ class _EpisodeAccounting:
             self.provider_error_message = str(llm_response.error_message or "")
         return None
 
+    async def after_tool(
+        self,
+        tool: BaseTool,
+        args: dict[str, Any],
+        tool_context: ToolContext,
+        tool_response: dict[str, Any],
+    ) -> None:
+        """Record only an ADK-confirmed successful load of an admitted skill."""
+
+        del args, tool_context
+        if tool.name != "load_skill" or not isinstance(tool_response, dict):
+            return None
+        skill_name = tool_response.get("skill_name")
+        if (
+            tool_response.get("error") is None
+            and isinstance(skill_name, str)
+            and skill_name in self.allowed_skill_names
+            and skill_name not in self.skills_loaded
+        ):
+            self.skills_loaded.append(skill_name)
+            event("agent.skill_loaded", role=self.role, skill_name=skill_name)
+        return None
+
     def usage(self, seconds: float) -> Usage:
         return Usage(
             llm_calls=self.llm_calls,
             tool_calls=self.tool_calls,
+            skills_loaded=self.skills_loaded,
+            skills_preloaded=self.skills_preloaded,
             input_tokens=self.input_tokens,
             output_tokens=self.output_tokens,
             seconds=seconds,
@@ -298,6 +340,7 @@ async def _run_native_episode(
     agent.before_model_callback = accounting.before_model
     agent.after_model_callback = accounting.after_model
     agent.before_tool_callback = accounting.before_tool
+    agent.after_tool_callback = accounting.after_tool
     last_text: str | None = None
     try:
         async with asyncio.timeout(timeout_seconds):
@@ -346,13 +389,21 @@ async def run_producer(
         producer_input.llm_call_limit, producer_input.budget.episode_llm_calls
     )
     tool_limit = min(producer_input.tool_call_limit, producer_input.budget.max_tool_calls)
-    private_tools = build_producer_tools(producer_input, StoredSourceReader(store))
+    spec = load_agent_spec("producer")
+    private_tools = build_producer_toolset(producer_input, StoredSourceReader(store))
     model = model_for_role(settings, "producer") if model_override is None else model_override
-    agent = build_producer(model, private_tools.native_tools())
+    agent = build_producer(model, private_tools)
+    for skill_name in spec.runtime_skills:
+        event("agent.skill_preloaded", role=spec.name, skill_name=skill_name)
     accounting = _EpisodeAccounting(
         max_llm_calls=llm_limit,
         max_output_tokens=producer_input.budget.max_output_tokens,
         max_tool_calls=tool_limit,
+        max_loader_calls=spec.loader_call_limit,
+        role=spec.name,
+        loader_tool_names=frozenset(spec.loader_tools),
+        allowed_skill_names=frozenset(spec.runtime_skills),
+        skills_preloaded=list(spec.runtime_skills),
     )
     last_agent_text, operational_feedback = await _run_native_episode(
         agent=agent,
@@ -369,7 +420,9 @@ async def run_producer(
     usage = accounting.usage(seconds)
     if operational_feedback is not None:
         return ProducerOutput(usage=usage, feedback=operational_feedback)
-    if accounting.tool_limit_exhausted:
+    if accounting.loader_limit_exhausted:
+        reason = "producer exhausted its runtime skill loader budget before structured completion"
+    elif accounting.tool_limit_exhausted:
         reason = "producer exhausted its tool-call budget before structured completion"
     elif accounting.llm_limit_exhausted:
         reason = "producer exhausted its LLM-call budget before structured completion"
@@ -405,13 +458,36 @@ async def run_auditor(
     settings: Settings | ModelSettings,
     model_override: str | BaseLlm | None = None,
 ) -> AuditOutput:
-    """Run one fresh, tool-free, outcome-blind audit request with no retry loop."""
+    """Run one fresh outcome-blind review with finite private procedure loaders."""
 
     started = time.perf_counter()
+    spec = load_agent_spec("auditor")
+    if spec.llm_call_limit is None:  # Covered by AgentSpec; retain a local safety boundary.
+        raise ValueError("auditor metadata must declare a finite native LLM-call limit")
+    llm_limit = min(audit_input.llm_call_limit, spec.llm_call_limit)
+    tool_limit = min(audit_input.tool_call_limit, spec.loader_call_limit)
+    if llm_limit == 0:
+        return AuditOutput(
+            usage=Usage(llm_calls=0, tool_calls=0, seconds=time.perf_counter() - started),
+            feedback=Feedback(
+                gate="audit_invalid",
+                reason="auditor has no remaining model-call budget for a review",
+                operational=False,
+            ),
+        )
     model = model_for_role(settings, "auditor") if model_override is None else model_override
-    agent = build_auditor(model)
+    agent = build_auditor(model, build_auditor_toolset())
+    for skill_name in spec.runtime_skills:
+        event("agent.skill_preloaded", role=spec.name, skill_name=skill_name)
     accounting = _EpisodeAccounting(
-        max_llm_calls=1, max_output_tokens=audit_input.max_output_tokens
+        max_llm_calls=llm_limit,
+        max_output_tokens=audit_input.max_output_tokens,
+        max_tool_calls=tool_limit,
+        max_loader_calls=tool_limit,
+        role=spec.name,
+        loader_tool_names=frozenset(spec.loader_tools),
+        allowed_skill_names=frozenset(spec.runtime_skills),
+        skills_preloaded=list(spec.runtime_skills),
     )
     last_agent_text, operational_feedback = await _run_native_episode(
         agent=agent,
@@ -420,13 +496,42 @@ async def run_auditor(
         session_id="audit",
         message=_auditor_prompt(audit_input),
         author="auditor",
-        llm_call_limit=1,
+        llm_call_limit=llm_limit,
         timeout_seconds=300,
         accounting=accounting,
     )
     usage = accounting.usage(seconds=time.perf_counter() - started)
     if operational_feedback is not None:
         return AuditOutput(usage=usage, feedback=operational_feedback)
+    if accounting.loader_limit_exhausted:
+        return AuditOutput(
+            usage=usage,
+            feedback=Feedback(
+                gate="audit_invalid",
+                reason=(
+                    "auditor exhausted its runtime skill loader budget before structured completion"
+                ),
+                operational=False,
+            ),
+        )
+    if accounting.tool_limit_exhausted:
+        return AuditOutput(
+            usage=usage,
+            feedback=Feedback(
+                gate="audit_invalid",
+                reason="auditor exhausted its tool-call budget before structured completion",
+                operational=False,
+            ),
+        )
+    if accounting.llm_limit_exhausted:
+        return AuditOutput(
+            usage=usage,
+            feedback=Feedback(
+                gate="audit_invalid",
+                reason="auditor exhausted its LLM-call budget before structured completion",
+                operational=False,
+            ),
+        )
     text = last_agent_text
     if text is None:
         return AuditOutput(

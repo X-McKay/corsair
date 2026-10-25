@@ -39,7 +39,7 @@ Nix/tool/dependency selection is reproducible, not a fully hermetic/offline imag
 
 macOS needs Docker Desktop or Colima's Linux daemon for targets. Hosted ARM runners lack nested virtualization, so physical-Mac full Docker-chain qualification is not claimed. Docker SDK context/socket setup and shared paths are documented in [platform support](../../../reference/platforms.md). Live security-producer policy blocking, population accuracy and arbitrary hostile-interpreter attestation remain unqualified.
 
-Use [environment setup](../../../development/setup.md) for the golden path and [next simplifications](../../active/next-simplifications.md) for identified—but not silently implemented—report provenance, names-only listing, duplicate source read and early input-validation improvements. Historical handoffs preserve the original Make commands as dated evidence.
+Use [environment setup](../../../development/setup.md) for the golden path and [next simplifications](../reviews/2026-10-25-next-simplifications-base-review.md) for identified—but not silently implemented—report provenance, names-only listing, duplicate source read and early input-validation improvements. Historical handoffs preserve the original Make commands as dated evidence.
 
 ## Target CI interruption fix
 
