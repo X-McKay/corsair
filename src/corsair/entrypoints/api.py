@@ -2,16 +2,15 @@
 
 from datetime import timedelta
 
-from pydantic import TypeAdapter
 from temporalio.client import Client, WorkflowHandle
 from temporalio.common import WorkflowIDConflictPolicy, WorkflowIDReusePolicy
 
 from corsair.contracts import (
     BatchItem,
     BatchRequest,
-    Identifier,
     InvestigationRequest,
     InvestigationResult,
+    validate_root_identity,
 )
 from corsair.settings import Settings
 from corsair.workflows.evaluation import EvaluationWorkflow
@@ -21,8 +20,13 @@ from corsair.workflows.investigation import InvestigationWorkflow
 async def start_investigation(
     client: Client, request: InvestigationRequest, settings: Settings, *, run_id: str
 ) -> WorkflowHandle[InvestigationWorkflow, InvestigationResult]:
-    """Submit one bounded durable investigation, refusing duplicate identities."""
-    identity = TypeAdapter(Identifier).validate_python(run_id)
+    """Submit one bounded durable investigation, refusing duplicate identities.
+
+    The root identity is validated with operation-suffix headroom so an over-long
+    id is rejected here, before any producer call, rather than failing later when
+    an evidence operation suffix would overflow the Identifier bound.
+    """
+    identity = validate_root_identity(run_id)
     return await client.start_workflow(
         InvestigationWorkflow.run,
         request,

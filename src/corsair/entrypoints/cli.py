@@ -10,17 +10,15 @@ from pathlib import Path
 from typing import Literal, cast
 from uuid import uuid4
 
-from pydantic import TypeAdapter
-
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
     BatchItem,
     BatchRequest,
     EvidenceInput,
-    Identifier,
     InvestigationResult,
     Submission,
     digest,
+    validate_root_identity,
 )
 from corsair.entrypoints.requests import load_investigation_request
 from corsair.entrypoints.terminal import Terminal
@@ -57,10 +55,7 @@ class CliArguments(argparse.Namespace):
 
 def validate_run_id(value: str) -> str:
     """Validate an operator-supplied Temporal identity before any service request."""
-    TypeAdapter(Identifier).validate_python(value)
-    if len(value) > 60:
-        raise ValueError("run identity must leave space for operation suffixes")
-    return value
+    return validate_root_identity(value)
 
 
 def _settings(args: CliArguments) -> Settings:

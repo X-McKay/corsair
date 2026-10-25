@@ -11,6 +11,7 @@ from temporalio.exceptions import ActivityError, ApplicationError, is_cancelled_
 
 with workflow.unsafe.imports_passed_through():
     from corsair.contracts import (
+        AuditDecision,
         AuditInput,
         AuditOutput,
         Disposition,
@@ -43,6 +44,57 @@ with workflow.unsafe.imports_passed_through():
 # capped at 2 by default. See Settings.negative_threshold / Settings.max_sessions.
 NEGATIVE_THRESHOLD = 2
 MAX_SESSIONS = 2
+
+# A payload-pair proposal that was not refined by the producer on retry.
+_BLIND_RETRY_REASON = (
+    "Prior structural checks passed; propose a different source-grounded candidate payload pair."
+)
+
+
+def _retry_feedback(audit: AuditOutput) -> Feedback:
+    """Feedback for the next producer round after a completed round that did not
+    demonstrate the exploit.
+
+    Outcome-blind contract (ADR 0004): the producer must never learn the exploit
+    outcome, so this never forwards ``decide()``'s disposition reason, which
+    encodes it. The only corrective signal it may carry is the auditor's own
+    rejection, which the auditor formed without seeing any run result; a round the
+    auditor accepted leaves nothing the producer may see, so it retries blind.
+    """
+    if audit.review is not None and audit.review.decision is not AuditDecision.ACCEPT:
+        return Feedback(gate="audit", reason=audit.review.reason)
+    return Feedback(gate="retry", reason=_BLIND_RETRY_REASON)
+
+
+def _aggregate_case_verdict(
+    prepared: PreparedCase | None,
+    rounds: list[RoundResult],
+    result: InvestigationResult,
+) -> Verdict:
+    """Pure aggregation of the terminal round into the canonical case verdict.
+
+    The last evaluated round decides a demonstration, but a later terminal
+    operational failure (an ERROR/BLOCKED/CANCELLED round after it) must not be
+    masked by an earlier non-decisive round: unless the earlier round positively
+    demonstrated the exploit, the operational failure carries into the verdict so
+    the canonical five-label result keeps its operational-error signal.
+    """
+    terminal = next(
+        (r for r in reversed(rounds) if r.observation is not None and r.audit is not None),
+        None,
+    )
+    if prepared is not None and terminal is not None:
+        assert terminal.observation is not None and terminal.audit is not None
+        outcome = session_verdict(prepared, terminal.observation, terminal.audit, result.fix_status)
+    else:
+        outcome = status_outcome(result.execution_status, result.reason)
+    if (
+        result.execution_status is not ExecutionStatus.COMPLETED
+        and outcome.verdict is not Verdict.EXPLOIT_DEMONSTRATED
+    ):
+        outcome = status_outcome(result.execution_status, result.reason)
+    verdict, _reason = case_verdict([outcome], NEGATIVE_THRESHOLD)
+    return verdict
 
 
 class BudgetExhausted(Exception):
@@ -280,7 +332,7 @@ class InvestigationWorkflow:
                     break
                 if status != ExecutionStatus.COMPLETED:
                     break
-                feedback = Feedback(gate="review_or_reproduction", reason=reason)
+                feedback = _retry_feedback(audit)
         except ActivityError as exc:
             cause_type = getattr(exc.cause, "type", "")
             # Operational failures must not erase a previously admitted source observation.
@@ -337,18 +389,5 @@ class InvestigationWorkflow:
         rounds: list[RoundResult],
         result: InvestigationResult,
     ) -> Verdict:
-        """Thin orchestration: select the terminal evaluated round and defer every
-        decision to the pure policy functions."""
-        terminal = next(
-            (r for r in reversed(rounds) if r.observation is not None and r.audit is not None),
-            None,
-        )
-        if prepared is not None and terminal is not None:
-            assert terminal.observation is not None and terminal.audit is not None
-            outcome = session_verdict(
-                prepared, terminal.observation, terminal.audit, result.fix_status
-            )
-        else:
-            outcome = status_outcome(result.execution_status, result.reason)
-        verdict, _reason = case_verdict([outcome], NEGATIVE_THRESHOLD)
-        return verdict
+        """Thin orchestration: defer every decision to the pure aggregation."""
+        return _aggregate_case_verdict(prepared, rounds, result)

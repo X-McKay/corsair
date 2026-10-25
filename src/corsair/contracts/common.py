@@ -11,6 +11,10 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
 
 Digest = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 Identifier = Annotated[str, Field(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$")]
+# A root run identity must leave room for the operation suffixes (".r<n>",
+# ".fix<n>") that are appended to form an EvidenceInput.operation_id, which shares
+# the 80-character Identifier bound.
+MAX_ROOT_IDENTIFIER_LENGTH = 60
 MAX_DIAGNOSTIC_TEXT_CHARS = 4096
 DIAGNOSTIC_TRUNCATION_MARKER = " … [diagnostic truncated]"
 DiagnosticText = Annotated[str, Field(max_length=MAX_DIAGNOSTIC_TEXT_CHARS)]
@@ -18,6 +22,21 @@ DiagnosticText = Annotated[str, Field(max_length=MAX_DIAGNOSTIC_TEXT_CHARS)]
 
 class Contract(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
+
+
+def validate_root_identity(value: str) -> str:
+    """Validate a root run identity and reserve operation-suffix headroom.
+
+    Used at every submission boundary (the Python API and the CLI) so an
+    over-long identity is rejected before any work is spent, rather than failing
+    later when an operation suffix overflows the Identifier bound.
+    """
+    from pydantic import TypeAdapter
+
+    identity = TypeAdapter(Identifier).validate_python(value)
+    if len(identity) > MAX_ROOT_IDENTIFIER_LENGTH:
+        raise ValueError("run identity must leave space for operation suffixes")
+    return identity
 
 
 def format_diagnostic(value: str) -> str:

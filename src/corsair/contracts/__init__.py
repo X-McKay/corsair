@@ -15,6 +15,7 @@ from .agents import ProducerProposal as ProducerProposal
 from .agents import Submission as Submission
 from .common import DIAGNOSTIC_TRUNCATION_MARKER as DIAGNOSTIC_TRUNCATION_MARKER
 from .common import MAX_DIAGNOSTIC_TEXT_CHARS as MAX_DIAGNOSTIC_TEXT_CHARS
+from .common import MAX_ROOT_IDENTIFIER_LENGTH as MAX_ROOT_IDENTIFIER_LENGTH
 from .common import ArtifactRef as ArtifactRef
 from .common import Contract as Contract
 from .common import DiagnosticText as DiagnosticText
@@ -25,6 +26,7 @@ from .common import Usage as Usage
 from .common import digest as digest
 from .common import format_diagnostic as format_diagnostic
 from .common import safe_path as safe_path
+from .common import validate_root_identity as validate_root_identity
 from .evaluation import BatchItem as BatchItem
 from .evaluation import BatchRequest as BatchRequest
 from .evaluation import MatchKind as MatchKind
