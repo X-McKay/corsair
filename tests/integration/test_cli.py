@@ -208,8 +208,9 @@ async def test_real_doctor_reports_failed_dependency(
     assert not (tmp_path / "artifacts").exists()  # doctor is read-only even on failed preflight.
 
 
+@pytest.mark.parametrize("_attempt", range(3))
 async def test_ctrl_c_detaches_real_temporal_client_without_cancelling_workflow(
-    temporal_server, tmp_path
+    temporal_server, tmp_path, _attempt
 ):
     from temporalio.client import WorkflowExecutionStatus
     from temporalio.worker import Worker
@@ -263,6 +264,7 @@ async def test_ctrl_c_detaches_real_temporal_client_without_cancelling_workflow(
                 ],
                 stdout=stdout_file,
                 stderr=stderr_file,
+                env={**os.environ, "PYTHONFAULTHANDLER": "1"},
             )
             try:
                 async with asyncio.timeout(15):
@@ -270,8 +272,24 @@ async def test_ctrl_c_detaches_real_temporal_client_without_cancelling_workflow(
                     while '"workflow.progress"' not in diagnostics.read_text():
                         assert process.poll() is None
                         await asyncio.sleep(0.05)
+                status = Path(f"/proc/{process.pid}/status")
+                if status.exists():
+                    fields = dict(line.split(":", 1) for line in status.read_text().splitlines())
+                    assert not int(fields["SigIgn"], 16) & (1 << (signal.SIGINT - 1)), (
+                        "The installed CLI inherited ignored SIGINT from its launcher"
+                    )
                 process.send_signal(signal.SIGINT)
-                await asyncio.to_thread(process.wait, 10)
+                try:
+                    await asyncio.to_thread(process.wait, 10)
+                except subprocess.TimeoutExpired:
+                    # Failure-only forensic capture from the actual installed console process.
+                    status = Path(f"/proc/{process.pid}/status")
+                    signals = status.read_text() if status.exists() else "no proc signal metadata"
+                    process.send_signal(signal.SIGABRT)
+                    await asyncio.to_thread(process.wait, 10)
+                    raise AssertionError(
+                        f"CLI did not detach after SIGINT. {signals}\n{stderr_path.read_text()}"
+                    ) from None
                 assert process.returncode == 130, stderr_path.read_text()
                 assert stdout_path.read_bytes() == b""
                 assert (
