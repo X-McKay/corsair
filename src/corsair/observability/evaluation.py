@@ -102,7 +102,11 @@ def valid_positive_evidence(result: InvestigationResult, store: ArtifactStore | 
         if observation is None or submission is None or audit is None:
             continue
         prepared = verifier.validate_saved(observation, submission, result.manifest)
-        if prepared is not None and decide(prepared, observation, audit)[0] == result.disposition:
+        if (
+            prepared is not None
+            and prepared.case_id == result.case_id
+            and decide(prepared, observation, audit)[0] == result.disposition
+        ):
             return True
     return False
 
@@ -120,10 +124,13 @@ def score(result: InvestigationResult, oracle: Oracle, store: ArtifactStore | No
             verifier = EvidenceVerifier(Settings(), store)
             fixed_valid = any(
                 item.producer.submission is not None
-                and verifier.validate_saved(
-                    fixed, item.producer.submission, result.manifest, expected_fixed=True
+                and (
+                    prepared := verifier.validate_saved(
+                        fixed, item.producer.submission, result.manifest, expected_fixed=True
+                    )
                 )
                 is not None
+                and prepared.case_id == result.case_id
                 for item in result.rounds
             )
         fix_correct = fix_correct and fixed_valid and fix_status(fixed) == result.fix_status
@@ -133,6 +140,24 @@ def score(result: InvestigationResult, oracle: Oracle, store: ArtifactStore | No
         and fix_correct
         and result.execution_status == oracle.expected_execution
     )
+    return {
+        "run_id": result.run_id,
+        "case_id": result.case_id,
+        "status": "pass" if passed else "fail",
+        "disposition": result.disposition.value,
+        "execution_status": result.execution_status.value,
+        "evidence_valid": evidence_valid,
+        "fix_correct": fix_correct,
+        "forbidden_label": result.disposition in oracle.forbidden,
+        "correctly_resolved": passed and result.disposition != Disposition.INCONCLUSIVE,
+        **usage_metrics(result),
+        "config_digest": result.manifest.config_digest if result.manifest else None,
+        "reason": result.reason,
+    }
+
+
+def usage_metrics(result: InvestigationResult) -> dict:
+    """One usage calculation shared by scoring and human CLI presentation."""
     usage = [item.producer.usage for item in result.rounds]
     usage += [item.audit.usage for item in result.rounds if item.audit is not None]
     input_tokens = (
@@ -146,22 +171,11 @@ def score(result: InvestigationResult, oracle: Oracle, store: ArtifactStore | No
         else None
     )
     return {
-        "run_id": result.run_id,
-        "case_id": result.case_id,
-        "status": "pass" if passed else "fail",
-        "disposition": result.disposition.value,
-        "execution_status": result.execution_status.value,
-        "evidence_valid": evidence_valid,
-        "fix_correct": fix_correct,
-        "forbidden_label": result.disposition in oracle.forbidden,
-        "correctly_resolved": passed and result.disposition != Disposition.INCONCLUSIVE,
         "llm_calls": sum(item.llm_calls for item in usage) if result.usage_complete else None,
         "tool_calls": sum(item.tool_calls for item in usage) if result.usage_complete else None,
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
         "agent_seconds": sum(item.seconds for item in usage) if result.usage_complete else None,
-        "config_digest": result.manifest.config_digest if result.manifest else None,
-        "reason": result.reason,
     }
 
 

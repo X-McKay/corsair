@@ -10,8 +10,9 @@ from __future__ import annotations
 import io
 import os
 import stat
+import sys
 import tarfile
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from pathlib import Path, PurePosixPath
 
 from corsair.contracts import ArtifactRef, Case, PreparedCase, RunManifest, Source, safe_path
@@ -39,6 +40,18 @@ _SENSITIVE_BASENAMES = {
 _MAX_SNAPSHOT_FILES = 10_000
 _MAX_SNAPSHOT_BYTES = 33_554_432
 
+# Source admission is a Linux-only pilot boundary. Record support before tests or
+# callers can replace os.open, and never substitute path-based traversal if it is absent.
+_SECURE_SOURCE_SUPPORTED = (
+    sys.platform.startswith("linux")
+    and hasattr(os, "O_DIRECTORY")
+    and hasattr(os, "O_NOFOLLOW")
+    and os.open in getattr(os, "supports_dir_fd", ())
+    and os.stat in getattr(os, "supports_dir_fd", ())
+    and os.stat in getattr(os, "supports_follow_symlinks", ())
+    and os.scandir in getattr(os, "supports_fd", ())
+)
+
 
 def _safe_relative(value: str, *, allow_dot: bool = False) -> PurePosixPath:
     """Validate a caller-provided relative POSIX path without resolving it."""
@@ -63,17 +76,77 @@ def _is_sensitive(path: PurePosixPath) -> bool:
     )
 
 
-def _admitted_directory(source: Source, settings: Settings) -> Path:
-    """Return a non-symlink directory lexically below ``source_root``.
+def _require_secure_source_support() -> int:
+    """Return no-follow directory flags or reject platforms lacking the required APIs."""
+    if not _SECURE_SOURCE_SUPPORTED:
+        raise SourceAdmissionError(
+            "secure source admission requires Linux fd-based no-follow support"
+        )
+    return os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
 
-    Absolute sources are supported when they are lexically within source_root. The
-    caller must preserve the source spelling (use ``Path.absolute()``, not ``resolve``)
-    so lstat below can reject every symlink hop before any file is opened.
-    """
-    root = Path(settings.source_root).resolve(strict=True)
-    root_mode = root.stat().st_mode
-    if not stat.S_ISDIR(root_mode):
+
+def _same_inode(left: os.stat_result, right: os.stat_result) -> bool:
+    return left.st_dev == right.st_dev and left.st_ino == right.st_ino
+
+
+def _open_source_root(root: Path, directory_flags: int) -> int:
+    """Open the configured trusted root and reject a replacement during the open."""
+    try:
+        expected = os.stat(root, follow_symlinks=False)
+    except FileNotFoundError as exc:
+        raise SourceAdmissionError("configured source_root does not exist") from exc
+    except OSError as exc:
+        raise SourceAdmissionError("cannot inspect configured source_root") from exc
+    if stat.S_ISLNK(expected.st_mode):
+        raise SourceAdmissionError("configured source_root must not be a symbolic link")
+    if not stat.S_ISDIR(expected.st_mode):
         raise SourceAdmissionError("configured source_root is not a directory")
+    try:
+        descriptor = os.open(root, directory_flags)
+    except OSError as exc:
+        raise SourceAdmissionError("cannot safely open configured source_root") from exc
+    try:
+        actual = os.fstat(descriptor)
+        if not stat.S_ISDIR(actual.st_mode) or not _same_inode(expected, actual):
+            raise SourceAdmissionError("configured source_root changed while it was being admitted")
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _open_directory(
+    parent_fd: int,
+    name: str,
+    expected: os.stat_result,
+    directory_flags: int,
+    *,
+    symbolic_error: str,
+    non_directory_error: str,
+) -> int:
+    """Pin one child directory under ``parent_fd`` and verify its identity."""
+    if stat.S_ISLNK(expected.st_mode):
+        raise SourceAdmissionError(symbolic_error)
+    if not stat.S_ISDIR(expected.st_mode):
+        raise SourceAdmissionError(non_directory_error)
+    try:
+        descriptor = os.open(name, directory_flags, dir_fd=parent_fd)
+    except OSError as exc:
+        raise SourceAdmissionError("source changed while it was being admitted") from exc
+    try:
+        actual = os.fstat(descriptor)
+        if not stat.S_ISDIR(actual.st_mode) or not _same_inode(expected, actual):
+            raise SourceAdmissionError("source changed while it was being admitted")
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _admitted_directory(source: Source, settings: Settings) -> int:
+    """Return a pinned non-symlink source directory below the trusted root descriptor."""
+    directory_flags = _require_secure_source_support()
+    root = Path(settings.source_root).absolute()
     raw = Path(source.path)
     if raw.is_absolute():
         try:
@@ -84,63 +157,76 @@ def _admitted_directory(source: Source, settings: Settings) -> Path:
         relative_text = source.path
     relative = _safe_relative(relative_text, allow_dot=True)
 
-    cursor = root
-    for part in relative.parts:
-        if part == ".":
-            continue
-        cursor = cursor / part
-        try:
-            mode = cursor.lstat().st_mode
-        except FileNotFoundError as exc:
-            raise SourceAdmissionError("source path does not exist") from exc
-        if stat.S_ISLNK(mode):
-            raise SourceAdmissionError("source path contains a symbolic link")
-        if not stat.S_ISDIR(mode) and part != relative.parts[-1]:
-            raise SourceAdmissionError("source path has a non-directory component")
+    cursor_fd = _open_source_root(root, directory_flags)
     try:
-        mode = cursor.lstat().st_mode
-    except FileNotFoundError as exc:
-        raise SourceAdmissionError("source path does not exist") from exc
-    if not stat.S_ISDIR(mode):
-        raise SourceAdmissionError("source must be a directory below configured source_root")
-    return cursor
+        parts = tuple(part for part in relative.parts if part != ".")
+        for index, part in enumerate(parts):
+            try:
+                expected = os.stat(part, dir_fd=cursor_fd, follow_symlinks=False)
+            except FileNotFoundError as exc:
+                raise SourceAdmissionError("source path does not exist") from exc
+            except OSError as exc:
+                raise SourceAdmissionError("cannot inspect source path") from exc
+            final_component = index == len(parts) - 1
+            next_fd = _open_directory(
+                cursor_fd,
+                part,
+                expected,
+                directory_flags,
+                symbolic_error="source path contains a symbolic link",
+                non_directory_error=(
+                    "source must be a directory below configured source_root"
+                    if final_component
+                    else "source path has a non-directory component"
+                ),
+            )
+            os.close(cursor_fd)
+            cursor_fd = next_fd
+        return cursor_fd
+    except BaseException:
+        os.close(cursor_fd)
+        raise
+
+
+def _directory_entries(directory_fd: int) -> list[os.DirEntry[str]]:
+    """Read one pinned directory, retaining no path string for later descent."""
+    try:
+        with os.scandir(directory_fd) as scan:
+            return sorted(scan, key=lambda entry: entry.name)
+    except OSError as exc:
+        raise SourceAdmissionError("source changed while it was being admitted") from exc
 
 
 def _iter_regular_files(
-    directory: Path, settings: Settings
-) -> Iterable[tuple[PurePosixPath, Path, os.stat_result]]:
-    """Walk safely in lexical order, pruning ignored trees before they are scanned."""
+    directory_fd: int, settings: Settings
+) -> Iterator[tuple[PurePosixPath, int, str, os.stat_result]]:
+    """Walk pinned descriptors in lexical order, rejecting every unadmitted entry."""
+    directory_flags = _require_secure_source_support()
     emitted = 0
-    for current_text, directory_names, file_names in os.walk(
-        directory, topdown=True, followlinks=False
-    ):
-        current = Path(current_text)
-        relative_directory = PurePosixPath(current.relative_to(directory).as_posix())
-        admitted_directories: list[str] = []
-        for name in sorted(directory_names):
-            if name in _EXCLUDED_DIRECTORIES:
-                continue
-            child = current / name
-            relative = relative_directory / name
-            try:
-                mode = child.lstat().st_mode
-            except FileNotFoundError as exc:
-                raise SourceAdmissionError("source changed while it was being admitted") from exc
-            if stat.S_ISLNK(mode):
-                raise SourceAdmissionError(f"symbolic links are not admitted: {relative}")
-            if not stat.S_ISDIR(mode):
-                raise SourceAdmissionError(f"special files are not admitted: {relative}")
-            admitted_directories.append(name)
-        # Mutating this list is how os.walk prunes traversal before eager descent.
-        directory_names[:] = admitted_directories
 
-        for name in sorted(file_names):
-            child = current / name
-            relative = relative_directory / name
+    def walk(
+        parent_fd: int, relative_directory: PurePosixPath
+    ) -> Iterator[tuple[PurePosixPath, int, str, os.stat_result]]:
+        nonlocal emitted
+        directories: list[tuple[str, PurePosixPath, os.stat_result]] = []
+        files: list[tuple[str, PurePosixPath, os.stat_result]] = []
+        for entry in _directory_entries(parent_fd):
+            relative = relative_directory / entry.name
             try:
-                metadata = child.lstat()
+                metadata = entry.stat(follow_symlinks=False)
             except FileNotFoundError as exc:
                 raise SourceAdmissionError("source changed while it was being admitted") from exc
+            except OSError as exc:
+                raise SourceAdmissionError("cannot inspect admitted source entry") from exc
+            if stat.S_ISDIR(metadata.st_mode):
+                if entry.name not in _EXCLUDED_DIRECTORIES:
+                    directories.append((entry.name, relative, metadata))
+            else:
+                files.append((entry.name, relative, metadata))
+
+        # os.walk yielded current files before descending sorted child directories; preserve
+        # that established member order so unchanged datasets retain their tar digests.
+        for name, relative, metadata in files:
             if stat.S_ISLNK(metadata.st_mode):
                 raise SourceAdmissionError(f"symbolic links are not admitted: {relative}")
             if not stat.S_ISREG(metadata.st_mode):
@@ -153,25 +239,43 @@ def _iter_regular_files(
             emitted += 1
             if emitted > settings.source_limit_files:
                 raise SourceAdmissionError("source exceeds configured file limit")
-            yield relative, child, metadata
+            yield relative, parent_fd, name, metadata
+
+        for name, relative, metadata in directories:
+            child_fd = _open_directory(
+                parent_fd,
+                name,
+                metadata,
+                directory_flags,
+                symbolic_error=f"symbolic links are not admitted: {relative}",
+                non_directory_error=f"special files are not admitted: {relative}",
+            )
+            try:
+                yield from walk(child_fd, relative)
+            finally:
+                os.close(child_fd)
+
+    yield from walk(directory_fd, PurePosixPath("."))
 
 
-def _read_regular_file(path: Path, metadata: os.stat_result, remaining: int) -> bytes:
-    """Read at most ``remaining`` bytes, refusing symlink races and post-stat changes."""
+def _read_regular_file(
+    parent_fd: int, name: str, metadata: os.stat_result, remaining: int
+) -> bytes:
+    """Read at most ``remaining`` bytes from a pinned parent without following links."""
     if metadata.st_size > remaining:
         raise SourceAdmissionError("source exceeds configured byte limit")
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    flags = os.O_RDONLY | os.O_NOFOLLOW
     try:
-        descriptor = os.open(path, flags)
+        descriptor = os.open(name, flags, dir_fd=parent_fd)
     except OSError as exc:
         raise SourceAdmissionError("cannot safely open admitted source file") from exc
     try:
         actual = os.fstat(descriptor)
         if (
             not stat.S_ISREG(actual.st_mode)
-            or actual.st_dev != metadata.st_dev
-            or actual.st_ino != metadata.st_ino
+            or not _same_inode(actual, metadata)
             or actual.st_size != metadata.st_size
+            or actual.st_mtime_ns != metadata.st_mtime_ns
         ):
             raise SourceAdmissionError("source changed while it was being admitted")
         with os.fdopen(descriptor, "rb", closefd=False) as stream:
@@ -179,7 +283,11 @@ def _read_regular_file(path: Path, metadata: os.stat_result, remaining: int) -> 
         if len(content) > remaining:
             raise SourceAdmissionError("source exceeds configured byte limit")
         after = os.fstat(descriptor)
-        if after.st_size != actual.st_size or after.st_mtime_ns != actual.st_mtime_ns:
+        if (
+            not _same_inode(after, actual)
+            or after.st_size != actual.st_size
+            or after.st_mtime_ns != actual.st_mtime_ns
+        ):
             raise SourceAdmissionError("source changed while it was being admitted")
         return content
     except OSError as exc:
@@ -190,13 +298,20 @@ def _read_regular_file(path: Path, metadata: os.stat_result, remaining: int) -> 
 
 def snapshot_source(source: Source, settings: Settings, store: ArtifactStore) -> ArtifactRef:
     """Store a deterministic bounded tar snapshot and enforce ``expected_digest``."""
-    directory = _admitted_directory(source, settings)
+    directory_fd = _admitted_directory(source, settings)
     entries: list[tuple[PurePosixPath, bytes]] = []
     total = 0
-    for relative, path, metadata in _iter_regular_files(directory, settings):
-        content = _read_regular_file(path, metadata, settings.source_limit_bytes - total)
-        total += len(content)
-        entries.append((relative, content))
+    files = _iter_regular_files(directory_fd, settings)
+    try:
+        for relative, parent_fd, name, metadata in files:
+            content = _read_regular_file(
+                parent_fd, name, metadata, settings.source_limit_bytes - total
+            )
+            total += len(content)
+            entries.append((relative, content))
+    finally:
+        files.close()
+        os.close(directory_fd)
 
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode="w", format=tarfile.GNU_FORMAT) as archive:

@@ -48,6 +48,14 @@ async def test_fetched_history_replays_without_repeating_completed_activities(
         "corsair.record",
     ]
     assert len(completed) == len(set(completed))
+    record = next(
+        event.activity_task_scheduled_event_attributes
+        for event in history.events
+        if event.HasField("activity_task_scheduled_event_attributes")
+        and event.activity_task_scheduled_event_attributes.activity_type.name == "corsair.record"
+    )
+    assert record.schedule_to_close_timeout.seconds == 90
+    assert record.start_to_close_timeout.seconds == 30
     replay = await Replayer(
         workflows=[InvestigationWorkflow], data_converter=pydantic_data_converter
     ).replay_workflow(history)

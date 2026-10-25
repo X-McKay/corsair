@@ -90,7 +90,9 @@ def test_operator_owned_recipe_assertions():
 
     try:
         result = _invoke()
-    except Exception as exc:
+    except BaseException as exc:
+        # pytest.Failed and SystemExit bypass Exception. A target must not turn
+        # its own failure signal plus a forged marker into observer disclosure.
         qualified = f"{type(exc).__module__}.{type(exc).__qualname__}"
         if qualified not in JOB["recipe"]["allowed_exceptions"]:
             _observation("execution_error")

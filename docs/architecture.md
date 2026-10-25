@@ -26,6 +26,12 @@ ADK provides the agent/tool schema, Runner, callbacks, session service and model
 
 Corsair retains only domain functionality that SDKs cannot decide: source admission, recipe restrictions, immutable evidence binding/reconciliation, the scoped verdict table, and scoring with human-owned oracles. There is no custom provider protocol, agent graph, generic backend registry, skill engine or scheduler.
 
+## Operator interface boundary
+
+The CLI is an operator/view layer over these native components, not another execution engine. A live inspection obtains phase/round or batch completion from Temporal workflow queries and a watch waits for the SDK workflow result; it does not synthesize progress from elapsed time, model calls, or activity heartbeats. The worker uses the Temporal SDK worker lifecycle, and client connection uses the configured SDK client/namespace rather than a custom connection retry broker.
+
+`doctor` asks the configured Docker and Temporal services about the actual operator dependencies (daemon/image/runtime, settings paths, namespace, and task-queue pollers). It does not call a model, validate credentials, start infrastructure, or convert preflight into a security conclusion. Human rendering is a compact presentation of a committed/native result; JSON remains the machine-result stream. Logs are a sanitized metadata channel, not an evidence, prompt, source, payload, or reasoning transport. The detailed intended CLI contract and its validation gate are in [PLAN-0106](development/plans/PLAN-0106-cli-audit.md).
+
 ## Durability
 
 An investigation activity episode may be lost before completion; it is not promised to resume at a specific model call. Activities with side effects default to one attempt. Before native execution, the local store publishes an immutable operation intent. A committed observation is reconciled by its identity; an intent without a committed observation is uncertain, even when no container remains, and is not replayed automatically. This intentionally favors honest uncertainty over duplicate execution.

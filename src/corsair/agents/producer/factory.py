@@ -20,20 +20,14 @@ def _tool_name(tool: Any) -> str:
 
 def build_producer(
     model: Any,
-    private_tools: Sequence[Any] | None = None,
-    *,
-    tools: Sequence[Any] | None = None,
+    tools: Sequence[Any],
 ) -> LlmAgent:
     """Build the producer with only its episode-private approved tools.
 
-    ``tools`` is retained as a keyword alias for callers that naturally name
-    the private capability collection that way. Passing both names is rejected
-    rather than silently selecting one.
+    The caller supplies the one approved, episode-private capability collection.
     """
 
-    if private_tools is not None and tools is not None:
-        raise ValueError("pass private_tools or tools, not both")
-    selected_tools = list(tools if tools is not None else private_tools or [])
+    selected_tools = list(tools)
     spec = load_agent_spec("producer")
     names = [_tool_name(tool) for tool in selected_tools]
     if names != spec.tools:

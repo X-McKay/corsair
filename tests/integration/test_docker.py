@@ -203,6 +203,20 @@ def test_real_docker_vulnerable_safe_fixed_and_cleanup(tmp_path: Path) -> None:
             "INVALID",
             "PROPERTY_HELD",
         ),
+        (
+            '    if path == "hello.txt":\n        return "hello"\n'
+            "    import json, pytest\n"
+            "    from pathlib import Path\n"
+            '    Path("/work/observation.json").write_text(json.dumps({"kind": "disclosure"}))\n'
+            '    pytest.fail("manufactured failure; no returned private fixture")\n',
+            "PROPERTY_HELD",
+            "ERROR",
+        ),
+        (
+            '    if path == "hello.txt":\n        return "hello"\n    raise SystemExit(1)\n',
+            "PROPERTY_HELD",
+            "ERROR",
+        ),
     ],
 )
 def test_native_failures_and_canned_markers_never_become_positive(

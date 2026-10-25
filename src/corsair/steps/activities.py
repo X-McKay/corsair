@@ -1,7 +1,6 @@
 """The only nondeterministic boundary used by the workflows."""
 
 import asyncio
-import threading
 
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
@@ -81,28 +80,16 @@ class Activities:
 
     @activity.defn(name="corsair.evidence")
     async def evidence(self, request: EvidenceInput) -> Observation:
-        from corsair.tools.security.evidence import EvidenceVerifier
+        from corsair.runtime.native_evidence import run_evidence
 
-        cancelled = threading.Event()
         loop = asyncio.get_running_loop()
 
         def heartbeat():
-            if cancelled.is_set() or activity.is_cancelled():
+            if activity.is_cancelled():
                 raise InterruptedError("Evidence activity cancelled")
             loop.call_soon_threadsafe(activity.heartbeat, request.operation_id)
 
-        task = asyncio.create_task(
-            asyncio.to_thread(
-                EvidenceVerifier(self.settings, self.store).evaluate, request, heartbeat
-            )
-        )
-        try:
-            return await asyncio.shield(task)
-        except asyncio.CancelledError:
-            cancelled.set()
-            # The thread owns its container; it must clean up before cancellation completes.
-            await asyncio.gather(task, return_exceptions=True)
-            raise
+        return await run_evidence(request, self.settings, self.store, heartbeat=heartbeat)
 
     @activity.defn(name="corsair.record")
     async def record(self, result: InvestigationResult) -> InvestigationResult:

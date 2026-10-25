@@ -5,6 +5,7 @@ proposal, while actual ADK, activities, source snapshots, containers and policy 
 """
 
 import json
+import logging
 import os
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from temporalio.worker import Worker
 
 from corsair.cli import request_from_file
 from corsair.contracts import Disposition, FixStatus
+from corsair.observability.logging import LifecycleLoggingInterceptor
 from corsair.runtime.artifacts import ArtifactStore
 from corsair.settings import Settings
 from corsair.steps.activities import Activities
@@ -64,7 +66,7 @@ class ReferenceModel(BaseLlm):
 @pytest.mark.docker
 @pytest.mark.temporal
 @pytest.mark.asyncio(loop_scope="module")
-async def test_native_adk_docker_temporal_chain_and_fix(temporal_server, tmp_path):
+async def test_native_adk_docker_temporal_chain_and_fix(temporal_server, tmp_path, caplog):
     if os.environ.get("CORSAIR_TEST_DOCKER") != "1":
         pytest.skip("set CORSAIR_TEST_DOCKER=1 for real native execution")
     root = Path(__file__).resolve().parents[2]
@@ -73,12 +75,14 @@ async def test_native_adk_docker_temporal_chain_and_fix(temporal_server, tmp_pat
     settings = Settings(source_root=str(root), artifact_root=str(store.root))
     model = ReferenceModel(model="scripted-reference")
     activities = Activities(settings, model_override=model)
+    caplog.set_level(logging.INFO, logger="corsair")
     queue, identity = temporal_id("native-queue"), temporal_id("native-run")
     async with Worker(
         temporal_server.client,
         task_queue=queue,
         workflows=[InvestigationWorkflow],
         activities=activities.registered(),
+        interceptors=[LifecycleLoggingInterceptor()],
     ):
         result = await temporal_server.client.execute_workflow(
             InvestigationWorkflow.run,
@@ -98,6 +102,21 @@ async def test_native_adk_docker_temporal_chain_and_fix(temporal_server, tmp_pat
         "list_files",
         "submit",
     ]
+    from corsair.observability.evaluation import Oracle, score
+
+    relabelled = result.model_copy(update={"case_id": "different-case"})
+    row = score(relabelled, Oracle(acceptable=[Disposition.SUPPORTED]), store)
+    assert row["status"] == "fail"
+    assert row["evidence_valid"] is False
+    assert row["fix_correct"] is False
+    receipts = [record for record in caplog.records if record.name == "corsair"]
+    assert any(record.message == "activity.started" for record in receipts)
+    completed = [record for record in receipts if record.message == "activity.completed"]
+    assert any(record.fields["activity"] == "corsair.produce" for record in completed)
+    assert any(record.fields["cleanup_confirmed"] for record in completed)
+    assert all(
+        "payload" not in record.fields and "prompt" not in record.fields for record in receipts
+    )
 
 
 @pytest.mark.docker
@@ -144,6 +163,18 @@ async def test_cli_frozen_batch_uses_native_chain_and_external_oracles(
         activities=activities.registered(),
     ):
         assert await execute(args) == 0
+        assert json.loads(capsys.readouterr().out)["summary"]["attempts"] == 3
+        inspection = ["inspect", args.run_id, "--online", "--settings", str(config)]
+        assert await execute(parser().parse_args(inspection)) == 0
+        assert json.loads(capsys.readouterr().out) == {"completed": 3, "total": 3}
+        assert await execute(parser().parse_args([*inspection, "--watch"])) == 0
+        children = json.loads(capsys.readouterr().out)
+        assert len(children) == 3
+        child_inspection = ["inspect", children[0]["run_id"], "--online", "--settings", str(config)]
+        assert await execute(parser().parse_args(child_inspection)) == 0
+        assert json.loads(capsys.readouterr().out)["phase"] == "complete"
+        assert await execute(parser().parse_args([*child_inspection, "--watch"])) == 0
+        assert json.loads(capsys.readouterr().out)["disposition"] == "SUPPORTED"
     rows = json.loads(report.read_text())["rows"]
     assert {row["case_id"]: row["disposition"] for row in rows} == {
         "case01": "SUPPORTED",
@@ -151,4 +182,3 @@ async def test_cli_frozen_batch_uses_native_chain_and_external_oracles(
         "case03": "CONDITIONAL",
     }
     assert all(row["status"] == "pass" for row in rows)
-    assert json.loads(capsys.readouterr().out)["summary"]["attempts"] == 3

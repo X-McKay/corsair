@@ -237,6 +237,11 @@ class InvestigationWorkflow:
                     result,
                     result_type=InvestigationResult,
                     start_to_close_timeout=timedelta(seconds=30),
+                    schedule_to_close_timeout=(
+                        timedelta(seconds=90)
+                        if workflow.patched("bounded-finalization-v1")
+                        else None
+                    ),
                     retry_policy=RetryPolicy(maximum_attempts=3),
                 )
             )

@@ -14,8 +14,16 @@ with workflow.unsafe.imports_passed_through():
 
 @workflow.defn(name="corsair.evaluation")
 class EvaluationWorkflow:
+    def __init__(self):
+        self.completed = self.total = 0
+
+    @workflow.query
+    def status(self) -> dict:
+        return {"completed": self.completed, "total": self.total}
+
     @workflow.run
     async def run(self, request: BatchRequest) -> list[BatchItem]:
+        self.total = len(request.requests) * request.repeats
         semaphore = asyncio.Semaphore(request.concurrency)
 
         async def investigate(index: int, repeat: int) -> BatchItem:
@@ -42,6 +50,8 @@ class EvaluationWorkflow:
                     return BatchItem(
                         case_id=case_request.case.case_id, run_id=run_id, error=str(exc)
                     )
+                finally:
+                    self.completed += 1
 
         return await asyncio.gather(
             *[

@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-24",
+  "branch": "manus/re-design",
+  "stage": "post-cleanup full-suite retest",
+  "tests_passed": 90,
+  "tests_skipped": 0,
+  "elapsed_seconds": 111.38,
+  "warnings_as_errors": true,
+  "ruff_check": "passed",
+  "ruff_format_check": "passed",
+  "package_build": "passed",
+  "fresh_installed_wheel_test": "passed",
+  "boundaries": {
+    "docker_native_reference_and_regressions": "passed",
+    "temporal_workflow_replay_restart_cancellation": "passed",
+    "adk_scripted_docker_temporal_composition": "passed",
+    "real_cli_processes_doctor_worker_logging_pty": "passed",
+    "client_ctrl_c_does_not_cancel_remote_work": "passed",
+    "live_outcome_blind_auditor_smoke": "passed",
+    "live_security_producer": "provider-policy-blocked; unqualified",
+    "population_accuracy": "not established",
+    "hostile_interpreter_attestation": "not qualified",
+    "artifact_host_loss_recovery": "not qualified"
+  },
+  "test_doubles": "labelled test-only; no production fallback or test package in wheel"
+}

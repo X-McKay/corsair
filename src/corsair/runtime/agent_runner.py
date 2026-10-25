@@ -15,7 +15,9 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
+from google.adk.agents.callback_context import CallbackContext
 from google.adk.agents.run_config import RunConfig
+from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
@@ -67,31 +69,35 @@ class _EpisodeAccounting:
     provider_error_code: str | None = None
     provider_error_message: str | None = None
 
-    async def before_model(self, context: Any, request: Any) -> LlmResponse | None:
+    async def before_model(
+        self, callback_context: CallbackContext, llm_request: LlmRequest
+    ) -> LlmResponse | None:
         """Charge model work before dispatch and bind this episode's generation cap."""
 
         if self.llm_calls >= self.max_llm_calls:
             self.llm_limit_exhausted = True
-            context._invocation_context.end_invocation = True
+            callback_context._invocation_context.end_invocation = True
             return LlmResponse(
                 error_code="CORSairLlmCallLimit",
                 error_message="episode LLM-call budget exhausted",
             )
         self.llm_calls += 1
-        request.config = request.config or types.GenerateContentConfig()
-        configured = request.config.max_output_tokens
-        request.config.max_output_tokens = (
+        llm_request.config = llm_request.config or types.GenerateContentConfig()
+        configured = llm_request.config.max_output_tokens
+        llm_request.config.max_output_tokens = (
             self.max_output_tokens
             if configured is None
             else min(configured, self.max_output_tokens)
         )
         return None
 
-    async def after_model(self, context: Any, response: LlmResponse) -> None:
+    async def after_model(
+        self, callback_context: CallbackContext, llm_response: LlmResponse
+    ) -> None:
         """Capture reported native response usage without manufacturing tokens."""
 
-        del context
-        usage = response.usage_metadata
+        del callback_context
+        usage = llm_response.usage_metadata
         if usage is not None:
             prompt_tokens = getattr(usage, "prompt_token_count", None)
             output_tokens = getattr(usage, "candidates_token_count", None)
@@ -99,9 +105,9 @@ class _EpisodeAccounting:
                 self.input_tokens = (self.input_tokens or 0) + int(prompt_tokens)
             if output_tokens is not None:
                 self.output_tokens = (self.output_tokens or 0) + int(output_tokens)
-        if response.error_code or response.error_message:
-            self.provider_error_code = str(response.error_code or "")
-            self.provider_error_message = str(response.error_message or "")
+        if llm_response.error_code or llm_response.error_message:
+            self.provider_error_code = str(llm_response.error_code or "")
+            self.provider_error_message = str(llm_response.error_message or "")
         return None
 
     def usage(self, tool_calls: int, seconds: float) -> Usage:
@@ -229,23 +235,20 @@ def _feedback_for_exception(error: Exception) -> Feedback:
     return _feedback_for_provider(type(error).__name__, str(error))
 
 
-def _last_agent_text(events: list[Any], author: str) -> str | None:
-    """Return the last non-thought text response authored by the requested role."""
+def _agent_text(event: Any, author: str) -> str | None:
+    """Return non-thought text when an ADK event belongs to the requested role."""
 
-    for event in reversed(events):
-        if getattr(event, "author", None) != author:
-            continue
-        content = getattr(event, "content", None)
-        if content is None or not content.parts:
-            continue
-        text = "".join(
-            part.text
-            for part in content.parts
-            if part.text is not None and not getattr(part, "thought", False)
-        )
-        if text.strip():
-            return text
-    return None
+    if getattr(event, "author", None) != author:
+        return None
+    content = getattr(event, "content", None)
+    if content is None or not content.parts:
+        return None
+    text = "".join(
+        part.text
+        for part in content.parts
+        if part.text is not None and not getattr(part, "thought", False)
+    )
+    return text if text.strip() else None
 
 
 async def _run_native_episode(
@@ -255,11 +258,11 @@ async def _run_native_episode(
     user_id: str,
     session_id: str,
     message: str,
+    author: str,
     llm_call_limit: int,
-    max_output_tokens: int,
     timeout_seconds: int,
     accounting: _EpisodeAccounting,
-) -> tuple[list[Any], Feedback | None]:
+) -> tuple[str | None, Feedback | None]:
     """Run exactly one ordinary ADK Runner episode with a fresh memory-only session."""
 
     service = InMemorySessionService()
@@ -270,7 +273,7 @@ async def _run_native_episode(
     # dispatches and constrains per-request output generation.
     agent.before_model_callback = accounting.before_model
     agent.after_model_callback = accounting.after_model
-    events: list[Any] = []
+    last_text: str | None = None
     try:
         async with asyncio.timeout(timeout_seconds):
             async for event in runner.run_async(
@@ -279,20 +282,21 @@ async def _run_native_episode(
                 new_message=types.Content(role="user", parts=[types.Part(text=message)]),
                 run_config=RunConfig(max_llm_calls=llm_call_limit),
             ):
-                events.append(event)
+                if text := _agent_text(event, author):
+                    last_text = text
     except TimeoutError:
-        return events, Feedback(
+        return last_text, Feedback(
             gate="episode_timeout",
             reason="bounded ADK episode exceeded its elapsed-time limit",
             operational=True,
         )
     except Exception as error:  # Provider/transport failures are activity data, not retries.
-        return events, _feedback_for_exception(error)
+        return last_text, _feedback_for_exception(error)
     if accounting.provider_error_code or accounting.provider_error_message:
-        return events, _feedback_for_provider(
+        return last_text, _feedback_for_provider(
             accounting.provider_error_code, accounting.provider_error_message
         )
-    return events, None
+    return last_text, None
 
 
 def _effective_limit(requested: int, configured: int) -> int:
@@ -324,14 +328,14 @@ async def run_producer(
         max_llm_calls=llm_limit,
         max_output_tokens=producer_input.budget.max_output_tokens,
     )
-    events, operational_feedback = await _run_native_episode(
+    last_agent_text, operational_feedback = await _run_native_episode(
         agent=agent,
         app_name="corsair-producer",
         user_id=producer_input.run_id,
         session_id=f"producer-{producer_input.round_index}",
         message=_producer_prompt(producer_input),
+        author="producer",
         llm_call_limit=llm_limit,
-        max_output_tokens=producer_input.budget.max_output_tokens,
         timeout_seconds=producer_input.budget.max_elapsed_seconds,
         accounting=accounting,
     )
@@ -347,7 +351,7 @@ async def run_producer(
         reason = "producer exhausted its LLM-call budget before a valid submission"
     elif private_tools.errors:
         reason = _bounded_text(private_tools.errors[-1], 2000)
-    elif _last_agent_text(events, "producer"):
+    elif last_agent_text:
         reason = "producer returned text instead of a terminal submit tool call"
     else:
         reason = "producer returned no terminal submission"
@@ -370,21 +374,21 @@ async def run_auditor(
     accounting = _EpisodeAccounting(
         max_llm_calls=1, max_output_tokens=audit_input.max_output_tokens
     )
-    events, operational_feedback = await _run_native_episode(
+    last_agent_text, operational_feedback = await _run_native_episode(
         agent=agent,
         app_name="corsair-auditor",
         user_id="corsair-auditor",
         session_id="audit",
         message=_auditor_prompt(audit_input),
+        author="auditor",
         llm_call_limit=1,
-        max_output_tokens=audit_input.max_output_tokens,
         timeout_seconds=300,
         accounting=accounting,
     )
     usage = accounting.usage(tool_calls=0, seconds=time.perf_counter() - started)
     if operational_feedback is not None:
         return AuditOutput(usage=usage, feedback=operational_feedback)
-    text = _last_agent_text(events, "auditor")
+    text = last_agent_text
     if text is None:
         return AuditOutput(
             usage=usage,

@@ -190,7 +190,7 @@ async def test_tool_cap_is_charged_before_work_and_source_path_escape_is_rejecte
 def test_factories_match_agent_metadata_and_submit_has_strict_native_schema(tmp_path: Path):
     store = ArtifactStore(tmp_path)
     tools = build_producer_tools(_producer_input(store), store)
-    producer = build_producer("gemini-2.5-flash", tools.native_tools())
+    producer = build_producer("gemini-2.5-flash", tools=tools.native_tools())
     auditor = build_auditor("gemini-2.5-flash")
     declaration = FunctionTool(tools.submit)._get_declaration()
 
