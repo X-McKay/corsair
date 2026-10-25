@@ -69,7 +69,7 @@ For a new operation, the kernel materializes the recipe with the proposed payloa
 
 `blind_audit` runs a fresh auditor activity. The auditor receives the finding, public recipe configuration, source excerpt, and the proposed pair; it never receives receipts, coverage, or a provisional label. It returns a structured `AuditResult` and can only reject. A rejection removes the pair from consideration; a non-rejection lets the kernel continue. The auditor cannot raise a label.
 
-When the exploit run demonstrated the reported condition with a healthy control, `fixed_differential` repeats the same pair against the configured fix revision under its own operation identity. The gate holds only when the control still passes and the demonstration no longer occurs. It is required for `EXPLOIT_DEMONSTRATED`; it says the submitted demonstration was blocked, not that the fix is generally correct.
+When the exploit run demonstrated the reported condition with a healthy control and a fix revision was supplied, `fixed_differential` repeats the same pair against that fix revision under its own operation identity. It is optional confirmation, not a precondition for `EXPLOIT_DEMONSTRATED`: a fix revision on which the demonstration no longer occurs confirms the label, while a fix revision on which the exploit still demonstrates (`FixStatus.NOT_BLOCKED`) withholds it as an incomplete fix or a suspect demonstration. When it holds, it says the submitted demonstration was blocked, not that the fix is generally correct.
 
 ## 6. Verdict table
 
@@ -77,7 +77,7 @@ The kernel assigns one of five labels; [`src/corsair/contracts/results.py`](../.
 
 | Label | Condition decided in code |
 | --- | --- |
-| `EXPLOIT_DEMONSTRATED` | Both runs covered the target line, the control held, the exploit run demonstrated the condition, the auditor did not reject, and the fixed differential held. |
+| `EXPLOIT_DEMONSTRATED` | Both runs covered the target line, the control held, the exploit run demonstrated the condition, and the auditor did not reject. A supplied fix revision confirms when it blocks the demonstration and withholds the label only when the exploit still demonstrates on it. |
 | `EXPLOIT_NOT_DEMONSTRATED` | At least `negative_threshold` (2) independent producer sessions each produced a coverage-valid, non-rejected pair whose exploit run did not demonstrate the condition. |
 | `INCONCLUSIVE` | Gates ran but did not settle: coverage missed in either run, evidence disagreed, the auditor rejected, fewer than two independent negative sessions, the fixed differential failed, or the budget ended first. |
 | `UNABLE_TO_RUN` | `target_binding`, `ast_guard`, or `build_replay` failed; the case could not be exercised. |

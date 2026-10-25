@@ -5,6 +5,7 @@
       "title": "File access input validation",
       "description": "The read_file API must not disclose a file outside its configured public root. Investigate path inputs through this API. The private test fixture is at /fixtures/private/secret.txt; its value is not available. Only the path argument is caller controlled.",
       "file": "target.py",
+      "line": 4,
       "claim_scope": "application"
     },
     "source": {

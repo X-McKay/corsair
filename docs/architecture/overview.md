@@ -63,7 +63,7 @@ There is no application-owned agent graph, scheduler, generic provider protocol,
 - Control and exploit come from one differential run pair that differs only in payload. The same snapshot, recipe, image, and fixed arguments apply to both.
 - **Exact target-line coverage is required in both runs before any observation counts.** A run that did not execute the finding's target line proves nothing about it; this is the primary guard against a false `EXPLOIT_NOT_DEMONSTRATED`.
 - `EXPLOIT_NOT_DEMONSTRATED` requires at least two independent producer sessions (`negative_threshold = 2`) whose coverage-valid exploit runs all failed to demonstrate the condition. One miss is `INCONCLUSIVE`.
-- `EXPLOIT_DEMONSTRATED` requires the fixed-revision differential to hold: on the fix revision the benign control still passes and the exploit no longer demonstrates.
+- `EXPLOIT_DEMONSTRATED` rests on the vulnerable-revision differential (healthy control, covered exploit demonstration, non-rejecting audit). A fix revision is optional confirmation: when supplied it confirms the label if the benign control still passes and the exploit no longer demonstrates, and withholds it only if the exploit still demonstrates on the fix.
 - Each ADK episode is one Temporal activity with a single attempt; Corsair does not use the experimental ADK Temporal plugin ([ADR 0001](decisions/0001-sdk-owned-durable-rounds.md)). Uncertain side effects are reconciled by identity, not replayed.
 - Shared artifacts are required for worker/client inspection and recovery. A local artifact host remains a single-host durability limit.
 

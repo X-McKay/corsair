@@ -14,7 +14,7 @@ EVALS_ROOT = ROOT / "evals"
 
 ORIGINAL_IDENTITIES = {
     "case01": (
-        "7fd8a7c3036704adde08b407744e7ea1fdf428554fef21a29e73b4a14d83a4c6",
+        "1519c8f50f04244dc7773c1f7277414c939c6e9e8ca0dfe372fc29489e126564",
         "02275f674a11f70a0cd426d67593d3e995a9fc1af9c91d55d9a889b427069eaf",
     ),
     "audit01": (

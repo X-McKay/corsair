@@ -17,7 +17,7 @@ Three constraints shape the design. The repository's rules forbid an agent from 
 
 **Exact target-line coverage gate.** Control and exploit come from one differential run pair differing only in payload. Each run must show that the finding's exact target line executed. A pair with an uncovered run is discarded as `INCONCLUSIVE` and counts toward nothing. Coverage is checked before any observation reaches `evidence_agreement`, `blind_audit`, or the verdict table.
 
-**Two independent sessions for a negative.** `EXPLOIT_NOT_DEMONSTRATED` requires at least `negative_threshold = 2` independent producer sessions, each producing a coverage-valid, non-rejected pair whose exploit run did not demonstrate the condition. `EXPLOIT_DEMONSTRATED` requires the fixed-revision differential to hold.
+**Two independent sessions for a negative.** `EXPLOIT_NOT_DEMONSTRATED` requires at least `negative_threshold = 2` independent producer sessions, each producing a coverage-valid, non-rejected pair whose exploit run did not demonstrate the condition. `EXPLOIT_DEMONSTRATED` rests on the control-versus-exploit differential on the vulnerable revision alone: a healthy control, a covered exploit run that demonstrated the condition, and a non-rejecting audit. A fixed revision is optional confirmation, not a precondition. When one is supplied, the label is withheld only if the exploit still demonstrates on the fix revision (`FixStatus.NOT_BLOCKED`), which signals an incomplete fix or a suspect demonstration; a fix revision that blocks the demonstration confirms the label, and one that cannot be cleanly evaluated leaves the vulnerable-revision differential standing.
 
 **One ADK episode per Temporal activity.** Each producer or auditor episode is one ordinary activity with a single attempt ([ADR 0001](0001-sdk-owned-durable-rounds.md)); the experimental ADK Temporal plugin is not used.
 
@@ -36,6 +36,6 @@ The verdict is decided by [`policies/verdicts.py`](../../../src/corsair/policies
 
 The producer's output surface is data, which keeps the agent evaluable in isolation with fixture-answered ports and keeps exploit authorship with the operator-reviewed recipe. Recipe coverage, not model creativity, bounds what the pilot can validate; a finding without a matching recipe is `UNABLE_TO_RUN`, not a model guess.
 
-A negative label costs at least two producer sessions and two differential pairs, and a positive label costs an extra fixed-revision pair. That is the intended price of making a false `EXPLOIT_NOT_DEMONSTRATED` the hardest outcome to produce. Evaluation datasets and oracles use the five labels.
+A negative label costs at least two producer sessions and two differential pairs; a positive label rests on one vulnerable-revision differential pair, with an optional fixed-revision pair as confirmation when a fix is supplied. That is the intended price of making a false `EXPLOIT_NOT_DEMONSTRATED` the hardest outcome to produce. Evaluation datasets and oracles use the five labels.
 
 The decision does not change contract/port boundaries ([ADR 0002](0002-pydantic-contracts-and-ports.md)) or evidence immutability ([ADR 0003](0003-immutable-native-evidence.md)). See [Data flow](../data-flow.md) for the gate order and verdict table and [Security architecture](../security.md) for the non-negotiables.

@@ -7,8 +7,8 @@
       "split": "dev",
       "request": "fixtures/case01/request.json",
       "oracle": "fixtures/case01/oracle.json",
-      "request_digest": "7fd8a7c3036704adde08b407744e7ea1fdf428554fef21a29e73b4a14d83a4c6",
-      "oracle_digest": "8286cba8edbacb8595fb13638fcb6c5904046b5a2c00294191d36ee69285697e"
+      "request_digest": "1519c8f50f04244dc7773c1f7277414c939c6e9e8ca0dfe372fc29489e126564",
+      "oracle_digest": "ea25827e52f51279851d1b37d40403bfc7ed83ccd91afaac61eed009b8af0bf3"
     },
     {
       "case_id": "case02",
@@ -16,8 +16,8 @@
       "split": "dev",
       "request": "fixtures/case02/request.json",
       "oracle": "fixtures/case02/oracle.json",
-      "request_digest": "447543a71e40b4d8ef4430cc0f54b9775e12058863fe60d00e1bd49e711653bc",
-      "oracle_digest": "dcb44caef57ac246a2f1fd7a6ef2f68cf255402415b1952bb777e4dc87f23e28"
+      "request_digest": "2e752ae4af4e6b3c993c4df801f6dc413186d4313698c1625682d37882b6df4a",
+      "oracle_digest": "7424ba94a759f93ce5d91f7a07a93c2d651eba66223b3c7c4cd1163740d9d32d"
     },
     {
       "case_id": "case03",
@@ -25,8 +25,8 @@
       "split": "dev",
       "request": "fixtures/case03/request.json",
       "oracle": "fixtures/case03/oracle.json",
-      "request_digest": "0388be8f5f6493a3c0967a0a3e3a08bd85abe148193a002fcc1b68f9b9bb7b07",
-      "oracle_digest": "ab140438d414863c2b5dfcef561044a229e95952d1aef2117eca71911206fb3e"
+      "request_digest": "043632f1296edeca17e49dfc59fa8d9c7565b8ec02dc3162cc148c45d580c673",
+      "oracle_digest": "8bcf89efe52817eaf048ca411aa2953ef55010f9e27b0423c56f76cdc15c631b"
     }
   ]
 }

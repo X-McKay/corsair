@@ -71,26 +71,39 @@ def _clean_negative() -> Observation:
 # --- session_verdict -------------------------------------------------------
 
 
-def test_likely_exploitable_requires_a_confirmed_differential():
-    outcome = session_verdict(
-        _prepared(), _demonstrated(), _audit(), FixStatus.DEMONSTRATION_BLOCKED
-    )
+def test_exploit_demonstrated_without_any_fixed_revision():
+    """The vulnerable-revision control/exploit differential alone earns the label
+    when no fixed revision was supplied. A fixed revision is optional confirmation,
+    not a precondition."""
+    outcome = session_verdict(_prepared(), _demonstrated(), _audit(), FixStatus.NOT_REQUESTED)
     assert outcome == SessionOutcome(outcome.verdict, outcome.reason)
     assert outcome.verdict is Verdict.EXPLOIT_DEMONSTRATED
     assert outcome.clean_negative is False
 
 
-def test_exploit_that_also_violates_on_the_fix_is_not_differential():
+def test_exploit_demonstrated_confirmed_by_a_blocking_fixed_revision():
+    """A fixed revision on which the exploit no longer violates confirms the label."""
+    outcome = session_verdict(
+        _prepared(), _demonstrated(), _audit(), FixStatus.DEMONSTRATION_BLOCKED
+    )
+    assert outcome.verdict is Verdict.EXPLOIT_DEMONSTRATED
+    assert outcome.clean_negative is False
+
+
+def test_exploit_that_also_violates_on_the_fix_is_withheld():
+    """If the exploit still violates on the supplied fixed revision, the fix is
+    incomplete or the demonstration is suspect; the label is withheld, not awarded."""
     outcome = session_verdict(_prepared(), _demonstrated(), _audit(), FixStatus.NOT_BLOCKED)
     assert outcome.verdict is Verdict.INCONCLUSIVE
-    assert outcome.reason == "not_differential"
+    assert "still violates on the fixed revision" in outcome.reason
 
 
-@pytest.mark.parametrize("fix", [FixStatus.UNVERIFIED, FixStatus.NOT_REQUESTED])
-def test_unconfirmed_fix_differential_is_never_decisive(fix: FixStatus):
-    outcome = session_verdict(_prepared(), _demonstrated(), _audit(), fix)
-    assert outcome.verdict is Verdict.INCONCLUSIVE
-    assert outcome.reason == "fix differential unverified"
+def test_unevaluable_fixed_revision_falls_back_to_the_vulnerable_differential():
+    """A fixed revision was supplied but its run could not be cleanly evaluated
+    (UNVERIFIED). The sound vulnerable-revision differential is not retracted, so
+    the label still stands -- confirmation was merely unavailable."""
+    outcome = session_verdict(_prepared(), _demonstrated(), _audit(), FixStatus.UNVERIFIED)
+    assert outcome.verdict is Verdict.EXPLOIT_DEMONSTRATED
 
 
 def test_coverage_miss_blocks_any_decisive_session():
@@ -102,13 +115,25 @@ def test_coverage_miss_blocks_any_decisive_session():
     assert outcome.clean_negative is False
 
 
-def test_absent_target_line_cannot_be_a_clean_negative():
+def test_absent_target_line_is_unable_to_run_not_a_clean_negative():
+    """With no declared line there is no target to bind to: the session cannot be
+    decisive in either direction, so it is UNABLE_TO_RUN and never a clean negative."""
     prepared = _prepared().model_copy(
         update={"finding": _prepared().finding.model_copy(update={"line": None})}
     )
     outcome = session_verdict(prepared, _clean_negative(), _audit(), FixStatus.NOT_REQUESTED)
-    assert outcome.verdict is Verdict.INCONCLUSIVE
+    assert outcome.verdict is Verdict.UNABLE_TO_RUN
     assert outcome.clean_negative is False
+
+
+def test_absent_target_line_cannot_demonstrate_an_exploit():
+    """The false-negative guard also holds in the positive direction: a reproduced
+    violation against an unbound target is UNABLE_TO_RUN, never EXPLOIT_DEMONSTRATED."""
+    prepared = _prepared().model_copy(
+        update={"finding": _prepared().finding.model_copy(update={"line": None})}
+    )
+    outcome = session_verdict(prepared, _demonstrated(), _audit(), FixStatus.NOT_REQUESTED)
+    assert outcome.verdict is Verdict.UNABLE_TO_RUN
 
 
 def test_clean_negative_is_a_signal_not_a_label():

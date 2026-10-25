@@ -6,5 +6,12 @@
     "REFUTED"
   ],
   "expected_execution": "COMPLETED",
-  "expected_fix": "DEMONSTRATION_BLOCKED"
+  "expected_fix": "DEMONSTRATION_BLOCKED",
+  "acceptable_verdicts": [
+    "EXPLOIT_DEMONSTRATED"
+  ],
+  "expected_verdict": "EXPLOIT_DEMONSTRATED",
+  "forbidden_verdicts": [
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ]
 }

@@ -7,5 +7,13 @@
     "SUPPORTED",
     "CONDITIONAL"
   ],
-  "expected_execution": "COMPLETED"
+  "expected_execution": "COMPLETED",
+  "acceptable_verdicts": [
+    "INCONCLUSIVE"
+  ],
+  "expected_verdict": "INCONCLUSIVE",
+  "forbidden_verdicts": [
+    "EXPLOIT_DEMONSTRATED",
+    "EXPLOIT_NOT_DEMONSTRATED"
+  ]
 }

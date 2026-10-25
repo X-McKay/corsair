@@ -17,7 +17,7 @@ Corsair's security design limits what agents can do, binds evidence to admitted 
 4. Control and exploit come from one differential run pair that differs only in payload.
 5. Exact target-line coverage is required in both runs before an observation counts toward any label.
 6. `EXPLOIT_NOT_DEMONSTRATED` needs at least two independent producer sessions (`negative_threshold = 2`).
-7. `EXPLOIT_DEMONSTRATED` needs the fixed-revision differential to hold.
+7. `EXPLOIT_DEMONSTRATED` rests on the vulnerable-revision differential; a supplied fix revision is optional confirmation and only withholds the label when the exploit still demonstrates on it.
 
 ## Trust boundaries and controls
 
@@ -37,7 +37,7 @@ Corsair's security design limits what agents can do, binds evidence to admitted 
 
 ## Scoped conclusions
 
-Only the kernel assigns labels, and only after every earlier gate passed. `EXPLOIT_DEMONSTRATED` means the proposed exploit payload demonstrated the reported condition at the covered target line while the benign control held, the auditor did not reject the pair, and the same pair no longer demonstrated it on the fix revision. `EXPLOIT_NOT_DEMONSTRATED` means at least two independent, coverage-valid, non-rejected sessions failed to demonstrate it. Everything else is `INCONCLUSIVE`, `UNABLE_TO_RUN`, or `ERROR`; none of those is proof that a target is safe.
+Only the kernel assigns labels, and only after every earlier gate passed. `EXPLOIT_DEMONSTRATED` means the proposed exploit payload demonstrated the reported condition at the covered target line while the benign control held and the auditor did not reject the pair. A fix revision is not required; when one is supplied, the label is confirmed if the same pair no longer demonstrates on it and withheld if it still does. `EXPLOIT_NOT_DEMONSTRATED` means at least two independent, coverage-valid, non-rejected sessions failed to demonstrate it. Everything else is `INCONCLUSIVE`, `UNABLE_TO_RUN`, or `ERROR`; none of those is proof that a target is safe.
 
 The costliest error is a false `EXPLOIT_NOT_DEMONSTRATED`. The gate order exists to make that label the hardest to reach: a case that cannot run, a run that missed the target line, a rejected pair, or a single session all stop short of it. A fixed-revision observation is similarly narrow: the submitted demonstration was blocked while the benign control held. It is not universal patch correctness. The architecture makes no production, hostile-target, or population-accuracy claim, no clearance claim, and no claim that local artifacts survive host loss.
 

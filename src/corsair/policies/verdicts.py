@@ -187,10 +187,11 @@ def session_verdict(
     """Decide the canonical outcome of ONE independent session. Pure; no I/O or SDK.
 
     The internal ``decide()`` supplies the conservative disposition/execution
-    status; this layer adds the coverage gate and the confirmed fixed-revision
-    differential that a decisive verdict requires.
+    status; this layer adds the target-binding and exact-coverage gates and treats
+    the fixed revision as optional confirmation of the vulnerable-revision
+    differential, never as a precondition for EXPLOIT_DEMONSTRATED.
     """
-    _disposition, execution_status, reason = decide(prepared, observation, audit)
+    disposition, execution_status, reason = decide(prepared, observation, audit)
 
     # 1. Infrastructure fault on the vulnerable revision: the session proved nothing.
     if execution_status is ExecutionStatus.ERROR:
@@ -208,7 +209,17 @@ def session_verdict(
     if not observation.cleanup_confirmed:
         return SessionOutcome(Verdict.ERROR, reason)
 
-    # 3. Exact target-line coverage gate: without it the session cannot be decisive.
+    # 4. Target binding: a decisive verdict is only ever about the exact declared
+    #    finding line. Without a line there is no target to bind to, so the session
+    #    is UNABLE_TO_RUN rather than a silent negative -- the primary guard against
+    #    a demonstration (or clean negative) credited to a target we never located.
+    if prepared.finding.line is None:
+        return SessionOutcome(
+            Verdict.UNABLE_TO_RUN, "finding declares no target line to bind the demonstration to"
+        )
+
+    # 5. Exact target-line coverage gate: the declared line must execute in BOTH the
+    #    control and adversarial runs before the session may be decisive.
     if not _line_covered_in_both(prepared, observation):
         return SessionOutcome(Verdict.INCONCLUSIVE, "declared target line not covered in both runs")
 
@@ -218,21 +229,34 @@ def session_verdict(
     adversarial_held = _native_role_valid(observation.adversarial, RoleOutcome.HELD)
     accepted = _audit_accepts(audit)
 
-    # 4. EXPLOIT_DEMONSTRATED requires a healthy control, a reproduced violation, an
-    #    accepted audit, and a CONFIRMED fixed-revision differential.
+    # 6. EXPLOIT_DEMONSTRATED rests on the control-vs-exploit differential on the
+    #    VULNERABLE revision: a healthy control, a reproduced violation, an accepted
+    #    audit, and the coverage gate above. A fixed revision is optional
+    #    confirmation, never a precondition (ADR 0004). The only outcome that blocks
+    #    the label is a fixed revision on which the exploit STILL violates
+    #    (FixStatus.NOT_BLOCKED): the fix is incomplete or the demonstration is
+    #    suspect, so the label is withheld rather than silently awarded.
     if control_held and adversarial_violation and accepted:
-        if fix is FixStatus.DEMONSTRATION_BLOCKED:
-            return SessionOutcome(Verdict.EXPLOIT_DEMONSTRATED, reason)
         if fix is FixStatus.NOT_BLOCKED:
-            return SessionOutcome(Verdict.INCONCLUSIVE, "not_differential")
-        return SessionOutcome(Verdict.INCONCLUSIVE, "fix differential unverified")
+            return SessionOutcome(
+                Verdict.INCONCLUSIVE,
+                "exploit still violates on the fixed revision; "
+                "fix incomplete or demonstration suspect",
+            )
+        # The named finding claimed application scope but only component-level
+        # evidence was produced (decide() -> CONDITIONAL). The exploit was shown at
+        # the component, yet the finding as stated is not fully demonstrated, so the
+        # canonical verdict stays non-decisive rather than over-claiming the label.
+        if disposition is Disposition.CONDITIONAL:
+            return SessionOutcome(Verdict.INCONCLUSIVE, reason)
+        return SessionOutcome(Verdict.EXPLOIT_DEMONSTRATED, reason)
 
-    # 5. Clean negative: healthy control, the exploit did NOT violate, accepted
+    # 7. Clean negative: healthy control, the exploit did NOT violate, accepted
     #    audit, coverage gate passed. A session-level signal, never itself a label.
     if control_held and adversarial_held and accepted:
         return SessionOutcome(Verdict.INCONCLUSIVE, "clean_negative", clean_negative=True)
 
-    # 6. Anything else is non-decisive.
+    # 8. Anything else is non-decisive.
     return SessionOutcome(Verdict.INCONCLUSIVE, reason)
 
 

@@ -2,7 +2,7 @@
 
 Corsair validates a reported security finding against a pinned source snapshot. **Google ADK** runs two bounded agents: a producer that proposes a benign/exploit payload pair as JSON, and an outcome-blind auditor with no tools that can only reject. A deterministic, coverage-gated **kernel** in trusted code admits the target, runs the differential pair in a sandbox, requires exact target-line coverage in both runs, and decides the label. **Temporal** runs each agent episode as one activity and coordinates rounds, budgets, cancellation and immutable results. No model ever assigns a verdict.
 
-The label is one of `EXPLOIT_DEMONSTRATED`, `EXPLOIT_NOT_DEMONSTRATED`, `INCONCLUSIVE`, `UNABLE_TO_RUN` or `ERROR`. `EXPLOIT_NOT_DEMONSTRATED` needs at least two independent producer sessions with covered, non-demonstrating exploit runs; `EXPLOIT_DEMONSTRATED` needs the fixed-revision differential to hold. Everything else is never a negative security clearance. This is a personal-use pilot whose running runtime is Python, not a general-purpose autonomous penetration tester.
+The label is one of `EXPLOIT_DEMONSTRATED`, `EXPLOIT_NOT_DEMONSTRATED`, `INCONCLUSIVE`, `UNABLE_TO_RUN` or `ERROR`. `EXPLOIT_NOT_DEMONSTRATED` needs at least two independent producer sessions with covered, non-demonstrating exploit runs; `EXPLOIT_DEMONSTRATED` rests on the vulnerable-revision control-versus-exploit differential, with a supplied fix revision as optional confirmation. Everything else is never a negative security clearance. This is a personal-use pilot whose running runtime is Python, not a general-purpose autonomous penetration tester.
 
 ## Start here
 
