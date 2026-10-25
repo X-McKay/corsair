@@ -204,3 +204,25 @@ def test_run_id_rejects_invalid_or_reserved_length_values():
         validate_run_id("invalid/id")
     with pytest.raises(ValueError, match="operation suffixes"):
         validate_run_id("a" * 61)
+
+
+def test_cli_exit_does_not_retain_handled_exception_tracebacks(tmp_path):
+    # A test-only context observer invokes the actual main function, without fake responses.
+    probe = (
+        "import json\n"
+        "from corsair.cli import main\n"
+        "try:\n"
+        "    main()\n"
+        "except SystemExit as exit:\n"
+        "    print(json.dumps({'code': exit.code, 'context_released': exit.__context__ is None}))\n"
+        "    raise\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", probe, "report", str(tmp_path / "absent"), "--log-format", "json"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert result.returncode == 2
+    assert json.loads(result.stdout) == {"code": 2, "context_released": True}
+    assert json.loads(result.stderr.splitlines()[-1])["event"] == "cli.failed"

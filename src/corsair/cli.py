@@ -467,11 +467,12 @@ def main() -> None:
             level=logging.WARNING,
             message="Local wait stopped; workflows continue. Use corsair cancel RUN_ID.",
         )
-        raise SystemExit(130) from None
+        code = 130
     except Exception as error:
         detail = safe_error_detail(error)
         event("cli.failed", level=logging.ERROR, error_type=type(error).__name__, message=detail)
-        raise SystemExit(2) from None
+        code = 2
+    # Exit after the handler: retaining exception tracebacks can retain native SDK clients.
     raise SystemExit(code)
 
 

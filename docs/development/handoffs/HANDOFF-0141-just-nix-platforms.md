@@ -38,3 +38,7 @@ Nix/tool/dependency selection is reproducible, not a fully hermetic/offline imag
 macOS needs Docker Desktop or Colima's Linux daemon for targets. Hosted ARM runners lack nested virtualization, so physical-Mac full Docker-chain qualification is not claimed. Docker SDK context/socket setup and shared paths are documented in [platform support](../../platforms.md). Live security-producer policy blocking, population accuracy and arbitrary hostile-interpreter attestation remain unqualified.
 
 Use [environment setup](../environment.md) for the golden path and [next simplifications](../../next-simplifications.md) for identified—but not silently implemented—report provenance, names-only listing, duplicate source read and early input-validation improvements. Historical handoffs preserve the original Make commands as dated evidence.
+
+## Target CI interruption fix
+
+Initial Nix-native CI reproduced intermittent client process hangs after `cli.interrupted` was already logged. Failure-only faulthandler captured interpreter garbage collection, not a blocked or ignored SIGINT. The CLI raised SystemExit inside the active exception handler, retaining the cancelled stack's SDK objects through exception context. It now assigns the exit code in each handler and raises SystemExit after the handler has ended. This releases handled tracebacks before interpreter shutdown, preserves exit codes/logging, and uses no forced exit or private SDK cleanup hook. A real-command context regression and three repeated native detachment attempts cover the change.
