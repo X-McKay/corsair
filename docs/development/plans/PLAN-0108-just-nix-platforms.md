@@ -17,4 +17,4 @@ Mac source admission must preserve descriptor/no-follow capability checks, immut
 
 Before delivery, run the actual Just default/argument/error tests and lint/type gates, review only concrete issues, clean obsolete/generated paths, re-test all available native integration and final frozen auditor evaluation, build the wheel outside checkout, inspect fixture/lock/privacy boundaries, and record actual results and unrun gates. Propose further SDK/code simplifications separately from implemented migration behavior; do not silently expand scope.
 
-Completed local final qualification: 116 passed in 110.27 seconds; frozen auditor 6/6; both target flake outputs evaluated. Target-native CI and physical-Mac Docker limits are recorded in [HANDOFF-0141](../handoffs/HANDOFF-0141-just-nix-platforms.md).
+Completed local final qualification: 120 passed in 139.91 seconds; frozen auditor 6/6; both target flake outputs evaluated. Target-native CI and physical-Mac Docker limits are recorded in [HANDOFF-0141](../handoffs/HANDOFF-0141-just-nix-platforms.md).

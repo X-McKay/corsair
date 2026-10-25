@@ -1,16 +1,49 @@
 {
   "date": "2026-10-25",
   "branch": "manus/just",
-  "supported_systems": ["x86_64-linux", "aarch64-darwin"],
+  "supported_systems": [
+    "x86_64-linux",
+    "aarch64-darwin"
+  ],
   "nixpkgs_revision": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
-  "flake_evaluation": "both target systems passed; no build locally",
+  "flake_evaluation": "both target systems passed; native shells realized in target CI",
   "python_dependencies": "unchanged uv.lock",
   "local_host": "aarch64-linux; regression only, not a supported target",
-  "local_tests": {"passed": 116, "skipped": 0, "seconds": 110.27, "warnings_as_errors": true},
-  "local_gates": ["Just recipes", "Ruff", "ty", "Docker", "Temporal", "CLI", "installed wheel", "live auditor"],
-  "final_auditor": {"attempts": 6, "passed": 6, "llm_calls": 6, "operational_failures": 0},
+  "local_tests": {
+    "passed": 120,
+    "skipped": 0,
+    "seconds": 139.91,
+    "warnings_as_errors": true
+  },
+  "local_gates": [
+    "Just recipes",
+    "Ruff",
+    "ty",
+    "Docker",
+    "Temporal",
+    "CLI",
+    "installed wheel",
+    "live auditor"
+  ],
+  "final_auditor": {
+    "attempts": 6,
+    "passed": 6,
+    "llm_calls": 6,
+    "operational_failures": 0
+  },
   "fixtures_changed": false,
   "live_security_producer": "policy blocked; not retried",
   "macos_full_docker_chain": "physical Mac operator gate; not hosted-CI qualified",
-  "reproducibility_boundary": "locked Nix tools plus uv artifacts; not fully offline/hermetic builds"
+  "reproducibility_boundary": "locked Nix tools plus uv artifacts; not fully offline/hermetic builds",
+  "validated_code_commit": "715886238b3757970d35b0b7de3832e8b231fc06",
+  "ci": {
+    "url": "https://github.com/X-McKay/corsair/actions/runs/40203541340",
+    "conclusion": "success",
+    "jobs": [
+      "offline-and-package",
+      "native-conformance",
+      "durable-workflows",
+      "macos-host"
+    ]
+  }
 }
