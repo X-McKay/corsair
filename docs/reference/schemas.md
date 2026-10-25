@@ -102,3 +102,7 @@ The narrow ports preserve this separation: `SourceSnapshotPort` produces a prepa
 For batch evaluation, [`evaluation.py`](../../src/corsair/contracts/evaluation.py) defines `BatchRequest` (bounded requests, repeats, concurrency, and batch ID) and `BatchItem` (case/run identity plus artifact or error). Evaluation labels and scores are owned outside this workflow-input contract.
 
 The [Python API reference](api.md) shows how these models enter and leave a Temporal workflow. For concise terminology, see the [glossary](glossary.md); for current schema-related work, see [current plans](../plans/README.md).
+
+## Execution intent compatibility
+
+New executions bind the complete capability manifest digest in `corsair.evidence-intent/2`. A completed or unknown v1 operation is not blindly migrated or re-executed under the changed policy: its immutable claim is retained and a mismatched reconciliation is explicit. The packaged risk assessment contributes to the declared capability identity; configuration settings alone are not the complete runtime identity.

@@ -15,3 +15,7 @@ Failed reproduction never means not affected. Application exposure remains condi
 Operational risks: a lost local artifact host loses retrievability; Temporal does not snapshot it. Interrupted/unknown operations reconcile committed manifests and are not blindly re-executed. Cancellation must stop and remove owned containers before the activity completes. Credentials remain in the worker environment, never in source snapshots or workflow arguments. Model/tool/round/time limits are hard admission bounds; token counts and cost may be unknown and are not claimed as exact pre-call financial limits.
 
 Production/team use, privileged capabilities, remote publication, arbitrary probes, new evidence types, and new languages require a new assessment, affected conformance tests, human review of residual risk, and new capability identities. No automatic external approval or risk acceptance is implemented.
+
+## This capability policy revision
+
+The declared outer probe timeout is forwarded to the trusted controller instead of a hidden 120-second cap. Controller supervision, coverage collection limits, isolated execution and immutable-container cleanup remain separate boundaries; a longer configured timeout does not grant broader sandbox permissions.

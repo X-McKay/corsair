@@ -29,6 +29,27 @@ Set `artifact_root` to one location visible to the worker and every client that 
 
 Retain the reviewed `image` and Docker `runtime` unless a change has its own native qualification. The remaining resource settings are operator limits for the Docker observer and source admission, not model-editable inputs. A changed image or settings identity changes the context recorded for a run.
 
+## Trusted probe deadline and image identity
+
+`Budget.probe_timeout_seconds` is the one validated wall-clock deadline for each
+trusted container role. `DockerSandbox` starts that deadline with the container,
+stops the immutable labeled container on expiry, and owns its cleanup confirmation.
+The in-container driver deliberately has no independent pytest target-execution
+cap. It retains a 30-second allowance only for post-pytest coverage JSON reporting;
+that subprocess cannot extend the outer container deadline.
+
+The trusted driver is copied into the reviewed Docker image. After this driver or
+Dockerfile changes, the parent must rebuild from this worktree with `just images`
+before running a real Docker regression or native replay. Rebuilding the same image
+tag after a driver or Dockerfile change produces a new immutable image ID recorded in
+each run manifest. If the settings JSON is unchanged, `Settings.identity` remains the
+same because it hashes settings, not image bytes; the manifest image ID distinguishes
+the changed runtime. Changing a recipe or probe budget is likewise a new evidence
+identity through the recipe and budget digests in the execution intent. Changing a
+settings field such as `image` or `runtime` changes `Settings.identity`. Do not
+reconcile or reuse an operation across
+any changed recipe, budget, settings, or image-runtime identity.
+
 ## Configure models without embedding secrets
 
 The `models` object selects one `connector`, the producer and auditor model names, an optional request timeout, and narrowly allowlisted generation controls.

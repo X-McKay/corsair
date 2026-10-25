@@ -28,6 +28,7 @@ WORK = Path("/work")
 JUNIT = WORK / "junit.xml"
 COVERAGE = WORK / "coverage.json"
 TEST = WORK / "test_recipe.py"
+COVERAGE_REPORT_TIMEOUT_SECONDS = 30
 
 
 TEST_SOURCE = r"""
@@ -198,6 +199,8 @@ def main() -> int:
         str(TEST),
     ]
     try:
+        # DockerSandbox owns the wall-clock probe deadline and stops the whole
+        # container on expiry. Do not add a second target-execution timeout here.
         completed = subprocess.run(
             command,
             cwd=WORK,
@@ -206,14 +209,15 @@ def main() -> int:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             check=False,
-            timeout=120,
         )
         exit_code = completed.returncode
-    except (OSError, subprocess.TimeoutExpired):
+    except OSError:
         exit_code = 2
 
     # Coverage reporting happens only after pytest exits, so a normal target return
-    # cannot write the driver record.  Failure to produce coverage remains invalid.
+    # cannot write the driver record. Its allowance is bounded here, while DockerSandbox's
+    # container deadline continues to govern the whole driver process. Failure to produce
+    # coverage remains invalid.
     with suppress(OSError, subprocess.TimeoutExpired):
         subprocess.run(
             [sys.executable, "-m", "coverage", "json", "-o", str(COVERAGE)],
@@ -223,7 +227,7 @@ def main() -> int:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             check=False,
-            timeout=30,
+            timeout=COVERAGE_REPORT_TIMEOUT_SECONDS,
         )
 
     status, junit = _junit_status(exit_code)

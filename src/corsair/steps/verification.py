@@ -307,11 +307,12 @@ class EvidenceVerifier:
         """Persist the domain-specific pre-execution record used to prevent replay."""
         return self.store.put_json(
             {
-                "schema_version": "corsair.evidence-intent/1",
+                "schema_version": "corsair.evidence-intent/2",
                 "operation_id": input.operation_id,
                 "source_digest": prepared.source.sha256,
                 "submission_digest": submission_digest,
                 "config_digest": prepared.manifest.config_digest,
+                "capabilities_digest": digest(prepared.manifest.capabilities),
                 "recipe_digest": digest(prepared.recipe),
                 "image_id": prepared.manifest.image_id,
                 "budget_digest": digest(input.budget),
