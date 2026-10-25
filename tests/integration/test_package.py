@@ -43,6 +43,7 @@ def test_built_wheel_includes_agent_metadata_instructions_and_risk(tmp_path):
 from importlib.resources import files
 from pathlib import Path
 import corsair
+from corsair.runtime.client import connect, wait_for_result
 from corsair.runtime.models import load_agent_spec, prompt_text
 from corsair.runtime.terminal import Terminal
 from corsair.observability.logging import LifecycleLoggingInterceptor

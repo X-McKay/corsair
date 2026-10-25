@@ -4,24 +4,14 @@ import asyncio
 import signal
 from datetime import timedelta
 
-from temporalio.client import Client
-from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
 
 from corsair.observability.logging import LifecycleLoggingInterceptor, event
+from corsair.runtime.client import connect
 from corsair.settings import Settings
 from corsair.steps.activities import Activities
 from corsair.workflows.evaluation import EvaluationWorkflow
 from corsair.workflows.investigation import InvestigationWorkflow
-
-
-async def connect(settings: Settings) -> Client:
-    async with asyncio.timeout(10):
-        return await Client.connect(
-            settings.temporal_address,
-            namespace=settings.temporal_namespace,
-            data_converter=pydantic_data_converter,
-        )
 
 
 async def run_worker(settings: Settings) -> None:

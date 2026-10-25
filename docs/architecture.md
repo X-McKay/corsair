@@ -10,7 +10,7 @@ This implementation follows the user's linked reference architecture. A `.py` su
 | Shared security capabilities | `tools/security/{sources,sandbox,driver,evidence}.py` | Corsair maintainer |
 | Deterministic workflows | `workflows/{investigation,evaluation}.py` | Corsair maintainer |
 | Durable I/O steps | `steps/activities.py` | Corsair maintainer |
-| Runtime and startup identity | `runtime/{models,agent_runner,manifest,worker,artifacts}.py` | Corsair maintainer |
+| Runtime and startup identity | `runtime/{models,agent_runner,manifest,client,worker,artifacts}.py` | Corsair maintainer |
 | Pure final policy | `policy/verdicts.py` | Corsair maintainer |
 | CLI observability/domain scorer | `cli.py`, `observability/evaluation.py` | Corsair maintainer |
 | Datasets/evaluators/experiments/fixtures/baselines | Named subdirectories under `evals` | Evaluation maintainer |
@@ -29,6 +29,8 @@ Corsair retains only domain functionality that SDKs cannot decide: source admiss
 ## Operator interface boundary
 
 The CLI is an operator/view layer over these native components, not another execution engine. A live inspection obtains phase/round or batch completion from Temporal workflow queries and a watch waits for the SDK workflow result; it does not synthesize progress from elapsed time, model calls, or activity heartbeats. The worker uses the Temporal SDK worker lifecycle, and client connection uses the configured SDK client/namespace rather than a custom connection retry broker.
+
+Client-only commands import `runtime/client.py`, not worker/ADK composition. Local completion observation uses bounded SDK `describe` calls and fetches the SDK result after closure, avoiding an interrupted history long-poll at interpreter teardown. This never schedules/cancels remote work or changes Temporal workflow durability. Progress still comes from real workflow queries; no timed progress is invented.
 
 `doctor` asks the configured Docker and Temporal services about the actual operator dependencies (daemon/image/runtime, settings paths, namespace, and task-queue pollers). It does not call a model, validate credentials, start infrastructure, or convert preflight into a security conclusion. Human rendering is a compact presentation of a committed/native result; JSON remains the machine-result stream. Logs are a sanitized metadata channel, not an evidence, prompt, source, payload, or reasoning transport. The detailed intended CLI contract and its validation gate are in [PLAN-0106](development/plans/PLAN-0106-cli-audit.md).
 

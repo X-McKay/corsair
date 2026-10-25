@@ -226,3 +226,19 @@ def test_cli_exit_does_not_retain_handled_exception_tracebacks(tmp_path):
     assert result.returncode == 2
     assert json.loads(result.stdout) == {"code": 2, "context_released": True}
     assert json.loads(result.stderr.splitlines()[-1])["event"] == "cli.failed"
+
+
+def test_client_only_operations_do_not_import_worker_or_adk_composition():
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys; import corsair.runtime.client; "
+            "assert 'corsair.runtime.worker' not in sys.modules; "
+            "assert not any(name.startswith('google.adk') for name in sys.modules)",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert result.returncode == 0, result.stderr

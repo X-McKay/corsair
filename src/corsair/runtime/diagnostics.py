@@ -12,7 +12,7 @@ from temporalio.api.taskqueue.v1 import TaskQueue
 from temporalio.api.workflowservice.v1 import DescribeNamespaceRequest, DescribeTaskQueueRequest
 
 from corsair.observability.logging import safe_text
-from corsair.runtime.worker import connect
+from corsair.runtime.client import connect
 from corsair.settings import Settings
 
 

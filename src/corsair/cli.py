@@ -191,7 +191,7 @@ async def _handle_inspect(args: CliArguments, ui: Terminal) -> int:
         ui.emit(_result_from_store(store, identity))
         return 0
 
-    from corsair.runtime.worker import connect
+    from corsair.runtime.client import connect, wait_for_result
     from corsair.workflows.evaluation import EvaluationWorkflow
     from corsair.workflows.investigation import InvestigationWorkflow
 
@@ -208,7 +208,7 @@ async def _handle_inspect(args: CliArguments, ui: Terminal) -> int:
     if args.watch:
         ui.emit(
             await ui.wait(
-                handle.result(),
+                wait_for_result(handle),
                 f"{'Evaluation' if is_batch else 'Investigation'} {handle.id}",
                 query=lambda: handle.query(query),
             )
@@ -220,7 +220,7 @@ async def _handle_inspect(args: CliArguments, ui: Terminal) -> int:
 
 async def _handle_cancel(args: CliArguments, ui: Terminal) -> int:
     """Request durable workflow cancellation without asserting cleanup completion."""
-    from corsair.runtime.worker import connect
+    from corsair.runtime.client import connect
 
     identity = validate_run_id(args.run_id or "")
     client = await ui.wait(connect(_settings(args)), "Connecting to Temporal")
@@ -232,7 +232,7 @@ async def _handle_cancel(args: CliArguments, ui: Terminal) -> int:
 
 async def _handle_investigate(args: CliArguments, ui: Terminal) -> int:
     """Submit one investigation and optionally wait for its actual result."""
-    from corsair.runtime.worker import connect
+    from corsair.runtime.client import connect, wait_for_result
     from corsair.workflows.investigation import InvestigationWorkflow
 
     settings = _settings(args)
@@ -259,7 +259,7 @@ async def _handle_investigate(args: CliArguments, ui: Terminal) -> int:
         return 0
 
     result = await ui.wait(
-        handle.result(),
+        wait_for_result(handle),
         f"Investigation {handle.id}",
         query=lambda: handle.query(InvestigationWorkflow.status),
     )
@@ -275,7 +275,7 @@ async def _handle_investigate(args: CliArguments, ui: Terminal) -> int:
 
 async def _handle_eval(args: CliArguments, ui: Terminal) -> int:
     """Run a frozen batch, score returned native receipts, and save its report."""
-    from corsair.runtime.worker import connect
+    from corsair.runtime.client import connect, wait_for_result
     from corsair.workflows.evaluation import EvaluationWorkflow
 
     settings = _settings(args)
@@ -299,7 +299,7 @@ async def _handle_eval(args: CliArguments, ui: Terminal) -> int:
     )
     event("evaluation.submitted", run_id=identity, total=len(requests) * args.repeats)
     items: list[BatchItem] = await ui.wait(
-        handle.result(),
+        wait_for_result(handle),
         f"Evaluation {handle.id}",
         query=lambda: handle.query(EvaluationWorkflow.status),
     )
