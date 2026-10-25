@@ -80,6 +80,7 @@ class _FakeSandbox:
     store: ArtifactStore
     forged: bool = False
     unknown: bool = False
+    cleanup_confirmed: bool = True
     calls: int = 0
     image_id: str = "sha256:trusted"
     raw_image_id: object = "sha256:trusted"
@@ -124,7 +125,7 @@ class _FakeSandbox:
                 "corsair.operation": operation_id,
                 "corsair.role": role,
             },
-            "cleanup_confirmed": True,
+            "cleanup_confirmed": self.cleanup_confirmed,
             "docker_exit_code": 1 if violation else 0,
             "driver": driver,
         }
@@ -162,6 +163,33 @@ def test_evidence_reconciles_committed_result_without_rerunning(tmp_path: Path) 
     assert first.control and first.control.outcome is RoleOutcome.HELD
     assert first.adversarial and first.adversarial.outcome is RoleOutcome.VIOLATION
     assert first.artifact is not None
+
+
+def test_unconfirmed_control_cleanup_preserves_receipt_and_skips_adversarial(
+    tmp_path: Path,
+) -> None:
+    store = ArtifactStore(tmp_path / "artifacts")
+    sandbox = _FakeSandbox(store, cleanup_confirmed=False)
+    observation = EvidenceVerifier(Settings(), store, sandbox).evaluate(_input())
+
+    assert sandbox.calls == 1
+    assert observation.control and observation.control.outcome is RoleOutcome.INVALID
+    assert observation.adversarial == RoleObservation(
+        outcome=RoleOutcome.ERROR,
+        target_executed=False,
+        reason="role was not executed",
+    )
+    assert observation.cleanup_confirmed is False
+    assert observation.artifact is not None
+    bundle = store.get_json(observation.artifact)
+    control_raw = ArtifactRef.model_validate(bundle["roles"]["control"])
+    assert store.get_json(control_raw)["cleanup_confirmed"] is False
+    assert bundle["roles"]["adversarial"] is None
+
+    disposition, status, reason = decide(_prepared(), observation, _audit())
+    assert disposition.value == "INCONCLUSIVE"
+    assert status.value == "ERROR"
+    assert reason == "container cleanup was not independently confirmed"
 
 
 def test_forged_driver_identity_and_unknown_prior_container_are_not_admissible(

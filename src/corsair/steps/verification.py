@@ -424,6 +424,12 @@ class EvidenceVerifier:
                 fixed=input.fixed,
             )
             raw_refs[role] = raw_ref
+            if role == "control" and not self._physical_cleanup_confirmed(
+                raw_ref, expected_operation=input.operation_id, expected_role=role
+            ):
+                # Do not create an adversarial container when cleanup of the control
+                # container was not independently confirmed.
+                break
 
         roles: tuple[SandboxRole, ...] = ("control", "adversarial")
         for role in roles:

@@ -2,9 +2,13 @@
 
 This is the current work index. Current user guides start at the [documentation index](../index.md); historical records in [archive](archive/README.md) are evidence, not executable instructions for the current tree.
 
-## This independent recommendation branch
+## Independent recommendation records
 
 [Require pinned evidence image identity](archive/plans/PLAN-0117-image-identity.md) is implemented on `manus/image-identity`. [Final handoff](archive/handoffs/HANDOFF-recommendation-image-identity.md) and [native receipt](../../evals/baselines/qualifications/qualification-image-identity-2026-10-25.json) record 155 passing physical-Mac tests with zero skips. The base-revision records below retain their original scope and are not the current branch's final qualification.
+
+
+
+[Stop probes after uncertain cleanup](archive/plans/PLAN-0118-cleanup-fail-closed.md) is implemented on `manus/cleanup-fail-closed`. [Final handoff](archive/handoffs/HANDOFF-recommendation-cleanup-fail-closed.md) and [native receipt](../../evals/baselines/qualifications/qualification-cleanup-fail-closed-2026-10-25.json) record 152 passing physical-Mac tests with zero skips. The base-revision records below retain their original scope and are not the current branch's final qualification.
 
 ## Active work
 

@@ -16,6 +16,10 @@ Operational risks: a lost local artifact host loses retrievability; Temporal doe
 
 Production/team use, privileged capabilities, remote publication, arbitrary probes, new evidence types, and new languages require a new assessment, affected conformance tests, human review of residual risk, and new capability identities. No automatic external approval or risk acceptance is implemented.
 
-## This capability policy revision
 
 Raw native evidence requires a non-empty image identity equal to the admitted manifest image. Missing or mismatched image identity invalidates evidence; this does not establish generic hostile-source observation integrity.
+
+
+## This capability policy revision
+
+The control role must confirm physical container cleanup before admitting the adversarial role. Unconfirmed cleanup stops the operation and remains explicit uncertainty, never a negative security verdict.
