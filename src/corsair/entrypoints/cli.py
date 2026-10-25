@@ -430,8 +430,8 @@ def parser() -> argparse.ArgumentParser:
     evaluation = commands["eval"]
     evaluation.add_argument("dataset")
     evaluation.add_argument("--run-id")
-    evaluation.add_argument("--repeats", type=int, default=1)
-    evaluation.add_argument("--concurrency", type=int, default=2)
+    evaluation.add_argument("--repeats", type=int, choices=range(1, 9), default=1)
+    evaluation.add_argument("--concurrency", type=int, choices=range(1, 9), default=2)
     evaluation.add_argument("--output")
     rescore = commands["rescore"]
     rescore.add_argument("dataset")

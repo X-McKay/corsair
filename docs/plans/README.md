@@ -18,6 +18,10 @@ This is the current work index. Current user guides start at the [documentation 
 
 [Bound terminal result payloads](archive/plans/PLAN-0120-terminal-payload-bounds.md) is implemented on `manus/terminal-payload-bounds`. [Final handoff](archive/handoffs/HANDOFF-recommendation-terminal-payload-bounds.md) and [native receipt](../../evals/baselines/qualifications/qualification-terminal-payload-bounds-2026-10-25.json) record 160 passing physical-Mac tests with zero skips. The base-revision records below retain their original scope and are not the current branch's final qualification.
 
+
+
+[Validate evaluation CLI bounds before I/O](archive/plans/PLAN-0121-eval-cli-bounds.md) is implemented on `manus/eval-cli-bounds`. [Final handoff](archive/handoffs/HANDOFF-recommendation-eval-cli-bounds.md) and [native receipt](../../evals/baselines/qualifications/qualification-eval-cli-bounds-2026-10-25.json) record 162 passing physical-Mac tests with zero skips. The base-revision records below retain their original scope and are not the current branch's final qualification.
+
 ## Active work
 
 

@@ -31,6 +31,31 @@ async def _command(*args, timeout=30):
     return process.returncode, stdout.decode(), stderr.decode()
 
 
+@pytest.mark.parametrize(
+    ("option", "value"),
+    [("repeats", 0), ("repeats", 9), ("concurrency", 0), ("concurrency", 9)],
+)
+async def test_real_cli_rejects_eval_bounds_before_handler_io(tmp_path, option, value):
+    missing_dataset = tmp_path / "unread-dataset.json"
+    missing_settings = tmp_path / "unread-settings.json"
+
+    code, stdout, stderr = await _command(
+        "eval",
+        missing_dataset,
+        "--settings",
+        missing_settings,
+        f"--{option}",
+        value,
+    )
+
+    assert code == 2
+    assert stdout == ""
+    assert f"argument --{option}: invalid choice: '{value}'" in stderr
+    assert "cli.failed" not in stderr
+    assert not missing_dataset.exists()
+    assert not missing_settings.exists()
+
+
 async def test_real_cli_worker_doctor_and_native_reference(temporal_server, tmp_path):
     if os.environ.get("CORSAIR_TEST_DOCKER") != "1":
         pytest.skip("set CORSAIR_TEST_DOCKER=1 for native CLI testing")
