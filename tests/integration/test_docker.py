@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 
 import docker
@@ -287,3 +288,53 @@ def test_native_timeout_removes_owned_container(tmp_path):
     assert observation.control is not None
     assert observation.control.outcome.value == "ERROR"
     _assert_cleanup(client, "timeout-native")
+
+
+@pytest.mark.docker
+@pytest.mark.long_probe
+def test_real_docker_probe_deadline_can_exceed_120_seconds(tmp_path: Path) -> None:
+    if os.environ.get("CORSAIR_TEST_LONG_PROBE") != "1":
+        pytest.skip("set CORSAIR_TEST_LONG_PROBE=1 to run the 121-second Docker regression")
+    client = _docker_client()
+    image = os.environ.get("CORSAIR_TEST_IMAGE", Settings().image)
+    image_id = DockerSandbox(Settings(image=image), client=client).image_id
+    settings, store, prepared = _prepared(tmp_path, image_id)
+    settings = settings.model_copy(update={"image": image})
+    prepared = prepared.model_copy(
+        update={
+            "manifest": prepared.manifest.model_copy(update={"config_digest": settings.identity})
+        }
+    )
+    (tmp_path / "vulnerable/reader.py").write_text(
+        "\n\nimport time\n\n\ndef read_file(root, path):\n"
+        "    time.sleep(121)\n"
+        '    return "hello"\n',
+        encoding="utf-8",
+    )
+    case = Case(
+        case_id="long-probe",
+        finding=prepared.finding,
+        source=Source(path="vulnerable"),
+        recipe=prepared.recipe,
+    )
+    prepared = prepare_case(case, settings, store, prepared.manifest)
+    sandbox = DockerSandbox(settings, client=client, store=store)
+
+    started = time.monotonic()
+    raw_ref = sandbox.execute_role(
+        prepared,
+        _submission(),
+        "control",
+        Budget(probe_timeout_seconds=180),
+        operation_id="long-probe-native",
+    )
+    elapsed = time.monotonic() - started
+
+    raw = store.get_json(raw_ref)
+    assert raw["cleanup_confirmed"] is True
+    assert raw["docker_exit_code"] == 0
+    assert raw["driver"]["native_exit_code"] == 0
+    assert raw["driver"]["outcome"] == "PROPERTY_HELD"
+    assert elapsed > 120
+    assert elapsed < 180
+    _assert_cleanup(client, "long-probe-native")

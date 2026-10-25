@@ -30,6 +30,10 @@ This is the current work index. Current user guides start at the [documentation 
 
 [Classify exact-match diagnostic failures](archive/plans/PLAN-0123-eval-match-diagnostics.md) is implemented on `manus/eval-match-diagnostics`. [Final handoff](archive/handoffs/HANDOFF-recommendation-eval-match-diagnostics.md) and [native receipt](../../evals/baselines/qualifications/qualification-eval-match-diagnostics-2026-10-25.json) record 156 passing physical-Mac tests with zero skips. The base-revision records below retain their original scope and are not the current branch's final qualification.
 
+
+
+[Use one effective sandbox probe deadline](archive/plans/PLAN-0124-probe-deadline.md) is implemented on `manus/probe-deadline`. [Final handoff](archive/handoffs/HANDOFF-recommendation-probe-deadline.md) and [native receipt](../../evals/baselines/qualifications/qualification-probe-deadline-2026-10-25.json) record 152 passing physical-Mac tests with zero skips. The base-revision records below retain their original scope and are not the current branch's final qualification.
+
 ## Active work
 
 

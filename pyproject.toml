@@ -39,6 +39,7 @@ asyncio_mode = "auto"
 addopts = "--strict-markers"
 markers = [
   "docker: requires a real Docker daemon and the Corsair image",
+  "long_probe: explicitly opted-in real Docker probe exceeding 120 seconds",
   "temporal: requires a real Temporal development server",
   "live: explicitly enabled real-provider smoke test",
 ]

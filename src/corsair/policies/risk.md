@@ -30,3 +30,7 @@ The native producer schema permits an explicit no-grounded-candidate decision. I
 
 
 Terminal JSON is limited to 1,000,000 bytes. Optional diagnostics are capped with an explicit marker and exception chains are bounded at transport boundaries. Factual evidence and operation claims are not shortened; oversized structured results fail explicitly and may have no committed final-result receipt, while referenced native artifacts remain retained.
+
+
+
+The declared outer probe timeout is forwarded to the trusted controller instead of a hidden 120-second cap. Controller supervision, coverage collection limits, isolated execution and immutable-container cleanup remain separate boundaries; a longer configured timeout does not grant broader sandbox permissions.
