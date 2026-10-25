@@ -82,6 +82,8 @@ class _FakeSandbox:
     unknown: bool = False
     calls: int = 0
     image_id: str = "sha256:trusted"
+    raw_image_id: object = "sha256:trusted"
+    omit_raw_image_id: bool = False
 
     def has_unknown_operation(self, operation_id: str) -> bool:
         del operation_id  # Test-controlled operation state, independent of its identity.
@@ -112,23 +114,23 @@ class _FakeSandbox:
             "covered_lines": [4],
             "coverage_file": "reader.py",
         }
-        ref = store.put_json(
-            {
-                "schema_version": "corsair.raw-evidence/1",
-                "operation_id": operation_id,
-                "role": role,
-                "container_id": f"id-{role}",
-                "labels": {
-                    "corsair.security": "true",
-                    "corsair.operation": operation_id,
-                    "corsair.role": role,
-                },
-                "cleanup_confirmed": True,
-                "image_id": prepared.manifest.image_id,
-                "docker_exit_code": 1 if violation else 0,
-                "driver": driver,
-            }
-        )
+        raw = {
+            "schema_version": "corsair.raw-evidence/1",
+            "operation_id": operation_id,
+            "role": role,
+            "container_id": f"id-{role}",
+            "labels": {
+                "corsair.security": "true",
+                "corsair.operation": operation_id,
+                "corsair.role": role,
+            },
+            "cleanup_confirmed": True,
+            "docker_exit_code": 1 if violation else 0,
+            "driver": driver,
+        }
+        if not self.omit_raw_image_id:
+            raw["image_id"] = self.raw_image_id
+        ref = store.put_json(raw)
         return ref
 
 
@@ -177,6 +179,44 @@ def test_forged_driver_identity_and_unknown_prior_container_are_not_admissible(
     blocked = EvidenceVerifier(Settings(), store, unknown_sandbox).evaluate(_input("unknown"))
     assert blocked.feedback and blocked.feedback.gate == "operation-reconciliation"
     assert unknown_sandbox.calls == 0
+
+
+@pytest.mark.parametrize(
+    ("raw_image_id", "omit_raw_image_id"),
+    [
+        (None, True),
+        (None, False),
+        (1, False),
+        ("sha256:other", False),
+    ],
+    ids=["missing", "null", "non-string", "mismatched"],
+)
+def test_raw_image_identity_must_be_a_matching_string(
+    tmp_path: Path, raw_image_id: object, omit_raw_image_id: bool
+) -> None:
+    store = ArtifactStore(tmp_path / "artifacts")
+    observation = EvidenceVerifier(
+        Settings(),
+        store,
+        _FakeSandbox(
+            store,
+            raw_image_id=raw_image_id,
+            omit_raw_image_id=omit_raw_image_id,
+        ),
+    ).evaluate(_input())
+
+    assert observation.cleanup_confirmed is True
+    assert observation.control and observation.control.outcome is RoleOutcome.INVALID
+    assert observation.adversarial and observation.adversarial.outcome is RoleOutcome.INVALID
+    disposition, status, _ = decide(_prepared(), observation, _audit())
+    assert disposition.value == "INCONCLUSIVE"
+    assert status.value == "COMPLETED"
+    assert (
+        EvidenceVerifier(Settings(), store).validate_saved(
+            observation, _submission(), _prepared().manifest
+        )
+        is None
+    )
 
 
 def test_prior_intent_and_competing_claim_prevent_operation_replay(tmp_path: Path) -> None:
@@ -252,7 +292,7 @@ def test_policy_never_refutes_negative_evidence_and_conditions_app_scope() -> No
     assert fix_status(demonstrated).value == "NOT_BLOCKED"
 
 
-@pytest.mark.parametrize("boundary", ["recipe", "image", "budget"])
+@pytest.mark.parametrize("boundary", ["recipe", "image", "budget", "capabilities"])
 def test_reconciliation_rejects_stale_recipe_runtime_or_budget(tmp_path, boundary):
     store = ArtifactStore(tmp_path)
     sandbox = _FakeSandbox(store)
@@ -267,6 +307,13 @@ def test_reconciliation_rejects_stale_recipe_runtime_or_budget(tmp_path, boundar
         manifest = request.prepared.manifest.model_copy(update={"image_id": "different"})
         prepared = request.prepared.model_copy(update={"manifest": manifest})
         changed = request.model_copy(update={"prepared": prepared})
+    elif boundary == "capabilities":
+        manifest = request.prepared.manifest.model_copy(
+            update={"capabilities": {"verification": {"policy_revision": "changed"}}}
+        )
+        changed = request.model_copy(
+            update={"prepared": request.prepared.model_copy(update={"manifest": manifest})}
+        )
     else:
         changed = request.model_copy(update={"budget": Budget(probe_timeout_seconds=6)})
     with pytest.raises(ValueError, match="recipe/configuration"):

@@ -190,7 +190,7 @@ class EvidenceVerifier:
             or not isinstance(junit, dict)
         ):
             return self._invalid("trusted driver record has invalid field types"), False
-        if raw_image_id is not None and raw_image_id != prepared.manifest.image_id:
+        if type(raw_image_id) is not str or raw_image_id != prepared.manifest.image_id:
             return self._invalid("sandbox image does not match the prepared manifest"), False
         try:
             outcome = RoleOutcome(outcome_value)
@@ -307,11 +307,12 @@ class EvidenceVerifier:
         """Persist the domain-specific pre-execution record used to prevent replay."""
         return self.store.put_json(
             {
-                "schema_version": "corsair.evidence-intent/1",
+                "schema_version": "corsair.evidence-intent/2",
                 "operation_id": input.operation_id,
                 "source_digest": prepared.source.sha256,
                 "submission_digest": submission_digest,
                 "config_digest": prepared.manifest.config_digest,
+                "capabilities_digest": digest(prepared.manifest.capabilities),
                 "recipe_digest": digest(prepared.recipe),
                 "image_id": prepared.manifest.image_id,
                 "budget_digest": digest(input.budget),
