@@ -2,10 +2,22 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
+
 from pydantic import Field, model_validator
 
 from .common import ArtifactRef, Contract, Identifier
 from .sources import InvestigationRequest
+
+
+class MatchKind(StrEnum):
+    """Exact-output diagnostic for an isolated agent evaluation row."""
+
+    EXACT_MATCH = "exact_match"
+    CANDIDATE_EXACT_MISMATCH = "candidate_exact_mismatch"
+    CONTROL_MISMATCH = "control_mismatch"
+    NO_VALID_OUTPUT = "no_valid_output"
+    OPERATIONAL_FAILURE = "operational_failure"
 
 
 class BatchRequest(Contract):
