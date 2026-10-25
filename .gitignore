@@ -12,3 +12,7 @@ __pycache__/
 htmlcov/
 dist/
 *.egg-info/
+
+.direnv/
+result
+result-*

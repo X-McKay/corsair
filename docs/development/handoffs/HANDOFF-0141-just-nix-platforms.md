@@ -1,0 +1,40 @@
+---
+id: HANDOFF-0141
+kind: handoff
+title: Just and Nix for Linux amd64 and macOS arm64
+status: complete
+updated: 2026-10-25
+related: [PLAN-0108, HANDOFF-0140]
+---
+
+# Just and Nix for Linux amd64 and macOS arm64
+
+One branch/PR contains the entire requested migration. Makefile is removed; all active commands use the documented justfile. Positional task arguments use quoted `$@`, including paths with spaces or shell characters. `just` alone lists tasks and does not start work. Ruff, Just formatting and warning-failing ty remain the required `just check` gate.
+
+`flake.nix` has one Nixpkgs input, pinned by the generated flake.lock at `3ec636362e1816bc2f0888fa0fa2c69f1bc9e504`. Only `x86_64-linux` and `aarch64-darwin` shells are exposed. Native Python 3.12.15, uv, Just, Bash, Docker client and Temporal CLI are selected by that pin; UV_PYTHON points to the exact Nix interpreter and managed downloads are disabled. Python dependencies remain in the unchanged uv.lock. CI rejects lock updates and enters this same shell.
+
+Source admission is now capability-based rather than Linux-name based, with no path fallback. Added real-host and missing-capability regressions; existing symlink/replacement/archive/oracle checks remain. The observer, its Docker image definition, SDK versions, prompts, fixtures/datasets, verdict policy and cancellation ownership are unchanged.
+
+## Local final results
+
+```bash
+just check
+DOCKER_HOST=unix:///run/user/1000/docker.sock \
+CORSAIR_LIVE_CONFIG=.state/live.json just -- test-all -q -W error
+just -- eval-agent auditor evals/datasets/auditor-dev.json \
+  --settings .state/live.json --repeats 3 \
+  --output .runs/evaluations/just-final-auditor.json
+just build
+```
+
+Final post-cleanup suite: **116 passed in 110.27 seconds**, no skips, warnings as errors; actual Docker, Temporal, CLI, installed-wheel and live-auditor gates enabled. First migration run was 110 passed in 111.95 seconds; the final run includes the added capability tests. Final frozen auditor: **6/6 passed**, six model calls, no operational failures, 12 JSONL lifecycle events. Just separately echoes its safe recipe command to stderr; command-result stdout remains JSON. Raw outputs/configuration remain ignored.
+
+Both target flakes evaluated successfully with `nix flake check --all-systems --no-build --no-update-lock-file`. Local host is Linux ARM, outside the supported matrix; local results are regression evidence, not target qualification. Actual target checks are in common CI: Linux amd64 native Docker/Temporal gates and macOS-26 ARM full offline/Temporal gates. The PR/packaged CI receipt records their final result.
+
+Nix/tool/dependency selection is reproducible, not a fully hermetic/offline image build. A direct local rebuild in the portability worktree failed in the unchanged external pip installation layer; no provider/runtime change was substituted. Final native regression tests used the already qualified unchanged observer image. Target CI performs the real image build again.
+
+## Limits and follow-ups
+
+macOS needs Docker Desktop or Colima's Linux daemon for targets. Hosted ARM runners lack nested virtualization, so physical-Mac full Docker-chain qualification is not claimed. Docker SDK context/socket setup and shared paths are documented in [platform support](../../platforms.md). Live security-producer policy blocking, population accuracy and arbitrary hostile-interpreter attestation remain unqualified.
+
+Use [environment setup](../environment.md) for the golden path and [next simplifications](../../next-simplifications.md) for identified—but not silently implemented—report provenance, names-only listing, duplicate source read and early input-validation improvements. Historical handoffs preserve the original Make commands as dated evidence.

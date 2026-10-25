@@ -10,7 +10,6 @@ from __future__ import annotations
 import io
 import os
 import stat
-import sys
 import tarfile
 from collections.abc import Generator, Iterable, Iterator
 from pathlib import Path, PurePosixPath
@@ -40,17 +39,22 @@ _SENSITIVE_BASENAMES = {
 _MAX_SNAPSHOT_FILES = 10_000
 _MAX_SNAPSHOT_BYTES = 33_554_432
 
-# Source admission is a Linux-only pilot boundary. Record support before tests or
-# callers can replace os.open, and never substitute path-based traversal if it is absent.
-_SECURE_SOURCE_SUPPORTED = (
-    sys.platform.startswith("linux")
-    and hasattr(os, "O_DIRECTORY")
-    and hasattr(os, "O_NOFOLLOW")
-    and os.open in getattr(os, "supports_dir_fd", ())
-    and os.stat in getattr(os, "supports_dir_fd", ())
-    and os.stat in getattr(os, "supports_follow_symlinks", ())
-    and os.scandir in getattr(os, "supports_fd", ())
-)
+
+# Record support before tests or callers can replace os.open. Admission is available
+# only when the host exposes every descriptor primitive used below; there is never a
+# path-based traversal fallback.
+def _secure_source_capabilities_available() -> bool:
+    return (
+        hasattr(os, "O_DIRECTORY")
+        and hasattr(os, "O_NOFOLLOW")
+        and os.open in getattr(os, "supports_dir_fd", ())
+        and os.stat in getattr(os, "supports_dir_fd", ())
+        and os.stat in getattr(os, "supports_follow_symlinks", ())
+        and os.scandir in getattr(os, "supports_fd", ())
+    )
+
+
+_SECURE_SOURCE_SUPPORTED = _secure_source_capabilities_available()
 
 
 def _safe_relative(value: str, *, allow_dot: bool = False) -> PurePosixPath:
@@ -79,9 +83,7 @@ def _is_sensitive(path: PurePosixPath) -> bool:
 def _require_secure_source_support() -> int:
     """Return no-follow directory flags or reject platforms lacking the required APIs."""
     if not _SECURE_SOURCE_SUPPORTED:
-        raise SourceAdmissionError(
-            "secure source admission requires Linux fd-based no-follow support"
-        )
+        raise SourceAdmissionError("secure source admission requires fd-based no-follow support")
     return os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
 
 

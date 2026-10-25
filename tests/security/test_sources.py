@@ -65,6 +65,32 @@ def _settings(root: Path) -> Settings:
     return Settings(source_root=str(root), artifact_root=str(root / "artifacts"))
 
 
+def test_current_host_exposes_the_recorded_fd_source_admission_capabilities() -> None:
+    """Linux and macOS CI must exercise the real descriptor-only admission path."""
+    assert sources._SECURE_SOURCE_SUPPORTED is sources._secure_source_capabilities_available()
+    assert sources._SECURE_SOURCE_SUPPORTED
+
+
+@pytest.mark.parametrize("attribute", ["O_DIRECTORY", "O_NOFOLLOW"])
+def test_source_admission_capability_probe_fails_closed_without_open_flags(
+    monkeypatch: pytest.MonkeyPatch, attribute: str
+) -> None:
+    monkeypatch.delattr(sources.os, attribute)
+
+    assert not sources._secure_source_capabilities_available()
+
+
+@pytest.mark.parametrize(
+    "support_set", ["supports_dir_fd", "supports_follow_symlinks", "supports_fd"]
+)
+def test_source_admission_capability_probe_fails_closed_without_descriptor_support(
+    monkeypatch: pytest.MonkeyPatch, support_set: str
+) -> None:
+    monkeypatch.setattr(sources.os, support_set, frozenset())
+
+    assert not sources._secure_source_capabilities_available()
+
+
 def test_snapshot_is_deterministic_and_expected_digest_is_enforced(tmp_path: Path) -> None:
     project = _source_tree(tmp_path)
     store = ArtifactStore(tmp_path / "artifacts")
@@ -167,7 +193,7 @@ def test_source_admission_fails_closed_without_fd_no_follow_support(
     _source_tree(tmp_path)
     monkeypatch.setattr(sources, "_SECURE_SOURCE_SUPPORTED", False)
 
-    with pytest.raises(SourceAdmissionError, match="Linux fd-based no-follow"):
+    with pytest.raises(SourceAdmissionError, match="fd-based no-follow"):
         snapshot_source(
             Source(path="project"), _settings(tmp_path), ArtifactStore(tmp_path / "artifacts")
         )

@@ -9,15 +9,15 @@ Small explicit composition was the simpler pattern here. No mixin, speculative b
 ## Required local and CI checks
 
 ```bash
-make sync
-make check        # Ruff lint + formatting + ty
-make test         # offline tests, including fresh installed-wheel resources
-make images
-CORSAIR_TEST_TEMPORAL=1 make test-docker
-make test-temporal
+just sync
+just check        # Ruff lint + formatting + ty
+just test         # offline tests, including fresh installed-wheel resources
+just images
+CORSAIR_TEST_TEMPORAL=1 just test-docker
+just test-temporal
 ```
 
-Ruff 0.17.2 and ty 0.0.91 are pinned in the uv lock. `make check` runs `ruff check src tests evals`, `ruff format --check src tests evals`, and `ty check --error-on-warning`. Ruff includes unused-argument checks. ty includes runtime source, all tests and all evaluation Python and targets Python 3.12. All 33 initial ty diagnostics were resolved by real annotations, imports and runtime narrowing; there are no broad type ignores or runtime/test typing exclusions.
+Ruff 0.17.2 and ty 0.0.91 are pinned in the uv lock. `just check` runs `ruff check src tests evals`, `ruff format --check src tests evals`, and `ty check --error-on-warning`. Ruff includes unused-argument checks. ty includes runtime source, all tests and all evaluation Python and targets Python 3.12. All 33 initial ty diagnostics were resolved by real annotations, imports and runtime narrowing; there are no broad type ignores or runtime/test typing exclusions.
 
 The only Ruff exclusion is immutable `evals/fixtures`, because formatting target code would change declared target line numbers and canonical source hashes. These fixtures remain checked by ty and frozen-hash/native conformance. Never change a frozen input merely to make an experiment pass.
 

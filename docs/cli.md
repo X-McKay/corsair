@@ -200,7 +200,7 @@ docker info
 If the configured image is absent, build the reviewed image rather than changing the investigation to an arbitrary tag:
 
 ```bash
-make images
+just images
 docker image inspect corsair-python:0.1
 ```
 

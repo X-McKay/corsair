@@ -7,10 +7,11 @@ This runbook uses real Docker, Temporal, configured filesystem paths, and the na
 ## 1. Prepare the host and configuration
 
 ```bash
-make sync
-make check
-make test
-make images
+# First checkout only: uv tool install rust-just==1.59.0
+just sync
+just check
+just test
+just images
 
 mkdir -p .state
 cp deploy/settings.example.json .state/settings.json
@@ -149,7 +150,7 @@ Start with the dependency report:
 corsair doctor --settings .state/settings.json
 ```
 
-If the daemon is unreachable, start it or set the correct rootless `DOCKER_HOST`, then confirm `docker info`. If the image is absent, rebuild the reviewed image with `make images` and inspect it:
+If the daemon is unreachable, start it or set the correct rootless `DOCKER_HOST`, then confirm `docker info`. If the image is absent, rebuild the reviewed image with `just images` and inspect it:
 
 ```bash
 docker image inspect corsair-python:0.1
@@ -180,13 +181,13 @@ Ctrl-C during `--wait`/`--watch` detaches only the client. Use online inspect to
 Use native reference replay before changing driver/image logic. For prompt/model changes, run the isolated role evaluator on its frozen development set and then a finite whole-system dataset with repeats. Oracles remain under evaluator-owned fixture paths and never enter `PreparedCase`, agent packets, or Temporal child inputs. Source snapshots reject known sensitive/oracle filenames and symlinks; this is not a general secret detector for arbitrary source content. Source/evidence binding does not attest a hostile target interpreter or establish generic observation integrity.
 
 ```bash
-make sync
-make check
-make test
-make images
-make test-docker
-make test-temporal
-make build
+just sync
+just check
+just test
+just images
+just test-docker
+just test-temporal
+just build
 ```
 
 The original live security-producer request was provider-policy blocked. That result cannot certify full live-chain accuracy. Scripted ADK models are confined to labelled tests; they are not a production fallback. Do not evade policy, silently change providers, retry prohibited requests, strip safety checks, or describe blocked execution as an application fix.

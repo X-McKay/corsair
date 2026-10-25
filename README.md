@@ -8,13 +8,14 @@ This is a personal-use pilot for the `python.secret_disclosure/1` recipe. An ope
 
 ## Start here
 
-Use a dedicated, disposable Ubuntu/Debian host with Python 3.12+, `uv`, a working Docker daemon, and the Temporal CLI/service. Do not admit third-party source on a host containing credentials or production workloads. Docker credentials and its socket must never reach target containers.
+Use the [locked Nix development shell](docs/development/environment.md) for Apple Silicon macOS or amd64 Linux tooling. Evidence execution still needs a reviewed Docker daemon/Linux VM and Temporal service; macOS source admission uses the same checked fd/no-follow boundary rather than a weaker fallback. Use a dedicated, disposable host. Do not admit third-party source on a host containing credentials or production workloads. Docker credentials and its socket must never reach target containers.
 
 Start with the native reference replay. It uses the configured Docker image and trusted observer, but makes **no model call and no Temporal request**. It is the fastest way to establish the local source/image/runtime path before starting a worker.
 
 ```bash
-make sync
-make images
+nix develop
+just sync
+just images
 mkdir -p .state
 cp deploy/settings.example.json .state/settings.json
 # Narrow source_root in .state/settings.json before admitting any other source tree.
@@ -136,14 +137,26 @@ For operating detail, use the [pilot runbook](docs/runbooks/pilot.md) and [CLI r
 
 ## Development checks
 
+Enter `nix develop` to get the pinned Python, uv, Just, Bash, Docker client and Temporal CLI, then run `just` to list documented recipes. Use `just -- RECIPE ...` when forwarding command flags; arguments remain literal, including paths containing spaces or shell characters. Run variadic test/CLI recipes separately rather than appending another recipe name.
+
 ```bash
-make sync
-make check   # Ruff lint/format + ty; type warnings fail the gate
-make test    # Offline unit/security/package checks
+just sync
+just check   # Ruff lint/format + ty; type warnings fail the gate
+just test    # Offline unit/security/package checks
 # Actual native execution and durable workflow checks require their real dependencies:
-make images
-CORSAIR_TEST_TEMPORAL=1 make test-docker
-make test-temporal
+just images
+CORSAIR_TEST_TEMPORAL=1 just test-docker
+just test-temporal
 ```
 
 Ruff and ty are pinned and enforced in CI. All maintained source, tests and evaluator scripts are linted and typed. Frozen target fixtures keep their declared source hashes/line numbers, so Ruff does not rewrite them; ty and native frozen-hash conformance still cover them. Do not add broad ignores, new backend layers or mixins without a concrete simplification and updated tests/evaluations.
+
+```bash
+just -- verify evals/fixtures/case01/request.json evals/fixtures/case01/submission.json \
+  --settings .state/settings.json --format human
+just -- eval-agent auditor evals/datasets/auditor-dev.json \
+  --settings .state/settings.json --repeats 3
+CORSAIR_LIVE_CONFIG=.state/settings.json just -- test-all -q -W error
+```
+
+`test-all` enables real Docker and Temporal; live tests still require an explicit provider configuration. Check the passed/skipped counts before claiming full qualification. These task wrappers never introduce a model fallback, retry layer, or automatic credential loading. Dated handoffs preserve the exact historical commands originally run; current instructions use only Just.

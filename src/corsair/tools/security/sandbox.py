@@ -82,7 +82,7 @@ class DockerSandbox:
             image = client.images.get(self.settings.image)
         except ImageNotFound:
             raise SandboxUnavailable(
-                "trusted image unavailable; build deploy/python/Dockerfile with make images"
+                "trusted image unavailable; build deploy/python/Dockerfile with just images"
             ) from None
         except (APIError, DockerException) as exc:
             raise SandboxUnavailable(f"trusted image unavailable: {type(exc).__name__}") from exc
