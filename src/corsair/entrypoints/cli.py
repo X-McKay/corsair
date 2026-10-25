@@ -310,9 +310,7 @@ async def _handle_eval(args: CliArguments, ui: Terminal) -> int:
                 }
             )
     output = Path(args.output or f".runs/evaluations/{identity}.json")
-    report = save_report(output, rows)
-    report["dataset_digest"] = digest(dataset)
-    output.write_text(json.dumps(report, indent=2) + "\n")
+    report = save_report(output, rows, dataset_digest=digest(dataset))
     ui.emit({"report": str(output), "summary": report["summary"]})
     event("evaluation.completed", run_id=identity, completed=len(items), total=len(items))
     return 0 if report["summary"]["failed"] == 0 else 1
@@ -322,12 +320,12 @@ async def _handle_rescore(args: CliArguments, ui: Terminal) -> int:
     """Rescore committed evidence locally, retaining unavailable results in the report."""
     settings = _settings(args)
     store = ArtifactStore(settings.artifact_root)
-    _, _, oracles = load_dataset(Path(args.dataset))
+    dataset, _, oracles = load_dataset(Path(args.dataset))
     rows = [
         _score_saved_result(store, validate_run_id(identity), oracles) for identity in args.run_ids
     ]
     output = Path(args.output or ".runs/evaluations/rescored.json")
-    report = save_report(output, rows)
+    report = save_report(output, rows, dataset_digest=digest(dataset))
     ui.emit({"report": str(output), "summary": report["summary"]})
     return 0 if report["summary"]["failed"] == 0 else 1
 

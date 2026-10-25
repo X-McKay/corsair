@@ -204,8 +204,11 @@ def summarize(rows: list[dict]) -> dict:
     }
 
 
-def save_report(path: Path, rows: list[dict]) -> dict:
+def save_report(path: Path, rows: list[dict], dataset_digest: Digest | None = None) -> dict:
+    """Write and return one complete external evaluation report."""
     report = {"rows": rows, "summary": summarize(rows)}
+    if dataset_digest is not None:
+        report["dataset_digest"] = dataset_digest
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(report, indent=2) + "\n")
     return report

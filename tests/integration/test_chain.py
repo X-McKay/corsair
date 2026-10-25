@@ -19,8 +19,9 @@ from corsair.adapters.inference.adk import AdkInference
 from corsair.adapters.sandboxing.docker import DockerSandbox
 from corsair.adapters.scm.local import LocalSourceSnapshots
 from corsair.adapters.storage.filesystem import ArtifactStore
-from corsair.contracts import Disposition, FixStatus
+from corsair.contracts import Disposition, FixStatus, digest
 from corsair.entrypoints.requests import load_investigation_request
+from corsair.evaluation.scoring import load_dataset
 from corsair.observability.logging import LifecycleLoggingInterceptor
 from corsair.settings import Settings
 from corsair.steps.activities import Activities
@@ -202,7 +203,10 @@ async def test_cli_frozen_batch_uses_native_chain_and_external_oracles(
         assert json.loads(capsys.readouterr().out)["phase"] == "complete"
         assert await execute(parser().parse_args([*child_inspection, "--watch"])) == 0
         assert json.loads(capsys.readouterr().out)["disposition"] == "SUPPORTED"
-    rows = json.loads(report.read_text())["rows"]
+    saved_report = json.loads(report.read_text())
+    dataset, _, _ = load_dataset(root / "evals/datasets/dev.json")
+    assert saved_report["dataset_digest"] == digest(dataset)
+    rows = saved_report["rows"]
     assert {row["case_id"]: row["disposition"] for row in rows} == {
         "case01": "SUPPORTED",
         "case02": "INCONCLUSIVE",
