@@ -62,6 +62,7 @@ class ActivityScenario:
     block_prepare: bool = False
     pause_prepare: bool = False
     pause_produce: bool = False
+    fail_evidence_reason: str | None = None
     fail_record_case_ids: frozenset[str] = frozenset()
 
 
@@ -184,6 +185,12 @@ class FakeActivities:
     async def evidence(self, request: EvidenceInput) -> Observation:
         self.call_counts["corsair.evidence"] += 1
         self.evidence_inputs.append(request)
+        if self.scenario.fail_evidence_reason is not None:
+            raise ApplicationError(
+                self.scenario.fail_evidence_reason,
+                type="EVIDENCE_FAILED",
+                non_retryable=True,
+            )
         if request.fixed:
             control, adversarial = RoleOutcome.HELD, RoleOutcome.HELD
         else:
@@ -235,11 +242,13 @@ class FakeActivities:
         self.record_inputs.append(result)
         if result.case_id in self.scenario.fail_record_case_ids:
             raise ApplicationError("test result recording failed", type="RECORD_FAILED")
-        normalized = result.model_copy(update={"result_artifact": None})
+        from corsair.contracts import format_terminal_result
+
+        normalized = format_terminal_result(result.model_copy(update={"result_artifact": None}))
         ref = self.store.put_json(normalized)
         self.store.commit(f"result.{result.run_id}", ref)
         self.recorded.set()
-        return result.model_copy(update={"result_artifact": ref})
+        return format_terminal_result(normalized.model_copy(update={"result_artifact": ref}))
 
     def registered(self) -> list:
         return [self.prepare, self.produce, self.evidence, self.audit, self.record]

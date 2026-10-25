@@ -8,7 +8,7 @@ from temporalio.common import RetryPolicy
 from temporalio.exceptions import ChildWorkflowError
 
 with workflow.unsafe.imports_passed_through():
-    from corsair.contracts import BatchItem, BatchRequest
+    from corsair.contracts import BatchItem, BatchRequest, format_diagnostic
     from corsair.workflows.investigation import InvestigationWorkflow
 
 
@@ -48,7 +48,9 @@ class EvaluationWorkflow:
                     )
                 except ChildWorkflowError as exc:
                     return BatchItem(
-                        case_id=case_request.case.case_id, run_id=run_id, error=str(exc)
+                        case_id=case_request.case.case_id,
+                        run_id=run_id,
+                        error=format_diagnostic(str(exc)),
                     )
                 finally:
                     self.completed += 1

@@ -14,6 +14,10 @@ This is the current work index. Current user guides start at the [documentation 
 
 [Add typed terminal producer abstention](archive/plans/PLAN-0119-producer-abstention.md) is implemented on `manus/producer-abstention`. [Final handoff](archive/handoffs/HANDOFF-recommendation-producer-abstention.md) and [native receipt](../../evals/baselines/qualifications/qualification-producer-abstention-2026-10-25.json) record 153 passing physical-Mac tests with zero skips. The feature is draft/unpromoted; [ISSUE-0012](active/ISSUE-0012-producer-decision-live-quality.md) retains the failed live gates. The base-revision records below retain their original scope and are not the current branch's final qualification.
 
+
+
+[Bound terminal result payloads](archive/plans/PLAN-0120-terminal-payload-bounds.md) is implemented on `manus/terminal-payload-bounds`. [Final handoff](archive/handoffs/HANDOFF-recommendation-terminal-payload-bounds.md) and [native receipt](../../evals/baselines/qualifications/qualification-terminal-payload-bounds-2026-10-25.json) record 160 passing physical-Mac tests with zero skips. The base-revision records below retain their original scope and are not the current branch's final qualification.
+
 ## Active work
 
 

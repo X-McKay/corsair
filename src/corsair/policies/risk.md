@@ -26,3 +26,7 @@ The control role must confirm physical container cleanup before admitting the ad
 
 
 The native producer schema permits an explicit no-grounded-candidate decision. It cannot create an observation, refute a finding, claim a fix, or authorize publication. The model/recipe combination remains unpromoted until its separate live fixture and composed evaluation gates qualify it.
+
+
+
+Terminal JSON is limited to 1,000,000 bytes. Optional diagnostics are capped with an explicit marker and exception chains are bounded at transport boundaries. Factual evidence and operation claims are not shortened; oversized structured results fail explicitly and may have no committed final-result receipt, while referenced native artifacts remain retained.
