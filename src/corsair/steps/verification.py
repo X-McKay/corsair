@@ -307,11 +307,12 @@ class EvidenceVerifier:
         """Persist the domain-specific pre-execution record used to prevent replay."""
         return self.store.put_json(
             {
-                "schema_version": "corsair.evidence-intent/1",
+                "schema_version": "corsair.evidence-intent/2",
                 "operation_id": input.operation_id,
                 "source_digest": prepared.source.sha256,
                 "submission_digest": submission_digest,
                 "config_digest": prepared.manifest.config_digest,
+                "capabilities_digest": digest(prepared.manifest.capabilities),
                 "recipe_digest": digest(prepared.recipe),
                 "image_id": prepared.manifest.image_id,
                 "budget_digest": digest(input.budget),
@@ -423,6 +424,12 @@ class EvidenceVerifier:
                 fixed=input.fixed,
             )
             raw_refs[role] = raw_ref
+            if role == "control" and not self._physical_cleanup_confirmed(
+                raw_ref, expected_operation=input.operation_id, expected_role=role
+            ):
+                # Do not create an adversarial container when cleanup of the control
+                # container was not independently confirmed.
+                break
 
         roles: tuple[SandboxRole, ...] = ("control", "adversarial")
         for role in roles:
