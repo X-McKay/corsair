@@ -19,8 +19,14 @@ from corsair.contracts import (
     ExecutionStatus,
     FixStatus,
     InvestigationResult,
+    NoGroundedCandidate,
     Observation,
+    ProducerDecision,
+    ProducerInput,
+    ProducerOutput,
     RoleOutcome,
+    Submission,
+    Usage,
     digest,
 )
 from corsair.workflows.evaluation import EvaluationWorkflow
@@ -45,6 +51,12 @@ def _three_round_budget() -> Budget:
         max_elapsed_seconds=30,
         probe_timeout_seconds=1,
     )
+
+
+def _producer_submission(output: ProducerOutput) -> Submission:
+    submission = output.submission_for_verification()
+    assert submission is not None
+    return submission
 
 
 async def test_supported_paired_observation_records_bound_result(
@@ -100,8 +112,15 @@ async def test_held_adversarial_results_stay_inconclusive_with_revised_plans(
     assert result.disposition is Disposition.INCONCLUSIVE
     assert result.disposition is not Disposition.REFUTED
     assert result.execution_status is ExecutionStatus.COMPLETED
-    assert [round_.producer.submission.plan.revision for round_ in result.rounds] == [1, 2, 3]
-    assert [round_.producer.submission.plan.parent_revision for round_ in result.rounds] == [
+    assert [_producer_submission(round_.producer).plan.revision for round_ in result.rounds] == [
+        1,
+        2,
+        3,
+    ]
+    parent_revisions = [
+        _producer_submission(round_.producer).plan.parent_revision for round_ in result.rounds
+    ]
+    assert parent_revisions == [
         None,
         1,
         2,
@@ -133,6 +152,59 @@ async def test_prepare_block_is_blocked_and_does_not_manufacture_evidence(
     assert activities.call_counts["corsair.evidence"] == 0
     assert activities.call_counts["corsair.audit"] == 0
     assert activities.call_counts["corsair.record"] == 1
+
+
+async def test_producer_abstention_is_inconclusive_and_skips_target_execution(
+    temporal_server, temporal_artifact_store
+):
+    from temporalio import activity
+
+    class AbstainingActivities(FakeActivities):
+        @activity.defn(name="corsair.produce")
+        async def produce(self, request: ProducerInput) -> ProducerOutput:
+            self.call_counts["corsair.produce"] += 1
+            self.producer_inputs.append(request)
+            self.produce_started.set()
+            return ProducerOutput(
+                decision=ProducerDecision(
+                    root=NoGroundedCandidate(
+                        reason="The admitted source does not ground an allowed payload candidate."
+                    )
+                ),
+                usage=Usage(llm_calls=1, tool_calls=1),
+            )
+
+    activities = AbstainingActivities(temporal_artifact_store)
+    identity, queue = temporal_id("abstention"), temporal_id("abstention-queue")
+    async with Worker(
+        temporal_server.client,
+        task_queue=queue,
+        workflows=[InvestigationWorkflow],
+        activities=activities.registered(),
+    ):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            investigation_request(),
+            id=identity,
+            task_queue=queue,
+            result_type=InvestigationResult,
+        )
+
+    assert result.disposition is Disposition.INCONCLUSIVE
+    assert result.disposition is not Disposition.REFUTED
+    assert result.execution_status is ExecutionStatus.COMPLETED
+    assert result.reason.startswith("Producer abstained:")
+    assert result.manifest is not None
+    assert len(result.rounds) == 1
+    producer = result.rounds[0].producer
+    assert producer.usage == Usage(llm_calls=1, tool_calls=1)
+    assert producer.decision is not None
+    assert isinstance(producer.decision.root, NoGroundedCandidate)
+    assert activities.call_counts["corsair.evidence"] == 0
+    assert activities.call_counts["corsair.audit"] == 0
+    assert activities.evidence_inputs == []
+    assert activities.audit_inputs == []
+    assert temporal_artifact_store.reconcile(f"result.{identity}")
 
 
 async def test_worker_restart_after_completed_prepare_runs_only_remaining_activities(
@@ -311,7 +383,7 @@ async def test_failed_later_activity_preserves_completed_producer_round(
         )
     assert result.execution_status == ExecutionStatus.ERROR
     assert len(result.rounds) == 1
-    assert result.rounds[0].producer.submission is not None
+    assert _producer_submission(result.rounds[0].producer)
     assert result.rounds[0].producer.usage.llm_calls == 1
     assert result.rounds[0].producer.usage.tool_calls == 1
     assert bool(result.rounds[0].observation) == (phase == "audit")

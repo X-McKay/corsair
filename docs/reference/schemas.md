@@ -20,10 +20,10 @@ from corsair.contracts import (
     AuditResult,
     InvestigationRequest,
     InvestigationResult,
-    Submission,
+    ProducerDecision,
 )
 
-for model in (InvestigationRequest, Submission, AuditResult, InvestigationResult):
+for model in (InvestigationRequest, ProducerDecision, AuditResult, InvestigationResult):
     print(f"# {model.__name__}")
     print(json.dumps(model.model_json_schema(), indent=2, sort_keys=True))
 PY
@@ -67,9 +67,10 @@ An **artifact reference** has only `sha256`, `size`, and `media_type`. It names 
 
 - A **plan revision** gives a positive `revision`, optional parent revision, objective, up to eight next steps, and a bounded reason. It is a proposal-local revision record, not a Temporal workflow plan or an execution log.
 - A **submission** (`corsair.submission/1`) contains a hypothesis, one `PlanRevision`, and exact control/exploit values for the recipe's `payload_parameter`. Each payload can be any JSON value through an explicit union; it is a value for the parameter, not a keyword-argument wrapper unless that parameter itself expects an object. The combined payload encoding is capped at 32 KiB.
+- A **producer decision** (`corsair.producer-decision/1`) is the producer's direct native ADK output schema. Its `kind` discriminator selects either `proposal`, which contains one unchanged `Submission`, or `no_grounded_candidate`, which contains a bounded explanation for abstaining. Only the proposal variant reaches trusted evidence collection.
 - An **audit result** is the auditor's structured, outcome-blind semantic review: `ACCEPT`, `REJECT`, or `INSUFFICIENT_CONTEXT`, plus a rule and reason. It cannot create native evidence or itself determine the final disposition.
 
-The producer declares `Submission` directly as its ADK `output_schema`; the auditor similarly declares `AuditResult`. The producer's only executable tools are `read_file` and `list_files` against an already admitted snapshot. The auditor has no tools. A valid structured object is therefore neither a successful target execution nor proof of a vulnerability.
+The producer declares `ProducerDecision` directly as its ADK `output_schema`; the auditor similarly declares `AuditResult`. The producer's only executable tools are `read_file` and `list_files` against an already admitted snapshot. The auditor has no tools. A valid structured object is therefore neither a successful target execution nor proof of a vulnerability.
 
 ## Observation and evidence
 
@@ -92,7 +93,7 @@ The narrow ports preserve this separation: `SourceSnapshotPort` produces a prepa
 
 [`results.py`](../../src/corsair/contracts/results.py) collects durable results without conflating their meanings:
 
-- A **round result** groups the producer output with its optional native observation and audit output for one numbered round.
+- A **round result** groups the producer decision/output with its optional native observation and audit output for one numbered round. An explicit no-grounded-candidate abstention ends a newly recorded workflow `INCONCLUSIVE` with no target execution or audit; it does not create negative clearance.
 - An **execution status** is operational: `COMPLETED`, `BLOCKED`, `ERROR`, or `CANCELLED`. `COMPLETED` means the workflow reached its result path; it does not mean that a finding was supported.
 - A **disposition** is the evidence-policy conclusion: `SUPPORTED`, `REFUTED`, `CONDITIONAL`, or `INCONCLUSIVE`. In the current policy, a held adversarial probe or incomplete evidence remains `INCONCLUSIVE`; it is not used to establish non-exploitability. A component demonstration against an application-scope finding becomes `CONDITIONAL`, not an application-wide claim.
 - A **fix status** concerns the separately observed `fixed_source`: `NOT_REQUESTED`, `DEMONSTRATION_BLOCKED`, `NOT_BLOCKED`, or `UNVERIFIED`. `DEMONSTRATION_BLOCKED` means the particular admitted demonstration was blocked while its control held; it is not universal patch correctness. Missing evidence, operational feedback, failed cleanup, or invalid roles leave the fix `UNVERIFIED`.

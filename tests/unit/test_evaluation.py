@@ -95,7 +95,9 @@ def test_synthetic_positive_with_plausible_roles_cannot_pass(artifact_exists, tm
         AuditOutput,
         AuditResult,
         Observation,
+        ProducerDecision,
         ProducerOutput,
+        ProducerProposal,
         RoleObservation,
         RoleOutcome,
         RoundResult,
@@ -137,7 +139,9 @@ def test_synthetic_positive_with_plausible_roles_cannot_pass(artifact_exists, tm
             "rounds": [
                 RoundResult(
                     index=1,
-                    producer=ProducerOutput(submission=submission),
+                    producer=ProducerOutput(
+                        decision=ProducerDecision(root=ProducerProposal(submission=submission))
+                    ),
                     observation=observation,
                     audit=AuditOutput(
                         review=AuditResult(

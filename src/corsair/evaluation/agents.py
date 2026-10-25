@@ -83,10 +83,11 @@ async def invoke_fixture_agent(
 def fixture_matches_oracle(output: ProducerOutput | AuditOutput, oracle: dict[str, Any]) -> bool:
     """Compare output outside the agent boundary; no native-evidence claim is made."""
     if isinstance(output, ProducerOutput):
+        submission = output.submission_for_verification()
         return (
-            output.submission is not None
-            and output.submission.control_payload == oracle["control_payload"]
-            and output.submission.exploit_payload in oracle["candidate_payloads"]
+            submission is not None
+            and submission.control_payload == oracle["control_payload"]
+            and submission.exploit_payload in oracle["candidate_payloads"]
         )
     return output.review is not None and output.review.decision == oracle["decision"]
 

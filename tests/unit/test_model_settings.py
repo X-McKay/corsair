@@ -60,9 +60,9 @@ def test_agent_specs_are_validated_resource_metadata_with_manifest_tools_field()
     assert producer.tools == ["read_file", "list_files"]
     assert auditor.tools == []
     assert producer.risk_path == auditor.risk_path == "corsair.policies:risk.md"
-    assert producer.schema_ref == "corsair.contracts.Submission"
+    assert producer.schema_ref == "corsair.contracts.ProducerDecision"
     assert auditor.schema_ref == "corsair.contracts.AuditResult"
-    assert "return one structured Submission" in prompt_text("producer")
+    assert "Return one structured ProducerDecision" in prompt_text("producer")
     assert "outcome-blind" in prompt_text("auditor")
 
 

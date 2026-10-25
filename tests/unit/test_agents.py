@@ -25,9 +25,13 @@ from corsair.contracts import (
     AuditResult,
     Budget,
     Finding,
+    NoGroundedCandidate,
     PlanRevision,
     PreparedCase,
+    ProducerDecision,
     ProducerInput,
+    ProducerOutput,
+    ProducerProposal,
     PythonRecipe,
     RunManifest,
     Submission,
@@ -118,6 +122,22 @@ def _submit_args(*, revision: int = 1, parent_revision: int | None = None) -> di
     }
 
 
+def _proposal_args(*, revision: int = 1, parent_revision: int | None = None) -> dict:
+    return {
+        "schema_version": "corsair.producer-decision/1",
+        "kind": "proposal",
+        "submission": _submit_args(revision=revision, parent_revision=parent_revision),
+    }
+
+
+def _abstention_args() -> dict:
+    return {
+        "schema_version": "corsair.producer-decision/1",
+        "kind": "no_grounded_candidate",
+        "reason": "The admitted source does not ground an allowed payload candidate.",
+    }
+
+
 @pytest.mark.asyncio
 async def test_producer_uses_native_structured_output_and_completes_after_one_response(
     tmp_path: Path,
@@ -127,19 +147,21 @@ async def test_producer_uses_native_structured_output_and_completes_after_one_re
     model = ScriptedLlm(
         model="scripted",
         responses=[
-            text_response(json.dumps(_submit_args())),
+            text_response(json.dumps(_proposal_args())),
             text_response("this must never receive a second request"),
         ],
     )
 
     output = await run_producer(producer_input, ModelSettings(), store, model)
 
-    assert output.submission is not None
+    assert output.decision is not None
+    assert isinstance(output.decision.root, ProducerProposal)
+    assert output.submission_for_verification() is not None
     assert output.feedback is None
     assert output.usage.llm_calls == 1
     assert output.usage.tool_calls == 0
-    assert isinstance(output.submission.plan, PlanRevision)
-    assert model.requests[0].config.response_schema is Submission
+    assert isinstance(output.decision.root.submission.plan, PlanRevision)
+    assert model.requests[0].config.response_schema is ProducerDecision
     assert len(model.requests) == 1
     assert model.requests[0].config.max_output_tokens == 512
 
@@ -150,12 +172,13 @@ async def test_adk_native_schema_tool_completion_is_counted_and_validated(tmp_pa
     model = ScriptedLlm(
         model="scripted-schema-tool",
         structured_tools=False,
-        responses=[tool_response("set_model_response", _submit_args())],
+        responses=[tool_response("set_model_response", _abstention_args())],
     )
     output = await run_producer(_producer_input(store), ModelSettings(), store, model)
     assert output.feedback is None
-    assert output.submission is not None
-    assert isinstance(output.submission.plan, PlanRevision)
+    assert output.decision is not None
+    assert isinstance(output.decision.root, NoGroundedCandidate)
+    assert output.submission_for_verification() is None
     assert output.usage.llm_calls == output.usage.tool_calls == 1
     assert "set_model_response" in model.requests[0].tools_dict
 
@@ -172,7 +195,7 @@ async def test_tool_cap_is_charged_before_work_and_source_path_escape_is_rejecte
         responses=[tool_batch_response([("list_files", {}), ("read_file", {"path": "target.py"})])],
     )
     output = await run_producer(producer_input, ModelSettings(), store, model)
-    assert output.submission is None
+    assert output.decision is None
     assert output.feedback is not None and "tool-call budget" in output.feedback.reason
     assert output.usage.tool_calls == 1
     assert len(model.requests) == 1
@@ -195,12 +218,33 @@ def test_factories_share_canonical_pydantic_output_models(tmp_path: Path):
     assert auditor.tools == []
     assert auditor.include_contents == "none"
     assert auditor.output_schema is AuditResult
-    assert producer.output_schema is Submission
-    schema = Submission.model_json_schema()
-    assert {"control_payload", "exploit_payload", "hypothesis", "plan"} <= set(schema["required"])
+    assert producer.output_schema is ProducerDecision
+    schema = ProducerDecision.model_json_schema()
+    assert schema["discriminator"]["propertyName"] == "kind"
+    assert len(schema["oneOf"]) == 2
+    proposal = schema["$defs"]["ProducerProposal"]
+    assert proposal["properties"]["kind"]["const"] == "proposal"
+    assert "submission" in proposal["required"]
+    assert {"control_payload", "exploit_payload", "hypothesis", "plan"} <= set(
+        schema["$defs"]["Submission"]["required"]
+    )
     assert schema["$defs"]["PlanRevision"]["additionalProperties"] is False
     with pytest.raises(ValueError, match="exactly match"):
         build_producer("gemini-2.5-flash", tools.native_tools()[:-1])
+
+
+def test_producer_output_uses_decisions_and_decodes_predecision_activity_data():
+    submission = Submission(**_submit_args())
+    decision = ProducerDecision(root=ProducerProposal(submission=submission))
+
+    current = ProducerOutput(decision=decision)
+    historical = ProducerOutput.model_validate({"submission": submission.model_dump()})
+
+    assert current.submission_for_verification() == submission
+    assert historical.decision is None
+    assert historical.submission_for_verification() == submission
+    with pytest.raises(ValueError, match="both a decision and a submission"):
+        ProducerOutput(decision=decision, submission=submission)
 
 
 @pytest.mark.asyncio
@@ -209,12 +253,12 @@ async def test_invalid_plan_parent_is_typed_producer_data_not_a_provider_retry(t
     producer_input = _producer_input(store)
     model = ScriptedLlm(
         model="scripted",
-        responses=[text_response(json.dumps(_submit_args(revision=2, parent_revision=1)))],
+        responses=[text_response(json.dumps(_proposal_args(revision=2, parent_revision=1)))],
     )
 
     output = await run_producer(producer_input, ModelSettings(), store, model)
 
-    assert output.submission is None
+    assert output.decision is None
     assert output.feedback is not None
     assert output.feedback.gate == "producer_invalid"
     assert output.feedback.operational is False
@@ -280,20 +324,20 @@ def test_role_prompts_exclude_oracles_case_paths_private_secret_and_audit_outcom
 @pytest.mark.asyncio
 async def test_structured_producer_rejects_invalid_or_stale_proposals(tmp_path, invalid_field):
     store = ArtifactStore(tmp_path)
-    args = _submit_args()
+    args = _proposal_args()
     if invalid_field == "string_plan":
-        args["plan"] = json.dumps(args["plan"])
+        args["submission"]["plan"] = json.dumps(args["submission"]["plan"])
     elif invalid_field == "unknown_field":
-        args["plan"]["unapproved"] = "must not be admitted"
+        args["submission"]["plan"]["unapproved"] = "must not be admitted"
     elif invalid_field == "missing_plan":
-        del args["plan"]
+        del args["submission"]["plan"]
     else:
-        args["plan"]["parent_revision"] = 1
+        args["submission"]["plan"]["parent_revision"] = 1
     model = ScriptedLlm(
         model="scripted-invalid-schema", responses=[text_response(json.dumps(args))]
     )
     output = await run_producer(_producer_input(store), ModelSettings(), store, model)
-    assert output.submission is None
+    assert output.decision is None
     assert output.feedback is not None and output.feedback.gate == "producer_invalid"
     assert output.feedback.operational is False
     assert "must not be admitted" not in output.feedback.reason
@@ -308,11 +352,11 @@ async def test_source_inspection_then_structured_completion_share_one_native_epi
         model="scripted-source-then-schema",
         responses=[
             tool_response("read_file", {"path": "target.py"}),
-            text_response(json.dumps(_submit_args())),
+            text_response(json.dumps(_proposal_args())),
         ],
     )
     output = await run_producer(_producer_input(store), ModelSettings(), store, model)
-    assert output.feedback is None and output.submission is not None
+    assert output.feedback is None and output.submission_for_verification() is not None
     assert output.usage.llm_calls == 2 and output.usage.tool_calls == 1
-    assert all(request.config.response_schema is Submission for request in model.requests)
+    assert all(request.config.response_schema is ProducerDecision for request in model.requests)
     assert all(set(request.tools_dict) == {"read_file", "list_files"} for request in model.requests)

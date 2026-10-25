@@ -20,6 +20,9 @@ Production/team use, privileged capabilities, remote publication, arbitrary prob
 Raw native evidence requires a non-empty image identity equal to the admitted manifest image. Missing or mismatched image identity invalidates evidence; this does not establish generic hostile-source observation integrity.
 
 
-## This capability policy revision
 
 The control role must confirm physical container cleanup before admitting the adversarial role. Unconfirmed cleanup stops the operation and remains explicit uncertainty, never a negative security verdict.
+
+
+
+The native producer schema permits an explicit no-grounded-candidate decision. It cannot create an observation, refute a finding, claim a fix, or authorize publication. The model/recipe combination remains unpromoted until its separate live fixture and composed evaluation gates qualify it.

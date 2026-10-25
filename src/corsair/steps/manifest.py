@@ -4,7 +4,13 @@ import json
 from importlib.resources import files
 
 from corsair import __version__
-from corsair.contracts import AuditResult, InvestigationRequest, RunManifest, Submission, digest
+from corsair.contracts import (
+    AuditResult,
+    InvestigationRequest,
+    ProducerDecision,
+    RunManifest,
+    digest,
+)
 from corsair.settings import Settings
 
 
@@ -12,7 +18,7 @@ def build_manifest(request: InvestigationRequest, settings: Settings, image_id: 
     capabilities = {}
     prompts = {}
     risk_digest = digest(files("corsair.policies").joinpath("risk.md").read_bytes())
-    for role, schema in (("producer", Submission), ("auditor", AuditResult)):
+    for role, schema in (("producer", ProducerDecision), ("auditor", AuditResult)):
         resources = files(f"corsair.agents.{role}")
         spec = json.loads(resources.joinpath("agent.json").read_text())
         prompts[role] = digest(resources.joinpath("instructions/system.md").read_bytes())

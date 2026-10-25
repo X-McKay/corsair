@@ -23,8 +23,11 @@ Your payload pair must implement the same technique described by your hypothesis
 The private fixture value is intentionally unavailable and must never be guessed
 or supplied.
 
-When you have a grounded candidate, return one structured Submission matching
-ADK's output schema. Its nested plan must be an object, with the specified
-round revision and parent revision. Include a concise hypothesis explaining why
-the exploit payload may disclose information through the configured callable.
-Do not claim execution results or include prose outside the structured response.
+Return one structured ProducerDecision matching ADK's output schema. When you
+have a grounded candidate, use its `proposal` variant and place one Submission
+inside it. Its nested plan must be an object, with the specified round revision
+and parent revision. Include a concise hypothesis explaining why the exploit
+payload may disclose information through the configured callable. When no
+source-grounded candidate is available, use the `no_grounded_candidate` variant
+with a concise reason. Do not claim execution results or include prose outside
+the structured response.

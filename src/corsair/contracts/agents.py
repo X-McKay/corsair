@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import json
 from enum import StrEnum
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import Field, JsonValue, model_validator
+from pydantic import ConfigDict, Field, JsonValue, RootModel, model_validator
 
 from .common import Contract, Feedback, Identifier, Usage
 from .sources import Budget, Finding, PreparedCase, PythonRecipe
@@ -43,6 +43,34 @@ class Submission(Contract):
         return self
 
 
+class ProducerProposal(Contract):
+    """A source-grounded payload proposal for trusted verification."""
+
+    schema_version: Literal["corsair.producer-decision/1"] = "corsair.producer-decision/1"
+    kind: Literal["proposal"] = "proposal"
+    submission: Submission
+
+
+class NoGroundedCandidate(Contract):
+    """An explicit producer abstention when source grounding is unavailable."""
+
+    schema_version: Literal["corsair.producer-decision/1"] = "corsair.producer-decision/1"
+    kind: Literal["no_grounded_candidate"] = "no_grounded_candidate"
+    reason: str = Field(min_length=1, max_length=2000)
+
+
+_ProducerDecisionVariant = Annotated[
+    ProducerProposal | NoGroundedCandidate,
+    Field(discriminator="kind"),
+]
+
+
+class ProducerDecision(RootModel[_ProducerDecisionVariant]):
+    """The producer's sole native ADK output: proposal or explicit abstention."""
+
+    model_config = ConfigDict(frozen=True, allow_inf_nan=False)
+
+
 class ProducerInput(Contract):
     run_id: Identifier
     prepared: PreparedCase
@@ -55,9 +83,26 @@ class ProducerInput(Contract):
 
 
 class ProducerOutput(Contract):
+    decision: ProducerDecision | None = None
+    # This is retained only to decode activity/result payloads recorded before
+    # corsair.producer-decision/1. New inference writes ``decision`` exclusively.
     submission: Submission | None = None
     usage: Usage = Field(default_factory=Usage)
     feedback: Feedback | None = None
+
+    @model_validator(mode="after")
+    def decision_or_legacy_submission(self):
+        if self.decision is not None and self.submission is not None:
+            raise ValueError("producer output cannot contain both a decision and a submission")
+        return self
+
+    def submission_for_verification(self) -> Submission | None:
+        """Return the proposal submission, including pre-decision persisted output."""
+
+        if self.decision is not None:
+            variant = self.decision.root
+            return variant.submission if isinstance(variant, ProducerProposal) else None
+        return self.submission
 
 
 class AuditDecision(StrEnum):

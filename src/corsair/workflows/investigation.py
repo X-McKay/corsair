@@ -20,6 +20,7 @@ with workflow.unsafe.imports_passed_through():
         FixStatus,
         InvestigationRequest,
         InvestigationResult,
+        NoGroundedCandidate,
         Observation,
         PreparedCase,
         ProducerInput,
@@ -136,7 +137,18 @@ class InvestigationWorkflow:
                     raise ValueError("Producer returned usage outside its admitted sub-budget")
                 round_result = RoundResult(index=index, producer=producer)
                 rounds.append(round_result)
-                if producer.submission is None:
+                decision = producer.decision
+                if decision is not None and isinstance(decision.root, NoGroundedCandidate):
+                    if workflow.patched("producer-abstention-v1"):
+                        result = result.model_copy(
+                            update={"reason": f"Producer abstained: {decision.root.reason}"}
+                        )
+                        break
+                    feedback = Feedback(gate="producer", reason=decision.root.reason)
+                    result = result.model_copy(update={"reason": feedback.reason})
+                    continue
+                submission = producer.submission_for_verification()
+                if submission is None:
                     feedback = producer.feedback or Feedback(
                         gate="producer", reason="No submission"
                     )
@@ -147,7 +159,7 @@ class InvestigationWorkflow:
                         )
                         break
                     continue
-                previous = producer.submission
+                previous = submission
                 self.phase = "evidence"
                 observation = await self._execute_bounded_activity(
                     "corsair.evidence",

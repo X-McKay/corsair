@@ -1,0 +1,41 @@
+{
+  "base_commit": "c0bd5b9783ed00ffceea99d820fb72f2e4035117",
+  "branch": "manus/producer-abstention",
+  "host": "macOS arm64",
+  "native_tests": 153,
+  "native_failures": 0,
+  "native_skips": 0,
+  "native_seconds": 154.633,
+  "cohorts": [
+    "scripted ADK",
+    "real Docker",
+    "real Temporal",
+    "actual CLI",
+    "installed wheel outside checkout",
+    "configured live-auditor smoke"
+  ],
+  "just_ruff_ty_docs": "passed",
+  "frozen_inputs_and_pins_unchanged": true,
+  "cost_usd": null,
+  "production_qualified": false,
+  "remote_ci": "not yet run at record creation",
+  "draft": true,
+  "producer_fixture_exact": {
+    "passed": 3,
+    "attempts": 9,
+    "valid_decisions": 9,
+    "proposals": 6,
+    "abstentions": 3
+  },
+  "auditor_fixture": {
+    "passed": 12,
+    "attempts": 12
+  },
+  "pre_final_identity_full_live": {
+    "passed": 0,
+    "attempts": 3,
+    "operational_failures": 1
+  },
+  "final_full_live": "unqualified",
+  "promoted": false
+}
