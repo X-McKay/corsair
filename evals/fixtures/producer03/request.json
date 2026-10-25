@@ -1,0 +1,39 @@
+{
+  "case": {
+    "case_id": "producer03",
+    "finding": {
+      "title": "Record name validation",
+      "description": "The fetch_record API must not disclose a file outside its configured records root. Investigate only the caller-controlled record_name value. The private fixture is at /fixtures/private/secret.txt; its value is unavailable.",
+      "file": "record_reader.py",
+      "line": 4,
+      "claim_scope": "component"
+    },
+    "source": {
+      "path": "source",
+      "expected_digest": "95bc5fee1e57929fc24f022494a93747e47d1e1800266a661ff43eff9d534950"
+    },
+    "recipe": {
+      "module_file": "record_reader.py",
+      "function": "fetch_record",
+      "payload_parameter": "record_name",
+      "fixed_kwargs": {
+        "records_root": "/fixtures/allowed",
+        "encoding": "utf-8"
+      },
+      "public_files": {
+        "status.txt": "system nominal\n"
+      },
+      "expected_control": "system nominal\n",
+      "allowed_exceptions": [
+        "builtins.ValueError"
+      ]
+    }
+  },
+  "budget": {
+    "max_rounds": 2,
+    "max_llm_calls": 8,
+    "episode_llm_calls": 3,
+    "max_tool_calls": 12,
+    "max_elapsed_seconds": 300
+  }
+}

@@ -4,8 +4,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import ArtifactRef, Budget, Case, PythonRecipe, safe_path
-from corsair.runtime.artifacts import ArtifactStore
 
 
 @pytest.mark.parametrize("path", ["../x", "/x", "a/../x", "a\\x", "a//b", "a/./b", ""])

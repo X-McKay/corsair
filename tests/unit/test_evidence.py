@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
     ArtifactRef,
     AuditDecision,
@@ -24,10 +25,9 @@ from corsair.contracts import (
     Submission,
     digest,
 )
-from corsair.policy.verdicts import decide, fix_status
-from corsair.runtime.artifacts import ArtifactStore
+from corsair.policies.verdicts import decide, fix_status
 from corsair.settings import Settings
-from corsair.tools.security.evidence import EvidenceVerifier
+from corsair.steps.verification import EvidenceVerifier
 
 SOURCE_DIGEST = "a" * 64
 ARTIFACT_DIGEST = "d" * 64
@@ -80,14 +80,18 @@ class _FakeSandbox:
     store: ArtifactStore
     forged: bool = False
     unknown: bool = False
+    cleanup_confirmed: bool = True
     calls: int = 0
     image_id: str = "sha256:trusted"
+    raw_image_id: object = "sha256:trusted"
+    omit_raw_image_id: bool = False
 
     def has_unknown_operation(self, operation_id: str) -> bool:
         del operation_id  # Test-controlled operation state, independent of its identity.
         return self.unknown
 
-    def run_role(self, prepared, submission, role, budget, store, heartbeat, *, operation_id):
+    def execute_role(self, prepared, submission, role, budget, heartbeat, *, operation_id):
+        store = self.store
         del budget, heartbeat
         self.calls += 1
         violation = role == "adversarial"
@@ -111,31 +115,24 @@ class _FakeSandbox:
             "covered_lines": [4],
             "coverage_file": "reader.py",
         }
-        ref = store.put_json(
-            {
-                "schema_version": "corsair.raw-evidence/1",
-                "operation_id": operation_id,
-                "role": role,
-                "container_id": f"id-{role}",
-                "labels": {
-                    "corsair.security": "true",
-                    "corsair.operation": operation_id,
-                    "corsair.role": role,
-                },
-                "cleanup_confirmed": True,
-                "image_id": prepared.manifest.image_id,
-                "docker_exit_code": 1 if violation else 0,
-                "driver": driver,
-            }
-        )
-        return (
-            RoleObservation(
-                outcome=RoleOutcome.ERROR,  # proves verifier trusts immutable raw record instead
-                target_executed=False,
-                reason="untrusted mutable return",
-            ),
-            ref,
-        )
+        raw = {
+            "schema_version": "corsair.raw-evidence/1",
+            "operation_id": operation_id,
+            "role": role,
+            "container_id": f"id-{role}",
+            "labels": {
+                "corsair.security": "true",
+                "corsair.operation": operation_id,
+                "corsair.role": role,
+            },
+            "cleanup_confirmed": self.cleanup_confirmed,
+            "docker_exit_code": 1 if violation else 0,
+            "driver": driver,
+        }
+        if not self.omit_raw_image_id:
+            raw["image_id"] = self.raw_image_id
+        ref = store.put_json(raw)
+        return ref
 
 
 def _input(operation_id: str = "operation") -> EvidenceInput:
@@ -168,6 +165,33 @@ def test_evidence_reconciles_committed_result_without_rerunning(tmp_path: Path) 
     assert first.artifact is not None
 
 
+def test_unconfirmed_control_cleanup_preserves_receipt_and_skips_adversarial(
+    tmp_path: Path,
+) -> None:
+    store = ArtifactStore(tmp_path / "artifacts")
+    sandbox = _FakeSandbox(store, cleanup_confirmed=False)
+    observation = EvidenceVerifier(Settings(), store, sandbox).evaluate(_input())
+
+    assert sandbox.calls == 1
+    assert observation.control and observation.control.outcome is RoleOutcome.INVALID
+    assert observation.adversarial == RoleObservation(
+        outcome=RoleOutcome.ERROR,
+        target_executed=False,
+        reason="role was not executed",
+    )
+    assert observation.cleanup_confirmed is False
+    assert observation.artifact is not None
+    bundle = store.get_json(observation.artifact)
+    control_raw = ArtifactRef.model_validate(bundle["roles"]["control"])
+    assert store.get_json(control_raw)["cleanup_confirmed"] is False
+    assert bundle["roles"]["adversarial"] is None
+
+    disposition, status, reason = decide(_prepared(), observation, _audit())
+    assert disposition.value == "INCONCLUSIVE"
+    assert status.value == "ERROR"
+    assert reason == "container cleanup was not independently confirmed"
+
+
 def test_forged_driver_identity_and_unknown_prior_container_are_not_admissible(
     tmp_path: Path,
 ) -> None:
@@ -183,6 +207,44 @@ def test_forged_driver_identity_and_unknown_prior_container_are_not_admissible(
     blocked = EvidenceVerifier(Settings(), store, unknown_sandbox).evaluate(_input("unknown"))
     assert blocked.feedback and blocked.feedback.gate == "operation-reconciliation"
     assert unknown_sandbox.calls == 0
+
+
+@pytest.mark.parametrize(
+    ("raw_image_id", "omit_raw_image_id"),
+    [
+        (None, True),
+        (None, False),
+        (1, False),
+        ("sha256:other", False),
+    ],
+    ids=["missing", "null", "non-string", "mismatched"],
+)
+def test_raw_image_identity_must_be_a_matching_string(
+    tmp_path: Path, raw_image_id: object, omit_raw_image_id: bool
+) -> None:
+    store = ArtifactStore(tmp_path / "artifacts")
+    observation = EvidenceVerifier(
+        Settings(),
+        store,
+        _FakeSandbox(
+            store,
+            raw_image_id=raw_image_id,
+            omit_raw_image_id=omit_raw_image_id,
+        ),
+    ).evaluate(_input())
+
+    assert observation.cleanup_confirmed is True
+    assert observation.control and observation.control.outcome is RoleOutcome.INVALID
+    assert observation.adversarial and observation.adversarial.outcome is RoleOutcome.INVALID
+    disposition, status, _ = decide(_prepared(), observation, _audit())
+    assert disposition.value == "INCONCLUSIVE"
+    assert status.value == "COMPLETED"
+    assert (
+        EvidenceVerifier(Settings(), store).validate_saved(
+            observation, _submission(), _prepared().manifest
+        )
+        is None
+    )
 
 
 def test_prior_intent_and_competing_claim_prevent_operation_replay(tmp_path: Path) -> None:
@@ -258,7 +320,7 @@ def test_policy_never_refutes_negative_evidence_and_conditions_app_scope() -> No
     assert fix_status(demonstrated).value == "NOT_BLOCKED"
 
 
-@pytest.mark.parametrize("boundary", ["recipe", "image", "budget"])
+@pytest.mark.parametrize("boundary", ["recipe", "image", "budget", "capabilities"])
 def test_reconciliation_rejects_stale_recipe_runtime_or_budget(tmp_path, boundary):
     store = ArtifactStore(tmp_path)
     sandbox = _FakeSandbox(store)
@@ -273,6 +335,13 @@ def test_reconciliation_rejects_stale_recipe_runtime_or_budget(tmp_path, boundar
         manifest = request.prepared.manifest.model_copy(update={"image_id": "different"})
         prepared = request.prepared.model_copy(update={"manifest": manifest})
         changed = request.model_copy(update={"prepared": prepared})
+    elif boundary == "capabilities":
+        manifest = request.prepared.manifest.model_copy(
+            update={"capabilities": {"verification": {"policy_revision": "changed"}}}
+        )
+        changed = request.model_copy(
+            update={"prepared": request.prepared.model_copy(update={"manifest": manifest})}
+        )
     else:
         changed = request.model_copy(update={"budget": Budget(probe_timeout_seconds=6)})
     with pytest.raises(ValueError, match="recipe/configuration"):

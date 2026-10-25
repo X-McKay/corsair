@@ -1,14 +1,59 @@
+# Local environments, runtime evidence, state and investigation scratch
 .venv/
 .runs/
 .state/
+.work/
+
+# Agent/tool metadata, download/build caches and generated deliverables
+.cache/
+.manus/
+outputs/
+build/
+dist/
+*.egg-info/
+*.whl
+
+# Local credentials and certificate private material
 .env
 .env.*
 !.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Local databases and sidecars; intentional fixtures require explicit review
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+
+# Python/tooling reports and bytecode
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
+.ty_cache/
 .coverage
+.coverage.*
 htmlcov/
-dist/
-*.egg-info/
+coverage.xml
+*.log
+
+# Local platform/editor/Nix-generated files
+.DS_Store
+.direnv/
+result
+result-*
+
+# Public developer skills are canonical; editor/session state is private.
+.agents/*
+!.agents/skills/
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/corsair-development
+!.claude/skills/corsair-evaluations
+.codex/

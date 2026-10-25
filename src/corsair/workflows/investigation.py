@@ -7,7 +7,7 @@ from typing import Any
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
-from temporalio.exceptions import ActivityError, is_cancelled_exception
+from temporalio.exceptions import ActivityError, ApplicationError, is_cancelled_exception
 
 with workflow.unsafe.imports_passed_through():
     from corsair.contracts import (
@@ -20,13 +20,15 @@ with workflow.unsafe.imports_passed_through():
         FixStatus,
         InvestigationRequest,
         InvestigationResult,
+        NoGroundedCandidate,
         Observation,
         PreparedCase,
         ProducerInput,
         ProducerOutput,
         RoundResult,
+        format_terminal_result,
     )
-    from corsair.policy.verdicts import decide, fix_status
+    from corsair.policies.verdicts import decide, fix_status
 
 
 class BudgetExhausted(Exception):
@@ -67,6 +69,16 @@ class InvestigationWorkflow:
     async def _record_result(self, result: InvestigationResult) -> InvestigationResult:
         """Persist the final receipt within its separate retry/finalization allowance."""
         self.phase = "record"
+        try:
+            result = format_terminal_result(result)
+        except ValueError:
+            # An unbounded validation exception must not become another failure payload.
+            raise ApplicationError(
+                "Terminal result failed schema or wire-budget validation; "
+                "referenced native evidence remains in the artifact store.",
+                type="TERMINAL_PAYLOAD_INVALID",
+                non_retryable=True,
+            ) from None
         recorded = await asyncio.shield(
             workflow.execute_activity(
                 "corsair.record",
@@ -136,7 +148,18 @@ class InvestigationWorkflow:
                     raise ValueError("Producer returned usage outside its admitted sub-budget")
                 round_result = RoundResult(index=index, producer=producer)
                 rounds.append(round_result)
-                if producer.submission is None:
+                decision = producer.decision
+                if decision is not None and isinstance(decision.root, NoGroundedCandidate):
+                    if workflow.patched("producer-abstention-v1"):
+                        result = result.model_copy(
+                            update={"reason": f"Producer abstained: {decision.root.reason}"}
+                        )
+                        break
+                    feedback = Feedback(gate="producer", reason=decision.root.reason)
+                    result = result.model_copy(update={"reason": feedback.reason})
+                    continue
+                submission = producer.submission_for_verification()
+                if submission is None:
                     feedback = producer.feedback or Feedback(
                         gate="producer", reason="No submission"
                     )
@@ -147,7 +170,7 @@ class InvestigationWorkflow:
                         )
                         break
                     continue
-                previous = producer.submission
+                previous = submission
                 self.phase = "evidence"
                 observation = await self._execute_bounded_activity(
                     "corsair.evidence",
@@ -176,21 +199,44 @@ class InvestigationWorkflow:
                     result = result.model_copy(update={"reason": "No budget remains for review."})
                     break
                 self.phase = "audit"
-                audit = await self._execute_bounded_activity(
-                    "corsair.audit",
-                    AuditInput(
+                audit_llm_call_limit, audit_tool_call_limit = 1, 0
+                if workflow.patched("auditor-runtime-budget-v1"):
+                    audit_llm_call_limit = min(2, calls_left)
+                    audit_tool_call_limit = min(4, tools_left)
+                    audit_request: AuditInput | dict[str, Any] = AuditInput(
                         finding=prepared.finding,
                         recipe=prepared.recipe,
                         source_excerpt=prepared.source_excerpt,
                         submission=previous,
                         max_output_tokens=budget.max_output_tokens,
-                    ),
+                        llm_call_limit=audit_llm_call_limit,
+                        tool_call_limit=audit_tool_call_limit,
+                    )
+                else:
+                    # Default-valued Pydantic fields serialize into Temporal payloads.
+                    # Retain this exact pre-limit command shape for old histories.
+                    audit_request = {
+                        "finding": prepared.finding,
+                        "recipe": prepared.recipe,
+                        "source_excerpt": prepared.source_excerpt,
+                        "submission": previous,
+                        "max_output_tokens": budget.max_output_tokens,
+                    }
+                audit = await self._execute_bounded_activity(
+                    "corsair.audit",
+                    audit_request,
                     AuditOutput,
                     180,
                 )
                 calls_left -= audit.usage.llm_calls
-                if audit.usage.llm_calls > 1:
-                    raise ValueError("Auditor returned usage outside its one-call budget")
+                tools_left -= audit.usage.tool_calls
+                if (
+                    audit.usage.llm_calls > audit_llm_call_limit
+                    or audit.usage.tool_calls > audit_tool_call_limit
+                    or calls_left < 0
+                    or tools_left < 0
+                ):
+                    raise ValueError("Auditor returned usage outside its admitted sub-budget")
                 round_result = round_result.model_copy(update={"audit": audit})
                 rounds[-1] = round_result
                 label, status, reason = decide(prepared, observation, audit)

@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from corsair.settings import Settings
-from tests.fixtures.temporal import temporal_id
+from tests.workflow.temporal import temporal_id
 
 pytestmark = [pytest.mark.docker, pytest.mark.temporal, pytest.mark.asyncio(loop_scope="module")]
 ROOT = Path(__file__).resolve().parents[2]
@@ -29,6 +29,31 @@ async def _command(*args, timeout=30):
     async with asyncio.timeout(timeout):
         stdout, stderr = await process.communicate()
     return process.returncode, stdout.decode(), stderr.decode()
+
+
+@pytest.mark.parametrize(
+    ("option", "value"),
+    [("repeats", 0), ("repeats", 9), ("concurrency", 0), ("concurrency", 9)],
+)
+async def test_real_cli_rejects_eval_bounds_before_handler_io(tmp_path, option, value):
+    missing_dataset = tmp_path / "unread-dataset.json"
+    missing_settings = tmp_path / "unread-settings.json"
+
+    code, stdout, stderr = await _command(
+        "eval",
+        missing_dataset,
+        "--settings",
+        missing_settings,
+        f"--{option}",
+        value,
+    )
+
+    assert code == 2
+    assert stdout == ""
+    assert f"argument --{option}: invalid choice: '{value}'" in stderr
+    assert "cli.failed" not in stderr
+    assert not missing_dataset.exists()
+    assert not missing_settings.exists()
 
 
 async def test_real_cli_worker_doctor_and_native_reference(temporal_server, tmp_path):
@@ -139,11 +164,15 @@ async def test_real_cli_reference_in_pseudo_terminal_has_animation(tmp_path):
         chunks = []
         try:
             while True:
-                chunks.append(os.read(master, 65536))
+                chunk = os.read(master, 65536)
+                if not chunk:
+                    break
+                chunks.append(chunk)
         except OSError:
-            return b"".join(chunks).decode()
+            pass
         finally:
             os.close(master)
+        return b"".join(chunks).decode()
 
     async with asyncio.timeout(30):
         rendered = await asyncio.to_thread(read_terminal)
@@ -208,16 +237,17 @@ async def test_real_doctor_reports_failed_dependency(
     assert not (tmp_path / "artifacts").exists()  # doctor is read-only even on failed preflight.
 
 
+@pytest.mark.parametrize("_attempt", range(3))
 async def test_ctrl_c_detaches_real_temporal_client_without_cancelling_workflow(
-    temporal_server, tmp_path
+    temporal_server, tmp_path, _attempt
 ):
     from temporalio.client import WorkflowExecutionStatus
     from temporalio.worker import Worker
 
+    from corsair.adapters.storage.filesystem import ArtifactStore
     from corsair.contracts import InvestigationResult
-    from corsair.runtime.artifacts import ArtifactStore
     from corsair.workflows.investigation import InvestigationWorkflow
-    from tests.fixtures.temporal import ActivityScenario, FakeActivities
+    from tests.workflow.temporal import ActivityScenario, FakeActivities
 
     # The provider is intentionally paused via a labelled test activity, not a production fallback.
     settings = Settings(
@@ -263,6 +293,7 @@ async def test_ctrl_c_detaches_real_temporal_client_without_cancelling_workflow(
                 ],
                 stdout=stdout_file,
                 stderr=stderr_file,
+                env={**os.environ, "PYTHONFAULTHANDLER": "1"},
             )
             try:
                 async with asyncio.timeout(15):
@@ -270,8 +301,24 @@ async def test_ctrl_c_detaches_real_temporal_client_without_cancelling_workflow(
                     while '"workflow.progress"' not in diagnostics.read_text():
                         assert process.poll() is None
                         await asyncio.sleep(0.05)
+                status = Path(f"/proc/{process.pid}/status")
+                if status.exists():
+                    fields = dict(line.split(":", 1) for line in status.read_text().splitlines())
+                    assert not int(fields["SigIgn"], 16) & (1 << (signal.SIGINT - 1)), (
+                        "The installed CLI inherited ignored SIGINT from its launcher"
+                    )
                 process.send_signal(signal.SIGINT)
-                await asyncio.to_thread(process.wait, 10)
+                try:
+                    await asyncio.to_thread(process.wait, 10)
+                except subprocess.TimeoutExpired:
+                    # Failure-only forensic capture from the actual installed console process.
+                    status = Path(f"/proc/{process.pid}/status")
+                    signals = status.read_text() if status.exists() else "no proc signal metadata"
+                    process.send_signal(signal.SIGABRT)
+                    await asyncio.to_thread(process.wait, 10)
+                    raise AssertionError(
+                        f"CLI did not detach after SIGINT. {signals}\n{stderr_path.read_text()}"
+                    ) from None
                 assert process.returncode == 130, stderr_path.read_text()
                 assert stdout_path.read_bytes() == b""
                 assert (

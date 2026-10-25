@@ -1,0 +1,237 @@
+{
+  "schema_version": "corsair.candidate-diagnostics/1",
+  "date": "2026-10-25",
+  "promotion_status": "candidate_unpromoted",
+  "fixture_authorship": "AI-authored, pending human review; not held-out or population-labelled",
+  "model_settings_identity": {
+    "connector": "litellm",
+    "producer": "openai/Qwen3.6-35B-A3B-NVFP4",
+    "auditor": "openai/Qwen3.6-35B-A3B-NVFP4",
+    "request_timeout_seconds": 120,
+    "extra_body": {
+      "reasoning_effort": "none"
+    }
+  },
+  "configuration_digest": "c9b35050e7eaa43723d25bb2f4dd9c07a7997f7dcbf52ea973ea8421a6fd1709",
+  "results": {
+    "old-producer-authenticated": {
+      "summary": {
+        "attempts": 3,
+        "passed": 3,
+        "failed": 0,
+        "pass_rate": 1.0,
+        "correctly_resolved": 0,
+        "invalid_positive_evidence": 0,
+        "forbidden_labels": 0,
+        "inconclusive": 0,
+        "operational_failures": 0,
+        "unavailable_results": 0,
+        "llm_calls": 3,
+        "tool_calls": 0,
+        "input_tokens": 2910,
+        "output_tokens": 841,
+        "cost_usd": null
+      },
+      "per_case": {
+        "case01": {
+          "attempts": 3,
+          "passed": 3,
+          "operational_failures": 0
+        }
+      },
+      "dataset_digest": "7d42f2b0428936d7082b3fd99be4dae323a57743d10afb29c6b54e37a852b1f5"
+    },
+    "old-auditor-authenticated": {
+      "summary": {
+        "attempts": 6,
+        "passed": 6,
+        "failed": 0,
+        "pass_rate": 1.0,
+        "correctly_resolved": 0,
+        "invalid_positive_evidence": 0,
+        "forbidden_labels": 0,
+        "inconclusive": 0,
+        "operational_failures": 0,
+        "unavailable_results": 0,
+        "llm_calls": 6,
+        "tool_calls": 0,
+        "input_tokens": 4170,
+        "output_tokens": 798,
+        "cost_usd": null
+      },
+      "per_case": {
+        "audit01": {
+          "attempts": 3,
+          "passed": 3,
+          "operational_failures": 0
+        },
+        "audit02": {
+          "attempts": 3,
+          "passed": 3,
+          "operational_failures": 0
+        }
+      },
+      "dataset_digest": "e865d259995f2e31d971ba5e01a3b5a627fe02771a195436fb73203b927fe0ef"
+    },
+    "expanded-producer-authenticated": {
+      "summary": {
+        "attempts": 9,
+        "passed": 4,
+        "failed": 5,
+        "pass_rate": 0.4444444444444444,
+        "correctly_resolved": 0,
+        "invalid_positive_evidence": 0,
+        "forbidden_labels": 0,
+        "inconclusive": 0,
+        "operational_failures": 0,
+        "unavailable_results": 0,
+        "llm_calls": 9,
+        "tool_calls": 0,
+        "input_tokens": 8889,
+        "output_tokens": 2664,
+        "cost_usd": null
+      },
+      "per_case": {
+        "case01": {
+          "attempts": 3,
+          "passed": 2,
+          "operational_failures": 0
+        },
+        "producer02": {
+          "attempts": 3,
+          "passed": 2,
+          "operational_failures": 0
+        },
+        "producer03": {
+          "attempts": 3,
+          "passed": 0,
+          "operational_failures": 0
+        }
+      },
+      "dataset_digest": "a2a6907fd06dc09003558ecfbe844f7659acc75ffa2a82a2feca4e150c74a3e2"
+    },
+    "expanded-auditor-authenticated": {
+      "summary": {
+        "attempts": 12,
+        "passed": 12,
+        "failed": 0,
+        "pass_rate": 1.0,
+        "correctly_resolved": 0,
+        "invalid_positive_evidence": 0,
+        "forbidden_labels": 0,
+        "inconclusive": 0,
+        "operational_failures": 0,
+        "unavailable_results": 0,
+        "llm_calls": 12,
+        "tool_calls": 0,
+        "input_tokens": 8550,
+        "output_tokens": 1539,
+        "cost_usd": null
+      },
+      "per_case": {
+        "audit01": {
+          "attempts": 3,
+          "passed": 3,
+          "operational_failures": 0
+        },
+        "audit02": {
+          "attempts": 3,
+          "passed": 3,
+          "operational_failures": 0
+        },
+        "audit03": {
+          "attempts": 3,
+          "passed": 3,
+          "operational_failures": 0
+        },
+        "audit04": {
+          "attempts": 3,
+          "passed": 3,
+          "operational_failures": 0
+        }
+      },
+      "dataset_digest": "b7284e237d2dce26f2f5a4719af4a7e9520ee750bad8fb5a9abd312946437bc7"
+    },
+    "final-expanded-producer": {
+      "summary": {
+        "attempts": 9,
+        "passed": 5,
+        "failed": 4,
+        "pass_rate": 0.5555555555555556,
+        "correctly_resolved": 0,
+        "invalid_positive_evidence": 0,
+        "forbidden_labels": 0,
+        "inconclusive": 0,
+        "operational_failures": 0,
+        "unavailable_results": 0,
+        "llm_calls": 9,
+        "tool_calls": 0,
+        "input_tokens": 8889,
+        "output_tokens": 2729,
+        "cost_usd": null
+      },
+      "per_case": {
+        "case01": {
+          "attempts": 3,
+          "passed": 3,
+          "operational_failures": 0
+        },
+        "producer02": {
+          "attempts": 3,
+          "passed": 1,
+          "operational_failures": 0
+        },
+        "producer03": {
+          "attempts": 3,
+          "passed": 1,
+          "operational_failures": 0
+        }
+      },
+      "dataset_digest": "a2a6907fd06dc09003558ecfbe844f7659acc75ffa2a82a2feca4e150c74a3e2"
+    },
+    "final-expanded-auditor": {
+      "summary": {
+        "attempts": 12,
+        "passed": 12,
+        "failed": 0,
+        "pass_rate": 1.0,
+        "correctly_resolved": 0,
+        "invalid_positive_evidence": 0,
+        "forbidden_labels": 0,
+        "inconclusive": 0,
+        "operational_failures": 0,
+        "unavailable_results": 0,
+        "llm_calls": 12,
+        "tool_calls": 0,
+        "input_tokens": 8550,
+        "output_tokens": 1636,
+        "cost_usd": null
+      },
+      "per_case": {
+        "audit01": {
+          "attempts": 3,
+          "passed": 3,
+          "operational_failures": 0
+        },
+        "audit02": {
+          "attempts": 3,
+          "passed": 3,
+          "operational_failures": 0
+        },
+        "audit03": {
+          "attempts": 3,
+          "passed": 3,
+          "operational_failures": 0
+        },
+        "audit04": {
+          "attempts": 3,
+          "passed": 3,
+          "operational_failures": 0
+        }
+      },
+      "dataset_digest": "b7284e237d2dce26f2f5a4719af4a7e9520ee750bad8fb5a9abd312946437bc7"
+    }
+  },
+  "cost_available": false,
+  "existing_runtime_permissions_model_settings_and_frozen_oracles_unchanged": true
+}

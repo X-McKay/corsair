@@ -6,9 +6,13 @@ import asyncio
 from datetime import timedelta
 
 import pytest
+from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
 
 from corsair.contracts import (
+    DIAGNOSTIC_TRUNCATION_MARKER,
+    MAX_DIAGNOSTIC_TEXT_CHARS,
+    TERMINAL_RESULT_MAX_BYTES,
     AuditInput,
     AuditOutput,
     BatchItem,
@@ -19,13 +23,20 @@ from corsair.contracts import (
     ExecutionStatus,
     FixStatus,
     InvestigationResult,
+    NoGroundedCandidate,
     Observation,
+    PlanRevision,
+    ProducerDecision,
+    ProducerInput,
+    ProducerOutput,
     RoleOutcome,
+    Submission,
+    Usage,
     digest,
 )
 from corsair.workflows.evaluation import EvaluationWorkflow
 from corsair.workflows.investigation import InvestigationWorkflow
-from tests.fixtures.temporal import (
+from tests.workflow.temporal import (
     ActivityScenario,
     FakeActivities,
     investigation_request,
@@ -45,6 +56,94 @@ def _three_round_budget() -> Budget:
         max_elapsed_seconds=30,
         probe_timeout_seconds=1,
     )
+
+
+def _producer_submission(output: ProducerOutput) -> Submission:
+    submission = output.submission_for_verification()
+    assert submission is not None
+    return submission
+
+
+def _maximum_round_budget() -> Budget:
+    return Budget(
+        max_rounds=16,
+        max_llm_calls=32,
+        episode_llm_calls=1,
+        max_tool_calls=16,
+        max_output_tokens=256,
+        max_elapsed_seconds=60,
+        probe_timeout_seconds=1,
+    )
+
+
+def _audit_input(
+    *, llm_call_limit: int | None = None, tool_call_limit: int | None = None
+) -> AuditInput:
+    request = investigation_request()
+    limits = {}
+    if llm_call_limit is not None:
+        limits["llm_call_limit"] = llm_call_limit
+    if tool_call_limit is not None:
+        limits["tool_call_limit"] = tool_call_limit
+    return AuditInput(
+        finding=request.case.finding,
+        recipe=request.case.recipe,
+        source_excerpt="4: return payload\n",
+        submission=Submission(
+            control_payload="hello.txt",
+            exploit_payload="../private/secret.txt",
+            hypothesis="The configured target returns an attacker-controlled payload.",
+            plan=PlanRevision(
+                revision=1,
+                objective="exercise the submitted control and adversarial payload pair",
+                next_steps=["submit the pair to trusted evidence collection"],
+                reason="the submitted source configuration admits this pair",
+            ),
+        ),
+        max_output_tokens=256,
+        **limits,
+    )
+
+
+async def test_audit_input_episode_limits_are_bounded_and_allow_exhausted_admission():
+    defaults = _audit_input()
+
+    assert defaults.llm_call_limit == 2
+    assert defaults.tool_call_limit == 4
+    assert _audit_input(llm_call_limit=0, tool_call_limit=0).model_dump(
+        include={"llm_call_limit", "tool_call_limit"}
+    ) == {"llm_call_limit": 0, "tool_call_limit": 0}
+    with pytest.raises(ValueError):
+        _audit_input(llm_call_limit=3)
+    with pytest.raises(ValueError):
+        _audit_input(tool_call_limit=-1)
+    await asyncio.sleep(0)
+
+
+async def test_native_auditor_does_not_overrun_exhausted_loader_budget():
+    """Run the native ADK runner directly; no Temporal service or live model."""
+
+    from corsair.adapters.inference.adk import run_auditor
+    from corsair.settings import ModelSettings
+    from tests.unit.adk import ScriptedLlm, text_response, tool_response
+
+    audit_input = _audit_input(llm_call_limit=1, tool_call_limit=0)
+    model = ScriptedLlm(
+        model="scripted",
+        responses=[
+            tool_response("load_skill", {"skill_name": "semantic-review"}),
+            text_response(
+                '{"decision":"ACCEPT","rule":"independent-evidence-review",'
+                '"reason":"the packet is semantically coherent"}'
+            ),
+        ],
+    )
+
+    output = await run_auditor(audit_input, ModelSettings(), model)
+
+    assert output.usage.llm_calls <= audit_input.llm_call_limit
+    assert output.usage.tool_calls <= audit_input.tool_call_limit
+    assert len(model.requests) <= audit_input.llm_call_limit
 
 
 async def test_supported_paired_observation_records_bound_result(
@@ -83,6 +182,68 @@ async def test_supported_paired_observation_records_bound_result(
     assert "adversarial" not in audit_packet
 
 
+async def test_auditor_receives_only_remaining_root_budgets(
+    temporal_server, temporal_artifact_store
+):
+    held = ActivityScenario(outcomes=((RoleOutcome.HELD, RoleOutcome.HELD),) * 3)
+    request = investigation_request("remaining-auditor-budget", budget=_three_round_budget())
+    async with temporal_server.worker(temporal_artifact_store, held) as (task_queue, activities):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            request,
+            id=temporal_id("remaining-auditor-budget"),
+            task_queue=task_queue,
+            result_type=InvestigationResult,
+        )
+
+    assert result.execution_status is ExecutionStatus.COMPLETED
+    assert [
+        (request.llm_call_limit, request.tool_call_limit) for request in activities.audit_inputs
+    ] == [(2, 2), (2, 1), (1, 0)]
+
+
+async def test_auditor_usage_cannot_exceed_its_admitted_remaining_budget(
+    temporal_server, temporal_artifact_store
+):
+    from temporalio import activity
+
+    class OverBudgetAuditorActivities(FakeActivities):
+        @activity.defn(name="corsair.audit")
+        async def audit(self, request: AuditInput) -> AuditOutput:
+            self.call_counts["corsair.audit"] += 1
+            self.audit_inputs.append(request)
+            return AuditOutput(
+                usage=Usage(
+                    llm_calls=request.llm_call_limit + 1,
+                    tool_calls=request.tool_call_limit + 1,
+                )
+            )
+
+    activities = OverBudgetAuditorActivities(temporal_artifact_store)
+    identity, queue = temporal_id("over-budget-audit"), temporal_id("over-budget-audit-queue")
+    async with Worker(
+        temporal_server.client,
+        task_queue=queue,
+        workflows=[InvestigationWorkflow],
+        activities=activities.registered(),
+    ):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            investigation_request("over-budget-audit"),
+            id=identity,
+            task_queue=queue,
+            result_type=InvestigationResult,
+        )
+
+    assert activities.call_counts["corsair.audit"] == 1
+    assert [
+        (request.llm_call_limit, request.tool_call_limit) for request in activities.audit_inputs
+    ] == [(1, 0)]
+    assert result.execution_status is ExecutionStatus.ERROR
+    assert result.reason == "Auditor returned usage outside its admitted sub-budget"
+    assert result.rounds[0].audit is None
+
+
 async def test_held_adversarial_results_stay_inconclusive_with_revised_plans(
     temporal_server, temporal_artifact_store
 ):
@@ -100,8 +261,15 @@ async def test_held_adversarial_results_stay_inconclusive_with_revised_plans(
     assert result.disposition is Disposition.INCONCLUSIVE
     assert result.disposition is not Disposition.REFUTED
     assert result.execution_status is ExecutionStatus.COMPLETED
-    assert [round_.producer.submission.plan.revision for round_ in result.rounds] == [1, 2, 3]
-    assert [round_.producer.submission.plan.parent_revision for round_ in result.rounds] == [
+    assert [_producer_submission(round_.producer).plan.revision for round_ in result.rounds] == [
+        1,
+        2,
+        3,
+    ]
+    parent_revisions = [
+        _producer_submission(round_.producer).plan.parent_revision for round_ in result.rounds
+    ]
+    assert parent_revisions == [
         None,
         1,
         2,
@@ -110,6 +278,68 @@ async def test_held_adversarial_results_stay_inconclusive_with_revised_plans(
         item.previous.plan.revision if item.previous else None
         for item in activities.producer_inputs
     ] == [None, 1, 2]
+
+
+async def test_maximum_round_result_stays_within_terminal_wire_budget(
+    temporal_server, temporal_artifact_store
+):
+    held = ActivityScenario(outcomes=((RoleOutcome.HELD, RoleOutcome.HELD),) * 16)
+    request = investigation_request("maximum-rounds", budget=_maximum_round_budget())
+    async with temporal_server.worker(temporal_artifact_store, held) as (task_queue, activities):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            request,
+            id=temporal_id("maximum-rounds"),
+            task_queue=task_queue,
+            result_type=InvestigationResult,
+        )
+
+    assert len(result.rounds) == 16
+    assert result.execution_status is ExecutionStatus.COMPLETED
+    assert result.result_artifact is not None
+    record_payload = (await pydantic_data_converter.encode([activities.record_inputs[-1]]))[0]
+    assert len(record_payload.data) <= TERMINAL_RESULT_MAX_BYTES
+    assert len(result.model_dump_json().encode()) <= TERMINAL_RESULT_MAX_BYTES
+    persisted = InvestigationResult.model_validate(
+        temporal_artifact_store.get_json(result.result_artifact)
+    )
+    assert len(persisted.rounds) == 16
+
+
+async def test_oversized_activity_error_reason_is_compacted_before_record(
+    temporal_server, temporal_artifact_store
+):
+    scenario = ActivityScenario(
+        fail_evidence_reason="native evidence failure: " + "x" * (MAX_DIAGNOSTIC_TEXT_CHARS * 2)
+    )
+    async with temporal_server.worker(temporal_artifact_store, scenario) as (
+        task_queue,
+        activities,
+    ):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            investigation_request("oversized-error"),
+            id=temporal_id("oversized-error"),
+            task_queue=task_queue,
+            result_type=InvestigationResult,
+        )
+
+    assert result.execution_status is ExecutionStatus.ERROR
+    assert result.reason.startswith("evidence: ")
+    assert result.reason.endswith(DIAGNOSTIC_TRUNCATION_MARKER)
+    assert len(result.reason) == MAX_DIAGNOSTIC_TEXT_CHARS
+    assert result.usage_complete is True
+    assert len(result.rounds) == 1
+    assert result.rounds[0].producer.submission_for_verification() is not None
+    assert activities.call_counts["corsair.record"] == 1
+    record_payload = await pydantic_data_converter.encode([activities.record_inputs[-1]])
+    assert len(record_payload[0].data) <= (TERMINAL_RESULT_MAX_BYTES)
+    assert result.result_artifact is not None
+    persisted = InvestigationResult.model_validate(
+        temporal_artifact_store.get_json(result.result_artifact)
+    )
+    assert persisted.execution_status is ExecutionStatus.ERROR
+    assert persisted.reason == result.reason
 
 
 async def test_prepare_block_is_blocked_and_does_not_manufacture_evidence(
@@ -133,6 +363,59 @@ async def test_prepare_block_is_blocked_and_does_not_manufacture_evidence(
     assert activities.call_counts["corsair.evidence"] == 0
     assert activities.call_counts["corsair.audit"] == 0
     assert activities.call_counts["corsair.record"] == 1
+
+
+async def test_producer_abstention_is_inconclusive_and_skips_target_execution(
+    temporal_server, temporal_artifact_store
+):
+    from temporalio import activity
+
+    class AbstainingActivities(FakeActivities):
+        @activity.defn(name="corsair.produce")
+        async def produce(self, request: ProducerInput) -> ProducerOutput:
+            self.call_counts["corsair.produce"] += 1
+            self.producer_inputs.append(request)
+            self.produce_started.set()
+            return ProducerOutput(
+                decision=ProducerDecision(
+                    root=NoGroundedCandidate(
+                        reason="The admitted source does not ground an allowed payload candidate."
+                    )
+                ),
+                usage=Usage(llm_calls=1, tool_calls=1),
+            )
+
+    activities = AbstainingActivities(temporal_artifact_store)
+    identity, queue = temporal_id("abstention"), temporal_id("abstention-queue")
+    async with Worker(
+        temporal_server.client,
+        task_queue=queue,
+        workflows=[InvestigationWorkflow],
+        activities=activities.registered(),
+    ):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            investigation_request(),
+            id=identity,
+            task_queue=queue,
+            result_type=InvestigationResult,
+        )
+
+    assert result.disposition is Disposition.INCONCLUSIVE
+    assert result.disposition is not Disposition.REFUTED
+    assert result.execution_status is ExecutionStatus.COMPLETED
+    assert result.reason.startswith("Producer abstained:")
+    assert result.manifest is not None
+    assert len(result.rounds) == 1
+    producer = result.rounds[0].producer
+    assert producer.usage == Usage(llm_calls=1, tool_calls=1)
+    assert producer.decision is not None
+    assert isinstance(producer.decision.root, NoGroundedCandidate)
+    assert activities.call_counts["corsair.evidence"] == 0
+    assert activities.call_counts["corsair.audit"] == 0
+    assert activities.evidence_inputs == []
+    assert activities.audit_inputs == []
+    assert temporal_artifact_store.reconcile(f"result.{identity}")
 
 
 async def test_worker_restart_after_completed_prepare_runs_only_remaining_activities(
@@ -311,9 +594,56 @@ async def test_failed_later_activity_preserves_completed_producer_round(
         )
     assert result.execution_status == ExecutionStatus.ERROR
     assert len(result.rounds) == 1
-    assert result.rounds[0].producer.submission is not None
+    assert result.rounds[0].producer.submission_for_verification() is not None
     assert result.rounds[0].producer.usage.llm_calls == 1
     assert result.rounds[0].producer.usage.tool_calls == 1
     assert bool(result.rounds[0].observation) == (phase == "audit")
     assert result.usage_complete == (phase == "evidence")
     assert temporal_artifact_store.reconcile(f"result.{identity}")
+
+
+async def test_oversized_structured_result_fails_workflow_not_workflow_tasks(
+    temporal_server, temporal_artifact_store
+):
+    from temporalio import activity
+    from temporalio.client import WorkflowFailureError
+    from temporalio.exceptions import ApplicationError
+
+    class LargePlans(FakeActivities):
+        @activity.defn(name="corsair.produce")
+        async def produce(self, request: ProducerInput) -> ProducerOutput:
+            producer = await super().produce(request)
+            submission = producer.submission_for_verification()
+            assert submission is not None
+            plan = submission.plan.model_copy(update={"next_steps": ["x" * 70_000]})
+            return ProducerOutput(
+                submission=submission.model_copy(update={"plan": plan}),
+                usage=producer.usage,
+                feedback=producer.feedback,
+            )
+
+    activities = LargePlans(
+        temporal_artifact_store,
+        ActivityScenario(outcomes=((RoleOutcome.HELD, RoleOutcome.HELD),)),
+    )
+    queue, identity = temporal_id("oversize-queue"), temporal_id("oversize-result")
+    async with Worker(
+        temporal_server.client,
+        task_queue=queue,
+        workflows=[InvestigationWorkflow],
+        activities=activities.registered(),
+    ):
+        with pytest.raises(WorkflowFailureError) as rejected:
+            await asyncio.wait_for(
+                temporal_server.client.execute_workflow(
+                    InvestigationWorkflow.run,
+                    investigation_request("oversize", budget=_maximum_round_budget()),
+                    id=identity,
+                    task_queue=queue,
+                ),
+                timeout=45,
+            )
+    assert isinstance(rejected.value.cause, ApplicationError)
+    assert rejected.value.cause.type == "TERMINAL_PAYLOAD_INVALID"
+    assert activities.record_inputs == []
+    assert len(activities.producer_inputs) == 16

@@ -11,9 +11,9 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from corsair.cli import execute, parser, validate_run_id
+from corsair.entrypoints.cli import execute, parser, validate_run_id
+from corsair.entrypoints.terminal import Terminal
 from corsair.observability.logging import JsonFormatter, MetadataFilter, event
-from corsair.runtime.terminal import Terminal
 
 
 @pytest.mark.parametrize(
@@ -192,6 +192,91 @@ async def test_execute_dispatches_report_without_runtime_services(tmp_path, caps
     assert json.loads(capsys.readouterr().out) == {"attempts": 1, "failed": 0}
 
 
+async def test_eval_saves_the_loaded_dataset_digest(tmp_path, monkeypatch, capsys):
+    from corsair.adapters.temporal import client as temporal_client
+    from corsair.contracts import BatchItem, digest
+    from corsair.entrypoints import api
+    from corsair.evaluation.scoring import load_dataset
+    from corsair.settings import Settings
+
+    class Handle:
+        id = "eval-provenance"
+
+        async def query(self, _query):
+            return {"completed": 1, "total": 1}
+
+    dataset_path = Path(__file__).resolve().parents[2] / "evals/datasets/dev.json"
+    dataset, _, _ = load_dataset(dataset_path)
+
+    async def connect(_settings):
+        return object()
+
+    async def start_evaluation(_client, _batch, _settings):
+        return Handle()
+
+    async def wait_for_result(_handle):
+        return [BatchItem(case_id="case01", run_id="eval-provenance-case01", error="unavailable")]
+
+    monkeypatch.setattr(
+        "corsair.entrypoints.cli._settings",
+        lambda _: Settings(artifact_root=str(tmp_path / "artifacts")),
+    )
+    monkeypatch.setattr(temporal_client, "connect", connect)
+    monkeypatch.setattr(temporal_client, "wait_for_result", wait_for_result)
+    monkeypatch.setattr(api, "start_evaluation", start_evaluation)
+    report = tmp_path / "evaluation.json"
+    args = parser().parse_args(
+        [
+            "--format",
+            "json",
+            "eval",
+            str(dataset_path),
+            "--run-id",
+            "eval-provenance",
+            "--output",
+            str(report),
+        ]
+    )
+
+    assert await execute(args) == 1
+    assert json.loads(capsys.readouterr().out)["summary"]["unavailable_results"] == 1
+    assert json.loads(report.read_text())["dataset_digest"] == digest(dataset)
+
+
+async def test_rescore_saves_the_loaded_dataset_digest(tmp_path, monkeypatch, capsys):
+    from corsair.contracts import digest
+    from corsair.entrypoints import cli
+    from corsair.evaluation.scoring import load_dataset
+    from corsair.settings import Settings
+
+    dataset_path = Path(__file__).resolve().parents[2] / "evals/datasets/dev.json"
+    dataset, _, _ = load_dataset(dataset_path)
+    monkeypatch.setattr(
+        cli, "_settings", lambda _: Settings(artifact_root=str(tmp_path / "artifacts"))
+    )
+    monkeypatch.setattr(
+        cli,
+        "_score_saved_result",
+        lambda _store, identity, _oracles: {"run_id": identity, "status": "pass"},
+    )
+    report = tmp_path / "rescored.json"
+    args = parser().parse_args(
+        [
+            "--format",
+            "json",
+            "rescore",
+            str(dataset_path),
+            "rescore-provenance",
+            "--output",
+            str(report),
+        ]
+    )
+
+    assert await execute(args) == 0
+    assert json.loads(capsys.readouterr().out)["summary"]["passed"] == 1
+    assert json.loads(report.read_text())["dataset_digest"] == digest(dataset)
+
+
 async def test_inspect_rejects_watch_before_loading_or_creating_runtime_state():
     args = parser().parse_args(["inspect", "run1", "--watch"])
 
@@ -204,3 +289,41 @@ def test_run_id_rejects_invalid_or_reserved_length_values():
         validate_run_id("invalid/id")
     with pytest.raises(ValueError, match="operation suffixes"):
         validate_run_id("a" * 61)
+
+
+def test_cli_exit_does_not_retain_handled_exception_tracebacks(tmp_path):
+    # A test-only context observer invokes the actual main function, without fake responses.
+    probe = (
+        "import json\n"
+        "from corsair.entrypoints.cli import main\n"
+        "try:\n"
+        "    main()\n"
+        "except SystemExit as exit:\n"
+        "    print(json.dumps({'code': exit.code, 'context_released': exit.__context__ is None}))\n"
+        "    raise\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", probe, "report", str(tmp_path / "absent"), "--log-format", "json"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert result.returncode == 2
+    assert json.loads(result.stdout) == {"code": 2, "context_released": True}
+    assert json.loads(result.stderr.splitlines()[-1])["event"] == "cli.failed"
+
+
+def test_client_only_operations_do_not_import_worker_or_adk_composition():
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys; import corsair.adapters.temporal.client; "
+            "assert 'corsair.entrypoints.worker' not in sys.modules; "
+            "assert not any(name.startswith('google.adk') for name in sys.modules)",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert result.returncode == 0, result.stderr

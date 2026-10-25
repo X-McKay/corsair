@@ -1,0 +1,104 @@
+{
+  "schema_version": "corsair.qualification/1",
+  "date": "2026-10-25",
+  "stage": "final_cleanup_before_authorized_branch_push",
+  "base_branch": "manus/just",
+  "target_pr": 197,
+  "local_platform": "macOS arm64",
+  "full_suite": {
+    "tests": 150,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "full_suite_seconds": 143.52,
+  "quality": "just sync check: pinned Ruff lint/format, Just format, ty error-on-warning and local docs check passed",
+  "frozen_role_evaluations": {
+    "producer": {
+      "summary": {
+        "attempts": 9,
+        "passed": 4,
+        "failed": 5,
+        "pass_rate": 0.4444444444444444,
+        "correctly_resolved": 0,
+        "invalid_positive_evidence": 0,
+        "forbidden_labels": 0,
+        "inconclusive": 0,
+        "operational_failures": 0,
+        "unavailable_results": 0,
+        "llm_calls": 9,
+        "tool_calls": 0,
+        "input_tokens": 8889,
+        "output_tokens": 2539,
+        "cost_usd": null
+      },
+      "per_case": {
+        "case01": {
+          "attempts": 3,
+          "passed": 3
+        },
+        "producer02": {
+          "attempts": 3,
+          "passed": 0
+        },
+        "producer03": {
+          "attempts": 3,
+          "passed": 1
+        }
+      },
+      "dataset_digest": "a2a6907fd06dc09003558ecfbe844f7659acc75ffa2a82a2feca4e150c74a3e2"
+    },
+    "auditor": {
+      "summary": {
+        "attempts": 12,
+        "passed": 12,
+        "failed": 0,
+        "pass_rate": 1.0,
+        "correctly_resolved": 0,
+        "invalid_positive_evidence": 0,
+        "forbidden_labels": 0,
+        "inconclusive": 0,
+        "operational_failures": 0,
+        "unavailable_results": 0,
+        "llm_calls": 12,
+        "tool_calls": 0,
+        "input_tokens": 8550,
+        "output_tokens": 1591,
+        "cost_usd": null
+      },
+      "per_case": {
+        "audit01": {
+          "attempts": 3,
+          "passed": 3
+        },
+        "audit02": {
+          "attempts": 3,
+          "passed": 3
+        },
+        "audit03": {
+          "attempts": 3,
+          "passed": 3
+        },
+        "audit04": {
+          "attempts": 3,
+          "passed": 3
+        }
+      },
+      "dataset_digest": "b7284e237d2dce26f2f5a4719af4a7e9520ee750bad8fb5a9abd312946437bc7"
+    }
+  },
+  "candidate_labels": "AI-authored, unpromoted, not held-out or population-labelled",
+  "current_full_live_batch": "not rerun in this six-line cleanup; previously2/3 with safe-case issue retained",
+  "unchanged_old_source_oracles_and_pins": true,
+  "cleanup": "redundant producer private error helper removed; native tool signatures unchanged;9 bytecode-only caches removed; current documentation whitespace normalized",
+  "privacy": "public/staged roots reviewed; no private/generated paths or credential signatures",
+  "build": "fresh wheel/sdist boundaries verified; fresh installed-wheel outside checkout passed in full suite",
+  "failed_or_unrun": [
+    "producer exact-candidate mismatches retained (4/9 latest repeat; prior5/9 and4/9 retained separately)",
+    "ISSUE-0010 prior full live safe-case ERROR/INCONCLUSIVE",
+    "local Linux current revision unrun; exact new CI pending",
+    "no human-held-out candidate promotion",
+    "uv cache/build-backend-range warnings retained; distributions checked for0 private members"
+  ],
+  "cost_usd": null
+}

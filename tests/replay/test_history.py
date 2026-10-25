@@ -8,7 +8,7 @@ from temporalio.worker import Replayer
 
 from corsair.contracts import InvestigationResult
 from corsair.workflows.investigation import InvestigationWorkflow
-from tests.fixtures.temporal import investigation_request, temporal_id
+from tests.workflow.temporal import investigation_request, temporal_id
 
 pytestmark = [pytest.mark.temporal, pytest.mark.asyncio(loop_scope="module")]
 

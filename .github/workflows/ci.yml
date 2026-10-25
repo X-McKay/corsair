@@ -1,31 +1,47 @@
 name: redesign-checks
 on:
   push:
-    branches: [main, develop, manus/re-design]
+    branches: [main, develop, manus/re-design, manus/just]
   pull_request:
 jobs:
   offline-and-package:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: astral-sh/setup-uv@v10.3.2
-        with:
-          python-version: '3.12'
-      - run: make sync check test build
+      - uses: cachix/install-nix-action@31.11.3
+      - run: nix flake check --all-systems --no-build --no-update-lock-file
+      - run: |
+          nix develop --no-update-lock-file --command bash -euc '
+            just sync check
+            just test
+            just build
+          '
   native-conformance:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: astral-sh/setup-uv@v10.3.2
-        with:
-          python-version: '3.12'
-      - run: make sync images
-      - run: CORSAIR_TEST_TEMPORAL=1 make test-docker
+      - uses: cachix/install-nix-action@31.11.3
+      - run: nix develop --no-update-lock-file --command just sync images
+      - run: nix develop --no-update-lock-file --command env CORSAIR_TEST_TEMPORAL=1 CORSAIR_TEST_LONG_PROBE=1 just test-docker
   durable-workflows:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: astral-sh/setup-uv@v10.3.2
-        with:
-          python-version: '3.12'
-      - run: make sync test-temporal
+      - uses: cachix/install-nix-action@31.11.3
+      - run: nix develop --no-update-lock-file --command just sync test-temporal
+  macos-host:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: cachix/install-nix-action@31.11.3
+      - run: |
+          nix develop --no-update-lock-file --command bash -euc '
+            python --version
+            uv --version
+            just --version
+            temporal --version
+            docker --version
+            just sync check
+            just -- test -q -W error
+            just -- test-temporal -q -W error
+          '

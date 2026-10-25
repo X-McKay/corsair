@@ -17,7 +17,7 @@ dependencies = [
 providers = ["litellm[mcp]==1.106.3"]
 
 [project.scripts]
-corsair = "corsair.cli:main"
+corsair = "corsair.entrypoints.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.12.19,<0.13"]
@@ -39,6 +39,7 @@ asyncio_mode = "auto"
 addopts = "--strict-markers"
 markers = [
   "docker: requires a real Docker daemon and the Corsair image",
+  "long_probe: explicitly opted-in real Docker probe exceeding 120 seconds",
   "temporal: requires a real Temporal development server",
   "live: explicitly enabled real-provider smoke test",
 ]
@@ -58,7 +59,7 @@ source = ["corsair"]
 python-version = "3.12"
 
 [tool.ty.src]
-include = ["src", "tests", "evals"]
+include = ["src", "tests", "evals", "scripts"]
 
 [tool.ty.terminal]
 error-on-warning = true

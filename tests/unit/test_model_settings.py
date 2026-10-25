@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from corsair.runtime import models
-from corsair.runtime.models import load_agent_spec, model_for_role, prompt_text
+from corsair.adapters.inference.models import model_for_role
+from corsair.agents.resources import AgentSpec, load_agent_spec, prompt_text
 from corsair.settings import ModelSettings
 
 
@@ -57,25 +57,39 @@ def test_agent_specs_are_validated_resource_metadata_with_manifest_tools_field()
     producer = load_agent_spec("producer")
     auditor = load_agent_spec("auditor")
 
-    assert producer.tools == ["read_file", "list_files", "submit"]
-    assert auditor.tools == []
-    assert producer.risk_path == auditor.risk_path == "corsair.runtime:risk.md"
-    assert producer.schema_ref == "corsair.contracts.Submission"
+    assert producer.source_tools == ["read_file", "list_files"]
+    assert producer.loader_tools == ["load_skill", "load_skill_resource"]
+    assert producer.tools == [*producer.source_tools, *producer.loader_tools]
+    assert auditor.source_tools == []
+    assert auditor.loader_tools == ["load_skill", "load_skill_resource"]
+    assert auditor.tools == auditor.loader_tools
+    assert producer.runtime_skills == ["source-grounding"]
+    assert auditor.runtime_skills == ["semantic-review"]
+    assert producer.llm_call_limit is None
+    assert auditor.llm_call_limit == 2
+    assert producer.loader_call_limit == auditor.loader_call_limit == 4
+    assert producer.risk_path == auditor.risk_path == "corsair.policies:risk.md"
+    assert producer.schema_ref == "corsair.contracts.ProducerDecision"
     assert auditor.schema_ref == "corsair.contracts.AuditResult"
-    assert "call `submit` exactly once" in prompt_text("producer")
+    assert "Return one structured ProducerDecision" in prompt_text("producer")
     assert "outcome-blind" in prompt_text("auditor")
 
 
 def test_agent_spec_rejects_unknown_metadata_fields():
     with pytest.raises(ValueError, match="Extra inputs are not permitted"):
-        models.AgentSpec.model_validate(
+        AgentSpec.model_validate(
             {
                 "name": "auditor",
-                "contract_version": "corsair.agent/1",
+                "contract_version": "corsair.agent/2",
                 "execution_class": "durable",
                 "governance_tier": "review",
                 "risk_path": "risk",
-                "tools": [],
+                "tools": ["load_skill", "load_skill_resource"],
+                "source_tools": [],
+                "loader_tools": ["load_skill", "load_skill_resource"],
+                "runtime_skills": ["semantic-review"],
+                "loader_call_limit": 4,
+                "llm_call_limit": 2,
                 "instruction_resource": "resource",
                 "schema_ref": "corsair.contracts.AuditResult",
                 "model": "must-not-be-declared-here",
