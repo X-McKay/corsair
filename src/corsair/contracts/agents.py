@@ -59,6 +59,10 @@ class ProducerOutput(Contract):
     usage: Usage = Field(default_factory=Usage)
     feedback: Feedback | None = None
 
+    def submission_for_verification(self) -> Submission | None:
+        """Return the canonical proposal projection used by evidence and scoring."""
+        return self.submission
+
 
 class AuditDecision(StrEnum):
     ACCEPT = "ACCEPT"
