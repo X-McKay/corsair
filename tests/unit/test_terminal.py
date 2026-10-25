@@ -9,8 +9,9 @@ import sys
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
-from corsair.cli import parser
+from corsair.cli import execute, parser, validate_run_id
 from corsair.observability.logging import JsonFormatter, MetadataFilter, event
 from corsair.runtime.terminal import Terminal
 
@@ -106,8 +107,11 @@ def test_structured_logs_whitelist_and_redact_credentials(monkeypatch):
     handler.addFilter(MetadataFilter())
     handler.setFormatter(JsonFormatter())
     logger = logging.getLogger("corsair")
-    prior_handlers, prior_level, prior_propagate = logger.handlers, logger.level, logger.propagate
-    logger.handlers, logger.propagate = [handler], False
+    prior_handlers = logger.handlers[:]
+    prior_level, prior_propagate = logger.level, logger.propagate
+    logger.handlers.clear()
+    logger.handlers.append(handler)
+    logger.propagate = False
     logger.setLevel(logging.DEBUG)
     try:
         event(
@@ -119,11 +123,9 @@ def test_structured_logs_whitelist_and_redact_credentials(monkeypatch):
             payload="NEVER_LOG_THIS",
         )
     finally:
-        logger.handlers, logger.level, logger.propagate = (
-            prior_handlers,
-            prior_level,
-            prior_propagate,
-        )
+        logger.handlers.clear()
+        logger.handlers.extend(prior_handlers)
+        logger.propagate = prior_propagate
         logger.setLevel(prior_level)
     row = json.loads(output.getvalue())
     assert row["run_id"] == "r1"
@@ -178,3 +180,27 @@ def test_nested_native_pydantic_receipts_are_json_serializable(capsys):
     terminal = Terminal(parser().parse_args(["report", "x", "--format", "json"]))
     terminal.emit([BatchItem(case_id="case1", run_id="run1", error="unavailable")])
     assert json.loads(capsys.readouterr().out)[0]["case_id"] == "case1"
+
+
+async def test_execute_dispatches_report_without_runtime_services(tmp_path, capsys):
+    report = tmp_path / "report.json"
+    report.write_text(json.dumps({"summary": {"attempts": 1, "failed": 0}}))
+
+    args = parser().parse_args(["--format", "json", "report", str(report)])
+
+    assert await execute(args) == 0
+    assert json.loads(capsys.readouterr().out) == {"attempts": 1, "failed": 0}
+
+
+async def test_inspect_rejects_watch_before_loading_or_creating_runtime_state():
+    args = parser().parse_args(["inspect", "run1", "--watch"])
+
+    with pytest.raises(ValueError, match="--watch requires --online"):
+        await execute(args)
+
+
+def test_run_id_rejects_invalid_or_reserved_length_values():
+    with pytest.raises(ValidationError):
+        validate_run_id("invalid/id")
+    with pytest.raises(ValueError, match="operation suffixes"):
+        validate_run_id("a" * 61)

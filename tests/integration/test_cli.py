@@ -109,7 +109,7 @@ async def test_real_cli_worker_doctor_and_native_reference(temporal_server, tmp_
     assert events[-2:] == ["worker.stopping", "worker.stopped"]
 
 
-async def test_real_cli_reference_in_pseudo_terminal_has_animation(temporal_server, tmp_path):
+async def test_real_cli_reference_in_pseudo_terminal_has_animation(tmp_path):
     if os.environ.get("CORSAIR_TEST_DOCKER") != "1":
         pytest.skip("set CORSAIR_TEST_DOCKER=1 for native terminal testing")
     config = tmp_path / "settings.json"

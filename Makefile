@@ -1,13 +1,20 @@
-.PHONY: sync check test test-offline test-config test-docker test-temporal test-live images build verify eval
+.PHONY: sync check lint format-check typecheck test test-offline test-docker test-temporal test-live images build verify eval
 
 sync:
 	uv sync --locked --all-extras
 
-check:
-	uv run --locked ruff check src tests evals/evaluators
-	uv run --locked ruff format --check src tests evals/evaluators
+check: lint format-check typecheck
 
-test test-offline test-config:
+lint:
+	uv run --locked ruff check src tests evals
+
+format-check:
+	uv run --locked ruff format --check src tests evals
+
+typecheck:
+	uv run --locked ty check --error-on-warning
+
+test test-offline:
 	uv run --locked pytest -m 'not docker and not temporal and not live'
 
 images:

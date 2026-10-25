@@ -15,8 +15,10 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
+from google.adk.agents import LlmAgent
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.agents.run_config import RunConfig
+from google.adk.events import Event
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.adk.runners import Runner
@@ -37,7 +39,7 @@ from corsair.contracts import (
     Usage,
 )
 from corsair.runtime.artifacts import ArtifactStore
-from corsair.runtime.models import model_for_role
+from corsair.runtime.models import AgentModel, model_for_role
 from corsair.settings import ModelSettings, Settings
 
 _MAX_PROMPT_BYTES = 32_768
@@ -235,7 +237,7 @@ def _feedback_for_exception(error: Exception) -> Feedback:
     return _feedback_for_provider(type(error).__name__, str(error))
 
 
-def _agent_text(event: Any, author: str) -> str | None:
+def _agent_text(event: Event, author: str) -> str | None:
     """Return non-thought text when an ADK event belongs to the requested role."""
 
     if getattr(event, "author", None) != author:
@@ -253,7 +255,7 @@ def _agent_text(event: Any, author: str) -> str | None:
 
 async def _run_native_episode(
     *,
-    agent: Any,
+    agent: LlmAgent,
     app_name: str,
     user_id: str,
     session_id: str,
@@ -312,7 +314,7 @@ async def run_producer(
     producer_input: ProducerInput,
     settings: Settings | ModelSettings,
     store: ArtifactStore,
-    model_override: Any | None = None,
+    model_override: AgentModel | None = None,
 ) -> ProducerOutput:
     """Run one bounded producer episode and return only typed proposal data."""
 
@@ -364,7 +366,7 @@ async def run_producer(
 async def run_auditor(
     audit_input: AuditInput,
     settings: Settings | ModelSettings,
-    model_override: Any | None = None,
+    model_override: AgentModel | None = None,
 ) -> AuditOutput:
     """Run one fresh, tool-free, outcome-blind audit request with no retry loop."""
 

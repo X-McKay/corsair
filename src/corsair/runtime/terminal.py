@@ -1,11 +1,13 @@
 """Presentation only. Rich owns color/animation; Temporal owns execution and waiting."""
 
+import argparse
 import asyncio
 import json
 import logging
 import sys
+from collections.abc import Awaitable, Callable, Mapping
 from contextlib import nullcontext
-from typing import Any
+from typing import Any, Literal, Protocol, TypeVar, cast
 
 from pydantic import TypeAdapter
 from rich.console import Console
@@ -18,7 +20,7 @@ from corsair.contracts import InvestigationResult
 from corsair.observability.evaluation import usage_metrics
 from corsair.observability.logging import event, safe_text
 
-_STYLES = {
+_STYLES: dict[str, str] = {
     "SUPPORTED": "green",
     "CONDITIONAL": "yellow",
     "INCONCLUSIVE": "yellow",
@@ -27,20 +29,31 @@ _STYLES = {
     "CANCELLED": "yellow",
     "COMPLETED": "green",
 }
+T = TypeVar("T")
 
 
-def _text(value) -> Text:
+class TerminalOptions(Protocol):
+    """Presentation switches shared by every parsed command."""
+
+    format: Literal["auto", "human", "json"]
+    no_color: bool
+    no_animation: bool
+    log_format: Literal["text", "json"]
+
+
+def _text(value: object) -> Text:
     return Text("unknown" if value is None else safe_text(value))
 
 
 class Terminal:
-    def __init__(self, args):
-        requested = getattr(args, "format", "auto")
+    def __init__(self, args: TerminalOptions | argparse.Namespace) -> None:
+        options = cast(TerminalOptions, args)
+        requested = options.format
         self.human = requested == "human" or (requested == "auto" and sys.stdout.isatty())
         # JSON mode must remain free of cursor movement even when running on a TTY.
-        colors = not getattr(args, "no_color", False) and requested != "json"
-        animation = self.human and not getattr(args, "no_animation", False)
-        animation = animation and getattr(args, "log_format", "text") != "json"
+        colors = not options.no_color and requested != "json"
+        animation = self.human and not options.no_animation
+        animation = animation and options.log_format != "json"
         self.out = Console(
             no_color=not colors,
             color_system="auto" if colors else None,
@@ -58,16 +71,17 @@ class Terminal:
         )
         self.animate = animation and self.err.is_interactive
 
-    def emit(self, value) -> None:
-        value = TypeAdapter(Any).dump_python(value, mode="json")
+    def emit(self, value: object) -> None:
+        """Write a complete JSON receipt or a compact human rendering to stdout."""
+        rendered = TypeAdapter(Any).dump_python(value, mode="json")
         if not self.human:
-            print(json.dumps(value, indent=2, ensure_ascii=False))
+            print(json.dumps(rendered, indent=2, ensure_ascii=False))
             return
-        if isinstance(value, dict) and "disposition" in value:
-            self._result(value)
-        elif isinstance(value, dict) and "checks" in value:
+        if isinstance(rendered, dict) and "disposition" in rendered:
+            self._result(rendered)
+        elif isinstance(rendered, dict) and "checks" in rendered:
             table = Table("Check", "Status", "Details", expand=True)
-            for check in value["checks"]:
+            for check in rendered["checks"]:
                 style = {"pass": "green", "fail": "red", "warn": "yellow"}.get(
                     check["status"], "cyan"
                 )
@@ -77,28 +91,31 @@ class Terminal:
                     _text(check["detail"]),
                 )
             self.out.print(Panel(table, title="Corsair · Environment checks", border_style="cyan"))
-            self.out.print(_text(value["qualification"]))
-        elif isinstance(value, dict) and ("summary" in value or "attempts" in value):
-            summary = value.get("summary", value)
+            self.out.print(_text(rendered["qualification"]))
+        elif isinstance(rendered, dict) and ("summary" in rendered or "attempts" in rendered):
+            summary = rendered.get("summary", rendered)
             table = Table.grid(padding=(0, 2))
             for key, detail in summary.items():
                 table.add_row(Text(key.replace("_", " "), style="cyan"), _text(detail))
             self.out.print(Panel(table, title="Corsair · Evaluation", border_style="cyan"))
-            if "report" in value:
-                self.out.print(Text("Report: ") + _text(value["report"]))
+            if "report" in rendered:
+                self.out.print(Text("Report: ") + _text(rendered["report"]))
         else:
             self.out.print(
                 Panel(
-                    JSON(json.dumps(value, ensure_ascii=False)),
+                    JSON(json.dumps(rendered, ensure_ascii=False)),
                     title="Corsair · Native receipt",
                     border_style="cyan",
                 )
             )
 
-    def _result(self, value: dict) -> None:
+    def _result(self, value: dict[str, Any]) -> None:
+        """Render a validated investigation result without exposing model content."""
         table = Table.grid(padding=(0, 2), expand=True)
         label = value["disposition"]
-        table.add_row(Text("Disposition", style="cyan"), Text(label, style=_STYLES.get(label)))
+        table.add_row(
+            Text("Disposition", style="cyan"), Text(label, style=_STYLES.get(label, "cyan"))
+        )
         for key in ("run_id", "case_id", "execution_status", "scope", "reason", "fix_status"):
             table.add_row(Text(key.replace("_", " ").title(), style="cyan"), _text(value.get(key)))
         for item in value.get("rounds", []):
@@ -135,15 +152,21 @@ class Terminal:
             Panel(table, title="Corsair · Investigation", border_style=_STYLES.get(label, "cyan"))
         )
 
-    async def wait(self, awaitable, label: str, *, query=None):
-        """Observe actual SDK completion; query failures never invent success/progress."""
+    async def wait(
+        self,
+        awaitable: Awaitable[T],
+        label: str,
+        *,
+        query: Callable[[], Awaitable[Mapping[str, object]]] | None = None,
+    ) -> T:
+        """Observe actual SDK completion; query failures never invent success or progress."""
         status = (
             self.err.status(Text(label), spinner="dots", spinner_style="cyan")
             if self.animate
             else None
         )
         task = asyncio.ensure_future(awaitable)
-        last = None
+        last: Mapping[str, object] | None = None
         query_failed = False
         with status if status is not None else nullcontext():
             try:
@@ -153,10 +176,20 @@ class Terminal:
                             async with asyncio.timeout(2):
                                 actual = await query()
                             if actual != last:
+                                phase = actual.get("phase")
+                                round_index = actual.get("round")
+                                completed = actual.get("completed")
+                                total = actual.get("total")
                                 detail = " · ".join(
                                     f"{key}={value}" for key, value in actual.items()
                                 )
-                                event("workflow.progress", **actual)
+                                event(
+                                    "workflow.progress",
+                                    phase=phase if isinstance(phase, str) else None,
+                                    round=round_index if isinstance(round_index, int) else None,
+                                    completed=completed if isinstance(completed, int) else None,
+                                    total=total if isinstance(total, int) else None,
+                                )
                                 if status:
                                     status.update(Text(f"{label} · {detail}"))
                                 last = actual

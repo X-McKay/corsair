@@ -84,6 +84,7 @@ class _FakeSandbox:
     image_id: str = "sha256:trusted"
 
     def has_unknown_operation(self, operation_id: str) -> bool:
+        del operation_id  # Test-controlled operation state, independent of its identity.
         return self.unknown
 
     def run_role(self, prepared, submission, role, budget, store, heartbeat, *, operation_id):
@@ -186,7 +187,8 @@ def test_forged_driver_identity_and_unknown_prior_container_are_not_admissible(
 
 def test_prior_intent_and_competing_claim_prevent_operation_replay(tmp_path: Path) -> None:
     store = ArtifactStore(tmp_path / "artifacts")
-    verifier = EvidenceVerifier(Settings(), store, _FakeSandbox(store))
+    sandbox = _FakeSandbox(store)
+    verifier = EvidenceVerifier(Settings(), store, sandbox)
     request = _input("crashed")
     intent = store.put_json(
         {
@@ -202,7 +204,7 @@ def test_prior_intent_and_competing_claim_prevent_operation_replay(tmp_path: Pat
 
     assert blocked.feedback and blocked.feedback.gate == "operation-reconciliation"
     assert blocked.cleanup_confirmed is False
-    assert verifier.sandbox.calls == 0
+    assert sandbox.calls == 0
     assert store.reconcile(request.operation_id) is None
 
 
@@ -237,6 +239,7 @@ def test_policy_never_refutes_negative_evidence_and_conditions_app_scope() -> No
     assert status.value == "COMPLETED"
     assert fix_status(observation).value == "DEMONSTRATION_BLOCKED"
 
+    assert observation.adversarial is not None
     demonstrated = observation.model_copy(
         update={
             "adversarial": observation.adversarial.model_copy(

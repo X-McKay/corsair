@@ -20,9 +20,19 @@ from typing import Any
 
 import docker
 from docker.errors import APIError, DockerException, ImageNotFound, NotFound
+from docker.types import LogConfig
 
-from corsair.contracts import Budget, PreparedCase, RoleObservation, RoleOutcome, Submission, digest
+from corsair.contracts import (
+    ArtifactRef,
+    Budget,
+    PreparedCase,
+    RoleObservation,
+    RoleOutcome,
+    Submission,
+    digest,
+)
 from corsair.runtime.artifacts import ArtifactStore
+from corsair.settings import Settings
 from corsair.tools.security.sources import SourceAdmissionError, iter_snapshot_files
 
 Heartbeat = Callable[[], None]
@@ -44,12 +54,11 @@ class DockerSandbox:
     dependency/build systems; initial support imports a pinned source module directly.
     """
 
-    def __init__(self, settings, client: Any | None = None):
+    def __init__(self, settings: Settings, client: docker.DockerClient | None = None) -> None:
         self.settings = settings
-        self._client = client
+        self._client: docker.DockerClient | None = client
         self._client_error: str | None = None
         self._image_id: str | None = None
-        self._image_error: str | None = None
         if client is None:
             try:
                 self._client = docker.from_env()
@@ -64,28 +73,29 @@ class DockerSandbox:
     def _ensure_image(self) -> str:
         if self._image_id is not None:
             return self._image_id
-        if self._client is None:
+        client = self._client
+        if client is None:
             raise SandboxUnavailable(
                 f"Docker client unavailable: {self._client_error or 'unknown error'}"
             )
         try:
-            image = self._client.images.get(self.settings.image)
+            image = client.images.get(self.settings.image)
         except ImageNotFound:
             raise SandboxUnavailable(
                 "trusted image unavailable; build deploy/python/Dockerfile with make images"
             ) from None
         except (APIError, DockerException) as exc:
-            self._image_error = type(exc).__name__
-            raise SandboxUnavailable(f"trusted image unavailable: {self._image_error}") from exc
+            raise SandboxUnavailable(f"trusted image unavailable: {type(exc).__name__}") from exc
         self._image_id = str(image.id)
         return self._image_id
 
     def has_unknown_operation(self, operation_id: str) -> bool:
         """An old labeled container means the operation may have run; never rerun it."""
-        if self._client is None:
+        client = self._client
+        if client is None:
             return False
         try:
-            containers = self._client.containers.list(
+            containers = client.containers.list(
                 all=True,
                 filters={"label": ["corsair.security=true", f"corsair.operation={operation_id}"]},
             )
@@ -184,7 +194,7 @@ class DockerSandbox:
 
     def _wait_with_heartbeat(
         self, container: Any, timeout_seconds: int, heartbeat: Heartbeat
-    ) -> dict:
+    ) -> dict[str, Any]:
         result: dict[str, Any] = {}
         failure: list[BaseException] = []
 
@@ -213,6 +223,9 @@ class DockerSandbox:
 
     def _cleanup(self, container: Any, immutable_id: str, labels: dict[str, str]) -> bool:
         """Remove only the created immutable ID and then independently confirm absence."""
+        client = self._client
+        if client is None:
+            return False
         try:
             container.reload()
             actual_id = str(container.attrs.get("Id", ""))
@@ -225,7 +238,7 @@ class DockerSandbox:
                 container.stop(timeout=1)
             container.remove(force=True)
             try:
-                self._client.api.inspect_container(immutable_id)
+                client.api.inspect_container(immutable_id)
             except NotFound:
                 return True
             except (APIError, DockerException):
@@ -246,7 +259,7 @@ class DockerSandbox:
         cleanup_confirmed: bool = False,
         image_id: str | None = None,
         docker_exit_code: int | None = None,
-    ) -> tuple[RoleObservation, Any]:
+    ) -> tuple[RoleObservation, ArtifactRef]:
         ref = store.put_json(
             {
                 "schema_version": "corsair.raw-evidence/1",
@@ -281,7 +294,7 @@ class DockerSandbox:
         heartbeat: Heartbeat = lambda: None,
         *,
         operation_id: str | None = None,
-    ) -> tuple[RoleObservation, Any]:
+    ) -> tuple[RoleObservation, ArtifactRef]:
         """Run one control/adversarial role and return provisional observation + raw ref.
 
         ``operation_id`` is keyword-only for backwards compatibility with the public
@@ -291,6 +304,11 @@ class DockerSandbox:
         if role not in {"control", "adversarial"}:
             raise ValueError("role must be control or adversarial")
         image_id = self._ensure_image()
+        client = self._client
+        if client is None:
+            raise SandboxUnavailable(
+                f"Docker client unavailable: {self._client_error or 'unknown error'}"
+            )
         if operation_id is None:
             operation_id = prepared.manifest.request_digest
         labels = {
@@ -333,7 +351,7 @@ class DockerSandbox:
                 os.chmod(job_path, 0o444)
                 os.chmod(input_root, 0o555)
 
-                container = self._client.containers.create(
+                container = client.containers.create(
                     image=image_id,
                     labels=labels,
                     network_mode="none",
@@ -356,7 +374,7 @@ class DockerSandbox:
                         "/work": "rw,nosuid,nodev,noexec,size=64m,mode=0700,uid=1000,gid=1000",
                         "/tmp": "rw,nosuid,nodev,noexec,size=32m,mode=1777",
                     },
-                    log_config=docker.types.LogConfig(
+                    log_config=LogConfig(
                         type="json-file",
                         config={"max-size": "128k", "max-file": "1"},
                     ),

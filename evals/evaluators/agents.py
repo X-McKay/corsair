@@ -1,101 +1,174 @@
-"""Isolated live-model fixture evaluations; no target code or arbitrary probes run on the host.
-
-This developer runner does not claim native-workspace or whole-system qualification.
-Use the production factories unchanged, then score against external frozen oracle data.
-"""
+"""Isolated live-model evaluations; no target code or arbitrary probes run on the host."""
 
 import argparse
 import asyncio
 import json
+import logging
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
-from corsair.cli import request_from_file
-from corsair.contracts import AuditInput, ProducerInput, digest
+from rich.console import Console
+
+from corsair.contracts import (
+    AuditInput,
+    AuditOutput,
+    InvestigationRequest,
+    ProducerInput,
+    ProducerOutput,
+    digest,
+)
 from corsair.observability.evaluation import dataset_root, summarize
+from corsair.observability.logging import configure_logging, event, safe_error_detail
 from corsair.runtime.agent_runner import run_auditor, run_producer
 from corsair.runtime.artifacts import ArtifactStore
 from corsair.runtime.manifest import build_manifest
-from corsair.settings import load_settings
+from corsair.runtime.requests import resolve_request_sources
+from corsair.settings import Settings, load_settings
 from corsair.tools.security.sources import prepare_case
 
 
-async def evaluate(args):
+def load_frozen_fixture(root: Path, entry: dict[str, Any]) -> tuple[Path, bytes, dict[str, Any]]:
+    """Read/verify once; the oracle remains local to this evaluator."""
+    contents: dict[str, bytes] = {}
+    paths: dict[str, Path] = {}
+    for field in ("input", "oracle"):
+        path = (root / entry[field]).resolve()
+        if not path.is_relative_to(root):
+            raise ValueError("agent dataset path escapes its root")
+        content = path.read_bytes()
+        if digest(content) != entry[f"{field}_digest"]:
+            raise ValueError("frozen isolated fixture changed")
+        paths[field], contents[field] = path, content
+    oracle = json.loads(contents["oracle"])
+    if not isinstance(oracle, dict):
+        raise ValueError("isolated oracle must be a JSON object")
+    return paths["input"], contents["input"], oracle
+
+
+async def invoke_fixture_agent(
+    agent: str,
+    path: Path,
+    content: bytes,
+    identity: str,
+    settings: Settings,
+    store: ArtifactStore,
+) -> ProducerOutput | AuditOutput:
+    """Invoke a production factory with only its admitted input, never oracle data."""
+    if agent == "auditor":
+        return await run_auditor(AuditInput.model_validate_json(content), settings)
+    if agent != "producer":
+        raise ValueError("unknown isolated agent")
+    request = resolve_request_sources(
+        InvestigationRequest.model_validate_json(content), path.parent
+    )
+    prepared = prepare_case(
+        request.case,
+        settings,
+        store,
+        build_manifest(request, settings, "fixture-only:no-native-execution"),
+    )
+    return await run_producer(
+        ProducerInput(
+            run_id=identity,
+            prepared=prepared,
+            budget=request.budget,
+            round_index=1,
+            llm_call_limit=request.budget.episode_llm_calls,
+            tool_call_limit=request.budget.max_tool_calls,
+        ),
+        settings,
+        store,
+    )
+
+
+def fixture_matches_oracle(output: ProducerOutput | AuditOutput, oracle: dict[str, Any]) -> bool:
+    """Compare output outside the agent boundary; no native-evidence claim is made."""
+    if isinstance(output, ProducerOutput):
+        return (
+            output.submission is not None
+            and output.submission.control_payload == oracle["control_payload"]
+            and output.submission.exploit_payload in oracle["candidate_payloads"]
+        )
+    return output.review is not None and output.review.decision == oracle["decision"]
+
+
+def fixture_score_row(
+    output: ProducerOutput | AuditOutput,
+    oracle: dict[str, Any],
+    *,
+    identity: str,
+    case_id: str,
+    repeat: int,
+    agent: str,
+    settings: Settings,
+    store: ArtifactStore,
+) -> dict[str, Any]:
+    """Persist the output and retain errors, unknown accounting, and evaluation identity."""
+    return {
+        "run_id": identity,
+        "case_id": case_id,
+        "repeat": repeat,
+        "status": "pass" if fixture_matches_oracle(output, oracle) else "fail",
+        "cohort": "live-model-fixture",
+        "execution_status": "ERROR"
+        if output.feedback and output.feedback.operational
+        else "COMPLETED",
+        "agent": agent,
+        "output_artifact": store.put_json(output).model_dump(mode="json"),
+        "config_digest": settings.identity,
+        "llm_calls": output.usage.llm_calls,
+        "tool_calls": output.usage.tool_calls,
+        "input_tokens": output.usage.input_tokens,
+        "output_tokens": output.usage.output_tokens,
+        "agent_seconds": output.usage.seconds,
+        "feedback": output.feedback.model_dump(mode="json") if output.feedback else None,
+    }
+
+
+async def evaluate(args: argparse.Namespace) -> int:
+    """Coordinate one finite isolated evaluation and save its external report."""
     settings = load_settings(args.settings)
     store = ArtifactStore(settings.artifact_root)
     path = Path(args.dataset)
-    dataset = json.loads(path.read_text())
-    if dataset["schema_version"] != "corsair.agent-dataset/1":
+    dataset = json.loads(path.read_bytes())
+    if not isinstance(dataset, dict) or dataset.get("schema_version") != "corsair.agent-dataset/1":
         raise ValueError("Unsupported isolated agent dataset")
+    entries = dataset.get("entries")
+    if not isinstance(entries, list) or not 1 <= len(entries) <= 64:
+        raise ValueError("isolated dataset requires 1..64 entries")
     root = dataset_root(path)
+    fixtures = [(entry, load_frozen_fixture(root, entry)) for entry in entries]
     rows = []
     for repeat in range(args.repeats):
-        for entry in dataset["entries"]:
-            files = {}
-            for field in ("input", "oracle"):
-                file = (root / entry[field]).resolve()
-                if not file.is_relative_to(root):
-                    raise ValueError("agent dataset path escapes its root")
-                if digest(file.read_bytes()) != entry[f"{field}_digest"]:
-                    raise ValueError("frozen isolated fixture changed")
-                files[field] = file
-            # Oracle only lives here. None of its fields enter the agent invocation.
-            oracle = json.loads(files["oracle"].read_text())
+        for entry, (input_path, content, oracle) in fixtures:
             identity = f"isolated-{uuid4().hex}"
-            if args.agent == "producer":
-                request = request_from_file(files["input"])
-                prepared = prepare_case(
-                    request.case,
-                    settings,
-                    store,
-                    build_manifest(request, settings, "fixture-only:no-native-execution"),
-                )
-                output = await run_producer(
-                    ProducerInput(
-                        run_id=identity,
-                        prepared=prepared,
-                        budget=request.budget,
-                        round_index=1,
-                        llm_call_limit=request.budget.episode_llm_calls,
-                        tool_call_limit=request.budget.max_tool_calls,
-                    ),
-                    settings,
-                    store,
-                )
-                accepted = (
-                    output.submission is not None
-                    and output.submission.control_payload == oracle["control_payload"]
-                    and output.submission.exploit_payload in oracle["candidate_payloads"]
-                )
-            else:
-                packet = AuditInput.model_validate_json(files["input"].read_bytes())
-                output = await run_auditor(packet, settings)
-                accepted = (
-                    output.review is not None and output.review.decision == oracle["decision"]
-                )
-            artifact = store.put_json(output)
-            rows.append(
-                {
-                    "run_id": identity,
-                    "case_id": entry["case_id"],
-                    "repeat": repeat,
-                    "status": "pass" if accepted else "fail",
-                    "cohort": "live-model-fixture",
-                    "execution_status": "ERROR"
-                    if output.feedback and output.feedback.operational
-                    else "COMPLETED",
-                    "agent": args.agent,
-                    "output_artifact": artifact.model_dump(mode="json"),
-                    "config_digest": settings.identity,
-                    "llm_calls": output.usage.llm_calls,
-                    "tool_calls": output.usage.tool_calls,
-                    "input_tokens": output.usage.input_tokens,
-                    "output_tokens": output.usage.output_tokens,
-                    "agent_seconds": output.usage.seconds,
-                    "feedback": output.feedback.model_dump(mode="json")
-                    if output.feedback
-                    else None,
-                }
+            event(
+                "isolated_agent.started",
+                run_id=identity,
+                case_id=entry["case_id"],
+                round=repeat + 1,
+            )
+            output = await invoke_fixture_agent(
+                args.agent, input_path, content, identity, settings, store
+            )
+            row = fixture_score_row(
+                output,
+                oracle,
+                identity=identity,
+                case_id=entry["case_id"],
+                repeat=repeat,
+                agent=args.agent,
+                settings=settings,
+                store=store,
+            )
+            rows.append(row)
+            event(
+                "isolated_agent.completed",
+                run_id=identity,
+                status=row["status"],
+                llm_calls=output.usage.llm_calls,
+                gate=output.feedback.gate if output.feedback else None,
             )
     report = {"dataset_digest": digest(dataset), "rows": rows, "summary": summarize(rows)}
     destination = Path(args.output or f".runs/evaluations/{args.agent}-{uuid4().hex}.json")
@@ -105,11 +178,30 @@ async def evaluate(args):
     return 0 if report["summary"]["failed"] == 0 else 1
 
 
-if __name__ == "__main__":
+def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("agent", choices=["producer", "auditor"])
     parser.add_argument("dataset")
     parser.add_argument("--settings", required=True)
     parser.add_argument("--repeats", type=int, choices=range(1, 9), default=1)
     parser.add_argument("--output")
-    raise SystemExit(asyncio.run(evaluate(parser.parse_args())))
+    args = parser.parse_args()
+    configure_logging(Console(stderr=True, no_color=True), format="json")
+    try:
+        code = asyncio.run(evaluate(args))
+    except KeyboardInterrupt:
+        event("isolated_agent.interrupted", level=logging.WARNING)
+        raise SystemExit(130) from None
+    except Exception as error:
+        event(
+            "isolated_agent.failed",
+            level=logging.ERROR,
+            error_type=type(error).__name__,
+            message=safe_error_detail(error),
+        )
+        raise SystemExit(2) from None
+    raise SystemExit(code)
+
+
+if __name__ == "__main__":
+    main()

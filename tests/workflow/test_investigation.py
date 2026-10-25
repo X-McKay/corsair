@@ -292,6 +292,7 @@ async def test_failed_later_activity_preserves_completed_producer_round(
 
         @activity.defn(name="corsair.audit")
         async def audit(self, request: AuditInput) -> AuditOutput:
+            del request  # Typed native activity signature; this scenario fails unconditionally.
             raise ApplicationError("test audit failed after its invocation", non_retryable=True)
 
     activities = FailingActivities(temporal_artifact_store)

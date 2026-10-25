@@ -6,21 +6,24 @@ this factory intentionally owns no session state or source handles.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any
 
 from google.adk.agents import LlmAgent
 
-from corsair.runtime.models import load_agent_spec, prompt_text
+from corsair.runtime.models import AgentModel, load_agent_spec, prompt_text
 
 
-def _tool_name(tool: Any) -> str:
-    return str(getattr(tool, "name", getattr(tool, "__name__", "")))
+def _tool_name(tool: Callable[..., Any]) -> str:
+    name = getattr(tool, "__name__", None)
+    if not isinstance(name, str) or not name:
+        raise ValueError("producer tools must have non-empty callable names")
+    return name
 
 
 def build_producer(
-    model: Any,
-    tools: Sequence[Any],
+    model: AgentModel,
+    tools: Sequence[Callable[..., Any]],
 ) -> LlmAgent:
     """Build the producer with only its episode-private approved tools.
 

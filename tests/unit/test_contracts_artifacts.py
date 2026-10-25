@@ -18,7 +18,14 @@ def test_unknown_fields_and_disabled_budgets_rejected():
     with pytest.raises(ValidationError):
         Budget(max_llm_calls=0)
     with pytest.raises(ValidationError):
-        PythonRecipe(module_file="x.py", function="f", payload_parameter="p", verdict="SUPPORTED")
+        PythonRecipe.model_validate(
+            {
+                "module_file": "x.py",
+                "function": "f",
+                "payload_parameter": "p",
+                "verdict": "SUPPORTED",
+            }
+        )
     with pytest.raises(ValidationError):
         ArtifactRef(sha256="not-a-digest", size=1)
 

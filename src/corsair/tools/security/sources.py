@@ -12,7 +12,7 @@ import os
 import stat
 import sys
 import tarfile
-from collections.abc import Iterable, Iterator
+from collections.abc import Generator, Iterable, Iterator
 from pathlib import Path, PurePosixPath
 
 from corsair.contracts import ArtifactRef, Case, PreparedCase, RunManifest, Source, safe_path
@@ -199,7 +199,7 @@ def _directory_entries(directory_fd: int) -> list[os.DirEntry[str]]:
 
 def _iter_regular_files(
     directory_fd: int, settings: Settings
-) -> Iterator[tuple[PurePosixPath, int, str, os.stat_result]]:
+) -> Generator[tuple[PurePosixPath, int, str, os.stat_result], None, None]:
     """Walk pinned descriptors in lexical order, rejecting every unadmitted entry."""
     directory_flags = _require_secure_source_support()
     emitted = 0
@@ -361,11 +361,6 @@ def _archive_members(ref: ArtifactRef, store: ArtifactStore) -> dict[str, tarfil
         raise SourceAdmissionError("source artifact is not a valid uncompressed tar") from exc
 
 
-def list_snapshot_paths(ref: ArtifactRef, store: ArtifactStore) -> list[str]:
-    """List only paths validated by the same artifact validator used for execution."""
-    return sorted(_archive_members(ref, store))
-
-
 def _read_member(ref: ArtifactRef, store: ArtifactStore, member: tarfile.TarInfo) -> bytes:
     content = store.get(ref)
     try:
@@ -421,7 +416,7 @@ def prepare_case(
 ) -> PreparedCase:
     """Freeze source revisions before an agent is given only a pinned source excerpt."""
     source = snapshot_source(case.source, settings, store)
-    module_text = read_source(source, case.recipe.module_file, store, settings.source_limit_bytes)
+    read_source(source, case.recipe.module_file, store, settings.source_limit_bytes)
     finding_text = read_source(source, case.finding.file, store, settings.source_limit_bytes)
     fixed_source = (
         snapshot_source(case.fixed_source, settings, store)
@@ -430,7 +425,6 @@ def prepare_case(
     )
     if fixed_source is not None:
         read_source(fixed_source, case.recipe.module_file, store, settings.source_limit_bytes)
-    _ = module_text
     return PreparedCase(
         case_id=case.case_id,
         finding=case.finding,

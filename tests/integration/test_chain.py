@@ -14,10 +14,10 @@ from google.adk.models import BaseLlm
 from pydantic import Field
 from temporalio.worker import Worker
 
-from corsair.cli import request_from_file
 from corsair.contracts import Disposition, FixStatus
 from corsair.observability.logging import LifecycleLoggingInterceptor
 from corsair.runtime.artifacts import ArtifactStore
+from corsair.runtime.requests import load_investigation_request
 from corsair.settings import Settings
 from corsair.steps.activities import Activities
 from corsair.workflows.investigation import InvestigationWorkflow
@@ -29,6 +29,7 @@ class ReferenceModel(BaseLlm):
     requests: list = Field(default_factory=list)
 
     async def generate_content_async(self, llm_request, stream=False):
+        del stream  # Native ADK interface; this labelled fixture returns one complete response.
         self.requests.append(llm_request)
         if llm_request.tools_dict:
             user_message = next(
@@ -70,7 +71,7 @@ async def test_native_adk_docker_temporal_chain_and_fix(temporal_server, tmp_pat
     if os.environ.get("CORSAIR_TEST_DOCKER") != "1":
         pytest.skip("set CORSAIR_TEST_DOCKER=1 for real native execution")
     root = Path(__file__).resolve().parents[2]
-    request = request_from_file(root / "evals/fixtures/case01/request.json")
+    request = load_investigation_request(root / "evals/fixtures/case01/request.json")
     store = ArtifactStore(tmp_path / "artifacts")
     settings = Settings(source_root=str(root), artifact_root=str(store.root))
     model = ReferenceModel(model="scripted-reference")

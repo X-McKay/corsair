@@ -1,6 +1,7 @@
 """External evaluator: oracle files are never passed to agents, tools or workflows."""
 
 import json
+from collections.abc import Iterable
 from pathlib import Path
 
 from pydantic import Field
@@ -17,6 +18,7 @@ from corsair.contracts import (
 )
 from corsair.policy.verdicts import decide, fix_status
 from corsair.runtime.artifacts import ArtifactStore
+from corsair.runtime.requests import resolve_request_sources
 from corsair.settings import Settings
 from corsair.tools.security.evidence import EvidenceVerifier
 
@@ -49,11 +51,15 @@ def dataset_root(path: Path) -> Path:
     return parent.parent if parent.name == "datasets" else parent
 
 
-def _under(root: Path, relative: str) -> Path:
+def _read_frozen_file(root: Path, relative: str, expected: Digest, kind: str) -> tuple[Path, bytes]:
+    """Read once and verify the exact bytes that the evaluator will parse."""
     path = (root / relative).resolve()
     if not path.is_relative_to(root) or not path.is_file():
         raise ValueError("dataset path escapes its root or is missing")
-    return path
+    content = path.read_bytes()
+    if digest(content) != expected:
+        raise ValueError(f"frozen {kind} digest changed")
+    return path, content
 
 
 def load_dataset(path: Path) -> tuple[Dataset, list[InvestigationRequest], dict[str, Oracle]]:
@@ -68,27 +74,15 @@ def load_dataset(path: Path) -> tuple[Dataset, list[InvestigationRequest], dict[
         if entry.family in family_splits and family_splits[entry.family] != entry.split:
             raise ValueError("related family variants may not cross dataset splits")
         family_splits[entry.family] = entry.split
-        request_path = _under(root, entry.request)
-        oracle_path = _under(root, entry.oracle)
-        if digest(request_path.read_bytes()) != entry.request_digest:
-            raise ValueError("frozen request digest changed")
-        if digest(oracle_path.read_bytes()) != entry.oracle_digest:
-            raise ValueError("frozen oracle digest changed")
-        request = InvestigationRequest.model_validate_json(request_path.read_bytes())
+        request_path, request_bytes = _read_frozen_file(
+            root, entry.request, entry.request_digest, "request"
+        )
+        _, oracle_bytes = _read_frozen_file(root, entry.oracle, entry.oracle_digest, "oracle")
+        request = InvestigationRequest.model_validate_json(request_bytes)
         if request.case.case_id != entry.case_id:
             raise ValueError("dataset and request case identities disagree")
-        # Resolve source paths at the client edge, never expose dataset/oracle paths to an agent.
-        source = request.case.source.model_copy(
-            update={"path": str((request_path.parent / request.case.source.path).absolute())}
-        )
-        fixed = request.case.fixed_source
-        if fixed is not None:
-            fixed = fixed.model_copy(
-                update={"path": str((request_path.parent / fixed.path).absolute())}
-            )
-        case = request.case.model_copy(update={"source": source, "fixed_source": fixed})
-        requests.append(request.model_copy(update={"case": case}))
-        oracles[entry.case_id] = Oracle.model_validate_json(oracle_path.read_bytes())
+        requests.append(resolve_request_sources(request, request_path.parent))
+        oracles[entry.case_id] = Oracle.model_validate_json(oracle_bytes)
     return dataset, requests, oracles
 
 
@@ -160,31 +154,30 @@ def usage_metrics(result: InvestigationResult) -> dict:
     """One usage calculation shared by scoring and human CLI presentation."""
     usage = [item.producer.usage for item in result.rounds]
     usage += [item.audit.usage for item in result.rounds if item.audit is not None]
-    input_tokens = (
-        sum(item.input_tokens for item in usage)
-        if result.usage_complete and usage and all(item.input_tokens is not None for item in usage)
-        else None
-    )
-    output_tokens = (
-        sum(item.output_tokens for item in usage)
-        if result.usage_complete and usage and all(item.output_tokens is not None for item in usage)
-        else None
-    )
     return {
         "llm_calls": sum(item.llm_calls for item in usage) if result.usage_complete else None,
         "tool_calls": sum(item.tool_calls for item in usage) if result.usage_complete else None,
-        "input_tokens": input_tokens,
-        "output_tokens": output_tokens,
+        "input_tokens": _sum_known_counts(item.input_tokens for item in usage)
+        if result.usage_complete
+        else None,
+        "output_tokens": _sum_known_counts(item.output_tokens for item in usage)
+        if result.usage_complete
+        else None,
         "agent_seconds": sum(item.seconds for item in usage) if result.usage_complete else None,
     }
 
 
-def known_total(rows: list[dict], field: str) -> int | None:
-    return (
-        sum(row[field] for row in rows)
-        if rows and all(row.get(field) is not None for row in rows)
-        else None
-    )
+def _sum_known_counts(values: Iterable[int | None]) -> int | None:
+    """Aggregate in one pass; missing values and an empty population stay unknown."""
+    iterator = iter(values)
+    total = next(iterator, None)
+    if total is None:
+        return None
+    for value in iterator:
+        if value is None:
+            return None
+        total += value
+    return total
 
 
 def summarize(rows: list[dict]) -> dict:
@@ -203,18 +196,10 @@ def summarize(rows: list[dict]) -> dict:
             row.get("execution_status") in {"BLOCKED", "ERROR", "CANCELLED"} for row in rows
         ),
         "unavailable_results": sum(row.get("status") == "unavailable" for row in rows),
-        "llm_calls": known_total(rows, "llm_calls"),
-        "tool_calls": known_total(rows, "tool_calls"),
-        "input_tokens": (
-            sum(row["input_tokens"] for row in rows)
-            if rows and all(row.get("input_tokens") is not None for row in rows)
-            else None
-        ),
-        "output_tokens": (
-            sum(row["output_tokens"] for row in rows)
-            if rows and all(row.get("output_tokens") is not None for row in rows)
-            else None
-        ),
+        "llm_calls": _sum_known_counts(row.get("llm_calls") for row in rows),
+        "tool_calls": _sum_known_counts(row.get("tool_calls") for row in rows),
+        "input_tokens": _sum_known_counts(row.get("input_tokens") for row in rows),
+        "output_tokens": _sum_known_counts(row.get("output_tokens") for row in rows),
         "cost_usd": None,
     }
 

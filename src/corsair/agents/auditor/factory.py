@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from google.adk.agents import LlmAgent
 from google.genai import types
 
 from corsair.contracts import AuditResult
-from corsair.runtime.models import load_agent_spec, prompt_text
+from corsair.runtime.models import AgentModel, load_agent_spec, prompt_text
 
 
-def build_auditor(model: Any) -> LlmAgent:
+def build_auditor(model: AgentModel) -> LlmAgent:
     """Build a fresh, tool-free, structured-output semantic reviewer."""
 
     spec = load_agent_spec("auditor")

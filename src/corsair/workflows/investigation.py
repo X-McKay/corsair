@@ -2,7 +2,8 @@
 
 import asyncio
 import math
-from datetime import timedelta
+from datetime import datetime, timedelta
+from typing import Any
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
@@ -29,21 +30,25 @@ with workflow.unsafe.imports_passed_through():
 
 
 class BudgetExhausted(Exception):
-    pass
+    """No action time remains before the investigation admission deadline."""
 
 
 @workflow.defn(name="corsair.investigation")
 class InvestigationWorkflow:
-    def __init__(self):
+    def __init__(self) -> None:
         self.phase = "pending"
         self.round_index = 0
-        self.deadline = None
+        self.deadline: datetime | None = None
 
     @workflow.query
     def status(self) -> dict:
         return {"phase": self.phase, "round": self.round_index}
 
-    async def step(self, name: str, argument, result_type, seconds: int):
+    async def _execute_bounded_activity[Result](
+        self, name: str, argument: Any, result_type: type[Result], seconds: int
+    ) -> Result:
+        if self.deadline is None:
+            raise RuntimeError("Investigation deadline has not been initialized")
         remaining = (self.deadline - workflow.now()).total_seconds()
         if remaining <= 0:
             raise BudgetExhausted
@@ -58,6 +63,24 @@ class InvestigationWorkflow:
             retry_policy=RetryPolicy(maximum_attempts=1),
             cancellation_type=workflow.ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
         )
+
+    async def _record_result(self, result: InvestigationResult) -> InvestigationResult:
+        """Persist the final receipt within its separate retry/finalization allowance."""
+        self.phase = "record"
+        recorded = await asyncio.shield(
+            workflow.execute_activity(
+                "corsair.record",
+                result,
+                result_type=InvestigationResult,
+                start_to_close_timeout=timedelta(seconds=30),
+                schedule_to_close_timeout=(
+                    timedelta(seconds=90) if workflow.patched("bounded-finalization-v1") else None
+                ),
+                retry_policy=RetryPolicy(maximum_attempts=3),
+            )
+        )
+        self.phase = "complete"
+        return recorded
 
     @workflow.run
     async def run(self, request: InvestigationRequest) -> InvestigationResult:
@@ -78,7 +101,9 @@ class InvestigationWorkflow:
         rounds: list[RoundResult] = []
         try:
             self.phase = "prepare"
-            prepared = await self.step("corsair.prepare", request, PreparedCase, 120)
+            prepared = await self._execute_bounded_activity(
+                "corsair.prepare", request, PreparedCase, 120
+            )
             result = result.model_copy(update={"manifest": prepared.manifest})
             calls_left, tools_left = budget.max_llm_calls, budget.max_tool_calls
             previous, feedback = None, None
@@ -90,7 +115,7 @@ class InvestigationWorkflow:
                     break
                 self.phase = "producer"
                 call_limit = min(budget.episode_llm_calls, calls_left - 1)
-                producer = await self.step(
+                producer = await self._execute_bounded_activity(
                     "corsair.produce",
                     ProducerInput(
                         run_id=run_id,
@@ -124,7 +149,7 @@ class InvestigationWorkflow:
                     continue
                 previous = producer.submission
                 self.phase = "evidence"
-                observation = await self.step(
+                observation = await self._execute_bounded_activity(
                     "corsair.evidence",
                     EvidenceInput(
                         run_id=run_id,
@@ -151,7 +176,7 @@ class InvestigationWorkflow:
                     result = result.model_copy(update={"reason": "No budget remains for review."})
                     break
                 self.phase = "audit"
-                audit = await self.step(
+                audit = await self._execute_bounded_activity(
                     "corsair.audit",
                     AuditInput(
                         finding=prepared.finding,
@@ -175,7 +200,7 @@ class InvestigationWorkflow:
                 if label in {Disposition.SUPPORTED, Disposition.CONDITIONAL}:
                     if prepared.fixed_source is not None:
                         self.phase = "fix"
-                        fixed = await self.step(
+                        fixed = await self._execute_bounded_activity(
                             "corsair.evidence",
                             EvidenceInput(
                                 run_id=run_id,
@@ -230,20 +255,5 @@ class InvestigationWorkflow:
             raise
         finally:
             result = result.model_copy(update={"rounds": rounds})
-            self.phase = "record"
-            result = await asyncio.shield(
-                workflow.execute_activity(
-                    "corsair.record",
-                    result,
-                    result_type=InvestigationResult,
-                    start_to_close_timeout=timedelta(seconds=30),
-                    schedule_to_close_timeout=(
-                        timedelta(seconds=90)
-                        if workflow.patched("bounded-finalization-v1")
-                        else None
-                    ),
-                    retry_policy=RetryPolicy(maximum_attempts=3),
-                )
-            )
-            self.phase = "complete"
+            result = await self._record_result(result)
         return result

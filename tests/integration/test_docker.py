@@ -5,6 +5,7 @@ from pathlib import Path
 
 import docker
 import pytest
+from docker.errors import DockerException
 
 from corsair.contracts import (
     Budget,
@@ -50,13 +51,13 @@ def _docker_client() -> docker.DockerClient:
     try:
         client = docker.from_env()
         client.ping()
-    except docker.errors.DockerException as exc:
+    except DockerException as exc:
         if os.getenv("CORSAIR_TEST_DOCKER") == "1":
             pytest.fail(f"explicit real Docker test requires daemon: {type(exc).__name__}")
         pytest.skip(f"real Docker unavailable: {type(exc).__name__}")
     try:
         client.images.get("corsair-python:0.1")
-    except docker.errors.DockerException as exc:
+    except DockerException as exc:
         if os.getenv("CORSAIR_TEST_DOCKER") == "1":
             pytest.fail(f"explicit real Docker test requires image: {type(exc).__name__}")
         pytest.skip(f"real Docker image unavailable: {type(exc).__name__}")
@@ -243,6 +244,8 @@ def test_native_failures_and_canned_markers_never_become_positive(
         )
     )
     assert observation.cleanup_confirmed
+    assert observation.control is not None
+    assert observation.adversarial is not None
     assert observation.control.outcome.value == expected_control
     assert observation.adversarial.outcome.value == expected_adversarial
     assert observation.adversarial.outcome.value != "VIOLATION"
@@ -273,5 +276,6 @@ def test_native_timeout_removes_owned_container(tmp_path):
         )
     )
     assert observation.cleanup_confirmed
+    assert observation.control is not None
     assert observation.control.outcome.value == "ERROR"
     _assert_cleanup(client, "timeout-native")

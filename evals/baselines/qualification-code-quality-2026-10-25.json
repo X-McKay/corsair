@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-25",
+  "branch": "manus/re-design",
+  "ruff_version": "0.17.2",
+  "ty_version": "0.0.91",
+  "initial_ty_diagnostics": 33,
+  "final_ty_diagnostics": 0,
+  "ty_warnings_fail_ci": true,
+  "typing_scope": ["src", "tests", "evals"],
+  "typing_suppressions_added": 0,
+  "full_tests": {"passed": 105, "skipped": 0, "seconds": 110.07, "warnings_as_errors": true},
+  "native_gates": ["Docker", "Temporal", "CLI processes", "history replay", "installed wheel", "live auditor"],
+  "isolated_auditor": {
+    "dataset_digest": "e865d259995f2e31d971ba5e01a3b5a627fe02771a195436fb73203b927fe0ef",
+    "cases": 2, "repeats": 3, "attempts": 6, "passed": 6,
+    "llm_calls": 6, "operational_failures": 0, "jsonl_lifecycle_events": 12
+  },
+  "performance": {
+    "dataset_200_loads_median_seconds": {"before": 0.18524103599975206, "after": 0.17477781800062075},
+    "count_200x10000_median_seconds": {"before": 0.08882753899979434, "after": 0.08126401199933753},
+    "request_oracle_reads_per_case": {"before": 4, "after": 2},
+    "boundary": "Five-repeat same-host local microbenchmarks, not total model/Temporal/Docker latency."
+  },
+  "live_security_producer": "provider-policy-blocked; not retried or silently replaced",
+  "hostile_interpreter_attestation": "not qualified",
+  "population_accuracy": "not claimed"
+}

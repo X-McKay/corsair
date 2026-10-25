@@ -8,6 +8,7 @@ submission; they never execute the target or write to the source tree.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Annotated, Any
 
@@ -34,7 +35,7 @@ class ProducerTools:
     _submit_claimed: bool = False
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
 
-    def native_tools(self) -> list:
+    def native_tools(self) -> list[Callable[..., Any]]:
         """Return the exact ADK callables approved for the producer role."""
 
         return [self.read_file, self.list_files, self.submit]

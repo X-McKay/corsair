@@ -52,18 +52,18 @@ class EvidenceVerifier:
             observation = Observation.model_validate(self.store.get_json(ref))
         except Exception as exc:
             raise ValueError("committed operation observation is invalid") from exc
-        selected = input.prepared.fixed_source if input.fixed else input.prepared.source
-        if selected is None:
-            raise ValueError("fixed evidence requested without a fixed source")
         prepared = self._selected_prepared(input)
+        if prepared is None:
+            raise ValueError("fixed evidence requested without a fixed source")
+        submission_digest = digest(input.submission)
         intent = self.store.reconcile(f"intent.{input.operation_id}")
-        expected_intent = self._intent_ref(input, prepared, digest(input.submission))
+        expected_intent = self._intent_ref(input, prepared, submission_digest)
         if intent is None or intent.sha256 != expected_intent.sha256:
             raise ValueError("committed operation recipe/configuration identity changed")
         if (
             observation.operation_id != input.operation_id
-            or observation.source_digest != selected.sha256
-            or observation.submission_digest != digest(input.submission)
+            or observation.source_digest != prepared.source.sha256
+            or observation.submission_digest != submission_digest
             or observation.artifact is None
         ):
             raise ValueError("committed operation does not match requested evidence identity")
@@ -75,8 +75,8 @@ class EvidenceVerifier:
             not isinstance(bundle, dict)
             or bundle.get("schema_version") != "corsair.evidence/1"
             or bundle.get("operation_id") != input.operation_id
-            or bundle.get("source_digest") != selected.sha256
-            or bundle.get("submission_digest") != digest(input.submission)
+            or bundle.get("source_digest") != prepared.source.sha256
+            or bundle.get("submission_digest") != submission_digest
         ):
             raise ValueError("committed evidence bundle is stale or forged")
         return observation

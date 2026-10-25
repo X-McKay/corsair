@@ -6,7 +6,7 @@ import asyncio
 import os
 import uuid
 from collections import Counter
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -253,7 +253,7 @@ class TemporalServer:
         scenario: ActivityScenario = DEFAULT_SCENARIO,
         *,
         task_queue: str | None = None,
-    ) -> AsyncIterator[tuple[str, FakeActivities]]:
+    ) -> AsyncGenerator[tuple[str, FakeActivities]]:
         activities = FakeActivities(store, scenario)
         task_queue = task_queue or temporal_id("queue")
         async with Worker(
@@ -319,7 +319,7 @@ def temporal_artifact_store(tmp_path: Path) -> ArtifactStore:
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
-async def temporal_server() -> AsyncIterator[TemporalServer]:
+async def temporal_server() -> AsyncGenerator[TemporalServer]:
     """Start and stop a real server unless CI supplies an existing address.
 
     The explicit opt-in avoids downloading or launching the Temporal CLI during

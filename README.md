@@ -122,7 +122,7 @@ src/corsair/
   tools/security/         source admission, Docker SDK, trusted driver, evidence
   workflows/              deterministic Temporal coordination
   steps/                  ordinary Temporal activities
-  runtime/                model assembly, worker, artifacts, manifests, risk
+  runtime/                models, worker, artifacts, request loading, terminal, risk
   policy/                 pure disposition and fix rules
   observability/          evaluator-owned scoring and reports
 
@@ -132,4 +132,18 @@ docs/                     architecture, runbooks, risks, threats, development pl
 deploy/                   trusted image and operator settings example
 ```
 
-For operating detail, use the [pilot runbook](docs/runbooks/pilot.md). For all commands and machine-output rules, use the [CLI reference](docs/cli.md). The system design is in [architecture](docs/architecture.md); development status remains in [CURRENT](docs/development/CURRENT.md). [Implementation audit](docs/implementation-audit.md) explains the SDK cleanup and exact scope. [PLAN-0106](docs/development/plans/PLAN-0106-cli-audit.md) and [HANDOFF-0139](docs/development/handoffs/HANDOFF-0139-cli-audit.md) record the completed CLI audit and its 90-test post-cleanup qualification.
+For operating detail, use the [pilot runbook](docs/runbooks/pilot.md) and [CLI reference](docs/cli.md). Design and ownership are in [architecture](docs/architecture.md); current status and the latest handoff are in [CURRENT](docs/development/CURRENT.md). [Code quality and review](docs/code-quality.md) records the latest dead-code/typing refactor, 105-test qualification and 6/6 frozen live-auditor evaluation. The earlier [implementation audit](docs/implementation-audit.md) remains the initial boundary assessment.
+
+## Development checks
+
+```bash
+make sync
+make check   # Ruff lint/format + ty; type warnings fail the gate
+make test    # Offline unit/security/package checks
+# Actual native execution and durable workflow checks require their real dependencies:
+make images
+CORSAIR_TEST_TEMPORAL=1 make test-docker
+make test-temporal
+```
+
+Ruff and ty are pinned and enforced in CI. All maintained source, tests and evaluator scripts are linted and typed. Frozen target fixtures keep their declared source hashes/line numbers, so Ruff does not rewrite them; ty and native frozen-hash conformance still cover them. Do not add broad ignores, new backend layers or mixins without a concrete simplification and updated tests/evaluations.

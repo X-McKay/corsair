@@ -5,15 +5,18 @@ import io
 import json
 import tarfile
 from pathlib import Path
+from typing import cast
 
 import pytest
 from google.adk.tools.function_tool import FunctionTool
+from google.adk.tools.tool_context import ToolContext
 
 from corsair.agents.auditor.factory import build_auditor
 from corsair.agents.producer.factory import build_producer
 from corsair.agents.producer.tools import build_producer_tools
 from corsair.contracts import (
     AuditInput,
+    AuditResult,
     Budget,
     Finding,
     PreparedCase,
@@ -94,17 +97,15 @@ def _prepared(store: ArtifactStore) -> PreparedCase:
     )
 
 
-def _producer_input(store: ArtifactStore, **overrides) -> ProducerInput:
-    values = {
-        "run_id": "run",
-        "prepared": _prepared(store),
-        "budget": Budget(episode_llm_calls=2, max_tool_calls=3, max_output_tokens=512),
-        "round_index": 1,
-        "llm_call_limit": 2,
-        "tool_call_limit": 3,
-    }
-    values.update(overrides)
-    return ProducerInput(**values)
+def _producer_input(store: ArtifactStore, *, tool_call_limit: int = 3) -> ProducerInput:
+    return ProducerInput(
+        run_id="run",
+        prepared=_prepared(store),
+        budget=Budget(episode_llm_calls=2, max_tool_calls=3, max_output_tokens=512),
+        round_index=1,
+        llm_call_limit=2,
+        tool_call_limit=tool_call_limit,
+    )
 
 
 def _submit_args(*, revision: int = 1, parent_revision: int | None = None) -> dict:
@@ -177,9 +178,10 @@ async def test_tool_cap_is_charged_before_work_and_source_path_escape_is_rejecte
     store = ArtifactStore(tmp_path)
     producer_input = _producer_input(store, tool_call_limit=1)
     tools = build_producer_tools(producer_input, store, tool_call_limit=1)
+    unused_context = cast(ToolContext, object())
 
-    escaped = await tools.read_file("../private.txt", None)
-    exhausted = await tools.list_files(None)
+    escaped = await tools.read_file("../private.txt", unused_context)
+    exhausted = await tools.list_files(unused_context)
 
     assert "error" in escaped
     assert "normalized relative" in escaped["error"]
@@ -195,11 +197,19 @@ def test_factories_match_agent_metadata_and_submit_has_strict_native_schema(tmp_
     declaration = FunctionTool(tools.submit)._get_declaration()
 
     assert producer.name == "producer"
-    assert [tool.__name__ for tool in producer.tools] == ["read_file", "list_files", "submit"]
+    tool_names = []
+    for tool in producer.tools:
+        assert callable(tool)
+        name = getattr(tool, "__name__", None)
+        assert isinstance(name, str)
+        tool_names.append(name)
+    assert tool_names == ["read_file", "list_files", "submit"]
     assert auditor.tools == []
     assert auditor.include_contents == "none"
-    assert auditor.output_schema.__name__ == "AuditResult"
+    assert auditor.output_schema is AuditResult
+    assert declaration is not None
     schema = declaration.parameters_json_schema
+    assert isinstance(schema, dict)
     assert set(schema["required"]) == {"control_payload", "exploit_payload", "hypothesis", "plan"}
     assert "tool_context" not in schema["properties"]
     assert schema["$defs"]["PlanRevision"]["additionalProperties"] is False

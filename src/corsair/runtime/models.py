@@ -10,12 +10,14 @@ from __future__ import annotations
 from importlib import resources
 from typing import Literal
 
+from google.adk.models import BaseLlm
 from pydantic import Field, field_validator
 
 from corsair.contracts import Contract
 from corsair.settings import ModelSettings, Settings
 
 RoleName = Literal["producer", "auditor"]
+AgentModel = str | BaseLlm
 
 _RESOURCE_PACKAGES: dict[RoleName, str] = {
     "producer": "corsair.agents.producer",
@@ -72,7 +74,7 @@ def prompt_text(role: RoleName) -> str:
     )
 
 
-def model_for_role(settings: Settings | ModelSettings, role: RoleName):
+def model_for_role(settings: Settings | ModelSettings, role: RoleName) -> AgentModel:
     """Resolve a role model without reading or accepting provider credentials.
 
     Gemini model IDs are left for ADK to resolve natively.  LiteLLM receives

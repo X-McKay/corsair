@@ -170,3 +170,64 @@ def test_lost_episode_usage_stays_unknown():
     assert scored["llm_calls"] is None
     assert scored["tool_calls"] is None
     assert scored["agent_seconds"] is None
+
+
+def test_dataset_parses_only_the_bytes_it_verified(tmp_path, monkeypatch):
+    from collections import Counter
+    from pathlib import Path
+
+    from corsair.observability.evaluation import Dataset, DatasetEntry
+
+    request = tmp_path / "request.json"
+    oracle = tmp_path / "oracle.json"
+    request.write_text(
+        json.dumps(
+            {
+                "case": {
+                    "case_id": "case01",
+                    "finding": {"title": "claim", "description": "claim", "file": "x.py"},
+                    "source": {"path": "."},
+                    "recipe": {"module_file": "x.py", "function": "f", "payload_parameter": "p"},
+                }
+            }
+        )
+    )
+    oracle.write_text('{"acceptable": ["INCONCLUSIVE"]}')
+    dataset = tmp_path / "dataset.json"
+    dataset.write_text(
+        Dataset(
+            entries=[
+                DatasetEntry(
+                    case_id="case01",
+                    family="family01",
+                    split="dev",
+                    request="request.json",
+                    oracle="oracle.json",
+                    request_digest=digest(request.read_bytes()),
+                    oracle_digest=digest(oracle.read_bytes()),
+                )
+            ]
+        ).model_dump_json()
+    )
+    reads: Counter[Path] = Counter()
+    original_read = Path.read_bytes
+
+    def read_and_replace(path: Path) -> bytes:
+        reads[path] += 1
+        content = original_read(path)
+        if path == oracle:
+            oracle.write_text('{"acceptable": ["SUPPORTED"]}')
+        return content
+
+    monkeypatch.setattr(Path, "read_bytes", read_and_replace)
+    _, _, oracles = load_dataset(dataset)
+    assert oracles["case01"].acceptable == [Disposition.INCONCLUSIVE]
+    assert reads[request] == reads[oracle] == 1
+
+
+@pytest.mark.parametrize(
+    "counts,expected", [([], None), ([None], None), ([0, 0], 0), ([1, 2], 3), ([2, None], None)]
+)
+def test_summary_counts_preserve_empty_missing_and_zero(counts, expected):
+    summary = summarize([{"status": "pass", "input_tokens": value} for value in counts])
+    assert summary["input_tokens"] == expected

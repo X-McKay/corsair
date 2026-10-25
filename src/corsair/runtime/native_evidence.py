@@ -2,11 +2,15 @@
 
 import asyncio
 import threading
+from collections.abc import Callable
+from typing import Any
 
-from corsair.contracts import EvidenceInput
+from corsair.contracts import EvidenceInput, Observation
 from corsair.runtime.artifacts import ArtifactStore
 from corsair.settings import Settings
 from corsair.tools.security.evidence import EvidenceVerifier
+
+Heartbeat = Callable[[], None]
 
 
 async def run_evidence(
@@ -14,12 +18,12 @@ async def run_evidence(
     settings: Settings,
     store: ArtifactStore,
     *,
-    heartbeat=None,
-    sandbox=None,
-):
+    heartbeat: Heartbeat | None = None,
+    sandbox: Any | None = None,
+) -> Observation:
     cancelled = threading.Event()
 
-    def pulse():
+    def pulse() -> None:
         if cancelled.is_set():
             raise InterruptedError("Native evidence execution cancelled")
         if heartbeat:
