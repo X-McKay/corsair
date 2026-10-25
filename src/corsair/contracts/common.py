@@ -11,10 +11,21 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
 Digest = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 Identifier = Annotated[str, Field(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,79}$")]
+MAX_DIAGNOSTIC_TEXT_CHARS = 4096
+DIAGNOSTIC_TRUNCATION_MARKER = " … [diagnostic truncated]"
+DiagnosticText = Annotated[str, Field(max_length=MAX_DIAGNOSTIC_TEXT_CHARS)]
 
 
 class Contract(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
+
+
+def format_diagnostic(value: str) -> str:
+    """Keep optional wire diagnostics concise without changing structured facts."""
+    if len(value) <= MAX_DIAGNOSTIC_TEXT_CHARS:
+        return value
+    prefix_length = MAX_DIAGNOSTIC_TEXT_CHARS - len(DIAGNOSTIC_TRUNCATION_MARKER)
+    return f"{value[:prefix_length]}{DIAGNOSTIC_TRUNCATION_MARKER}"
 
 
 def digest(value: BaseModel | dict | list | str | bytes) -> str:
@@ -55,6 +66,6 @@ class Usage(Contract):
 
 
 class Feedback(Contract):
-    gate: str
-    reason: str
+    gate: str = Field(max_length=128)
+    reason: DiagnosticText
     operational: StrictBool = False

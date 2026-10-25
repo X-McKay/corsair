@@ -7,7 +7,7 @@ from typing import Any
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
-from temporalio.exceptions import ActivityError, is_cancelled_exception
+from temporalio.exceptions import ActivityError, ApplicationError, is_cancelled_exception
 
 with workflow.unsafe.imports_passed_through():
     from corsair.contracts import (
@@ -25,6 +25,7 @@ with workflow.unsafe.imports_passed_through():
         ProducerInput,
         ProducerOutput,
         RoundResult,
+        format_terminal_result,
     )
     from corsair.policies.verdicts import decide, fix_status
 
@@ -67,6 +68,16 @@ class InvestigationWorkflow:
     async def _record_result(self, result: InvestigationResult) -> InvestigationResult:
         """Persist the final receipt within its separate retry/finalization allowance."""
         self.phase = "record"
+        try:
+            result = format_terminal_result(result)
+        except ValueError:
+            # An unbounded validation exception must not become another failure payload.
+            raise ApplicationError(
+                "Terminal result failed schema or wire-budget validation; "
+                "referenced native evidence remains in the artifact store.",
+                type="TERMINAL_PAYLOAD_INVALID",
+                non_retryable=True,
+            ) from None
         recorded = await asyncio.shield(
             workflow.execute_activity(
                 "corsair.record",

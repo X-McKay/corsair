@@ -252,7 +252,7 @@ def test_policy_never_refutes_negative_evidence_and_conditions_app_scope() -> No
     assert fix_status(demonstrated).value == "NOT_BLOCKED"
 
 
-@pytest.mark.parametrize("boundary", ["recipe", "image", "budget"])
+@pytest.mark.parametrize("boundary", ["recipe", "image", "budget", "capabilities"])
 def test_reconciliation_rejects_stale_recipe_runtime_or_budget(tmp_path, boundary):
     store = ArtifactStore(tmp_path)
     sandbox = _FakeSandbox(store)
@@ -267,6 +267,13 @@ def test_reconciliation_rejects_stale_recipe_runtime_or_budget(tmp_path, boundar
         manifest = request.prepared.manifest.model_copy(update={"image_id": "different"})
         prepared = request.prepared.model_copy(update={"manifest": manifest})
         changed = request.model_copy(update={"prepared": prepared})
+    elif boundary == "capabilities":
+        manifest = request.prepared.manifest.model_copy(
+            update={"capabilities": {"verification": {"policy_revision": "changed"}}}
+        )
+        changed = request.model_copy(
+            update={"prepared": request.prepared.model_copy(update={"manifest": manifest})}
+        )
     else:
         changed = request.model_copy(update={"budget": Budget(probe_timeout_seconds=6)})
     with pytest.raises(ValueError, match="recipe/configuration"):

@@ -7,7 +7,7 @@ from enum import StrEnum
 from pydantic import Field, StrictBool
 
 from .agents import Submission
-from .common import ArtifactRef, Contract, Digest, Feedback, Identifier
+from .common import ArtifactRef, Contract, DiagnosticText, Digest, Feedback, Identifier
 from .sources import Budget, PreparedCase
 
 
@@ -22,7 +22,7 @@ class RoleObservation(Contract):
     outcome: RoleOutcome
     target_executed: StrictBool
     covered_lines: list[int] = Field(default_factory=list)
-    reason: str
+    reason: DiagnosticText = ""
     native_exit_code: int | None = None
 
 

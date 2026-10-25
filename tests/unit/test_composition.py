@@ -9,11 +9,16 @@ import pytest
 
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
+    DIAGNOSTIC_TRUNCATION_MARKER,
+    MAX_DIAGNOSTIC_TEXT_CHARS,
     ArtifactRef,
     AuditInput,
     AuditOutput,
     Budget,
     Case,
+    Disposition,
+    ExecutionStatus,
+    InvestigationResult,
     PreparedCase,
     ProducerInput,
     ProducerOutput,
@@ -99,6 +104,33 @@ def test_activities_require_all_explicit_boundary_dependencies(tmp_path: Path):
     constructor = cast(Any, Activities)
     with pytest.raises(TypeError, match="sandbox"):
         constructor(settings, store=store, inference=inference, sources=sources)
+
+
+async def test_record_revalidates_model_copy_before_persistence_and_return(tmp_path: Path):
+    settings = Settings(artifact_root=str(tmp_path / "artifacts"))
+    store = ArtifactStore(settings.artifact_root)
+    activities = Activities(
+        settings,
+        store=store,
+        inference=InferenceStub(),
+        sources=SourcesStub(),
+        sandbox=SandboxStub(),
+    )
+    result = InvestigationResult(
+        run_id="run",
+        case_id="case",
+        disposition=Disposition.INCONCLUSIVE,
+        execution_status=ExecutionStatus.ERROR,
+        reason="short failure diagnostic",
+    ).model_copy(update={"reason": "x" * (MAX_DIAGNOSTIC_TEXT_CHARS * 2)})
+
+    recorded = await activities.record(result)
+
+    assert recorded.result_artifact is not None
+    assert recorded.reason.endswith(DIAGNOSTIC_TRUNCATION_MARKER)
+    persisted = InvestigationResult.model_validate(store.get_json(recorded.result_artifact))
+    assert persisted.result_artifact is None
+    assert persisted.reason == recorded.reason
 
 
 def test_worker_composes_real_boundary_roles_around_one_store(monkeypatch, tmp_path: Path):

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import Field, model_validator
 
-from .common import ArtifactRef, Contract, Identifier
+from .common import ArtifactRef, Contract, DiagnosticText, Identifier
 from .sources import InvestigationRequest
 
 
@@ -27,4 +27,4 @@ class BatchItem(Contract):
     case_id: Identifier
     run_id: Identifier
     artifact: ArtifactRef | None = None
-    error: str | None = None
+    error: DiagnosticText | None = None

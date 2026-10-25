@@ -16,6 +16,8 @@ from corsair.contracts import (
     PreparedCase,
     ProducerInput,
     ProducerOutput,
+    format_diagnostic,
+    format_terminal_result,
 )
 from corsair.ports.inference import InferencePort
 from corsair.ports.sandboxing import SandboxPort
@@ -40,6 +42,17 @@ class Activities:
         self.sources = sources
         self.sandbox = sandbox
 
+    @staticmethod
+    def _activity_error(
+        error: Exception, error_type: str, *, non_retryable: bool
+    ) -> ApplicationError:
+        """Bound transport diagnostics; the original exception chain must not defeat the cap."""
+        return ApplicationError(
+            format_diagnostic(f"{type(error).__name__}: {error}"),
+            type=error_type,
+            non_retryable=non_retryable,
+        )
+
     @activity.defn(name="corsair.prepare")
     async def prepare(self, request: InvestigationRequest) -> PreparedCase:
         activity.heartbeat("preparing")
@@ -55,7 +68,7 @@ class Activities:
         try:
             return await asyncio.to_thread(self.sources.prepare, request.case, manifest)
         except (ValueError, FileNotFoundError, PermissionError) as exc:
-            raise ApplicationError(str(exc), type="SOURCE_DENIED", non_retryable=True) from exc
+            raise self._activity_error(exc, "SOURCE_DENIED", non_retryable=True) from None
 
     async def _model_episode(self, awaitable):
         async def heartbeats():
@@ -72,11 +85,17 @@ class Activities:
 
     @activity.defn(name="corsair.produce")
     async def produce(self, request: ProducerInput) -> ProducerOutput:
-        return await self._model_episode(self.inference.produce(request))
+        try:
+            return await self._model_episode(self.inference.produce(request))
+        except Exception as exc:
+            raise self._activity_error(exc, "PRODUCER_FAILED", non_retryable=True) from None
 
     @activity.defn(name="corsair.audit")
     async def audit(self, request: AuditInput) -> AuditOutput:
-        return await self._model_episode(self.inference.audit(request))
+        try:
+            return await self._model_episode(self.inference.audit(request))
+        except Exception as exc:
+            raise self._activity_error(exc, "AUDITOR_FAILED", non_retryable=True) from None
 
     @activity.defn(name="corsair.evidence")
     async def evidence(self, request: EvidenceInput) -> Observation:
@@ -89,16 +108,28 @@ class Activities:
                 raise InterruptedError("Evidence activity cancelled")
             loop.call_soon_threadsafe(activity.heartbeat, request.operation_id)
 
-        return await run_evidence(
-            request, self.settings, self.store, heartbeat=heartbeat, sandbox=self.sandbox
-        )
+        try:
+            return await run_evidence(
+                request, self.settings, self.store, heartbeat=heartbeat, sandbox=self.sandbox
+            )
+        except Exception as exc:
+            raise self._activity_error(exc, "EVIDENCE_FAILED", non_retryable=True) from None
 
     @activity.defn(name="corsair.record")
     async def record(self, result: InvestigationResult) -> InvestigationResult:
-        normalized = result.model_copy(update={"result_artifact": None})
-        ref = await asyncio.to_thread(self.store.put_json, normalized)
-        await asyncio.to_thread(self.store.commit, f"result.{result.run_id}", ref)
-        return result.model_copy(update={"result_artifact": ref})
+        try:
+            normalized = format_terminal_result(result.model_copy(update={"result_artifact": None}))
+        except ValueError as exc:
+            raise self._activity_error(exc, "RECORD_PAYLOAD_INVALID", non_retryable=True) from None
+        try:
+            ref = await asyncio.to_thread(self.store.put_json, normalized)
+            await asyncio.to_thread(self.store.commit, f"result.{normalized.run_id}", ref)
+        except Exception as exc:
+            raise self._activity_error(exc, "RECORD_FAILED", non_retryable=False) from None
+        try:
+            return format_terminal_result(normalized.model_copy(update={"result_artifact": ref}))
+        except ValueError as exc:
+            raise self._activity_error(exc, "RECORD_PAYLOAD_INVALID", non_retryable=True) from None
 
     def registered(self) -> list:
         return [self.prepare, self.produce, self.evidence, self.audit, self.record]

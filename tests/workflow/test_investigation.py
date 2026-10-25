@@ -6,9 +6,13 @@ import asyncio
 from datetime import timedelta
 
 import pytest
+from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
 
 from corsair.contracts import (
+    DIAGNOSTIC_TRUNCATION_MARKER,
+    MAX_DIAGNOSTIC_TEXT_CHARS,
+    TERMINAL_RESULT_MAX_BYTES,
     AuditInput,
     AuditOutput,
     BatchItem,
@@ -20,6 +24,8 @@ from corsair.contracts import (
     FixStatus,
     InvestigationResult,
     Observation,
+    ProducerInput,
+    ProducerOutput,
     RoleOutcome,
     digest,
 )
@@ -43,6 +49,18 @@ def _three_round_budget() -> Budget:
         max_tool_calls=3,
         max_output_tokens=256,
         max_elapsed_seconds=30,
+        probe_timeout_seconds=1,
+    )
+
+
+def _maximum_round_budget() -> Budget:
+    return Budget(
+        max_rounds=16,
+        max_llm_calls=32,
+        episode_llm_calls=1,
+        max_tool_calls=16,
+        max_output_tokens=256,
+        max_elapsed_seconds=60,
         probe_timeout_seconds=1,
     )
 
@@ -110,6 +128,68 @@ async def test_held_adversarial_results_stay_inconclusive_with_revised_plans(
         item.previous.plan.revision if item.previous else None
         for item in activities.producer_inputs
     ] == [None, 1, 2]
+
+
+async def test_maximum_round_result_stays_within_terminal_wire_budget(
+    temporal_server, temporal_artifact_store
+):
+    held = ActivityScenario(outcomes=((RoleOutcome.HELD, RoleOutcome.HELD),) * 16)
+    request = investigation_request("maximum-rounds", budget=_maximum_round_budget())
+    async with temporal_server.worker(temporal_artifact_store, held) as (task_queue, activities):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            request,
+            id=temporal_id("maximum-rounds"),
+            task_queue=task_queue,
+            result_type=InvestigationResult,
+        )
+
+    assert len(result.rounds) == 16
+    assert result.execution_status is ExecutionStatus.COMPLETED
+    assert result.result_artifact is not None
+    record_payload = (await pydantic_data_converter.encode([activities.record_inputs[-1]]))[0]
+    assert len(record_payload.data) <= TERMINAL_RESULT_MAX_BYTES
+    assert len(result.model_dump_json().encode()) <= TERMINAL_RESULT_MAX_BYTES
+    persisted = InvestigationResult.model_validate(
+        temporal_artifact_store.get_json(result.result_artifact)
+    )
+    assert len(persisted.rounds) == 16
+
+
+async def test_oversized_activity_error_reason_is_compacted_before_record(
+    temporal_server, temporal_artifact_store
+):
+    scenario = ActivityScenario(
+        fail_evidence_reason="native evidence failure: " + "x" * (MAX_DIAGNOSTIC_TEXT_CHARS * 2)
+    )
+    async with temporal_server.worker(temporal_artifact_store, scenario) as (
+        task_queue,
+        activities,
+    ):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            investigation_request("oversized-error"),
+            id=temporal_id("oversized-error"),
+            task_queue=task_queue,
+            result_type=InvestigationResult,
+        )
+
+    assert result.execution_status is ExecutionStatus.ERROR
+    assert result.reason.startswith("evidence: ")
+    assert result.reason.endswith(DIAGNOSTIC_TRUNCATION_MARKER)
+    assert len(result.reason) == MAX_DIAGNOSTIC_TEXT_CHARS
+    assert result.usage_complete is True
+    assert len(result.rounds) == 1
+    assert result.rounds[0].producer.submission is not None
+    assert activities.call_counts["corsair.record"] == 1
+    record_payload = await pydantic_data_converter.encode([activities.record_inputs[-1]])
+    assert len(record_payload[0].data) <= (TERMINAL_RESULT_MAX_BYTES)
+    assert result.result_artifact is not None
+    persisted = InvestigationResult.model_validate(
+        temporal_artifact_store.get_json(result.result_artifact)
+    )
+    assert persisted.execution_status is ExecutionStatus.ERROR
+    assert persisted.reason == result.reason
 
 
 async def test_prepare_block_is_blocked_and_does_not_manufacture_evidence(
@@ -317,3 +397,47 @@ async def test_failed_later_activity_preserves_completed_producer_round(
     assert bool(result.rounds[0].observation) == (phase == "audit")
     assert result.usage_complete == (phase == "evidence")
     assert temporal_artifact_store.reconcile(f"result.{identity}")
+
+
+async def test_oversized_structured_result_fails_workflow_not_workflow_tasks(
+    temporal_server, temporal_artifact_store
+):
+    from temporalio import activity
+    from temporalio.client import WorkflowFailureError
+    from temporalio.exceptions import ApplicationError
+
+    class LargePlans(FakeActivities):
+        @activity.defn(name="corsair.produce")
+        async def produce(self, request: ProducerInput) -> ProducerOutput:
+            producer = await super().produce(request)
+            assert producer.submission is not None
+            plan = producer.submission.plan.model_copy(update={"next_steps": ["x" * 70_000]})
+            return producer.model_copy(
+                update={"submission": producer.submission.model_copy(update={"plan": plan})}
+            )
+
+    activities = LargePlans(
+        temporal_artifact_store,
+        ActivityScenario(outcomes=((RoleOutcome.HELD, RoleOutcome.HELD),)),
+    )
+    queue, identity = temporal_id("oversize-queue"), temporal_id("oversize-result")
+    async with Worker(
+        temporal_server.client,
+        task_queue=queue,
+        workflows=[InvestigationWorkflow],
+        activities=activities.registered(),
+    ):
+        with pytest.raises(WorkflowFailureError) as rejected:
+            await asyncio.wait_for(
+                temporal_server.client.execute_workflow(
+                    InvestigationWorkflow.run,
+                    investigation_request("oversize", budget=_maximum_round_budget()),
+                    id=identity,
+                    task_queue=queue,
+                ),
+                timeout=45,
+            )
+    assert isinstance(rejected.value.cause, ApplicationError)
+    assert rejected.value.cause.type == "TERMINAL_PAYLOAD_INVALID"
+    assert activities.record_inputs == []
+    assert len(activities.producer_inputs) == 16
