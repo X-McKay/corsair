@@ -27,6 +27,7 @@ from .common import format_diagnostic as format_diagnostic
 from .common import safe_path as safe_path
 from .evaluation import BatchItem as BatchItem
 from .evaluation import BatchRequest as BatchRequest
+from .evaluation import MatchKind as MatchKind
 from .evidence import EvidenceInput as EvidenceInput
 from .evidence import Observation as Observation
 from .evidence import RoleObservation as RoleObservation

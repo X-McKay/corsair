@@ -18,6 +18,7 @@ from corsair.contracts import (
     AuditInput,
     AuditOutput,
     InvestigationRequest,
+    MatchKind,
     ProducerInput,
     ProducerOutput,
     digest,
@@ -92,6 +93,26 @@ def fixture_matches_oracle(output: ProducerOutput | AuditOutput, oracle: dict[st
     return output.review is not None and output.review.decision == oracle["decision"]
 
 
+def fixture_match_kind(output: ProducerOutput | AuditOutput, oracle: dict[str, Any]) -> MatchKind:
+    """Classify exact fixture output without changing the evaluator's pass predicate."""
+    if output.feedback is not None and output.feedback.operational:
+        return MatchKind.OPERATIONAL_FAILURE
+    if isinstance(output, ProducerOutput):
+        submission = output.submission_for_verification()
+        if submission is None:
+            return MatchKind.NO_VALID_OUTPUT
+        if submission.control_payload != oracle["control_payload"]:
+            return MatchKind.CONTROL_MISMATCH
+        if submission.exploit_payload not in oracle["candidate_payloads"]:
+            return MatchKind.CANDIDATE_EXACT_MISMATCH
+        return MatchKind.EXACT_MATCH
+    if output.review is None:
+        return MatchKind.NO_VALID_OUTPUT
+    if output.review.decision != oracle["decision"]:
+        return MatchKind.CANDIDATE_EXACT_MISMATCH
+    return MatchKind.EXACT_MATCH
+
+
 def fixture_score_row(
     output: ProducerOutput | AuditOutput,
     oracle: dict[str, Any],
@@ -109,6 +130,7 @@ def fixture_score_row(
         "case_id": case_id,
         "repeat": repeat,
         "status": "pass" if fixture_matches_oracle(output, oracle) else "fail",
+        "match_kind": fixture_match_kind(output, oracle),
         "cohort": "live-model-fixture",
         "execution_status": "ERROR"
         if output.feedback and output.feedback.operational

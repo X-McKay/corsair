@@ -1,0 +1,22 @@
+{
+  "base_commit": "c0bd5b9783ed00ffceea99d820fb72f2e4035117",
+  "branch": "manus/eval-match-diagnostics",
+  "host": "macOS arm64",
+  "native_tests": 156,
+  "native_failures": 0,
+  "native_skips": 0,
+  "native_seconds": 147.856,
+  "cohorts": [
+    "scripted ADK",
+    "real Docker",
+    "real Temporal",
+    "actual CLI",
+    "installed wheel outside checkout",
+    "configured live-auditor smoke"
+  ],
+  "just_ruff_ty_docs": "passed",
+  "frozen_inputs_and_pins_unchanged": true,
+  "cost_usd": null,
+  "production_qualified": false,
+  "remote_ci": "not yet run at record creation"
+}

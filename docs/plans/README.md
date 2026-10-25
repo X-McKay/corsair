@@ -26,6 +26,10 @@ This is the current work index. Current user guides start at the [documentation 
 
 [Write complete dataset-bound reports once](archive/plans/PLAN-0122-eval-report-provenance.md) is implemented on `manus/eval-report-provenance`. [Final handoff](archive/handoffs/HANDOFF-recommendation-eval-report-provenance.md) and [native receipt](../../evals/baselines/qualifications/qualification-eval-report-provenance-2026-10-25.json) record 153 passing physical-Mac tests with zero skips. The base-revision records below retain their original scope and are not the current branch's final qualification.
 
+
+
+[Classify exact-match diagnostic failures](archive/plans/PLAN-0123-eval-match-diagnostics.md) is implemented on `manus/eval-match-diagnostics`. [Final handoff](archive/handoffs/HANDOFF-recommendation-eval-match-diagnostics.md) and [native receipt](../../evals/baselines/qualifications/qualification-eval-match-diagnostics-2026-10-25.json) record 156 passing physical-Mac tests with zero skips. The base-revision records below retain their original scope and are not the current branch's final qualification.
+
 ## Active work
 
 
