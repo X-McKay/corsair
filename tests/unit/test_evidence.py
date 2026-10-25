@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
     ArtifactRef,
     AuditDecision,
@@ -24,10 +25,9 @@ from corsair.contracts import (
     Submission,
     digest,
 )
-from corsair.policy.verdicts import decide, fix_status
-from corsair.runtime.artifacts import ArtifactStore
+from corsair.policies.verdicts import decide, fix_status
 from corsair.settings import Settings
-from corsair.tools.security.evidence import EvidenceVerifier
+from corsair.steps.verification import EvidenceVerifier
 
 SOURCE_DIGEST = "a" * 64
 ARTIFACT_DIGEST = "d" * 64
@@ -87,7 +87,8 @@ class _FakeSandbox:
         del operation_id  # Test-controlled operation state, independent of its identity.
         return self.unknown
 
-    def run_role(self, prepared, submission, role, budget, store, heartbeat, *, operation_id):
+    def execute_role(self, prepared, submission, role, budget, heartbeat, *, operation_id):
+        store = self.store
         del budget, heartbeat
         self.calls += 1
         violation = role == "adversarial"
@@ -128,14 +129,7 @@ class _FakeSandbox:
                 "driver": driver,
             }
         )
-        return (
-            RoleObservation(
-                outcome=RoleOutcome.ERROR,  # proves verifier trusts immutable raw record instead
-                target_executed=False,
-                reason="untrusted mutable return",
-            ),
-            ref,
-        )
+        return ref
 
 
 def _input(operation_id: str = "operation") -> EvidenceInput:

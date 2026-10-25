@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir "pytest==9.1.1" "coverage==7.13.0" \
     && chown -R 1000:1000 /work /tmp /home/corsair \
     && chmod 0555 /opt/corsair
 
-COPY --chmod=0555 src/corsair/tools/security/driver.py /opt/corsair/driver.py
+COPY --chmod=0555 src/corsair/adapters/sandboxing/driver.py /opt/corsair/driver.py
 
 # DockerSandbox additionally enforces read_only, no-new-privileges, cap_drop=ALL,
 # network_mode=none, PID/CPU/memory limits, and read-only fixture/source/job binds.

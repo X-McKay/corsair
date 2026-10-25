@@ -8,16 +8,16 @@ from pathlib import Path
 
 import pytest
 
-from corsair.contracts import Case, Finding, PythonRecipe, RunManifest, Source
-from corsair.runtime.artifacts import ArtifactStore
-from corsair.settings import Settings
-from corsair.tools.security import sources
-from corsair.tools.security.sources import (
+from corsair.adapters.scm import local as sources
+from corsair.adapters.scm.local import (
     SourceAdmissionError,
     prepare_case,
     read_source,
     snapshot_source,
 )
+from corsair.adapters.storage.filesystem import ArtifactStore
+from corsair.contracts import Case, Finding, PythonRecipe, RunManifest, Source
+from corsair.settings import Settings
 
 
 def _manifest() -> RunManifest:

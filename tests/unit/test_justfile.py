@@ -47,7 +47,15 @@ def test_default_just_lists_recipes_without_running_side_effects():
         (
             "eval-agent",
             ["auditor", "dataset.json", "--settings", "settings path.json"],
-            ["run", "--locked", "--extra", "providers", "python", "evals/evaluators/agents.py"],
+            [
+                "run",
+                "--locked",
+                "--extra",
+                "providers",
+                "python",
+                "-m",
+                "corsair.evaluation.agents",
+            ],
         ),
     ],
 )

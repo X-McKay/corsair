@@ -26,7 +26,7 @@ with workflow.unsafe.imports_passed_through():
         ProducerOutput,
         RoundResult,
     )
-    from corsair.policy.verdicts import decide, fix_status
+    from corsair.policies.verdicts import decide, fix_status
 
 
 class BudgetExhausted(Exception):

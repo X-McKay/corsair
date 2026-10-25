@@ -1,0 +1,327 @@
+{
+  "schema_version": "corsair.qualification/1",
+  "date": "2026-10-25",
+  "scope": "local macOS arm64 current uncommitted source; explicit composition/local-state/quality-gate consolidation",
+  "initial_full_suite": {
+    "tests": 150,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "final_full_suite": {
+    "tests": 150,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "offline": {
+    "tests": 119,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "initial_full_seconds": 170.87,
+  "final_full_seconds": 152.43,
+  "quality": [
+    "pinned Ruff lint/format",
+    "Just format",
+    "pinned ty error-on-warning",
+    "maintained local docs links/anchors",
+    "import/privacy regression tests"
+  ],
+  "cohorts": [
+    "scripted native ADK conformance",
+    "real Docker",
+    "real Temporal",
+    "fresh installed wheel outside checkout",
+    "live-provider auditor smoke",
+    "separate isolated live frozen diagnostics",
+    "separate actual live batch"
+  ],
+  "live_evals": {
+    "old-producer-authenticated": {
+      "summary": {
+        "attempts": 3,
+        "passed": 3,
+        "failed": 0,
+        "pass_rate": 1.0,
+        "correctly_resolved": 0,
+        "invalid_positive_evidence": 0,
+        "forbidden_labels": 0,
+        "inconclusive": 0,
+        "operational_failures": 0,
+        "unavailable_results": 0,
+        "llm_calls": 3,
+        "tool_calls": 0,
+        "input_tokens": 2910,
+        "output_tokens": 841,
+        "cost_usd": null
+      },
+      "per_case": {
+        "case01": {
+          "attempts": 3,
+          "passed": 3,
+          "operational_failures": 0
+        }
+      },
+      "dataset_digest": "7d42f2b0428936d7082b3fd99be4dae323a57743d10afb29c6b54e37a852b1f5"
+    },
+    "old-auditor-authenticated": {
+      "summary": {
+        "attempts": 6,
+        "passed": 6,
+        "failed": 0,
+        "pass_rate": 1.0,
+        "correctly_resolved": 0,
+        "invalid_positive_evidence": 0,
+        "forbidden_labels": 0,
+        "inconclusive": 0,
+        "operational_failures": 0,
+        "unavailable_results": 0,
+        "llm_calls": 6,
+        "tool_calls": 0,
+        "input_tokens": 4170,
+        "output_tokens": 798,
+        "cost_usd": null
+      },
+      "per_case": {
+        "audit01": {
+          "attempts": 3,
+          "passed": 3,
+          "operational_failures": 0
+        },
+        "audit02": {
+          "attempts": 3,
+          "passed": 3,
+          "operational_failures": 0
+        }
+      },
+      "dataset_digest": "e865d259995f2e31d971ba5e01a3b5a627fe02771a195436fb73203b927fe0ef"
+    },
+    "expanded-producer-authenticated": {
+      "summary": {
+        "attempts": 9,
+        "passed": 4,
+        "failed": 5,
+        "pass_rate": 0.4444444444444444,
+        "correctly_resolved": 0,
+        "invalid_positive_evidence": 0,
+        "forbidden_labels": 0,
+        "inconclusive": 0,
+        "operational_failures": 0,
+        "unavailable_results": 0,
+        "llm_calls": 9,
+        "tool_calls": 0,
+        "input_tokens": 8889,
+        "output_tokens": 2664,
+        "cost_usd": null
+      },
+      "per_case": {
+        "case01": {
+          "attempts": 3,
+          "passed": 2,
+          "operational_failures": 0
+        },
+        "producer02": {
+          "attempts": 3,
+          "passed": 2,
+          "operational_failures": 0
+        },
+        "producer03": {
+          "attempts": 3,
+          "passed": 0,
+          "operational_failures": 0
+        }
+      },
+      "dataset_digest": "a2a6907fd06dc09003558ecfbe844f7659acc75ffa2a82a2feca4e150c74a3e2"
+    },
+    "expanded-auditor-authenticated": {
+      "summary": {
+        "attempts": 12,
+        "passed": 12,
+        "failed": 0,
+        "pass_rate": 1.0,
+        "correctly_resolved": 0,
+        "invalid_positive_evidence": 0,
+        "forbidden_labels": 0,
+        "inconclusive": 0,
+        "operational_failures": 0,
+        "unavailable_results": 0,
+        "llm_calls": 12,
+        "tool_calls": 0,
+        "input_tokens": 8550,
+        "output_tokens": 1539,
+        "cost_usd": null
+      },
+      "per_case": {
+        "audit01": {
+          "attempts": 3,
+          "passed": 3,
+          "operational_failures": 0
+        },
+        "audit02": {
+          "attempts": 3,
+          "passed": 3,
+          "operational_failures": 0
+        },
+        "audit03": {
+          "attempts": 3,
+          "passed": 3,
+          "operational_failures": 0
+        },
+        "audit04": {
+          "attempts": 3,
+          "passed": 3,
+          "operational_failures": 0
+        }
+      },
+      "dataset_digest": "b7284e237d2dce26f2f5a4719af4a7e9520ee750bad8fb5a9abd312946437bc7"
+    },
+    "final-expanded-producer": {
+      "summary": {
+        "attempts": 9,
+        "passed": 5,
+        "failed": 4,
+        "pass_rate": 0.5555555555555556,
+        "correctly_resolved": 0,
+        "invalid_positive_evidence": 0,
+        "forbidden_labels": 0,
+        "inconclusive": 0,
+        "operational_failures": 0,
+        "unavailable_results": 0,
+        "llm_calls": 9,
+        "tool_calls": 0,
+        "input_tokens": 8889,
+        "output_tokens": 2729,
+        "cost_usd": null
+      },
+      "per_case": {
+        "case01": {
+          "attempts": 3,
+          "passed": 3,
+          "operational_failures": 0
+        },
+        "producer02": {
+          "attempts": 3,
+          "passed": 1,
+          "operational_failures": 0
+        },
+        "producer03": {
+          "attempts": 3,
+          "passed": 1,
+          "operational_failures": 0
+        }
+      },
+      "dataset_digest": "a2a6907fd06dc09003558ecfbe844f7659acc75ffa2a82a2feca4e150c74a3e2"
+    },
+    "final-expanded-auditor": {
+      "summary": {
+        "attempts": 12,
+        "passed": 12,
+        "failed": 0,
+        "pass_rate": 1.0,
+        "correctly_resolved": 0,
+        "invalid_positive_evidence": 0,
+        "forbidden_labels": 0,
+        "inconclusive": 0,
+        "operational_failures": 0,
+        "unavailable_results": 0,
+        "llm_calls": 12,
+        "tool_calls": 0,
+        "input_tokens": 8550,
+        "output_tokens": 1636,
+        "cost_usd": null
+      },
+      "per_case": {
+        "audit01": {
+          "attempts": 3,
+          "passed": 3,
+          "operational_failures": 0
+        },
+        "audit02": {
+          "attempts": 3,
+          "passed": 3,
+          "operational_failures": 0
+        },
+        "audit03": {
+          "attempts": 3,
+          "passed": 3,
+          "operational_failures": 0
+        },
+        "audit04": {
+          "attempts": 3,
+          "passed": 3,
+          "operational_failures": 0
+        }
+      },
+      "dataset_digest": "b7284e237d2dce26f2f5a4719af4a7e9520ee750bad8fb5a9abd312946437bc7"
+    }
+  },
+  "live_batch": {
+    "passed": 2,
+    "attempts": 3,
+    "operational_failures": 1,
+    "unavailable_results": 0,
+    "outstanding_issue": "ISSUE-0010"
+  },
+  "candidate_unpromoted": true,
+  "producer_exact_match_issue": "ISSUE-0011",
+  "linux_current_revision": "unrun",
+  "performance_microbenchmarks": {
+    "before": {
+      "load_request": {
+        "median_us": 140.63731208443642,
+        "iterations_per_repeat": 2000,
+        "repeats": 5
+      },
+      "load_dataset": {
+        "median_us": 771.8514557927847,
+        "iterations_per_repeat": 200,
+        "repeats": 5
+      }
+    },
+    "after": {
+      "load_request": {
+        "median_us": 62.47372878715395,
+        "iterations_per_repeat": 2000,
+        "repeats": 5
+      },
+      "load_dataset": {
+        "median_us": 441.904584877193,
+        "iterations_per_repeat": 200,
+        "repeats": 5
+      }
+    },
+    "scope": "same local deterministic request/dataset loading only; repeated trials with concurrent work; not model or overall agent speedup"
+  },
+  "state_migration": {
+    "closed_databases": 2,
+    "sqlite_backup_and_integrity_verified": true,
+    "logical_digest_equivalent": true,
+    "byte_identical_originals_retained": true,
+    "settings_files_moved_unchanged": 3,
+    "artifact_stores_not_merged": true,
+    "legacy_tls_untouched": true
+  },
+  "environment": "canonical root .venv recreated and validated; previous duplicate environments/cache retired only after full tests",
+  "cleanup": {
+    "original_work_allocated_KiB": 1902760,
+    "final_work_allocated_KiB": 259456,
+    "passed_test_temp_trees_removed": 12,
+    "duplicate_envs_removed": 2,
+    "old_task_cache_cleaned_by_uv": true,
+    "all_run_evidence_and_failure_diagnostics_retained": true,
+    "owned_services_gracefully_stopped": true,
+    "corsair_labelled_containers_remaining": 0
+  },
+  "preserved_failures": [
+    "initial missing EMPTY client setting prevented inference; attempted rows retained with unknown tokens/cost",
+    "new canonical cache lacked wheel dependencies in offline attempt; package gate and full suite rerun after locked fetch",
+    "first workflow script syntax failure before agents; corrected no duplicate agent effects",
+    "isolated candidate mismatches remain failures",
+    "live batch safe-case ERROR/INCONCLUSIVE retained",
+    "native SDK long-workflow-task warning during concurrent first-import validation retained",
+    "uv local-cache/build-backend-range warnings retained; sdist and wheel checked to contain0 private files"
+  ],
+  "publication": "local only; no commit/push/deployment"
+}

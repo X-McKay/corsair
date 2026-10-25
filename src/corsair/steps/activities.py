@@ -5,6 +5,7 @@ import asyncio
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
+from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
     AuditInput,
     AuditOutput,
@@ -16,25 +17,34 @@ from corsair.contracts import (
     ProducerInput,
     ProducerOutput,
 )
-from corsair.runtime.artifacts import ArtifactStore
-from corsair.runtime.manifest import build_manifest
+from corsair.ports.inference import InferencePort
+from corsair.ports.sandboxing import SandboxPort
+from corsair.ports.scm import SourceSnapshotPort
 from corsair.settings import Settings
+from corsair.steps.manifest import build_manifest
 
 
 class Activities:
-    def __init__(self, settings: Settings, *, model_override=None):
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        store: ArtifactStore,
+        inference: InferencePort,
+        sources: SourceSnapshotPort,
+        sandbox: SandboxPort,
+    ):
         self.settings = settings
-        self.store = ArtifactStore(settings.artifact_root)
-        self.model_override = model_override
+        self.store = store
+        self.inference = inference
+        self.sources = sources
+        self.sandbox = sandbox
 
     @activity.defn(name="corsair.prepare")
     async def prepare(self, request: InvestigationRequest) -> PreparedCase:
-        from corsair.tools.security.sandbox import DockerSandbox
-        from corsair.tools.security.sources import prepare_case
-
         activity.heartbeat("preparing")
         try:
-            image_id = await asyncio.to_thread(lambda: DockerSandbox(self.settings).image_id)
+            image_id = await asyncio.to_thread(lambda: self.sandbox.image_id)
         except Exception as exc:
             raise ApplicationError(
                 "Docker daemon or the pinned Corsair image is unavailable",
@@ -43,9 +53,7 @@ class Activities:
             ) from exc
         manifest = build_manifest(request, self.settings, image_id)
         try:
-            return await asyncio.to_thread(
-                prepare_case, request.case, self.settings, self.store, manifest
-            )
+            return await asyncio.to_thread(self.sources.prepare, request.case, manifest)
         except (ValueError, FileNotFoundError, PermissionError) as exc:
             raise ApplicationError(str(exc), type="SOURCE_DENIED", non_retryable=True) from exc
 
@@ -64,23 +72,15 @@ class Activities:
 
     @activity.defn(name="corsair.produce")
     async def produce(self, request: ProducerInput) -> ProducerOutput:
-        from corsair.runtime.agent_runner import run_producer
-
-        return await self._model_episode(
-            run_producer(request, self.settings, self.store, model_override=self.model_override)
-        )
+        return await self._model_episode(self.inference.produce(request))
 
     @activity.defn(name="corsair.audit")
     async def audit(self, request: AuditInput) -> AuditOutput:
-        from corsair.runtime.agent_runner import run_auditor
-
-        return await self._model_episode(
-            run_auditor(request, self.settings, model_override=self.model_override)
-        )
+        return await self._model_episode(self.inference.audit(request))
 
     @activity.defn(name="corsair.evidence")
     async def evidence(self, request: EvidenceInput) -> Observation:
-        from corsair.runtime.native_evidence import run_evidence
+        from corsair.steps.evidence import run_evidence
 
         loop = asyncio.get_running_loop()
 
@@ -89,7 +89,9 @@ class Activities:
                 raise InterruptedError("Evidence activity cancelled")
             loop.call_soon_threadsafe(activity.heartbeat, request.operation_id)
 
-        return await run_evidence(request, self.settings, self.store, heartbeat=heartbeat)
+        return await run_evidence(
+            request, self.settings, self.store, heartbeat=heartbeat, sandbox=self.sandbox
+        )
 
     @activity.defn(name="corsair.record")
     async def record(self, result: InvestigationResult) -> InvestigationResult:

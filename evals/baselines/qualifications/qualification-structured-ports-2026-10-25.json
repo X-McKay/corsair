@@ -1,0 +1,122 @@
+{
+  "schema_version": "corsair.qualification/1",
+  "date": "2026-10-25",
+  "platform": "aarch64-darwin",
+  "branch": "manus/just",
+  "base_commit": "80e2ff56431ecc8e24d771c306ee203772ddbc69",
+  "local_changes_committed": false,
+  "pushed": false,
+  "source_tree_digest": "04f6e3c718013c4f8f9758076d176ec058c83bb676d6cc57cdd2dbb8ab04110e",
+  "quality": {
+    "ruff": "passed",
+    "ruff_format": "passed",
+    "just_format": "passed",
+    "ty": "passed"
+  },
+  "full_native_suite": {
+    "tests": 134,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 139.68
+  },
+  "final_fresh_wheel_test": {
+    "passed": 1,
+    "seconds": 7.74
+  },
+  "sdist_and_wheel": "built",
+  "producer_isolated": {
+    "metric": "exact_canonical_payload_match",
+    "distinct_cases": 1,
+    "attempts": 3,
+    "passed": 3,
+    "failed": 0,
+    "pass_rate": 1.0,
+    "correctly_resolved": 0,
+    "invalid_positive_evidence": 0,
+    "forbidden_labels": 0,
+    "inconclusive": 0,
+    "operational_failures": 0,
+    "unavailable_results": 0,
+    "llm_calls": 3,
+    "tool_calls": 0,
+    "input_tokens": 2910,
+    "output_tokens": 845,
+    "cost_usd": null
+  },
+  "auditor_isolated": {
+    "distinct_cases": 2,
+    "attempts": 6,
+    "passed": 6,
+    "failed": 0,
+    "pass_rate": 1.0,
+    "correctly_resolved": 0,
+    "invalid_positive_evidence": 0,
+    "forbidden_labels": 0,
+    "inconclusive": 0,
+    "operational_failures": 0,
+    "unavailable_results": 0,
+    "llm_calls": 6,
+    "tool_calls": 0,
+    "input_tokens": 4170,
+    "output_tokens": 867,
+    "cost_usd": null
+  },
+  "live_native_batch": {
+    "summary": {
+      "attempts": 3,
+      "passed": 2,
+      "failed": 1,
+      "pass_rate": 0.6666666666666666,
+      "correctly_resolved": 2,
+      "invalid_positive_evidence": 0,
+      "forbidden_labels": 0,
+      "inconclusive": 1,
+      "operational_failures": 1,
+      "unavailable_results": 0,
+      "llm_calls": 8,
+      "tool_calls": 0,
+      "input_tokens": 8385,
+      "output_tokens": 2332,
+      "cost_usd": null
+    },
+    "cases": [
+      {
+        "case_id": "case01",
+        "status": "pass",
+        "disposition": "SUPPORTED",
+        "execution_status": "COMPLETED",
+        "evidence_valid": true,
+        "fix_correct": true
+      },
+      {
+        "case_id": "case02",
+        "status": "fail",
+        "disposition": "INCONCLUSIVE",
+        "execution_status": "ERROR",
+        "evidence_valid": true,
+        "fix_correct": true
+      },
+      {
+        "case_id": "case03",
+        "status": "pass",
+        "disposition": "CONDITIONAL",
+        "execution_status": "COMPLETED",
+        "evidence_valid": true,
+        "fix_correct": true
+      }
+    ]
+  },
+  "resolved_issue": "ISSUE-0009",
+  "remaining_issue": "ISSUE-0010",
+  "linux_amd64_current_local_revision": "unrun",
+  "frozen_inputs_and_sdk_nix_pins": "unchanged",
+  "cleanup": {
+    "remaining_corsair_security_containers": 0,
+    "task_worker_stopped": true,
+    "task_temporal_stopped": true,
+    "loopback_17374_listener_absent": true,
+    "previous_main_stash_preserved": "0ce65a61"
+  },
+  "scope": "Small diagnostic fixtures and real local composition, not population accuracy or production hostile-target qualification."
+}

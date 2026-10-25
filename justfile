@@ -7,21 +7,25 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 sync:
     uv sync --locked --all-extras
 
-# Run every lint, formatting and typing gate.
-check: lint format-check typecheck
+# Run every lint, formatting, typing and documentation gate.
+check: lint format-check typecheck docs-check
 
 # Lint maintained source, tests and evaluators.
 lint:
-    uv run --locked ruff check src tests evals
+    uv run --locked ruff check src tests evals scripts
 
 # Check Python and Just formatting without rewriting frozen fixtures.
 format-check:
-    uv run --locked ruff format --check src tests evals
+    uv run --locked ruff format --check src tests evals scripts
     just --fmt --check
 
 # Fail on type errors and warnings.
 typecheck:
     uv run --locked ty check --error-on-warning
+
+# Check checked-in local Markdown links and heading anchors without network access.
+docs-check:
+    uv run --locked python scripts/check_docs.py
 
 # Run offline tests; remaining arguments go directly to pytest.
 test *args:
@@ -63,4 +67,4 @@ eval dataset *args:
 
 # Run an isolated producer/auditor evaluation; pass --settings and other switches.
 eval-agent agent dataset *args:
-    uv run --locked --extra providers python evals/evaluators/agents.py "$@"
+    uv run --locked --extra providers python -m corsair.evaluation.agents "$@"

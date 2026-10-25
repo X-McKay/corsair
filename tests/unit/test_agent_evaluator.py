@@ -1,10 +1,10 @@
 import json
 from pathlib import Path
 
+from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import AuditDecision, AuditOutput, AuditResult, Feedback, Usage, digest
-from corsair.runtime.artifacts import ArtifactStore
+from corsair.evaluation.agents import fixture_matches_oracle, fixture_score_row, load_frozen_fixture
 from corsair.settings import Settings
-from evals.evaluators.agents import fixture_matches_oracle, fixture_score_row, load_frozen_fixture
 
 
 def test_frozen_fixture_is_read_once_and_returns_verified_bytes(tmp_path, monkeypatch):

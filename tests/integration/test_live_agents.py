@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
+from corsair.adapters.inference.adk import run_auditor
 from corsair.contracts import AuditInput, Finding, PythonRecipe, Submission
-from corsair.runtime.agent_runner import run_auditor
 from corsair.settings import load_settings
 
 

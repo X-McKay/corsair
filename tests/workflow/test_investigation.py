@@ -25,7 +25,7 @@ from corsair.contracts import (
 )
 from corsair.workflows.evaluation import EvaluationWorkflow
 from corsair.workflows.investigation import InvestigationWorkflow
-from tests.fixtures.temporal import (
+from tests.workflow.temporal import (
     ActivityScenario,
     FakeActivities,
     investigation_request,

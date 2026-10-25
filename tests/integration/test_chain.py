@@ -11,21 +11,29 @@ from pathlib import Path
 
 import pytest
 from google.adk.models import BaseLlm
+from google.adk.models.base_llm import LlmCapabilities
 from pydantic import Field
 from temporalio.worker import Worker
 
+from corsair.adapters.inference.adk import AdkInference
+from corsair.adapters.sandboxing.docker import DockerSandbox
+from corsair.adapters.scm.local import LocalSourceSnapshots
+from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import Disposition, FixStatus
+from corsair.entrypoints.requests import load_investigation_request
 from corsair.observability.logging import LifecycleLoggingInterceptor
-from corsair.runtime.artifacts import ArtifactStore
-from corsair.runtime.requests import load_investigation_request
 from corsair.settings import Settings
 from corsair.steps.activities import Activities
 from corsair.workflows.investigation import InvestigationWorkflow
-from tests.fixtures.adk import text_response, tool_response
-from tests.fixtures.temporal import temporal_id
+from tests.unit.adk import text_response
+from tests.workflow.temporal import temporal_id
 
 
 class ReferenceModel(BaseLlm):
+    @property
+    def capabilities(self) -> LlmCapabilities:
+        return LlmCapabilities(output_schema_and_tools=True)
+
     requests: list = Field(default_factory=list)
 
     async def generate_content_async(self, llm_request, stream=False):
@@ -37,20 +45,21 @@ class ReferenceModel(BaseLlm):
             )
             packet = json.loads(user_message.parts[0].text.split("\n", maxsplit=1)[1])
             revision = packet["round"]["revision"]
-            yield tool_response(
-                "submit",
-                {
-                    "control_payload": "hello.txt",
-                    "exploit_payload": "../private/secret.txt",
-                    "hypothesis": "Caller-controlled path joins the root without containment.",
-                    "plan": {
-                        "revision": revision,
-                        "parent_revision": packet["round"]["parent_revision"],
-                        "objective": "Exercise the reported component file-access boundary",
-                        "next_steps": ["Submit benign and path-traversal payloads"],
-                        "reason": "The reported callable is the production seam",
-                    },
-                },
+            yield text_response(
+                json.dumps(
+                    {
+                        "control_payload": "hello.txt",
+                        "exploit_payload": "../private/secret.txt",
+                        "hypothesis": "Caller-controlled path joins the root without containment.",
+                        "plan": {
+                            "revision": revision,
+                            "parent_revision": packet["round"]["parent_revision"],
+                            "objective": "Exercise the reported component file-access boundary",
+                            "next_steps": ["Submit benign and path-traversal payloads"],
+                            "reason": "The reported callable is the production seam",
+                        },
+                    }
+                )
             )
         else:
             yield text_response(
@@ -75,7 +84,13 @@ async def test_native_adk_docker_temporal_chain_and_fix(temporal_server, tmp_pat
     store = ArtifactStore(tmp_path / "artifacts")
     settings = Settings(source_root=str(root), artifact_root=str(store.root))
     model = ReferenceModel(model="scripted-reference")
-    activities = Activities(settings, model_override=model)
+    activities = Activities(
+        settings,
+        store=store,
+        inference=AdkInference(settings, store, model),
+        sources=LocalSourceSnapshots(settings, store),
+        sandbox=DockerSandbox(settings, store=store),
+    )
     caplog.set_level(logging.INFO, logger="corsair")
     queue, identity = temporal_id("native-queue"), temporal_id("native-run")
     async with Worker(
@@ -101,9 +116,8 @@ async def test_native_adk_docker_temporal_chain_and_fix(temporal_server, tmp_pat
     assert result.manifest.capabilities["producer"]["tools"] == [
         "read_file",
         "list_files",
-        "submit",
     ]
-    from corsair.observability.evaluation import Oracle, score
+    from corsair.evaluation.scoring import Oracle, score
 
     relabelled = result.model_copy(update={"case_id": "different-case"})
     row = score(relabelled, Oracle(acceptable=[Disposition.SUPPORTED]), store)
@@ -126,7 +140,7 @@ async def test_native_adk_docker_temporal_chain_and_fix(temporal_server, tmp_pat
 async def test_cli_frozen_batch_uses_native_chain_and_external_oracles(
     temporal_server, tmp_path, capsys
 ):
-    from corsair.cli import execute, parser
+    from corsair.entrypoints.cli import execute, parser
     from corsair.workflows.evaluation import EvaluationWorkflow
 
     if os.environ.get("CORSAIR_TEST_DOCKER") != "1":
@@ -142,7 +156,14 @@ async def test_cli_frozen_batch_uses_native_chain_and_external_oracles(
     config = tmp_path / "settings.json"
     config.write_text(settings.model_dump_json())
     report = tmp_path / "report.json"
-    activities = Activities(settings, model_override=ReferenceModel(model="scripted-batch"))
+    store = ArtifactStore(settings.artifact_root)
+    activities = Activities(
+        settings,
+        store=store,
+        inference=AdkInference(settings, store, ReferenceModel(model="scripted-batch")),
+        sources=LocalSourceSnapshots(settings, store),
+        sandbox=DockerSandbox(settings, store=store),
+    )
     args = parser().parse_args(
         [
             "eval",

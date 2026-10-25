@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from corsair.runtime import models
-from corsair.runtime.models import load_agent_spec, model_for_role, prompt_text
+from corsair.adapters.inference.models import model_for_role
+from corsair.agents.resources import AgentSpec, load_agent_spec, prompt_text
 from corsair.settings import ModelSettings
 
 
@@ -57,18 +57,18 @@ def test_agent_specs_are_validated_resource_metadata_with_manifest_tools_field()
     producer = load_agent_spec("producer")
     auditor = load_agent_spec("auditor")
 
-    assert producer.tools == ["read_file", "list_files", "submit"]
+    assert producer.tools == ["read_file", "list_files"]
     assert auditor.tools == []
-    assert producer.risk_path == auditor.risk_path == "corsair.runtime:risk.md"
+    assert producer.risk_path == auditor.risk_path == "corsair.policies:risk.md"
     assert producer.schema_ref == "corsair.contracts.Submission"
     assert auditor.schema_ref == "corsair.contracts.AuditResult"
-    assert "call `submit` exactly once" in prompt_text("producer")
+    assert "return one structured Submission" in prompt_text("producer")
     assert "outcome-blind" in prompt_text("auditor")
 
 
 def test_agent_spec_rejects_unknown_metadata_fields():
     with pytest.raises(ValueError, match="Extra inputs are not permitted"):
-        models.AgentSpec.model_validate(
+        AgentSpec.model_validate(
             {
                 "name": "auditor",
                 "contract_version": "corsair.agent/1",

@@ -10,8 +10,10 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 from google.adk.agents import LlmAgent
+from google.adk.models import BaseLlm
 
-from corsair.runtime.models import AgentModel, load_agent_spec, prompt_text
+from corsair.agents.resources import load_agent_spec, prompt_text
+from corsair.contracts import Submission
 
 
 def _tool_name(tool: Callable[..., Any]) -> str:
@@ -22,7 +24,7 @@ def _tool_name(tool: Callable[..., Any]) -> str:
 
 
 def build_producer(
-    model: AgentModel,
+    model: str | BaseLlm,
     tools: Sequence[Callable[..., Any]],
 ) -> LlmAgent:
     """Build the producer with only its episode-private approved tools.
@@ -49,6 +51,7 @@ def build_producer(
         model=model,
         instruction=prompt_text("producer"),
         tools=selected_tools,
+        output_schema=Submission,
         disallow_transfer_to_parent=True,
         disallow_transfer_to_peers=True,
     )

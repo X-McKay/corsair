@@ -3,7 +3,7 @@ import json
 import pytest
 
 from corsair.contracts import Disposition, ExecutionStatus, InvestigationResult, digest
-from corsair.observability.evaluation import Oracle, load_dataset, score, summarize
+from corsair.evaluation.scoring import Oracle, load_dataset, score, summarize
 
 
 def result(label=Disposition.INCONCLUSIVE):
@@ -88,6 +88,7 @@ def test_frozen_oracle_refuses_changes(tmp_path):
 
 @pytest.mark.parametrize("artifact_exists", [False, True])
 def test_synthetic_positive_with_plausible_roles_cannot_pass(artifact_exists, tmp_path):
+    from corsair.adapters.storage.filesystem import ArtifactStore
     from corsair.contracts import (
         ArtifactRef,
         AuditDecision,
@@ -99,7 +100,6 @@ def test_synthetic_positive_with_plausible_roles_cannot_pass(artifact_exists, tm
         RoleOutcome,
         RoundResult,
     )
-    from corsair.runtime.artifacts import ArtifactStore
     from tests.unit.test_evidence import _prepared, _submission
 
     store = ArtifactStore(tmp_path)
@@ -176,7 +176,7 @@ def test_dataset_parses_only_the_bytes_it_verified(tmp_path, monkeypatch):
     from collections import Counter
     from pathlib import Path
 
-    from corsair.observability.evaluation import Dataset, DatasetEntry
+    from corsair.evaluation.scoring import Dataset, DatasetEntry
 
     request = tmp_path / "request.json"
     oracle = tmp_path / "oracle.json"

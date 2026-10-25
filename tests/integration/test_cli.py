@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from corsair.settings import Settings
-from tests.fixtures.temporal import temporal_id
+from tests.workflow.temporal import temporal_id
 
 pytestmark = [pytest.mark.docker, pytest.mark.temporal, pytest.mark.asyncio(loop_scope="module")]
 ROOT = Path(__file__).resolve().parents[2]
@@ -139,11 +139,15 @@ async def test_real_cli_reference_in_pseudo_terminal_has_animation(tmp_path):
         chunks = []
         try:
             while True:
-                chunks.append(os.read(master, 65536))
+                chunk = os.read(master, 65536)
+                if not chunk:
+                    break
+                chunks.append(chunk)
         except OSError:
-            return b"".join(chunks).decode()
+            pass
         finally:
             os.close(master)
+        return b"".join(chunks).decode()
 
     async with asyncio.timeout(30):
         rendered = await asyncio.to_thread(read_terminal)
@@ -215,10 +219,10 @@ async def test_ctrl_c_detaches_real_temporal_client_without_cancelling_workflow(
     from temporalio.client import WorkflowExecutionStatus
     from temporalio.worker import Worker
 
+    from corsair.adapters.storage.filesystem import ArtifactStore
     from corsair.contracts import InvestigationResult
-    from corsair.runtime.artifacts import ArtifactStore
     from corsair.workflows.investigation import InvestigationWorkflow
-    from tests.fixtures.temporal import ActivityScenario, FakeActivities
+    from tests.workflow.temporal import ActivityScenario, FakeActivities
 
     # The provider is intentionally paused via a labelled test activity, not a production fallback.
     settings = Settings(

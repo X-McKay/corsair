@@ -7,6 +7,9 @@ import docker
 import pytest
 from docker.errors import DockerException
 
+from corsair.adapters.sandboxing.docker import DockerSandbox
+from corsair.adapters.scm.local import prepare_case
+from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
     Budget,
     Case,
@@ -18,12 +21,9 @@ from corsair.contracts import (
     Source,
     Submission,
 )
-from corsair.policy.verdicts import fix_status
-from corsair.runtime.artifacts import ArtifactStore
+from corsair.policies.verdicts import fix_status
 from corsair.settings import Settings
-from corsair.tools.security.evidence import EvidenceVerifier
-from corsair.tools.security.sandbox import DockerSandbox
-from corsair.tools.security.sources import prepare_case
+from corsair.steps.verification import EvidenceVerifier
 
 pytestmark = pytest.mark.docker
 
@@ -132,7 +132,7 @@ def test_real_docker_vulnerable_safe_fixed_and_cleanup(tmp_path: Path) -> None:
     image_id = DockerSandbox(Settings(), client=client).image_id
 
     settings, store, vulnerable = _prepared(tmp_path / "vulnerable-case", image_id)
-    sandbox = DockerSandbox(settings, client=client)
+    sandbox = DockerSandbox(settings, client=client, store=store)
     verifier = EvidenceVerifier(settings, store, sandbox)
     vulnerable_observation = verifier.evaluate(
         EvidenceInput(
@@ -152,7 +152,9 @@ def test_real_docker_vulnerable_safe_fixed_and_cleanup(tmp_path: Path) -> None:
 
     safe_root = tmp_path / "safe-case"
     settings, store, safe = _prepared(safe_root, image_id, safe=True)
-    safe_verifier = EvidenceVerifier(settings, store, DockerSandbox(settings, client=client))
+    safe_verifier = EvidenceVerifier(
+        settings, store, DockerSandbox(settings, client=client, store=store)
+    )
     safe_observation = safe_verifier.evaluate(
         EvidenceInput(
             run_id="run-safe",
@@ -169,7 +171,9 @@ def test_real_docker_vulnerable_safe_fixed_and_cleanup(tmp_path: Path) -> None:
 
     fixed_root = tmp_path / "fixed-case"
     settings, store, prepared = _prepared(fixed_root, image_id, fixed=True)
-    fixed_verifier = EvidenceVerifier(settings, store, DockerSandbox(settings, client=client))
+    fixed_verifier = EvidenceVerifier(
+        settings, store, DockerSandbox(settings, client=client, store=store)
+    )
     fixed_observation = fixed_verifier.evaluate(
         EvidenceInput(
             run_id="run-fixed",
@@ -234,7 +238,9 @@ def test_native_failures_and_canned_markers_never_become_positive(
         recipe=prepared.recipe,
     )
     prepared = prepare_case(case, settings, store, prepared.manifest)
-    observation = EvidenceVerifier(settings, store, DockerSandbox(settings, client)).evaluate(
+    observation = EvidenceVerifier(
+        settings, store, DockerSandbox(settings, client, store=store)
+    ).evaluate(
         EvidenceInput(
             run_id="regression",
             operation_id="regression-native",
@@ -266,7 +272,9 @@ def test_native_timeout_removes_owned_container(tmp_path):
         recipe=prepared.recipe,
     )
     prepared = prepare_case(case, settings, store, prepared.manifest)
-    observation = EvidenceVerifier(settings, store, DockerSandbox(settings, client)).evaluate(
+    observation = EvidenceVerifier(
+        settings, store, DockerSandbox(settings, client, store=store)
+    ).evaluate(
         EvidenceInput(
             run_id="timeout",
             operation_id="timeout-native",

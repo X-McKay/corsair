@@ -11,9 +11,9 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from corsair.cli import execute, parser, validate_run_id
+from corsair.entrypoints.cli import execute, parser, validate_run_id
+from corsair.entrypoints.terminal import Terminal
 from corsair.observability.logging import JsonFormatter, MetadataFilter, event
-from corsair.runtime.terminal import Terminal
 
 
 @pytest.mark.parametrize(
@@ -210,7 +210,7 @@ def test_cli_exit_does_not_retain_handled_exception_tracebacks(tmp_path):
     # A test-only context observer invokes the actual main function, without fake responses.
     probe = (
         "import json\n"
-        "from corsair.cli import main\n"
+        "from corsair.entrypoints.cli import main\n"
         "try:\n"
         "    main()\n"
         "except SystemExit as exit:\n"
@@ -233,8 +233,8 @@ def test_client_only_operations_do_not_import_worker_or_adk_composition():
         [
             sys.executable,
             "-c",
-            "import sys; import corsair.runtime.client; "
-            "assert 'corsair.runtime.worker' not in sys.modules; "
+            "import sys; import corsair.adapters.temporal.client; "
+            "assert 'corsair.entrypoints.worker' not in sys.modules; "
             "assert not any(name.startswith('google.adk') for name in sys.modules)",
         ],
         capture_output=True,

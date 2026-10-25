@@ -19,6 +19,11 @@ def test_built_wheel_includes_agent_metadata_instructions_and_risk(tmp_path):
     wheel = next((tmp_path / "dist").glob("*.whl"))
     with zipfile.ZipFile(wheel) as archive:
         assert not any(name.startswith("tests/") for name in archive.namelist())
+        assert "corsair/cli.py" not in archive.namelist()
+        assert not any(
+            name.startswith(("corsair/runtime/", "corsair/tools/", "corsair/policy/"))
+            for name in archive.namelist()
+        )
     installed = tmp_path / "installed"
     subprocess.run(
         ["uv", "venv", str(installed), "--python", sys.executable],
@@ -43,18 +48,25 @@ def test_built_wheel_includes_agent_metadata_instructions_and_risk(tmp_path):
 from importlib.resources import files
 from pathlib import Path
 import corsair
-from corsair.runtime.client import connect, wait_for_result
-from corsair.runtime.models import load_agent_spec, prompt_text
-from corsair.runtime.terminal import Terminal
+from corsair.adapters.scm.requests import normalize_request_sources
+from corsair.adapters.temporal.client import connect, wait_for_result
+from corsair.agents.resources import load_agent_spec, prompt_text
+from corsair.entrypoints.terminal import Terminal
 from corsair.observability.logging import LifecycleLoggingInterceptor
-from corsair.cli import parser
+from corsair.entrypoints.cli import parser
+from corsair.entrypoints.api import start_investigation, start_evaluation
+from corsair.entrypoints.requests import load_investigation_request
+from corsair.ports.inference import InferencePort
+from corsair.contracts.agents import Submission
 assert Path(corsair.__file__).is_relative_to(Path('installed').resolve()), corsair.__file__
 for role in ('producer', 'auditor'):
     assert load_agent_spec(role).name == role
     assert len(prompt_text(role)) > 100
-assert 'pilot risk' in files('corsair.runtime').joinpath('risk.md').read_text().lower()
-assert files('corsair.tools.security').joinpath('driver.py').is_file()
+assert 'pilot risk' in files('corsair.policies').joinpath('risk.md').read_text().lower()
+assert files('corsair.adapters.sandboxing').joinpath('driver.py').is_file()
 assert parser().parse_args(['report', 'report.json']).command == 'report'
+assert callable(load_investigation_request)
+assert callable(normalize_request_sources)
 print('Installed-wheel resources verified outside checkout')
 """,
         ],
