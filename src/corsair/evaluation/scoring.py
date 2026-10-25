@@ -92,7 +92,7 @@ def valid_positive_evidence(result: InvestigationResult, store: ArtifactStore | 
     verifier = EvidenceVerifier(Settings(), store)
     for item in result.rounds:
         observation, audit = item.observation, item.audit
-        submission = item.producer.submission
+        submission = item.producer.submission_for_verification()
         if observation is None or submission is None or audit is None:
             continue
         prepared = verifier.validate_saved(observation, submission, result.manifest)
@@ -117,10 +117,10 @@ def score(result: InvestigationResult, oracle: Oracle, store: ArtifactStore | No
         if fixed is not None and store is not None and result.manifest is not None:
             verifier = EvidenceVerifier(Settings(), store)
             fixed_valid = any(
-                item.producer.submission is not None
+                (submission := item.producer.submission_for_verification()) is not None
                 and (
                     prepared := verifier.validate_saved(
-                        fixed, item.producer.submission, result.manifest, expected_fixed=True
+                        fixed, submission, result.manifest, expected_fixed=True
                     )
                 )
                 is not None

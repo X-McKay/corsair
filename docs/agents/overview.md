@@ -4,14 +4,14 @@ Corsair has two bounded Google ADK roles. They propose or review structured data
 
 | Role | Objective | Agent-visible material | Native output | Tools |
 | --- | --- | --- | --- | --- |
-| Producer | Propose one declarative benign/adversarial payload pair for the admitted Python recipe. | Finding, public recipe configuration, bounded source excerpt, current round, and any prior submission/feedback. Execution outcomes, private fixtures, manifests, case paths, and verifier oracles are excluded. | [`Submission`](../../src/corsair/contracts/agents.py), including a nested `PlanRevision`. | `read_file`, `list_files` only. |
+| Producer | Return a grounded payload proposal or explicitly abstain when source grounding is unavailable. | Finding, public recipe configuration, bounded source excerpt, current round, and any prior submission/feedback. Execution outcomes, private fixtures, manifests, case paths, and verifier oracles are excluded. | [`ProducerDecision`](../../src/corsair/contracts/agents.py): `proposal` wraps a `Submission` with `PlanRevision`; `no_grounded_candidate` carries a bounded reason. | `read_file`, `list_files` only. |
 | Auditor | Decide whether a complete producer claim and payload pair are semantically coherent with the reported mechanism. | Finding, public recipe configuration, source excerpt, and submission. It receives no observation, execution outcome, private fixture, or expected label. | [`AuditResult`](../../src/corsair/contracts/agents.py). | None. |
 
 The producer may choose data values for the configured payload parameter. It cannot change the callable, fixed arguments, fixture, exception policy, target source, or expected control behavior. It does not author assertions or executable probes. The auditor is outcome-blind: its decision is a semantic review, not a statement that code ran, a private value was observed, a fix succeeded, or a final disposition is justified.
 
 ## Native structured episodes
 
-Each role factory declares the existing Pydantic contract directly through `LlmAgent.output_schema`: `Submission` for the producer and `AuditResult` for the auditor. The canonical models remain defined once under `corsair.contracts`; this guide is not a second schema definition.
+Each role factory declares the existing Pydantic contract directly through `LlmAgent.output_schema`: `ProducerDecision` for the producer and `AuditResult` for the auditor. The producer decision's `proposal` retains the existing `Submission`; `no_grounded_candidate` is an explicit `INCONCLUSIVE` abstention that schedules no target or audit work. The canonical models remain defined once under `corsair.contracts`; this guide is not a second schema definition.
 
 The native ADK runner creates one fresh in-memory session and ordinary `Runner.run_async` episode per role activity. Temporal coordinates the bounded rounds, cancellation, final recording, and durable state through ordinary activities. Corsair does **not** use the upstream Google ADK Temporal plugin/integration.
 

@@ -6,9 +6,12 @@ from .agents import AuditDecision as AuditDecision
 from .agents import AuditInput as AuditInput
 from .agents import AuditOutput as AuditOutput
 from .agents import AuditResult as AuditResult
+from .agents import NoGroundedCandidate as NoGroundedCandidate
 from .agents import PlanRevision as PlanRevision
+from .agents import ProducerDecision as ProducerDecision
 from .agents import ProducerInput as ProducerInput
 from .agents import ProducerOutput as ProducerOutput
+from .agents import ProducerProposal as ProducerProposal
 from .agents import Submission as Submission
 from .common import ArtifactRef as ArtifactRef
 from .common import Contract as Contract

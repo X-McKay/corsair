@@ -2,6 +2,10 @@
 
 This is the current work index. Current user guides start at the [documentation index](../index.md); historical records in [archive](archive/README.md) are evidence, not executable instructions for the current tree.
 
+## This independent recommendation branch
+
+[Add typed terminal producer abstention](archive/plans/PLAN-0119-producer-abstention.md) is implemented on `manus/producer-abstention`. [Final handoff](archive/handoffs/HANDOFF-recommendation-producer-abstention.md) and [native receipt](../../evals/baselines/qualifications/qualification-producer-abstention-2026-10-25.json) record 153 passing physical-Mac tests with zero skips. The feature is draft/unpromoted; [ISSUE-0012](active/ISSUE-0012-producer-decision-live-quality.md) retains the failed live gates. The base-revision records below retain their original scope and are not the current branch's final qualification.
+
 ## Active work
 
 
@@ -27,7 +31,7 @@ This is the current work index. Current user guides start at the [documentation 
 
 ## Current implementation and qualification
 
-The local `manus/just` working tree has canonical Pydantic structured producer output and explicit contracts, ports, adapters, entrypoints, policies, workflows, steps, observability and evaluation packages. The source is a personal-use standard-library Python disclosure-recipe pilot. Remote forge adapters, a standalone HTTP service, general negative clearance and production artifact-host-loss recovery are not implemented claims.
+The base revision below had canonical Pydantic structured producer output and explicit contracts, ports, adapters, entrypoints, policies, workflows, steps, observability and evaluation packages. The source is a personal-use standard-library Python disclosure-recipe pilot. Remote forge adapters, a standalone HTTP service, general negative clearance and production artifact-host-loss recovery are not implemented claims.
 
 The latest pre-documentation physical-Mac suite passed **134 tests** with real Docker/Temporal and live-auditor checks. The unchanged isolated producer freeze passed **3/3** (one case repeated three times), auditor **6/6** (two cases repeated three times). A separate actual live-model native batch scored **2/3**; ISSUE-0010 retains its operational failure. Current-local-revision Linux amd64 checks have not been rerun. Earlier CI successes refer to their recorded revisions, not a later revision without its exact corresponding checks.
 

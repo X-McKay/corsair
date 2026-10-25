@@ -13,7 +13,7 @@ from google.adk.agents import LlmAgent
 from google.adk.models import BaseLlm
 
 from corsair.agents.resources import load_agent_spec, prompt_text
-from corsair.contracts import Submission
+from corsair.contracts import ProducerDecision
 
 
 def _tool_name(tool: Callable[..., Any]) -> str:
@@ -42,7 +42,7 @@ def build_producer(
         )
     if spec.instruction_resource != "corsair.agents.producer.instructions:system.md":
         raise ValueError("producer instruction resource metadata is not canonical")
-    if spec.schema_ref != "corsair.contracts.Submission":
+    if spec.schema_ref != "corsair.contracts.ProducerDecision":
         raise ValueError("producer schema metadata is not canonical")
 
     return LlmAgent(
@@ -51,7 +51,7 @@ def build_producer(
         model=model,
         instruction=prompt_text("producer"),
         tools=selected_tools,
-        output_schema=Submission,
+        output_schema=ProducerDecision,
         disallow_transfer_to_parent=True,
         disallow_transfer_to_peers=True,
     )

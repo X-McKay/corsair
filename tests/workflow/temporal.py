@@ -35,8 +35,10 @@ from corsair.contracts import (
     Observation,
     PlanRevision,
     PreparedCase,
+    ProducerDecision,
     ProducerInput,
     ProducerOutput,
+    ProducerProposal,
     PythonRecipe,
     RoleObservation,
     RoleOutcome,
@@ -163,7 +165,10 @@ class FakeActivities:
                 reason="the prior admissible observation did not end the investigation",
             ),
         )
-        return ProducerOutput(submission=submission, usage=Usage(llm_calls=1, tool_calls=1))
+        return ProducerOutput(
+            decision=ProducerDecision(root=ProducerProposal(submission=submission)),
+            usage=Usage(llm_calls=1, tool_calls=1),
+        )
 
     @staticmethod
     def _role(outcome: RoleOutcome, line: int | None) -> RoleObservation:

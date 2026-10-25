@@ -6,7 +6,7 @@ Change an agent as one bounded component: keep its objective, typed contract, to
 
 | Concern | Canonical location | Change boundary |
 | --- | --- | --- |
-| Producer behavior | [`src/corsair/agents/producer/`](../../src/corsair/agents/producer/) | Prompt, exact two source-read tools, and `Submission` factory configuration. |
+| Producer behavior | [`src/corsair/agents/producer/`](../../src/corsair/agents/producer/) | Prompt, exact two source-read tools, and `ProducerDecision` factory configuration. |
 | Auditor behavior | [`src/corsair/agents/auditor/`](../../src/corsair/agents/auditor/) | Prompt, tool-free factory configuration, and `AuditResult` output. |
 | Role metadata and packaged prompts | [`src/corsair/agents/resources.py`](../../src/corsair/agents/resources.py) and each role's `agent.json`/`instructions/system.md` | Metadata is validated against the factory's exact tool names, instruction resource, and schema reference. |
 | Wire contracts | [`src/corsair/contracts/agents.py`](../../src/corsair/contracts/agents.py) | Define or change a Pydantic model once; consumers import the canonical export. |
@@ -18,10 +18,11 @@ The runtime loads the role-local packaged prompt and JSON metadata through Pytho
 ## Preserve these role invariants
 
 - The producer is restricted to data-only payload proposals and receives exactly `read_file` and `list_files`; the auditor remains fresh-context, tool-free, and outcome-blind.
-- Factories use native `LlmAgent.output_schema` with canonical `Submission` or `AuditResult`. Do not reintroduce a custom `submit` function, termination state, string decoder, or schema-repair layer.
+- Factories use native `LlmAgent.output_schema` with canonical `ProducerDecision` or `AuditResult`. A producer decision is either a `proposal` containing the unchanged `Submission` or `no_grounded_candidate` with a bounded reason. Do not reintroduce a custom `submit` function, termination state, string decoder, or schema-repair layer.
 - Model capability determines whether ADK can combine schema output and ordinary tools directly or uses its own schema-completion fallback. Keep native callbacks, call/output/tool budgets, and post-generation Pydantic plus round/parent validation in force for both paths.
 - Provider credentials stay in the worker environment. A model setting selects the native Gemini or LiteLLM route; it is not a credential broker or an invitation to add provider-specific placeholders.
 - The model episode is an ordinary bounded Temporal activity. Do not substitute an upstream Google ADK Temporal integration, invent an agent graph, or add an implicit retry/fallback loop.
+- A `no_grounded_candidate` decision is an explicit terminal abstention for a newly recorded workflow history: it records the producer usage and prepared provenance, executes no target or audit, and remains `INCONCLUSIVE`. The Temporal patch marker preserves the preceding command path for old histories. It never establishes negative clearance.
 
 The producer's snapshot reader, the Docker sandbox, evidence verifier, artifact store, and final policy belong to trusted components. They must not be moved into an agent prompt or tool surface to make an evaluation pass.
 

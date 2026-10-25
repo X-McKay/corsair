@@ -48,15 +48,20 @@ class ReferenceModel(BaseLlm):
             yield text_response(
                 json.dumps(
                     {
-                        "control_payload": "hello.txt",
-                        "exploit_payload": "../private/secret.txt",
-                        "hypothesis": "Caller-controlled path joins the root without containment.",
-                        "plan": {
-                            "revision": revision,
-                            "parent_revision": packet["round"]["parent_revision"],
-                            "objective": "Exercise the reported component file-access boundary",
-                            "next_steps": ["Submit benign and path-traversal payloads"],
-                            "reason": "The reported callable is the production seam",
+                        "kind": "proposal",
+                        "submission": {
+                            "control_payload": "hello.txt",
+                            "exploit_payload": "../private/secret.txt",
+                            "hypothesis": (
+                                "Caller-controlled path joins the root without containment."
+                            ),
+                            "plan": {
+                                "revision": revision,
+                                "parent_revision": packet["round"]["parent_revision"],
+                                "objective": "Exercise the reported component file-access boundary",
+                                "next_steps": ["Submit benign and path-traversal payloads"],
+                                "reason": "The reported callable is the production seam",
+                            },
                         },
                     }
                 )

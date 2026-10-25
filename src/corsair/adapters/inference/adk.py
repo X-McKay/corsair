@@ -40,9 +40,10 @@ from corsair.contracts import (
     AuditOutput,
     AuditResult,
     Feedback,
+    ProducerDecision,
     ProducerInput,
     ProducerOutput,
-    Submission,
+    ProducerProposal,
     Usage,
 )
 from corsair.settings import ModelSettings, Settings
@@ -338,7 +339,7 @@ async def run_producer(
     store: ArtifactStore,
     model_override: str | BaseLlm | None = None,
 ) -> ProducerOutput:
-    """Run one bounded producer episode and return only typed proposal data."""
+    """Run one bounded producer episode and return only typed decision data."""
 
     started = time.perf_counter()
     llm_limit = _effective_limit(
@@ -373,22 +374,26 @@ async def run_producer(
     elif accounting.llm_limit_exhausted:
         reason = "producer exhausted its LLM-call budget before structured completion"
     elif last_agent_text is None:
-        reason = "producer returned no structured Submission output"
+        reason = "producer returned no structured ProducerDecision output"
     else:
         try:
-            submission = Submission.model_validate_json(last_agent_text)
+            decision = ProducerDecision.model_validate_json(last_agent_text)
         except ValidationError:
-            reason = "producer returned malformed Submission output"
+            reason = "producer returned malformed ProducerDecision output"
         else:
-            expected_parent = (
-                None if producer_input.round_index == 1 else producer_input.round_index - 1
-            )
-            if submission.plan.revision != producer_input.round_index:
-                reason = "plan revision must equal the current round index"
-            elif submission.plan.parent_revision != expected_parent:
-                reason = "plan parent_revision does not match the preceding round"
+            variant = decision.root
+            if isinstance(variant, ProducerProposal):
+                expected_parent = (
+                    None if producer_input.round_index == 1 else producer_input.round_index - 1
+                )
+                if variant.submission.plan.revision != producer_input.round_index:
+                    reason = "plan revision must equal the current round index"
+                elif variant.submission.plan.parent_revision != expected_parent:
+                    reason = "plan parent_revision does not match the preceding round"
+                else:
+                    return ProducerOutput(decision=decision, usage=usage)
             else:
-                return ProducerOutput(submission=submission, usage=usage)
+                return ProducerOutput(decision=decision, usage=usage)
     return ProducerOutput(
         usage=usage,
         feedback=Feedback(gate="producer_invalid", reason=reason, operational=False),
