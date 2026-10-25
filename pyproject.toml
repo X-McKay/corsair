@@ -1,46 +1,68 @@
 [project]
 name = "corsair"
-version = "0.0.0"
-description = "Sandboxed security issue validation with two native unit-test probes"
-requires-python = ">=3.12,<3.13"
+version = "0.1.0"
+description = "Evidence-first security finding verification with Google ADK and Temporal"
+requires-python = ">=3.12,<3.14"
 dependencies = [
-    "pydantic-ai-slim[openai,temporal]==2.55.0",
-    "pydantic-ai-harness[skills]==0.55.0",
-    "temporalio==1.34.0",
-    "PyYAML==6.0.3",
-    # Native OpenShell SDK for the OpenShell sandbox backend (the version v1 qualified; release wheel, hashed in uv.lock).
-    "openshell @ https://github.com/NVIDIA/OpenShell/releases/download/v0.1.3/openshell-0.1.3-py3-none-any.whl",
-    "rich==15.0.0",
+  "google-adk==2.13.0",
+  "temporalio==1.34.0",
+  "pydantic>=2.12,<3",
+  "docker==7.2.0",
+  "duckdb==2.0.0",
+  "rich>=14,<15",
+  "typing-extensions>=4.15,<5",
 ]
 
+[project.optional-dependencies]
+# LiteLLM imports its MCP conversion package even for ordinary OpenAI function tools.
+providers = ["litellm[mcp]==1.106.3"]
+
 [project.scripts]
-corsair-v2 = "corsair.cli:main"
+corsair = "corsair.entrypoints.cli:main"
 
 [build-system]
-requires = ["uv_build>=0.11.32,<0.12"]
+requires = ["uv_build>=0.12.19,<0.13"]
 build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "pytest==9.0.3",
-    "pytest-xdist==3.8.0",
-    "pydantic-evals==2.55.0",  # native eval runner for the per-agent evals (evals/agent_eval.py)
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "pytest-cov>=7,<8",
+    "ruff==0.17.2",
+    "ty==0.0.91",
 ]
-
-[tool.uv]
-package = true
-
-[tool.uv.build-backend]
-# src/corsair is a namespace package (no __init__.py).
-namespace = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src", "."]
+pythonpath = ["."]
+asyncio_mode = "auto"
 addopts = "--strict-markers"
 markers = [
-    "platform: live kind and CNI qualification; requires explicit kubeconfig (make qualify-network)",
-    "admission: live storage and native OpenShell kernel admission; requires installed prerequisites (make qualify-admission)",
-    "gateway: live gateway TLS and generated identity qualification; uninstalls the gateway afterwards (make qualify-gateway)",
-    "openshell: live v2 OpenShell sandbox backend against .state/openshell/config.json (make qualify-openshell-v2)",
+  "docker: requires a real Docker daemon and the Corsair image",
+  "long_probe: explicitly opted-in real Docker probe exceeding 120 seconds",
+  "temporal: requires a real Temporal development server",
+  "live: explicitly enabled real-provider smoke test",
 ]
+
+[tool.ruff]
+line-length = 100
+# Deliberately-flawed corpus/fixture source trees are evaluation inputs, not style targets.
+extend-exclude = ["evals/fixtures", "evals/datasets"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ARG001", "ARG002"]
+
+[tool.coverage.run]
+source = ["corsair"]
+
+[tool.ty.environment]
+python-version = "3.12"
+
+[tool.ty.src]
+include = ["src", "tests", "evals", "scripts"]
+# Deliberately-flawed corpus/fixture source trees are evaluation inputs, not type targets.
+exclude = ["evals/datasets", "evals/fixtures"]
+
+[tool.ty.terminal]
+error-on-warning = true

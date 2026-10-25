@@ -1,6 +1,0 @@
-# Native Kustomize image locations for the Agent Sandbox custom resource.
-images:
-- kind: Sandbox
-  path: spec/podTemplate/spec/initContainers/image
-- kind: Sandbox
-  path: spec/podTemplate/spec/containers/image

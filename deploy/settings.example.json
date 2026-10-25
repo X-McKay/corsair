@@ -1,0 +1,24 @@
+{
+  "artifact_root": ".runs",
+  "source_root": ".",
+  "temporal_address": "localhost:7233",
+  "temporal_namespace": "default",
+  "task_queue": "corsair",
+  "image": "corsair-python:0.1",
+  "runtime": "runc",
+  "memory_limit": "512m",
+  "nano_cpus": 1000000000,
+  "pids_limit": 64,
+  "source_limit_bytes": 8388608,
+  "source_limit_files": 1000,
+  "negative_threshold": 2,
+  "max_sessions": 2,
+  "models": {
+    "connector": "gemini",
+    "producer": "gemini-2.5-flash",
+    "auditor": "gemini-2.5-flash",
+    "api_base": null,
+    "request_timeout_seconds": 120,
+    "extra_body": {}
+  }
+}

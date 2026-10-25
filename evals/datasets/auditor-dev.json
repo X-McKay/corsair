@@ -1,0 +1,19 @@
+{
+  "schema_version": "corsair.agent-dataset/1",
+  "entries": [
+    {
+      "case_id": "audit01",
+      "input": "fixtures/audit01/input.json",
+      "oracle": "fixtures/audit01/oracle.json",
+      "input_digest": "d48f38dc1dbd5c13fb50f5e0abcc205ec64d8b2f7f98a19f007dd8feddd92123",
+      "oracle_digest": "374257696b602b3252f2e1fb7340ecd8630e1fcf53820260d04b884bed126f4f"
+    },
+    {
+      "case_id": "audit02",
+      "input": "fixtures/audit02/input.json",
+      "oracle": "fixtures/audit02/oracle.json",
+      "input_digest": "dc8fe285edf0b8de5c0b5e0e4e6a115a6e69b6d1d6f83ce8a876991b8f39ce7f",
+      "oracle_digest": "7db730fa160fd72c8613962722bd63d70ba5dec5627c5c93aefa3fe0a29c4424"
+    }
+  ]
+}

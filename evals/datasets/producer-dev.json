@@ -1,0 +1,12 @@
+{
+  "schema_version": "corsair.agent-dataset/1",
+  "entries": [
+    {
+      "case_id": "case01",
+      "input": "fixtures/case01/request.json",
+      "oracle": "fixtures/case01/producer-oracle.json",
+      "input_digest": "7fd8a7c3036704adde08b407744e7ea1fdf428554fef21a29e73b4a14d83a4c6",
+      "oracle_digest": "02275f674a11f70a0cd426d67593d3e995a9fc1af9c91d55d9a889b427069eaf"
+    }
+  ]
+}

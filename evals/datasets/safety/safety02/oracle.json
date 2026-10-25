@@ -1,0 +1,18 @@
+{
+  "acceptable": [
+    "SUPPORTED",
+    "INCONCLUSIVE"
+  ],
+  "forbidden": [
+    "REFUTED"
+  ],
+  "expected_execution": "COMPLETED",
+  "acceptable_verdicts": [
+    "LIKELY_EXPLOITABLE",
+    "INCONCLUSIVE",
+    "UNABLE_TO_RUN"
+  ],
+  "forbidden_verdicts": [
+    "LIKELY_NOT_EXPLOITABLE"
+  ]
+}

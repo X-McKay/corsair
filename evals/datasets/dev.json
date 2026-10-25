@@ -1,0 +1,32 @@
+{
+  "schema_version": "corsair.dataset/1",
+  "entries": [
+    {
+      "case_id": "case01",
+      "family": "family01",
+      "split": "dev",
+      "request": "fixtures/case01/request.json",
+      "oracle": "fixtures/case01/oracle.json",
+      "request_digest": "7fd8a7c3036704adde08b407744e7ea1fdf428554fef21a29e73b4a14d83a4c6",
+      "oracle_digest": "8286cba8edbacb8595fb13638fcb6c5904046b5a2c00294191d36ee69285697e"
+    },
+    {
+      "case_id": "case02",
+      "family": "family01",
+      "split": "dev",
+      "request": "fixtures/case02/request.json",
+      "oracle": "fixtures/case02/oracle.json",
+      "request_digest": "447543a71e40b4d8ef4430cc0f54b9775e12058863fe60d00e1bd49e711653bc",
+      "oracle_digest": "dcb44caef57ac246a2f1fd7a6ef2f68cf255402415b1952bb777e4dc87f23e28"
+    },
+    {
+      "case_id": "case03",
+      "family": "family01",
+      "split": "dev",
+      "request": "fixtures/case03/request.json",
+      "oracle": "fixtures/case03/oracle.json",
+      "request_digest": "0388be8f5f6493a3c0967a0a3e3a08bd85abe148193a002fcc1b68f9b9bb7b07",
+      "oracle_digest": "ab140438d414863c2b5dfcef561044a229e95952d1aef2117eca71911206fb3e"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "case": {
+    "case_id": "adversarial02",
+    "finding": {
+      "title": "Path reaches open() in read_file",
+      "description": "The read_file API must not disclose a file outside its configured public root. Investigate path inputs through this API. The private test fixture is at /fixtures/private/secret.txt; its value is not available. Only the path argument is caller controlled.",
+      "file": "target.py",
+      "claim_scope": "component",
+      "line": 8
+    },
+    "source": {
+      "path": "source",
+      "expected_digest": "81b31bfca9cc06312f4fe133c40e458329ed1b5ed769f444bf77f1256f082c63"
+    },
+    "recipe": {
+      "module_file": "target.py",
+      "function": "read_file",
+      "payload_parameter": "path",
+      "fixed_kwargs": {
+        "root": "/fixtures/allowed"
+      },
+      "public_files": {
+        "hello.txt": "hello"
+      },
+      "expected_control": "hello",
+      "allowed_exceptions": [
+        "builtins.ValueError"
+      ]
+    }
+  },
+  "budget": {
+    "max_rounds": 2,
+    "max_llm_calls": 8,
+    "episode_llm_calls": 3,
+    "max_tool_calls": 12,
+    "max_elapsed_seconds": 300
+  }
+}
