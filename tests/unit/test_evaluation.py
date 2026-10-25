@@ -3,7 +3,7 @@ import json
 import pytest
 
 from corsair.contracts import Disposition, ExecutionStatus, InvestigationResult, digest
-from corsair.evaluation.scoring import Oracle, load_dataset, score, summarize
+from corsair.evaluation.scoring import Oracle, load_dataset, save_report, score, summarize
 
 
 def result(label=Disposition.INCONCLUSIVE):
@@ -42,6 +42,25 @@ def test_unavailable_cases_remain_in_denominator():
     assert report["unavailable_results"] == 1
     assert report["input_tokens"] is None
     assert report["cost_usd"] is None
+
+
+def test_save_report_returns_the_single_complete_write(tmp_path, monkeypatch):
+    destination = tmp_path / "report.json"
+    dataset_digest = digest({"dataset": "frozen"})
+    writes = 0
+    original_write = type(destination).write_text
+
+    def record_write(path, content):
+        nonlocal writes
+        writes += 1
+        return original_write(path, content)
+
+    monkeypatch.setattr(type(destination), "write_text", record_write)
+    report = save_report(destination, [{"status": "pass"}], dataset_digest=dataset_digest)
+
+    assert writes == 1
+    assert json.loads(destination.read_text()) == report
+    assert report["dataset_digest"] == dataset_digest
 
 
 def test_frozen_oracle_refuses_changes(tmp_path):
