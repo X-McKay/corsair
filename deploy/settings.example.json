@@ -1,0 +1,15 @@
+{
+  "artifact_root": ".runs",
+  "source_root": ".",
+  "temporal_address": "localhost:7233",
+  "temporal_namespace": "default",
+  "task_queue": "corsair",
+  "image": "corsair-python:0.1",
+  "runtime": "runc",
+  "models": {
+    "connector": "gemini",
+    "producer": "gemini-2.5-flash",
+    "auditor": "gemini-2.5-flash",
+    "request_timeout_seconds": 120
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "schema_version": "corsair.qualification/1",
+  "date": "2026-10-24",
+  "branch": "manus/re-design",
+  "base_revision": "d3da7d3f77e6395c795727cb1341f2c81dc69e80",
+  "cohort": "pilot-integration-not-population-accuracy",
+  "sdk_versions": {
+    "google-adk": "2.13.0",
+    "temporalio": "1.34.0",
+    "docker": "7.2.0"
+  },
+  "pytest": {
+    "passed": 66,
+    "failed": 0,
+    "skipped": 0,
+    "deselected": 0,
+    "warnings_as_errors": true,
+    "seconds": 68.63
+  },
+  "verified": [
+    "ruff-check-and-format",
+    "fresh-installed-wheel-and-console-outside-checkout",
+    "real-docker-native-control-adversarial-and-fixed-observation",
+    "native-error-marker-control-failure-timeout-and-cleanup-regressions",
+    "real-temporal-workflows-cancellation-activity-worker-restart-and-history-replay",
+    "real-cli-frozen-batch-with-scripted-native-adk-and-real-docker-temporal",
+    "immutable-evidence-intent-and-complete-identity-reconciliation",
+    "runtime-validator-reused-for-saved-scoring",
+    "real-provider-auditor-smoke"
+  ],
+  "auditor_development_experiment": {
+    "model": "openai/gpt-6.1-sol",
+    "cases": 2,
+    "repeats": 3,
+    "attempts": 6,
+    "passed": 6,
+    "input_tokens": 4668,
+    "output_tokens": 604,
+    "cost_usd": null,
+    "held_out": false,
+    "population_accuracy_claim": false
+  },
+  "live_security_producer": {
+    "qualified": false,
+    "blocker": "provider cyber_policy rejection",
+    "policy_evasion_attempted": false
+  },
+  "production_qualified": false,
+  "hostile_interpreter_attestation_claim": false
+}

@@ -1,0 +1,10 @@
+{
+  "name": "auditor",
+  "contract_version": "corsair.agent/1",
+  "execution_class": "durable",
+  "governance_tier": "review",
+  "risk_path": "corsair.runtime:risk.md",
+  "tools": [],
+  "instruction_resource": "corsair.agents.auditor.instructions:system.md",
+  "schema_ref": "corsair.contracts.AuditResult"
+}

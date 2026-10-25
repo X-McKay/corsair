@@ -1,0 +1,11 @@
+{
+  "acceptable": [
+    "INCONCLUSIVE"
+  ],
+  "forbidden": [
+    "REFUTED",
+    "SUPPORTED",
+    "CONDITIONAL"
+  ],
+  "expected_execution": "COMPLETED"
+}

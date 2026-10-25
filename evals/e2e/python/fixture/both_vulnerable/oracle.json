@@ -1,9 +1,0 @@
-{
-  "stopped_at": null,
-  "gate": {
-    "execution": "completed",
-    "finding": "reproduced",
-    "fix": "not_verified"
-  },
-  "assessment_admitted": true
-}

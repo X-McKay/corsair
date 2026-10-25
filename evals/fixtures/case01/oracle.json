@@ -1,0 +1,10 @@
+{
+  "acceptable": [
+    "SUPPORTED"
+  ],
+  "forbidden": [
+    "REFUTED"
+  ],
+  "expected_execution": "COMPLETED",
+  "expected_fix": "DEMONSTRATION_BLOCKED"
+}

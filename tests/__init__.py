@@ -1,1 +1,0 @@
-"""Corsair's operator tests."""

@@ -1,162 +1,259 @@
-"""`corsair-v2`: run one case through the v2 chain, directly or as a Temporal workflow.
-
-Stage progress goes to stderr. --format json emits one final versioned object
-on completion or client cancellation; text mode adds recorded agent telemetry.
-"""
-from __future__ import annotations
+"""Finite commands; production investigations always go through Temporal."""
 
 import argparse
 import asyncio
 import json
-import os
 import sys
 from pathlib import Path
+from uuid import uuid4
 
-DEFAULT_MANIFEST = Path("benchmarks/corpus/infosec-harness/manifest.json")
-DEFAULT_PROVIDERS = Path("config/v2/providers.local.json")
-DEFAULT_MATRIX = Path("deploy/v2/runtime-matrix.yaml")
-CLI_SCHEMA = "corsair-v2-cli/1"
+from pydantic import TypeAdapter, ValidationError
+from temporalio.common import WorkflowIDConflictPolicy, WorkflowIDReusePolicy
 
-
-def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="corsair-v2", description=__doc__.splitlines()[0])
-    commands = parser.add_subparsers(dest="command", required=True)
-    run = commands.add_parser("run", help="investigate one case")
-    source = run.add_mutually_exclusive_group(required=True)
-    source.add_argument("--case", help="case name in the manifest")
-    source.add_argument("--issue-json", type=Path, help="an issue snapshot file")
-    run.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
-    run.add_argument("--mode", choices=("direct", "temporal"), default="direct")
-    run.add_argument("--run-root", type=Path, default=None, help="default: ./.runs/v2/runs")
-    worker = commands.add_parser("worker", help="serve the three v2 task queues")
-    runs = commands.add_parser("runs", help="inspect recorded runs")
-    runs_commands = runs.add_subparsers(dest="runs_command", required=True)
-    compare = runs_commands.add_parser("compare", help="outcome, cost and prompt versions per recorded run")
-    compare.add_argument("run_dirs", type=Path, nargs="+")
-    compare.add_argument("--agents", action="store_true", help="include recorded per-agent telemetry")
-    for command in (run, compare):
-        command.add_argument("--format", choices=("text", "json"), default="text")
-    for command in (run, worker, compare):
-        command.add_argument("--color", choices=("auto", "never"), default="auto")
-    for command in (run, worker):
-        command.add_argument("--provider-config", type=Path, default=DEFAULT_PROVIDERS)
-        command.add_argument("--matrix", type=Path, default=DEFAULT_MATRIX)
-        command.add_argument("--temporal-address", default="localhost:7233")
-        command.add_argument("--workspace-slots", type=int, default=4)
-    return parser
+from corsair.contracts import (
+    BatchItem,
+    BatchRequest,
+    EvidenceInput,
+    Identifier,
+    InvestigationRequest,
+    InvestigationResult,
+    Submission,
+    digest,
+)
+from corsair.observability.evaluation import load_dataset, save_report, score
+from corsair.runtime.artifacts import ArtifactStore
+from corsair.settings import load_settings
 
 
-def _intake(args):
-    """Intake strips evaluator-only fields; nothing here prints manifest labels/oracles."""
-    from . import intake
-    if args.issue_json is not None:
-        return intake.from_issue_json(args.issue_json)
-    return intake.load_corpus_case(args.manifest, args.case)
+def emit(value):
+    if hasattr(value, "model_dump"):
+        value = value.model_dump(mode="json")
+    print(json.dumps(value, indent=2, ensure_ascii=False))
 
 
-def _print_json(record, verdict, data, *, interrupted: bool = False) -> None:
-    print(json.dumps({"schema": CLI_SCHEMA, "state": data["state"], "run_id": record.run_id,
-                      "run_dir": str(record.run_dir), "verdict": verdict.model_dump(mode="json") if verdict else None,
-                      "totals": data["totals"] or None, "agents": data["agents"],
-                      **({"client_interrupted": True} if interrupted else {})}))
+def run_id(value: str) -> str:
+    TypeAdapter(Identifier).validate_python(value)
+    if len(value) > 60:
+        raise ValueError("run identity must leave space for operation suffixes")
+    return value
 
 
-async def _run(args) -> int:
-    from .chain import default_stages, run_case
-    from .models import agent_models, load_provider_config
-    from .presentation import StageReporter, render_result
-    from .record import RunRecorder
-    from .runs import details
+def request_from_file(path: Path) -> InvestigationRequest:
+    request = InvestigationRequest.model_validate_json(path.read_bytes())
+    base = path.parent.resolve()
+    source = request.case.source.model_copy(
+        update={"path": str((base / request.case.source.path).absolute())}
+    )
+    fixed = request.case.fixed_source
+    if fixed:
+        fixed = fixed.model_copy(update={"path": str((base / fixed.path).absolute())})
+    return request.model_copy(
+        update={"case": request.case.model_copy(update={"source": source, "fixed_source": fixed})}
+    )
 
-    case = _intake(args)
-    config = load_provider_config(args.provider_config)
-    record = RunRecorder.create(args.run_root)
-    stages = default_stages()
-    try:
-        with StageReporter(color=args.color, animate=args.format == "text") as progress:
-            progress.announce(f"corsair-v2: case {case.case_id} ({args.mode}); run {record.run_dir}")
-            async with agent_models(config) as models:
-                if args.mode == "direct":
-                    verdict = await run_case(case, stages=stages, models=models, matrix_path=args.matrix, record=record,
-                                             progress=progress, provider_config=args.provider_config)
-                else:
-                    from . import workflow
-                    workflow.configure(stages, models, args.matrix, progress, args.provider_config)
-                    client = await workflow.connect(args.temporal_address)
-                    serving = asyncio.ensure_future(workflow.serve(client, workspace_slots=args.workspace_slots))
-                    try:
-                        verdict = await workflow.run_workflow(
-                            client, workflow.RunRequest(case=case, run_dir=str(record.run_dir.resolve()),
-                                                 workspace=os.environ.get("CORSAIR_WORKSPACE") or "docker"),
-                            workflow_id=f"corsair-v2-{record.run_id}")
-                    finally:
-                        serving.cancel()
-                        await asyncio.gather(serving, return_exceptions=True)
-    except asyncio.CancelledError:
-        if args.format == "json":
+
+async def execute(args) -> int:
+    settings = load_settings(args.settings)
+    store = ArtifactStore(settings.artifact_root)
+    if args.command == "worker":
+        from corsair.runtime.worker import run_worker
+
+        await run_worker(settings)
+        return 0
+    if args.command == "verify":
+        from corsair.runtime.manifest import build_manifest
+        from corsair.tools.security.evidence import EvidenceVerifier
+        from corsair.tools.security.sandbox import DockerSandbox
+        from corsair.tools.security.sources import prepare_case
+
+        request = request_from_file(Path(args.request))
+        submission = Submission.model_validate_json(Path(args.submission).read_bytes())
+        identity = run_id(args.run_id or f"reference-{uuid4().hex}")
+        image_id = await asyncio.to_thread(lambda: DockerSandbox(settings).image_id)
+        prepared = await asyncio.to_thread(
+            prepare_case,
+            request.case,
+            settings,
+            store,
+            build_manifest(request, settings, image_id),
+        )
+        observation = await asyncio.to_thread(
+            EvidenceVerifier(settings, store).evaluate,
+            EvidenceInput(
+                run_id=identity,
+                operation_id=f"{identity}.reference",
+                prepared=prepared,
+                submission=submission,
+                budget=request.budget,
+                fixed=args.fixed,
+            ),
+        )
+        # Local reference replay returns observations, never a release-facing disposition.
+        emit(observation)
+        healthy = (
+            observation.feedback is None
+            and observation.cleanup_confirmed
+            and observation.control is not None
+            and observation.adversarial is not None
+            and observation.control.outcome.value == "PROPERTY_HELD"
+            and observation.adversarial.outcome.value in {"PROPERTY_HELD", "VIOLATION"}
+        )
+        return 0 if healthy else 1
+    if args.command == "inspect" and not args.online:
+        ref = store.reconcile(f"result.{args.run_id}")
+        if ref is None:
+            raise ValueError("No committed result; use --online to query the Temporal workflow")
+        emit(InvestigationResult.model_validate(store.get_json(ref)))
+        return 0
+    if args.command == "rescore":
+        _, _, oracles = load_dataset(Path(args.dataset))
+        rows = []
+        for identity in args.run_ids:
+            ref = store.reconcile(f"result.{identity}")
+            if ref is None:
+                rows.append({"run_id": identity, "status": "unavailable", "reason": "No result"})
+                continue
+            result = InvestigationResult.model_validate(store.get_json(ref))
+            rows.append(score(result, oracles[result.case_id], store))
+        report = save_report(Path(args.output), rows)
+        emit(report["summary"])
+        return 0 if report["summary"]["failed"] == 0 else 1
+    if args.command == "report":
+        report = json.loads(Path(args.report).read_text())
+        emit(report["summary"])
+        return 0
+
+    from datetime import timedelta
+
+    from corsair.runtime.worker import connect
+    from corsair.workflows.evaluation import EvaluationWorkflow
+    from corsair.workflows.investigation import InvestigationWorkflow
+
+    client = await connect(settings)
+    if args.command == "investigate":
+        request = request_from_file(Path(args.request))
+        identity = run_id(args.run_id or f"run-{uuid4().hex}")
+        handle = await client.start_workflow(
+            InvestigationWorkflow.run,
+            request,
+            id=identity,
+            task_queue=settings.task_queue,
+            execution_timeout=timedelta(seconds=request.budget.max_elapsed_seconds + 120),
+            id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
+            id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
+        )
+        if args.wait:
+            result = await handle.result()
+            emit(result)
+            return 0 if result.execution_status.value == "COMPLETED" else 1
+        emit({"run_id": handle.id, "state": "submitted", "security_disposition": None})
+        return 0
+    if args.command == "inspect":
+        emit(await client.get_workflow_handle(args.run_id).query(InvestigationWorkflow.status))
+        return 0
+    if args.command == "cancel":
+        await client.get_workflow_handle(args.run_id).cancel()
+        emit({"run_id": args.run_id, "state": "cancellation_requested"})
+        return 0
+    if args.command == "eval":
+        dataset, requests, oracles = load_dataset(Path(args.dataset))
+        identity = run_id(args.run_id or f"eval-{uuid4().hex}")
+        batch = BatchRequest(
+            batch_id=identity,
+            requests=requests,
+            repeats=args.repeats,
+            concurrency=args.concurrency,
+        )
+        handle = await client.start_workflow(
+            EvaluationWorkflow.run,
+            batch,
+            id=identity,
+            task_queue=settings.task_queue,
+            id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
+            id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
+        )
+        items: list[BatchItem] = await handle.result()
+        rows = []
+        for item in items:
+            if item.artifact is None:
+                rows.append(
+                    {
+                        "case_id": item.case_id,
+                        "run_id": item.run_id,
+                        "status": "unavailable",
+                        "reason": item.error or "Result artifact unavailable",
+                    }
+                )
+                continue
             try:
-                data = details(record.run_dir)
-            except (OSError, ValueError):
-                data = {"state": "incomplete", "totals": {}, "agents": {}}
-            # Persisted state only: interrupting a client does not prove a remote workflow/command stopped.
-            _print_json(record, None, data, interrupted=True)
-        raise
-    data = details(record.run_dir)
-    if args.format == "json":
-        _print_json(record, verdict, data)
-    else:
-        render_result(verdict, record.run_dir, data, color=args.color)
-    return 0
+                result = InvestigationResult.model_validate(store.get_json(item.artifact))
+                rows.append(score(result, oracles[item.case_id], store))
+            except (FileNotFoundError, ValueError) as exc:
+                rows.append(
+                    {
+                        "case_id": item.case_id,
+                        "run_id": item.run_id,
+                        "status": "unavailable",
+                        "reason": str(exc),
+                    }
+                )
+        output = Path(args.output or f".runs/evaluations/{identity}.json")
+        report = save_report(output, rows)
+        report["dataset_digest"] = digest(dataset)
+        output.write_text(json.dumps(report, indent=2) + "\n")
+        emit({"report": str(output), "summary": report["summary"]})
+        return 0 if report["summary"]["failed"] == 0 else 1
+    raise ValueError("Unknown command")
 
 
-async def _worker(args) -> int:
-    from .chain import default_stages
-    from .models import agent_models, load_provider_config
-    from .presentation import StageReporter
-    from . import workflow
+def parser() -> argparse.ArgumentParser:
+    root = argparse.ArgumentParser(
+        description="Evidence-first security verification on ADK + Temporal"
+    )
+    sub = root.add_subparsers(dest="command", required=True)
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument(
+        "--settings", help="Worker/client settings JSON; credentials stay in environment"
+    )
+    sub.add_parser("worker", parents=[common], help="Run the standard Temporal worker")
+    investigate = sub.add_parser("investigate", parents=[common])
+    investigate.add_argument("request")
+    investigate.add_argument("--run-id")
+    investigate.add_argument("--wait", action="store_true")
+    inspect = sub.add_parser("inspect", parents=[common])
+    inspect.add_argument("run_id")
+    inspect.add_argument("--online", action="store_true")
+    cancel = sub.add_parser("cancel", parents=[common])
+    cancel.add_argument("run_id")
+    verify = sub.add_parser(
+        "verify", parents=[common], help="Replay a reference submission; no verdict"
+    )
+    verify.add_argument("request")
+    verify.add_argument("submission")
+    verify.add_argument("--run-id")
+    verify.add_argument("--fixed", action="store_true")
+    evaluation = sub.add_parser("eval", parents=[common])
+    evaluation.add_argument("dataset")
+    evaluation.add_argument("--run-id")
+    evaluation.add_argument("--repeats", type=int, default=1)
+    evaluation.add_argument("--concurrency", type=int, default=2)
+    evaluation.add_argument("--output")
+    rescore = sub.add_parser("rescore", parents=[common])
+    rescore.add_argument("dataset")
+    rescore.add_argument("run_ids", nargs="+")
+    rescore.add_argument("--output", default=".runs/evaluations/rescored.json")
+    report = sub.add_parser("report", parents=[common])
+    report.add_argument("report")
+    return root
 
-    with StageReporter(color=args.color) as progress:
-        async with agent_models(load_provider_config(args.provider_config)) as models:
-            workflow.configure(default_stages(), models, args.matrix, progress, args.provider_config)
-            client = await workflow.connect(args.temporal_address)
-            progress.announce(f"corsair-v2 worker: serving {workflow.MODEL_QUEUE}, {workflow.WORKSPACE_QUEUE}, "
-                              f"{workflow.CONTROL_QUEUE} on {args.temporal_address}")
-            await workflow.serve(client, workspace_slots=args.workspace_slots)
-    return 0
 
-
-def _compare(args) -> int:
-    from .presentation import agent_table, console
-    from .runs import printable, row, table
-
-    rows = [row(path) for path in args.run_dirs]  # validate every input before emitting any success output
-    if args.format == "json":
-        print(json.dumps({"schema": CLI_SCHEMA, "runs": rows}))
-    else:
-        print(table(args.run_dirs))
-        if args.agents:
-            out = console(color=args.color)
-            for data in rows:
-                out.print("\nRun", printable(data["run"]), markup=False)
-                out.print(agent_table(data["agents"]))
-            out.print("Agent seconds sum recorded calls, not elapsed run time. Missing telemetry is unknown.")
-    return 0
-
-
-def main(argv: list[str] | None = None) -> int:
-    args = _parser().parse_args(sys.argv[1:] if argv is None else argv)
+def main() -> None:
+    args = parser().parse_args()
     try:
-        if args.command == "runs":
-            return _compare(args)
-        return asyncio.run(_run(args) if args.command == "run" else _worker(args))
-    except (KeyboardInterrupt, asyncio.CancelledError):
-        return 130
-    except (OSError, ValueError) as exc:
-        from .presentation import console
-        from .runs import printable
-        console(color=args.color, stderr=True).print(printable(f"corsair-v2: {exc}"), markup=False)
-        return 2
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+        code = asyncio.run(execute(args))
+    except (ValueError, ValidationError, FileNotFoundError, PermissionError) as exc:
+        print(f"corsair: {exc}", file=sys.stderr)
+        raise SystemExit(2) from None
+    except KeyboardInterrupt:
+        raise SystemExit(130) from None
+    raise SystemExit(code)

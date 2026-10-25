@@ -1,0 +1,31 @@
+name: redesign-checks
+on:
+  push:
+    branches: [main, develop, manus/re-design]
+  pull_request:
+jobs:
+  offline-and-package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+      - run: make sync check test build
+  native-conformance:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+      - run: make sync images
+      - run: CORSAIR_TEST_TEMPORAL=1 make test-docker
+  durable-workflows:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+      - run: make sync test-temporal

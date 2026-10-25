@@ -1,0 +1,9 @@
+**
+!deploy/
+!deploy/python/
+!deploy/python/Dockerfile
+!src/
+!src/corsair/
+!src/corsair/tools/
+!src/corsair/tools/security/
+!src/corsair/tools/security/driver.py

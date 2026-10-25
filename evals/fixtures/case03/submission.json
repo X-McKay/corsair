@@ -1,0 +1,15 @@
+{
+  "control_payload": "hello.txt",
+  "exploit_payload": "../private/secret.txt",
+  "hypothesis": "The caller-controlled path reaches an unchecked join/open operation outside the fixed root. The benign path should retain normal public file access.",
+  "plan": {
+    "revision": 1,
+    "parent_revision": null,
+    "objective": "Verify whether path input can disclose data outside the fixed root",
+    "next_steps": [
+      "Read target.py",
+      "Submit benign and traversal payloads against read_file"
+    ],
+    "reason": "The source and reported property specify a direct file-access API"
+  }
+}

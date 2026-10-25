@@ -1,7 +1,3 @@
-"""Live-gate options; registered here so root-level runs load them before collection."""
+"""Pytest plugin registration for Corsair's opt-in Temporal test fixtures."""
 
-
-def pytest_addoption(parser):
-    parser.addoption("--kubeconfig", help="Explicit owned local kind kubeconfig; no ambient fallback")
-    parser.addoption("--context", help="Explicit kind-corsair context")
-    parser.addoption("--evidence-dir", help="New host-owned evidence directory")
+pytest_plugins = ("tests.fixtures.temporal",)

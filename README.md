@@ -1,61 +1,103 @@
 # Corsair
 
-Corsair validates a reported security issue against an exact repository revision. Agents write exactly two native
-unit tests, a benign control probe and a security-regression (exploit) probe, against the real code; trusted code runs
-both in a sandbox and a fixed rule table labels the issue `LIKELY_EXPLOITABLE`, `LIKELY_NOT_EXPLOITABLE`,
-`INCONCLUSIVE`, `UNABLE_TO_RUN` or `ERROR`. No model runs after execution.
+Corsair investigates a reported security finding against a pinned source snapshot. Google ADK runs a bounded producer and an outcome-blind auditor inside ordinary Temporal activities. Temporal coordinates rounds, budgets, cancellation, and immutable results. Trusted code—not either agent—admits observations and determines the scoped disposition.
 
-This branch carries Corsair v2, a rebuild on native PydanticAI agents and skills, the PydanticAI workspace interface
-(Docker is the default; the explicitly selected OpenShell backend is implemented but not live-qualified) and
-Temporal durability. The v1 implementation remains on `main`.
-[src/corsair/README.md](src/corsair/README.md) describes the chain, its stages and the rules every module keeps.
+This branch is a from-scratch implementation of **Plan 1: durable investigation rounds**. It does not use the experimental native ADK–Temporal integration or a custom agent checkpoint engine. A completed activity is durable; an unfinished ADK episode is not resumable at every model call.
 
-## Commands
+## Supported first slice
 
-Requirements: Linux, Python 3.12, `uv`; Docker for workspace, build and canary runs.
+The initial recipe is `python.secret_disclosure/1`: a Python public callable receives a JSON payload, with operator-fixed keyword arguments. Trusted native pytest/coverage tooling runs a benign and adversarial input in fresh offline containers. A private random fixture is created independently of the producer; the observer checks whether the target returned it. The producer can read admitted source and submit payloads, but cannot author assertions or executable probe code.
 
-```shell
-make test-v2                     # offline suite (alias: make test); no model, no cluster; Docker tests skip without Docker
-make test-config                 # fast configuration and shared developer-skill guards
-make eval AGENT=<agent> [SET=<set>] [PROVIDER_CONFIG=<providers.json>]   # one agent's isolated eval
-make eval-baseline AGENT=<agent> RUN=<run id>                             # promote a run as that agent's baseline
-make canary                      # classify each runtime-matrix row's passing and failing canary on its image
-make toolchain-images TOOLCHAINS=python   # build toolchain images and run their trusted controls
-uv run --locked corsair-v2 run --case <name> [--mode direct|temporal]     # one case through the chain
+The initial image supports standard-library Python projects. Dependency installation, arbitrary build scripts, child-process coverage, other languages, arbitrary probes, and general refutation are deliberately unsupported. These are capability additions requiring new recipes and conformance cases—not hidden fallbacks.
+
+`SUPPORTED` means a violation was demonstrated within component scope. An application-level claim remains `CONDITIONAL` when only its component API was exercised. Failed reproduction is `INCONCLUSIVE`, never `REFUTED` merely because several attempts failed. Build/runtime/host failures remain operational statuses. A fix result means this demonstration was blocked while the benign behavior survived; it is not a universal patch-correctness claim.
+
+The native observer is protected from model-authored code by accepting data-only submissions. It is not attestation of arbitrary malicious target/interpreter behavior. Read the [packaged risk assessment](src/corsair/runtime/risk.md) before admitting hostile repositories or deploying beyond a disposable personal-use sandbox.
+
+## Quick start
+
+Requirements: Python 3.12+, `uv`, an actual Docker daemon, and a Temporal service. Use a dedicated disposable Ubuntu/Debian sandbox host, not a host with sensitive workloads. Docker credentials/socket access must never reach target containers.
+
+```bash
+make sync
+make check
+make test
+make images
+make test-docker
+
+mkdir -p .state
+# Separate terminal. Persistent SQLite is for development, not production.
+temporal server start-dev --db-filename .state/temporal.db
+
+# Configure worker-side models; provider credentials stay in environment.
+cp deploy/settings.example.json .state/settings.json
+# Edit model connector/name and source_root as needed, then:
+uv run --locked --extra providers corsair worker --settings .state/settings.json
+
+# A second terminal, same artifact root and source-root policy:
+uv run --locked --extra providers corsair investigate \
+  evals/fixtures/case01/request.json --settings .state/settings.json --wait
 ```
 
-The kind + OpenShell cluster for the v2 OpenShell backend (`make tools kind-up ... openshell-config qualify-openshell-v2`) is in the [OpenShell v2 runbook](docs/runbooks/openshell-v2.md).
+The worker and client must share access to the configured artifact root. The pilot uses one host/task queue. A local artifact path is not recoverable after host loss; choose shared durable storage before promising that recovery level. Production Temporal requires an appropriate persistence backend or Temporal Cloud, not the dev server.
 
-Stage logs go to stderr. Interactive terminals show an indeterminate Rich spinner and scrolling
-stage states; pipes remain append-only. The final text includes recorded per-agent tokens, requests,
-tool calls and agent seconds, with missing values shown as `unknown`. `NO_COLOR` and `--color never`
-disable color. Tool identities/durations and live token deltas remain a follow-on, not inferred metrics.
+If the optional LiteLLM connector is selected, install `--extra providers` and set its usual provider credentials, such as `OPENAI_API_KEY` or AWS worker identity. The endpoint belongs in `models.api_base`, not workflow inputs. Gemini uses the standard ADK credential configuration. No credentials are included in the settings example.
 
-```shell
-uv run --locked corsair-v2 run --case <name> --format json
-uv run --locked corsair-v2 runs compare <run_dir>... --agents
-uv run --locked corsair-v2 runs compare <run_dir>... --format json
+## CLI
+
+```bash
+corsair investigate request.json --wait --settings settings.json
+corsair inspect RUN_ID --settings settings.json           # committed local result
+corsair inspect RUN_ID --online --settings settings.json  # Temporal phase and round
+corsair cancel RUN_ID --settings settings.json
+
+# Native reference replay, no model and no release-facing verdict:
+corsair verify evals/fixtures/case01/request.json \
+  evals/fixtures/case01/submission.json --settings settings.json
+
+# Oracle labels stay in the external evaluator, outside workflow/agent inputs:
+corsair eval evals/datasets/dev.json --repeats 3 --settings settings.json
+corsair rescore evals/datasets/dev.json RUN_ID... --settings settings.json
+corsair report .runs/evaluations/REPORT.json
 ```
 
-JSON mode emits one versioned object on stdout and retains null telemetry. Direct cancellation
-records a lifecycle receipt without manufacturing a verdict; it is not proof of external command
-termination, cleanup, or resumability. An unfinished recorded run is `incomplete`, not presumed active.
+Commands emit JSON on stdout. Diagnostics use stderr and invalid configuration returns a nonzero exit. Submission acceptance is not security verification. Cancellation requests are not proof of cleanup; evidence activities wait for their owning sandbox thread to stop/remove resources.
 
-Evidence lands under `.runs/` and is never committed.
+## Directory structure
 
-## Layout
+The layout follows the requested [playbook reference architecture](https://github.com/X-McKay/playbooks/blob/main/agent-playbook%2F02-reference-architecture.md), without empty catalogs or duplicate schemas:
 
 ```text
-src/corsair/           the chain: contracts, stages, intake, matrix selection, build, execute, rules, workflow, CLI
-  skills/frameworks/      per-framework guidance and canaries (the only place framework knowledge lives, with the matrix)
-  workspace/              sandbox port and explicit Docker/OpenShell backends (pydantic_ai.workspaces)
-deploy/v2/runtime-matrix.yaml   operator-owned runtime rows: image, framework, exit-code map
-deploy/qualification/toolchains/ toolchain image sources; tools/toolchain_images.py builds them
-config/v2/                provider configuration
-evals/                    frozen per-case eval data and sets, the corpus loader, and `make eval` (evals/run.py)
-benchmarks/               benchmark inventory and the imported infosec-harness corpus
-tools/                    canary runner and toolchain image builder
-tests/v2/                 offline tests
+src/corsair/
+  agents/producer/        factory, private tools, agent.json, instructions
+  agents/auditor/         factory, agent.json, instructions
+  contracts.py           one canonical shared wire schema
+  tools/security/        source admission, Docker SDK, trusted native driver, evidence
+  workflows/             deterministic investigation and bounded evaluation fan-out
+  steps/                 ordinary Temporal activities
+  runtime/               model/runner assembly, worker, artifacts, manifests, packaged risk
+  policy/                pure disposition and fix rules
+  observability/         authoritative scorer and report aggregation
+  settings.py, cli.py
+
+evals/
+  datasets/              digest-frozen case/oracle references with family-grouped splits
+  fixtures/              reviewed source pairs, submissions, evaluator-only oracles
+  evaluators/            isolated agent evaluation entry point
+  experiments/           instructions for comparison, not committed private runs
+  baselines/             explicit qualification status, no invented live baseline
+
+tests/{unit,integration,workflow,replay,security}/
+docs/{risk-assessments,threat-models,runbooks,development}/
+deploy/                  settings and trusted image build
 ```
 
-Development rules are in [AGENTS.md](AGENTS.md).
+Agent JSON files are declarative capability metadata referencing Python contracts. They do not duplicate the Python field schemas or contain secrets. Factories validate the admitted tool surface; the manifest identifies spec, instruction, output schema, risk assessment, image, model configuration and budget identities. Private tools stay beside their agent. Shared security/runtime components are owned by the Corsair maintainer.
+
+## Evaluation and contribution
+
+Use four different reruns for four different changes: rescore saved observations for policy changes; replay frozen submissions for driver/image changes; run fresh agents for prompt/model/tool changes; replay Temporal history for workflow changes. Exact tool-trajectory matching is not the security oracle.
+
+Start with native reference conformance, then scripted genuine-ADK integration, isolated auditor cases, and finally frozen live investigations with repeats. Keep blocked/invalid/unavailable attempts in the denominator. Unknown token usage and cost stay `null`. The small authored pilot fixtures diagnose behavior; they are not evidence of a low population-wide error rate.
+
+See [development status](docs/development/CURRENT.md), [the implementation plan](docs/development/plans/PLAN-0105-adk-temporal-redesign.md), and [the runbook](docs/runbooks/pilot.md). Follow [AGENTS.md](AGENTS.md): implement, test end to end, clean up, re-test, and verify the built artifact before delivery.

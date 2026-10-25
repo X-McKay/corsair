@@ -1,0 +1,9 @@
+{
+  "acceptable": [
+    "CONDITIONAL"
+  ],
+  "forbidden": [
+    "REFUTED"
+  ],
+  "expected_execution": "COMPLETED"
+}

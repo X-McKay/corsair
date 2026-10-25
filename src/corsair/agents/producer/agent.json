@@ -1,0 +1,10 @@
+{
+  "name": "producer",
+  "contract_version": "corsair.agent/1",
+  "execution_class": "durable",
+  "governance_tier": "restricted",
+  "risk_path": "corsair.runtime:risk.md",
+  "tools": ["read_file", "list_files", "submit"],
+  "instruction_resource": "corsair.agents.producer.instructions:system.md",
+  "schema_ref": "corsair.contracts.Submission"
+}
