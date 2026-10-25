@@ -153,7 +153,7 @@ class SessionOutcome:
 
     ``clean_negative`` is a session-level signal, not a verdict: a single clean
     negative is never decisive. The aggregator counts independent clean negatives
-    and only promotes them to LIKELY_NOT_EXPLOITABLE once the threshold is met.
+    and only promotes them to EXPLOIT_NOT_DEMONSTRATED once the threshold is met.
     """
 
     verdict: Verdict
@@ -168,7 +168,7 @@ def _audit_accepts(audit: AuditOutput) -> bool:
 def _line_covered_in_both(prepared: PreparedCase, observation: Observation) -> bool:
     """The exact declared finding line must execute in BOTH the control and the
     adversarial run before a session may be decisive. This is the primary guard
-    against a false LIKELY_NOT_EXPLOITABLE: a negative we did not actually reach
+    against a false EXPLOIT_NOT_DEMONSTRATED: a negative we did not actually reach
     is never a clean negative."""
     line = prepared.finding.line
     if line is None or observation.control is None or observation.adversarial is None:
@@ -218,11 +218,11 @@ def session_verdict(
     adversarial_held = _native_role_valid(observation.adversarial, RoleOutcome.HELD)
     accepted = _audit_accepts(audit)
 
-    # 4. LIKELY_EXPLOITABLE requires a healthy control, a reproduced violation, an
+    # 4. EXPLOIT_DEMONSTRATED requires a healthy control, a reproduced violation, an
     #    accepted audit, and a CONFIRMED fixed-revision differential.
     if control_held and adversarial_violation and accepted:
         if fix is FixStatus.DEMONSTRATION_BLOCKED:
-            return SessionOutcome(Verdict.LIKELY_EXPLOITABLE, reason)
+            return SessionOutcome(Verdict.EXPLOIT_DEMONSTRATED, reason)
         if fix is FixStatus.NOT_BLOCKED:
             return SessionOutcome(Verdict.INCONCLUSIVE, "not_differential")
         return SessionOutcome(Verdict.INCONCLUSIVE, "fix differential unverified")
@@ -250,19 +250,19 @@ def case_verdict(
 ) -> tuple[Verdict, str]:
     """Aggregate independent sessions into one canonical case verdict. Pure.
 
-    LIKELY_NOT_EXPLOITABLE is deliberately the hardest verdict to reach: it needs
+    EXPLOIT_NOT_DEMONSTRATED is deliberately the hardest verdict to reach: it needs
     at least ``negative_threshold`` independent clean negatives and no exploitable
     session, and it is only ever scoped to the exact finding/payloads/revision/
     runtime that were exercised (sensitivity:unverified).
     """
     if not sessions:
         return Verdict.INCONCLUSIVE, "no sessions"
-    if any(session.verdict is Verdict.LIKELY_EXPLOITABLE for session in sessions):
-        return Verdict.LIKELY_EXPLOITABLE, "a session reproduced an exploitable differential"
+    if any(session.verdict is Verdict.EXPLOIT_DEMONSTRATED for session in sessions):
+        return Verdict.EXPLOIT_DEMONSTRATED, "a session reproduced an exploitable differential"
     clean_negatives = sum(1 for session in sessions if session.clean_negative)
     if clean_negatives >= negative_threshold:
         return (
-            Verdict.LIKELY_NOT_EXPLOITABLE,
+            Verdict.EXPLOIT_NOT_DEMONSTRATED,
             "independent clean negatives scoped to finding/payloads/revision/runtime "
             "(sensitivity:unverified)",
         )

@@ -5,7 +5,7 @@
   "kind": "negative",
   "category": "adversarial",
   "probes": "A scanner flags string-built SQL in build_query, which lives only in the test tree: the chain must not report test-only code as an exploitable product finding.",
-  "expected": "Waits on a test-or-vendored exit, which v2 does not have: LIKELY_NOT_EXPLOITABLE (R5) or an unsupported_scope refusal (UNABLE_TO_RUN by R0) is accepted and no label is forbidden yet.",
+  "expected": "Waits on a test-or-vendored exit, which v2 does not have: EXPLOIT_NOT_DEMONSTRATED (R5) or an unsupported_scope refusal (UNABLE_TO_RUN by R0) is accepted and no label is forbidden yet.",
   "dimensions": [
     "correctness",
     "contract",

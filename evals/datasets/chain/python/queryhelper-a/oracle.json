@@ -1,7 +1,7 @@
 {
-  "expected_label": "LIKELY_NOT_EXPLOITABLE",
+  "expected_label": "EXPLOIT_NOT_DEMONSTRATED",
   "acceptable_labels": [
-    "LIKELY_NOT_EXPLOITABLE",
+    "EXPLOIT_NOT_DEMONSTRATED",
     "UNABLE_TO_RUN"
   ],
   "forbidden_labels": [],

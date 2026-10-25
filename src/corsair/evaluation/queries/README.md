@@ -10,7 +10,7 @@ calls a model, and the verdict in every row was decided by code upstream.
 The queries declare the columns they read, so extra keys in a record are ignored and
 missing keys read as `NULL`. No case, CVE, repository or runtime identifier is hardcoded;
 `$safe_label` names the label whose false use is the costliest error
-(`LIKELY_NOT_EXPLOITABLE` by default). All other labels are taken from the data.
+(`EXPLOIT_NOT_DEMONSTRATED` by default). All other labels are taken from the data.
 
 ## Expected row shape
 
@@ -22,7 +22,7 @@ missing keys read as `NULL`. No case, CVE, repository or runtime identifier is h
 | `language` | string or null | language stratum, from the case data |
 | `runtime` | string or null | runtime/toolchain row used for the probes |
 | `cwe` | string or null | weakness class of the finding |
-| `label` | string or null | the verdict decided by code (`LIKELY_EXPLOITABLE`, `LIKELY_NOT_EXPLOITABLE`, `INCONCLUSIVE`, `UNABLE_TO_RUN`, `ERROR`); `null` when no verdict was recorded |
+| `label` | string or null | the verdict decided by code (`EXPLOIT_DEMONSTRATED`, `EXPLOIT_NOT_DEMONSTRATED`, `INCONCLUSIVE`, `UNABLE_TO_RUN`, `ERROR`); `null` when no verdict was recorded |
 | `expected_label` | string or null | evaluator-joined oracle label; never present in agent inputs |
 | `decisive` | boolean | whether the verdict counts as decisive for cost accounting (decided by code upstream) |
 | `last_gate` | string or null | the last gate the run reached (for example `plan`, `build`, `check`, `review`, `verdict`) |

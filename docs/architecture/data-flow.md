@@ -61,7 +61,7 @@ Trusted code writes an immutable operation intent binding operation, source, sub
 
 For a new operation, the kernel materializes the recipe with the proposed payloads and the Docker adapter runs one fresh container for the control role and one for the exploit role. The two runs share snapshot, image, recipe, fixtures, and fixed arguments; only the payload differs. Each run returns raw receipts and a coverage record, not a conclusion.
 
-`control_coverage` and `exploit_coverage` each require that the finding's **exact target line** executed in that run. A run that never reached the target line observed nothing about it, so the kernel discards the pair as `INCONCLUSIVE` rather than counting it toward any label. This is the primary guard against a false `LIKELY_NOT_EXPLOITABLE`.
+`control_coverage` and `exploit_coverage` each require that the finding's **exact target line** executed in that run. A run that never reached the target line observed nothing about it, so the kernel discards the pair as `INCONCLUSIVE` rather than counting it toward any label. This is the primary guard against a false `EXPLOIT_NOT_DEMONSTRATED`.
 
 `evidence_agreement` then checks raw/driver identity, cleanup confirmation, source and submission digests, image identity, and agreement between the native exit status, the test report, and the driver report. Only then is a validated `Observation` committed with the evidence bundle. The verifier is [`src/corsair/steps/verification.py`](../../src/corsair/steps/verification.py).
 
@@ -69,7 +69,7 @@ For a new operation, the kernel materializes the recipe with the proposed payloa
 
 `blind_audit` runs a fresh auditor activity. The auditor receives the finding, public recipe configuration, source excerpt, and the proposed pair; it never receives receipts, coverage, or a provisional label. It returns a structured `AuditResult` and can only reject. A rejection removes the pair from consideration; a non-rejection lets the kernel continue. The auditor cannot raise a label.
 
-When the exploit run demonstrated the reported condition with a healthy control, `fixed_differential` repeats the same pair against the configured fix revision under its own operation identity. The gate holds only when the control still passes and the demonstration no longer occurs. It is required for `LIKELY_EXPLOITABLE`; it says the submitted demonstration was blocked, not that the fix is generally correct.
+When the exploit run demonstrated the reported condition with a healthy control, `fixed_differential` repeats the same pair against the configured fix revision under its own operation identity. The gate holds only when the control still passes and the demonstration no longer occurs. It is required for `EXPLOIT_DEMONSTRATED`; it says the submitted demonstration was blocked, not that the fix is generally correct.
 
 ## 6. Verdict table
 
@@ -77,8 +77,8 @@ The kernel assigns one of five labels; [`src/corsair/contracts/results.py`](../.
 
 | Label | Condition decided in code |
 | --- | --- |
-| `LIKELY_EXPLOITABLE` | Both runs covered the target line, the control held, the exploit run demonstrated the condition, the auditor did not reject, and the fixed differential held. |
-| `LIKELY_NOT_EXPLOITABLE` | At least `negative_threshold` (2) independent producer sessions each produced a coverage-valid, non-rejected pair whose exploit run did not demonstrate the condition. |
+| `EXPLOIT_DEMONSTRATED` | Both runs covered the target line, the control held, the exploit run demonstrated the condition, the auditor did not reject, and the fixed differential held. |
+| `EXPLOIT_NOT_DEMONSTRATED` | At least `negative_threshold` (2) independent producer sessions each produced a coverage-valid, non-rejected pair whose exploit run did not demonstrate the condition. |
 | `INCONCLUSIVE` | Gates ran but did not settle: coverage missed in either run, evidence disagreed, the auditor rejected, fewer than two independent negative sessions, the fixed differential failed, or the budget ended first. |
 | `UNABLE_TO_RUN` | `target_binding`, `ast_guard`, or `build_replay` failed; the case could not be exercised. |
 | `ERROR` | An operational failure: provider, sandbox infrastructure, missing artifact, unknown cleanup, or uncertain operation. |

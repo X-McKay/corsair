@@ -12,8 +12,8 @@ from corsair.evaluation.scoring import load_dataset
 ROOT = Path(__file__).resolve().parents[2]
 
 LE, LNE, INC, UTR, ERR = (
-    "LIKELY_EXPLOITABLE",
-    "LIKELY_NOT_EXPLOITABLE",
+    "EXPLOIT_DEMONSTRATED",
+    "EXPLOIT_NOT_DEMONSTRATED",
     "INCONCLUSIVE",
     "UNABLE_TO_RUN",
     "ERROR",

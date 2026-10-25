@@ -39,7 +39,7 @@ with workflow.unsafe.imports_passed_through():
 
 
 # The canonical case layer aggregates independent sessions. A lone clean negative
-# must never become LIKELY_NOT_EXPLOITABLE, so the threshold is 2 and sessions are
+# must never become EXPLOIT_NOT_DEMONSTRATED, so the threshold is 2 and sessions are
 # capped at 2 by default. See Settings.negative_threshold / Settings.max_sessions.
 NEGATIVE_THRESHOLD = 2
 MAX_SESSIONS = 2
@@ -323,8 +323,8 @@ class InvestigationWorkflow:
         return result
 
     # TODO(v3, parked): wire a SECOND fresh, independent producer session for the
-    # LIKELY_NOT_EXPLOITABLE path. After a first session ends in a clean negative
-    # with no LIKELY_EXPLOITABLE, a second blind producer session (new operation
+    # EXPLOIT_NOT_DEMONSTRATED path. After a first session ends in a clean negative
+    # with no EXPLOIT_DEMONSTRATED, a second blind producer session (new operation
     # ids, no shared probe/feedback/result) should run, and both outcomes feed
     # case_verdict(..., NEGATIVE_THRESHOLD). That requires restructuring this
     # replay-sensitive round loop into a session loop and cannot be validated

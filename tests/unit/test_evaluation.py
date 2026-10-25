@@ -29,11 +29,11 @@ def test_oracle_scores_the_canonical_verdict_label():
     oracle = Oracle(
         acceptable=[Disposition.INCONCLUSIVE], acceptable_verdicts=[Verdict.INCONCLUSIVE]
     )
-    mislabelled = result().model_copy(update={"verdict": Verdict.LIKELY_NOT_EXPLOITABLE})
+    mislabelled = result().model_copy(update={"verdict": Verdict.EXPLOIT_NOT_DEMONSTRATED})
     row = score(mislabelled, oracle)
     assert row["status"] == "fail"
     assert row["verdict_allowed"] is False
-    assert row["verdict"] == "LIKELY_NOT_EXPLOITABLE"
+    assert row["verdict"] == "EXPLOIT_NOT_DEMONSTRATED"
 
     aligned = result().model_copy(update={"verdict": Verdict.INCONCLUSIVE})
     assert score(aligned, oracle)["status"] == "pass"
@@ -42,10 +42,10 @@ def test_oracle_scores_the_canonical_verdict_label():
 def test_forbidden_verdict_blocks_a_pass():
     from corsair.contracts import Verdict
 
-    base = result().model_copy(update={"verdict": Verdict.LIKELY_NOT_EXPLOITABLE})
+    base = result().model_copy(update={"verdict": Verdict.EXPLOIT_NOT_DEMONSTRATED})
     oracle = Oracle(
         acceptable=[Disposition.INCONCLUSIVE],
-        forbidden_verdicts=[Verdict.LIKELY_NOT_EXPLOITABLE],
+        forbidden_verdicts=[Verdict.EXPLOIT_NOT_DEMONSTRATED],
     )
     row = score(base, oracle)
     assert row["status"] == "fail"

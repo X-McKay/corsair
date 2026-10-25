@@ -1,10 +1,10 @@
 {
-  "expected_label": "LIKELY_EXPLOITABLE",
+  "expected_label": "EXPLOIT_DEMONSTRATED",
   "acceptable_labels": [
-    "LIKELY_EXPLOITABLE"
+    "EXPLOIT_DEMONSTRATED"
   ],
   "forbidden_labels": [
-    "LIKELY_NOT_EXPLOITABLE"
+    "EXPLOIT_NOT_DEMONSTRATED"
   ],
   "expected_rule": "R4",
   "expected_terminal_reason": "ok",

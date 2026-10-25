@@ -9,10 +9,10 @@
   ],
   "expected_execution": "COMPLETED",
   "acceptable_verdicts": [
-    "LIKELY_NOT_EXPLOITABLE",
+    "EXPLOIT_NOT_DEMONSTRATED",
     "INCONCLUSIVE"
   ],
   "forbidden_verdicts": [
-    "LIKELY_EXPLOITABLE"
+    "EXPLOIT_DEMONSTRATED"
   ]
 }

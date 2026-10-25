@@ -14,7 +14,7 @@ Evaluation assets have exactly datasets, evaluators, experiments, fixtures and b
 
 The initial recipe admits JSON payload proposals, never model-authored execution/assertions. Only trusted evidence code can produce observations. Untrusted target code runs only in the configured Docker sandbox, never on the host. Keep source/tooling read-only, credentials/socket outside containers, network and resource limits enforced, and cleanup bound to immutable container identity.
 
-Failed reproduction never permits a LIKELY_NOT_EXPLOITABLE / non-exploitable conclusion. Missing evidence, native reports, coverage, unexpected exceptions, provider errors, lost hosts, and uncertain completion must remain explicit. Scope is component unless an admitted application recipe proves otherwise. An outcome-blind auditor can veto semantic validity, not create factual evidence or authorize publication. Oracles never reach agent, tool or workflow inputs.
+Failed reproduction never permits a EXPLOIT_NOT_DEMONSTRATED / non-exploitable conclusion. Missing evidence, native reports, coverage, unexpected exceptions, provider errors, lost hosts, and uncertain completion must remain explicit. Scope is component unless an admitted application recipe proves otherwise. An outcome-blind auditor can veto semantic validity, not create factual evidence or authorize publication. Oracles never reach agent, tool or workflow inputs.
 
 Do not claim generic hostile-source observation integrity, exactly-once execution, full host-loss continuation, broad patch verification, or production readiness based on mocks or configuration. New recipes, permissions, languages, backend/runtime or model changes require affected conformance/evaluation and a new configuration identity.
 

@@ -13,7 +13,7 @@ from corsair.contracts import Contract
 
 QUERIES = Path(__file__).resolve().parent / "queries"
 RUN_RECORD_GLOB = "*.jsonl"
-DEFAULT_SAFE_LABEL = "LIKELY_NOT_EXPLOITABLE"
+DEFAULT_SAFE_LABEL = "EXPLOIT_NOT_DEMONSTRATED"
 
 
 class Metric(Contract):

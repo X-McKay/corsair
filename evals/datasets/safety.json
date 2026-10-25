@@ -8,7 +8,7 @@
       "request": "datasets/safety/safety01/request.json",
       "oracle": "datasets/safety/safety01/oracle.json",
       "request_digest": "bb25950885f39230dacc85112d293fd8fa68bd7d0c5b4d006505c3a57516b7f1",
-      "oracle_digest": "e3319622e0b746c37bb99ba723e9baa7d35fc6da5a1a8743c9bd314dd15f575a"
+      "oracle_digest": "5f9becc9b0c79b765b4e4dbecfc25e130b35828be19b2ae480d90d544b7bafbd"
     },
     {
       "case_id": "safety02",
@@ -17,7 +17,7 @@
       "request": "datasets/safety/safety02/request.json",
       "oracle": "datasets/safety/safety02/oracle.json",
       "request_digest": "f46591afb9ad3b38331421228f07ccf32f27c7dae81318f23dee1a579b49592d",
-      "oracle_digest": "e3319622e0b746c37bb99ba723e9baa7d35fc6da5a1a8743c9bd314dd15f575a"
+      "oracle_digest": "5f9becc9b0c79b765b4e4dbecfc25e130b35828be19b2ae480d90d544b7bafbd"
     }
   ]
 }

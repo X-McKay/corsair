@@ -13,11 +13,11 @@ Three constraints shape the design. The repository's rules forbid an agent from 
 
 **Payload pair, not probe module.** The producer proposes one JSON payload pair, a benign payload and an exploit payload for the same target seam, as canonical `ProducerDecision` data. The kernel owns the operator-reviewed recipe, materializes the probe from recipe plus payloads at run time, and runs it. The producer never writes code, never runs anything, and never sees an outcome. The executable is operator-owned; the model contributes data.
 
-**Five labels.** The result label is one of `LIKELY_EXPLOITABLE`, `LIKELY_NOT_EXPLOITABLE`, `INCONCLUSIVE`, `UNABLE_TO_RUN`, and `ERROR`. Claim scope is carried as separate result data, not folded into the label.
+**Five labels.** The result label is one of `EXPLOIT_DEMONSTRATED`, `EXPLOIT_NOT_DEMONSTRATED`, `INCONCLUSIVE`, `UNABLE_TO_RUN`, and `ERROR`. Claim scope is carried as separate result data, not folded into the label.
 
 **Exact target-line coverage gate.** Control and exploit come from one differential run pair differing only in payload. Each run must show that the finding's exact target line executed. A pair with an uncovered run is discarded as `INCONCLUSIVE` and counts toward nothing. Coverage is checked before any observation reaches `evidence_agreement`, `blind_audit`, or the verdict table.
 
-**Two independent sessions for a negative.** `LIKELY_NOT_EXPLOITABLE` requires at least `negative_threshold = 2` independent producer sessions, each producing a coverage-valid, non-rejected pair whose exploit run did not demonstrate the condition. `LIKELY_EXPLOITABLE` requires the fixed-revision differential to hold.
+**Two independent sessions for a negative.** `EXPLOIT_NOT_DEMONSTRATED` requires at least `negative_threshold = 2` independent producer sessions, each producing a coverage-valid, non-rejected pair whose exploit run did not demonstrate the condition. `EXPLOIT_DEMONSTRATED` requires the fixed-revision differential to hold.
 
 **One ADK episode per Temporal activity.** Each producer or auditor episode is one ordinary activity with a single attempt ([ADR 0001](0001-sdk-owned-durable-rounds.md)); the experimental ADK Temporal plugin is not used.
 
@@ -36,6 +36,6 @@ The verdict is decided by [`policies/verdicts.py`](../../../src/corsair/policies
 
 The producer's output surface is data, which keeps the agent evaluable in isolation with fixture-answered ports and keeps exploit authorship with the operator-reviewed recipe. Recipe coverage, not model creativity, bounds what the pilot can validate; a finding without a matching recipe is `UNABLE_TO_RUN`, not a model guess.
 
-A negative label costs at least two producer sessions and two differential pairs, and a positive label costs an extra fixed-revision pair. That is the intended price of making a false `LIKELY_NOT_EXPLOITABLE` the hardest outcome to produce. Evaluation datasets and oracles use the five labels.
+A negative label costs at least two producer sessions and two differential pairs, and a positive label costs an extra fixed-revision pair. That is the intended price of making a false `EXPLOIT_NOT_DEMONSTRATED` the hardest outcome to produce. Evaluation datasets and oracles use the five labels.
 
 The decision does not change contract/port boundaries ([ADR 0002](0002-pydantic-contracts-and-ports.md)) or evidence immutability ([ADR 0003](0003-immutable-native-evidence.md)). See [Data flow](../data-flow.md) for the gate order and verdict table and [Security architecture](../security.md) for the non-negotiables.

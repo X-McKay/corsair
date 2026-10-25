@@ -5,7 +5,7 @@
   "kind": "negative",
   "category": "capability",
   "probes": "Improper signature verification in verify_token (CWE-347) reported against the variant where a named control on the path stops the input: the chain must not reproduce it.",
-  "expected": "The control passes and the proof-of-vulnerability (exploit) probe's assertion fails on this tree (the condition is not shown), so the label is LIKELY_NOT_EXPLOITABLE by R5.",
+  "expected": "The control passes and the proof-of-vulnerability (exploit) probe's assertion fails on this tree (the condition is not shown), so the label is EXPLOIT_NOT_DEMONSTRATED by R5.",
   "dimensions": [
     "correctness",
     "contract",

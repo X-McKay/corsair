@@ -16,8 +16,8 @@ Corsair's security design limits what agents can do, binds evidence to admitted 
 3. The producer proposes JSON payload data only. It never authors a probe or any executable code; the kernel owns the recipe and materializes it at run time ([ADR 0004](decisions/0004-payload-pair-and-coverage-gated-verdict.md)).
 4. Control and exploit come from one differential run pair that differs only in payload.
 5. Exact target-line coverage is required in both runs before an observation counts toward any label.
-6. `LIKELY_NOT_EXPLOITABLE` needs at least two independent producer sessions (`negative_threshold = 2`).
-7. `LIKELY_EXPLOITABLE` needs the fixed-revision differential to hold.
+6. `EXPLOIT_NOT_DEMONSTRATED` needs at least two independent producer sessions (`negative_threshold = 2`).
+7. `EXPLOIT_DEMONSTRATED` needs the fixed-revision differential to hold.
 
 ## Trust boundaries and controls
 
@@ -37,9 +37,9 @@ Corsair's security design limits what agents can do, binds evidence to admitted 
 
 ## Scoped conclusions
 
-Only the kernel assigns labels, and only after every earlier gate passed. `LIKELY_EXPLOITABLE` means the proposed exploit payload demonstrated the reported condition at the covered target line while the benign control held, the auditor did not reject the pair, and the same pair no longer demonstrated it on the fix revision. `LIKELY_NOT_EXPLOITABLE` means at least two independent, coverage-valid, non-rejected sessions failed to demonstrate it. Everything else is `INCONCLUSIVE`, `UNABLE_TO_RUN`, or `ERROR`; none of those is proof that a target is safe.
+Only the kernel assigns labels, and only after every earlier gate passed. `EXPLOIT_DEMONSTRATED` means the proposed exploit payload demonstrated the reported condition at the covered target line while the benign control held, the auditor did not reject the pair, and the same pair no longer demonstrated it on the fix revision. `EXPLOIT_NOT_DEMONSTRATED` means at least two independent, coverage-valid, non-rejected sessions failed to demonstrate it. Everything else is `INCONCLUSIVE`, `UNABLE_TO_RUN`, or `ERROR`; none of those is proof that a target is safe.
 
-The costliest error is a false `LIKELY_NOT_EXPLOITABLE`. The gate order exists to make that label the hardest to reach: a case that cannot run, a run that missed the target line, a rejected pair, or a single session all stop short of it. A fixed-revision observation is similarly narrow: the submitted demonstration was blocked while the benign control held. It is not universal patch correctness. The architecture makes no production, hostile-target, or population-accuracy claim, no clearance claim, and no claim that local artifacts survive host loss.
+The costliest error is a false `EXPLOIT_NOT_DEMONSTRATED`. The gate order exists to make that label the hardest to reach: a case that cannot run, a run that missed the target line, a rejected pair, or a single session all stop short of it. A fixed-revision observation is similarly narrow: the submitted demonstration was blocked while the benign control held. It is not universal patch correctness. The architecture makes no production, hostile-target, or population-accuracy claim, no clearance claim, and no claim that local artifacts survive host loss.
 
 ## Operational posture
 

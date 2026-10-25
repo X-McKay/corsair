@@ -5,7 +5,7 @@
   "kind": "negative",
   "category": "capability",
   "probes": "Cross-site scripting in render (CWE-79) reported against the Ruby variant with a control on the path: the chain must not reproduce it.",
-  "expected": "The control passes and the proof-of-vulnerability (exploit) probe's assertion fails on this tree: LIKELY_NOT_EXPLOITABLE by R5.",
+  "expected": "The control passes and the proof-of-vulnerability (exploit) probe's assertion fails on this tree: EXPLOIT_NOT_DEMONSTRATED by R5.",
   "dimensions": [
     "correctness",
     "contract",

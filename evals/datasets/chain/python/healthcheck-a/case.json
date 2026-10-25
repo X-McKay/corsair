@@ -5,7 +5,7 @@
   "kind": "negative",
   "category": "adversarial",
   "probes": "A scanner flags the CWE-89 sink in healthcheck, but no untrusted value reaches it: the chain must not report the constant query as exploitable.",
-  "expected": "The control passes and the proof-of-vulnerability (exploit) probe's assertion fails on this tree (the condition is not shown), so the label is LIKELY_NOT_EXPLOITABLE by R5.",
+  "expected": "The control passes and the proof-of-vulnerability (exploit) probe's assertion fails on this tree (the condition is not shown), so the label is EXPLOIT_NOT_DEMONSTRATED by R5.",
   "dimensions": [
     "correctness",
     "contract",

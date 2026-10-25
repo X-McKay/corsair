@@ -47,11 +47,11 @@ class FixStatus(StrEnum):
 
 class Verdict(StrEnum):
     """The canonical per-case label decided by code, layered over the internal
-    Disposition/ExecutionStatus/FixStatus. A false LIKELY_NOT_EXPLOITABLE is the
+    Disposition/ExecutionStatus/FixStatus. A false EXPLOIT_NOT_DEMONSTRATED is the
     costliest mistake, so it is the hardest verdict to reach."""
 
-    LIKELY_EXPLOITABLE = "LIKELY_EXPLOITABLE"
-    LIKELY_NOT_EXPLOITABLE = "LIKELY_NOT_EXPLOITABLE"
+    EXPLOIT_DEMONSTRATED = "EXPLOIT_DEMONSTRATED"
+    EXPLOIT_NOT_DEMONSTRATED = "EXPLOIT_NOT_DEMONSTRATED"
     INCONCLUSIVE = "INCONCLUSIVE"
     UNABLE_TO_RUN = "UNABLE_TO_RUN"
     ERROR = "ERROR"

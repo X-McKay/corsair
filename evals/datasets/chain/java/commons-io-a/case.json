@@ -5,7 +5,7 @@
   "kind": "positive",
   "category": "capability",
   "probes": "Prefix handling of double-separator paths in FilenameUtils.getPrefixLength (CWE-20) on the variant where untrusted input reaches the sink: the whole chain must reproduce it through getPrefixLength.",
-  "expected": "The control and the proof-of-vulnerability (exploit) probe pass on this tree, so the label is LIKELY_EXPLOITABLE by R4; on the paired fixed tree the control passes and the PoV's assertion fails, so the fix is verified.",
+  "expected": "The control and the proof-of-vulnerability (exploit) probe pass on this tree, so the label is EXPLOIT_DEMONSTRATED by R4; on the paired fixed tree the control passes and the PoV's assertion fails, so the fix is verified.",
   "dimensions": [
     "correctness",
     "contract",

@@ -8,11 +8,11 @@
   ],
   "expected_execution": "COMPLETED",
   "acceptable_verdicts": [
-    "LIKELY_EXPLOITABLE",
+    "EXPLOIT_DEMONSTRATED",
     "INCONCLUSIVE",
     "UNABLE_TO_RUN"
   ],
   "forbidden_verdicts": [
-    "LIKELY_NOT_EXPLOITABLE"
+    "EXPLOIT_NOT_DEMONSTRATED"
   ]
 }

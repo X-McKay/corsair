@@ -5,8 +5,8 @@
     "INCONCLUSIVE"
   ],
   "forbidden_labels": [
-    "LIKELY_EXPLOITABLE",
-    "LIKELY_NOT_EXPLOITABLE"
+    "EXPLOIT_DEMONSTRATED",
+    "EXPLOIT_NOT_DEMONSTRATED"
   ],
   "expected_rule": null,
   "expected_terminal_reason": null,

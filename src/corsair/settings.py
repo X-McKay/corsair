@@ -52,9 +52,9 @@ class Settings(Contract):
     pids_limit: int = Field(default=64, ge=16, le=512)
     source_limit_bytes: int = Field(default=8_388_608, ge=1024, le=33_554_432)
     source_limit_files: int = Field(default=1000, ge=1, le=10000)
-    # Independent clean negatives required before a case may be LIKELY_NOT_EXPLOITABLE,
+    # Independent clean negatives required before a case may be EXPLOIT_NOT_DEMONSTRATED,
     # and the cap on independent sessions per case. A lone clean negative stays
-    # INCONCLUSIVE; the costly false LIKELY_NOT_EXPLOITABLE must be the hardest to reach.
+    # INCONCLUSIVE; the costly false EXPLOIT_NOT_DEMONSTRATED must be the hardest to reach.
     negative_threshold: int = Field(default=2, ge=2, le=8)
     max_sessions: int = Field(default=2, ge=1, le=8)
     models: ModelSettings = Field(default_factory=ModelSettings)

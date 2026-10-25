@@ -76,7 +76,7 @@ def test_likely_exploitable_requires_a_confirmed_differential():
         _prepared(), _demonstrated(), _audit(), FixStatus.DEMONSTRATION_BLOCKED
     )
     assert outcome == SessionOutcome(outcome.verdict, outcome.reason)
-    assert outcome.verdict is Verdict.LIKELY_EXPLOITABLE
+    assert outcome.verdict is Verdict.EXPLOIT_DEMONSTRATED
     assert outcome.clean_negative is False
 
 
@@ -156,7 +156,7 @@ def test_completed_run_without_confirmed_cleanup_is_error():
 
 
 def _le() -> SessionOutcome:
-    return SessionOutcome(Verdict.LIKELY_EXPLOITABLE, "le")
+    return SessionOutcome(Verdict.EXPLOIT_DEMONSTRATED, "le")
 
 
 def _neg() -> SessionOutcome:
@@ -177,7 +177,7 @@ def _inconclusive() -> SessionOutcome:
 
 def test_any_exploitable_session_wins():
     verdict, _ = case_verdict([_le(), _error(), _neg()])
-    assert verdict is Verdict.LIKELY_EXPLOITABLE
+    assert verdict is Verdict.EXPLOIT_DEMONSTRATED
 
 
 def test_lone_clean_negative_is_never_likely_not_exploitable():
@@ -187,7 +187,7 @@ def test_lone_clean_negative_is_never_likely_not_exploitable():
 
 def test_two_independent_clean_negatives_reach_likely_not_exploitable():
     verdict, reason = case_verdict([_neg(), _neg()], negative_threshold=2)
-    assert verdict is Verdict.LIKELY_NOT_EXPLOITABLE
+    assert verdict is Verdict.EXPLOIT_NOT_DEMONSTRATED
     assert "sensitivity:unverified" in reason
 
 
