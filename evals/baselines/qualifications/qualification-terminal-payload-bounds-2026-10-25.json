@@ -5,7 +5,7 @@
   "native_tests": 160,
   "native_failures": 0,
   "native_skips": 0,
-  "native_seconds": 157.89,
+  "native_seconds": 153.388,
   "cohorts": [
     "scripted ADK",
     "real Docker",
@@ -18,5 +18,11 @@
   "frozen_inputs_and_pins_unchanged": true,
   "cost_usd": null,
   "production_qualified": false,
-  "remote_ci": "not yet run at record creation"
+  "remote_ci": "not yet run at record creation",
+  "cross_pr_native": {
+    "tests": 189,
+    "failures": 0,
+    "skips": 0,
+    "initial_failures_preserved": 2
+  }
 }

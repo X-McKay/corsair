@@ -461,7 +461,7 @@ async def test_failed_later_activity_preserves_completed_producer_round(
         )
     assert result.execution_status == ExecutionStatus.ERROR
     assert len(result.rounds) == 1
-    assert _producer_submission(result.rounds[0].producer)
+    assert result.rounds[0].producer.submission_for_verification() is not None
     assert result.rounds[0].producer.usage.llm_calls == 1
     assert result.rounds[0].producer.usage.tool_calls == 1
     assert bool(result.rounds[0].observation) == (phase == "audit")
