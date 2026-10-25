@@ -63,7 +63,6 @@ def _producer_submission(output: ProducerOutput) -> Submission:
     return submission
 
 
-
 def _maximum_round_budget() -> Budget:
     return Budget(
         max_rounds=16,
@@ -198,7 +197,7 @@ async def test_oversized_activity_error_reason_is_compacted_before_record(
     assert len(result.reason) == MAX_DIAGNOSTIC_TEXT_CHARS
     assert result.usage_complete is True
     assert len(result.rounds) == 1
-    assert result.rounds[0].producer.submission is not None
+    assert result.rounds[0].producer.submission_for_verification() is not None
     assert activities.call_counts["corsair.record"] == 1
     record_payload = await pydantic_data_converter.encode([activities.record_inputs[-1]])
     assert len(record_payload[0].data) <= (TERMINAL_RESULT_MAX_BYTES)
@@ -481,10 +480,13 @@ async def test_oversized_structured_result_fails_workflow_not_workflow_tasks(
         @activity.defn(name="corsair.produce")
         async def produce(self, request: ProducerInput) -> ProducerOutput:
             producer = await super().produce(request)
-            assert producer.submission is not None
-            plan = producer.submission.plan.model_copy(update={"next_steps": ["x" * 70_000]})
-            return producer.model_copy(
-                update={"submission": producer.submission.model_copy(update={"plan": plan})}
+            submission = producer.submission_for_verification()
+            assert submission is not None
+            plan = submission.plan.model_copy(update={"next_steps": ["x" * 70_000]})
+            return ProducerOutput(
+                submission=submission.model_copy(update={"plan": plan}),
+                usage=producer.usage,
+                feedback=producer.feedback,
             )
 
     activities = LargePlans(
