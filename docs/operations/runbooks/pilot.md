@@ -63,7 +63,7 @@ With credentials exported for the worker in the current shell, the recipes start
 
 ```bash
 just temporal-up      # Temporal dev server; pid, log and database under .state/
-just worker-up        # corsair worker; waits for its worker.ready event
+just worker-up        # corsair worker on that dev server only; waits for its worker.ready event
 uv run --locked corsair doctor --format human --settings .state/settings.json
 
 RUN_ID="case01-$(date +%s)"

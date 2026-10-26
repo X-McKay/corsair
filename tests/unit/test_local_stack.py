@@ -187,8 +187,18 @@ def test_down_never_signals_a_process_it_did_not_start(stack: Path):
     assert not (stack / ".state/temporal.pid").exists()
 
 
+def test_worker_up_refuses_without_the_managed_temporal_server(stack: Path):
+    assert run(stack, "settings-init").returncode == 0
+
+    refused = run(stack, "worker-up")
+    assert refused.returncode != 0
+    assert "run `just temporal-up` first" in refused.stderr
+    assert not (stack / ".state/worker.pid").exists()
+
+
 def test_worker_up_waits_for_ready_event_and_down_stops_it(stack: Path):
     assert run(stack, "settings-init").returncode == 0
+    assert run(stack, "temporal-up").returncode == 0
 
     started = run(stack, "worker-up")
     assert started.returncode == 0, started.stderr

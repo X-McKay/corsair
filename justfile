@@ -60,7 +60,7 @@ temporal-up: settings-init
 temporal-down:
     uv run --locked python scripts/local_stack.py temporal-down
 
-# Start a background worker; provider credentials come from this environment.
+# Start a background worker on the dev server temporal-up started; provider credentials come from this environment.
 worker-up: settings-init
     uv run --locked python scripts/local_stack.py worker-up
 

@@ -250,9 +250,19 @@ def temporal_up(root: Path, ready_seconds: float = 60) -> None:
 
 
 def worker_up(root: Path, ready_seconds: float = 120) -> None:
-    """Start the worker in the background with the repository settings and a JSONL log."""
+    """Start the worker in the background against the dev server that temporal-up started.
 
-    _read_settings(root)
+    The worker is only ever attached to the local dev server this script manages. Without
+    that check a default or forwarded ``temporal_address`` would let it poll another Temporal
+    and pick up that server's tasks.
+    """
+
+    host, port = _temporal_endpoint(_read_settings(root))
+    if running_pid(root, TEMPORAL) is None:
+        raise StackError(
+            f"no Temporal dev server started by temporal-up is running for {host}:{port}; "
+            "run `just temporal-up` first (worker-up never attaches to another Temporal)"
+        )
     pid = running_pid(root, WORKER)
     if pid is not None:
         print(f"Corsair worker already running: pid {pid}.")
