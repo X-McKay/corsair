@@ -2,7 +2,9 @@
 
 Role factories own concrete ADK construction. This module supplies immutable
 prompt text, validates declared role capabilities, and admits only the two
-small packaged procedural skills before native ADK receives them.
+small packaged procedural skills before native ADK receives them. Each role's
+procedure is preloaded into its instruction; no role exposes a native skill
+loader. The producer declares only its two source reads and the auditor no tools.
 """
 
 from __future__ import annotations
@@ -15,7 +17,7 @@ from typing import TYPE_CHECKING, Literal
 
 from pydantic import Field, field_validator, model_validator
 
-from corsair.contracts import Contract
+from corsair.contracts import Contract, Finding
 
 if TYPE_CHECKING:
     from google.adk.skills import Skill
@@ -26,12 +28,53 @@ _RESOURCE_PACKAGES: dict[RoleName, str] = {
     "producer": "corsair.agents.producer",
     "auditor": "corsair.agents.auditor",
 }
-_LOADER_TOOLS = ("load_skill", "load_skill_resource")
-_MAX_LOADER_CALLS = 4
 _MAX_SKILL_BYTES = 12_000
 _MAX_REFERENCE_BYTES = 8_000
-_MAX_REFERENCE_COUNT = 4
+_MAX_REFERENCE_COUNT = 8
 _MAX_TOTAL_SKILL_BYTES = 24_000
+
+
+# Data-driven class selection. Each row names a packaged reference basename and the
+# lowercase keywords whose presence in a finding's title or description marks that
+# vulnerability class. Trusted code scans in this fixed priority order and selects the
+# first matching row's reference; this is a static table, not model-authored logic and
+# not a discovery registry. Both roles package the same six basenames.
+_REFERENCE_CLASS_SELECTORS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (
+        "code-execution.md",
+        ("deserializ", "unpickl", "pickle", "code injection", "eval", "arbitrary code"),
+    ),
+    (
+        "command-injection.md",
+        ("command injection", "os command", "subprocess", "shell", "argument injection"),
+    ),
+    (
+        "ssrf-allowlist.md",
+        ("request forgery", "ssrf", "urlopen", "server-side request"),
+    ),
+    (
+        "error-exposure.md",
+        ("error message", "traceback", "stack trace", "information exposure", "exception"),
+    ),
+    (
+        "mass-assignment.md",
+        ("mass assignment", "setattr", "request body", "mass-assignment"),
+    ),
+    (
+        "path-confinement.md",
+        (
+            "path traversal",
+            "traversal",
+            "outside its",
+            "document root",
+            "records root",
+            "path validation",
+            "name validation",
+            "disclose a file",
+        ),
+    ),
+)
+_SELECTABLE_RECIPE_KINDS = frozenset({"python.secret_disclosure/1"})
 
 
 def _admitted_skill_slugs(role: RoleName) -> tuple[str, ...]:
@@ -56,7 +99,7 @@ class AgentSpec(Contract):
     source_tools: list[str]
     loader_tools: list[str]
     runtime_skills: list[str]
-    loader_call_limit: int = Field(ge=1, le=_MAX_LOADER_CALLS)
+    loader_call_limit: int = Field(ge=0)
     llm_call_limit: int | None = Field(default=None, ge=1, le=4)
     instruction_resource: str = Field(min_length=1, max_length=240)
     schema_ref: str = Field(min_length=1, max_length=240)
@@ -70,8 +113,14 @@ class AgentSpec(Contract):
 
     @model_validator(mode="after")
     def validated_runtime_layout(self) -> AgentSpec:
-        if tuple(self.loader_tools) != _LOADER_TOOLS:
-            raise ValueError(f"loader_tools must exactly equal {list(_LOADER_TOOLS)!r}")
+        # Each procedure is preloaded into the instruction. A loader would only
+        # re-offer that text and make ADK add its generic "load the skill first"
+        # guidance and loader declarations to every request.
+        if self.loader_tools or self.loader_call_limit:
+            raise ValueError(
+                f"{self.name} procedure is preloaded; loader_tools must be empty "
+                "and loader_call_limit 0"
+            )
         if tuple(self.runtime_skills) != _admitted_skill_slugs(self.name):
             raise ValueError("runtime_skills must exactly equal the role-local admitted skill")
         if self.tools != [*self.source_tools, *self.loader_tools]:
@@ -81,8 +130,8 @@ class AgentSpec(Contract):
                 raise ValueError("producer source_tools must exactly expose source reads")
             if self.llm_call_limit is not None:
                 raise ValueError("producer LLM calls are bounded by the input and budget")
-        elif self.source_tools:
-            raise ValueError("auditor must not expose source tools")
+        elif self.tools:
+            raise ValueError("auditor must not expose any tools")
         elif self.llm_call_limit is None:
             raise ValueError("auditor must declare its finite native LLM-call limit")
         return self
@@ -233,6 +282,45 @@ def load_runtime_skills(role: str) -> list[Skill]:
     validated_role = _validated_role(role)
     spec = load_agent_spec(validated_role)
     return [_load_runtime_skill(validated_role, slug) for slug in spec.runtime_skills]
+
+
+def _reference_class(finding: Finding) -> str | None:
+    """Return the packaged reference basename for a finding's class, or None.
+
+    Pure, deterministic keyword selection over the finding's own title and
+    description in trusted code: at most one class, by the fixed priority table.
+    """
+
+    haystack = f"{finding.title}\n{finding.description}".lower()
+    for basename, keywords in _REFERENCE_CLASS_SELECTORS:
+        if any(keyword in haystack for keyword in keywords):
+            return basename
+    return None
+
+
+def select_reference(role: str, finding: Finding, recipe_kind: str) -> tuple[str, str] | None:
+    """Select at most one admitted reference for a finding's vulnerability class.
+
+    Trusted-code path: the caller may append the returned text to the role's
+    packet so per-class depth is available even where no loader tool is offered.
+    Selection reads only the finding and the recipe kind; it never reads an
+    oracle, an outcome, or model output. Returns ``(relative_path, text)`` with
+    the ``references/`` prefix, or ``None`` when no class matches or the recipe
+    kind has no packaged references.
+    """
+
+    validated_role = _validated_role(role)
+    if recipe_kind not in _SELECTABLE_RECIPE_KINDS:
+        return None
+    basename = _reference_class(finding)
+    if basename is None:
+        return None
+    relative = f"references/{basename}"
+    for slug in load_agent_spec(validated_role).runtime_skills:
+        for admitted_path, content in _admitted_skill_files(validated_role, slug):
+            if admitted_path == relative:
+                return relative, content.decode("utf-8")
+    return None
 
 
 def runtime_skill_digest(role: str) -> str:

@@ -11,6 +11,7 @@ from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Replayer
 
 from corsair.contracts import Budget, InvestigationResult, RoleOutcome, Verdict
+from corsair.workflows.evaluation import EvaluationWorkflow
 from corsair.workflows.investigation import InvestigationWorkflow
 from tests.workflow.temporal import ActivityScenario, investigation_request, temporal_id
 
@@ -46,6 +47,9 @@ async def test_fetched_history_replays_without_repeating_completed_activities(
         calls_before_replay = dict(activities.call_counts)
 
     assert result.result_artifact is not None
+    # The recorded result's phase timeline rides in the record activity input; replay
+    # must accept it (and histories recorded without it, below).
+    assert [entry.phase for entry in result.timeline][-1] == "record"
     assert completed == [
         "corsair.prepare",
         "corsair.produce",
@@ -136,4 +140,64 @@ async def test_pre_session_history_with_a_lone_clean_negative_still_replays():
     assert "independent-sessions-v1" not in _patches(history)
     assert _scheduled(history).count("corsair.produce") == 1
     replay = await _replayer().replay_workflow(history)
+    assert replay.replay_failure is None
+
+
+async def test_recorded_activity_options_match_the_time_bound_policy():
+    """The single time-bound policy reproduces every option a recorded history holds.
+
+    Moving the activity bounds into ``policies.time_bounds`` must not change one
+    scheduled command; a deliberate change needs a ``workflow.patched`` gate.
+    """
+    from corsair.policies import time_bounds
+
+    history = WorkflowHistory.from_json(
+        "pre-sessions-lone-clean-negative",
+        (HISTORIES / "pre-sessions-lone-clean-negative.json").read_text(),
+    )
+    started = next(
+        event.workflow_execution_started_event_attributes
+        for event in history.events
+        if event.HasField("workflow_execution_started_event_attributes")
+    )
+    budget = Budget.model_validate(json.loads(started.input.payloads[0].data)["budget"])
+    remaining = budget.max_elapsed_seconds
+    expected = {
+        "corsair.prepare": (min(time_bounds.PREPARE_ACTIVITY_SECONDS, remaining),) * 2,
+        "corsair.produce": (time_bounds.producer_activity_seconds(budget, 0),) * 2,
+        "corsair.evidence": (time_bounds.evidence_activity_seconds(budget),) * 2,
+        "corsair.audit": (min(time_bounds.AUDITOR_ACTIVITY_SECONDS, remaining),) * 2,
+        "corsair.record": (
+            time_bounds.RECORD_ATTEMPT_SECONDS,
+            time_bounds.RECORD_FINALIZATION_SECONDS,
+        ),
+    }
+    recorded = {}
+    for event in history.events:
+        if event.HasField("activity_task_scheduled_event_attributes"):
+            options = event.activity_task_scheduled_event_attributes
+            recorded[options.activity_type.name] = (
+                options.start_to_close_timeout.seconds,
+                options.schedule_to_close_timeout.seconds,
+            )
+            if options.activity_type.name != "corsair.record":
+                assert options.heartbeat_timeout.seconds == time_bounds.heartbeat_seconds(
+                    options.start_to_close_timeout.seconds
+                )
+    assert recorded == expected
+    replay = await _replayer().replay_workflow(history)
+    assert replay.replay_failure is None
+
+
+async def test_counts_only_evaluation_history_replays_with_the_child_state_query():
+    """Recorded by the evaluation workflow before its status query listed child rows
+    (two cases, two repeats, concurrency one, two failed children). Child rows and
+    their workflow-time stamps issue no command, so the history replays unchanged."""
+    history = WorkflowHistory.from_json(
+        "evaluation-counts-only",
+        (HISTORIES / "evaluation-counts-only.json").read_text(),
+    )
+    replay = await Replayer(
+        workflows=[EvaluationWorkflow], data_converter=pydantic_data_converter
+    ).replay_workflow(history)
     assert replay.replay_failure is None

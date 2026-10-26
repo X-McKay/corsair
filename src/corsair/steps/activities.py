@@ -21,7 +21,9 @@ from corsair.contracts import (
     format_diagnostic,
     format_terminal_result,
 )
+from corsair.policies.line_binding import bind_target_line
 from corsair.policies.target_binding import target_binding
+from corsair.policies.time_bounds import activity_window_seconds
 from corsair.ports.inference import InferencePort
 from corsair.ports.sandboxing import SandboxPort
 from corsair.ports.scm import SourceSnapshotPort
@@ -96,7 +98,29 @@ class Activities:
                 raise ApplicationError(
                     format_diagnostic(str(failure)), type="PREPARE_BLOCKED", non_retryable=True
                 )
-        return prepared
+        # Bind the finding to the statement line coverage reports for it. bind_target_line
+        # returns the declared line unchanged on non-Python source (ast.parse fails), so a
+        # C recipe binds to its declared gcov line. Absent a declared line, the coverage
+        # gate falls back to actual recipe-module execution.
+        if prepared.finding.line is None:
+            return prepared
+        target_line = bind_target_line(module_text, prepared.finding.line)
+        return prepared.model_copy(update={"target_line": target_line})
+
+    @staticmethod
+    def _activity_window() -> float | None:
+        """Time left to this activity attempt, from the bounds the workflow scheduled."""
+        info = activity.info()
+        queued = (info.started_time - info.current_attempt_scheduled_time).total_seconds()
+        start_to_close, schedule_to_close = (
+            info.start_to_close_timeout,
+            info.schedule_to_close_timeout,
+        )
+        return activity_window_seconds(
+            start_to_close.total_seconds() if start_to_close else None,
+            schedule_to_close.total_seconds() if schedule_to_close else None,
+            queued,
+        )
 
     async def _model_episode(self, awaitable):
         async def heartbeats():
@@ -114,14 +138,16 @@ class Activities:
     @activity.defn(name="corsair.produce")
     async def produce(self, request: ProducerInput) -> ProducerOutput:
         try:
-            return await self._model_episode(self.inference.produce(request))
+            window = self._activity_window()
+            return await self._model_episode(self.inference.produce(request, window_seconds=window))
         except Exception as exc:
             raise self._activity_error(exc, "PRODUCER_FAILED", non_retryable=True) from None
 
     @activity.defn(name="corsair.audit")
     async def audit(self, request: AuditInput) -> AuditOutput:
         try:
-            return await self._model_episode(self.inference.audit(request))
+            window = self._activity_window()
+            return await self._model_episode(self.inference.audit(request, window_seconds=window))
         except Exception as exc:
             raise self._activity_error(exc, "AUDITOR_FAILED", non_retryable=True) from None
 

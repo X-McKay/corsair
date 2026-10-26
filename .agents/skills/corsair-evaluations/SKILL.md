@@ -13,6 +13,7 @@ Use this workflow to improve or run a stated evaluation boundary. Treat it as ma
 2. State one hypothesis and one measured boundary. Keep the input bytes, declared hashes, external labels/oracles, source/image/instruction/tool/schema/budget identity, and cohort membership frozen for a repeat. Do not edit an oracle, fixture, allowed candidate, or denominator to convert a failure into a pass.
 3. Keep the original frozen cohort, expanded candidate cohort, and safety or composed cohort separate. Report their membership and results separately; candidate cases remain pending human review and are not held-out or promoted baselines.
 4. Retain the full denominator: exact matches, mismatches and match kinds, abstentions, malformed outputs, provider/configuration failures, unavailable rows, unexpected exceptions, and uncertain outcomes. Exact-match diagnostics are not semantic-equivalence, vulnerability-accuracy, or negative-clearance measurements.
+5. To tell a wrong producer payload from an unlisted right one, replay the report's mismatches natively with `corsair dataset replay-candidates REPORT.json DATASET.json --settings /operator/settings.json` (real Docker, no model). Read its `Replay` column beside the exact-match label, but keep the exact-match pass rate as the scored result. A `demonstrates` row is evidence for a human to admit the payload into the oracle under a new digest, never an automatic oracle edit; see [admitting an alternate producer payload](../../../docs/agents/evaluations.md#admitting-an-alternate-producer-payload).
 
 ## Run independently and explicitly
 
@@ -35,6 +36,13 @@ Use this workflow to improve or run a stated evaluation boundary. Treat it as ma
    ```
 
    Preserve raw reports in ignored `.runs/` and retain only appropriate sanitized records under `evals/baselines/` or `evals/experiments/`.
+
+5. For the improvement loop's rig step, prefer the recording recipes, which refuse without a named connector and its provider environment, and leave a raw report, a sanitised `identity.json`, the `corsair compare` result and a README draft under `.runs/live/` (see [recording a live run](../../../docs/agents/evaluations.md#recording-a-live-run-in-one-step)). Run `--dry-run` first; review the draft and resolve its TODOs before copying a record under `evals/baselines/candidates/`:
+
+   ```bash
+   just -- live-agent auditor evals/datasets/auditor-dev.json BASELINE.json --dry-run
+   just -- live-chain evals/datasets/dev.json BASELINE.json
+   ```
 
 ## Keep qualification levels separate
 

@@ -4,12 +4,12 @@
   "execution_class": "durable",
   "governance_tier": "review",
   "risk_path": "corsair.policies:risk.md",
-  "tools": ["load_skill", "load_skill_resource"],
+  "tools": [],
   "source_tools": [],
-  "loader_tools": ["load_skill", "load_skill_resource"],
+  "loader_tools": [],
   "runtime_skills": ["semantic-review"],
-  "loader_call_limit": 4,
-  "llm_call_limit": 2,
+  "loader_call_limit": 0,
+  "llm_call_limit": 1,
   "instruction_resource": "corsair.agents.auditor.instructions:system.md",
   "schema_ref": "corsair.contracts.AuditResult"
 }

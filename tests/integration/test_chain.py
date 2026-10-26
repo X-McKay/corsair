@@ -42,14 +42,18 @@ class ReferenceModel(BaseLlm):
         self.requests.append(llm_request)
         user_message = next(content for content in llm_request.contents if content.role == "user")
         if user_message.parts[0].text.startswith("Investigate this admitted work packet."):
-            packet = json.loads(user_message.parts[0].text.split("\n", maxsplit=1)[1])
+            # The packet is the JSON object after the header line; trusted code may append a
+            # data-only class reference section after it.
+            packet, _ = json.JSONDecoder().raw_decode(
+                user_message.parts[0].text.split("\n", maxsplit=1)[1]
+            )
             revision = packet["round"]["revision"]
             if not any(
-                part.function_response and part.function_response.name == "load_skill"
+                part.function_response and part.function_response.name == "read_file"
                 for content in llm_request.contents
                 for part in content.parts
             ):
-                yield tool_response("load_skill", {"skill_name": "source-grounding"})
+                yield tool_response("read_file", {"path": "target.py"})
                 return
             yield text_response(
                 json.dumps(
@@ -129,12 +133,7 @@ async def test_native_adk_docker_temporal_chain_and_fix(temporal_server, tmp_pat
     assert result.fix_observation.cleanup_confirmed
     assert result.result_artifact and store.reconcile(f"result.{identity}")
     assert len(model.requests) == 3
-    assert result.manifest.capabilities["producer"]["tools"] == [
-        "read_file",
-        "list_files",
-        "load_skill",
-        "load_skill_resource",
-    ]
+    assert result.manifest.capabilities["producer"]["tools"] == ["read_file", "list_files"]
     from corsair.evaluation.scoring import Oracle, score
 
     relabelled = result.model_copy(update={"case_id": "different-case"})
@@ -206,12 +205,17 @@ async def test_cli_frozen_batch_uses_native_chain_and_external_oracles(
         assert json.loads(capsys.readouterr().out)["summary"]["attempts"] == 3
         inspection = ["inspect", args.run_id, "--online", "--settings", str(config)]
         assert await execute(parser().parse_args(inspection)) == 0
-        assert json.loads(capsys.readouterr().out) == {
+        batch_status = json.loads(capsys.readouterr().out)
+        rows = batch_status.pop("children")
+        assert batch_status.pop("started")
+        assert batch_status == {
             "completed": 3,
             "total": 3,
             "running": 0,
             "errors": 0,
+            "children_omitted": 0,
         }
+        assert [row["state"] for row in rows] == ["completed"] * 3
         assert await execute(parser().parse_args([*inspection, "--watch"])) == 0
         children = json.loads(capsys.readouterr().out)
         assert len(children) == 3
@@ -240,3 +244,12 @@ async def test_cli_frozen_batch_uses_native_chain_and_external_oracles(
         "case03": "COMPONENT_EXPLOIT_DEMONSTRATED",
     }
     assert all(row["status"] == "pass" for row in rows)
+    # `explain` reads each committed native result offline, re-validates its receipts
+    # and names the kernel gate that decided every session, never evidence_unverified.
+    for row in rows:
+        explained = ["--format", "json", "explain", row["run_id"], "--settings", str(config)]
+        assert await execute(parser().parse_args(explained)) == 0
+        statements = json.loads(capsys.readouterr().out)["statements"]
+        assert statements[0]["text"].startswith(f"Verdict {row['verdict']}:")
+        sessions = [item["text"] for item in statements if item["kind"] == "session"]
+        assert sessions and not any("evidence_unverified" in text for text in sessions)

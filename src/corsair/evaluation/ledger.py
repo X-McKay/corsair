@@ -6,10 +6,15 @@ entry is derived from data recorded in the ``InvestigationResult`` plus, for rou
 that reached the kernel, the prepared case recovered from that round's own validated
 receipts. A round whose receipts do not validate is reported as unverified rather
 than classified from unverified fields.
+
+An isolated agent row has one entry, derived from the row's own recorded match kind,
+adapter feedback and auditor decision; its reasons are fixed evaluator text or the
+adapter's feedback, never oracle content.
 """
 
 from collections import Counter
 from collections.abc import Iterable, Mapping
+from typing import Any
 
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
@@ -17,7 +22,7 @@ from corsair.contracts import (
     ExecutionStatus,
     FixStatus,
     InvestigationResult,
-    NoGroundedCandidate,
+    MatchKind,
     PreparedCase,
     RoleOutcome,
     RoundResult,
@@ -41,7 +46,6 @@ _BUDGET_REASONS = frozenset(
 # Fixed adapter reasons behind the non-operational producer_invalid/audit_invalid
 # gates. Qualifying them separates "ran out of calls" from "returned bad output".
 _INVALID_QUALIFIERS = (
-    ("exhausted its runtime skill loader budget", "loader_budget"),
     ("exhausted its tool-call budget", "tool_budget"),
     ("exhausted its LLM-call budget", "llm_budget"),
     ("no remaining model-call budget", "llm_budget"),
@@ -51,6 +55,17 @@ _INVALID_QUALIFIERS = (
     ("plan parent_revision", "plan_revision"),
 )
 _QUALIFIED_GATES = frozenset({"producer_invalid", "audit_invalid"})
+
+# Isolated agent rows: the role's stage, the auditor's fixed rubric ids (any other
+# model-chosen rule text stays out of the gate name), and fixed oracle-stage reasons.
+_AGENT_STAGES = {"producer": "producer", "auditor": "audit"}
+_AUDIT_RUBRIC = frozenset({"R1", "R2", "R3", "R4", "ALL"})
+_ORACLE_REASONS = {
+    MatchKind.EXACT_MATCH: "output matched the frozen oracle exactly",
+    MatchKind.CONTROL_MISMATCH: "control payload differs from the frozen oracle",
+    MatchKind.CANDIDATE_EXACT_MISMATCH: "output differs from the frozen oracle",
+    MatchKind.RULE_MISMATCH: "decision matched but the decisive rule differs from the oracle",
+}
 
 
 def _entry(
@@ -104,7 +119,7 @@ def _kernel_entry(item: RoundResult, prepared: PreparedCase) -> dict:
     if outcome.verdict is Verdict.UNABLE_TO_RUN:
         return _entry(session, index, "kernel", "target_unbound", outcome.reason)
     assert observation.control is not None and observation.adversarial is not None
-    line = prepared.finding.line
+    line = prepared.bound_line
     if line not in observation.control.covered_lines or (
         line not in observation.adversarial.covered_lines
     ):
@@ -125,10 +140,9 @@ def _round_entry(item: RoundResult, prepared: PreparedCase | None) -> tuple[dict
     """One round's stopping entry and whether it was an operational stop."""
     session, index = item.session, item.index
     producer = item.producer
-    if producer.decision is not None and isinstance(producer.decision.root, NoGroundedCandidate):
-        return _entry(
-            session, index, "producer", "producer_abstained", producer.decision.root.reason
-        ), False
+    abstention = producer.abstention_reason()
+    if abstention is not None:
+        return _entry(session, index, "producer", "producer_abstained", abstention), False
     if producer.submission_for_verification() is None:
         feedback = producer.feedback
         if feedback is None:
@@ -248,6 +262,63 @@ def verified_rounds(
         if prepared is not None and prepared.case_id == result.case_id:
             verified[(item.session, item.index)] = prepared
     return verified
+
+
+def _agent_no_output_entry(stage: str, feedback: object) -> dict:
+    """An agent episode with no valid output: the adapter's own gate when it gave one."""
+    if isinstance(feedback, Mapping) and isinstance(feedback.get("gate"), str):
+        reason = str(feedback.get("reason") or "")
+        return _entry(None, None, stage, _qualified(feedback["gate"], reason), reason)
+    if stage == "producer":
+        # The producer adapter attaches feedback to every failed episode, so no
+        # submission without feedback is the producer's explicit abstention.
+        return _entry(
+            None, None, stage, "producer_abstained", "producer returned no grounded candidate"
+        )
+    if stage == "audit":
+        return _entry(None, None, stage, "audit_missing", "auditor returned no review")
+    return _entry(None, None, stage, MatchKind.NO_VALID_OUTPUT.value, "agent returned no output")
+
+
+def _agent_oracle_entry(kind: MatchKind, row: Mapping[str, Any]) -> dict:
+    """A valid agent output compared with its oracle; auditor mismatches name the decision."""
+    gate, reason = kind.value, _ORACLE_REASONS[kind]
+    decision = row.get("audit_decision")
+    if isinstance(decision, str) and decision in {item.value for item in AuditDecision}:
+        rule = row.get("audit_rule")
+        cited = f":{rule}" if rule in _AUDIT_RUBRIC else ""
+        if kind in {MatchKind.CANDIDATE_EXACT_MISMATCH, MatchKind.RULE_MISMATCH}:
+            gate += f":{decision.lower()}{cited}"
+        reason = f"auditor returned {decision}{cited.replace(':', ' under ')}; {reason}"
+    return _entry(None, None, "oracle", gate, reason)
+
+
+def agent_row_ledger(row: Mapping[str, Any]) -> list[dict]:
+    """Pure: the one stopping entry of an isolated agent row, or none for other rows.
+
+    Uses the composed ledger's entry keys; ``session`` and ``round`` stay unset because
+    an isolated row is a single episode outside any investigation.
+    """
+    try:
+        kind = MatchKind(row.get("match_kind"))
+    except ValueError:
+        return []
+    stage = _AGENT_STAGES.get(str(row.get("agent")), "agent")
+    if kind in {MatchKind.OPERATIONAL_FAILURE, MatchKind.NO_VALID_OUTPUT}:
+        return [_agent_no_output_entry(stage, row.get("feedback"))]
+    return [_agent_oracle_entry(kind, row)]
+
+
+def row_ledger(row: Mapping[str, Any]) -> list[dict]:
+    """A row's recorded ledger, else one derived from its isolated-agent fields.
+
+    Deriving covers isolated reports saved before rows carried a ledger, so they
+    compare per gate with newer ones; a composed row without a ledger has none.
+    """
+    ledger = row.get("gate_ledger")
+    if isinstance(ledger, list):
+        return ledger
+    return agent_row_ledger(row)
 
 
 def ledger_counts(ledgers: Iterable[Iterable[dict]]) -> dict[str, int]:
