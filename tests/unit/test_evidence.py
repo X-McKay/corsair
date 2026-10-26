@@ -351,3 +351,22 @@ def test_reconciliation_rejects_stale_recipe_runtime_or_budget(tmp_path, boundar
     with pytest.raises(ValueError, match="recipe/configuration"):
         verifier.evaluate(changed)
     assert sandbox.calls == 2
+
+
+def test_driver_children_receive_only_the_fixed_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from corsair.adapters.sandboxing import driver
+
+    monkeypatch.setenv("PATH", "/usr/local/bin:/usr/bin")
+    monkeypatch.setenv("COVERAGE_CORE", "pytrace")
+    monkeypatch.setenv("PYTHONPATH", "/source")
+    assert driver._child_environment() == {
+        "PATH": "/usr/local/bin:/usr/bin",
+        "HOME": "/tmp",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONNOUSERSITE": "1",
+        "COVERAGE_FILE": "/work/.coverage",
+        # sys.monitoring line measurement; an inherited core choice cannot override it.
+        "COVERAGE_CORE": "sysmon",
+    }
