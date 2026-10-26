@@ -95,6 +95,8 @@ model (`Qwen3.6-35B-A3B-NVFP4` via `hosted_vllm/`), not promoted baselines; see 
 | lang-java | merge | MERGED (last language branch; union now has 7 members) | JavaRecipe java.secret_disclosure/1; JDK image by digest with vendored, checksummed JUnit 5 + JaCoCo; drivers/java/driver.sh (javac + fixed JUnit test + JaCoCo XML); xxe-b/v3 row verified (control held / adversarial violated, sink line 13 covered); 4 docker tests; ~1.1 s/role (JVM); host confirmed x86_64. |
 - Gates on head 97c58027 (Perl + workflow refactor in): check ok; offline 933 passed; Temporal 50 passed/10 skipped; 5 images rebuilt; Docker suite 48 passed, 1 skipped.
 
+- Final head `8f8e18d9` (all six runtimes): `just check` ok; offline 934 passed; Temporal 50 passed, 10 skipped; six images rebuilt (python f3239cc4b3cb, javascript a053c7f4b56b, ruby df5363c39589, java ebe72067568f, perl 771c387f23fc, c 6d80bc5b3631); Docker suite 52 passed, 1 skipped (long-probe opt-in).
+
 ## Gates on the integrated branch
 
 Run through the Nix shell on this Linux amd64 host after every merge (`just check`, `just -- test -q`); the Temporal and
