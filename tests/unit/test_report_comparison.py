@@ -44,7 +44,7 @@ def test_identical_reports_have_no_regression_and_zero_deltas():
     diff = compare_reports(baseline, baseline)
 
     assert diff["regression"] is False
-    assert diff["dataset_match"] is True
+    assert diff["dataset_match"] is True and diff["comparable"] is True
     assert diff["regressions"] == []
     assert diff["counts"]["joined"] == 2
     assert all(case["flip"] is None and not case["label_changed"] for case in diff["cases"])
@@ -117,7 +117,19 @@ def test_mismatched_dataset_digests_are_refused_without_explicit_permission():
     diff = compare_reports(baseline, candidate, allow_dataset_mismatch=True)
     assert diff["dataset_match"] is False
     assert diff["dataset_digest"] == {"baseline": DIGEST, "candidate": "sha256:another-dataset"}
-    assert diff["regression"] is False
+    # Incomparable reports have no regression verdict either way; the deltas stay descriptive.
+    assert diff["comparable"] is False and diff["regression"] is None
+
+
+def test_an_incomparable_regression_is_described_but_not_decided():
+    baseline = report(row("case01"))
+    candidate = report(row("case01", status="fail"), dataset_digest="sha256:another-dataset")
+
+    diff = compare_reports(baseline, candidate, allow_dataset_mismatch=True)
+
+    assert diff["comparable"] is False and diff["regression"] is None
+    assert diff["counts"]["pass_to_fail"] == 1
+    assert [item["reason"] for item in diff["regressions"]] == ["pass_to_fail"]
 
 
 def test_an_undeclared_dataset_digest_is_never_treated_as_a_match():

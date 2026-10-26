@@ -225,16 +225,18 @@ def _comparable_report(path, *, status="pass", digest_value="sha256:frozen", rea
 
 def test_human_report_renders_one_row_per_case(tmp_path, capsys, monkeypatch):
     monkeypatch.setenv("COLUMNS", "200")
-    report = _comparable_report(tmp_path / "report.json", reason="[red]not markup[/red]")
+    report = json.loads(_comparable_report(tmp_path / "report.json").read_text())
+    report["rows"][0]["run_id"] = "[red]not markup[/red]"
     terminal = Terminal(parser().parse_args(["--format", "human", "--no-color", "report", "x"]))
 
-    terminal.emit(json.loads(report.read_text()))
+    terminal.emit(report)
 
     output = capsys.readouterr().out
     assert "Corsair · Cases" in output
     assert "case01" in output and "EXPLOIT_DEMONSTRATED" in output
     assert "3 LLM" in output and "120/30 tok" in output
     assert "[red]not markup[/red]" in output
+    assert "Reason" not in output and "done" not in output
     assert "sha256:frozen" in output
 
 
@@ -268,8 +270,10 @@ async def test_execute_compare_refuses_mismatched_datasets_without_the_flag(tmp_
     args = parser().parse_args(
         ["--format", "json", "compare", str(baseline), str(other), "--allow-dataset-mismatch"]
     )
-    assert await execute(args) == 0
-    assert json.loads(capsys.readouterr().out)["dataset_match"] is False
+    assert await execute(args) == 2
+    diff = json.loads(capsys.readouterr().out)
+    assert diff["dataset_match"] is False and diff["comparable"] is False
+    assert diff["regression"] is None
 
 
 async def test_human_compare_warns_on_dataset_mismatch_and_lists_changed_cases(
@@ -290,12 +294,13 @@ async def test_human_compare_warns_on_dataset_mismatch_and_lists_changed_cases(
         ]
     )
 
-    assert await execute(args) == 1
+    assert await execute(args) == 2
 
     output = capsys.readouterr().out
     assert "Dataset mismatch" in output
     assert "sha256:frozen" in output and "sha256:b" in output
-    assert "REGRESSION" in output
+    assert "INCOMPARABLE" in _line(output, "Result")
+    assert "REGRESSION" not in output
     assert "pass to fail" in output
     assert "Changed cases" in output
 
@@ -798,7 +803,8 @@ def test_human_verify_observation_renders_roles_without_a_verdict(capsys):
 def test_human_result_colours_verdict_without_interpreting_markup(capsys, monkeypatch):
     monkeypatch.setenv("FORCE_COLOR", "1")
     monkeypatch.delenv("NO_COLOR", raising=False)
-    result = _demonstrated_result().model_copy(update={"reason": "[bold]not markup[/bold]"})
+    manifest = _manifest().model_copy(update={"models": {"producer": "[bold]not markup[/bold]"}})
+    result = _demonstrated_result().model_copy(update={"manifest": manifest})
 
     output = _human(capsys, result)
 
@@ -815,6 +821,91 @@ def test_json_result_and_observation_are_unchanged_dumps(capsys):
         terminal.emit(value)
         expected = json.dumps(value.model_dump(mode="json"), indent=2, ensure_ascii=False) + "\n"
         assert capsys.readouterr().out == expected
+
+
+# The result's final ``reason`` repeats model text on these three paths: an accepted audit's
+# review, a rejected audit's review and a producer abstention (policies/verdicts.py and the
+# workflow's abstention note). Human views must omit it; JSON keeps the complete record.
+_FINAL_REASON = "FINAL-REASON-SENTINEL"
+
+
+def _final_reason_result(path: str):
+    from corsair.contracts import ProducerDecision, ProducerOutput, RoundResult
+
+    if path == "accepted_audit":
+        return _demonstrated_result().model_copy(update={"reason": _FINAL_REASON})
+    if path == "rejected_audit":
+        return _inconclusive_result().model_copy(update={"reason": _FINAL_REASON})
+    abstained = RoundResult(
+        index=1,
+        producer=ProducerOutput(
+            decision=ProducerDecision(kind="no_grounded_candidate", reason=_FINAL_REASON)
+        ),
+    )
+    return _inconclusive_result().model_copy(
+        update={"reason": f"Producer abstained: {_FINAL_REASON}", "rounds": [abstained]}
+    )
+
+
+@pytest.mark.parametrize("path", ["accepted_audit", "rejected_audit", "producer_abstention"])
+def test_human_views_and_markdown_omit_the_final_reason_that_json_keeps(path, capsys, monkeypatch):
+    from corsair.entrypoints.markdown import to_markdown
+    from corsair.evaluation.ledger import gate_ledger
+    from corsair.policies.explanation import explain_result
+
+    result = _final_reason_result(path)
+    row = {
+        "run_id": result.run_id,
+        "case_id": result.case_id,
+        "status": "fail",
+        "verdict": result.verdict.value if result.verdict else None,
+        "execution_status": result.execution_status.value,
+        "reason": result.reason,
+    }
+    report = {"rows": [row], "summary": {"attempts": 1}, "dataset_digest": "sha256:frozen"}
+    explanation = {
+        "run_id": result.run_id,
+        "verdict": result.verdict.value if result.verdict else None,
+        "statements": explain_result(result, gate_ledger(result, {})),
+        "result": result.model_dump(mode="json"),
+    }
+
+    for value in (result, report, explanation):
+        assert _FINAL_REASON not in _wide(capsys, monkeypatch, value)
+    assert _FINAL_REASON not in to_markdown(report)
+
+    terminal = Terminal(parser().parse_args(["--format", "json", "report", "x"]))
+    for value in (result, report):
+        terminal.emit(value)
+        assert _FINAL_REASON in capsys.readouterr().out
+
+
+def test_human_result_never_prints_a_reason_row(capsys, monkeypatch):
+    output = _wide(capsys, monkeypatch, _demonstrated_result())
+
+    assert not any(line.strip("│ ").startswith("Reason") for line in output.splitlines())
+    assert "paired native observation supports" not in output
+
+
+@pytest.mark.parametrize(
+    "verdict",
+    ["EXPLOIT_DEMONSTRATED", "EXPLOIT_NOT_DEMONSTRATED", "INCONCLUSIVE", "UNABLE_TO_RUN"],
+)
+def test_human_result_labels_the_claimed_scope_beside_the_fixed_evidence_scope(
+    verdict, capsys, monkeypatch
+):
+    from corsair.contracts import Scope, Verdict
+
+    result = _demonstrated_result().model_copy(
+        update={"verdict": Verdict(verdict), "scope": Scope.APPLICATION}
+    )
+
+    output = _wide(capsys, monkeypatch, result)
+
+    assert "application" in _line(output, "Claimed scope")
+    assert "component (recipe seam)" in _line(output, "Evidence scope")
+    assert output.index("Claimed scope") < output.index("Evidence scope")
+    assert not any(line.strip("│ ").startswith("Scope ") for line in output.splitlines())
 
 
 def test_human_result_renders_fixed_revision_roles_and_gate(capsys):

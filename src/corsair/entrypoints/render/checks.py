@@ -1,6 +1,7 @@
 """Pre-run check views: `doctor` (environment checks with their remedies), `dataset
-validate` (identity, cohort and one row of checks per entry) and `intake` (a scanner-report
-dry run: one row per finding, admissible or why it is blocked).
+validate` and `dataset refreeze` (identity, cohort, one row of checks per entry and any
+digest rewrite) and `intake` (a scanner-report dry run: one row per finding, admissible or
+why it is blocked).
 """
 
 from typing import Any
@@ -141,13 +142,21 @@ def print_datasets(console: Console, value: dict[str, Any]) -> None:
                     f"{short_digest(change['old'])} -> {short_digest(change['new'])}"
                 )
             )
+        refrozen = dataset.get("dataset_digest_change")
+        if refrozen is not None:
+            parts.append(
+                Text("dataset digest: ", style="yellow")
+                + as_text(f"{refrozen['old']} -> {refrozen['new']}")
+            )
         title = f"Corsair · Dataset {safe_text(dataset['dataset'])}"
         style = "green" if dataset["status"] == "pass" else "red"
         console.print(Panel(Group(*parts), title=title, border_style=style))
     for problem in value["problems"]:
         console.print(Text("Problem: ", style="red") + as_text(problem))
-    console.print(
-        Text("All datasets valid", style="green")
-        if value["valid"]
-        else Text("Dataset validation failed", style="red")
-    )
+    if not value["valid"]:
+        console.print(Text("Dataset validation failed", style="red"))
+    elif not value.get("rewritten"):
+        console.print(Text("All datasets valid", style="green"))
+    if value.get("rewritten"):
+        # A rewritten manifest is a new frozen cohort, never a plain pass (exit 1).
+        console.print(Text("Digests rewritten; review the diff and commit", style="bold yellow"))

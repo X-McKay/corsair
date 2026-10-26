@@ -135,11 +135,18 @@ def test_fix_digests_rewrites_only_the_stale_digest_and_revalidates(tmp_path):
     request.write_bytes(request.read_bytes() + b"\n")
     frozen = {item: item.read_bytes() for item in (tmp_path / "fixtures").rglob("*.json")}
     before = json.loads(path.read_text())
+    stale_digest = validate_dataset(path).dataset_digest
 
     result = validate_datasets([path], fix=True)
 
-    assert result["valid"] is True
-    changes = result["datasets"][0]["digest_changes"]
+    assert result["valid"] is True and result["rewritten"] is True
+    refrozen = result["datasets"][0]
+    assert refrozen["dataset_digest_change"] == {
+        "old": stale_digest,
+        "new": refrozen["dataset_digest"],
+    }
+    assert stale_digest is not None and stale_digest != refrozen["dataset_digest"]
+    changes = refrozen["digest_changes"]
     assert changes == [
         {
             "case_id": "case01",
@@ -165,7 +172,8 @@ def test_fix_digests_leaves_an_entry_with_other_failures_unchanged(tmp_path):
 
     result = validate_datasets([path], fix=True)
 
-    assert result["valid"] is False
+    assert result["valid"] is False and result["rewritten"] is False
+    assert result["datasets"][0]["dataset_digest_change"] is None
     assert path.read_bytes() == original
     [change] = result["datasets"][0]["digest_changes"]
     assert change["field"] == "oracle_digest" and change["applied"] is False
@@ -579,7 +587,7 @@ def test_fix_digests_updates_an_agent_input_digest(tmp_path):
 
     result = validate_datasets([path], fix=True)
 
-    assert result["valid"] is True
+    assert result["valid"] is True and result["rewritten"] is True
     [change] = result["datasets"][0]["digest_changes"]
     assert change["field"] == "input_digest" and change["applied"] is True
     stored = json.loads(path.read_text())["entries"][0]
@@ -614,13 +622,63 @@ def test_dataset_requires_a_subcommand_and_a_dataset(capsys):
     assert "required" in capsys.readouterr().err
 
 
-def test_dataset_validate_parses_fix_digests_and_presentation_options():
-    args = cli.parser().parse_args(
-        ["dataset", "validate", "a.json", "b.json", "--fix-digests", "--format", "human"]
+def test_dataset_refreeze_is_its_own_subcommand_and_validate_never_writes(capsys):
+    args = cli.parser().parse_args(["dataset", "refreeze", "a.json", "b.json", "--format", "human"])
+
+    assert args.dataset_command == "refreeze"
+    assert args.datasets == ["a.json", "b.json"] and args.format == "human"
+    with pytest.raises(SystemExit) as stopped:
+        cli.parser().parse_args(["dataset", "validate", "a.json", "--fix-digests"])
+    assert stopped.value.code == 2
+    assert "--fix-digests" in capsys.readouterr().err
+
+
+async def test_dataset_refreeze_exits_one_whenever_it_rewrote_a_digest(
+    tmp_path, capsys, monkeypatch
+):
+    path = _case_dataset(tmp_path, "case01")
+    request = tmp_path / "fixtures/case01/request.json"
+    request.write_bytes(request.read_bytes() + b"\n")
+    stale = path.read_bytes()
+    validate = _arguments("dataset", "validate", str(path))
+    assert await cli.execute(validate, Terminal(validate)) == 1
+    assert path.read_bytes() == stale
+    capsys.readouterr()
+
+    refreeze = _arguments("dataset", "refreeze", str(path))
+    events: list[tuple[str, dict]] = []
+    monkeypatch.setattr(cli, "event", lambda name, **fields: events.append((name, fields)))
+    assert await cli.execute(refreeze, Terminal(refreeze)) == 1
+    output = json.loads(capsys.readouterr().out)
+    assert output["rewritten"] is True and output["valid"] is True
+    assert path.read_bytes() != stale
+    [(name, fields)] = events
+    assert name == "dataset.refrozen"
+    assert fields["message"].startswith("digests rewritten; review the diff and commit")
+
+    assert await cli.execute(refreeze, Terminal(refreeze)) == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["rewritten"] is False and output["valid"] is True
+
+
+def test_human_refreeze_names_the_dataset_digest_change_and_asks_for_review(tmp_path, capsys):
+    path = _case_dataset(tmp_path, "case01")
+    request = tmp_path / "fixtures/case01/request.json"
+    request.write_bytes(request.read_bytes() + b"\n")
+    stale_digest = validate_dataset(path).dataset_digest
+    terminal = Terminal(
+        cli.parser().parse_args(["--format", "human", "--no-color", "dataset", "refreeze", "x"])
     )
 
-    assert args.datasets == ["a.json", "b.json"]
-    assert args.fix_digests is True and args.format == "human"
+    result = validate_datasets([path], fix=True)
+    terminal.emit(result)
+
+    output = "".join(ch for ch in capsys.readouterr().out if ch not in " │\n")
+    new_digest = result["datasets"][0]["dataset_digest"]
+    assert f"datasetdigest:{stale_digest}->{new_digest}" in output
+    assert "rewrotecase01request_digest" in output
+    assert "Digestsrewritten;reviewthediffandcommit" in output
+    assert "Alldatasetsvalid" not in output
 
 
 def test_human_dataset_validation_renders_a_row_per_entry_and_its_problems(tmp_path, capsys):

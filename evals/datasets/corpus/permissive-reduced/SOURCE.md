@@ -46,3 +46,12 @@ SPDX licence, NVD CWE, pointer source and what the reduction removed.
 
 The CVE-to-commit pointers come from public vulnerability datasets used as metadata only (SecBench.js for
 JavaScript, Vul4J for Java); none of those datasets' code is included. See each family's `provenance.json`.
+
+## Licence and notice retention
+
+Not yet complete. Each family records its upstream SPDX identifier and how it was checked in `provenance.json`,
+but the upstream `LICENSE`, `NOTICE` (required on redistribution for the Apache-2.0 families) and copyright files
+are not retained in this tree, and no digest of those upstream files is recorded. Until the exact upstream licence
+and notice bytes are vendored beside each family with their hashes, this corpus is local evaluation material only:
+sharing or redistributing it outside the repository waits on the project owner's licence decision (the same open
+decision as the Perl corpus licence in PLAN-0001 item 5 and PLAN-0002's owner decisions).

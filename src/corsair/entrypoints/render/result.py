@@ -4,7 +4,9 @@ result half of `inspect --explain`.
 A result leads with its verdict and case stop, then one row per round with the gate-ledger
 stop, the fixed-revision roles, the recorded phase durations and an identity/totals panel.
 A native reference observation (`verify`) shows role facts without a verdict. Only
-kernel-authored facts are shown; payloads, plans and model-authored reasons never are.
+code-owned facts are shown: verdict, disposition, stage and gate names, the verifier's fixed
+role and gate reasons, and the explanation rules. Payloads, plans and the result's ``reason``
+(an auditor's review or a producer's abstention on some paths) never are; JSON keeps them.
 """
 
 from collections.abc import Mapping
@@ -85,6 +87,9 @@ _STOP_STYLES: dict[str, str] = {
     "evidence_unverified": "dim",
     "kernel_error": "magenta",
 }
+# Every recipe probes the component seam, whatever scope the finding claimed; the claim is
+# ``result.scope`` and is labelled as such.
+_EVIDENCE_SCOPE = "component (recipe seam)"
 # Case-level ledger stops whose reason is a fixed, code-authored sentence. Every other
 # ledger reason may repeat model text (an abstention, an audit reason) or the result's
 # own reason, so the human view names only the stage and gate.
@@ -274,7 +279,10 @@ def _timeline_table(timeline: list[PhaseTransition]) -> Table:
 
 
 def _roles_table(observation: Observation, title: str, *, caption: bool = False) -> Table:
-    """Kernel-authored role facts for a native observation; no payload or model content."""
+    """Verifier-authored role facts for a native observation; no payload or model content.
+
+    Role reasons are the verifier's fixed sentences (steps/verification.py); target output
+    never reaches them."""
     table = Table(title=title, title_justify="left", expand=True)
     if caption:
         summary = Text("cleanup ") + _cleanup_text(observation.cleanup_confirmed)
@@ -332,9 +340,9 @@ def print_result(
         ),
     )
     header.add_row(field_label("Disposition"), as_text(result.disposition.value))
-    header.add_row(field_label("Scope"), as_text(result.scope.value))
+    header.add_row(field_label("Claimed scope"), as_text(result.scope.value))
+    header.add_row(field_label("Evidence scope"), as_text(_EVIDENCE_SCOPE))
     header.add_row(field_label("Fix"), as_text(result.fix_status.value))
-    header.add_row(field_label("Reason"), as_text(result.reason))
     header.add_row(field_label("Run"), as_text(result.run_id))
     header.add_row(field_label("Case"), as_text(result.case_id))
     console.print(Panel(header, title="Corsair · Investigation", border_style=style))

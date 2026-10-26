@@ -577,7 +577,8 @@ def execute(plan: Plan) -> int:
     comparison, regression = None, False
     if (compare := plan.compare_command()) is not None:
         code, comparison = _run_json(compare, plan.root)
-        if code in {0, 1} and isinstance(comparison, dict):
+        # Exit 2 with a receipt is an allowed dataset mismatch: recorded, never a regression.
+        if code in {0, 1, 2} and isinstance(comparison, dict):
             (plan.run_dir / "comparison.json").write_text(json.dumps(comparison, indent=2) + "\n")
             regression = code == 1
         else:

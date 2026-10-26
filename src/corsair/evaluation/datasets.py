@@ -179,6 +179,8 @@ class DatasetReport:
     problems: list[str] = field(default_factory=list)
     entries: list[EntryReport] = field(default_factory=list)
     digest_changes: list[dict[str, Any]] = field(default_factory=list)
+    # Set by a refreeze that rewrote the manifest: the dataset digest before and after.
+    dataset_digest_change: dict[str, str | None] | None = None
 
     @property
     def valid(self) -> bool:
@@ -201,6 +203,7 @@ class DatasetReport:
             "problems": list(self.problems),
             "entries": [entry.as_dict() for entry in self.entries],
             "digest_changes": list(self.digest_changes),
+            "dataset_digest_change": self.dataset_digest_change,
         }
 
 
@@ -730,17 +733,22 @@ def _cross_dataset_problems(reports: list[DatasetReport]) -> list[str]:
 def validate_datasets(
     paths: list[Path], settings: Settings | None = None, *, fix: bool = False
 ) -> dict[str, Any]:
-    """Validate manifests; with ``fix``, rewrite stale digests, then report the new state."""
+    """Validate manifests; with ``fix`` (``dataset refreeze``), rewrite stale digests, then
+    report the new state. ``rewritten`` is true whenever a manifest was written: the dataset
+    digest changed, so the result is a new frozen cohort to review, never a plain pass."""
     reports = [validate_dataset(path, settings) for path in paths]
     if fix:
         for index, report in enumerate(reports):
             changes = fix_digests(report) if report.entries else []
             if any(change["applied"] for change in changes):
+                stale_digest = report.dataset_digest
                 report = reports[index] = validate_dataset(report.path, settings)
+                report.dataset_digest_change = {"old": stale_digest, "new": report.dataset_digest}
             report.digest_changes = changes
     problems = _cross_dataset_problems(reports)
     return {
         "datasets": [report.as_dict() for report in reports],
         "problems": problems,
         "valid": not problems and all(report.valid for report in reports),
+        "rewritten": any(report.dataset_digest_change is not None for report in reports),
     }
