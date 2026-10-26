@@ -13,7 +13,6 @@ from corsair.contracts import (
     PlanRevision,
     ProducerDecision,
     ProducerOutput,
-    ProducerProposal,
     RoleObservation,
     RoleOutcome,
     RoundResult,
@@ -66,7 +65,7 @@ def _result() -> InvestigationResult:
             RoundResult(
                 index=1,
                 producer=ProducerOutput(
-                    decision=ProducerDecision(root=ProducerProposal(submission=submission))
+                    decision=ProducerDecision(kind="proposal", submission=submission)
                 ),
                 observation=observation,
             )
@@ -103,7 +102,7 @@ def test_terminal_formatter_revalidates_model_copy_without_truncating_operation_
     oversized_round = result.rounds[0].model_copy(
         update={
             "producer": ProducerOutput(
-                decision=ProducerDecision(root=ProducerProposal(submission=oversized_submission))
+                decision=ProducerDecision(kind="proposal", submission=oversized_submission)
             )
         }
     )

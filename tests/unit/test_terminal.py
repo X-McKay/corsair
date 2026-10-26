@@ -472,7 +472,6 @@ def _proposal():
     from corsair.contracts import (
         PlanRevision,
         ProducerDecision,
-        ProducerProposal,
         Submission,
     )
 
@@ -487,7 +486,7 @@ def _proposal():
         control_payload={"path": "CONTROL-PAYLOAD-SENTINEL"},
         exploit_payload={"path": "../EXPLOIT-PAYLOAD-SENTINEL"},
     )
-    return ProducerDecision(root=ProducerProposal(submission=submission))
+    return ProducerDecision(kind="proposal", submission=submission)
 
 
 def _observation(adversarial_outcome, *, operation_id="run1.r1"):

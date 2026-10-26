@@ -38,7 +38,6 @@ from corsair.agents.producer.contracts import (
     ProducerDecision,
     ProducerInput,
     ProducerOutput,
-    ProducerProposal,
 )
 from corsair.agents.producer.factory import build_producer
 from corsair.agents.producer.toolsets import build_producer_toolset
@@ -553,15 +552,14 @@ async def run_producer(
     except ValidationError:
         reason = "producer returned malformed ProducerDecision output"
     else:
-        variant = decision.root
-        if not isinstance(variant, ProducerProposal):
+        if decision.submission is None:
             return ProducerOutput(decision=decision, usage=usage)
         expected_parent = (
             None if producer_input.round_index == 1 else producer_input.round_index - 1
         )
-        if variant.submission.plan.revision != producer_input.round_index:
+        if decision.submission.plan.revision != producer_input.round_index:
             reason = "plan revision must equal the current round index"
-        elif variant.submission.plan.parent_revision != expected_parent:
+        elif decision.submission.plan.parent_revision != expected_parent:
             reason = "plan parent_revision does not match the preceding round"
         else:
             return ProducerOutput(decision=decision, usage=usage)

@@ -11,11 +11,9 @@ from corsair.contracts import (
     ExecutionStatus,
     Feedback,
     InvestigationResult,
-    NoGroundedCandidate,
     Observation,
     ProducerDecision,
     ProducerOutput,
-    ProducerProposal,
     RoleOutcome,
     RoundResult,
     Verdict,
@@ -30,9 +28,7 @@ from tests.unit.test_verdicts import _HELD, _VIOLATION, _clean_negative, _observ
 
 
 def _proposal() -> ProducerOutput:
-    return ProducerOutput(
-        decision=ProducerDecision(root=ProducerProposal(submission=_submission()))
-    )
+    return ProducerOutput(decision=ProducerDecision(kind="proposal", submission=_submission()))
 
 
 def _invalid(reason: str, gate: str = "producer_invalid", operational: bool = False):
@@ -103,7 +99,7 @@ def test_budget_exhaustion_is_a_policy_stop_after_the_producer_rounds():
 
 def test_producer_invalid_output_and_abstention_are_distinguished():
     abstained = ProducerOutput(
-        decision=ProducerDecision(root=NoGroundedCandidate(reason="no grounded seam"))
+        decision=ProducerDecision(kind="no_grounded_candidate", reason="no grounded seam")
     )
     result = _result(
         [

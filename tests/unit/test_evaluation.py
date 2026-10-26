@@ -124,7 +124,6 @@ def _negative_result(sessions):
         AuditResult,
         ProducerDecision,
         ProducerOutput,
-        ProducerProposal,
         RoundResult,
         Verdict,
     )
@@ -136,7 +135,7 @@ def _negative_result(sessions):
             index=1,
             session=session,
             producer=ProducerOutput(
-                decision=ProducerDecision(root=ProducerProposal(submission=_submission()))
+                decision=ProducerDecision(kind="proposal", submission=_submission())
             ),
             observation=_clean_negative(),
             audit=AuditOutput(
@@ -297,7 +296,6 @@ def test_synthetic_positive_with_plausible_roles_cannot_pass(artifact_exists, tm
         Observation,
         ProducerDecision,
         ProducerOutput,
-        ProducerProposal,
         RoleObservation,
         RoleOutcome,
         RoundResult,
@@ -340,7 +338,7 @@ def test_synthetic_positive_with_plausible_roles_cannot_pass(artifact_exists, tm
                 RoundResult(
                     index=1,
                     producer=ProducerOutput(
-                        decision=ProducerDecision(root=ProducerProposal(submission=submission))
+                        decision=ProducerDecision(kind="proposal", submission=submission)
                     ),
                     observation=observation,
                     audit=AuditOutput(
