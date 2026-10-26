@@ -37,6 +37,7 @@ from .intake import ScannerClaim as ScannerClaim
 from .intake import ScannerFinding as ScannerFinding
 from .intake import ScannerScope as ScannerScope
 from .intake import ScanReport as ScanReport
+from .recipes_javascript import JavaScriptRecipe as JavaScriptRecipe
 from .results import MAX_TERMINAL_ROUNDS as MAX_TERMINAL_ROUNDS
 from .results import MAX_TERMINAL_TIMELINE as MAX_TERMINAL_TIMELINE
 from .results import TERMINAL_RESULT_MAX_BYTES as TERMINAL_RESULT_MAX_BYTES
@@ -55,6 +56,7 @@ from .sources import InvestigationRequest as InvestigationRequest
 from .sources import LineProvenance as LineProvenance
 from .sources import PreparedCase as PreparedCase
 from .sources import PythonRecipe as PythonRecipe
+from .sources import Recipe as Recipe
 from .sources import RunManifest as RunManifest
 from .sources import Scope as Scope
 from .sources import Source as Source

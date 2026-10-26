@@ -164,6 +164,10 @@ class SleepingSandbox:
     def image_id(self) -> str:
         return IMAGE_ID
 
+    def image_id_for(self, kind: str) -> str:
+        del kind  # One measurement image serves every recipe kind.
+        return IMAGE_ID
+
     def has_unknown_operation(self, operation_id: str) -> bool:
         del operation_id  # Every measurement operation id is fresh.
         return False

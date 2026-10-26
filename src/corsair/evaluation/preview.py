@@ -42,6 +42,7 @@ from corsair.contracts import (
     InvestigationRequest,
     PreparedCase,
     ProducerInput,
+    PythonRecipe,
     Submission,
     digest,
 )
@@ -293,11 +294,13 @@ def _prepare(
     module_text = read_source(
         prepared.source, prepared.recipe.module_file, store, settings.source_limit_bytes
     )
-    failure = target_binding(prepared.finding, prepared.recipe, module_text)
-    if failure is not None:
-        raise ValueError(
-            f"agent preview: the workflow stops this case before any model request ({failure})"
-        )
+    # The structural gate is Python-AST specific; other recipes declare their line.
+    if isinstance(prepared.recipe, PythonRecipe):
+        failure = target_binding(prepared.finding, prepared.recipe, module_text)
+        if failure is not None:
+            raise ValueError(
+                f"agent preview: the workflow stops this case before any model request ({failure})"
+            )
     return prepared
 
 

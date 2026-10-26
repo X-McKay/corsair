@@ -41,15 +41,22 @@ InvestigationRequest
 │   ├── finding: Finding
 │   ├── source: Source
 │   ├── fixed_source: Source | null
-│   └── recipe: PythonRecipe
+│   └── recipe: Recipe  # PythonRecipe | JavaScriptRecipe, discriminated on `kind`
 └── budget: Budget
 ```
 
 - A **finding** is the reported title, description, source file, optional line, and requested claim scope. It is not trusted evidence.
 - A **source** names a local source-tree path and may pin its expected snapshot digest. It is a proposed local input, not an admitted archive or a remote checkout.
-- A **recipe** is the operator-owned test shape. The initial recipe binds to one public Python callable and its actual module file. The investigator controls only the `payload_parameter` value; fixed keyword arguments, public fixtures, expected control value, and allowed-exception policy are not agent-editable. The recipe must bind to the finding's file.
+- A **recipe** is the operator-owned test shape, selected by its `kind` tag. See [Recipes](#recipes). The recipe must bind to the finding's file.
 - A **case** combines that finding, source, recipe, optional fixed source, and stable `case_id`. A case describes what to investigate; it has no run budget and no workflow identity.
 - An **investigation request** is a case plus a bounded `Budget`. The default budget is bounded in rounds, model/tool calls, output tokens, elapsed time, probe time, tool output, and source handling. `max_output_tokens` caps each model request of both the producer and the auditor; on a thinking model it includes reasoning tokens (see the `Budget` docstring in [`contracts/sources.py`](../../src/corsair/contracts/sources.py)). It is the typed Temporal input for one investigation.
+
+### Recipes
+
+`Case.recipe` is a discriminated union on the stable `kind` tag, following the native `ProducerDecision` pattern; a request that predates the union omits `kind` and resolves to the Python recipe. Each member is one concrete, tested recipe with its own trusted observer and runtime image. Adding a language adds a union member, not a generic adapter.
+
+- **`PythonRecipe`** (`kind: "python.secret_disclosure/1"`, [`sources.py`](../../src/corsair/contracts/sources.py)) binds to one public Python callable and its actual module file. The investigator controls only the `payload_parameter` value; fixed keyword arguments, public fixtures, expected control value, and allowed-exception policy are not agent-editable.
+- **`JavaScriptRecipe`** (`kind: "javascript.prototype_pollution/1"`, [`recipes_javascript.py`](../../src/corsair/contracts/recipes_javascript.py)) binds to one exported CommonJS `.js` callable. The investigator controls only the model payload, which the trusted driver passes as the final positional argument to `function(*fixed_arguments, payload)`; `module_file`, `function` and the fixed leading arguments are not agent-editable. The observed property is whether invoking the callable adds any enumerable property to `Object.prototype` (CWE-1321); it reads no fixture. See the [JavaScript corpus survey](corpus-javascript.md) for the row it qualifies.
 
 `load_investigation_request()` validates request JSON and converts source paths to absolute paths relative to the request file. That is not admission. The local admission adapter later accepts only a non-symlink directory beneath configured `source_root`, snapshots its admitted bytes, and exposes only that immutable snapshot. Current source admission is local; remote SCM checkout is not a present schema or adapter.
 

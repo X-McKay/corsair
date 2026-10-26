@@ -29,6 +29,7 @@ from corsair.contracts import (
     FixStatus,
     InvestigationRequest,
     InvestigationResult,
+    PythonRecipe,
     Source,
     Verdict,
     digest,
@@ -304,7 +305,12 @@ class _Validator:
         admitted, text = self.module_text(entry, request)
         if not admitted:
             return
-        failure = target_binding(request.case.finding, request.case.recipe, text)
+        recipe = request.case.recipe
+        if not isinstance(recipe, PythonRecipe):
+            # The structural gate is Python-AST specific, as in activities.prepare.
+            entry.passed("target_binding")
+            return
+        failure = target_binding(request.case.finding, recipe, text)
         if failure is None:
             entry.passed("target_binding")
             return

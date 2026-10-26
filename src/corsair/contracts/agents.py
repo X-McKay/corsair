@@ -17,7 +17,7 @@ from .sources import (
     Finding,
     LineProvenance,
     PreparedCase,
-    PythonRecipe,
+    Recipe,
 )
 
 # Explicit JSON shapes keep native output schemas informative; JsonValue alone emits {}.
@@ -153,7 +153,7 @@ class AuditResult(Contract):
 
 class AuditInput(Contract):
     finding: Finding
-    recipe: PythonRecipe
+    recipe: Recipe
     source_excerpt: str
     submission: Submission
     # Copied from PreparedCase: whether finding.line was declared or bound by trusted

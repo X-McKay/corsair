@@ -90,6 +90,7 @@ assert _selected is not None and _selected[0] == 'references/path-confinement.md
 assert 'Path confinement' in _selected[1]
 assert 'pilot risk' in files('corsair.policies').joinpath('risk.md').read_text().lower()
 assert files('corsair.adapters.sandboxing').joinpath('driver.py').is_file()
+assert files('corsair.adapters.sandboxing').joinpath('drivers/javascript/driver.mjs').is_file()
 assert parser().parse_args(['report', 'report.json']).command == 'report'
 assert callable(load_investigation_request)
 assert callable(normalize_request_sources)

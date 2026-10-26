@@ -39,9 +39,10 @@ test *args:
 
 alias test-offline := test
 
-# Build the reviewed native observer image.
+# Build the reviewed native observer images (one per language under deploy/).
 images:
     docker build -f deploy/python/Dockerfile -t corsair-python:0.1 .
+    docker build -f deploy/javascript/Dockerfile -t corsair-javascript:0.1 .
 
 # Create .state/settings.json from the template with an absolute source_root; never overwrites.
 settings-init:

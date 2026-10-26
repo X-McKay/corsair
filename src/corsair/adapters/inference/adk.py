@@ -46,7 +46,7 @@ from corsair.contracts import (
     Feedback,
     Finding,
     LineProvenance,
-    PythonRecipe,
+    Recipe,
     Usage,
 )
 from corsair.observability.logging import event
@@ -206,7 +206,7 @@ def _redact_provider_detail(value: str) -> str:
 
 
 def _derived_line_note(
-    provenance: LineProvenance, finding: Finding, recipe: PythonRecipe
+    provenance: LineProvenance, finding: Finding, recipe: Recipe
 ) -> dict[str, str]:
     """Say where a derived target line came from; a declared line adds nothing.
 

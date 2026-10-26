@@ -91,6 +91,10 @@ class _FakeSandbox:
     omit_raw_image_id: bool = False
     adversarial_violates: bool = True
 
+    def image_id_for(self, kind: str) -> str:
+        del kind  # The double resolves one trusted image regardless of recipe kind.
+        return self.image_id
+
     def has_unknown_operation(self, operation_id: str) -> bool:
         del operation_id  # Test-controlled operation state, independent of its identity.
         return self.unknown
