@@ -31,6 +31,7 @@ from corsair.contracts import (
     ProducerOutput,
     ProducerProposal,
     RoleOutcome,
+    Scope,
     Submission,
     Usage,
     Verdict,
@@ -794,3 +795,26 @@ async def test_exhausted_root_budget_leaves_a_lone_clean_negative_inconclusive(
     assert result.verdict is Verdict.INCONCLUSIVE
     assert {item.session for item in result.rounds} == {1}
     assert all(".s" not in item.operation_id for item in acts.evidence_inputs)
+
+
+async def test_component_demonstration_survives_a_crashed_fixed_revision_run(
+    temporal_server, temporal_artifact_store
+):
+    request = investigation_request("component-fix-crash", fixed=True)
+    finding = request.case.finding.model_copy(update={"claim_scope": Scope.APPLICATION})
+    request = request.model_copy(
+        update={"case": request.case.model_copy(update={"finding": finding})}
+    )
+    scenario = ActivityScenario(fail_fixed_evidence=True)
+    async with temporal_server.worker(temporal_artifact_store, scenario) as (task_queue, acts):
+        result = await temporal_server.client.execute_workflow(
+            InvestigationWorkflow.run,
+            request,
+            id=temporal_id("component-fix-crash"),
+            task_queue=task_queue,
+            result_type=InvestigationResult,
+        )
+
+    assert result.execution_status is ExecutionStatus.ERROR
+    assert result.verdict is Verdict.COMPONENT_EXPLOIT_DEMONSTRATED
+    assert [item.fixed for item in acts.evidence_inputs] == [False, True]

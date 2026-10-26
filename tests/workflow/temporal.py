@@ -66,6 +66,7 @@ class ActivityScenario:
     pause_prepare: bool = False
     pause_produce: bool = False
     fail_evidence_reason: str | None = None
+    fail_fixed_evidence: bool = False
     fail_record_case_ids: frozenset[str] = frozenset()
 
 
@@ -188,9 +189,11 @@ class FakeActivities:
     async def evidence(self, request: EvidenceInput) -> Observation:
         self.call_counts["corsair.evidence"] += 1
         self.evidence_inputs.append(request)
-        if self.scenario.fail_evidence_reason is not None:
+        if self.scenario.fail_evidence_reason is not None or (
+            request.fixed and self.scenario.fail_fixed_evidence
+        ):
             raise ApplicationError(
-                self.scenario.fail_evidence_reason,
+                self.scenario.fail_evidence_reason or "test fixed-revision run crashed",
                 type="EVIDENCE_FAILED",
                 non_retryable=True,
             )
