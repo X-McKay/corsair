@@ -19,7 +19,7 @@ from typing import Literal
 
 from pydantic import Field, field_validator
 
-from .common import Contract, safe_path
+from ..common import Contract, safe_path
 
 # AddressSanitizer / UndefinedBehaviorSanitizer error classes admitted as the trusted
 # assertion for this recipe kind. Keep this narrow; a new class is a recipe change.

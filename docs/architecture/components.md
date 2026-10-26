@@ -4,10 +4,10 @@ Corsair organizes stable domain meaning separately from SDK-dependent execution.
 
 | Component | Owns | Does not own |
 | --- | --- | --- |
-| `contracts/` | Canonical SDK-free Pydantic contracts for requests, the payload pair, audit results, source, coverage/evidence, labels, and evaluation | SDK objects, provider-specific payloads, duplicate documentation schemas |
+| `contracts/` | Canonical SDK-free Pydantic contracts for requests, recipes (one `contracts/recipes/<language>.py` per runtime plus the `Recipe` union), the payload pair, audit results, source, coverage/evidence, labels, and evaluation | SDK objects, provider-specific payloads, duplicate documentation schemas |
 | `agents/` | Producer/auditor metadata, instructions, canonical-contract re-exports, factories, role-local toolsets, and packaged skills | Workflow state, source admission, probe authoring, verdicts, sandbox execution |
 | `ports/` | Narrow typed contracts for inference, source snapshots, and sandbox execution | Vendor SDK imports or generic plugin registries |
-| `adapters/` | Concrete ADK, local-source, Docker, filesystem, and Temporal integrations | Domain policy, kernel gates, or durable round decisions |
+| `adapters/` | Concrete ADK, local-source, Docker (one trusted driver per runtime under `adapters/sandboxing/drivers/<language>/`), filesystem, and Temporal integrations | Domain policy, kernel gates, or durable round decisions |
 | `steps/` | Activity composition, manifests, probe materialization from the recipe and payload pair, differential execution/reconciliation, receipt and coverage validation | Temporal scheduling policy or model-authored judgment |
 | `workflows/` | Deterministic Temporal coordination of episodes, gate order, session count, deadlines, cancellation, and result finalization | Nondeterministic I/O, model calls, or container creation |
 | `policies/` | The pure kernel: gate decisions, the verdict table, `negative_threshold`, and the packaged risk assessment | Evidence generation or operator authorization |

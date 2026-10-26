@@ -20,7 +20,7 @@ from typing import Literal, Self
 
 from pydantic import Field, JsonValue, field_validator, model_validator
 
-from .common import Contract, safe_path
+from ..common import Contract, safe_path
 
 _PACKAGE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(::[A-Za-z_][A-Za-z0-9_]*)*")
 _SUB = re.compile(r"[A-Za-z][A-Za-z0-9_]*")

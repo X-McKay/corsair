@@ -34,9 +34,9 @@ The [documentation index](docs/index.md) is the main navigation page.
 ```text
 src/corsair/
   agents/          producer and auditor ADK factories, instructions, source tools and packaged skills with per-class references
-  contracts/       canonical SDK-free Pydantic models: payload pair, audit result, evidence, labels, one recipe per runtime
+  contracts/       canonical SDK-free Pydantic models: payload pair, audit result, evidence, labels, recipes/<language>.py per runtime
   ports/           narrow inference, source-snapshot and sandbox interfaces
-  adapters/        ADK inference, local SCM, Docker sandboxing with one trusted driver per runtime, filesystem storage and Temporal
+  adapters/        ADK inference, local SCM, Docker sandboxing with one trusted driver per runtime (sandboxing/drivers/<language>/), filesystem storage and Temporal
   entrypoints/     CLI, typed Python API, worker, terminal and diagnostics
   policies/        the deterministic kernel: gate order, verdict table, fix decisions, target and line binding, time bounds, explanations, risk assessment
   workflows/       deterministic durable coordination of episodes and gates

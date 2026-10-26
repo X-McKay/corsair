@@ -34,17 +34,12 @@ from corsair.contracts import (
     Submission,
     digest,
 )
+from corsair.contracts.recipes import NATIVE_EXEC_KINDS
 from corsair.ports.sandboxing import SandboxRole
 from corsair.ports.sandboxing import SandboxUnavailable as SandboxUnavailable
 from corsair.settings import Settings
 
 Heartbeat = Callable[[], None]
-
-# Deliberate, kind-scoped relaxation: recipe kinds whose trusted driver compiles and
-# executes a native binary in /work. Only their /work tmpfs drops noexec (nosuid, nodev,
-# size, mode and ownership stay); every interpreter recipe keeps /work noexec, /tmp is
-# always noexec, and every other container control is unchanged.
-NATIVE_EXEC_KINDS = frozenset({"c.integer_overflow/1"})
 
 
 class SandboxExecutionError(RuntimeError):

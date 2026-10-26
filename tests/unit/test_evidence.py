@@ -361,7 +361,7 @@ def test_reconciliation_rejects_stale_recipe_runtime_or_budget(tmp_path, boundar
 def test_driver_children_receive_only_the_fixed_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from corsair.adapters.sandboxing import driver
+    from corsair.adapters.sandboxing.drivers.python import driver
 
     monkeypatch.setenv("PATH", "/usr/local/bin:/usr/bin")
     monkeypatch.setenv("COVERAGE_CORE", "pytrace")
@@ -379,7 +379,7 @@ def test_driver_children_receive_only_the_fixed_environment(
 
 
 def test_driver_line_numbers_are_sorted_unique_positive_or_none() -> None:
-    from corsair.adapters.sandboxing import driver
+    from corsair.adapters.sandboxing.drivers.python import driver
 
     assert driver._valid_line_numbers({4, 1, 3}) == [1, 3, 4]
     assert driver._valid_line_numbers([3, 3, 1]) == [1, 3]
@@ -432,7 +432,7 @@ def test_driver_executed_lines_match_the_coverage_json_report(tmp_path: Path) ->
     import subprocess
     import sys
 
-    from corsair.adapters.sandboxing import driver
+    from corsair.adapters.sandboxing.drivers.python import driver
 
     root = tmp_path.resolve()
     target = root / "target.py"

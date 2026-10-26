@@ -16,7 +16,7 @@ from typing import Literal
 
 from pydantic import Field, field_validator
 
-from .common import Contract, safe_path
+from ..common import Contract, safe_path
 
 _JAVA_IDENTIFIER = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*")
 _JAVA_FQN = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*(\.[A-Za-z_$][A-Za-z0-9_$]*)*")

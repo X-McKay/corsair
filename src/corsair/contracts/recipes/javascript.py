@@ -17,7 +17,7 @@ from typing import Literal
 
 from pydantic import Field, JsonValue, field_validator
 
-from .common import Contract, safe_path
+from ..common import Contract, safe_path
 
 # A conservative public JavaScript identifier (ASCII; `$` permitted, no leading digit).
 _JS_IDENTIFIER = re.compile(r"[A-Za-z$][A-Za-z0-9_$]*")

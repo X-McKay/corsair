@@ -10,11 +10,11 @@ The corpus trees live under
 [`evals/datasets/corpus/infosec-harness/python/`](../../evals/datasets/corpus/infosec-harness/python)
 and are standard-library Python only. Two running recipes exist today:
 
-- `python.secret_disclosure/1` ([`PythonRecipe`](../../src/corsair/contracts/sources.py)): the
+- `python.secret_disclosure/1` ([`PythonRecipe`](../../src/corsair/contracts/recipes/python.py)): the
   adversarial input causes a private fixture secret to appear in the callable's returned
   JSON value.
 - `python.command_sentinel/1`
-  ([`PythonCommandSentinel`](../../src/corsair/contracts/recipes_python.py)): the benign
+  ([`PythonCommandSentinel`](../../src/corsair/contracts/recipes/python.py)): the benign
   input must not create the operator's private sentinel file; an input that reaches
   command or code execution does. Added in this change; see the
   [extension guide](../guides/extensions.md).
