@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Measure producer LLM requests rendered by native ADK for frozen fixture rows.
 
-The real production path (``run_producer``: factory, toolset, packet and ADK request
-processors) renders each request; a capturing ``BaseLlm`` records it and abstains, so
-no provider is called and no target code runs. With ``--after-load-skill`` the first
-scripted response is a ``load_skill`` call, and the second request shows what one
-redundant reload of the preloaded procedure adds to every later call.
+A dataset-wide wrapper over ``corsair.evaluation.preview`` (the engine behind
+``corsair agent preview``): the production ``run_producer`` path renders each request
+and a capturing model records it, so no provider is called and no target code runs.
+With ``--after-load-skill`` the first scripted response is a ``load_skill`` call, and
+the second request shows what one redundant reload of the preloaded procedure adds to
+every later call.
 
 Token counts are an approximation, ``ceil(bytes / 4)``, not a provider tokenizer.
 """
@@ -15,107 +16,26 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import math
-import tempfile
-from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import Any
 
-from google.adk.models import BaseLlm
-from google.adk.models.base_llm import LlmCapabilities
 from google.adk.models.llm_request import LlmRequest
-from google.adk.models.llm_response import LlmResponse
-from google.genai import types
-from pydantic import BaseModel, Field
 
-from corsair.adapters.inference.adk import run_producer
-from corsair.adapters.scm.local import prepare_case
-from corsair.adapters.scm.requests import normalize_request_sources
-from corsair.adapters.storage.filesystem import ArtifactStore
-from corsair.agents.producer.factory import producer_instruction
-from corsair.agents.resources import load_runtime_skills
-from corsair.contracts import InvestigationRequest, ProducerInput
-from corsair.evaluation.agents import load_frozen_fixture
+from corsair.evaluation.datasets import load_frozen_fixture
+from corsair.evaluation.preview import load_request, text_size
+from corsair.evaluation.preview import render_requests as render_role_requests
+from corsair.evaluation.preview import request_sections as role_request_sections
 from corsair.evaluation.scoring import dataset_root
 from corsair.settings import Settings
-from corsair.steps.manifest import build_manifest
 
 DEFAULT_DATASETS = ("evals/datasets/producer-dev.json", "evals/datasets/producer-expanded.json")
-_ABSTAIN = {"kind": "no_grounded_candidate", "reason": "measurement only"}
-
-
-class CapturingLlm(BaseLlm):
-    """Record each native request and answer from a fixed script; never a provider."""
-
-    structured_tools: bool = False
-    load_skill_first: bool = False
-    requests: list[LlmRequest] = Field(default_factory=list)
-
-    @property
-    def capabilities(self) -> LlmCapabilities:
-        return LlmCapabilities(output_schema_and_tools=self.structured_tools)
-
-    async def generate_content_async(
-        self, llm_request: LlmRequest, stream: bool = False
-    ) -> AsyncGenerator[LlmResponse, None]:
-        del stream
-        self.requests.append(llm_request)
-        if self.load_skill_first and len(self.requests) == 1:
-            call = types.FunctionCall(name="load_skill", args={"skill_name": "source-grounding"})
-            part = types.Part(function_call=call)
-        elif self.structured_tools:
-            part = types.Part(text=json.dumps(_ABSTAIN))
-        else:
-            call = types.FunctionCall(name="set_model_response", args=dict(_ABSTAIN))
-            part = types.Part(function_call=call)
-        yield LlmResponse(content=types.Content(role="model", parts=[part]))
-
-
-def _compact(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-
-
-def text_size(text: str) -> dict[str, int]:
-    """Return UTF-8 bytes and the ceil(bytes/4) token approximation."""
-
-    raw = len(text.encode("utf-8"))
-    return {"bytes": raw, "approx_tokens": math.ceil(raw / 4)}
+_LOAD_SKILL = {"name": "load_skill", "args": {"skill_name": "source-grounding"}}
 
 
 def request_sections(request: LlmRequest) -> dict[str, str]:
-    """Split one rendered request into the parts sent to the provider."""
+    """Split one rendered producer request into the parts sent to the provider."""
 
-    config = request.config or types.GenerateContentConfig()
-    system = str(config.system_instruction or "")
-    corsair = producer_instruction(load_runtime_skills("producer"))
-    if not system.startswith(corsair):
-        raise ValueError("rendered system instruction does not start with the producer's own")
-    declarations = [
-        declaration.model_dump(mode="json", exclude_none=True)
-        for tool in config.tools or []
-        if isinstance(tool, types.Tool)
-        for declaration in tool.function_declarations or []
-    ]
-    schema = config.response_schema
-    response_schema = (
-        _compact(schema.model_json_schema())
-        if isinstance(schema, type) and issubclass(schema, BaseModel)
-        else ""
-    )
-    packet = "".join(
-        part.text or "" for content in request.contents[:1] for part in content.parts or []
-    )
-    conversation = _compact(
-        [content.model_dump(mode="json", exclude_none=True) for content in request.contents[1:]]
-    )
-    return {
-        "corsair_instruction": corsair,
-        "adk_instruction": system.removeprefix(corsair),
-        "tool_declarations": _compact(declarations),
-        "response_schema": response_schema,
-        "user_packet": packet,
-        "conversation": conversation if request.contents[1:] else "",
-    }
+    return role_request_sections("producer", request)
 
 
 async def render_requests(
@@ -123,37 +43,13 @@ async def render_requests(
 ) -> list[LlmRequest]:
     """Render one fixture's producer requests through the production path."""
 
-    with tempfile.TemporaryDirectory(prefix="corsair-measure-") as artifacts:
-        settings = Settings(artifact_root=artifacts)
-        store = ArtifactStore(Path(artifacts))
-        request = normalize_request_sources(
-            InvestigationRequest.model_validate_json(content), request_path
-        )
-        prepared = prepare_case(
-            request.case,
-            settings,
-            store,
-            build_manifest(request, settings, "fixture-only:no-native-execution"),
-        )
-        model = CapturingLlm(
-            model="capturing-measurement",
-            structured_tools=structured_tools,
-            load_skill_first=load_skill_first,
-        )
-        await run_producer(
-            ProducerInput(
-                run_id="measure-producer-request",
-                prepared=prepared,
-                budget=request.budget,
-                round_index=1,
-                llm_call_limit=request.budget.episode_llm_calls,
-                tool_call_limit=request.budget.max_tool_calls,
-            ),
-            settings,
-            store,
-            model,
-        )
-    return model.requests
+    return await render_role_requests(
+        "producer",
+        load_request(request_path, content),
+        Settings(),
+        structured_tools=structured_tools,
+        leading_calls=[_LOAD_SKILL] if load_skill_first else [],
+    )
 
 
 def dataset_fixtures(datasets: list[Path]) -> list[tuple[str, Path, bytes]]:
@@ -212,7 +108,6 @@ def main() -> None:
         action="store_true",
         help="measure the request that follows one load_skill call",
     )
-    parser.add_argument("--dump", help="write the first fixture's rendered sections here")
     args = parser.parse_args()
     paths = [Path(item).resolve() for item in args.datasets]
     rows = asyncio.run(
@@ -221,21 +116,6 @@ def main() -> None:
         )
     )
     print(json.dumps({"token_estimate": "ceil(bytes/4)", "rows": rows}, indent=2))
-    if args.dump:
-        _case_id, input_path, content = dataset_fixtures(paths)[0]
-        requests = asyncio.run(
-            render_requests(
-                input_path,
-                content,
-                structured_tools=args.structured_tools,
-                load_skill_first=args.after_load_skill,
-            )
-        )
-        sections = request_sections(requests[-1])
-        Path(args.dump).write_text(
-            "\n\n=====\n\n".join(f"[{name}]\n{text}" for name, text in sections.items()),
-            encoding="utf-8",
-        )
 
 
 if __name__ == "__main__":

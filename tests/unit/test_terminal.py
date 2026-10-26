@@ -895,7 +895,9 @@ def _loads(modules: set[str], prefix: str) -> bool:
     return any(name == prefix or name.startswith(f"{prefix}.") for name in modules)
 
 
-@pytest.mark.parametrize("arguments", [["--version"], ["--help"], ["unknown-command"]])
+@pytest.mark.parametrize(
+    "arguments", [["--version"], ["--help"], ["unknown-command"], ["agent", "preview", "--help"]]
+)
 def test_parser_exits_load_no_presentation_contract_or_sdk_modules(tmp_path, arguments):
     modules = _modules_loaded_by_cli(tmp_path, *arguments)
 

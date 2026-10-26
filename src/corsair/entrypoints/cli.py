@@ -60,6 +60,15 @@ class CliArguments(argparse.Namespace):
     dataset_command: str
     datasets: list[str]
     fix_digests: bool
+    agent_command: str
+    role: Literal["producer", "auditor"]
+    round: int
+    previous: str | None
+    feedback: tuple[str, str] | None
+    review_submission: str | None
+    diff: str | None
+    full: bool
+    structured_tools: bool | None
 
 
 def validate_run_id(value: str) -> str:
@@ -409,6 +418,38 @@ async def _handle_runs(args: CliArguments, ui: Terminal) -> int:
     return 0
 
 
+async def _handle_agent(args: CliArguments, ui: Terminal) -> int:
+    """Render what one role would receive, without a model; optionally diff a saved preview."""
+    import json
+
+    from corsair.contracts import Feedback, Submission
+    from corsair.evaluation.preview import diff_previews, load_preview, preview_request
+
+    def submission(path: str | None) -> Submission | None:
+        return None if path is None else Submission.model_validate_json(Path(path).read_bytes())
+
+    baseline = load_preview(Path(args.diff)) if args.diff else None
+    preview = await preview_request(
+        args.role,
+        Path(args.request),
+        _settings(args),
+        round_index=args.round,
+        previous=submission(args.previous),
+        feedback=None
+        if args.feedback is None
+        else Feedback(gate=args.feedback[0], reason=args.feedback[1]),
+        submission=submission(args.review_submission),
+        structured_tools=args.structured_tools,
+    )
+    if args.output:
+        output = Path(args.output)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(preview, indent=2, ensure_ascii=False) + "\n")
+    shown = preview if baseline is None else diff_previews(baseline, preview)
+    ui.preview(shown, full=args.full)
+    return 0
+
+
 type CommandHandler = Callable[[CliArguments, Terminal], Awaitable[int]]
 _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "report": _handle_report,
@@ -423,6 +464,7 @@ _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "eval": _handle_eval,
     "rescore": _handle_rescore,
     "dataset": _handle_dataset,
+    "agent": _handle_agent,
 }
 
 
@@ -444,6 +486,22 @@ def positive_limit(value: str) -> int:
     if limit < 1:
         raise argparse.ArgumentTypeError("must be at least 1")
     return limit
+
+
+def positive_round(value: str) -> int:
+    """Admit a producer round index of at least one."""
+    index = int(value)
+    if index < 1:
+        raise argparse.ArgumentTypeError("must be at least 1")
+    return index
+
+
+def gate_reason(value: str) -> tuple[str, str]:
+    """Split ``GATE:REASON`` retry feedback; both halves must be present."""
+    gate, separator, reason = value.partition(":")
+    if not separator or not gate.strip() or not reason.strip():
+        raise argparse.ArgumentTypeError("expected GATE:REASON, for example audit:wrong path")
+    return gate.strip(), reason.strip()
 
 
 def _presentation_options(parser: argparse.ArgumentParser, *, defaults: bool = False) -> None:
@@ -498,6 +556,7 @@ def parser() -> argparse.ArgumentParser:
         "report": "Display an existing evaluation report and its per-case rows",
         "compare": "Compare two evaluation reports by case; exit 1 on a regression",
         "dataset": "Check frozen evaluation datasets offline; no model, target or services",
+        "agent": "Inspect agent roles offline; no model provider, target or services",
     }
     commands: dict[str, argparse.ArgumentParser] = {}
     for name, description in descriptions.items():
@@ -562,6 +621,49 @@ def parser() -> argparse.ArgumentParser:
         "--fix-digests",
         action="store_true",
         help="Rewrite only stale manifest digests of otherwise valid entries",
+    )
+    agents = commands["agent"].add_subparsers(
+        dest="agent_command", required=True, title="agent commands"
+    )
+    preview_help = (
+        "Render the system instruction, tool declarations and packet a role would receive, "
+        "with byte and approximate token counts; no model is called"
+    )
+    preview = agents.add_parser("preview", help=preview_help, description=preview_help)
+    _presentation_options(preview)
+    preview.add_argument("role", choices=("producer", "auditor"))
+    preview.add_argument("request", help="Case request JSON; source paths relative to this file")
+    preview.add_argument(
+        "--submission",
+        dest="review_submission",
+        metavar="FILE",
+        help="Submission JSON the auditor reviews (auditor only)",
+    )
+    preview.add_argument(
+        "--round", type=positive_round, default=1, help="Producer round index (default 1)"
+    )
+    preview.add_argument(
+        "--previous", metavar="FILE", help="Previous-round Submission JSON (producer, round > 1)"
+    )
+    preview.add_argument(
+        "--feedback",
+        type=gate_reason,
+        metavar="GATE:REASON",
+        help="Retry feedback the producer receives (round > 1), e.g. audit:REASON",
+    )
+    preview.add_argument(
+        "--structured-tools",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Force the native response-schema route (or, with --no-, the set_model_response "
+        "tool); default: what the configured model route reports",
+    )
+    preview.add_argument("--output", metavar="FILE", help="Also save the JSON preview here")
+    preview.add_argument(
+        "--diff", metavar="PREVIEW.json", help="Compare against a saved preview, part by part"
+    )
+    preview.add_argument(
+        "--full", action="store_true", help="Human output: print every part (or diff) in full"
     )
     return root
 

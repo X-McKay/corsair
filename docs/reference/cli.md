@@ -289,6 +289,32 @@ The comparison is refused (exit `2`) when the dataset digests differ or either r
 
 The command exits `1` when the candidate regressed: a baseline pass that does not pass in the candidate, a forbidden label the baseline row did not have, a baseline attempt missing from the candidate, or more rows without a case identity than the baseline had. Otherwise it exits `0`, including when cases only improved or were added. Human output opens with a `gates moved` line, renders the per-gate table and lists only attempts whose status, label, forbidden flag or presence changed, with their final stop; `--format json` emits every joined attempt under `cases` along with `regressions`, `counts`, `summary_delta` and `gate_delta`. `--format markdown` writes the result line, the caveats (a dataset mismatch first), an identity table per side (report path, dataset digest, config digests, cohorts), the counts, the summary deltas, the regressions and the changed attempts with their usage deltas; a side an attempt is missing from is `absent`. The exit codes are the same in every format.
 
+### `agent preview ROLE REQUEST`
+
+```bash
+corsair agent preview producer evals/fixtures/case01/request.json --output .work/preview.json
+corsair agent preview producer evals/fixtures/case01/request.json --diff .work/preview.json
+corsair agent preview producer evals/fixtures/case01/request.json --round 2 \
+  --previous evals/fixtures/case01/submission.json --feedback "audit:the exploit never reaches open"
+corsair agent preview auditor evals/fixtures/case01/request.json \
+  --submission evals/fixtures/case01/submission.json --full
+```
+
+Renders the first model request one role would receive, without calling a model. The production `run_producer` or `run_auditor` path (role factory, toolset, packet builder and ADK's own request processors) builds the request and a capturing model in [`evaluation/preview.py`](../../src/corsair/evaluation/preview.py) records it and answers with a fixed abstention or review. No provider, container, Temporal service or oracle is touched; sources are admitted from `--settings`' `source_root` and limits into a throwaway store, so nothing is written to `artifact_root`. A case the pre-model `target_binding` gate would stop is refused, because the workflow would never send it.
+
+The request is split into parts, in request order: `instruction.prompt` (the role's `system.md`), one `instruction.skill.NAME` per preloaded procedure, `instruction.adk` (text ADK appends, such as skill and `set_model_response` guidance), one `tool.NAME` per declared function with its full parameter schema (whatever tools the factory returns, `set_model_response` included when ADK declares it), `response_schema` when the route sends one, and `packet`. Each part carries its UTF-8 `bytes`, `approx_tokens` (`ceil(bytes/4)`, not a provider tokenizer), `sha256` and exact `text`; `totals` sums them per kind and for the whole request, and `request_sha256` identifies the request. Human output is a collapsed table (part, bytes, tokens, a one-line summary); `--full` prints every part whole. `--format json` and `--output FILE` give the complete preview, the exact artifact to attach to a review.
+
+| Option | Role | Effect |
+| --- | --- | --- |
+| `--submission FILE` | auditor (required) | The `Submission` JSON under review. |
+| `--round N` | producer | The round index (default `1`, at most the request's `max_rounds`). |
+| `--previous FILE` | producer, round > 1 | The previous round's `Submission`, as the retry packet carries it. |
+| `--feedback GATE:REASON` | producer, round > 1 | The retry feedback; the workflow only ever sends `audit` (the auditor's rejection) or `retry` (a fixed blind text), per [ADR 0005](../architecture/decisions/0005-outcome-blind-retry-feedback.md). |
+| `--structured-tools` / `--no-structured-tools` | both | Force the native response-schema route or the `set_model_response` route; by default the configured model's own capability decides, as it does in production. |
+| `--diff PREVIEW.json` | both | Compare against a saved preview of the same role: per part `added`, `removed`, `changed` or `unchanged` with byte and token deltas, totals deltas, and (for `--full` or in JSON) a unified diff in which JSON lines are pretty-printed. |
+
+The command exits `0` when it renders; invalid role inputs exit `2` with a remedy.
+
 ## Watching and recovery
 
 A native activity records an immutable intent before its Docker side effect and reconciles a committed observation by identity. A committed observation can be recovered from the artifact root. An intent with no committed observation is uncertain—even if no container remains—and is not safe to replay automatically.
