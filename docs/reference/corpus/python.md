@@ -1,23 +1,23 @@
 # Python corpus coverage map
 
-This page surveys every row under [`evals/datasets/chain/python/`](../../evals/datasets/chain/python)
+This page surveys every row under [`evals/datasets/chain/python/`](../../../evals/datasets/chain/python)
 and records which operator-owned recipe each row's security property needs. It is a
 planning aid for the improvement loop, not a support claim: a row is "runnable" only once
 a concrete, tested recipe expresses its property and the row is migrated to the v3
 `request.json` + `oracle.json` shape with a frozen reference submission.
 
 The corpus trees live under
-[`evals/datasets/corpus/infosec-harness/python/`](../../evals/datasets/corpus/infosec-harness/python)
+[`evals/datasets/corpus/infosec-harness/python/`](../../../evals/datasets/corpus/infosec-harness/python)
 and are standard-library Python only. Two running recipes exist today:
 
-- `python.secret_disclosure/1` ([`PythonRecipe`](../../src/corsair/contracts/sources.py)): the
+- `python.secret_disclosure/1` ([`PythonRecipe`](../../../src/corsair/contracts/sources.py)): the
   adversarial input causes a private fixture secret to appear in the callable's returned
   JSON value.
 - `python.command_sentinel/1`
-  ([`PythonCommandSentinel`](../../src/corsair/contracts/recipes_python.py)): the benign
+  ([`PythonCommandSentinel`](../../../src/corsair/contracts/recipes_python.py)): the benign
   input must not create the operator's private sentinel file; an input that reaches
   command or code execution does. Added in this change; see the
-  [extension guide](../guides/extensions.md).
+  [extension guide](../../guides/extensions.md).
 
 "Recipe fit" below is one of: **existing** (a current recipe expresses the property as-is),
 **existing + adaptation** (a current recipe is the right shape but needs a small bounded
@@ -70,7 +70,7 @@ addition, noted in the reason), **proposed** (a new operator-owned recipe is req
 
 The following rows now carry a v3 `request.json`, a frozen operator reference
 `submission.json`, and an `oracle-v3.json` beside their original lite files, and are
-listed in [`evals/datasets/chain-python.json`](../../evals/datasets/chain-python.json):
+listed in [`evals/datasets/chain-python.json`](../../../evals/datasets/chain-python.json):
 
 - `cmdi-b` and `codeinjection-b` (positive, `EXPLOIT_DEMONSTRATED`),
 - `cmdi-a` (negative, `EXPLOIT_NOT_DEMONSTRATED`).

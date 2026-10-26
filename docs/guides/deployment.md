@@ -55,10 +55,10 @@ A ready report confirms Docker, paths, Temporal namespace, and worker pollers; i
 
 Set `max_concurrent_activities` to at least the largest `--concurrency` you run (plus investigations run alongside), and no higher than the host can carry: every slot can hold an evidence activity running one target container with the configured `nano_cpus` and `memory_limit`. Restart the worker after changing it; its `worker.ready` log line reports both slot counts. `max_concurrent_workflow_tasks` (default `100`, the SDK default) rarely needs changing.
 
-`scripts/measure_eval_concurrency.py` measures the curve on a real local Temporal test server with the production worker composition and timed fake model and sandbox ports (no model call, no container); it starts its own server and never connects to a configured address:
+[`scripts/benchmarks/measure_eval_concurrency.py`](../../scripts/benchmarks/measure_eval_concurrency.py) measures the curve on a real local Temporal test server with the production worker composition and timed fake model and sandbox ports (no model call, no container); it starts its own server and never connects to a configured address:
 
 ```bash
-uv run --locked python scripts/measure_eval_concurrency.py --slots 4 16
+uv run --locked python scripts/benchmarks/measure_eval_concurrency.py --slots 4 16
 ```
 
 Its figures measure coordination and slot limits only. Real speedup is lower when model endpoints rate-limit or host CPUs saturate under concurrent containers.

@@ -66,6 +66,8 @@ Record the exact command, environment gates (without secrets), result, elapsed t
 
 `tests/` has only unit, integration, workflow, replay and security category directories. Root `conftest.py` and `__init__.py` are standard discovery/package files. Shared ADK test doubles live in [unit/adk.py](../../tests/unit/adk.py); real Temporal fixture registration and typed workflow doubles live in [workflow/temporal.py](../../tests/workflow/temporal.py). Integration/replay consumers import those single implementations; there is no separate tests/fixtures compatibility package.
 
+`scripts/` holds four operator scripts, each behind a `just` recipe: [`check_toolchain.py`](../../scripts/check_toolchain.py) (`just toolchain` and the `just sync` pre-check), [`check_docs.py`](../../scripts/check_docs.py) (`just docs-check`), [`local_stack.py`](../../scripts/local_stack.py) (`just settings-init`, `temporal-up`, `temporal-down`, `worker-up`, `worker-down` and `demo`) and [`live_eval.py`](../../scripts/live_eval.py) (`just live-agent` and `live-chain`). One-off measurement harnesses whose results are recorded in a plan live under [`scripts/benchmarks/`](../../scripts/benchmarks/README.md); a role's request size is measured with `corsair agent preview`, not a script.
+
 `evals/` has datasets, evaluators, experiments, fixtures and baselines. The [evaluator guide](../../evals/evaluators/README.md) points to installed canonical evaluator/scorer code rather than duplicating it. Dataset/fixture/oracle/baseline bytes must survive organization-only changes unchanged. Ignored bytecode and obsolete cache-only folders are not components and are excluded from delivery.
 
 

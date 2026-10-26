@@ -6,9 +6,9 @@ Source admission checks the APIs it actually uses rather than accepting an OS na
 
 These checks do not attest an arbitrary network, FUSE, synchronized-cloud or removable filesystem. Use a dedicated disposable workspace and test the filesystem that will hold source. Native targets still run only inside the reviewed Linux container, never inside the Nix shell on the host.
 
-The Ruby recipe `ruby.secret_disclosure/1` runs in `corsair-ruby:0.1` (`deploy/ruby/Dockerfile`, Ruby 3.1 pinned by digest), selected through its `Settings.images` entry; `just images` builds it with the other reviewed images. The Ruby recipe is qualified on **Linux amd64 only**; its macOS arm64 and live-model gates are unrun. See the [Ruby corpus survey](corpus-ruby.md).
+The Ruby recipe `ruby.secret_disclosure/1` runs in `corsair-ruby:0.1` (`deploy/ruby/Dockerfile`, Ruby 3.1 pinned by digest), selected through its `Settings.images` entry; `just images` builds it with the other reviewed images. The Ruby recipe is qualified on **Linux amd64 only**; its macOS arm64 and live-model gates are unrun. See the [Ruby corpus survey](corpus/ruby.md).
 
-The Perl recipe `perl.html_injection/1` runs in `corsair-perl:0.1` (`deploy/perl/Dockerfile`, Perl 5.40 pinned by digest; Test::More and JSON::PP are core, line coverage is a core-only `Devel::LineCover` tracer the driver writes). Its real-Docker evidence (`tests/integration/test_docker_perl.py`, `corsair verify`) is recorded on **Linux amd64 only**; macOS arm64 and the live chain are unrun. See the [Perl corpus survey](corpus-perl.md).
+The Perl recipe `perl.html_injection/1` runs in `corsair-perl:0.1` (`deploy/perl/Dockerfile`, Perl 5.40 pinned by digest; Test::More and JSON::PP are core, line coverage is a core-only `Devel::LineCover` tracer the driver writes). Its real-Docker evidence (`tests/integration/test_docker_perl.py`, `corsair verify`) is recorded on **Linux amd64 only**; macOS arm64 and the live chain are unrun. See the [Perl corpus survey](corpus/perl.md).
 
 ## Development and CI
 
@@ -113,6 +113,6 @@ read-only source/job binds, `/tmp` `noexec`, and cleanup confirmed before the ad
 container starts — and the Python and interpreter images keep `/work` `noexec`. This relaxation
 is intrinsic to a compiled-to-native runtime and is recorded in the image identity; it is not a
 weakening of the Python sandbox. Qualified on Linux amd64 only; macOS arm64 and the live chain
-are unrun. See [the C corpus survey](corpus-c.md).
+are unrun. See [the C corpus survey](corpus/c.md).
 
 The implementation sandbox is Linux ARM, outside the requested matrix. Its local full-suite results are regression evidence; target-platform qualification comes from the actual Linux amd64/macOS arm64 CI jobs. See [environment setup](../development/setup.md) and [current plans](../plans/README.md) for exact receipts and remaining limits.

@@ -6,7 +6,7 @@ trusted driver passes as the sole ``String`` argument of a fixed public callable
 operator fixes the entry class, method, compile roots, public fixtures, the expected
 benign return, and the exception policy.  The private fixture's random content never
 appears in an agent prompt, the job JSON, or any observation.  See
-``docs/reference/corpus-java.md`` for the per-row survey that chose the qualified row.
+``docs/reference/corpus/java.md`` for the per-row survey that chose the qualified row.
 """
 
 from __future__ import annotations

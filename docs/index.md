@@ -61,14 +61,15 @@ These pages explain how to perform a task; exact signatures/defaults live in ref
 - [CLI](reference/cli.md): commands, switches, output contracts and exits.
 - [Configuration](reference/configuration.md): canonical settings and constraints.
 - [Schemas](reference/schemas.md): canonical Pydantic models and schema inspection.
-- [Ruby corpus survey](reference/corpus-ruby.md): the Ruby rows, their properties, and the one migrated, qualified row.
-- [Python corpus map](reference/corpus-python.md): which recipe each Python corpus row's property needs.
 - [Glossary](reference/glossary.md): domain terms and result meanings.
 - [Platforms](reference/platforms.md): Linux amd64/macOS arm64 support and native qualification boundaries.
-- [JavaScript corpus survey](reference/corpus-javascript.md): the JavaScript rows and why the prototype-pollution recipe is qualified first.
-- [Java corpus survey](reference/corpus-java.md): per-row fit for the Java secret-disclosure recipe and the one qualified row.
-- [Perl corpus survey](reference/corpus-perl.md): the Perl rows, their properties, and the qualified `perl.html_injection/1` row.
-- [C corpus survey](reference/corpus-c.md): the C rows and the qualified `c.integer_overflow/1` recipe.
+- [Corpus surveys](reference/corpus/README.md): one page per language and its chain dataset.
+  - [C corpus survey](reference/corpus/c.md): the C rows and the qualified `c.integer_overflow/1` recipe.
+  - [Java corpus survey](reference/corpus/java.md): per-row fit for the Java secret-disclosure recipe and the one qualified row.
+  - [JavaScript corpus survey](reference/corpus/javascript.md): the JavaScript rows and why the prototype-pollution recipe is qualified first.
+  - [Perl corpus survey](reference/corpus/perl.md): the Perl rows, their properties, and the qualified `perl.html_injection/1` row.
+  - [Python corpus map](reference/corpus/python.md): which recipe each Python corpus row's property needs.
+  - [Ruby corpus survey](reference/corpus/ruby.md): the Ruby rows, their properties, and the one migrated, qualified row.
 
 ## Agents
 

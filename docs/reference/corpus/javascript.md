@@ -1,7 +1,7 @@
 # JavaScript corpus survey
 
 This page surveys the JavaScript rows under `evals/datasets/chain/javascript/` against
-the [extension bar](../guides/extensions.md): what a trusted observer could assert for
+the [extension bar](../../guides/extensions.md): what a trusted observer could assert for
 each, whether it fits a narrow data-only recipe, and what blocks it. It records why the
 first qualified JavaScript recipe is **prototype pollution on `mergePreferences`**
 (`javascript.prototype_pollution/1`), not a generic JavaScript adapter.
@@ -39,10 +39,10 @@ with line coverage. It is migrated to the v3 shape at
 `evals/datasets/chain/javascript/prototypepollution-a-v3/` (frozen `source/`,
 `request.json`, `submission.json`, `oracle.json`) and listed in
 `evals/datasets/chain-javascript.json`. The recipe is
-[`JavaScriptRecipe`](schemas.md#recipes); the trusted observer is
+[`JavaScriptRecipe`](../schemas.md#recipes); the trusted observer is
 `src/corsair/adapters/sandboxing/drivers/javascript/driver.mjs`; the image is
 `deploy/javascript/Dockerfile` (`corsair-javascript:0.1`). See
-[platforms](platforms.md#javascript-prototype-pollution-linux-amd64) for the qualification
+[platforms](../platforms.md#javascript-prototype-pollution-linux-amd64) for the qualification
 boundary (Linux amd64 only; the live chain is unrun).
 
 The `-b` variants (and `dot-prop-b`) block the dangerous keys and so hold under the same

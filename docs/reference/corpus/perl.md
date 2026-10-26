@@ -1,9 +1,9 @@
 # Perl corpus survey
 
-This page surveys the Perl rows under [`evals/datasets/corpus/infosec-harness/perl/`](../../evals/datasets/corpus/infosec-harness/perl)
-and the paired chain rows under [`evals/datasets/chain/perl/`](../../evals/datasets/chain/perl), so a reader can
+This page surveys the Perl rows under [`evals/datasets/corpus/infosec-harness/perl/`](../../../evals/datasets/corpus/infosec-harness/perl)
+and the paired chain rows under [`evals/datasets/chain/perl/`](../../../evals/datasets/chain/perl), so a reader can
 see which rows a trusted observer can qualify and which carry a dependency or licence blocker. It records the state
-of the tree; it does not itself qualify a language or recipe (see [extensions](../guides/extensions.md)).
+of the tree; it does not itself qualify a language or recipe (see [extensions](../../guides/extensions.md)).
 
 ## Licence caveat
 

@@ -1,24 +1,27 @@
 """Size and constraint pins for the producer's rendered per-call request.
 
 Renders the exact first request for the frozen case01 producer row through
-scripts/measure_producer_request.py, which drives the production run_producer path
-with a capturing model; no provider is called. Sizes are UTF-8 bytes.
+``corsair.evaluation.preview`` (the renderer behind ``corsair agent preview``), which drives
+the production run_producer path with a capturing model; no provider is called. Sizes are
+UTF-8 bytes.
 """
 
 from __future__ import annotations
 
-import importlib.util
-import sys
+import json
 from pathlib import Path
-from types import ModuleType
 
 import pytest
+from google.adk.models.llm_request import LlmRequest
 
 from corsair.agents.producer.factory import producer_instruction
 from corsair.agents.resources import load_runtime_skills
+from corsair.evaluation import preview
+from corsair.evaluation.agents import load_frozen_fixture
+from corsair.settings import Settings
 
 ROOT = Path(__file__).resolve().parents[2]
-MEASURE_SCRIPT = ROOT / "scripts/measure_producer_request.py"
+EVALS_ROOT = ROOT / "evals"
 PRODUCER_DEV = ROOT / "evals/datasets/producer-dev.json"
 
 # Before the tightening the Corsair-owned instruction (system.md plus the preloaded
@@ -65,13 +68,26 @@ REQUIRED_CONSTRAINTS = (
 )
 
 
-def _measure_module() -> ModuleType:
-    spec = importlib.util.spec_from_file_location("measure_producer_request", MEASURE_SCRIPT)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+def _dataset_fixtures(dataset_path: Path) -> list[tuple[str, Path, bytes]]:
+    """Each distinct frozen producer input once, digest-verified; the oracle stays unused."""
+    fixtures: list[tuple[str, Path, bytes]] = []
+    for entry in json.loads(dataset_path.read_bytes())["entries"]:
+        if entry["case_id"] not in {case_id for case_id, _, _ in fixtures}:
+            input_path, content, _oracle = load_frozen_fixture(EVALS_ROOT, entry)
+            fixtures.append((entry["case_id"], input_path, content))
+    return fixtures
+
+
+async def _render_requests(
+    input_path: Path, content: bytes, *, structured_tools: bool
+) -> list[LlmRequest]:
+    requests, _usage = await preview.render_requests(
+        "producer",
+        preview.load_request(input_path, content),
+        Settings(),
+        structured_tools=structured_tools,
+    )
+    return requests
 
 
 def test_producer_instruction_keeps_every_rule_and_preloads_each_procedure_once():
@@ -90,13 +106,12 @@ def test_producer_instruction_keeps_every_rule_and_preloads_each_procedure_once(
 async def test_rendered_case01_request_instruction_stays_below_its_byte_bound(
     structured_tools: bool,
 ):
-    measure = _measure_module()
-    fixtures = measure.dataset_fixtures([PRODUCER_DEV])
+    fixtures = _dataset_fixtures(PRODUCER_DEV)
     assert [case_id for case_id, _, _ in fixtures] == ["case01"]
     _case_id, input_path, content = fixtures[0]
 
-    requests = await measure.render_requests(input_path, content, structured_tools=structured_tools)
-    sections = measure.request_sections(requests[0])
+    requests = await _render_requests(input_path, content, structured_tools=structured_tools)
+    sections = preview.request_sections("producer", requests[0])
     system = sections["corsair_instruction"] + sections["adk_instruction"]
 
     assert len(requests) == 1
@@ -113,12 +128,11 @@ async def test_rendered_case01_request_instruction_stays_below_its_byte_bound(
 async def test_rendered_request_declares_only_source_reads_and_no_generic_skill_text(
     structured_tools: bool,
 ):
-    measure = _measure_module()
-    _case_id, input_path, content = measure.dataset_fixtures([PRODUCER_DEV])[0]
+    _case_id, input_path, content = _dataset_fixtures(PRODUCER_DEV)[0]
 
-    requests = await measure.render_requests(input_path, content, structured_tools=structured_tools)
+    requests = await _render_requests(input_path, content, structured_tools=structured_tools)
     declared = set(requests[0].tools_dict)
-    sections = measure.request_sections(requests[0])
+    sections = preview.request_sections("producer", requests[0])
 
     expected = {"read_file", "list_files"} | (set() if structured_tools else {"set_model_response"})
     assert declared == expected
@@ -129,12 +143,16 @@ async def test_rendered_request_declares_only_source_reads_and_no_generic_skill_
 
 
 @pytest.mark.asyncio
-async def test_measurement_rows_report_bytes_and_their_token_approximation():
-    measure = _measure_module()
+async def test_rendered_rows_report_bytes_and_their_token_approximation():
+    rows = []
+    for case_id, input_path, content in _dataset_fixtures(PRODUCER_DEV):
+        requests = await _render_requests(input_path, content, structured_tools=False)
+        sections = preview.request_sections("producer", requests[-1])
+        rows.append((case_id, len(requests), sections))
 
-    rows = await measure.measure([PRODUCER_DEV], structured_tools=False)
-
-    assert [row["case_id"] for row in rows] == ["case01"]
-    assert rows[0]["request_index"] == 1
-    assert rows[0]["sections"]["conversation"]["bytes"] == 0
-    assert rows[0]["total"]["approx_tokens"] * 4 >= rows[0]["total"]["bytes"]
+    assert [case_id for case_id, _, _ in rows] == ["case01"]
+    _case_id, request_count, sections = rows[0]
+    assert request_count == 1
+    assert preview.text_size(sections["conversation"])["bytes"] == 0
+    total = preview.text_size("".join(sections.values()))
+    assert total["approx_tokens"] * 4 >= total["bytes"]
