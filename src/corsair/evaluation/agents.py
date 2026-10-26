@@ -24,28 +24,11 @@ from corsair.contracts import (
     ProducerOutput,
     digest,
 )
+from corsair.evaluation.datasets import load_frozen_fixture as load_frozen_fixture
 from corsair.evaluation.scoring import dataset_root, summarize
 from corsair.observability.logging import configure_logging, event, safe_error_detail
 from corsair.settings import Settings, load_settings
 from corsair.steps.manifest import build_manifest
-
-
-def load_frozen_fixture(root: Path, entry: dict[str, Any]) -> tuple[Path, bytes, dict[str, Any]]:
-    """Read/verify once; the oracle remains local to this evaluator."""
-    contents: dict[str, bytes] = {}
-    paths: dict[str, Path] = {}
-    for field in ("input", "oracle"):
-        path = (root / entry[field]).resolve()
-        if not path.is_relative_to(root):
-            raise ValueError("agent dataset path escapes its root")
-        content = path.read_bytes()
-        if digest(content) != entry[f"{field}_digest"]:
-            raise ValueError("frozen isolated fixture changed")
-        paths[field], contents[field] = path, content
-    oracle = json.loads(contents["oracle"])
-    if not isinstance(oracle, dict):
-        raise ValueError("isolated oracle must be a JSON object")
-    return paths["input"], contents["input"], oracle
 
 
 async def invoke_fixture_agent(

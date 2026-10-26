@@ -211,6 +211,31 @@ Starts a bounded Temporal evaluation batch. The evaluator-owned oracle labels do
 
 `--run-id ID`, `--repeats N`, and `--concurrency N` select the finite batch. `--output PATH` remains the explicit report path; if omitted, the default is `.runs/evaluations/<batch-id>.json`. An evaluation returns nonzero when the completed report has failed rows or unavailable results. Query its live complete/total count with `inspect BATCH_ID --online` (and add `--watch` to wait).
 
+### `dataset validate DATASET...`
+
+```bash
+corsair dataset validate evals/datasets/dev.json evals/datasets/producer-dev.json
+corsair --format json dataset validate evals/datasets/safety.json
+corsair dataset validate evals/datasets/dev.json --fix-digests
+```
+
+Checks frozen dataset manifests offline before an `eval`, `eval-agent` or `rescore` spends a model, container or service on them. It runs no model, target code, container or Temporal request and writes nothing except, with `--fix-digests`, the manifest. Both manifest schemas are accepted: composed-case datasets (`corsair.dataset/1`) and isolated producer/auditor datasets (`corsair.agent-dataset/1`, the role inferred from each input). For every entry it runs these checks over the exact bytes the evaluator reads:
+
+| Check | What fails it |
+| --- | --- |
+| `entry` | Malformed entry, duplicate `case_id`, a `family` or `split` that is not a lowercase identifier, or a family that crosses splits. |
+| `digests` | A request/input or oracle path that is missing or escapes the dataset root, or a declared `*_digest` that differs from the file. |
+| `request` | The request (or auditor input) fails its contract, or the request's `case_id` differs from the entry. |
+| `source` | The source or fixed source has no `expected_digest`, cannot be admitted, or its snapshot digest differs; the fixed source lacks the recipe module. |
+| `target_binding` | The pure pre-model [`target_binding`](../../src/corsair/policies/target_binding.py) gate blocks the case and the oracle does not accept the resulting `UNABLE_TO_RUN`/`BLOCKED` result (the case could never pass). A block the oracle does expect passes with a note. |
+| `oracle` | A case oracle lists a disposition or verdict as both acceptable and forbidden, has an empty `acceptable_verdicts`, an `expected_verdict` outside `acceptable_verdicts` or inside `forbidden_verdicts`, or no satisfiable verdict; a producer oracle has no candidates or lists its control as a candidate; an auditor oracle names an unknown decision. |
+
+A check that cannot run because an earlier one failed is `skip`, as are source and target binding for auditor entries. After the entries, the consuming evaluator's own loader (`load_dataset`, or the isolated fixture loader) is run so its rules cannot drift from these checks. When several datasets are given, a family placed in different splits by different manifests is reported too. Human output shows each dataset's schema, role, dataset digest (the `dataset_digest` an evaluation report of it records) and cohort, a table of check results per entry, then each problem; `--format json` emits the complete record. Problems name fields and labels but never an oracle payload. Sources are admitted below the dataset root by default; pass `--settings` to admit them under that file's `source_root` and limits instead, as the worker will.
+
+`--fix-digests` rewrites only stale `request_digest`, `input_digest` or `oracle_digest` values in the manifest, and only for entries whose every other check passes; it never edits a request, input, oracle or source, nor a request's own source `expected_digest`. Each change is listed with its old and new digest and whether it was applied, and the datasets are validated again afterwards. A rewritten digest changes the dataset digest, so it is a new frozen cohort identity: treat it as the deliberate, reviewed change [evaluation discipline](../development/testing.md#frozen-inputs-and-evaluation-discipline) requires, never as a way to turn a failed run green.
+
+The command exits `0` when every dataset is valid and `1` when any entry, manifest or cross-dataset check fails.
+
 ### `rescore DATASET RUN_ID...`
 
 ```bash
@@ -264,7 +289,7 @@ Do not delete an intent to obtain a pass, reuse a run ID with a different reques
 | Exit | Meaning |
 | --- | --- |
 | `0` | The command completed its stated healthy/success condition. |
-| `1` | A completed doctor, investigation, reference replay, evaluation, scoring, or report comparison operation reported a non-success/unhealthy condition or a regression. `runs` and `inspect` never exit `1` on a verdict. |
+| `1` | A completed doctor, investigation, reference replay, evaluation, scoring, dataset validation, or report comparison operation reported a non-success/unhealthy condition, an invalid dataset or a regression. `runs` and `inspect` never exit `1` on a verdict. |
 | `2` | Input, settings, invocation, or local configuration validation failed before normal execution. |
 | `130` | Ctrl-C interrupted the local CLI. A remote workflow is not implicitly cancelled. |
 
