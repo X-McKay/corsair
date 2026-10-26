@@ -522,12 +522,19 @@ def _roles_table(observation: Observation, title: str, *, caption: bool = False)
 
 
 def _target_caption(item: Mapping[str, Any]) -> str:
-    """The kernel's target line, and that it was derived when prepare bound it."""
+    """The kernel's target line, and where it came from: derived by prepare from the
+    recipe function, or bound by line binding from a different declared line."""
     line = item.get("target_line")
     if line is None:
         return ""
-    derived = item.get("line_provenance") == "recipe_function"
-    return f" · target=L{line}" + (" (derived from recipe function)" if derived else "")
+    declared = item.get("declared_line")
+    if item.get("line_provenance") == "recipe_function":
+        origin = " (derived from recipe function)"
+    elif declared is not None and declared != line:
+        origin = f" (declared L{declared}, bound to its reported statement)"
+    else:
+        origin = ""
+    return f" · target=L{line}{origin}"
 
 
 # Validation check keys and their compact column headings.

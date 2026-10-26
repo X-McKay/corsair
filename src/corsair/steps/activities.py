@@ -20,6 +20,7 @@ from corsair.contracts import (
     format_diagnostic,
     format_terminal_result,
 )
+from corsair.policies.line_binding import bind_target_line
 from corsair.policies.target_binding import target_binding
 from corsair.policies.time_bounds import activity_window_seconds
 from corsair.ports.inference import InferencePort
@@ -92,7 +93,11 @@ class Activities:
             raise ApplicationError(
                 format_diagnostic(str(failure)), type="PREPARE_BLOCKED", non_retryable=True
             )
-        return prepared
+        # target_binding passed, so the finding declares a line and the module exists.
+        # The coverage gate binds to the statement line coverage reports for it.
+        assert prepared.finding.line is not None
+        target_line = bind_target_line(module_text, prepared.finding.line)
+        return prepared.model_copy(update={"target_line": target_line})
 
     @staticmethod
     def _activity_window() -> float | None:

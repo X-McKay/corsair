@@ -1,8 +1,8 @@
 """Read-only navigation of committed results and their evidence receipts.
 
 Nothing here writes to the artifact store or decides a label. Listing and evidence views
-report what was committed; payloads, source excerpts, findings and driver jobs never leave
-the store through them.
+report what was committed; payloads, source excerpts, findings (beyond their declared and
+bound line numbers) and driver jobs never leave the store through them.
 """
 
 from __future__ import annotations
@@ -155,6 +155,7 @@ def _observation_view(
         "evidence": "absent",
         "receipts_admissible": None,
         "target_line": None,
+        "declared_line": None,
         "line_provenance": None,
     }
     roles: Any = {}
@@ -178,9 +179,11 @@ def _observation_view(
         )
         view["receipts_admissible"] = prepared is not None
         if prepared is not None:
-            # The line the kernel's coverage gate checked, and whether trusted prepare
-            # code derived it from the recipe function; never the finding's text.
-            view["target_line"] = prepared.finding.line
+            # The line the kernel's coverage gate checked, the finding line it was bound
+            # from, and whether trusted prepare code derived that line from the recipe
+            # function; never the finding's text.
+            view["target_line"] = prepared.bound_line
+            view["declared_line"] = prepared.finding.line
             view["line_provenance"] = prepared.line_provenance
     view["roles"] = {
         role: _role_receipt(

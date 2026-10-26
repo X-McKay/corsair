@@ -119,7 +119,7 @@ def _kernel_entry(item: RoundResult, prepared: PreparedCase) -> dict:
     if outcome.verdict is Verdict.UNABLE_TO_RUN:
         return _entry(session, index, "kernel", "target_unbound", outcome.reason)
     assert observation.control is not None and observation.adversarial is not None
-    line = prepared.finding.line
+    line = prepared.bound_line
     if line not in observation.control.covered_lines or (
         line not in observation.adversarial.covered_lines
     ):

@@ -196,3 +196,20 @@ class PreparedCase(Contract):
     manifest: RunManifest
     # Defaulted so prepared cases recorded before line derivation still decode.
     line_provenance: LineProvenance = LineProvenance.DECLARED
+    # The line the coverage gate binds to, chosen in code at prepare from finding.line
+    # (declared, or derived when line_provenance is recipe_function) over the admitted
+    # module (corsair.policies.line_binding). finding.line keeps the declared or
+    # derived line. None in records made before line binding: the kernel then binds to
+    # finding.line itself.
+    target_line: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def target_line_needs_a_declared_line(self):
+        if self.target_line is not None and self.finding.line is None:
+            raise ValueError("a bound target line needs a declared finding line")
+        return self
+
+    @property
+    def bound_line(self) -> int | None:
+        """The exact line the kernel requires in both runs: bound, else declared."""
+        return self.finding.line if self.target_line is None else self.target_line
