@@ -7,7 +7,7 @@
       "split": "adversarial",
       "request": "datasets/adversarial/adversarial01/request.json",
       "oracle": "datasets/adversarial/adversarial01/oracle.json",
-      "request_digest": "faf02e9c74a2002e5fda05186f2347771ecb4de50009864c82c83f450dc16855",
+      "request_digest": "6b007bc9c17b026b7eedc3fd94c5eb9c6ee6ec20355910d07875dabf110246d7",
       "oracle_digest": "5061c0ee1e147b88e00edb26e148f186564aed4c77c9f5e3e670b93975a0d736"
     },
     {
@@ -16,7 +16,7 @@
       "split": "adversarial",
       "request": "datasets/adversarial/adversarial02/request.json",
       "oracle": "datasets/adversarial/adversarial02/oracle.json",
-      "request_digest": "e57ebdf59c62a71fb3171f2860cead36b7e3930df18ed75ef9bb5e7b88cf1090",
+      "request_digest": "585dec2cd9eafcffe2f8c3a41bb2a55be8533dbb8f70b5538462c63baeec8df3",
       "oracle_digest": "5061c0ee1e147b88e00edb26e148f186564aed4c77c9f5e3e670b93975a0d736"
     }
   ]
