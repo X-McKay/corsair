@@ -26,8 +26,9 @@ Heartbeat = Callable[[], None]
 ROLES: tuple[SandboxRole, ...] = ("control", "adversarial")
 # The trusted in-image driver writes exactly one of these markers, and only when its
 # own recipe assertion genuinely failed on the adversarial role. Keep this in sync with
-# VIOLATION_MARKERS in adapters/sandboxing/driver.py. A target cannot forge a violation
-# by making pytest fail some other way: the driver never writes a marker in that case.
+# VIOLATION_MARKERS in adapters/sandboxing/drivers/python/driver.py. A target cannot forge
+# a violation by making pytest fail some other way: the driver never writes a marker in
+# that case.
 # Each trusted driver's own violation signal: disclosure of the private fixture (Python,
 # Ruby), a created sentinel (Python command), and for C an operator-fixed sanitizer class
 # reported in a target frame. A plain C crash never reaches here; its driver reports ERROR.

@@ -1,7 +1,7 @@
 """Canonical Ruby recipe contract; no vendor SDK types.
 
 A second, concrete recipe for a non-Python runtime.  It mirrors
-:class:`corsair.contracts.sources.PythonRecipe` field for field so the trusted Ruby
+:class:`corsair.contracts.recipes.python.PythonRecipe` field for field so the trusted Ruby
 driver reads the same operator-owned secret-disclosure check: the investigator controls
 only the value of ``payload_parameter``; the receiver constant, method, fixed keyword
 arguments, public fixtures, expected benign value, and tolerated exception classes are
@@ -17,7 +17,7 @@ from typing import Literal
 
 from pydantic import Field, JsonValue, field_validator, model_validator
 
-from .common import Contract, safe_path
+from ..common import Contract, safe_path
 
 _RUBY_CONSTANT = re.compile(r"[A-Z]\w*(::[A-Z]\w*)*")
 _RUBY_METHOD = re.compile(r"[a-z_]\w*[?!]?")

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from corsair.adapters.sandboxing import driver
+from corsair.adapters.sandboxing.drivers.python import driver
 
 
 def _job(kind: str) -> dict:

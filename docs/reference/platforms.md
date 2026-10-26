@@ -27,12 +27,15 @@ Hosted macOS ARM runners do not support nested virtualization. CI therefore does
 
 Each recipe kind selects its own reviewed image through `Settings.images` (see
 [configuration](configuration.md)); `just images` builds every `deploy/*/Dockerfile`.
-The Python secret-disclosure recipe uses `corsair-python:0.1`; the JavaScript
+The Python recipes use `corsair-python:0.1`; the JavaScript
 prototype-pollution recipe uses `corsair-javascript:0.1`; the Java secret-disclosure
 recipe uses `corsair-java:0.1`. All apply the identical
 `DockerSandbox` isolation (read-only, offline, dropped capabilities, no-new-privileges,
 CPU/memory/PID limits, immutable-identity cleanup). Image selection is a one-line mapping,
-not a code path.
+not a code path. Each image copies its runtime's trusted driver from
+`src/corsair/adapters/sandboxing/drivers/<language>/` (for Python,
+`drivers/python/driver.py`); rebuild the image with `just images` after changing a driver,
+since the recorded runtime identity is the local image ID, not the tag.
 
 ### JavaScript prototype pollution (Linux amd64)
 
@@ -107,7 +110,7 @@ The C recipe ([`c.integer_overflow/1`](schemas.md#recipes)) runs in the reviewed
 image (`deploy/c/Dockerfile`, pinned gcc 13.3.0). Its trusted driver compiles the admitted C
 source plus a fixed harness under AddressSanitizer and must **execute a freshly built native
 binary**, so that image's `/work` tmpfs keeps `nosuid` and `nodev` but drops `noexec` (see
-`DockerSandbox.NATIVE_EXEC_KINDS`). Every other control is unchanged — read-only root, dropped
+`NATIVE_EXEC_KINDS` in `contracts/recipes/`). Every other control is unchanged — read-only root, dropped
 capabilities, no-new-privileges, offline network, non-root user, resource/PID limits,
 read-only source/job binds, `/tmp` `noexec`, and cleanup confirmed before the adversarial
 container starts — and the Python and interpreter images keep `/work` `noexec`. This relaxation

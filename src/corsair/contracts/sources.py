@@ -2,21 +2,14 @@
 
 from __future__ import annotations
 
-import json
-import re
 from enum import StrEnum
-from typing import Annotated, Any, Literal
+from typing import Literal
 
-from pydantic import Discriminator, Field, JsonValue, Tag, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from .common import ArtifactRef, Contract, Digest, Identifier, safe_path
 from .intake import ScannerClaim
-from .recipes_c import CRecipe
-from .recipes_java import JavaRecipe
-from .recipes_javascript import JavaScriptRecipe
-from .recipes_perl import PerlRecipe
-from .recipes_python import PythonCommandSentinel
-from .recipes_ruby import RubyRecipe
+from .recipes import Recipe
 
 
 class Source(Contract):
@@ -46,105 +39,6 @@ class Finding(Contract):
     scanner: ScannerClaim | None = None
 
     _safe_file = field_validator("file")(safe_path)
-
-
-class PythonRecipe(Contract):
-    """Operator-owned secret-disclosure check at a Python callable's real API.
-
-    The investigator controls ONLY the value of payload_parameter. Fixed keyword
-    arguments, fixtures, expected benign value, and exception policy are not editable.
-    The private fixture's actual random content never appears in an agent prompt.
-    """
-
-    kind: Literal["python.secret_disclosure/1"] = "python.secret_disclosure/1"
-    module_file: str
-    function: str
-    payload_parameter: str
-    fixed_kwargs: dict[str, JsonValue] = Field(default_factory=dict)
-    public_files: dict[str, str] = Field(default_factory=lambda: {"hello.txt": "hello"})
-    expected_control: JsonValue = "hello"
-    allowed_exceptions: list[str] = Field(default_factory=lambda: ["builtins.ValueError"])
-
-    _safe_module = field_validator("module_file")(safe_path)
-
-    @field_validator("module_file")
-    @classmethod
-    def python_file(cls, value: str) -> str:
-        if not value.endswith(".py"):
-            raise ValueError("the initial recipe supports Python source files only")
-        return value
-
-    @field_validator("function", "payload_parameter")
-    @classmethod
-    def identifier(cls, value: str) -> str:
-        if not value.isidentifier() or value.startswith("_"):
-            raise ValueError("expected a public Python identifier")
-        return value
-
-    @field_validator("fixed_kwargs")
-    @classmethod
-    def keyword_arguments(cls, value: dict) -> dict:
-        if len(value) > 16 or any(not key.isidentifier() for key in value):
-            raise ValueError("invalid fixed keyword arguments")
-        if len(json.dumps(value)) > 16000:
-            raise ValueError("fixed arguments exceed the recipe limit")
-        return value
-
-    @field_validator("public_files")
-    @classmethod
-    def fixtures(cls, value: dict[str, str]) -> dict[str, str]:
-        if len(value) > 16 or sum(len(text.encode()) for text in value.values()) > 65536:
-            raise ValueError("public fixtures exceed the recipe limit")
-        for name in value:
-            safe_path(name)
-        return value
-
-    @field_validator("allowed_exceptions")
-    @classmethod
-    def exceptions(cls, value: list[str]) -> list[str]:
-        if any(not re.fullmatch(r"[A-Za-z][\w]*(\.[A-Za-z][\w]*)+", item) for item in value):
-            raise ValueError("exceptions must have fully qualified names")
-        return value
-
-    @model_validator(mode="after")
-    def payload_not_fixed(self):
-        if self.payload_parameter in self.fixed_kwargs:
-            raise ValueError("payload_parameter may not override an operator-fixed argument")
-        return self
-
-
-def _recipe_kind(value: Any) -> str:
-    """Discriminate recipe members by ``kind``.
-
-    A request that predates the recipe union omits ``kind``; it is the original
-    Python secret-disclosure recipe, so a missing tag resolves there. This keeps the
-    frozen request fixtures (and their recorded digests) valid without a rewrite.
-    """
-    tag = value.get("kind") if isinstance(value, dict) else getattr(value, "kind", None)
-    return tag if isinstance(tag, str) else "python.secret_disclosure/1"
-
-
-# The Python callable recipes: both import one stdlib module directly and invoke one
-# public function, so they share the Python-AST gates (target binding, line derivation)
-# that other languages replace with their own run-time binding gates.
-PythonCallableRecipe = PythonRecipe | PythonCommandSentinel
-PYTHON_CALLABLE_RECIPES = (PythonRecipe, PythonCommandSentinel)
-
-
-# The admitted recipe alternatives, discriminated on the stable ``kind`` tag following
-# the native ProducerDecision pattern. Each member is one concrete, tested recipe with
-# its own trusted observer and runtime image; adding a language adds a union member, not
-# a generic adapter. Every member exposes ``module_file`` so the finding binds uniformly.
-Recipe = Annotated[
-    Annotated[PythonRecipe, Tag("python.secret_disclosure/1")]
-    | Annotated[PythonCommandSentinel, Tag("python.command_sentinel/1")]
-    | Annotated[JavaScriptRecipe, Tag("javascript.prototype_pollution/1")]
-    | Annotated[RubyRecipe, Tag("ruby.secret_disclosure/1")]
-    | Annotated[JavaRecipe, Tag("java.secret_disclosure/1")]
-    | Annotated[PerlRecipe, Tag("perl.html_injection/1")]
-    | Annotated[CRecipe, Tag("c.integer_overflow/1")],
-    Discriminator(_recipe_kind),
-]
 
 
 class Case(Contract):

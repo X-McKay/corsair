@@ -1,9 +1,9 @@
-"""Additional operator-owned Python recipes beyond the initial disclosure check.
+"""Canonical Python recipe wire contracts; no vendor SDK types.
 
-The initial `PythonRecipe` lives in `sources.py`; keep it there while it remains the
-disclosure property. This module adds one concrete, tested second recipe so that
-`Case.recipe` becomes a discriminated union on `kind`. Every member constrains the
-model to one JSON payload value and keeps the assertion with the operator.
+`PythonRecipe` is the initial secret-disclosure check; `PythonCommandSentinel` is the
+command/code-execution check. Both bind one public Python callable and share the one
+trusted driver (``adapters/sandboxing/drivers/python/driver.py``). Every member
+constrains the model to one JSON payload value and keeps the assertion with the operator.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from typing import Literal
 
 from pydantic import Field, JsonValue, field_validator, model_validator
 
-from .common import Contract, safe_path
+from ..common import Contract, safe_path
 
 
 def _public_identifier(value: str) -> str:
@@ -43,6 +43,71 @@ def _qualified_exceptions(value: list[str]) -> list[str]:
     if any(not re.fullmatch(r"[A-Za-z][\w]*(\.[A-Za-z][\w]*)+", item) for item in value):
         raise ValueError("exceptions must have fully qualified names")
     return value
+
+
+class PythonRecipe(Contract):
+    """Operator-owned secret-disclosure check at a Python callable's real API.
+
+    The investigator controls ONLY the value of payload_parameter. Fixed keyword
+    arguments, fixtures, expected benign value, and exception policy are not editable.
+    The private fixture's actual random content never appears in an agent prompt.
+    """
+
+    kind: Literal["python.secret_disclosure/1"] = "python.secret_disclosure/1"
+    module_file: str
+    function: str
+    payload_parameter: str
+    fixed_kwargs: dict[str, JsonValue] = Field(default_factory=dict)
+    public_files: dict[str, str] = Field(default_factory=lambda: {"hello.txt": "hello"})
+    expected_control: JsonValue = "hello"
+    allowed_exceptions: list[str] = Field(default_factory=lambda: ["builtins.ValueError"])
+
+    _safe_module = field_validator("module_file")(safe_path)
+
+    @field_validator("module_file")
+    @classmethod
+    def python_file(cls, value: str) -> str:
+        if not value.endswith(".py"):
+            raise ValueError("the initial recipe supports Python source files only")
+        return value
+
+    @field_validator("function", "payload_parameter")
+    @classmethod
+    def identifier(cls, value: str) -> str:
+        if not value.isidentifier() or value.startswith("_"):
+            raise ValueError("expected a public Python identifier")
+        return value
+
+    @field_validator("fixed_kwargs")
+    @classmethod
+    def keyword_arguments(cls, value: dict) -> dict:
+        if len(value) > 16 or any(not key.isidentifier() for key in value):
+            raise ValueError("invalid fixed keyword arguments")
+        if len(json.dumps(value)) > 16000:
+            raise ValueError("fixed arguments exceed the recipe limit")
+        return value
+
+    @field_validator("public_files")
+    @classmethod
+    def fixtures(cls, value: dict[str, str]) -> dict[str, str]:
+        if len(value) > 16 or sum(len(text.encode()) for text in value.values()) > 65536:
+            raise ValueError("public fixtures exceed the recipe limit")
+        for name in value:
+            safe_path(name)
+        return value
+
+    @field_validator("allowed_exceptions")
+    @classmethod
+    def exceptions(cls, value: list[str]) -> list[str]:
+        if any(not re.fullmatch(r"[A-Za-z][\w]*(\.[A-Za-z][\w]*)+", item) for item in value):
+            raise ValueError("exceptions must have fully qualified names")
+        return value
+
+    @model_validator(mode="after")
+    def payload_not_fixed(self):
+        if self.payload_parameter in self.fixed_kwargs:
+            raise ValueError("payload_parameter may not override an operator-fixed argument")
+        return self
 
 
 class PythonCommandSentinel(Contract):
