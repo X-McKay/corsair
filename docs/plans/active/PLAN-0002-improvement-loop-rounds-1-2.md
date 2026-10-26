@@ -162,7 +162,11 @@ Two findings:
 - `chain-python-cmdi-a` (expected `EXPLOIT_NOT_DEMONSTRATED`): the producer abstained with a correct reading of the
   source (`subprocess.run` with `shell=False` and a list argument), so the kernel stopped at `INCONCLUSIVE`, a permitted
   but unresolved label. Reaching the negative label needs the producer to submit a probe whose control and adversarial
-  runs both hold under coverage; this is the producer-behaviour question round 2 left open for the dev set.
+  runs both hold under coverage; this is the producer-behaviour question round 2 left open for the dev set. Three
+  further repeats of the Python chain (`.runs/live/20261026T142926Z-chain-chain-python/`, 9 attempts) resolved every
+  demonstrated case 6/6 and abstained on `cmdi-a` 3/3 (twice after an audit rejection of a first proposal; 29 s to
+  209 s, 2 to 17 LLM calls), so the abstention is stable, not variance: the producer reads the safe variant correctly
+  and stops instead of submitting a holding probe.
 - `js-prototypepollution-a` was labelled `COMPONENT_EXPLOIT_DEMONSTRATED` while its request claims component scope,
   which the scope policy labels `EXPLOIT_DEMONSTRATED` (an application claim probed at the component seam is what
   earns the component label). The oracle was corrected and its digest refreshed, `corsair rescore` on the stored run
