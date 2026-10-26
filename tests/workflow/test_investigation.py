@@ -1078,6 +1078,29 @@ async def test_status_query_reports_bounds_deadline_and_phase_timeline(
     assert [(entry["session"], entry["round"]) for entry in status["timeline"]][1:4] == [(1, 1)] * 3
     moments = [datetime.fromisoformat(entry["at"]) for entry in status["timeline"]]
     assert moments == sorted(moments) and moments[0] >= started
+    # The recorded result carries the same transitions up to finalization, so offline
+    # inspection can show phase durations after the workflow has closed.
+    recorded = [entry.model_dump(mode="json") for entry in result.timeline]
+    assert [entry["phase"] for entry in recorded] == [
+        "prepare",
+        "producer",
+        "evidence",
+        "audit",
+        "record",
+    ]
+    assert [entry.at for entry in result.timeline] == moments[:-1]
+    assert [(entry.session, entry.round) for entry in result.timeline] == [
+        (0, 0),
+        (1, 1),
+        (1, 1),
+        (1, 1),
+        (1, 1),
+    ]
+    assert result.result_artifact is not None
+    committed = InvestigationResult.model_validate(
+        temporal_artifact_store.get_json(result.result_artifact)
+    )
+    assert committed.timeline == result.timeline
 
 
 async def test_status_query_reports_the_last_feedback_gate_per_round(
