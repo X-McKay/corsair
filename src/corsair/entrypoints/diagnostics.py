@@ -12,6 +12,7 @@ from temporalio.api.taskqueue.v1 import TaskQueue
 from temporalio.api.workflowservice.v1 import DescribeNamespaceRequest, DescribeTaskQueueRequest
 
 from corsair.adapters.temporal.client import connect
+from corsair.entrypoints.terminal import failure_remedy
 from corsair.observability.logging import safe_text
 from corsair.settings import Settings
 
@@ -39,6 +40,17 @@ def _docker(settings: Settings) -> str:
         return f"Daemon reachable; runtime={settings.runtime}; image={image.id}"
 
 
+def _failed_check(name: str, error: Exception) -> dict:
+    """Report a failed dependency with its sanitized error and any fixed remedy."""
+    check = {
+        "name": name,
+        "status": "fail",
+        "detail": safe_text(f"{type(error).__name__}: {error}"),
+    }
+    remedy = failure_remedy(error)
+    return check if remedy is None else {**check, "remedy": remedy}
+
+
 async def diagnose(settings: Settings) -> dict:
     checks = []
     for name, operation in (
@@ -50,13 +62,7 @@ async def diagnose(settings: Settings) -> dict:
             detail = await asyncio.to_thread(operation)
             checks.append({"name": name, "status": "pass", "detail": detail})
         except Exception as error:
-            checks.append(
-                {
-                    "name": name,
-                    "status": "fail",
-                    "detail": safe_text(f"{type(error).__name__}: {error}"),
-                }
-            )
+            checks.append(_failed_check(name, error))
     try:
         async with asyncio.timeout(8):
             client = await connect(settings)
@@ -96,13 +102,7 @@ async def diagnose(settings: Settings) -> dict:
                 }
             )
     except Exception as error:
-        checks.append(
-            {
-                "name": "temporal",
-                "status": "fail",
-                "detail": safe_text(f"{type(error).__name__}: {error}"),
-            }
-        )
+        checks.append(_failed_check("temporal", error))
     return {
         "ready": all(check["status"] == "pass" for check in checks),
         "checks": checks,

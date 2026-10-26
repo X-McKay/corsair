@@ -23,7 +23,7 @@ from corsair.contracts import (
 from corsair.entrypoints.requests import load_investigation_request
 from corsair.entrypoints.terminal import Terminal
 from corsair.evaluation.scoring import Oracle, load_dataset, save_report, score
-from corsair.observability.logging import configure_logging, event, safe_error_detail, safe_text
+from corsair.observability.logging import configure_logging, event, safe_text
 from corsair.settings import Settings, load_settings
 
 
@@ -450,8 +450,7 @@ def main() -> None:
         )
         code = 130
     except Exception as error:
-        detail = safe_error_detail(error)
-        event("cli.failed", level=logging.ERROR, error_type=type(error).__name__, message=detail)
+        terminal.report_failure(error)
         code = 2
     # Exit after the handler: retaining exception tracebacks can retain native SDK clients.
     raise SystemExit(code)
