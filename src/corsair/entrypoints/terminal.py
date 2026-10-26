@@ -17,6 +17,7 @@ from rich.table import Table
 from rich.text import Text
 
 from corsair.contracts import InvestigationResult
+from corsair.evaluation.comparison import row_label
 from corsair.evaluation.scoring import usage_metrics
 from corsair.observability.logging import event, safe_text
 
@@ -28,6 +29,9 @@ _STYLES: dict[str, str] = {
     "BLOCKED": "red",
     "CANCELLED": "yellow",
     "COMPLETED": "green",
+    "pass": "green",
+    "fail": "red",
+    "unavailable": "yellow",
 }
 T = TypeVar("T")
 
@@ -43,6 +47,28 @@ class TerminalOptions(Protocol):
 
 def _text(value: object) -> Text:
     return Text("unknown" if value is None else safe_text(value))
+
+
+def _plain(value: object) -> str:
+    if isinstance(value, float):
+        return str(round(value, 4))
+    return "unknown" if value is None else safe_text(value)
+
+
+def _signed(value: object) -> str:
+    """Render a delta with its sign; an unknown delta is never shown as zero."""
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return "unknown"
+    return f"{round(value, 4):+}"
+
+
+def _usage(values: Mapping[str, Any], show: Callable[[object], str]) -> str:
+    """One compact usage cell: model calls, tokens in/out and agent seconds."""
+    return (
+        f"{show(values.get('llm_calls'))} LLM · "
+        f"{show(values.get('input_tokens'))}/{show(values.get('output_tokens'))} tok · "
+        f"{show(values.get('agent_seconds'))} s"
+    )
 
 
 class Terminal:
@@ -92,12 +118,18 @@ class Terminal:
                 )
             self.out.print(Panel(table, title="Corsair · Environment checks", border_style="cyan"))
             self.out.print(_text(rendered["qualification"]))
+        elif isinstance(rendered, dict) and "cases" in rendered and "regression" in rendered:
+            self._comparison(rendered)
         elif isinstance(rendered, dict) and ("summary" in rendered or "attempts" in rendered):
             summary = rendered.get("summary", rendered)
             table = Table.grid(padding=(0, 2))
             for key, detail in summary.items():
                 table.add_row(Text(key.replace("_", " "), style="cyan"), _text(detail))
             self.out.print(Panel(table, title="Corsair · Evaluation", border_style="cyan"))
+            if "dataset_digest" in rendered:
+                self.out.print(Text("Dataset: ") + _text(rendered["dataset_digest"]))
+            if isinstance(rendered.get("rows"), list):
+                self._report_rows(rendered["rows"])
             if "report" in rendered:
                 self.out.print(Text("Report: ") + _text(rendered["report"]))
         else:
@@ -108,6 +140,101 @@ class Terminal:
                     border_style="cyan",
                 )
             )
+
+    def _report_rows(self, rows: list[dict[str, Any]]) -> None:
+        """Render one table row per scored attempt; unknown usage stays unknown."""
+        table = Table(expand=True)
+        for column in ("Case", "Run", "Status", "Label", "Usage", "Reason"):
+            table.add_column(column, overflow="fold")
+        for row in rows:
+            status = row.get("status")
+            execution = row.get("execution_status")
+            detail = _plain(status)
+            if execution not in {None, "COMPLETED"}:
+                detail += f" · {_plain(execution)}"
+            table.add_row(
+                _text(row.get("case_id")),
+                _text(row.get("run_id")),
+                Text(detail, style=_STYLES.get(str(status), "cyan")),
+                _text(row_label(row)),
+                _text(_usage(row, _plain)),
+                _text(row.get("reason") or ""),
+            )
+        self.out.print(Panel(table, title="Corsair · Cases", border_style="cyan"))
+
+    def _comparison(self, value: dict[str, Any]) -> None:
+        """Render a report comparison: dataset identity first, then deltas and changed cases."""
+        digests = value["dataset_digest"]
+        if not value["dataset_match"]:
+            self.out.print(
+                Panel(
+                    _text(
+                        "Dataset digests differ or are undeclared; this is not a comparison "
+                        f"on one frozen dataset. baseline={_plain(digests['baseline'])} "
+                        f"candidate={_plain(digests['candidate'])}"
+                    ),
+                    title="Corsair · Dataset mismatch",
+                    border_style="red",
+                )
+            )
+        grid = Table.grid(padding=(0, 2))
+        grid.add_row(
+            Text("Result", style="cyan"),
+            Text(
+                "REGRESSION" if value["regression"] else "NO REGRESSION",
+                style="red" if value["regression"] else "green",
+            ),
+        )
+        if value["dataset_match"]:
+            grid.add_row(Text("Dataset", style="cyan"), _text(digests["baseline"]))
+        for key, count in value["counts"].items():
+            grid.add_row(Text(key.replace("_", " "), style="cyan"), _text(count))
+        for key, delta in value["summary_delta"].items():
+            grid.add_row(
+                Text(key.replace("_", " "), style="cyan"),
+                _text(
+                    f"{_plain(delta['baseline'])} -> {_plain(delta['candidate'])} "
+                    f"({_signed(delta['delta'])})"
+                ),
+            )
+        for item in value["regressions"]:
+            grid.add_row(
+                Text("Regression", style="red"),
+                _text(f"{_plain(item['case_id'])} #{_plain(item['repeat'])}: {item['reason']}"),
+            )
+        self.out.print(Panel(grid, title="Corsair · Comparison", border_style="cyan"))
+        changed = [
+            case
+            for case in value["cases"]
+            if case["flip"]
+            or case["label_changed"]
+            or case["new_forbidden_label"]
+            or case["presence"] != "both"
+        ]
+        if not changed:
+            self.out.print(Text(f"No per-case status or label changes in {len(value['cases'])}."))
+            return
+        table = Table(expand=True)
+        for column in ("Case", "#", "Status", "Label", "Change", "Usage Δ"):
+            table.add_column(column, overflow="fold")
+        for case in changed:
+            regressed = (
+                case["flip"] == "pass_to_fail"
+                or case["new_forbidden_label"]
+                or case["presence"] == "baseline_only"
+            )
+            change = case["flip"] or case["presence"]
+            if case["new_forbidden_label"]:
+                change += " · new forbidden label"
+            table.add_row(
+                _text(case["case_id"]),
+                _text(case["repeat"]),
+                _text(f"{_plain(case['baseline_status'])} -> {_plain(case['candidate_status'])}"),
+                _text(f"{_plain(case['baseline_label'])} -> {_plain(case['candidate_label'])}"),
+                Text(safe_text(change.replace("_", " ")), style="red" if regressed else "cyan"),
+                _text(_usage(case["usage_delta"], _signed) if case["presence"] == "both" else "-"),
+            )
+        self.out.print(Panel(table, title="Corsair · Changed cases", border_style="cyan"))
 
     def _result(self, value: dict[str, Any]) -> None:
         """Render a validated investigation result without exposing model content."""

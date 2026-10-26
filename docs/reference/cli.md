@@ -155,7 +155,20 @@ Scores existing committed result artifacts against evaluator-owned oracles witho
 corsair report .runs/evaluations/dev.json
 ```
 
-Reads and summarizes an existing evaluation report. It does not re-run, re-score, or repair the report.
+Reads an existing evaluation report. Human output shows the summary, the report's dataset digest and one table row per scored attempt (case, run, status, verdict or disposition or match kind, usage and reason); unknown usage is shown as `unknown`. `--format json` emits the complete saved report (`rows`, `summary` and `dataset_digest`). It does not re-run, re-score, or repair the report.
+
+### `compare BASELINE.json CANDIDATE.json`
+
+```bash
+corsair compare .runs/evaluations/before.json .runs/evaluations/after.json
+corsair --format json compare .runs/evaluations/before.json .runs/evaluations/after.json
+```
+
+Compares two saved evaluation reports without contacting services or re-scoring. Rows join on `(case_id, repeat)`: an isolated report's own `repeat` field, otherwise the row's position among that case's rows, which follows the batch's case-major, repeat-minor order. For every joined attempt it reports the status flip (`pass_to_fail` or `fail_to_pass`; an `unavailable` row is not a pass), a verdict/label change, a newly forbidden label, and usage deltas for LLM calls, tool calls, input/output tokens and agent seconds. Summary deltas are recomputed from each report's rows. A delta with an unknown side stays unknown, never zero. The result also lists each side's dataset digest, config digests and cohorts.
+
+The comparison is refused (exit `2`) when the dataset digests differ or either report does not declare one. `--allow-dataset-mismatch` compares them anyway; the result then carries `dataset_match: false`, the human output opens with a mismatch warning and a `compare.dataset_mismatch` warning is logged. A mismatched comparison is not a statement about one frozen dataset.
+
+The command exits `1` when the candidate regressed: a baseline pass that does not pass in the candidate, a forbidden label the baseline row did not have, a baseline attempt missing from the candidate, or more rows without a case identity than the baseline had. Otherwise it exits `0`, including when cases only improved or were added. Human output lists only attempts whose status, label, forbidden flag or presence changed; `--format json` emits every joined attempt under `cases` along with `regressions`, `counts` and `summary_delta`.
 
 ## Watching and recovery
 
@@ -180,7 +193,7 @@ Do not delete an intent to obtain a pass, reuse a run ID with a different reques
 | Exit | Meaning |
 | --- | --- |
 | `0` | The command completed its stated healthy/success condition. |
-| `1` | A completed doctor, investigation, reference replay, evaluation, or scoring operation reported a non-success/unhealthy condition. |
+| `1` | A completed doctor, investigation, reference replay, evaluation, scoring, or report comparison operation reported a non-success/unhealthy condition or a regression. |
 | `2` | Input, settings, invocation, or local configuration validation failed before normal execution. |
 | `130` | Ctrl-C interrupted the local CLI. A remote workflow is not implicitly cancelled. |
 

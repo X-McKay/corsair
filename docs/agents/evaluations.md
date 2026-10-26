@@ -31,4 +31,8 @@ Isolated diagnostics compare payload values and audit decisions against frozen o
 
 The expanded datasets (`producer-expanded.json`, `auditor-expanded.json`) add AI-authored candidate cases pending human review; they are not held-out human labels. A candidate exact-string mismatch is a retained failure, not a reason to widen the oracle: alternate payloads require separately admitted trusted native replay before being called equivalent.
 
+## Comparing two runs
+
+Compare two saved reports on the same frozen dataset with `corsair compare BASELINE.json CANDIDATE.json` (see the [CLI reference](../reference/cli.md#compare-baselinejson-candidatejson)). It joins attempts by case and repeat, flags pass/fail flips, label changes and new forbidden labels, and reports usage deltas; it exits `1` on a regression. It refuses reports whose dataset digests differ or are undeclared unless `--allow-dataset-mismatch` is passed, and then marks the result as a mismatch. Report the dataset digest, the cohort of each side and any configuration digest change with the comparison. A comparison of two isolated diagnostics remains a role-level diagnostic, and a candidate with no regression on one frozen cohort is not a promoted baseline.
+
 See the [baseline policy](../../evals/baselines/README.md) and [frozen experiment index](../../evals/experiments/README.md) for the evidence rules, and [current plans](../plans/README.md) for the open decisions that affect evaluation. Use [the eval skill and coding-agent workflow](../development/coding-agent-workflows.md) for the concrete iteration sequence, and [extension qualification](../guides/extensions.md) before changing recipe, language, framework or image. Keep prior reports immutable and give each comparison a separate output path.

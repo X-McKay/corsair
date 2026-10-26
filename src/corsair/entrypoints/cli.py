@@ -2,7 +2,6 @@
 
 import argparse
 import asyncio
-import json
 import logging
 from collections.abc import Awaitable, Callable, Mapping
 from datetime import timedelta
@@ -22,6 +21,7 @@ from corsair.contracts import (
 )
 from corsair.entrypoints.requests import load_investigation_request
 from corsair.entrypoints.terminal import Terminal
+from corsair.evaluation.comparison import compare_reports, read_report
 from corsair.evaluation.scoring import Oracle, load_dataset, save_report, score
 from corsair.observability.logging import configure_logging, event, safe_error_detail, safe_text
 from corsair.settings import Settings, load_settings
@@ -51,6 +51,9 @@ class CliArguments(argparse.Namespace):
     output: str | None
     run_ids: list[str]
     report: str
+    baseline: str
+    candidate: str
+    allow_dataset_mismatch: bool
 
 
 def validate_run_id(value: str) -> str:
@@ -84,12 +87,27 @@ def _score_saved_result(
 
 
 async def _handle_report(args: CliArguments, ui: Terminal) -> int:
-    """Display a saved evaluation summary without touching runtime services."""
-    report = json.loads(Path(args.report).read_bytes())
-    if not isinstance(report, dict) or not isinstance(report.get("summary"), dict):
-        raise ValueError("report must contain a summary object")
-    ui.emit(report["summary"])
+    """Display a saved evaluation report and its per-case rows without runtime services."""
+    ui.emit(read_report(Path(args.report)))
     return 0
+
+
+async def _handle_compare(args: CliArguments, ui: Terminal) -> int:
+    """Compare two saved reports by case; exit 1 when the candidate regressed."""
+    diff = compare_reports(
+        read_report(Path(args.baseline)),
+        read_report(Path(args.candidate)),
+        allow_dataset_mismatch=args.allow_dataset_mismatch,
+    )
+    if not diff["dataset_match"]:
+        digests = diff["dataset_digest"]
+        event(
+            "compare.dataset_mismatch",
+            level=logging.WARNING,
+            message=f"baseline={digests['baseline']} candidate={digests['candidate']}",
+        )
+    ui.emit({"baseline_report": args.baseline, "candidate_report": args.candidate, **diff})
+    return 1 if diff["regression"] else 0
 
 
 async def _handle_doctor(args: CliArguments, ui: Terminal) -> int:
@@ -328,6 +346,7 @@ async def _handle_rescore(args: CliArguments, ui: Terminal) -> int:
 CommandHandler = Callable[[CliArguments, Terminal], Awaitable[int]]
 _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "report": _handle_report,
+    "compare": _handle_compare,
     "doctor": _handle_doctor,
     "worker": _handle_worker,
     "verify": _handle_verify,
@@ -396,7 +415,8 @@ def parser() -> argparse.ArgumentParser:
         "verify": "Execute a frozen reference submission natively; no security verdict",
         "eval": "Run frozen cases with bounded child workflows and external oracles",
         "rescore": "Revalidate saved native evidence and apply current verdict policy",
-        "report": "Display an existing evaluation summary without contacting services",
+        "report": "Display an existing evaluation report and its per-case rows",
+        "compare": "Compare two evaluation reports by case; exit 1 on a regression",
     }
     commands: dict[str, argparse.ArgumentParser] = {}
     for name, description in descriptions.items():
@@ -431,6 +451,14 @@ def parser() -> argparse.ArgumentParser:
     rescore.add_argument("run_ids", nargs="+")
     rescore.add_argument("--output", default=".runs/evaluations/rescored.json")
     commands["report"].add_argument("report")
+    compare = commands["compare"]
+    compare.add_argument("baseline", help="Baseline evaluation report JSON")
+    compare.add_argument("candidate", help="Candidate evaluation report JSON")
+    compare.add_argument(
+        "--allow-dataset-mismatch",
+        action="store_true",
+        help="Compare reports over different or undeclared frozen dataset digests",
+    )
     return root
 
 
