@@ -74,6 +74,15 @@ class Settings(Contract):
     # The prepare activity admits both into RunManifest, which the workflow reads.
     negative_threshold: int = Field(default=2, ge=2, le=8)
     max_sessions: int = Field(default=2, ge=1, le=8)
+    # Temporal worker task slots. An investigation has at most one activity in flight,
+    # so max_concurrent_activities caps how many investigations (including a batch's
+    # child workflows) progress at once; work above it waits in the task queue, and
+    # that wait counts against each activity's schedule-to-close deadline. Keep it at
+    # least the largest `eval --concurrency` plus any investigations run alongside.
+    # Workflow tasks are short deterministic replays; the SDK requires at least two
+    # while workflows are cached.
+    max_concurrent_activities: int = Field(default=4, ge=1, le=64)
+    max_concurrent_workflow_tasks: int = Field(default=100, ge=2, le=1000)
     models: ModelSettings = Field(default_factory=ModelSettings)
 
     @property
