@@ -14,10 +14,10 @@ just sync
 just check
 just test
 just images
-
-mkdir -p .state
-cp deploy/settings.example.json .state/settings.json
+just settings-init
 ```
+
+`just settings-init` copies `deploy/settings.example.json` to `.state/settings.json` with `source_root` set to the absolute repository root, and never overwrites an existing file. By hand it is `mkdir -p .state && cp deploy/settings.example.json .state/settings.json` followed by setting `source_root`.
 
 The Nix shell provides the pinned Python, uv, Just, Docker client, and Temporal CLI. `uv.lock` pins Python dependencies and the Nix lock pins tooling, but this is not a claim of a fully hermetic image or runtime. Do not run these commands from another directory; paths in this runbook are repository-root-relative.
 
@@ -36,7 +36,7 @@ On a rootless Linux daemon, point `DOCKER_HOST` to its actual socket instead, th
 
 Edit `.state/settings.json` before admitting any source. Use the settings template and [CLI reference](../../reference/cli.md) as the configuration authority rather than copying its schema into this runbook.
 
-- Set `source_root` to the narrowest **absolute** local directory that contains source you have authorized for admission.
+- Set `source_root` to the narrowest **absolute** local directory that contains source you have authorized for admission. The repository root written by `settings-init` is meant for the frozen fixtures only.
 - Select an `artifact_root` reachable at the same path by the worker and every client that will inspect/reconcile results. A local default such as `.runs` is not durable across host loss.
 - Keep the reviewed image and Docker runtime unless the change has separate qualification.
 - Make the Temporal address, namespace, and task queue identical for the service, worker, and client.
@@ -46,7 +46,7 @@ The producer sees only an immutable admitted snapshot and has `read_file`/`list_
 
 ## 3. Establish native reference execution
 
-Before starting Temporal or a model-backed worker, run the native reference replay:
+Before starting a model-backed worker, run the native reference replay (`just demo` runs it after `settings-init`, `temporal-up` and `doctor`; see the [quickstart](../../getting-started/quickstart.md)):
 
 ```bash
 uv run --locked corsair --format human verify \
@@ -59,7 +59,24 @@ This verifies the admitted source/image/runtime path with trusted control and ad
 
 ## 4. Start the durable path
 
-Use three terminals with the same settings and shared artifact root.
+With credentials exported for the worker in the current shell, the recipes start both services in the background:
+
+```bash
+just temporal-up      # Temporal dev server; pid, log and database under .state/
+just worker-up        # corsair worker; waits for its worker.ready event
+uv run --locked corsair doctor --format human --settings .state/settings.json
+
+RUN_ID="case01-$(date +%s)"
+uv run --locked --extra providers corsair investigate \
+  evals/fixtures/case01/request.json --run-id "$RUN_ID" --wait \
+  --format human --settings .state/settings.json
+
+just worker-down temporal-down
+```
+
+`temporal-up` keeps the configured local port (7233 by default) unless it cannot bind it or another server already answers there, for example through a NAT rule forwarding `localhost:7233`; it then records the free port it chose as `temporal_address` in `.state/settings.json`, so every later client uses the same server. It refuses a non-local `temporal_address`. Both `-up` recipes are idempotent; both `-down` recipes signal only the process group they recorded (a stale or reused pid is removed, never signalled), wait for the worker's 45-second drain, and confirm that no member remains. Logs are `.state/temporal.log`, `.state/worker.console.log` and the JSONL `.state/worker.log`.
+
+The recipes run the same commands as three terminals by hand, which remains the way to watch each process directly:
 
 ```bash
 # Terminal 1 — local development persistence only.

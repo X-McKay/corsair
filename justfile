@@ -42,6 +42,32 @@ alias test-offline := test
 images:
     docker build -f deploy/python/Dockerfile -t corsair-python:0.1 .
 
+# Create .state/settings.json from the template with an absolute source_root; never overwrites.
+settings-init:
+    uv run --locked python scripts/local_stack.py settings-init
+
+# Start a background Temporal dev server; pid, log and database live under .state.
+temporal-up: settings-init
+    uv run --locked python scripts/local_stack.py temporal-up
+
+# Stop the Temporal dev server started by temporal-up and confirm it is gone.
+temporal-down:
+    uv run --locked python scripts/local_stack.py temporal-down
+
+# Start a background worker; provider credentials come from this environment.
+worker-up: settings-init
+    uv run --locked python scripts/local_stack.py worker-up
+
+# Stop the worker started by worker-up after its graceful drain.
+worker-down:
+    uv run --locked python scripts/local_stack.py worker-down
+
+# First run without a model: settings, Temporal, doctor, then the case01 native verify.
+demo: settings-init temporal-up
+    uv run --locked python scripts/local_stack.py demo-doctor
+    uv run --locked corsair --format human verify evals/fixtures/case01/request.json evals/fixtures/case01/submission.json --settings .state/settings.json
+    @echo "Next: configure models in .state/settings.json, export provider credentials, run 'just worker-up', then follow docs/getting-started/first-project.md. Stop with 'just worker-down temporal-down'."
+
 # Run real Docker tests; set CORSAIR_TEST_TEMPORAL=1 for integrated durable tests.
 test-docker *args:
     CORSAIR_TEST_DOCKER=1 uv run --locked pytest -m docker "$@"
