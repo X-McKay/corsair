@@ -123,30 +123,44 @@ async def test_audit_input_episode_limits_are_bounded_and_allow_exhausted_admiss
     await asyncio.sleep(0)
 
 
-async def test_native_auditor_does_not_overrun_exhausted_loader_budget():
-    """Run the native ADK runner directly; no Temporal service or live model."""
+async def test_native_auditor_charges_one_call_and_no_tool_within_its_admitted_budget():
+    """Run the native ADK runner directly; no Temporal service or live model.
+
+    The workflow still admits up to two calls and four tools to an audit; the
+    tool-free auditor charges one request and no tool against that sub-budget, and
+    a model naming a tool anyway gets nothing executed.
+    """
 
     from corsair.adapters.inference.adk import run_auditor
     from corsair.settings import ModelSettings
     from tests.unit.adk import ScriptedLlm, text_response, tool_response
 
-    audit_input = _audit_input(llm_call_limit=1, tool_call_limit=0)
-    model = ScriptedLlm(
+    audit_input = _audit_input()
+    reviewed = ScriptedLlm(
         model="scripted",
         responses=[
-            tool_response("load_skill", {"skill_name": "semantic-review"}),
             text_response(
-                '{"decision":"ACCEPT","rule":"independent-evidence-review",'
-                '"reason":"the packet is semantically coherent"}'
-            ),
+                '{"decision":"ACCEPT","rule":"ALL","reason":"the packet is semantically coherent"}'
+            )
         ],
     )
+    output = await run_auditor(audit_input, ModelSettings(), reviewed)
 
-    output = await run_auditor(audit_input, ModelSettings(), model)
+    assert output.feedback is None and output.review is not None
+    assert (output.usage.llm_calls, output.usage.tool_calls) == (1, 0)
+    assert len(reviewed.requests) == 1
 
-    assert output.usage.llm_calls <= audit_input.llm_call_limit
-    assert output.usage.tool_calls <= audit_input.tool_call_limit
-    assert len(model.requests) <= audit_input.llm_call_limit
+    named_tool = ScriptedLlm(
+        model="scripted",
+        responses=[tool_response("load_skill", {"skill_name": "semantic-review"})],
+    )
+    stopped = await run_auditor(
+        _audit_input(llm_call_limit=1, tool_call_limit=0), ModelSettings(), named_tool
+    )
+
+    assert stopped.review is None and stopped.feedback is not None
+    assert (stopped.usage.llm_calls, stopped.usage.tool_calls) == (1, 0)
+    assert len(named_tool.requests) == 1
 
 
 async def test_supported_paired_observation_records_bound_result(

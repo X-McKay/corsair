@@ -34,7 +34,6 @@ from corsair.adapters.scm.local import StoredSourceReader
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.agents.auditor.contracts import AuditInput, AuditOutput, AuditResult
 from corsair.agents.auditor.factory import build_auditor
-from corsair.agents.auditor.toolsets import build_auditor_toolset
 from corsair.agents.producer.contracts import (
     ProducerDecision,
     ProducerInput,
@@ -74,14 +73,9 @@ class _EpisodeAccounting:
     max_llm_calls: int
     max_output_tokens: int
     max_tool_calls: int = 0
-    max_loader_calls: int = 0
     role: str = ""
-    loader_tool_names: frozenset[str] = frozenset()
-    allowed_skill_names: frozenset[str] = frozenset()
     tool_calls: int = 0
-    loader_calls: int = 0
     tool_limit_exhausted: bool = False
-    loader_limit_exhausted: bool = False
     llm_calls: int = 0
     input_tokens: int | None = None
     output_tokens: int | None = None
@@ -90,7 +84,6 @@ class _EpisodeAccounting:
     provider_error_message: str | None = None
     applied_output_cap: int | None = None
     final_response_hit_output_cap: bool = False
-    skills_loaded: list[str] = field(default_factory=list)
     skills_preloaded: list[str] = field(default_factory=list)
 
     async def before_model(
@@ -121,18 +114,12 @@ class _EpisodeAccounting:
     ) -> dict[str, str] | None:
         """Charge every native tool, including ADK schema completion, before work."""
 
-        del args
+        del tool, args
         if self.tool_calls >= self.max_tool_calls:
             self.tool_limit_exhausted = True
             tool_context._invocation_context.end_invocation = True
             return {"error": "tool-call budget exhausted"}
-        if tool.name in self.loader_tool_names and self.loader_calls >= self.max_loader_calls:
-            self.loader_limit_exhausted = True
-            tool_context._invocation_context.end_invocation = True
-            return {"error": "runtime skill loader budget exhausted"}
         self.tool_calls += 1
-        if tool.name in self.loader_tool_names:
-            self.loader_calls += 1
         return None
 
     async def after_model(
@@ -158,34 +145,12 @@ class _EpisodeAccounting:
             self.provider_error_message = str(llm_response.error_message or "")
         return None
 
-    async def after_tool(
-        self,
-        tool: BaseTool,
-        args: dict[str, Any],
-        tool_context: ToolContext,
-        tool_response: dict[str, Any],
-    ) -> None:
-        """Record only an ADK-confirmed successful load of an admitted skill."""
-
-        del args, tool_context
-        if tool.name != "load_skill" or not isinstance(tool_response, dict):
-            return None
-        skill_name = tool_response.get("skill_name")
-        if (
-            tool_response.get("error") is None
-            and isinstance(skill_name, str)
-            and skill_name in self.allowed_skill_names
-            and skill_name not in self.skills_loaded
-        ):
-            self.skills_loaded.append(skill_name)
-            event("agent.skill_loaded", role=self.role, skill_name=skill_name)
-        return None
-
     def usage(self, seconds: float) -> Usage:
         return Usage(
             llm_calls=self.llm_calls,
             tool_calls=self.tool_calls,
-            skills_loaded=self.skills_loaded,
+            # No role exposes a native skill loader: procedures are preloaded only.
+            skills_loaded=[],
             skills_preloaded=self.skills_preloaded,
             input_tokens=self.input_tokens,
             output_tokens=self.output_tokens,
@@ -406,7 +371,6 @@ async def _run_native_episode(
     agent.before_model_callback = accounting.before_model
     agent.after_model_callback = accounting.after_model
     agent.before_tool_callback = accounting.before_tool
-    agent.after_tool_callback = accounting.after_tool
     last_text: str | None = None
     try:
         async with asyncio.timeout(timeout_seconds):
@@ -457,9 +421,7 @@ def _completed_text(
     role = accounting.role
     if operational_feedback is not None:
         return operational_feedback
-    if accounting.loader_limit_exhausted:
-        reason = f"{role} exhausted its runtime skill loader budget before structured completion"
-    elif accounting.tool_limit_exhausted:
+    if accounting.tool_limit_exhausted:
         reason = f"{role} exhausted its tool-call budget before structured completion"
     elif accounting.llm_limit_exhausted:
         reason = f"{role} exhausted its LLM-call budget before structured completion"
@@ -546,16 +508,18 @@ async def run_auditor(
     settings: Settings | ModelSettings,
     model_override: str | BaseLlm | None = None,
 ) -> AuditOutput:
-    """Run one fresh outcome-blind review with finite private procedure loaders."""
+    """Run one fresh outcome-blind review: a single tool-free structured request.
+
+    The auditor declares no tools, so its episode admits no tool call whatever tool
+    budget the caller still holds; ``audit_input.tool_call_limit`` is only an upper
+    bound the workflow checks the (always zero) reported tool usage against.
+    """
 
     started = time.perf_counter()
     spec = load_agent_spec("auditor")
     if spec.llm_call_limit is None:  # Covered by AgentSpec; retain a local safety boundary.
         raise ValueError("auditor metadata must declare a finite native LLM-call limit")
-    if spec.loader_call_limit is None:  # Covered by AgentSpec; retain a local safety boundary.
-        raise ValueError("auditor metadata must declare a finite loader-call limit")
     llm_limit = min(audit_input.llm_call_limit, spec.llm_call_limit)
-    tool_limit = min(audit_input.tool_call_limit, spec.loader_call_limit)
     if llm_limit == 0:
         return AuditOutput(
             usage=Usage(llm_calls=0, tool_calls=0, seconds=time.perf_counter() - started),
@@ -566,17 +530,13 @@ async def run_auditor(
             ),
         )
     model = model_for_role(settings, "auditor") if model_override is None else model_override
-    agent = build_auditor(model, build_auditor_toolset())
+    agent = build_auditor(model)
     for skill_name in spec.runtime_skills:
         event("agent.skill_preloaded", role=spec.name, skill_name=skill_name)
     accounting = _EpisodeAccounting(
         max_llm_calls=llm_limit,
         max_output_tokens=audit_input.max_output_tokens,
-        max_tool_calls=tool_limit,
-        max_loader_calls=tool_limit,
         role=spec.name,
-        loader_tool_names=frozenset(spec.loader_tools),
-        allowed_skill_names=frozenset(spec.runtime_skills),
         skills_preloaded=list(spec.runtime_skills),
     )
     last_agent_text, operational_feedback = await _run_native_episode(

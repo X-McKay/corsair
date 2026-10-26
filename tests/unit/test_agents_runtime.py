@@ -13,7 +13,7 @@ from corsair.adapters.inference.adk import run_auditor, run_producer
 from corsair.adapters.scm.local import StoredSourceReader
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.agents.auditor.contracts import AuditResult as RoleAuditResult
-from corsair.agents.auditor.toolsets import build_auditor_toolset
+from corsair.agents.auditor.factory import build_auditor
 from corsair.agents.producer.contracts import ProducerDecision as RoleProducerDecision
 from corsair.agents.producer.toolsets import build_producer_toolset
 from corsair.agents.resources import load_runtime_skills
@@ -55,8 +55,9 @@ def test_role_contract_re_exports_are_the_canonical_models(tmp_path: Path):
     producer_names = [getattr(tool, "__name__", None) for tool in producer_tools]
     assert producer_names == ["read_file", "list_files"]
     assert not any(isinstance(tool, SkillToolset) for tool in producer_tools)
-    auditor_tools = build_auditor_toolset()
-    assert [skill.name for skill in auditor_tools[0].skills] == ["semantic-review"]
+    auditor = build_auditor("scripted")
+    assert auditor.tools == []
+    assert load_runtime_skills("auditor")[0].instructions in str(auditor.instruction)
 
 
 @pytest.mark.asyncio
@@ -98,32 +99,60 @@ async def test_producer_loader_call_is_a_native_unknown_tool_and_records_no_load
 
 
 @pytest.mark.asyncio
-async def test_auditor_native_load_skill_is_bounded_and_remains_source_free(tmp_path: Path):
+@pytest.mark.parametrize("structured_tools", [False, True])
+async def test_auditor_is_one_tool_free_schema_request_on_every_route(
+    tmp_path: Path, structured_tools: bool
+):
+    """Without tools ADK sends the AuditResult schema itself, even on a route (LiteLLM)
+    whose model cannot pair a schema with tools, so no set_model_response round trip
+    and no generic skill-loading guidance reach the request."""
+
     store = ArtifactStore(tmp_path)
     model = ScriptedLlm(
-        model="scripted-auditor-runtime-skill",
+        model="scripted-auditor-tool-free",
+        structured_tools=structured_tools,
         responses=[
-            tool_response("load_skill", {"skill_name": "semantic-review"}),
             text_response(
-                json.dumps(
-                    {
-                        "decision": "ACCEPT",
-                        "rule": "source-grounded-fixture",
-                        "reason": "The paired payloads exercise the configured seam.",
-                    }
-                )
-            ),
+                json.dumps({"decision": "ACCEPT", "rule": "ALL", "reason": "Line 4 joins."})
+            )
         ],
     )
 
     output = await run_auditor(_audit_input(store), ModelSettings(), model)
 
     assert output.feedback is None and output.review is not None
-    assert output.usage.llm_calls == 2 and output.usage.tool_calls == 1
-    assert output.usage.skills_loaded == ["semantic-review"]
-    assert set(model.requests[0].tools_dict) == {"load_skill", "load_skill_resource"}
-    assert "read_file" not in model.requests[0].tools_dict
-    assert "list_files" not in model.requests[0].tools_dict
+    assert output.usage.llm_calls == 1 and output.usage.tool_calls == 0
+    assert output.usage.skills_loaded == []
+    assert output.usage.skills_preloaded == ["semantic-review"]
+    request = model.requests[0]
+    assert request.tools_dict == {}
+    assert not request.config.tools
+    assert request.config.response_schema is AuditResult
+    assert request.config.response_mime_type == "application/json"
+    system = str(request.config.system_instruction)
+    assert "set_model_response" not in system
+    assert "load_skill" not in system and "<available_skills>" not in system
+
+
+@pytest.mark.asyncio
+async def test_auditor_hallucinated_tool_call_executes_nothing(tmp_path: Path):
+    """A model that names a tool anyway gets no loader: the zero tool budget stops the
+    episode before anything runs, and the stop is a typed invalid audit, not a review."""
+
+    store = ArtifactStore(tmp_path)
+    model = ScriptedLlm(
+        model="scripted-auditor-hallucinated-tool",
+        responses=[tool_response("load_skill", {"skill_name": "semantic-review"})],
+    )
+
+    output = await run_auditor(_audit_input(store), ModelSettings(), model)
+
+    assert output.review is None and output.feedback is not None
+    assert output.feedback.gate == "audit_invalid"
+    assert output.feedback.operational is False
+    assert output.usage.llm_calls == 1 and output.usage.tool_calls == 0
+    assert output.usage.skills_loaded == []
+    assert len(model.requests) == 1
 
 
 @pytest.mark.asyncio

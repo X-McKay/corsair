@@ -70,6 +70,9 @@ for role in ('producer', 'auditor'):
     assert len(runtime_skill_digest(role)) == 64
 assert [skill.name for skill in load_runtime_skills('producer')] == ['source-grounding']
 assert [skill.name for skill in load_runtime_skills('auditor')] == ['semantic-review']
+from corsair.agents.auditor.factory import build_auditor
+assert load_agent_spec('auditor').tools == [] and build_auditor('gemini-2.5-flash').tools == []
+assert 'Runtime procedure: semantic-review' in build_auditor('gemini-2.5-flash').instruction
 assert files('corsair.agents.producer').joinpath('skills/source-grounding/SKILL.md').is_file()
 assert files('corsair.agents.auditor').joinpath('skills/semantic-review/SKILL.md').is_file()
 assert 'pilot risk' in files('corsair.policies').joinpath('risk.md').read_text().lower()

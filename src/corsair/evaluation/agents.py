@@ -24,6 +24,7 @@ from corsair.contracts import (
     ProducerOutput,
     digest,
 )
+from corsair.evaluation.ledger import agent_row_ledger
 from corsair.evaluation.scoring import dataset_root, summarize
 from corsair.observability.logging import configure_logging, event, safe_error_detail
 from corsair.settings import Settings, load_settings
@@ -127,7 +128,7 @@ def fixture_score_row(
 ) -> dict[str, Any]:
     """Persist the output and retain errors, unknown accounting, and evaluation identity."""
     review = output.review if isinstance(output, AuditOutput) else None
-    return {
+    row: dict[str, Any] = {
         "run_id": identity,
         "case_id": case_id,
         "repeat": repeat,
@@ -160,6 +161,9 @@ def fixture_score_row(
         "agent_seconds": output.usage.seconds,
         "feedback": output.feedback.model_dump(mode="json") if output.feedback else None,
     }
+    # Same keys as a composed row's ledger, so report and compare count both per gate.
+    row["gate_ledger"] = agent_row_ledger(row)
+    return row
 
 
 async def evaluate(args: argparse.Namespace) -> int:

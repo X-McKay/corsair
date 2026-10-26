@@ -93,17 +93,15 @@ def test_agent_specs_are_validated_resource_metadata_with_manifest_tools_field()
     auditor = load_agent_spec("auditor")
 
     assert producer.source_tools == ["read_file", "list_files"]
+    # Each role's procedure is preloaded; neither declares a loader.
     assert producer.loader_tools == []
     assert producer.tools == producer.source_tools
-    assert auditor.source_tools == []
-    assert auditor.loader_tools == ["load_skill", "load_skill_resource"]
-    assert auditor.tools == auditor.loader_tools
+    assert auditor.tools == auditor.source_tools == auditor.loader_tools == []
     assert producer.runtime_skills == ["source-grounding"]
     assert auditor.runtime_skills == ["semantic-review"]
     assert producer.llm_call_limit is None
-    assert auditor.llm_call_limit == 2
-    assert producer.loader_call_limit is None
-    assert auditor.loader_call_limit == 4
+    assert auditor.llm_call_limit == 1
+    assert producer.loader_call_limit == auditor.loader_call_limit == 0
     assert producer.risk_path == auditor.risk_path == "corsair.policies:risk.md"
     assert producer.schema_ref == "corsair.contracts.ProducerDecision"
     assert auditor.schema_ref == "corsair.contracts.AuditResult"
@@ -120,17 +118,59 @@ def test_agent_spec_rejects_unknown_metadata_fields():
                 "execution_class": "durable",
                 "governance_tier": "review",
                 "risk_path": "risk",
-                "tools": ["load_skill", "load_skill_resource"],
+                "tools": [],
                 "source_tools": [],
-                "loader_tools": ["load_skill", "load_skill_resource"],
+                "loader_tools": [],
                 "runtime_skills": ["semantic-review"],
-                "loader_call_limit": 4,
-                "llm_call_limit": 2,
+                "loader_call_limit": 0,
+                "llm_call_limit": 1,
                 "instruction_resource": "resource",
                 "schema_ref": "corsair.contracts.AuditResult",
                 "model": "must-not-be-declared-here",
             }
         )
+
+
+def _auditor_spec(**overrides: object) -> dict[str, object]:
+    spec: dict[str, object] = {
+        "name": "auditor",
+        "contract_version": "corsair.agent/2",
+        "execution_class": "durable",
+        "governance_tier": "review",
+        "risk_path": "risk",
+        "tools": [],
+        "source_tools": [],
+        "loader_tools": [],
+        "runtime_skills": ["semantic-review"],
+        "loader_call_limit": 0,
+        "llm_call_limit": 1,
+        "instruction_resource": "resource",
+        "schema_ref": "corsair.contracts.AuditResult",
+    }
+    return {**spec, **overrides}
+
+
+def test_agent_spec_admits_the_tool_free_auditor():
+    assert AgentSpec.model_validate(_auditor_spec()).tools == []
+
+
+_LOADERS = ["load_skill", "load_skill_resource"]
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        (
+            {"tools": _LOADERS, "loader_tools": _LOADERS, "loader_call_limit": 4},
+            "auditor procedure is preloaded; loader_tools must be empty",
+        ),
+        ({"loader_call_limit": 2}, "loader_call_limit 0"),
+        ({"tools": ["read_file"], "source_tools": ["read_file"]}, "must not expose any tools"),
+    ],
+)
+def test_agent_spec_rejects_any_auditor_tool(overrides: dict[str, object], message: str):
+    with pytest.raises(ValueError, match=message):
+        AgentSpec.model_validate(_auditor_spec(**overrides))
 
 
 def _producer_metadata(**changes: object) -> dict[str, object]:
@@ -139,22 +179,17 @@ def _producer_metadata(**changes: object) -> dict[str, object]:
 
 def test_producer_spec_preloads_its_procedure_without_a_native_loader():
     AgentSpec.model_validate(_producer_metadata())
-    loaders = ["load_skill", "load_skill_resource"]
-    with pytest.raises(ValueError, match="must not expose a loader"):
+    with pytest.raises(ValueError, match="producer procedure is preloaded; loader_tools"):
         AgentSpec.model_validate(
             _producer_metadata(
-                tools=["read_file", "list_files", *loaders],
-                loader_tools=loaders,
+                tools=["read_file", "list_files", *_LOADERS],
+                loader_tools=_LOADERS,
                 loader_call_limit=4,
             )
         )
-    with pytest.raises(ValueError, match="loader_call_limit is declared exactly when"):
+    with pytest.raises(ValueError, match="loader_call_limit 0"):
         AgentSpec.model_validate(_producer_metadata(loader_call_limit=4))
-    with pytest.raises(ValueError, match="loader_tools must be empty or exactly"):
+    with pytest.raises(ValueError, match="producer source_tools must exactly expose"):
         AgentSpec.model_validate(
-            _producer_metadata(
-                tools=["read_file", "list_files", "load_skill"],
-                loader_tools=["load_skill"],
-                loader_call_limit=4,
-            )
+            _producer_metadata(tools=["read_file"], source_tools=["read_file"])
         )

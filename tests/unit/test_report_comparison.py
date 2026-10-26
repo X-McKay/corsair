@@ -219,3 +219,43 @@ def test_read_report_validates_summary_and_rows(tmp_path):
     path.write_text(json.dumps({"summary": {}, "rows": ["not-a-row"]}))
     with pytest.raises(ValueError, match="list of objects"):
         read_report(path)
+
+
+def _stops(*gates):
+    return [
+        {"session": 1, "round": i + 1, "stage": "kernel", "gate": g, "reason": "r"}
+        for i, g in enumerate(gates)
+    ]
+
+
+def test_composed_gate_deltas_name_the_moved_gates_without_deciding_a_regression():
+    baseline = report(
+        row("case01", gate_ledger=_stops("demonstrated")),
+        row("case02", status="fail", verdict="INCONCLUSIVE", gate_ledger=_stops("coverage")),
+    )
+    candidate = report(
+        row("case01", gate_ledger=_stops("audit_reject", "demonstrated")),
+        row("case02", status="fail", verdict="INCONCLUSIVE", gate_ledger=_stops("audit_reject")),
+    )
+
+    diff = compare_reports(baseline, candidate)
+
+    # A moved gate with no status flip, label change or lost case is not a regression.
+    assert diff["regression"] is False
+    assert diff["gate_delta"]["gate_ledger"] == [
+        {"gate": "audit_reject", "baseline": 0, "candidate": 2, "delta": 2},
+        {"gate": "coverage", "baseline": 1, "candidate": 0, "delta": -1},
+        {"gate": "demonstrated", "baseline": 1, "candidate": 1, "delta": 0},
+    ]
+    assert diff["gate_delta"]["failure_stops"] == [
+        {"gate": "audit_reject", "baseline": 0, "candidate": 1, "delta": 1},
+        {"gate": "coverage", "baseline": 1, "candidate": 0, "delta": -1},
+    ]
+    stops = [(case["baseline_stop"], case["candidate_stop"]) for case in diff["cases"]]
+    assert stops == [("demonstrated", "demonstrated"), ("coverage", "audit_reject")]
+
+
+def test_rows_without_any_ledger_have_no_gate_delta_or_stop():
+    diff = compare_reports(report(row("case01")), report(row("case01")))
+    assert diff["gate_delta"] == {"gate_ledger": [], "failure_stops": []}
+    assert diff["cases"][0]["baseline_stop"] is None

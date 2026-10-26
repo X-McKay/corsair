@@ -30,9 +30,11 @@ All contracts are frozen, reject unknown fields, and disallow non-finite floats.
 | `pids_limit` | `64` | Integer from `16` through `512`. |
 | `source_limit_bytes` | `8388608` | Integer from `1024` through `33554432`; bounds admitted source bytes. |
 | `source_limit_files` | `1000` | Integer from `1` through `10000`; bounds admitted source files. |
+| `max_concurrent_activities` | `4` | Integer from `1` through `64`; the worker's Temporal activity task slots. An investigation has at most one activity in flight, so this caps how many investigations, including an evaluation batch's child workflows, make progress at once; an evidence activity runs one container at a time, so it also caps concurrent target containers. Activities above it wait in the task queue, and that wait counts against each activity's schedule-to-close deadline. See [sizing worker concurrency](../guides/deployment.md#size-worker-concurrency). |
+| `max_concurrent_workflow_tasks` | `100` | Integer from `2` through `1000`; the worker's workflow task slots (the SDK default; the SDK requires at least two while workflows are cached). Workflow tasks are short deterministic replays and rarely limit throughput. |
 | `models` | a default `ModelSettings` | Nested model-selection configuration below. |
 
-`Settings.identity` is a SHA-256 digest of the canonical JSON representation of the validated settings. It is used as configuration identity in run metadata; it is not a secret store.
+`Settings.identity` is a SHA-256 digest of the canonical JSON representation of the validated settings. It is used as configuration identity in run metadata; it is not a secret store. It covers operational fields too (for example `task_queue` and the worker slot counts), so changing one changes the identity.
 
 ## `ModelSettings`
 

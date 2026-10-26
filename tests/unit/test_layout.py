@@ -107,7 +107,9 @@ def test_role_local_agent_layout_has_only_concrete_source_tools_and_native_tools
     assert (producer / "tools/read_file.py").is_file()
     assert (producer / "tools/list_files.py").is_file()
     assert (producer / "toolsets.py").is_file()
-    assert (auditor / "toolsets.py").is_file()
+    # The auditor is tool-free: no toolset module, no tools package.
+    assert not (auditor / "toolsets.py").exists()
+    assert not (auditor / "tools").exists()
     assert (producer / "contracts.py").is_file()
     assert (auditor / "contracts.py").is_file()
 
