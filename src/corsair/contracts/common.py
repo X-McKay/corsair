@@ -77,6 +77,48 @@ class ArtifactRef(Contract):
     media_type: str = "application/json"
 
 
+# Per-call telemetry lists keep at most this many entries each; beyond it only the
+# episode totals grow and ``Usage.calls_truncated`` is set, which keeps a saved
+# result inside its size cap however long an episode runs.
+MAX_USAGE_CALL_ENTRIES = 64
+
+
+class ModelCall(Contract):
+    """One dispatched model request, as the provider reported it.
+
+    ``index`` is the 1-based dispatch ordinal within the episode.  A count the
+    provider did not report is ``None``, never 0.  ``cached_input_tokens`` is
+    recorded only when the provider reports a positive count, because ADK's LiteLLM
+    route reports an absent cache figure as 0.  ``output_tokens`` is the provider's
+    candidate count exactly as reported: on OpenAI-compatible routes it already
+    includes reasoning tokens, on ADK's native Gemini route it excludes them, and
+    ``thought_tokens`` is never added to it.  ``seconds`` spans dispatch to the
+    complete response.
+    """
+
+    index: int = Field(ge=1)
+    input_tokens: int | None = Field(default=None, ge=0)
+    cached_input_tokens: int | None = Field(default=None, ge=0)
+    output_tokens: int | None = Field(default=None, ge=0)
+    thought_tokens: int | None = Field(default=None, ge=0)
+    seconds: float = Field(ge=0)
+
+
+class ToolCall(Contract):
+    """One native tool call admitted by the episode's tool budget.
+
+    ``index`` is the 1-based admission ordinal.  ``result_bytes`` is the size of the
+    tool's response as compact JSON and ``truncated`` is whether the tool itself
+    reported a truncated result.  ``seconds`` spans admission to the response.
+    """
+
+    index: int = Field(ge=1)
+    name: str = Field(min_length=1, max_length=128)
+    result_bytes: int = Field(ge=0)
+    truncated: StrictBool
+    seconds: float = Field(ge=0)
+
+
 class Usage(Contract):
     llm_calls: int = Field(default=0, ge=0)
     tool_calls: int = Field(default=0, ge=0)
@@ -89,6 +131,16 @@ class Usage(Contract):
     input_tokens: int | None = Field(default=None, ge=0)
     output_tokens: int | None = Field(default=None, ge=0)
     seconds: float = Field(default=0, ge=0)
+    # Telemetry added after results were first saved; every field defaults so those
+    # results still decode.  Totals sum the per-call reports and stay ``None`` when
+    # no call reported a value (see ``ModelCall`` for the cached and thought rules).
+    cached_input_tokens: int | None = Field(default=None, ge=0)
+    thought_tokens: int | None = Field(default=None, ge=0)
+    model_calls: list[ModelCall] = Field(default_factory=list, max_length=MAX_USAGE_CALL_ENTRIES)
+    tool_calls_detail: list[ToolCall] = Field(
+        default_factory=list, max_length=MAX_USAGE_CALL_ENTRIES
+    )
+    calls_truncated: StrictBool = False
 
     @field_validator("skills_loaded", "skills_preloaded")
     @classmethod
