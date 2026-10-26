@@ -56,6 +56,7 @@ class CliArguments(argparse.Namespace):
     case: str | None
     limit: int | None
     evidence: bool
+    model: bool
 
 
 def validate_run_id(value: str) -> str:
@@ -128,9 +129,12 @@ async def _handle_doctor(args: CliArguments, ui: Terminal) -> int:
     """Run the read-only infrastructure diagnosis."""
     from corsair.entrypoints.diagnostics import diagnose
 
-    report = await ui.wait(
-        diagnose(_settings(args)), "Checking real Docker and Temporal infrastructure"
+    message = (
+        "Checking real Docker, Temporal and model provider routes"
+        if args.model
+        else "Checking real Docker and Temporal infrastructure"
     )
+    report = await ui.wait(diagnose(_settings(args), model=args.model), message)
     ui.emit(report)
     return 0 if report["ready"] else 1
 
@@ -465,7 +469,8 @@ def parser() -> argparse.ArgumentParser:
     root.add_argument("--version", action="version", version="%(prog)s 0.1.0")
     sub = root.add_subparsers(dest="command", required=True, title="commands")
     descriptions = {
-        "doctor": "Check actual Docker, namespace and worker poller readiness; no model calls",
+        "doctor": "Check actual Docker, namespace and worker poller readiness; "
+        "--model also probes the model routes",
         "worker": "Run the native Temporal worker; Ctrl+C stops gracefully",
         "investigate": "Submit a durable investigation; use --wait for live phase updates",
         "inspect": "Read a committed result or query/watch the native Temporal workflow",
@@ -481,6 +486,11 @@ def parser() -> argparse.ArgumentParser:
     for name, description in descriptions.items():
         commands[name] = sub.add_parser(name, help=description, description=description)
         _presentation_options(commands[name])
+    commands["doctor"].add_argument(
+        "--model",
+        action="store_true",
+        help="Also send minimal requests (32-token text, one trivial tool) to each role model",
+    )
     investigate = commands["investigate"]
     investigate.add_argument(
         "request", help="Case request JSON; source paths relative to this file"

@@ -89,7 +89,24 @@ corsair --format json doctor --settings .state/settings.json
 - the configured Temporal address and namespace are reachable; and
 - the configured task queue has worker pollers.
 
-It makes no model request and does not validate provider credentials, model availability, prompt policy, or a future investigation’s likely result. It does not build an image, create directories, start a worker, change Docker/Temporal state, or submit a workflow. It does not create or modify source content.
+By default it makes no model request and does not validate provider credentials, model availability, prompt policy, or a future investigation’s likely result. It does not build an image, create directories, start a worker, change Docker/Temporal state, or submit a workflow. It does not create or modify source content.
+
+```bash
+corsair doctor --model --format human --settings .state/settings.json
+```
+
+`--model` adds provider-route checks after the infrastructure checks. It sends no agent prompt, source, finding, or Corsair packet; the probes are short fixed sentences, sent through the same ADK model object each role uses (`model_for_role`; a plain Gemini id resolves through ADK's model registry, as an agent does):
+
+| Check | What it reports |
+| --- | --- |
+| `model_config` | Connector, producer and auditor model names, the `api_base` host and port only (never userinfo, path, query, or fragment), `request_timeout_seconds`, and the `extra_body` key names. |
+| `model_credentials` | Whether each role's provider credential variable is set, by **name only**; the value is never read into the report. A missing required variable fails; a route with no known variable warns. |
+| `model_producer`, `model_auditor` | One non-streaming request per role with a 32-token output cap and no tools: latency, finish reason, and reported output tokens. Stopping at the probe cap still passes, because the route answered; reasoning tokens count against the cap, and role caps are separate. |
+| `model_producer_tools` | One request on the producer model declaring a single argument-free tool, with a 128-token cap. It passes only when the response is a native call of that tool. When the model declares that it supports a response schema alongside tools, the probe pairs a trivial schema with the tool, as the producer's requests do. A text answer fails (the route would void every producer episode); stopping at the cap without a call is an inconclusive `warn`. |
+
+Credential variables follow the connector's conventions: `gemini` needs `GOOGLE_API_KEY` or `GEMINI_API_KEY` (or `GOOGLE_CLOUD_PROJECT` when `GOOGLE_GENAI_USE_VERTEXAI` is `true`); `litellm` routes map by model prefix: `openai/` to `OPENAI_API_KEY`, `anthropic/` to `ANTHROPIC_API_KEY`, `gemini/` to `GEMINI_API_KEY` or `GOOGLE_API_KEY`, `openrouter/`, `groq/`, `mistral/`, `deepseek/`, `xai/` to their `PREFIX_API_KEY`, `together_ai/` to `TOGETHERAI_API_KEY`; `hosted_vllm/` (`HOSTED_VLLM_API_KEY`) and `litellm_proxy/` (`LITELLM_PROXY_API_KEY`) are optional, and `ollama/` needs none. The mapping lives in [`diagnostics.py`](../../src/corsair/entrypoints/diagnostics.py).
+
+Each request is bounded by `request_timeout_seconds` plus five seconds, and the three run concurrently. A failed model check carries sanitized detail and, for a known class (timeout, authentication, unknown model, connection, missing providers extra, missing tool call), a fixed `remedy`. A ready `--model` report shows that each route answered a minimal request and that the producer route returns tool calls. It is not a provider qualification: prompt-sized requests, provider policy, role output caps, evidence, and accuracy remain untested, and the requests are billed like any other.
 
 A failed doctor report identifies the failed dependency, adds the same fixed `remedy` to a failed check of a known class, and exits nonzero. A missing workflow or activity task-queue poller is reported as a warning check, but the overall report is not ready and exits `1`. Resolve the dependency rather than bypassing the check or substituting fake health data.
 
