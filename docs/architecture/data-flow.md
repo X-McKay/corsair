@@ -7,9 +7,7 @@ request + settings
       │
       ▼
 prepare ──► manifest + immutable admitted source snapshot
-      │
-      ▼
-pre-model gates: target_binding → ast_guard → build_replay
+      │       (request load already bound finding.file to the recipe's module)
       │
       ▼  (one producer session per bounded Temporal round)
 producer ADK episode ──► Submission (benign/exploit payload pair)
@@ -35,19 +33,20 @@ verdict table in code ──► one of six labels ──► immutable result art
 
 ## 1. Admission and run identity
 
-The request identifies the recipe, the finding (file, exact target line, CWE), a bounded budget, the source to admit, and an optional fix revision. `prepare` resolves the configured immutable image identity, then admits the source through the local snapshot adapter. Admission uses descriptor/no-follow checks, rejects unsafe/sensitive entries, produces deterministic bounded archive bytes, and can enforce an expected digest. The resulting `PreparedCase` refers to an artifact rather than a live checkout path.
+The request identifies the recipe, the finding (file and, when known, the exact target line), a bounded budget, the source to admit, and an optional fix revision. `prepare` resolves the configured immutable image identity, then admits the source through the local snapshot adapter. Admission uses descriptor/no-follow checks, rejects unsafe/sensitive entries, produces deterministic bounded archive bytes, and can enforce an expected digest. The resulting `PreparedCase` refers to an artifact rather than a live checkout path.
 
-A `RunManifest` records request/configuration identity, image ID, model names, prompt and agent-spec digests, output-schema digests, budget digest, `negative_threshold`, and risk-assessment digest. These identities make a receipt attributable to the resources actually used; they do not make the source or target trustworthy.
+A `RunManifest` records request/configuration identity, image ID, model names, prompt and agent-spec digests, output-schema digests, budget digest, and risk-assessment digest. These identities make a receipt attributable to the resources actually used; they do not make the source or target trustworthy.
 
-## 2. Pre-model gates
+A request may also originate from an upstream security scanner. The intake mapping in [`src/corsair/entrypoints/requests.py`](../../src/corsair/entrypoints/requests.py) reads a `ScanReport` ([`src/corsair/contracts/intake.py`](../../src/corsair/contracts/intake.py)) and maps one scanner finding onto an internal `Finding`. The scanner's severity, confidence, category and narrative are untrusted self-assessment: they are carried on the finding as a `ScannerClaim` for reporting only and are never read by the verdict kernel, nor placed in any producer or auditor prompt. A scanner finding's claimed scope maps conservatively to `application`, so a genuine demonstration against the supplied repositories is capped at `COMPONENT_EXPLOIT_DEMONSTRATED`: the supplied repositories bound what can be demonstrated, and driving a real application entry point needs an application-entry recipe mechanism that is a known follow-up. A finding whose file is absent from the admitted source cannot bind its target line and resolves `UNABLE_TO_RUN`, never a demonstration or a clean negative.
 
-Three gates run before any model is called, so that a case that cannot be exercised neither consumes a producer session nor is mistaken for a negative:
+## 2. Request binding and admission
 
-- `target_binding` resolves the finding's file and target line inside the admitted snapshot.
-- `ast_guard` confirms the target line sits inside a callable the recipe can reach and that the recipe's fixed arguments apply to it.
-- `build_replay` confirms the snapshot imports and builds inside the pinned image.
+Corsair does not run separate pre-model AST or build gates today; the Python-only pilot recipe has no build step. Two checks stand between a request and a producer session:
 
-A failure at any of these is `UNABLE_TO_RUN`. The gate module is [`src/corsair/policies/verdicts.py`](../../src/corsair/policies/verdicts.py); the admission contracts are in [`src/corsair/contracts/sources.py`](../../src/corsair/contracts/sources.py).
+- At request load, a `Case` validator requires `finding.file == recipe.module_file`, so a finding that does not bind to its recipe's module is rejected before any work is spent. The admission contracts are in [`src/corsair/contracts/sources.py`](../../src/corsair/contracts/sources.py).
+- Admission snapshots the source into an immutable artifact, so every later run reads the same bytes.
+
+The target line itself is bound at verdict time, not before the model: a finding with no declared line is `UNABLE_TO_RUN`, and a declared line that does not execute in both runs is `INCONCLUSIVE` (see §4 and §6). A cheap pre-model `target_binding` gate (line present and within the recipe's callable) is planned follow-up; until it lands, a bad or absent line costs one producer session before the verdict-time gate catches it. The policy module is [`src/corsair/policies/verdicts.py`](../../src/corsair/policies/verdicts.py).
 
 ## 3. Producer session
 

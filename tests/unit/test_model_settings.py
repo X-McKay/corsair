@@ -34,7 +34,7 @@ def test_litellm_model_uses_only_configured_endpoint_controls(monkeypatch):
     value = model_for_role(
         ModelSettings(
             connector="litellm",
-            producer="openai/example",
+            producer="hosted_vllm/example",
             api_base="https://provider.example/v1",
             request_timeout_seconds=17,
             extra_body={"reasoning_effort": "low"},
@@ -44,13 +44,29 @@ def test_litellm_model_uses_only_configured_endpoint_controls(monkeypatch):
 
     assert isinstance(value, FakeLiteLlm)
     assert captured == {
-        "model": "openai/example",
+        "model": "hosted_vllm/example",
         "api_base": "https://provider.example/v1",
         "timeout": 17,
         "num_retries": 0,
         "extra_body": {"reasoning_effort": "low"},
     }
     assert "api_key" not in captured
+
+
+def test_litellm_openai_route_is_rejected_for_the_tool_using_producer():
+    """The producer uses tools; ADK pairs its schema with them, and a LiteLLM
+    'openai/' route backed by vLLM guided-decodes and blocks tool calls. The
+    combination is rejected at config time rather than silently voiding a run."""
+    with pytest.raises(ValueError, match="guided decoding"):
+        ModelSettings(connector="litellm", producer="openai/qwen")
+
+
+def test_litellm_openai_route_is_allowed_for_the_tool_free_auditor():
+    """The auditor has no tools, so a schema-only 'openai/' route is safe for it."""
+    settings = ModelSettings(
+        connector="litellm", producer="hosted_vllm/qwen", auditor="openai/qwen"
+    )
+    assert settings.auditor == "openai/qwen"
 
 
 def test_agent_specs_are_validated_resource_metadata_with_manifest_tools_field():

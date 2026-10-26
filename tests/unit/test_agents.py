@@ -325,6 +325,46 @@ def test_role_prompts_exclude_oracles_case_paths_private_secret_and_audit_outcom
     assert model_text
 
 
+def test_role_prompts_exclude_the_untrusted_scanner_self_assessment(tmp_path: Path):
+    """A finding carrying a scanner claim must not expose that claim to either model:
+    the producer and auditor are grounded in the finding and source alone, never in
+    the scanner's severity, confidence or its own exploit narrative."""
+    from corsair.contracts import Repository, ScannerClaim
+
+    store = ArtifactStore(tmp_path)
+    producer_input = _producer_input(store)
+    claim = ScannerClaim(
+        severity="SCANNER_SEVERITY_DO_NOT_PROMPT",
+        confidence=0.99,
+        exploit_scenario="SCANNER_NARRATIVE_DO_NOT_PROMPT",
+        recommendation="SCANNER_RECOMMENDATION_DO_NOT_PROMPT",
+        application="SCANNER_APPLICATION_DO_NOT_PROMPT",
+        repositories=[Repository(name="svc", url="https://example.invalid/svc")],
+    )
+    finding = producer_input.prepared.finding.model_copy(update={"scanner": claim})
+    prepared = producer_input.prepared.model_copy(update={"finding": finding})
+    producer_packet = _producer_prompt(producer_input.model_copy(update={"prepared": prepared}))
+    audit_packet = _auditor_prompt(
+        AuditInput(
+            finding=finding,
+            recipe=prepared.recipe,
+            source_excerpt=prepared.source_excerpt,
+            submission=Submission(**_submit_args()),
+            max_output_tokens=512,
+        )
+    )
+
+    for sentinel in (
+        "SCANNER_SEVERITY_DO_NOT_PROMPT",
+        "SCANNER_NARRATIVE_DO_NOT_PROMPT",
+        "SCANNER_RECOMMENDATION_DO_NOT_PROMPT",
+        "SCANNER_APPLICATION_DO_NOT_PROMPT",
+        "scanner",
+    ):
+        assert sentinel not in producer_packet
+        assert sentinel not in audit_packet
+
+
 @pytest.mark.parametrize(
     "invalid_field", ["string_plan", "unknown_field", "missing_plan", "parent"]
 )

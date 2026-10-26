@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from corsair.contracts import Contract, digest
 
@@ -37,6 +37,22 @@ class ModelSettings(Contract):
         if set(value) - {"reasoning", "reasoning_effort", "thinking"}:
             raise ValueError("extra_body supports reasoning controls only")
         return value
+
+    @model_validator(mode="after")
+    def guard_litellm_openai_tool_route(self):
+        # The producer is a tool-using agent, and ADK pairs its response schema with
+        # those tools. On a LiteLLM "openai/" route backed by vLLM, guided decoding
+        # then blocks tool calls entirely, silently voiding every producer episode.
+        # Reject the combination at config time rather than lose a whole run to it.
+        # The auditor is tool-free, so a schema-only "openai/" route is fine for it.
+        if self.connector == "litellm" and self.producer.startswith("openai/"):
+            raise ValueError(
+                "the producer uses tools and ADK pairs its response schema with them; "
+                "on a LiteLLM 'openai/' route vLLM's guided decoding blocks tool calls "
+                "and voids the run. Serve the producer on a route that does not "
+                "guided-decode alongside tools (e.g. a native provider connector)."
+            )
+        return self
 
 
 class Settings(Contract):

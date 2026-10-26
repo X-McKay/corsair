@@ -10,6 +10,7 @@ from typing import Literal
 from pydantic import Field, JsonValue, field_validator, model_validator
 
 from .common import ArtifactRef, Contract, Digest, Identifier, safe_path
+from .intake import ScannerClaim
 
 
 class Source(Contract):
@@ -30,6 +31,9 @@ class Finding(Contract):
     file: str
     line: int | None = Field(default=None, ge=1)
     claim_scope: Scope = Scope.COMPONENT
+    # The upstream scanner's untrusted self-assessment, carried for reporting only.
+    # The verdict kernel never reads this; see corsair.contracts.intake.
+    scanner: ScannerClaim | None = None
 
     _safe_file = field_validator("file")(safe_path)
 
@@ -115,11 +119,16 @@ class Case(Contract):
 
 
 class Budget(Contract):
+    # Defaults are sized for a thinking model on a live provider: a producer episode
+    # must cover reading several files AND submitting a pair (episode_llm_calls), the
+    # case budget must leave room for a second independent session (max_llm_calls),
+    # and the answer budget must sit well above a model's reasoning spend
+    # (max_output_tokens) or the submission is truncated to MAX_TOKENS.
     max_rounds: int = Field(default=3, ge=1, le=16)
-    max_llm_calls: int = Field(default=16, ge=2, le=128)
-    episode_llm_calls: int = Field(default=4, ge=1, le=32)
-    max_tool_calls: int = Field(default=24, ge=1, le=256)
-    max_output_tokens: int = Field(default=4096, ge=256, le=16384)
+    max_llm_calls: int = Field(default=48, ge=2, le=128)
+    episode_llm_calls: int = Field(default=12, ge=1, le=32)
+    max_tool_calls: int = Field(default=48, ge=1, le=256)
+    max_output_tokens: int = Field(default=12288, ge=256, le=16384)
     max_elapsed_seconds: int = Field(default=900, ge=30, le=3600)
     probe_timeout_seconds: int = Field(default=30, ge=1, le=300)
     tool_output_bytes: int = Field(default=32768, ge=1024, le=131072)
