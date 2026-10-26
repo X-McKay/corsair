@@ -70,6 +70,12 @@ def _assert_private(statements: list[dict]) -> None:
         assert marker not in rendered, marker
 
 
+def _distinct_proposal() -> ProducerOutput:
+    """A second candidate on a different exploit payload: only distinct candidates count."""
+    submission = _submission().model_copy(update={"exploit_payload": "../other/secret.txt"})
+    return ProducerOutput(decision=ProducerDecision(kind="proposal", submission=submission))
+
+
 def test_exploit_demonstrated_names_the_rule_and_the_only_thing_that_withholds_it():
     result = _result(
         [_round(_proposal(), _observation(_HELD, _VIOLATION), _audit())],
@@ -128,7 +134,7 @@ def test_exploit_not_demonstrated_counts_clean_negatives_against_the_threshold()
     result = _result(
         [
             _round(_proposal(), _clean_negative(), _audit()),
-            _round(_proposal(), _clean_negative(), _audit(), session=2),
+            _round(_distinct_proposal(), _clean_negative(), _audit(), session=2),
         ],
         verdict=Verdict.EXPLOIT_NOT_DEMONSTRATED,
     )

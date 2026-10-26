@@ -27,6 +27,7 @@ from corsair.contracts import (
     Scope,
     Verdict,
 )
+from corsair.policies.verdicts import candidate_key
 
 # Default evidence policy, used only when an older result recorded no manifest.
 _DEFAULT_THRESHOLD = 2
@@ -71,6 +72,15 @@ _GATES: dict[str, tuple[str, str]] = {
     "producer_abstained": (
         "the producer abstained instead of proposing a payload pair",
         "a grounded payload-pair proposal for the recipe's seam",
+    ),
+    "clean_negative_unqualified": (
+        "the pair held, but the recipe kind has no qualified auditor rubric, so the kernel "
+        "withheld the clean negative",
+        "a recipe kind whose auditor rubric is qualified for clean negatives",
+    ),
+    "negative_threshold_unmet": (
+        "fewer distinct clean-negative candidates were reached than the policy requires",
+        "the admitted number of independent clean negatives on distinct exploit payloads",
     ),
     "producer_no_submission": (
         "the producer made no proposal",
@@ -269,17 +279,23 @@ def _policy_gates(ledger: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]
 def _clean_negatives(
     result: InvestigationResult, sessions: Mapping[int, list[RoundResult]], entries: Mapping
 ) -> int:
-    """Sessions whose last evaluated round was a clean negative, as the ledger counts them."""
-    clean = set()
+    """Distinct candidates whose session ended in a clean negative, as the kernel counts them.
+
+    A session is clean by its last evaluated round; two sessions that held on the same
+    exploit payload are one candidate, never two independent negatives.
+    """
+    clean: dict[int, str] = {}
     for session, rounds in sessions.items():
         decided = _evaluated(rounds)
         entry = entries.get((session, decided.index)) if decided is not None else None
-        if entry is not None and entry.get("gate") == "clean_negative":
-            clean.add(session)
+        if entry is not None and entry.get("gate") == "clean_negative" and decided is not None:
+            decision = decided.producer.decision
+            submission = decision.submission if decision is not None else None
+            clean[session] = candidate_key(submission) if submission is not None else ""
     if result.execution_status is not ExecutionStatus.COMPLETED and result.rounds:
         # A terminal operational failure overrides the last session's outcome.
-        clean.discard(result.rounds[-1].session)
-    return len(clean)
+        clean.pop(result.rounds[-1].session, None)
+    return len({key for key in clean.values() if key})
 
 
 def _session_statements(

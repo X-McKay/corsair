@@ -47,6 +47,7 @@ from corsair.contracts import (
     Verdict,
     digest,
 )
+from corsair.contracts.recipes import CLEAN_NEGATIVE_QUALIFIED_KINDS
 from corsair.evaluation import intake
 from corsair.evaluation.scoring import score
 from corsair.observability.logging import safe_error_detail, safe_text
@@ -254,6 +255,26 @@ def claim_scope_problems(scope: Scope, oracle: Oracle) -> list[str]:
         problems.append(
             f"expected_verdict {unreachable.value} is unreachable for a {scope.value}-scope "
             f"claim, which a demonstration labels {reachable.value}"
+        )
+    return problems
+
+
+def negative_label_problems(kind: str, oracle: Oracle) -> list[str]:
+    """A negative label the kernel withholds for a recipe kind without a qualified rubric."""
+    if kind in CLEAN_NEGATIVE_QUALIFIED_KINDS:
+        return []
+    negative = Verdict.EXPLOIT_NOT_DEMONSTRATED
+    acceptable = oracle.acceptable_verdicts
+    problems: list[str] = []
+    if acceptable is not None and acceptable == [negative]:
+        problems.append(
+            f"acceptable_verdicts admits only {negative.value} but clean negatives are withheld "
+            f"for {kind} (auditor rubric not qualified)"
+        )
+    elif oracle.expected_verdict is negative:
+        problems.append(
+            f"expected_verdict {negative.value} is unreachable for {kind}: clean negatives are "
+            "withheld until its auditor rubric is qualified"
         )
     return problems
 
@@ -483,6 +504,8 @@ def _validate_case_dataset(
                 if oracle is not None:
                     scope = request.case.finding.claim_scope
                     for problem in claim_scope_problems(scope, oracle):
+                        entry.fail("oracle", problem)
+                    for problem in negative_label_problems(request.case.recipe.kind, oracle):
                         entry.fail("oracle", problem)
                 validator.binding(entry, request, oracle)
     try:

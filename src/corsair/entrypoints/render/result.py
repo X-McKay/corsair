@@ -93,7 +93,14 @@ _EVIDENCE_SCOPE = "component (recipe seam)"
 # Case-level ledger stops whose reason is a fixed, code-authored sentence. Every other
 # ledger reason may repeat model text (an abstention, an audit reason) or the result's
 # own reason, so the human view names only the stage and gate.
-_CODE_REASON_STOPS = frozenset({"fix_not_blocked", "negative_threshold_unmet", "budget_exhausted"})
+_CODE_REASON_STOPS = frozenset(
+    {
+        "fix_not_blocked",
+        "negative_threshold_unmet",
+        "budget_exhausted",
+        "clean_negative_unqualified",
+    }
+)
 
 
 def _outcome(role: RoleObservation) -> Text:

@@ -18,6 +18,7 @@ from corsair.entrypoints.terminal import Terminal
 from corsair.evaluation.datasets import (
     case_oracle_problems,
     claim_scope_problems,
+    negative_label_problems,
     validate_dataset,
     validate_datasets,
 )
@@ -295,6 +296,40 @@ def test_case_oracle_contradictions_are_named(oracle, problem):
 )
 def test_a_demonstration_label_must_be_reachable_for_the_claimed_scope(scope, oracle, problems):
     assert claim_scope_problems(scope, Oracle.model_validate(oracle)) == problems
+
+
+@pytest.mark.parametrize(
+    ("kind", "oracle", "count"),
+    [
+        (
+            "javascript.prototype_pollution/1",
+            {"acceptable": ["SUPPORTED"], "acceptable_verdicts": ["EXPLOIT_NOT_DEMONSTRATED"]},
+            1,
+        ),
+        (
+            "ruby.secret_disclosure/1",
+            {"acceptable": ["SUPPORTED"], "expected_verdict": "EXPLOIT_NOT_DEMONSTRATED"},
+            1,
+        ),
+        (
+            "python.secret_disclosure/1",
+            {"acceptable": ["SUPPORTED"], "expected_verdict": "EXPLOIT_NOT_DEMONSTRATED"},
+            0,
+        ),
+        (
+            "c.integer_overflow/1",
+            {
+                "acceptable": ["SUPPORTED"],
+                "acceptable_verdicts": ["EXPLOIT_NOT_DEMONSTRATED", "INCONCLUSIVE"],
+            },
+            0,
+        ),
+    ],
+)
+def test_a_negative_label_is_unreachable_for_a_kind_whose_rubric_is_not_qualified(
+    kind, oracle, count
+):
+    assert len(negative_label_problems(kind, Oracle.model_validate(oracle))) == count
 
 
 def test_a_source_tree_that_no_longer_matches_its_frozen_digest_fails(tmp_path):
