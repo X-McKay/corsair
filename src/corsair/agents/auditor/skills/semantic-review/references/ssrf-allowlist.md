@@ -12,7 +12,7 @@ allowlist). Apply the standing rubric; this says what each rule checks here.
   through the source's own parsing/comparison.
 - R3 production logic: both go through the production fetch with the recipe's
   fixed kwargs, not a substituted client.
-- R4 disclosure, not echo: the claimed violation is disclosure of the protected
+- R4 real violation, not echo: the claimed violation is disclosure of the protected
   resource, not that a request was made or that the URL was echoed back.
 
 Reject on the first contradicted rule; do not invent a check the source lacks or

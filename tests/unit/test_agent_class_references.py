@@ -31,6 +31,8 @@ _EXPECTED_REFERENCES = {
     "mass-assignment.md",
     "path-confinement.md",
     "ssrf-allowlist.md",
+    # Selected by recipe kind rather than by finding class.
+    "command-sentinel.md",
 }
 
 
@@ -38,7 +40,7 @@ def _finding(title: str, description: str = "finding body") -> Finding:
     return Finding(title=title, description=description, file="app.py")
 
 
-def test_both_roles_package_the_same_six_class_references_as_text():
+def test_both_roles_package_the_same_class_and_kind_references_as_text():
     for role in ("producer", "auditor"):
         skill = load_runtime_skills(role)[0]
         assert set(skill.resources.references) == _EXPECTED_REFERENCES
@@ -75,6 +77,17 @@ def test_selection_is_none_for_an_unclear_class_or_unknown_recipe_kind():
     assert select_reference("producer", unclear, "python.secret_disclosure/1") is None
     # A recipe kind without packaged references selects nothing even on a clear class.
     assert select_reference("producer", _finding("Path traversal"), "other.kind/9") is None
+
+
+@pytest.mark.parametrize("title", ["OS command injection in count_lines", "Unusual behavior"])
+def test_command_sentinel_kind_selects_its_own_note_whatever_the_class(title: str):
+    # The property is fixed by the recipe kind, so the class words do not matter.
+    for role in ("producer", "auditor"):
+        selected = select_reference(role, _finding(title), "python.command_sentinel/1")
+        assert selected is not None
+        relative, text = selected
+        assert relative == "references/command-sentinel.md"
+        assert "sentinel" in text
 
 
 def test_producer_packet_appends_the_selected_reference_only_for_a_clear_class(tmp_path: Path):

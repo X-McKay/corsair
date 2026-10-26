@@ -12,7 +12,7 @@ rule checks here.
   in `payload_parameter` and forces the exact failure branch the finding names.
 - R3 production logic: both go through the production handler with the recipe's
   fixed kwargs, not a reconstructed response.
-- R4 disclosure, not echo: the claimed violation is the handler disclosing its
+- R4 real violation, not echo: the claimed violation is the handler disclosing its
   own internal detail, not echoing the attacker's input or merely returning an
   error status.
 

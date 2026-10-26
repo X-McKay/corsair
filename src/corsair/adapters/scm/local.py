@@ -16,11 +16,11 @@ from pathlib import Path, PurePosixPath
 
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
+    PYTHON_CALLABLE_RECIPES,
     ArtifactRef,
     Case,
     LineProvenance,
     PreparedCase,
-    PythonRecipe,
     RunManifest,
     Source,
     safe_path,
@@ -440,7 +440,7 @@ def prepare_case(
     if fixed_source is not None:
         read_source(fixed_source, case.recipe.module_file, store, settings.source_limit_bytes)
     finding, provenance = case.finding, LineProvenance.DECLARED
-    if isinstance(case.recipe, PythonRecipe):
+    if isinstance(case.recipe, PYTHON_CALLABLE_RECIPES):
         # Python-AST derivation only; other recipes must declare their line.
         # finding.file is the recipe module (Case.bind_recipe), so finding_text is its
         # admitted text. A missing line comes from the trusted recipe, never the narrative.

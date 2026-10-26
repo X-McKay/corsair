@@ -36,13 +36,13 @@ from corsair.adapters.scm.requests import normalize_request_sources
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.agents.resources import RoleName, load_runtime_skills, prompt_text
 from corsair.contracts import (
+    PYTHON_CALLABLE_RECIPES,
     AuditInput,
     AuditOutput,
     Feedback,
     InvestigationRequest,
     PreparedCase,
     ProducerInput,
-    PythonRecipe,
     Submission,
     digest,
 )
@@ -295,7 +295,7 @@ def _prepare(
         prepared.source, prepared.recipe.module_file, store, settings.source_limit_bytes
     )
     # The structural gate is Python-AST specific; other recipes declare their line.
-    if isinstance(prepared.recipe, PythonRecipe):
+    if isinstance(prepared.recipe, PYTHON_CALLABLE_RECIPES):
         failure = target_binding(prepared.finding, prepared.recipe, module_text)
         if failure is not None:
             raise ValueError(

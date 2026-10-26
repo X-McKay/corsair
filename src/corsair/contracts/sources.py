@@ -12,6 +12,7 @@ from pydantic import Discriminator, Field, JsonValue, Tag, field_validator, mode
 from .common import ArtifactRef, Contract, Digest, Identifier, safe_path
 from .intake import ScannerClaim
 from .recipes_javascript import JavaScriptRecipe
+from .recipes_python import PythonCommandSentinel
 from .recipes_ruby import RubyRecipe
 
 
@@ -120,12 +121,20 @@ def _recipe_kind(value: Any) -> str:
     return tag if isinstance(tag, str) else "python.secret_disclosure/1"
 
 
+# The Python callable recipes: both import one stdlib module directly and invoke one
+# public function, so they share the Python-AST gates (target binding, line derivation)
+# that other languages replace with their own run-time binding gates.
+PythonCallableRecipe = PythonRecipe | PythonCommandSentinel
+PYTHON_CALLABLE_RECIPES = (PythonRecipe, PythonCommandSentinel)
+
+
 # The admitted recipe alternatives, discriminated on the stable ``kind`` tag following
 # the native ProducerDecision pattern. Each member is one concrete, tested recipe with
 # its own trusted observer and runtime image; adding a language adds a union member, not
 # a generic adapter. Every member exposes ``module_file`` so the finding binds uniformly.
 Recipe = Annotated[
     Annotated[PythonRecipe, Tag("python.secret_disclosure/1")]
+    | Annotated[PythonCommandSentinel, Tag("python.command_sentinel/1")]
     | Annotated[JavaScriptRecipe, Tag("javascript.prototype_pollution/1")]
     | Annotated[RubyRecipe, Tag("ruby.secret_disclosure/1")],
     Discriminator(_recipe_kind),

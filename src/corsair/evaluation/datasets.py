@@ -22,6 +22,7 @@ from corsair.adapters.scm.local import iter_snapshot_files, snapshot_source
 from corsair.adapters.scm.requests import load_recipe_template, normalize_request_sources
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
+    PYTHON_CALLABLE_RECIPES,
     AuditDecision,
     AuditInput,
     Disposition,
@@ -29,7 +30,6 @@ from corsair.contracts import (
     FixStatus,
     InvestigationRequest,
     InvestigationResult,
-    PythonRecipe,
     Source,
     Verdict,
     digest,
@@ -306,7 +306,7 @@ class _Validator:
         if not admitted:
             return
         recipe = request.case.recipe
-        if not isinstance(recipe, PythonRecipe):
+        if not isinstance(recipe, PYTHON_CALLABLE_RECIPES):
             # The structural gate is Python-AST specific, as in activities.prepare.
             entry.passed("target_binding")
             return

@@ -38,6 +38,7 @@ from .intake import ScannerFinding as ScannerFinding
 from .intake import ScannerScope as ScannerScope
 from .intake import ScanReport as ScanReport
 from .recipes_javascript import JavaScriptRecipe as JavaScriptRecipe
+from .recipes_python import PythonCommandSentinel as PythonCommandSentinel
 from .recipes_ruby import RubyRecipe as RubyRecipe
 from .results import MAX_TERMINAL_ROUNDS as MAX_TERMINAL_ROUNDS
 from .results import MAX_TERMINAL_TIMELINE as MAX_TERMINAL_TIMELINE
@@ -50,12 +51,14 @@ from .results import PhaseTransition as PhaseTransition
 from .results import RoundResult as RoundResult
 from .results import Verdict as Verdict
 from .results import format_terminal_result as format_terminal_result
+from .sources import PYTHON_CALLABLE_RECIPES as PYTHON_CALLABLE_RECIPES
 from .sources import Budget as Budget
 from .sources import Case as Case
 from .sources import Finding as Finding
 from .sources import InvestigationRequest as InvestigationRequest
 from .sources import LineProvenance as LineProvenance
 from .sources import PreparedCase as PreparedCase
+from .sources import PythonCallableRecipe as PythonCallableRecipe
 from .sources import PythonRecipe as PythonRecipe
 from .sources import Recipe as Recipe
 from .sources import RunManifest as RunManifest

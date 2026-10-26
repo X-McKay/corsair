@@ -25,10 +25,10 @@ from docker.types import LogConfig
 from corsair.adapters.scm.local import SourceAdmissionError, iter_snapshot_files
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
+    PYTHON_CALLABLE_RECIPES,
     ArtifactRef,
     Budget,
     PreparedCase,
-    PythonRecipe,
     RubyRecipe,
     Submission,
     digest,
@@ -143,7 +143,7 @@ class DockerSandbox:
         # private secret. Other recipes (e.g. the JavaScript prototype-pollution check)
         # observe a global side effect and read no fixture, so the mount stays empty.
         recipe = prepared.recipe
-        if isinstance(recipe, (PythonRecipe, RubyRecipe)):
+        if isinstance(recipe, (*PYTHON_CALLABLE_RECIPES, RubyRecipe)):
             for relative, content in recipe.public_files.items():
                 destination = allowed.joinpath(*relative.split("/"))
                 cls._mkdir(destination.parent)

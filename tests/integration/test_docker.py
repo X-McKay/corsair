@@ -59,6 +59,11 @@ def read_file(root, path):
 """
 
 
+def _image() -> str:
+    """The trusted image under test: the configured tag, or a scratch build's tag."""
+    return os.environ.get("CORSAIR_TEST_IMAGE", Settings().image)
+
+
 def _docker_client() -> docker.DockerClient:
     try:
         client = docker.from_env()
@@ -68,7 +73,7 @@ def _docker_client() -> docker.DockerClient:
             pytest.fail(f"explicit real Docker test requires daemon: {type(exc).__name__}")
         pytest.skip(f"real Docker unavailable: {type(exc).__name__}")
     try:
-        client.images.get("corsair-python:0.1")
+        client.images.get(_image())
     except DockerException as exc:
         if os.getenv("CORSAIR_TEST_DOCKER") == "1":
             pytest.fail(f"explicit real Docker test requires image: {type(exc).__name__}")
@@ -162,7 +167,7 @@ def _prepared(tmp_path: Path, image_id: str, *, safe: bool = False, fixed: bool 
     settings = Settings(
         source_root=str(tmp_path),
         artifact_root=str(tmp_path / "artifacts"),
-        image="corsair-python:0.1",
+        image=_image(),
         runtime="runc",
     )
     store = ArtifactStore(tmp_path / "artifacts")
@@ -181,7 +186,7 @@ def test_real_docker_vulnerable_safe_fixed_and_cleanup(
     tmp_path: Path, session_operation: Callable[[str], str]
 ) -> None:
     client = _docker_client()
-    image_id = DockerSandbox(Settings(), client=client).image_id
+    image_id = DockerSandbox(Settings(image=_image()), client=client).image_id
 
     vulnerable_operation = session_operation("docker-vulnerable")
     safe_operation = session_operation("docker-safe")
@@ -288,7 +293,7 @@ def test_native_failures_and_canned_markers_never_become_positive(
 ):
     client = _docker_client()
     operation_id = session_operation("regression-native")
-    image_id = DockerSandbox(Settings(), client=client).image_id
+    image_id = DockerSandbox(Settings(image=_image()), client=client).image_id
     settings, store, prepared = _prepared(tmp_path, image_id)
     (tmp_path / "vulnerable/reader.py").write_text("\n\n\ndef read_file(root, path):\n" + body)
     case = Case(
@@ -321,7 +326,7 @@ def test_native_failures_and_canned_markers_never_become_positive(
 def test_native_timeout_removes_owned_container(tmp_path, session_operation):
     client = _docker_client()
     operation_id = session_operation("timeout-native")
-    image_id = DockerSandbox(Settings(), client=client).image_id
+    image_id = DockerSandbox(Settings(image=_image()), client=client).image_id
     settings, store, prepared = _prepared(tmp_path, image_id)
     (tmp_path / "vulnerable/reader.py").write_text(
         "\n\n\ndef read_file(root, path):\n    while True:\n        pass\n"
@@ -358,7 +363,7 @@ def test_real_docker_probe_deadline_can_exceed_120_seconds(
     if os.environ.get("CORSAIR_TEST_LONG_PROBE") != "1":
         pytest.skip("set CORSAIR_TEST_LONG_PROBE=1 to run the 121-second Docker regression")
     client = _docker_client()
-    image = os.environ.get("CORSAIR_TEST_IMAGE", Settings().image)
+    image = _image()
     image_id = DockerSandbox(Settings(image=image), client=client).image_id
     settings, store, prepared = _prepared(tmp_path, image_id)
     settings = settings.model_copy(update={"image": image})
@@ -405,7 +410,7 @@ def test_real_docker_probe_deadline_can_exceed_120_seconds(
 
 def test_session_sweep_removes_only_this_sessions_sandboxes(session_operation) -> None:
     client = _docker_client()
-    image_id = DockerSandbox(Settings(), client=client).image_id
+    image_id = DockerSandbox(Settings(image=_image()), client=client).image_id
     own = session_operation("sweep-probe")
     prefix = own.rsplit(".", 1)[0]
     other = f"pytest-{uuid.uuid4().hex[:12]}.sweep-probe"

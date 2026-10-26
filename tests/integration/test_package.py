@@ -78,7 +78,8 @@ assert 'Runtime procedure: semantic-review' in build_auditor('gemini-2.5-flash')
 assert files('corsair.agents.producer').joinpath('skills/source-grounding/SKILL.md').is_file()
 assert files('corsair.agents.auditor').joinpath('skills/semantic-review/SKILL.md').is_file()
 _classes = {'code-execution.md', 'command-injection.md', 'error-exposure.md',
-            'mass-assignment.md', 'path-confinement.md', 'ssrf-allowlist.md'}
+            'mass-assignment.md', 'path-confinement.md', 'ssrf-allowlist.md',
+            'command-sentinel.md'}
 for _role, _slug in (('producer', 'source-grounding'), ('auditor', 'semantic-review')):
     _refs = files(f'corsair.agents.{_role}').joinpath(f'skills/{_slug}/references')
     assert set(load_runtime_skills(_role)[0].resources.references) == _classes

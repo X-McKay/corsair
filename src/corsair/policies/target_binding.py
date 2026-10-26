@@ -15,7 +15,7 @@ import ast
 from dataclasses import dataclass
 from enum import StrEnum
 
-from corsair.contracts import Finding, LineProvenance, PythonRecipe
+from corsair.contracts import Finding, LineProvenance, PythonCallableRecipe
 
 
 class TargetBindingReason(StrEnum):
@@ -114,7 +114,7 @@ def _compiles_to_nothing(statement: ast.stmt) -> bool:
     )
 
 
-def derive_target_line(recipe: PythonRecipe, module_text: str) -> int | None:
+def derive_target_line(recipe: PythonCallableRecipe, module_text: str) -> int | None:
     """Bind a line-less finding to the recipe function's first body statement.
 
     Trusted, deterministic and model-free: the line comes from the operator-owned
@@ -154,7 +154,7 @@ def derive_target_line(recipe: PythonRecipe, module_text: str) -> int | None:
 
 
 def bind_target_line(
-    finding: Finding, recipe: PythonRecipe, module_text: str
+    finding: Finding, recipe: PythonCallableRecipe, module_text: str
 ) -> tuple[Finding, LineProvenance]:
     """The finding prepare hands on: its declared line, else one derived from the recipe.
 
@@ -172,7 +172,7 @@ def bind_target_line(
 
 
 def _signature_failure(
-    function: ast.FunctionDef, recipe: PythonRecipe
+    function: ast.FunctionDef, recipe: PythonCallableRecipe
 ) -> TargetBindingFailure | None:
     """The driver calls ``function(**fixed_kwargs, payload_parameter=payload)``."""
     arguments = function.args
@@ -212,7 +212,7 @@ def _signature_failure(
 
 
 def target_binding(
-    finding: Finding, recipe: PythonRecipe, module_text: str | None
+    finding: Finding, recipe: PythonCallableRecipe, module_text: str | None
 ) -> TargetBindingFailure | None:
     """Return the first certain structural reason the case cannot bind, else None.
 

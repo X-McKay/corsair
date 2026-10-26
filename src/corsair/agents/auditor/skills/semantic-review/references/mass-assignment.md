@@ -13,7 +13,7 @@ rule checks here.
   attribute through the exact write shown.
 - R3 production logic: both go through the production update with the recipe's
   fixed kwargs, not a substitute object.
-- R4 disclosure, not echo: the claimed violation is the protected attribute
+- R4 real violation, not echo: the claimed violation is the protected attribute
   being changed/disclosed, not that the body parsed or was echoed.
 
 Reject on the first contradicted rule; a key the object never defines fails R1.

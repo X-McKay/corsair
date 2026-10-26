@@ -8,6 +8,7 @@ from temporalio.exceptions import ApplicationError
 from corsair.adapters.storage.filesystem import ArtifactStore
 from corsair.contracts import (
     MAX_TERMINAL_ROUNDS,
+    PYTHON_CALLABLE_RECIPES,
     AuditInput,
     AuditOutput,
     EvidenceInput,
@@ -17,7 +18,6 @@ from corsair.contracts import (
     PreparedCase,
     ProducerInput,
     ProducerOutput,
-    PythonRecipe,
     format_diagnostic,
     format_terminal_result,
 )
@@ -92,7 +92,7 @@ class Activities:
         # bind its target stops here as UNABLE_TO_RUN, before any model or container cost.
         # The structural gate and statement-line binding are Python-AST specific; other
         # languages rely on their own run-time coverage and binding gates.
-        if isinstance(prepared.recipe, PythonRecipe):
+        if isinstance(prepared.recipe, PYTHON_CALLABLE_RECIPES):
             failure = target_binding(prepared.finding, prepared.recipe, module_text)
             if failure is not None:
                 raise ApplicationError(
