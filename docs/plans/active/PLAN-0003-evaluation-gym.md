@@ -191,3 +191,14 @@ content-addressed tags and cannot contaminate parallel runs.
   warned (no worker running). `nix develop -c just sync` exit 0. Builder check on this plan resolved: receipt path for
   sandbox timing, transport-free identity, content-addressed images, complete reward table, per-call list caps,
   `after_tool` as new work, budgets seeded from the first live run.
+- 2026-10-26 WP1a merged (f1146a3d, branch `gym/wp1a-model-telemetry` d16a08b5). Gates in its worktree:
+  `nix develop -c just -- test -q -W error` 1083 passed, 107 deselected (docker/temporal/live markers), 0 skipped, 0
+  warnings; `nix develop -c just check` exit 0; `just build` ok (wheel resources not loaded outside the checkout
+  separately); `dataset validate` on dev, producer-dev, auditor-dev, chain-python exit 0. Live
+  `eval-agent producer producer-dev --repeats 1` on `hosted_vllm/Qwen3.6-35B-A3B-NVFP4`: exit 1, case01
+  `candidate_exact_mismatch` (model behaviour, 0 operational failures); per-call entries present in the stored output
+  (2 model calls: 2619/1179 and 3953/420 input/output tokens, thought 787 and 38, 11.8 s and 3.6 s; 2 tool calls).
+  Provider reports reasoning tokens inside the output count; no positive cached-token count was reported, so
+  `cached_input_tokens` stays None. Identity and fixture digests unchanged (Usage is outside both). Report rows still
+  carry only totals; per-call lists live in the stored output artifact (row copying in `evaluation/agents.py` is WP2/WP3
+  territory). Re-exports for `ModelCall`, `ToolCall`, `MAX_USAGE_CALL_ENTRIES` added on `gym/loop` (d0816f13).
