@@ -271,10 +271,9 @@ Starts a bounded Temporal evaluation batch. The evaluator-owned oracle labels do
 ```bash
 corsair dataset validate evals/datasets/dev.json evals/datasets/producer-dev.json
 corsair --format json dataset validate evals/datasets/safety.json
-corsair dataset validate evals/datasets/dev.json --fix-digests
 ```
 
-Checks frozen dataset manifests offline before an `eval`, `eval-agent` or `rescore` spends a model, container or service on them. It runs no model, target code, container or Temporal request and writes nothing except, with `--fix-digests`, the manifest. Both manifest schemas are accepted: composed-case datasets (`corsair.dataset/1`) and isolated producer/auditor datasets (`corsair.agent-dataset/1`, the role inferred from each input). For every entry it runs these checks over the exact bytes the evaluator reads:
+Checks frozen dataset manifests offline before an `eval`, `eval-agent` or `rescore` spends a model, container or service on them. It runs no model, target code, container or Temporal request and writes nothing; [`dataset refreeze`](#dataset-refreeze-dataset) is the one command that rewrites a manifest. Both manifest schemas are accepted: composed-case datasets (`corsair.dataset/1`) and isolated producer/auditor datasets (`corsair.agent-dataset/1`, the role inferred from each input). For every entry it runs these checks over the exact bytes the evaluator reads:
 
 | Check | What fails it |
 | --- | --- |
@@ -287,9 +286,18 @@ Checks frozen dataset manifests offline before an `eval`, `eval-agent` or `resco
 
 A check that cannot run because an earlier one failed is `skip`, as are source and target binding for auditor entries. After the entries, the consuming evaluator's own loader (`load_dataset`, or the isolated `load_frozen_fixture`, both in `corsair.evaluation.datasets`) is run so its rules cannot drift from these checks. When several datasets are given, a family placed in different splits by different manifests is reported too. Human output shows each dataset's schema, role, dataset digest (the `dataset_digest` an evaluation report of it records) and cohort, a table of check results per entry, then each problem; `--format json` emits the complete record. Problems name fields and labels but never an oracle payload. Sources are admitted below the dataset root by default; pass `--settings` to admit them under that file's `source_root` and limits instead, as the worker will.
 
-`--fix-digests` rewrites only stale `request_digest`, `input_digest` or `oracle_digest` values in the manifest, and only for entries whose every other check passes; it never edits a request, input, oracle or source, nor a request's own source `expected_digest`. Each change is listed with its old and new digest and whether it was applied, and the datasets are validated again afterwards. A rewritten digest changes the dataset digest, so it is a new frozen cohort identity: treat it as the deliberate, reviewed change [evaluation discipline](../development/testing.md#frozen-inputs-and-evaluation-discipline) requires, never as a way to turn a failed run green.
-
 The command exits `0` when every dataset is valid and `1` when any entry, manifest or cross-dataset check fails.
+
+### `dataset refreeze DATASET...`
+
+```bash
+corsair dataset refreeze evals/datasets/dev.json
+git diff evals/datasets/dev.json
+```
+
+Runs the same checks as `dataset validate`, then rewrites only stale `request_digest`, `input_digest` or `oracle_digest` values in the manifest, and only for entries whose every other check passes; it never edits a request, input, oracle or source, nor a request's own source `expected_digest`. Each change is listed with its old and new digest and whether it was applied, the datasets are validated again afterwards, and each rewritten manifest's dataset digest is shown `old -> new` (`dataset_digest_change` in JSON, with a top-level `rewritten` flag). A rewritten digest changes the dataset digest, so it is a new frozen cohort identity that every report, comparison and baseline over the old digest refuses: treat it as the deliberate, reviewed change [evaluation discipline](../development/testing.md#frozen-inputs-and-evaluation-discipline) requires, never as a way to turn a failed run green.
+
+A refreeze that wrote anything is never a success: it prints `Digests rewritten; review the diff and commit` (and logs `dataset.refrozen` with the digest change) and exits `1`, even when the rewritten datasets now validate. With nothing stale it exits `0` when every dataset is valid and `1` otherwise.
 
 ### `dataset replay-candidates REPORT.json DATASET.json`
 

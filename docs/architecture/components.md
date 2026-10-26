@@ -55,7 +55,7 @@ The steps package is the application/activity layer, not a second workflow engin
 | `result` | Investigation result, verdict explanation and native reference observation | `investigate`, `inspect`, `explain`, `verify` |
 | `reports` | Evaluation summary, scored rows, family/split tables, gate counts and report comparison | `eval`, `rescore`, `report`, `compare`, `dataset replay-candidates` |
 | `runs` | Committed-run listing and per-role evidence receipts | `runs`, `inspect --evidence` |
-| `checks` | Environment checks, dataset validation and scanner-intake dry run | `doctor`, `dataset validate`, `intake` |
+| `checks` | Environment checks, dataset validation and refreeze, and scanner-intake dry run | `doctor`, `dataset validate`, `dataset refreeze`, `intake` |
 | `preview` | Agent request preview and preview diff | `agent preview` |
 | `progress` | Live progress panel and plain progress lines while a workflow runs | every command that waits on a workflow status query |
 | `remedies` | The fixed next step logged beside a failed command | every command's error path; `doctor` checks |

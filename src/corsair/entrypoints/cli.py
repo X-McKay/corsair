@@ -64,7 +64,6 @@ class CliArguments(argparse.Namespace):
     recipe_template: str | None
     dataset_command: str
     datasets: list[str]
-    fix_digests: bool
     agent_command: str
     role: Literal["producer", "auditor"]
     round: int
@@ -464,15 +463,39 @@ async def _handle_intake(args: CliArguments, ui: Terminal) -> int:
     return 0 if intakes and all(item.admissible for item in intakes) else 1
 
 
-async def _handle_dataset_validate(args: CliArguments, ui: Terminal) -> int:
-    """Validate frozen dataset manifests offline; exit 1 on any failed entry or manifest."""
+def _dataset_report(args: CliArguments, *, fix: bool) -> dict[str, Any]:
     from corsair.evaluation.datasets import validate_datasets
 
     settings = _settings(args) if args.settings else None
-    report = validate_datasets(
-        [Path(path) for path in args.datasets], settings, fix=args.fix_digests
-    )
+    return validate_datasets([Path(path) for path in args.datasets], settings, fix=fix)
+
+
+async def _handle_dataset_validate(args: CliArguments, ui: Terminal) -> int:
+    """Validate frozen dataset manifests offline, never writing; exit 1 on any failure."""
+    report = _dataset_report(args, fix=False)
     ui.emit(report)
+    return 0 if report["valid"] else 1
+
+
+async def _handle_dataset_refreeze(args: CliArguments, ui: Terminal) -> int:
+    """Rewrite stale manifest digests of otherwise valid entries; exit 1 whenever it wrote,
+    because a new dataset digest is a new frozen cohort that a human must review."""
+    report = _dataset_report(args, fix=True)
+    ui.emit(report)
+    if report["rewritten"]:
+        changed = [
+            f"{item['dataset_digest_change']['old']} -> {item['dataset_digest_change']['new']}"
+            for item in report["datasets"]
+            if item["dataset_digest_change"] is not None
+        ]
+        event(
+            "dataset.refrozen",
+            level=logging.WARNING,
+            message=(
+                f"digests rewritten; review the diff and commit; dataset digest {'; '.join(changed)}"
+            ),
+        )
+        return 1
     return 0 if report["valid"] else 1
 
 
@@ -511,6 +534,8 @@ async def _handle_dataset(args: CliArguments, ui: Terminal) -> int:
     """Dispatch one ``corsair dataset`` subcommand."""
     if args.dataset_command == "validate":
         return await _handle_dataset_validate(args, ui)
+    if args.dataset_command == "refreeze":
+        return await _handle_dataset_refreeze(args, ui)
     if args.dataset_command == "replay-candidates":
         return await _handle_replay_candidates(args, ui)
     raise ValueError("Unknown dataset command")
@@ -669,7 +694,10 @@ def parser() -> argparse.ArgumentParser:
         "compare": "Compare two evaluation reports by case; exit 1 on a regression",
         "intake": "Dry-run a scanner report: which findings become admissible requests; "
         "no model or container",
-        "dataset": "Frozen dataset tools: validate offline; replay-candidates natively in Docker",
+        "dataset": (
+            "Frozen dataset tools: validate offline; refreeze stale digests; "
+            "replay-candidates natively in Docker"
+        ),
         "agent": "Inspect agent roles offline; no model provider, target or services",
     }
     commands: dict[str, argparse.ArgumentParser] = {}
@@ -748,11 +776,13 @@ def parser() -> argparse.ArgumentParser:
     validate = datasets.add_parser("validate", help=validate_help, description=validate_help)
     _presentation_options(validate)
     validate.add_argument("datasets", nargs="+", metavar="DATASET", help="Dataset manifest JSON")
-    validate.add_argument(
-        "--fix-digests",
-        action="store_true",
-        help="Rewrite only stale manifest digests of otherwise valid entries",
+    refreeze_help = (
+        "Rewrite only stale manifest digests of otherwise valid entries; exit 1 when it "
+        "wrote, since the new dataset digest needs review"
     )
+    refreeze = datasets.add_parser("refreeze", help=refreeze_help, description=refreeze_help)
+    _presentation_options(refreeze)
+    refreeze.add_argument("datasets", nargs="+", metavar="DATASET", help="Dataset manifest JSON")
     replay_help = (
         "Replay a producer report's mismatching proposals in the real sandbox; "
         "evidence for a human oracle decision, pass/fail unchanged"
