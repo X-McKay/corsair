@@ -12,6 +12,7 @@ from pydantic import Discriminator, Field, JsonValue, Tag, field_validator, mode
 from .common import ArtifactRef, Contract, Digest, Identifier, safe_path
 from .intake import ScannerClaim
 from .recipes_javascript import JavaScriptRecipe
+from .recipes_ruby import RubyRecipe
 
 
 class Source(Contract):
@@ -125,7 +126,8 @@ def _recipe_kind(value: Any) -> str:
 # a generic adapter. Every member exposes ``module_file`` so the finding binds uniformly.
 Recipe = Annotated[
     Annotated[PythonRecipe, Tag("python.secret_disclosure/1")]
-    | Annotated[JavaScriptRecipe, Tag("javascript.prototype_pollution/1")],
+    | Annotated[JavaScriptRecipe, Tag("javascript.prototype_pollution/1")]
+    | Annotated[RubyRecipe, Tag("ruby.secret_disclosure/1")],
     Discriminator(_recipe_kind),
 ]
 

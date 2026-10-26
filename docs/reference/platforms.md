@@ -6,6 +6,8 @@ Source admission checks the APIs it actually uses rather than accepting an OS na
 
 These checks do not attest an arbitrary network, FUSE, synchronized-cloud or removable filesystem. Use a dedicated disposable workspace and test the filesystem that will hold source. Native targets still run only inside the reviewed Linux container, never inside the Nix shell on the host.
 
+The Ruby recipe `ruby.secret_disclosure/1` runs in `corsair-ruby:0.1` (`deploy/ruby/Dockerfile`, Ruby 3.1 pinned by digest), selected through its `Settings.images` entry; `just images` builds it with the other reviewed images. The Ruby recipe is qualified on **Linux amd64 only**; its macOS arm64 and live-model gates are unrun. See the [Ruby corpus survey](corpus-ruby.md).
+
 ## Development and CI
 
 ```bash

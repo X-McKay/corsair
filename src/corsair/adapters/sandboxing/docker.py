@@ -29,6 +29,7 @@ from corsair.contracts import (
     Budget,
     PreparedCase,
     PythonRecipe,
+    RubyRecipe,
     Submission,
     digest,
 )
@@ -138,11 +139,11 @@ class DockerSandbox:
         private = root / "private"
         cls._mkdir(allowed)
         cls._mkdir(private)
-        # Only the secret-disclosure recipe uses public fixtures and a private secret.
-        # Other recipes (e.g. the JavaScript prototype-pollution check) observe a global
-        # side effect and read no fixture, so the mount stays present but empty.
+        # Only the secret-disclosure recipes (Python, Ruby) use public fixtures and a
+        # private secret. Other recipes (e.g. the JavaScript prototype-pollution check)
+        # observe a global side effect and read no fixture, so the mount stays empty.
         recipe = prepared.recipe
-        if isinstance(recipe, PythonRecipe):
+        if isinstance(recipe, (PythonRecipe, RubyRecipe)):
             for relative, content in recipe.public_files.items():
                 destination = allowed.joinpath(*relative.split("/"))
                 cls._mkdir(destination.parent)

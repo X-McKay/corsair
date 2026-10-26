@@ -38,6 +38,7 @@ from .intake import ScannerFinding as ScannerFinding
 from .intake import ScannerScope as ScannerScope
 from .intake import ScanReport as ScanReport
 from .recipes_javascript import JavaScriptRecipe as JavaScriptRecipe
+from .recipes_ruby import RubyRecipe as RubyRecipe
 from .results import MAX_TERMINAL_ROUNDS as MAX_TERMINAL_ROUNDS
 from .results import MAX_TERMINAL_TIMELINE as MAX_TERMINAL_TIMELINE
 from .results import TERMINAL_RESULT_MAX_BYTES as TERMINAL_RESULT_MAX_BYTES

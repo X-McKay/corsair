@@ -69,6 +69,7 @@ class Settings(Contract):
         default_factory=lambda: {
             "python.secret_disclosure/1": "corsair-python:0.1",
             "javascript.prototype_pollution/1": "corsair-javascript:0.1",
+            "ruby.secret_disclosure/1": "corsair-ruby:0.1",
         }
     )
     runtime: str = "runc"

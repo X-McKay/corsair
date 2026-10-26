@@ -41,7 +41,7 @@ InvestigationRequest
 │   ├── finding: Finding
 │   ├── source: Source
 │   ├── fixed_source: Source | null
-│   └── recipe: Recipe  # PythonRecipe | JavaScriptRecipe, discriminated on `kind`
+│   └── recipe: Recipe  # PythonRecipe | JavaScriptRecipe | RubyRecipe, discriminated on `kind`
 └── budget: Budget
 ```
 
@@ -57,6 +57,7 @@ InvestigationRequest
 
 - **`PythonRecipe`** (`kind: "python.secret_disclosure/1"`, [`sources.py`](../../src/corsair/contracts/sources.py)) binds to one public Python callable and its actual module file. The investigator controls only the `payload_parameter` value; fixed keyword arguments, public fixtures, expected control value, and allowed-exception policy are not agent-editable.
 - **`JavaScriptRecipe`** (`kind: "javascript.prototype_pollution/1"`, [`recipes_javascript.py`](../../src/corsair/contracts/recipes_javascript.py)) binds to one exported CommonJS `.js` callable. The investigator controls only the model payload, which the trusted driver passes as the final positional argument to `function(*fixed_arguments, payload)`; `module_file`, `function` and the fixed leading arguments are not agent-editable. The observed property is whether invoking the callable adds any enumerable property to `Object.prototype` (CWE-1321); it reads no fixture. See the [JavaScript corpus survey](corpus-javascript.md) for the row it qualifies.
+- **`RubyRecipe`** (`kind: "ruby.secret_disclosure/1"`, [`recipes_ruby.py`](../../src/corsair/contracts/recipes_ruby.py)) binds to one public Ruby module/class method (`receiver`, `function`) in a `.rb` file and observes the same secret-disclosure property as `PythonRecipe`: the investigator controls only the `payload_parameter` keyword value; the receiver, method, fixed keyword arguments, public fixtures, expected control value and allowed exception classes are not agent-editable. See the [Ruby corpus survey](corpus-ruby.md).
 
 `load_investigation_request()` validates request JSON and converts source paths to absolute paths relative to the request file. That is not admission. The local admission adapter later accepts only a non-symlink directory beneath configured `source_root`, snapshots its admitted bytes, and exposes only that immutable snapshot. Current source admission is local; remote SCM checkout is not a present schema or adapter.
 
